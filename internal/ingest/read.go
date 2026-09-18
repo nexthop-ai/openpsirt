@@ -296,9 +296,10 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// whole of the condition: the snapshot puts the tracked unit in the root's
 	// place where the document named none, and what stands in is ours rather
 	// than the producer's. A reader given that would look for a name their own
-	// copy of the inventory does not carry. This is empty exactly when the
-	// document declared nothing, because a reader sets the root and says it
-	// declared one in the same breath.
+	// copy of the inventory does not carry. It is empty where the document
+	// declared nothing, because a reader sets the root and says it declared one
+	// in the same breath — and equally where it declared a root and gave it no
+	// package identifier, which is the same answer for the same reason.
 	rootIdentifier := doc.Root.Purl
 
 	// The three writes are one act. Applied separately, a graph stored beside

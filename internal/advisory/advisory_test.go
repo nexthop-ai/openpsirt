@@ -12,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -34,9 +35,13 @@ type fixture struct {
 	// more than one release to name. With one, the list cannot be told from
 	// "whichever build was asked from".
 	master, tagged int64
-	who            access.Subject
-	seq            int
-	built          time.Time
+	// A second tag, for the claims that are about more than one release at
+	// once. With one fixed release, "all of them, in the order the tree names
+	// them" passes just as well as "the first" or "the last".
+	older int64
+	who   access.Subject
+	seq   int
+	built time.Time
 }
 
 var (
@@ -53,10 +58,13 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		// because what an advisory says about a release that never moves is
 		// half of what this store answers.
 		tagged := w.TargetFor(w.Tag, w.Customer)
+		earlier := w.DeclareStream(w.Product, "v2.3.9", catalog.Tag, &w.Branch.ID)
+		older := w.TargetFor(earlier, w.Customer)
 		f := &fixture{
 			db: w.DB, store: advisory.NewStore(w.DB.DB), finds: finding.NewStore(w.DB.DB),
 			graph: graph.NewStore(w.DB.DB), scans: ingest.NewStore(w.DB.DB),
 			product: w.Product.ID, master: w.Target.ID, tagged: tagged.ID,
+			older: older.ID,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
 				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
 			}, 0),
@@ -64,6 +72,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		}
 		f.shipped(t, f.master)
 		f.shipped(t, f.tagged)
+		f.shipped(t, f.older)
 		fn(t, f)
 	})
 }
@@ -508,14 +517,19 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 		}
 
 		// And once a release no longer carries it, that release is what to
-		// update to.
+		// update to. Two of them, because the claim is "all of them, in the
+		// order the tree names them" — against one fixed release that passes
+		// just as well as naming the first, or the last, or any one of them.
 		issueID, err := finding.NewVulnerabilities(f.db.DB).ByName(ctx, identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.finds.Resolve(ctx, f.who, f.tagged, issueID,
-			"Shipped in the tag, which carries the patch."); err != nil {
-			t.Fatalf("closing it in the tagged release: %v", err)
+		f.alsoIn(t, identifier, f.older)
+		for _, fixedIn := range []int64{f.tagged, f.older} {
+			if _, err := f.finds.Resolve(ctx, f.who, fixedIn, issueID,
+				"Shipped in the tag, which carries the patch."); err != nil {
+				t.Fatalf("closing it in a tagged release: %v", err)
+			}
 		}
 		doc, err = f.store.For(ctx, f.who, issuer, "sonic", identifier)
 		if err != nil {
@@ -533,7 +547,12 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 		// And it says which release, by the name the product tree gives it.
 		// "Update to a release in which this flaw is fixed" is the instruction
 		// with the answer left out, and the answer is in the same document.
+		// Both of them, joined, in the order the product tree names them —
+		// which is the order the releases sort in and not the order they were
+		// fixed in. Asserted as the whole sentence, because that is what a
+		// reader gets.
 		says := "Update to a release in which this flaw is fixed: " +
+			fixtures.ProductDisplayName + " v2.3.9 (broadcom), " +
 			fixtures.ProductDisplayName + " " + fixtures.TagName + " (broadcom)."
 		if fix[0].Details != says {
 			t.Errorf("the remediation reads %q, want %q", fix[0].Details, says)
@@ -849,4 +868,53 @@ func TestAFlawNobodyClassifiedSaysNothingAboutItsKind(t *testing.T) {
 			t.Errorf("the document calls it %+v, and nobody classified it", got)
 		}
 	})
+}
+
+func TestAnIdentifierThatIsNotOneIsNotPublished(t *testing.T) {
+	// The string is a producer's, out of a scan file, and a scan file is
+	// hostile input. The standard states a pattern for this field and a
+	// consumer's validator applies it to the whole document — so one producer
+	// writing something else into the component its inventory is about would
+	// fail every advisory about that build, rather than losing one field.
+	for _, one := range []struct {
+		what      string
+		declared  string
+		published bool
+	}{
+		{"a package identifier", "pkg:generic/sonic-broadcom.bin@1.0", true},
+		{"one with a namespace", "pkg:deb/debian/linux@6.12", true},
+		// What a producer might reasonably put there and the standard refuses.
+		{"a path", "/build/out/sonic-broadcom.bin", false},
+		{"a bare name", "sonic-broadcom.bin", false},
+		{"a scheme with nothing after it", "pkg:generic", false},
+		{"a scheme and a type and no name", "pkg:generic/", false},
+		{"something that is not an identifier at all", "the nightly build", false},
+	} {
+		t.Run(one.what, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				f.shippedAs(t, f.master, one.declared)
+				identifier := f.recorded(t, f.master)
+
+				doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+				if err != nil {
+					t.Fatal(err)
+				}
+				branch := "sonic:" + fixtures.BranchName + ":broadcom"
+				for _, leaf := range releaseLeaves(doc) {
+					if leaf.ID != branch {
+						continue
+					}
+					stated := leaf.Helper != nil
+					if stated != one.published {
+						t.Errorf("%q published as %+v, want published=%v",
+							one.declared, leaf.Helper, one.published)
+					}
+					if stated && leaf.Helper.Purl != one.declared {
+						t.Errorf("published %q, want what the build declared, %q",
+							leaf.Helper.Purl, one.declared)
+					}
+				}
+			})
+		})
+	}
 }

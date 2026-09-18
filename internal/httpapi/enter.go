@@ -86,7 +86,7 @@ func registerEntry(api huma.API, in Ingest) {
 			// The vector rather than a score. The number is derived from it
 			// here, so the two cannot say different things.
 			Vector     string   `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula"`
-			Weaknesses []string `json:"weaknesses,omitempty" doc:"What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given"`
+			Weaknesses []string `json:"weaknesses,omitempty" doc:"What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which"`
 			Component  string   `json:"component,omitempty" doc:"What carries it. Omit for the build itself"`
 			Version    string   `json:"version,omitempty" doc:"Which one, where the build holds that name at several versions"`
 			Ecosystem  string   `json:"ecosystem,omitempty" doc:"Which one, where two share a name and a version"`

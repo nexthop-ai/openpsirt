@@ -569,7 +569,7 @@ func TestAnEstimateDatedAheadOfNowIsNotTakenAsItsDay(t *testing.T) {
 // twoWeaknesses is one match classified two ways, with the one the data calls
 // the root cause deliberately not the one any ordering would reach for: CWE-20
 // is the lower number and "CWE-119" is the earlier string, and CWE-20 is
-// primary. A reader that sorts picks the wrong one.
+// primary. A reader that sorts picks the wrong one either way round.
 const twoWeaknesses = `{
  "descriptor": {"name": "grype", "version": "0.112.0",
    "db": {"built": "2026-08-28T01:31:12Z", "schemaVersion": "6.0.2"}},
@@ -585,53 +585,69 @@ const twoWeaknesses = `{
  }]
 }`
 
-func TestTheWeaknessTheDataCallsTheRootCauseLeads(t *testing.T) {
+func TestWhichWeaknessTheDataCallsTheRootCauseIsRead(t *testing.T) {
 	// A published advisory states one weakness and a report commonly carries
-	// several, so something has to say which. The feeds say it, in the word
-	// beside each entry, and it was read and dropped — which left the answer
-	// to whichever happened to sort first.
-	result, err := scanner.ParseGrype(strings.NewReader(twoWeaknesses), scanner.Limits{})
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	if len(result.Reported) != 1 {
-		t.Fatalf("read %d matches, want 1", len(result.Reported))
-	}
-	got := result.Reported[0].Issue.Weaknesses
-	want := []string{"CWE-20", "CWE-119"}
-	if !slices.Equal(got, want) {
-		t.Errorf("the weaknesses read %v, want %v — the root cause leads", got, want)
-	}
-}
-
-func TestWhereNothingIsCalledTheRootCauseTheOrderIsStillTheSameEveryRun(t *testing.T) {
-	// Two secondaries and no primary, which is ordinary. Nothing is promoted,
-	// and the order is the identifier order — so a re-scan of unchanged data
-	// still writes nothing.
-	neither := strings.ReplaceAll(twoWeaknesses, `"type": "Primary"`, `"type": "Secondary"`)
-	result, err := scanner.ParseGrype(strings.NewReader(neither), scanner.Limits{})
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	got := result.Reported[0].Issue.Weaknesses
-	want := []string{"CWE-119", "CWE-20"}
-	if !slices.Equal(got, want) {
-		t.Errorf("the weaknesses read %v, want %v", got, want)
-	}
-}
-
-func TestAReportNamingTwoRootCausesKeepsTheFirst(t *testing.T) {
-	// A report disagreeing with itself. One weakness is stated, so one of the
-	// two has to lose, and the first stands — an answer stated rather than
-	// left to whichever the loop happened to reach last.
-	both := strings.ReplaceAll(twoWeaknesses, `"type": "Secondary"`, `"type": "Primary"`)
-	result, err := scanner.ParseGrype(strings.NewReader(both), scanner.Limits{})
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	got := result.Reported[0].Issue.Weaknesses
-	want := []string{"CWE-119", "CWE-20"}
-	if !slices.Equal(got, want) {
-		t.Errorf("the weaknesses read %v, want %v — the first stated root cause stands", got, want)
+	// several, so something has to say which. The feeds say it, in a word
+	// beside each entry that was being read and dropped.
+	//
+	// Carried apart from the list rather than as its first entry, because a
+	// list cannot say "nobody said" — and the difference between "this is the
+	// root cause" and "this sorted first" is the difference between a document
+	// making a claim somebody made and one making a claim nobody did.
+	for _, one := range []struct {
+		what     string
+		document string
+		named    []string
+		primary  string
+	}{
+		{
+			"one marked, and it is not the one any ordering reaches for",
+			twoWeaknesses, []string{"CWE-119", "CWE-20"}, "CWE-20",
+		},
+		{
+			// The ordinary case. Nothing is promoted and nothing is invented.
+			"nothing marked",
+			strings.ReplaceAll(twoWeaknesses, `"type": "Primary"`, `"type": "Secondary"`),
+			[]string{"CWE-119", "CWE-20"}, "",
+		},
+		{
+			// A report disagreeing with itself. One weakness is what gets
+			// stated, so one of the two has to lose, and the first stands.
+			"two marked",
+			strings.ReplaceAll(twoWeaknesses, `"type": "Secondary"`, `"type": "Primary"`),
+			[]string{"CWE-119", "CWE-20"}, "CWE-119",
+		},
+		{
+			// A feed carries one entry per source, so the same weakness
+			// commonly appears twice under different words. Asked after the
+			// duplicate is dropped, the entry calling it the root cause is
+			// never reached.
+			"marked on the second mention of a weakness already seen",
+			strings.ReplaceAll(twoWeaknesses,
+				`{"cwe": "CWE-119", "source": "nvd@nist.gov", "type": "Secondary"},`,
+				`{"cwe": "CWE-119", "source": "nvd@nist.gov", "type": "Secondary"},
+       {"cwe": "CWE-119", "source": "other", "type": "Primary"},`),
+			[]string{"CWE-119", "CWE-20"}, "CWE-119",
+		},
+	} {
+		t.Run(one.what, func(t *testing.T) {
+			result, err := scanner.ParseGrype(strings.NewReader(one.document), scanner.Limits{})
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if len(result.Reported) != 1 {
+				t.Fatalf("read %d matches, want 1", len(result.Reported))
+			}
+			issue := result.Reported[0].Issue
+			// Sorted, always: what is stored has to be the same for the same
+			// report, or a re-scan of unchanged data writes.
+			if !slices.Equal(issue.Weaknesses, one.named) {
+				t.Errorf("the weaknesses read %v, want %v", issue.Weaknesses, one.named)
+			}
+			if issue.PrimaryWeakness != one.primary {
+				t.Errorf("the root cause reads %q, want %q",
+					issue.PrimaryWeakness, one.primary)
+			}
+		})
 	}
 }

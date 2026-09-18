@@ -312,7 +312,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	// what the limit is went to the log instead of to the person who can act
 	// on it.
 	if len(rows) > s.carrying() {
-		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed dismissals: a "+
+		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed claims: a "+
 			"document that stopped at the limit would say nothing is claimed about "+
 			"everything past it",
 			ErrTooLarge, product, stream, variant, s.carrying())

@@ -3587,7 +3587,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         mitigation:
-          description: What a holder can do about it, where somebody said. Nothing here notices a control being removed, so this is the record somebody checks
+          description: What a holder can do about it. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks
           type: string
         outcome:
           enum:
@@ -6377,7 +6377,7 @@ components:
           description: Which one, where the build holds that name at several versions
           type: string
         weaknesses:
-          description: What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given
+          description: What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which
           items:
             type: string
           type:

@@ -6509,7 +6509,7 @@ export interface components {
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What a holder can do about it, where somebody said. Nothing here notices a control being removed, so this is the record somebody checks */
+            /** @description What a holder can do about it. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
@@ -8064,7 +8064,7 @@ export interface components {
             vector?: string;
             /** @description Which one, where the build holds that name at several versions */
             version?: string;
-            /** @description What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given */
+            /** @description What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which */
             weaknesses?: string[] | null;
         };
         RecordBody: {

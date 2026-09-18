@@ -401,7 +401,9 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 	if !entered.OpenedAt.IsZero() {
 		vulnerability.DiscoveryDate = entered.OpenedAt.UTC().Format("2006-01-02")
 	}
-	vulnerability.CWE = weaknessOf(ctx, s.db, issue.ID)
+	if vulnerability.CWE, err = weaknessOf(ctx, s.db, issue.ID); err != nil {
+		return nil, nil, nil, err
+	}
 
 	// One branch per release, under the product, under the publisher. The
 	// tree names releases rather than components on purpose: an advisory
@@ -417,7 +419,13 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 			Name: fmt.Sprintf("%s %s", shown, release.Name()),
 			ID:   release.ProductID(product),
 		}
-		if release.Identifier != "" {
+		// Only where it is the shape the standard states. The string is a
+		// producer's, taken from a scan file, and a scan file is hostile input
+		// (REQ-66): one that wrote something other than a package identifier
+		// into the field the root is declared in would fail a customer's
+		// validator on the **whole document** rather than on this field, which
+		// is a worse outcome than the field being absent.
+		if isPackageIdentifier(release.Identifier) {
 			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
 		}
 		versions = append(versions, Branch{

@@ -491,7 +491,11 @@ func TestAVEXStatementPublishesTheMitigationAndNeverTheReasoning(t *testing.T) {
 	// the flaw, which is what somebody holding the build can act on. The
 	// reasoning is the argument a triager put to a second person here, and
 	// publishing it hands every customer this deployment's review of itself.
-	twoReach(t, func(t *testing.T, r *reach) {
+	//
+	// On every engine, because what this pins is what a query does: the
+	// document is assembled by a join whose predicate decides what a customer
+	// is told, and two engines of four is not where a portability trap shows.
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
 
@@ -530,7 +534,12 @@ func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing
 	// advisory is issued about it, and under silence it reaches a customer
 	// never. The format has a status for exactly this and a field for what to
 	// do instead, and the second is why the first is publishable at all.
-	twoReach(t, func(t *testing.T, r *reach) {
+	//
+	// On every engine. The new arm of the join — a claim that will not be
+	// fixed, joined only where it says what to do instead — is what decides
+	// whether such a flaw is published at all, and it is the half a comparison
+	// against an empty string is most likely to answer differently on.
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
 
