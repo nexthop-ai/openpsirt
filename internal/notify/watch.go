@@ -70,8 +70,8 @@ func (w *Watch) Run(ctx context.Context, interval time.Duration) {
 	})
 }
 
-// tellAdministrators derives the two conditions that go to administrators and
-// to nobody else.
+// tellAdministrators derives the conditions that go to administrators and to
+// nobody else.
 //
 // The same list to each of them. An alert about the tool's health is not
 // somebody's personal work item, and the first administrator to look should
@@ -102,6 +102,31 @@ func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened,
 		}
 		opened += o
 		cleared += c
+	}
+
+	// The tool's own health, and a control that did not hold. Both are a
+	// report that has to come back empty, asked as a condition — see health.go
+	// for why that is not the same as mailing the report.
+	for _, each := range []struct {
+		kind Kind
+		of   func(context.Context) ([]Holds, error)
+		what string
+	}{
+		{VulnerabilityDataStale, w.dataStale, "that the vulnerability data has stopped moving"},
+		{RiskUnagreed, w.riskUnagreed, "what stands with nobody agreeing"},
+	} {
+		holding, err := each.of(ctx)
+		if err != nil {
+			return opened, cleared, err
+		}
+		for _, admin := range admins {
+			o, c, err := NewStore(w.db).Reconcile(ctx, admin, each.kind, holding)
+			if err != nil {
+				return opened, cleared, fmt.Errorf("tell %d %s: %w", admin, each.what, err)
+			}
+			opened += o
+			cleared += c
+		}
 	}
 	return opened, cleared, nil
 }
@@ -184,8 +209,8 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		cleared += c
 	}
 
-	// Work that has stopped moving. Four passes rather than one, because
-	// they are four different waits with four different audiences — and
+	// Work that has stopped moving. A pass each rather than one over all of
+	// them, because they are different waits with different audiences — and
 	// each is reconciled on its own kind, so a person holding two of them
 	// keeps both.
 	for _, sitting := range []struct {

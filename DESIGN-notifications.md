@@ -12,6 +12,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49.
 - [Mentions](#mentions)
 - [New criticals in a shipped release](#new-criticals-in-a-shipped-release)
 - [Staleness conditions](#staleness-conditions)
+- [Reports that must come back empty](#reports-that-must-come-back-empty)
 - [Absent holders](#absent-holders)
 - [Work arriving by rule](#work-arriving-by-rule)
 - [Claim outcomes](#claim-outcomes)
@@ -113,11 +114,14 @@ occurred, which nothing driven by an event can do.
 | A deferral whose end is approaching | The proposer |
 | A claim sent back and untouched | The proposer |
 | Work sitting in a team queue | The people on that team |
+| A report nobody has answered | Whoever may triage undisclosed work in that product |
 
-Each carries its own period, which is a setting. Four periods rather than one:
-a claim waiting on a second person is somebody else's turn, one sent back is the
-author's own, a deferral needs enough warning to do the work again before it
-lapses, and a queue is nobody's turn at all.
+Each of the waits carries its own period, which is a setting. A period each
+rather than one shared: a claim waiting on a second person is somebody else's
+turn, one sent back is the author's own, a deferral needs enough warning to do
+the work again before it lapses, and a queue is nobody's turn at all. An
+unanswered report carries no period — the answer to how long that may go
+unanswered is "not at all".
 
 Every one is bounded by what the person may read. An alert is not a way back in
 to something somebody has lost the reading of.
@@ -138,6 +142,64 @@ findings list.
 The queue is counted per team and product; the others per claim. A claim is one
 person's action and one thing to read, however many rows it wrote. A queue is a
 population: one routing rule places thousands of findings in a sweep.
+
+## Reports that must come back empty
+
+Two of them, and being empty is what they are for. The disposition register
+filtered for what one person decided should return nothing, because every
+outcome that hides risk needs a second person; and the vulnerability data
+should never have stopped moving.
+
+**A report that is empty every time is one nobody opens.** Checked twice, seen
+to be empty, stopped — so it is read after something has gone wrong rather than
+before, which is the opposite of what it is for.
+
+**Mailing it on a schedule fails whichever way it is sent.**
+
+| Sent | What silence means |
+|---|---|
+| Only when it has something to say | Either the control held or the job did not run, and nothing tells the two apart |
+| Always | Fifty-one messages saying nothing teach somebody to filter the fifty-second |
+
+So they are conditions rather than reports that arrive. Nothing is sent while
+the control holds, and what is sent when it does not reaches somebody who was
+not looking.
+
+| Condition | What is wrong |
+|---|---|
+| The vulnerability data has stopped moving | Nothing failed. Every scan since answers as confidently as ever against what was known a month ago, and a finding newer data would have opened has not |
+| Something is hidden with nobody's agreement | The three outcomes claiming no further work is needed each require a second person, so one standing alone means the write path was got around |
+
+Both go to administrators, like the other conditions about the deployment rather
+than about anybody's work, and both are asked as the deployment rather than as a
+person: administering grants no reading, so an administrator's own subject would
+answer about whichever products they happen to hold.
+
+**The fact and a link, never the rows.** One of these is a list of places a
+security control failed, and a condition carrying it would put that list wherever
+the channel goes. The count is what the message holds, which is also why the
+question underneath it returns counts rather than rows — the rule holds by
+construction rather than by a check on the way out.
+
+**Only the three outcomes that claim no further work is needed.** A deferral and
+a promise to act hide risk too, and are approved conditionally on where their
+date sits against the deadline already set — so one of those standing alone is
+the rule working, and counting it would report a broken control on the case it
+was built for. A claim still waiting for its second person is not this either: it
+suppresses nothing while it waits.
+
+**The staleness check is inequality, never ordering.** What a scanner reports as
+its data version is opaque — a date for one, a schema revision and a build stamp
+for another — so the only question that can be asked is whether it is the same
+string as last time. That is enough: what matters is that it moved.
+
+Measured from the first run carrying the version in force rather than the last,
+because the question is when the data changed. The condition holds under one key
+however the data moves: a deployment that fetched once and stalled again never
+stopped being stale, and a condition keyed on the version would clear and
+re-open while nothing had changed about it. What it says is rewritten as it
+changes, so the sentence names the data in force rather than the data the alert
+was first raised for.
 
 ## Absent holders
 

@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
@@ -570,4 +571,325 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 			t.Errorf("whoever holds it now was told %d things, want 1", n)
 		}
 	})
+}
+
+func TestTheWatchTellsAdministratorsWhenTheVulnerabilityDataStopsMoving(t *testing.T) {
+	// Nothing fails when the data stops moving, which is the whole danger: the
+	// scans keep succeeding, every screen keeps answering, and each answer is
+	// as old as the data behind it without saying so. So it has to be looked
+	// for rather than waited for.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target := aScannedTarget(t, db)
+		watch := notify.NewWatch(db.DB, quiet)
+		seeing := func(who *access.Account) int {
+			t.Helper()
+			_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return total
+		}
+
+		// A month of runs, every one of them against the same data. Nothing
+		// here has failed and nothing has gone quiet: the scans are arriving.
+		ranAt := func(when time.Time, version string) {
+			t.Helper()
+			finished := when.Add(time.Minute)
+			if _, err := db.DB.NewInsert().Model(&finding.Run{
+				TargetID: target, Scanner: "grype", ScannerVersion: "0.112.0",
+				DatabaseVersion: version, RanHere: true,
+				StartedAt: when, FinishedAt: &finished,
+			}).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for day := 30; day >= 0; day-- {
+			ranAt(time.Now().UTC().Add(-time.Duration(day)*24*time.Hour), "2026-08-19")
+		}
+
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := seeing(admin); n == 0 {
+			t.Fatal("the data has not moved in a month and nobody was told")
+		}
+		if n := seeing(reader); n != 0 {
+			t.Errorf("somebody who administers nothing was told %d things", n)
+		}
+
+		// The data moves. The condition clears itself, because what was wrong
+		// has stopped being true — nobody dismisses it.
+		ranAt(time.Now().UTC(), "2026-09-18")
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := seeing(admin); n != 0 {
+			t.Errorf("the data moved and %d alerts are still waiting", n)
+		}
+	})
+}
+
+func TestDataThatMovedRecentlyIsNotReportedAsStale(t *testing.T) {
+	// The other arm, and the one that decides whether the condition is worth
+	// having: a deployment whose data moves is told nothing at all.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
+			access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target := aScannedTarget(t, db)
+		for day, version := range map[int]string{3: "2026-09-15", 1: "2026-09-17"} {
+			at := time.Now().UTC().Add(-time.Duration(day) * 24 * time.Hour)
+			finished := at.Add(time.Minute)
+			if _, err := db.DB.NewInsert().Model(&finding.Run{
+				TargetID: target, Scanner: "grype", DatabaseVersion: version,
+				RanHere: true, StartedAt: at, FinishedAt: &finished,
+			}).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if _, _, err := notify.NewWatch(db.DB, quiet).Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		_, total, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, admin), 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 0 {
+			t.Errorf("the data moved two days ago and %d alerts were raised", total)
+		}
+	})
+}
+
+// aScannedTarget declares a product with one build and files a scan against it,
+// so that the deployment is not also reported as having gone quiet.
+func aScannedTarget(t *testing.T, db *database.DB) int64 {
+	t.Helper()
+	ctx := t.Context()
+	cat := catalog.NewStore(db.DB)
+	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
+		TargetID: target.ID, ContentHash: "scanned",
+		BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return target.ID
+}
+
+func TestAStaleAlertNamesTheDataInForceRatherThanTheDataItWasRaisedFor(t *testing.T) {
+	// The data moving does not always mean it started moving. A deployment
+	// that fetched once and stopped again has a newer version and the same
+	// problem — and an alert still naming the version it was first raised for
+	// sends somebody to check a fetch that did happen.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		admin, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin",
+			access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target := aScannedTarget(t, db)
+		ranAt := func(daysAgo int, version string) {
+			t.Helper()
+			at := time.Now().UTC().Add(-time.Duration(daysAgo) * 24 * time.Hour)
+			finished := at.Add(time.Minute)
+			if _, err := db.DB.NewInsert().Model(&finding.Run{
+				TargetID: target, Scanner: "grype", DatabaseVersion: version,
+				RanHere: true, StartedAt: at, FinishedAt: &finished,
+			}).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		watch := notify.NewWatch(db.DB, quiet)
+		said := func() string {
+			t.Helper()
+			rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, admin), 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, row := range rows {
+				if row.Kind == notify.VulnerabilityDataStale {
+					return row.Body
+				}
+			}
+			return ""
+		}
+
+		// Stuck on one version for a month.
+		for day := 40; day >= 30; day-- {
+			ranAt(day, "2026-08-01")
+		}
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if body := said(); !strings.Contains(body, "2026-08-01") {
+			t.Fatalf("the alert says %q, want it to name the data in force", body)
+		}
+
+		// One fetch landed, then nothing again. Newer data, same problem.
+		for day := 20; day >= 0; day-- {
+			ranAt(day, "2026-08-29")
+		}
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		body := said()
+		if body == "" {
+			t.Fatal("the data is still twenty days old and nothing is being said")
+		}
+		if !strings.Contains(body, "2026-08-29") {
+			t.Errorf("the alert says %q, want it to name the data in force now", body)
+		}
+	})
+}
+
+func TestTheWatchTellsAdministratorsWhenSomethingIsHiddenWithNobodyAgreeing(t *testing.T) {
+	// The report that has to come back empty, asked as a condition. Empty
+	// every time is a report nobody opens — checked twice, seen to be empty,
+	// stopped — so it gets read after something has gone wrong rather than
+	// before. This is the other way round: silence unless it has something to
+	// say, and the saying reaches somebody who did not go looking.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		admin, err := rights.Ensure(ctx, "admin@example.com", "Admin", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Reader", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		aScannedTarget(t, db)
+		product, err := catalog.NewStore(db.DB).ProductByName(ctx, "sonic")
+		if err != nil {
+			t.Fatal(err)
+		}
+		watch := notify.NewWatch(db.DB, quiet)
+		hearing := func(who *access.Account) string {
+			t.Helper()
+			rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asks(t, db, who), 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, row := range rows {
+				if row.Kind == notify.RiskUnagreed {
+					return row.Body
+				}
+			}
+			return ""
+		}
+
+		// A deployment where the control is holding says nothing at all.
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if body := hearing(admin); body != "" {
+			t.Fatalf("nothing is hidden and the alert says %q", body)
+		}
+
+		// A dismissal standing with nobody behind it, written the way the
+		// failure would arrive: the row exists and no agreement does.
+		hideSomething(t, db, product.ID)
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		body := hearing(admin)
+		if body == "" {
+			t.Fatal("a dismissal stands with nobody agreeing and nobody was told")
+		}
+		if !strings.Contains(body, "One judgment") {
+			t.Errorf("the alert says %q, want it to count what stands", body)
+		}
+		// The fact and a link. The rows are what the report is for, and this is
+		// a message that may leave the deployment.
+		if strings.Contains(body, "CVE-") || strings.Contains(body, "openssl") {
+			t.Errorf("the alert names what it is about: %q", body)
+		}
+		if n := hearing(reader); n != "" {
+			t.Errorf("somebody who administers nothing was told %q", n)
+		}
+	})
+}
+
+// hideSomething writes a dismissal that stands with nobody's agreement behind
+// it, straight to the tables — which is the only way the row exists at all.
+func hideSomething(t *testing.T, db *database.DB, productID int64) {
+	t.Helper()
+	ctx := t.Context()
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	who, err := access.NewStore(db.DB).Ensure(ctx, "triager@example.com", "Triager", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	interned, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
+		{Identifier: "CVE-2026-7777", Severity: "high"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reason := string(triage.CodeNotPresent)
+	// The typed models rather than maps of column names, so the generated key
+	// comes back the way bun returns one. Asking the driver for it works on
+	// one engine and is unsupported on another, which is what four engines are
+	// for — and this failed on the second of them.
+	claim := &triage.Claim{
+		Kind: triage.FindingClaim, ProposedBy: who.ID, ProposedAt: now,
+		Outcome: triage.NotApplicable, Justification: &reason,
+	}
+	if _, err := db.DB.NewInsert().Model(claim).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	key := "live"
+	decision := &triage.Decision{
+		ClaimID: claim.ID, ProductID: productID,
+		VulnerabilityID: interned["CVE-2026-7777"],
+		PlaceIdentity:   "openssl", Visibility: access.Public,
+		NeedsApproval: true, State: triage.Approved, LiveKey: &key,
+		ProposedBy: who.ID, ProposedAt: now,
+	}
+	if _, err := db.DB.NewInsert().Model(decision).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -421,3 +421,51 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	}
 	return covered, nil
 }
+
+// HiddenWithNobodyAgreeing counts the claims that hide risk with no second
+// person behind them, and the decisions they wrote.
+//
+// **This should answer zero, and a number is a control that did not hold.** The
+// three outcomes that claim something needs no further work — it does not
+// apply, it will not be fixed, the fix is already here — each require a second
+// person, so a claim of one of them standing alone is not a backlog item. It is
+// the write path having been got around, and it is the one failure the record
+// cannot find on its own afterwards.
+//
+// **The three, and not everything that hides risk.** A deferral and a promise
+// to act hide risk too and are approved conditionally, on where the date sits
+// against the deadline already set — so one of those standing alone is the rule
+// working rather than failing, and counting it here would report a control as
+// broken on the ordinary case.
+//
+// **Asked of the record rather than of a stored flag**, the same way the report
+// that shows these rows asks it: no approval from anybody other than the
+// proposer, and none taken back. A flag would be the row's own account of
+// itself, and the test that matters writes a self-approval straight to the
+// table.
+//
+// Counted rather than listed, and unnarrowed. What it feeds is a condition told
+// to administrators, which carries the fact and a link and never the rows —
+// which is also why no subject is taken: administering grants no reading, so a
+// narrowed count would answer about whichever products an administrator
+// happened to hold.
+func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int, err error) {
+	standing, held := finding.InForce()
+	var counted struct {
+		Claims int `bun:"claims"`
+		Rows   int `bun:"written"`
+	}
+	err = s.db.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		ColumnExpr(`COUNT(*) AS "written"`).
+		Where("cl.outcome IN (?)", bun.List([]Outcome{NotApplicable, WontFix, AlreadyFixed})).
+		Where(standing, held...).
+		Where(standingAlone).
+		Scan(ctx, &counted)
+	if err != nil {
+		return 0, 0, fmt.Errorf("count what hides risk with nobody agreeing: %w", err)
+	}
+	return counted.Claims, counted.Rows, nil
+}
