@@ -74,7 +74,7 @@ to.
 
 | Rule | |
 |---|---|
-| Nothing is fetched at run time | No font, no script, no stylesheet from anywhere, so an air-gapped install is an ordinary install rather than a configuration |
+| Nothing is fetched at run time | No font, no script, no stylesheet from anywhere, so nothing a screen needs depends on somebody else's server being up. An air-gapped install is then an ordinary install rather than a configuration |
 | The embed needs a directory that always exists | `//go:embed` fails to compile when its target is missing and the built output is not in the repository, so `internal/webui/dist` is tracked, empty, and the frontend build fills it. Two rules, not one: `dist/` is ignored everywhere and git does not descend into an excluded directory, so the placeholder is un-ignored at the top level along with its directory |
 | A binary built without the interface serves the API alone | The embed is read for `index.html` and yields nothing without one, so a checkout with no node toolchain still builds and runs. A supported way to build this |
 
