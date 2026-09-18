@@ -3,6 +3,7 @@ package vercmp_test
 import (
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/vercmp"
 )
 
@@ -111,6 +112,16 @@ func TestOrderingIsAntisymmetric(t *testing.T) {
 		{vercmp.Semantic, "1.0.0-alpha", "1.0.0-beta"},
 		{vercmp.Semantic, "1.0.0-rc", "1.0.0-rc.1"},
 		{vercmp.Semantic, "1.2", "1.2.0"},
+		{vercmp.RPM, "1.0", "1.0~rc1"},
+		{vercmp.RPM, "1.0", "1.0^20240101"},
+		{vercmp.RPM, "1.a", "1.2"},
+		{vercmp.RPM, "1:1.0-1", "2.0-1"},
+		{vercmp.RPM, "1.0-1", "1.0-2"},
+		{vercmp.APK, "1.2.0_rc1", "1.2.0"},
+		{vercmp.APK, "1.2.0", "1.2.0_p1"},
+		{vercmp.APK, "1.2.0-r1", "1.2.0-r2"},
+		{vercmp.APK, "8.2.0015", "8.2.002"},
+		{vercmp.APK, "1.2.0_alpha", "1.2.0_beta"},
 	} {
 		forward, ok := vercmp.Order(each.scheme, each.a, each.b)
 		if !ok {
@@ -145,11 +156,11 @@ func TestAnEcosystemIsOrderedByTheSchemeItsIdentifierNames(t *testing.T) {
 		{"golang", vercmp.Semantic},
 		{"npm", vercmp.Semantic},
 		{"cargo", vercmp.Semantic},
+		{"rpm", vercmp.RPM},
+		{"apk", vercmp.APK},
 		// Ecosystems that plainly do have an ordering, and whose algorithm is
 		// not written here. Claiming one is the confident wrong answer this
 		// package exists to refuse.
-		{"rpm", vercmp.Unordered},
-		{"apk", vercmp.Unordered},
 		{"pypi", vercmp.Unordered},
 		{"maven", vercmp.Unordered},
 		{"gem", vercmp.Unordered},
@@ -218,5 +229,56 @@ func TestReachingAVersionReachesEveryEarlierOne(t *testing.T) {
 	// And reaches nothing else there, rather than guessing.
 	if vercmp.Reaches(vercmp.Unordered, "go1.27.1", "go1.26.3") {
 		t.Error("an unordered pair was treated as reachable")
+	}
+}
+
+func TestTheSchemeFollowsThePackageIdentifierARealScanCarries(t *testing.T) {
+	// The ecosystem reaching SchemeOf is read out of a package identifier, so
+	// the spelling that matters is the one a scanner actually emits rather
+	// than the word somebody would pick for the ecosystem.
+	for _, each := range []struct {
+		purl string
+		want vercmp.Scheme
+	}{
+		{"pkg:rpm/fedora/openssl@3.2.1-1.fc39?arch=x86_64", vercmp.RPM},
+		{"pkg:rpm/redhat/kernel@5.14.0-427.el9", vercmp.RPM},
+		{"pkg:apk/alpine/busybox@1.37.0-r14?arch=x86_64", vercmp.APK},
+		{"pkg:deb/debian/libc6@2.41", vercmp.Debian},
+		{"pkg:golang/github.com/example/mod@v1.2.3", vercmp.Semantic},
+		{"pkg:pypi/requests@2.31.0", vercmp.Unordered},
+	} {
+		if got := vercmp.SchemeOf(graph.EcosystemOf(each.purl)); got != each.want {
+			t.Errorf("%s is ordered as %v, want %v", each.purl, got, each.want)
+		}
+	}
+}
+
+func TestADistributionUpgradeReachesWhatItLeavesBehind(t *testing.T) {
+	// What the planner asks, through the two new schemes: moving to this
+	// version also closes what these earlier ones fixed.
+	for _, each := range []struct {
+		scheme            vercmp.Scheme
+		candidate, wanted string
+		want              bool
+	}{
+		{vercmp.RPM, "3.2.1-2.fc39", "3.2.1-1.fc39", true},
+		{vercmp.RPM, "3.2.1-1.fc39", "3.2.1-2.fc39", false},
+		{vercmp.RPM, "1:1.0-1", "0.9-1", true},
+		{vercmp.RPM, "1.0-1", "1.0~rc1-1", true},
+		{vercmp.RPM, "1.0~rc1-1", "1.0-1", false},
+		{vercmp.APK, "1.37.0-r15", "1.37.0-r14", true},
+		{vercmp.APK, "1.37.0-r14", "1.37.0-r15", false},
+		{vercmp.APK, "1.2.0", "1.2.0_rc1", true},
+		{vercmp.APK, "1.2.0_rc1", "1.2.0", false},
+		{vercmp.APK, "1.2.0_p1", "1.2.0", true},
+		// Refused rather than guessed, which answers false: an upgrade never
+		// claims to close what could not be ordered against it.
+		{vercmp.APK, "1.2.0", "not a version", false},
+		{vercmp.RPM, "1.0-1", "unfixed", false},
+	} {
+		if got := vercmp.Reaches(each.scheme, each.candidate, each.wanted); got != each.want {
+			t.Errorf("%v: reaching %q from %q is %v, want %v",
+				each.scheme, each.wanted, each.candidate, got, each.want)
+		}
 	}
 }

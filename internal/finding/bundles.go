@@ -955,6 +955,7 @@ func candidatesFrom(found []namedFix, scheme vercmp.Scheme) []Candidate {
 			break
 		}
 	}
+
 	if !ordered {
 		scheme = vercmp.Unordered
 	}
