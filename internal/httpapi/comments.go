@@ -10,11 +10,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// The words people put on a claim, and what they said before.
+// The words people put on a claim, and the revisions before them.
 //
 // Their own subject: everything else in triage_read.go is about decisions and
-// claims, and this is about text and its revisions — which is why an edit, a
-// write, had ended up in a file named for reading.
+// claims, and this is about text and its revisions — which is how an edit, a
+// write, ends up in a file named for reading.
 func registerComments(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-claim-comments", Method: http.MethodGet,

@@ -19,7 +19,7 @@ type SpreadBody struct {
 	Worst  float64 `json:"worst_days" doc:"The longest single one, in days"`
 }
 
-// WorkedBody is what one person got through.
+// WorkedBody is one person's throughput.
 type WorkedBody struct {
 	Person    string `json:"person"`
 	Proposed  int    `json:"proposed" doc:"Claims they made in the window"`
@@ -27,7 +27,7 @@ type WorkedBody struct {
 	Withdrawn int    `json:"withdrawn" doc:"Claims of theirs they took back"`
 }
 
-// MeasuresBody is how triage is going, as against what is open.
+// MeasuresBody is the state of triage, against what is open.
 type MeasuresBody struct {
 	Since    string       `json:"since"`
 	Until    string       `json:"until"`
@@ -41,11 +41,11 @@ type MeasuresBody struct {
 
 // registerMeasures answers how triage is going.
 //
-// **Every one of these was already in the record and none was added up.** How
-// long a finding waits before anybody says anything, how long a claim waits for
-// a second person, how much each person got through, and how much came back:
-// four questions a manager asks constantly, and the answer to all four was a
-// screen somebody counted rows on.
+// Every one of these is in the record already and none of them is added up
+// anywhere else. The wait before anybody says anything, the wait for a second
+// person, each person's throughput and how much came back: four questions a
+// manager asks constantly, and without this the answer to all four is a screen
+// somebody counts rows on.
 func registerMeasures(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-measures", Method: http.MethodGet, Path: "/v1/measures",

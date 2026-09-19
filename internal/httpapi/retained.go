@@ -15,10 +15,10 @@ import (
 
 // registerRetained reads back a document a build sent.
 //
-// **Retaining it was the point.** A tag's documents are kept precisely so a
-// release can be re-scanned later, and nothing returned one — so
-// "send me the SBOM you scanned for v2.4" was answered from the build system,
-// which is the copy that may have moved since.
+// Retaining it is the point. A tag's documents are kept precisely so a release
+// can be re-scanned later, and without a route that returns one the inventory
+// a release was scanned against is answered from the build system, which is
+// the copy that may have moved since.
 func registerRetained(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "fetch-scan-document", Method: http.MethodGet,

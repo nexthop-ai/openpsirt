@@ -11,9 +11,9 @@ import (
 
 // registerTags is the words people put on findings.
 //
-// **People tag work regardless.** With nowhere to put it they do it inside
-// the reasoning text, where nothing can filter on it and an approver reads it
-// as part of the argument.
+// People tag work regardless. With nowhere to put it they do it inside the
+// reasoning text, where nothing can filter on it and an approver reads it as
+// part of the argument.
 func registerTags(api huma.API, in Ingest) {
 	const at = "/v1/products/{product}/streams/{stream}/variants/{variant}" +
 		"/findings/{vulnerability}/components/{component}/tags/{tag}"

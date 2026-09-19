@@ -26,10 +26,10 @@ type WentBody struct {
 
 // registerPublished answers what advisories went out over a period.
 //
-// The per-flaw list answers "has one gone out for this, and is what is
-// published still what we would generate" — which is what somebody about to
-// publish a revision asks. A period asks something else: what went out at all,
-// and what went out more than once.
+// The per-flaw list answers whether one has gone out for this flaw and whether
+// what is published is still what we would generate, which is what somebody
+// about to publish a revision asks. A period asks something else: what went
+// out at all, and what went out more than once.
 func registerPublished(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-published-advisories", Method: http.MethodGet,

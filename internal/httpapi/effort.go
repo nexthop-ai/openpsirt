@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// SpentBody is what the work went into, for one component in one product.
+// SpentBody is the work spent on one component in one product.
 type SpentBody struct {
 	Product   string `json:"product"`
 	Component string `json:"component" doc:"The subject of the judgments, by name. Empty where nothing in any build carries the place any more"`
@@ -20,8 +20,8 @@ type SpentBody struct {
 	Claims    int `json:"claims" doc:"Arguments made about it in the period"`
 	Decisions int `json:"decisions" doc:"Places those reached"`
 	People    int `json:"people" doc:"The number of different people who argued about it"`
-	// Promised is what came out of them, counted as claims for the same
-	// reason.
+	// Promised is the upgrades that came out of them, counted as claims for
+	// the same reason.
 	Promised  int `json:"promised" doc:"Claims that promised work: an upgrade or a backport"`
 	Dismissed int `json:"dismissed" doc:"Claims that argued it away"`
 	Deferred  int `json:"deferred" doc:"Claims that put it off"`
@@ -85,8 +85,8 @@ func registerEffort(api huma.API, in Ingest) {
 
 // measuring resolves a product and a team into what the store narrows by.
 //
-// One spelling, because two reports take the same pair and a name resolved
-// two ways is two answers to "may this reader ask about it".
+// One spelling, because two reports take the same pair and a name resolved two
+// ways is two answers about one reader's reach.
 func measuring(ctx context.Context, in Ingest, subject access.Subject,
 	product, team string) (triage.Measuring, error) {
 

@@ -10,8 +10,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// CarriedClaimBody is one thing a build says it deals with itself, and for how long
-// it has been saying so.
+// CarriedClaimBody is one thing a build says it deals with itself, and how
+// long it has been saying so.
 type CarriedClaimBody struct {
 	Vulnerability string `json:"vulnerability" doc:"The identifier the build argued about, as it wrote it"`
 	Subject       string `json:"subject" doc:"The claim's subject — a package name, or its identifier where it named no name"`
@@ -29,14 +29,13 @@ type CarriedClaimBody struct {
 	Until      string `json:"until,omitempty" doc:"The moment it stopped saying it. Absent while it is still being said"`
 }
 
-// registerCarried answers what a build has been declaring it deals with itself
-// .
+// registerCarried answers what a build declares it deals with itself.
 //
-// **The one thing a version comparison can never see.** A distribution carries
-// a fix into a package without moving its version, and the only evidence is the
-// build saying so in its own inventory. That was stored and read by nothing a
-// person could reach, so "when did we start carrying this, and are we still"
-// was a question with an answer only in the database.
+// The one thing a version comparison can never see. A distribution carries a
+// fix into a package without moving its version, and the only evidence is the
+// build saying so in its own inventory. Stored and read by nothing a person
+// can reach, the start and the persistence of a carried patch are facts held
+// only in the database.
 func registerCarried(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-carried-patches", Method: http.MethodGet,

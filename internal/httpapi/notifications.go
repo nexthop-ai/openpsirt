@@ -28,7 +28,7 @@ type NotificationBody struct {
 type notificationsOutput struct {
 	Body struct {
 		Items []NotificationBody `json:"items"`
-		// Total is how many are waiting, which is the number the area draws.
+		// Total is the number waiting, which is what the area draws.
 		// Counted through the same conditions as the page, so a badge cannot
 		// disagree with the list under it.
 		Total int `json:"total" doc:"The number waiting on you"`
