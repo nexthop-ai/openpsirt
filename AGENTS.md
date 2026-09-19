@@ -84,15 +84,19 @@ write and a form not to.
 
 | Surface | Register |
 |---|---|
-| `DESIGN-*.md`, `docs/`, code comments | Spec |
+| `DESIGN-*.md` | Spec, including the `Contents` and `Limits` rules below |
+| `docs/`, `README.md`, `SECURITY.md` | Spec. No `Contents` section, because the site generates one; no `Limits` block, because the case for a design is not published |
+| Code comments | Spec, and neither of those two rules |
 | The published API document | Spec, with the divergences below |
 | `REQUIREMENTS.md` rows | Spec, plus the one clause of reason a row carries |
+| This file | Spec. Its own drift is the subject of the section you are reading, which is the one place a register's history belongs in a document |
+| `TODO.md` | Spec. It is a work list, and § The work list holds what may reference it |
 | Interface strings | Labels and intents, which are skimmed rather than read. `DESIGN-interface.md` holds those rules |
 | Commit messages, pull request descriptions | Why, including what the behavior was and what the change makes of it |
 
 The last row is the only place prior behavior belongs. A document and a comment
-describe the system as it is now; a reader years later needs the constraint, not
-its discovery.
+describe the system as it is now, and a reader years later needs the
+constraint.
 
 | Rule | |
 |---|---|
@@ -107,8 +111,8 @@ its discovery.
 | **A table, a list or an example before a paragraph** | Prose is the last resort. If what is being said has parts, it is a table; if it has steps or cases, a list; if it is a shape, an example. A paragraph is for the one thing that is none of those |
 | **Plain words, short sentences** | One clause per point, ordinary vocabulary, no clause piled on a clause. A sentence that has to be read twice fails whatever it was trying to say |
 | **One fact in one place** | A fact another document owns is pointed at, not restated. Two copies disagree eventually and neither says which is authoritative |
-| **Rationale that is not about one rule goes in `Limits`** | The block at the foot of every document, for the boundaries and trade-offs the sections above would otherwise argue in line |
-| **Every document opens with a `Contents` section** | One entry per `##` heading, in order |
+| **Rationale that is not about one rule goes in `Limits`** | The block at the foot of every `DESIGN-*.md`, for the boundaries and trade-offs the sections above would otherwise argue in line. A published page carries none: the case for a design is not what a reader of `docs/` came for |
+| **Every `DESIGN-*.md` opens with a `Contents` section** | One entry per `##` heading, in order. A page under `docs/` carries none, because the site generates one |
 | **Measured numbers stay** | "5,047 fixable rows are 271 distinct bumps" is evidence for a design choice. Cut the sentence introducing it, not the number |
 | **Component selection is design** | Why this scanner, this database, this format is part of the document. Why a variable is named what it is, is not |
 
@@ -131,11 +135,11 @@ whole of what a description carries.
 | **Refusals are described, and the reason a caller can act on** | Which request is turned away and what to send instead. Not why the rule exists |
 | **No bold** | It renders wherever the document is read, and a claim pressed at a reader working through a parameter list is noise in the one place a reader is most in a hurry |
 
-#### Constraints, not their discovery
+#### Constraints in the present tense
 
-A defect that produced a rule carries knowledge worth keeping. The knowledge is
-the constraint; the incident is not. Write the constraint in the present tense
-and the reader gets what they need without the archaeology.
+A defect that produced a rule carries knowledge worth keeping, and the
+knowledge is the constraint. Written in the present tense it reaches the reader
+without the archaeology.
 
 | Written as history | Written as a constraint |
 |---|---|
@@ -730,7 +734,7 @@ This is not hypothetical: a table added with a foreign key to `person` was
 missing from the test cleanup, and SQLite alone never noticed. It failed 40
 tests on the other three the first time they were run.
 
-### Getting the four engines
+### The four engines
 
  make engines-up
 
@@ -765,7 +769,7 @@ somebody's own — and the URLs are read when make starts, so the run that write
 the file is not the run that uses it. Run `make engines-up` first, then
 `make check && make check-engines`.
 
-### Adding a table
+### A new table
 
 Add it to `tables` in `internal/dbtest`, ahead of everything it points at.
 
