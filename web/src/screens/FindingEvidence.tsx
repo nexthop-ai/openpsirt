@@ -165,7 +165,7 @@ export function References({
 // which is the wrong way round: the list is where they are noticed and this is
 // where the judgment is made. Nothing is said where the scanner said nothing,
 // because unknown is not unconfirmed.
-export function HowMatched({
+export function MatchMethod({
   matched,
   from,
   version,
@@ -250,7 +250,7 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
 // Acknowledging records that it happened rather than doing it. What
 // reaches a researcher is a mail somebody sends from an address they already
 // have; recording it turns "somebody probably replied" into a date.
-export function WhoTold({ product, vulnerability }: { product: string; vulnerability: string }) {
+export function Reporter({ product, vulnerability }: { product: string; vulnerability: string }) {
   const queries = useQueryClient();
   const [alias, setAlias] = useState("");
   const told = useQuery({

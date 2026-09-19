@@ -417,7 +417,7 @@ export function Record() {
 
         {choices.length > 0 && (
           <div className="alert">
-            <strong>Which {component}?</strong>
+            <strong>Components named {component}</strong>
             <span>Shipped as more than one component here. Pick the one that carries it.</span>
             <ul className="refs" style={{ marginTop: 8 }}>
               {choices.map((choice) => (

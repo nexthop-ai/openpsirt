@@ -9,7 +9,7 @@ import {
 } from "./FindingClaim";
 import { Assess } from "./FindingAssess";
 import { Notes } from "./FindingNotes";
-import { HowMatched, LookItUp, Places, References, WhoTold } from "./FindingEvidence";
+import { MatchMethod, LookItUp, Places, References, Reporter } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
 import { useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -309,7 +309,7 @@ export function Finding() {
     if (choices.length > 0) {
       return (
         <div className="card">
-          <h3>Which {component}?</h3>
+          <h3>Versions of {component}</h3>
           <p className="reading" style={{ marginBottom: 10 }}>
             Shipped at more than one version here.
           </p>
@@ -713,7 +713,7 @@ export function Finding() {
           )}
         </div>
 
-        <HowMatched
+        <MatchMethod
           matched={it.matched}
           from={it.matched_from}
           version={it.version}
@@ -1163,7 +1163,7 @@ export function Finding() {
         {/* Who told us, where somebody outside did, and the names
             this issue answers to. Both are about a flaw recorded
             here rather than one a scanner reported. */}
-        {it.recorded && <WhoTold product={product} vulnerability={vulnerability} />}
+        {it.recorded && <Reporter product={product} vulnerability={vulnerability} />}
 
         {/* And which builds it affects, which the first belief about
             a flaw is often wrong about — that is the point of being able to

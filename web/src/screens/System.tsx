@@ -34,11 +34,11 @@ export function System() {
     <>
       <div className="screen-head">
         <h2>System</h2>
-        <p>What this deployment is doing, and whether what it posts is arriving</p>
+        <p>The deployment&rsquo;s own state, and whether what it posts is arriving</p>
       </div>
       <VulnerabilityData />
       <TheQueue />
-      <WhatUpstreamCouldNotAnswer />
+      <UpstreamUnanswered />
       <WebhookDelivery />
     </>
   );
@@ -59,7 +59,7 @@ const MOST = 100;
 // Nothing here is a fault, which is why the empty state is the good news and
 // the table is not drawn in a failing color. A private module, a vendored
 // fork and a name this deployment publishes under all reach it.
-function WhatUpstreamCouldNotAnswer() {
+function UpstreamUnanswered() {
   const asked = useQuery({
     queryKey: ["upstream-unanswered"],
     queryFn: async () =>
