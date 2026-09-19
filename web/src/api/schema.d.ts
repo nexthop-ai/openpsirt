@@ -627,7 +627,7 @@ export interface paths {
          * Hold part of a claim back
          * @description Moves the rows named into a claim of their own, belonging to you, carrying the argument they were made under and sitting with you rather than in the review queue. Revise it to give them an argument of their own.
          *
-         *     This is the proposer's side of setting rows aside: an approver reading a bulk claim may agree to most of it and hold some back, and until this the author could only withdraw the whole thing and start again. Each act is refused to the other — an approver holding rows back is agreeing to the rest in the same action, and a proposer doing that would be approving their own claim.
+         *     This is the proposer's side of setting rows aside, and each act is refused to the other: an approver holding rows back is agreeing to the rest in the same action, and a proposer doing that would be approving their own claim.
          *
          *     `because` is required and is recorded as a comment on the new claim. Naming a row that is not part of the claim is refused rather than ignored, and so is naming all of what is still being argued — that is a revision or a withdrawal.
          *
@@ -5122,7 +5122,7 @@ export interface components {
              * @enum {string}
              */
             kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
-            /** @description Nobody had set it before this */
+            /** @description The setting held nothing before this */
             unset?: boolean;
             was?: string;
         };
