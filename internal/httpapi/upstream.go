@@ -24,8 +24,8 @@ type UnansweredOutput struct {
 	Body struct {
 		Items []UnansweredBody `json:"items"`
 		Total int              `json:"total" doc:"The total, through the same filter as the page"`
-		// Ours is what a name is matched against, so a row saying "ours" can
-		// be checked rather than taken on trust. It is the whole reason the
+		// Ours is the list a name is matched against, so a row saying "ours"
+		// can be checked rather than taken on trust. It is the whole reason the
 		// derived default is safe to ship on: a default nobody can see is one
 		// an operator turns the feature off to escape.
 		Ours []string `json:"ours" doc:"The names this deployment holds back, from its publisher namespace, from what it stated, and from what the builds you may read declared themselves to be. A name here is matched against each part of a package's name, either exactly or followed by one of - . _, and a name carrying a dot also covers a host under it"`
@@ -37,10 +37,10 @@ type UnansweredOutput struct {
 
 // registerUpstream answers what asking upstream could not answer, and why.
 //
-// **Two questions that are one report.** What was held back says what the
-// derived default is costing, and what no index has heard of is the list an
-// operator reads to decide what else should be held back — a name promoted
-// from the second appears in the first afterwards.
+// Two questions that are one report. The held-back list says what the derived
+// default costs, and the list no index has heard of is what an operator reads
+// to decide what else should be held back — a name promoted from the second
+// appears in the first afterwards.
 //
 // Nothing here is a fault. A private module, a vendored fork and a name this
 // deployment publishes under all reach it, and the screen says which.
@@ -78,15 +78,15 @@ func registerUpstream(api huma.API, in Ingest) {
 		}
 		// Classified against every root, because that is what the pass held
 		// names back against. Read against a narrower list, a name the pass
-		// never sent would be reported as sent.
+		// never sent is reported as sent.
 		roots, err := currency.RootOwners(ctx, in.DB.DB)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "cannot read who publishes what was scanned", err)
 		}
 		ours := in.Ours.With(roots...)
 		// Answered from the readable ones alone. A label derived from a root
-		// is the name a product is published under, so the whole list would
-		// tell a reader the scope of a product nobody has announced to them —
+		// is the name a product is published under, so the whole list tells a
+		// reader the scope of a product nobody has announced to them —
 		// the exact name this exists to keep out of an index's logs (REQ-42).
 		// What the deployment configured is not product data and stays.
 		readable, err := currency.RootOwnersFor(ctx, in.DB.DB, subject)

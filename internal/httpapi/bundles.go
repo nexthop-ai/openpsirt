@@ -44,7 +44,7 @@ type BundleBody struct {
 	In []BuildName `json:"in" doc:"The builds that hold this upgrade"`
 }
 
-// BundleQuery is what narrows the fix-bundle list.
+// BundleQuery is the narrowing the fix-bundle list takes.
 //
 // One struct for the screen and the file, because they are one question. An
 // export declaring its own parameters drifts from the list it came from, and
@@ -63,7 +63,7 @@ type BundleQuery struct {
 	Ascending bool       `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
 }
 
-// narrow is what the store reads by, from what was asked for.
+// narrow is the store's own filter, built from the request.
 func (q BundleQuery) narrow(floor finding.Floor) finding.Filter {
 	return finding.Filter{
 		MinSeverity: q.Severity, Exploited: q.Exploited,

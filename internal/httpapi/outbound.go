@@ -32,7 +32,8 @@ type OutboundBody struct {
 	Because string `json:"because,omitempty" doc:"The reason the last one failed, where one did"`
 }
 
-// registerOutbound configures where this deployment sends what it has to say .
+// registerOutbound configures where this deployment sends what it has to
+// say.
 func registerOutbound(api huma.API, in Ingest, a Administering) {
 	const path = "/v1/outbound"
 
@@ -103,8 +104,8 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		if err != nil {
 			return nil, err
 		}
-		// Normalized here so what is stored is the address as it parses. What
-		// may be stored is decided by the store, where the rest of this
+		// Normalized here so the stored value is the address as it parses. The
+		// rule for what may be stored is the store's, where the rest of this
 		// table's rules live.
 		parsed, err := url.Parse(strings.TrimSpace(input.Body.URL))
 		address := strings.TrimSpace(input.Body.URL)

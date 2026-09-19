@@ -178,10 +178,10 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 			return nil, err
 		}
 		// Both writes or neither, and every name they turn on resolved inside
-		// the transaction that acts on it. Written apart, a date that could
-		// not be recorded left the parent filled in permanently — and the
-		// parent is what a comparison walks, so the caller's refusal described
-		// a state the database no longer had.
+		// the transaction that acts on it. Written apart, a date that cannot
+		// be recorded leaves the parent filled in permanently — and the parent
+		// is what a comparison walks, so the caller's refusal describes a
+		// state the database no longer has.
 		if err := changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
 			store, err := storeFor(d, tx)
 			if err != nil {

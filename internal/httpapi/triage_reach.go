@@ -46,7 +46,8 @@ func reachBody(r finding.Reach) ReachBody {
 type MatchBody struct {
 	Stream  string `json:"stream"`
 	Variant string `json:"variant"`
-	// Version is what that build ships, and why this is a separate question.
+	// Version is what that build ships, and the reason this is a separate
+	// question.
 	// Where it matched, the decision already reaches there and nobody is
 	// asked. It is the version the decision route resolves a name by, so a
 	// caller applying the decision there passes it back as ?version=.

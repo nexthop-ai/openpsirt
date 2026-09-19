@@ -20,10 +20,9 @@ type ReportBody struct {
 	Contact    string `json:"contact,omitempty"`
 	Credit     string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
 	Received   string `json:"received,omitempty" doc:"The day it arrived, which the embargo is counted from"`
-	// Acknowledged is when somebody answered them, and by whom. Absent is
-	// the condition an unacknowledged report reports: prompt
-	// acknowledgment is the part of coordinated disclosure a reporter
-	// actually judges.
+	// Acknowledged is when somebody answered them, and by whom. Absent is the
+	// state an unacknowledged report is in: prompt acknowledgment is the part
+	// of coordinated disclosure a reporter actually judges.
 	Acknowledged   string `json:"acknowledged,omitempty"`
 	AcknowledgedBy string `json:"acknowledged_by,omitempty"`
 	RecordedBy     string `json:"recorded_by"`

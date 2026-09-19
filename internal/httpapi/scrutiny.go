@@ -85,8 +85,8 @@ type scrutinyOutput struct {
 
 // registerScrutiny answers how much a second pair of eyes actually did.
 //
-// **The control cannot be bypassed, so this is not a list of people who broke
-// it.** Approving refuses the proposer and refuses the author of the revision
+// The control cannot be bypassed, so this is not a list of people who broke
+// it. Approving refuses the proposer and refuses the author of the revision
 // being agreed to, and the write is conditional on that revision still being
 // current. What is worth reporting is where the rule did not apply, and where
 // it applied in form only.

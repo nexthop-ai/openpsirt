@@ -50,8 +50,8 @@ func registerKeys(api huma.API, a Administering) {
 					body.ProductDisplayName = product.DisplayName
 				}
 			}
-			// What the key is narrowed to, not only which product it names.
-			// "any branch, any variant" and "one release only" are different
+			// The whole narrowing, not only the product it names. "any
+			// branch, any variant" and "one release only" are different
 			// credentials, and a list that renders both the same way cannot be
 			// used to decide which one to withdraw.
 			if key.StreamID != nil {

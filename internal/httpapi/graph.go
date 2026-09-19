@@ -42,8 +42,8 @@ type RootsBody struct {
 	// and how much of it was placed.
 	Components int `json:"components" doc:"The number of components this build holds"`
 	Edges      int `json:"edges" doc:"The number of edges placing them"`
-	// Searching is what somebody does when Items would be thousands long, so
-	// what they searched for comes back with the answer.
+	// Searching is the term somebody typed when Items would be thousands
+	// long, and it comes back with the answer.
 	Term string `json:"term,omitempty" doc:"The search this answers, where one was asked"`
 }
 
@@ -91,7 +91,7 @@ func registerGraph(api huma.API, in Ingest) {
 
 		// A refusal from the store is the answer a build nobody declared
 		// gets, not a fault. Falling through to the fault answer, this route
-		// said 500 where a stranger got 404 — and the pair says which builds
+		// says 500 where a stranger gets 404 — and the pair says which builds
 		// exist, one name at a time. A case collaborator is the reach that
 		// meets it: they hold nothing on the product and may open exactly one
 		// finding.
@@ -106,8 +106,8 @@ func registerGraph(api huma.API, in Ingest) {
 		out.Body.Components = components
 		out.Body.Edges = edges
 
-		// A search answers with matches and no root. What is being asked for
-		// is a set of components rather than a position, and naming a root
+		// A search answers with matches and no root. The request is for a set
+		// of components rather than a position, and naming a root
 		// beside them would invite drawing them as though they hung off it.
 		if strings.TrimSpace(input.Term) != "" {
 			found, err := store.Search(ctx, subject, target, input.Term, input.Limit)
@@ -194,9 +194,9 @@ func neighbors(rows []graph.Neighbor) []NeighborBody {
 // are real.
 //
 // A scanner's own "unknown", a producer's invented word and no rating at all
-// are the same state everywhere that ranks or filters — only what a reader saw
-// differed, and it differed by screen. Done here because the walk that counts
-// a subtree cannot reach that list without an import cycle, and a second copy
+// are the same state everywhere that ranks or filters — only what a reader
+// sees differs, and it differs by screen. Done here because the walk that
+// counts a subtree cannot reach that list without an import cycle, and a copy
 // of "which words are real" is exactly what one list exists to prevent.
 func banded(by map[string]int) map[string]int {
 	if len(by) == 0 {

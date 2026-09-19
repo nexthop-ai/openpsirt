@@ -44,10 +44,10 @@ type IssueOutput struct {
 
 // registerIssue answers for one issue across every product.
 //
-// **The work starts from an issue as often as from a product.** "A critical
-// just landed in openssl — which of our products ship an affected version" was
-// a question asked a dozen times and assembled by hand, because findings are
-// answered per product.
+// The work starts from an issue as often as from a product. A critical landing
+// in openssl raises the question of which products ship an affected version,
+// and answered per product that is a question assembled by hand a dozen
+// times.
 func registerIssue(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-issue", Method: http.MethodGet, Path: "/v1/issues/{vulnerability}",
@@ -91,11 +91,11 @@ func registerIssue(api huma.API, in Ingest) {
 			if !errors.Is(err, finding.ErrNoSuchIssue) {
 				return nil, wentWrong(in.Logger, "what issue this is could not be read", err)
 			}
-			// **Not affected is an answer, and it is the one a customer
-			// inquiry asks for.** This refused with a 404, so the question
-			// "are you affected by this" could be answered "yes, here" and
-			// never "no" — and the case somebody is under time pressure to
-			// answer is the second one.
+			// Not affected is an answer, and it is the one a customer
+			// inquiry asks for. Refused with a 404, the question of whether
+			// we are affected can be answered yes-here and never no — and the
+			// case somebody is under time pressure to answer is the second
+			// one.
 			//
 			// An identifier nobody here has ever seen answers the same way as
 			// one that affects only products this reader cannot see. Told

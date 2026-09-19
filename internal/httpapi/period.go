@@ -12,11 +12,10 @@ import (
 // window, so the operation that takes it says which in its own description:
 // one struct tag cannot carry three answers.
 //
-// **A rolling window cannot say "last financial year".** Every report here
-// took a number of days ending now, which answers "how are we doing lately"
-// and nothing else — and the two questions a manager and an auditor ask are
-// "how did the quarter go" and "what does the year on the certificate say".
-// Those are a pair of dates.
+// A rolling window cannot say "last financial year". A number of days ending
+// now answers "how are we doing lately" and nothing else, and the two
+// questions a manager and an auditor ask are how the quarter went and what the
+// year on the certificate says. Those are a pair of dates.
 //
 // One struct, so every report over a stretch of time takes it the same way and
 // a screen linking from one to another carries the same two parameters.
@@ -56,9 +55,9 @@ func (p Period) window(byDefault int, now time.Time) (time.Time, time.Time, erro
 			since = *from
 		}
 		// The end, resolved here rather than left to each store. A report
-		// says the period back, and a start with no end answered "to: ''"
-		// over figures that ran all the way to now — the one field meant to
-		// make a figure checkable saying nothing.
+		// says the period back, and a start with no end answers "to: ''" over
+		// figures that run all the way to now — the one field meant to make a
+		// figure checkable saying nothing.
 		until = now
 		if to != nil {
 			until = *to
