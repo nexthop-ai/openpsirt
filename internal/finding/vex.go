@@ -211,9 +211,9 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 // A claim against a source tree is kept however it was named: with no package
 // identifier at all, and with one of the generic type. The two are the same
 // claim and the matching rules match them the same way (DESIGN-ingest.md), so
-// narrowing the generic spelling away here hid the evidence for a suppression
-// that had already been applied — the finding was gone and what a publisher
-// said about it was not on the page.
+// narrowing the generic spelling away here hides the evidence for a
+// suppression already applied — the finding is gone and what a publisher said
+// about it is not on the page.
 func namingTheSamePackage(said []Statement, purl string) []Statement {
 	here := graph.PartsOfPurl(purl)
 	if here.Name == "" {

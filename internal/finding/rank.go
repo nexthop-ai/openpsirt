@@ -110,13 +110,13 @@ type Ranked struct {
 // likelihood** — each owning a range of digits so it never trades against a
 // lower signal.
 //
-// Likelihood used to sit above severity, and that was measured wrong on a real
-// image: a 2004 negligible with no score at all outranked every one of 379
-// criticals, because its likelihood was 0.80 where theirs topped out at 0.073
-// and any difference in the higher signal won outright.
+// Likelihood above severity is wrong, measured on a real image: a 2004
+// negligible with no score at all outranks every one of 379 criticals, because
+// its likelihood is 0.80 where theirs tops out at 0.073 and any difference in
+// the higher signal wins outright.
 //
-// Multiplying the two was tried next, which is the published practice for
-// these two scores, and the same image argued against it: **95% of its issues
+// Multiplying the two is the published practice for these two scores, and the
+// same image argues against it: 95% of its issues
 // sit between 0.001 and 0.01 likelihood**, one order of magnitude, where the
 // differences are not differences anybody should act on. Multiplied, that 4.5×
 // ratio inside the spike outweighs the 2× between a medium and a critical, so

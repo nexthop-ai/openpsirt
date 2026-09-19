@@ -10,9 +10,9 @@ import (
 // Scope narrows a cross-product answer to what somebody has selected.
 //
 // The screens that span products — what is running out, what nobody owns, how
-// the estate is trending — used to answer for everything a reader may see and
-// nothing else. Once a product is chosen in the picker, a page counting the
-// others is answering a question nobody asked, so the picker narrows the whole
+// the estate is trending — otherwise answer for everything a reader may see
+// and nothing else. Once a product is chosen in the picker, a page counting
+// the others answers a question nobody asked, so the picker narrows the whole
 // interface and "all" is offered at each level rather than being the only
 // option.
 //

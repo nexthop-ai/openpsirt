@@ -31,9 +31,9 @@ var ErrUnknownIssue = errors.New("no issue is known by that name")
 //
 // The one question, because every act on an issue here is about it in a named
 // product: a rating, a finding's detail, a decision about a place, a
-// disclosure date, a fix target, an assignment. There was a second form asking
-// "anywhere", for the rating that used to belong to the deployment, and it
-// read "an issue is public knowledge" one product wider than it needed to.
+// disclosure date, a fix target, an assignment. A second form asking
+// "anywhere" reads "an issue is public knowledge" one product wider than it
+// needs to.
 //
 // The question every route shaped "this issue, at this place" has to ask
 // before it answers anything at all. Those routes resolve the issue name first

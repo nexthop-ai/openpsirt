@@ -22,20 +22,18 @@ import (
 
 // FoldedOn is the grouping, over a component joined as "c".
 //
-// It replaces the source-package expression these queries used to group by.
-// That expression could not see three of the collisions a real image contains:
-// one source shipped at two versions in one build, and two ecosystems using
-// one word for different packages.
+// A source-package expression in its place cannot see three of the collisions
+// a real image contains: one source shipped at two versions in one build, and
+// two ecosystems using one word for different packages.
 const FoldedOn = "c.fold_key"
 
 // GroupedOn is the grain the findings list, its hidden count and its
 // cross-product form all group by: one issue at one fold.
 //
-// Spelled once because the empty-page fallback grouped one step finer than
-// the page it belongs to, and the figure above the list then changed
-// depending on which page was being looked at. The grain of a page and the
-// grain of the number above it are one fact, and it was written out at five
-// sites by hand.
+// Spelled once, because an empty-page fallback grouping one step finer than
+// the page it belongs to changes the figure above the list depending on which
+// page is being looked at. The grain of a page and the grain of the number
+// above it are one fact.
 const GroupedOn = "f.vulnerability_id, " + FoldedOn
 
 // GroupedAcross is the same grain across products, where a row is an issue at

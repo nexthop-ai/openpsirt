@@ -139,9 +139,9 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		// — did not appear on the chart at all rather than appearing wrongly.
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		// And the closing off the row too, for the same reason and the same
-		// join. A finding a person closed has no run either, so reaching one
-		// for the moment dropped it from the chart exactly as the opening
-		// side used to — this is that lesson arriving on the other half.
+		// join. A finding a person closed has no run either, so reaching for
+		// one to get the moment drops it from the chart exactly as it does on
+		// the opening side.
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
 		// Only what can fall in the range. A finding opened after the last

@@ -180,12 +180,11 @@ func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, target
 
 // RegisterEach walks the whole register, handing over one row at a time.
 //
-// **An export does not page, and paging is what made it cost what it did.** A
-// file was written by asking for a page a thousand times, and every page
-// re-sorted the build's quarter of a million rows and then skipped past the
-// ones already written — so the deeper the file got, the more each page cost.
-// Measured on a real build: 52 minutes, and 0.69s for the first page against
-// 3.41s for the last.
+// An export does not page, because paging is what makes it cost. Written by
+// asking for a page a thousand times, every page re-sorts the build's quarter
+// of a million rows and then skips past the ones already written, so the
+// deeper the file gets the more each page costs. Measured on a real build: 52
+// minutes, and 0.69s for the first page against 3.41s for the last.
 //
 // One statement and one cursor instead. The sort happens once; nothing is
 // skipped; **1.9 seconds** for the same 249,288 rows, in the same order. The
