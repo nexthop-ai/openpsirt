@@ -140,7 +140,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 		Body          struct {
-			Summary string `json:"summary,omitempty" maxLength:"191" doc:"What this revision says, for the document's revision history. A history whose every entry reads the same is one nobody reads"`
+			Summary string `json:"summary,omitempty" maxLength:"191" doc:"The revision's summary, for the document's revision history. A history whose every entry reads the same is one nobody reads"`
 		}
 	}) (*struct {
 		Status int
@@ -178,8 +178,8 @@ func registerAdvisory(api huma.API, in Ingest) {
 
 // IssuanceBody is one time an advisory went out.
 type IssuanceBody struct {
-	Version  int    `json:"version" doc:"Which issuance this is, counting from one. It is what the next document's version says"`
-	Digest   string `json:"digest" doc:"What went out, hashed, so that what is published and what we would generate stay answerable against each other"`
+	Version  int    `json:"version" doc:"The issuance number, counting from one. It is what the next document's version says"`
+	Digest   string `json:"digest" doc:"A digest of what went out, so that what is published and what we would generate stay answerable against each other"`
 	Summary  string `json:"summary,omitempty"`
 	IssuedAt string `json:"issued_at"`
 }

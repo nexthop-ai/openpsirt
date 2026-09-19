@@ -22,14 +22,14 @@ import (
 // showed it would put a shared secret on a page anybody with the settings
 // right can read.
 type OutboundBody struct {
-	Name string `json:"name" doc:"What it is called, so a log line and a screen can name it"`
-	Kind string `json:"kind" doc:"Which notifications go here, or * for all of them"`
+	Name string `json:"name" doc:"The name, so a log line and a screen can use it"`
+	Kind string `json:"kind" doc:"The notifications that go here, or * for all of them"`
 	URL  string `json:"url"`
 	// Sent and Failing say whether it is working, which is the question an
 	// operator has about a destination and one nothing else answers.
-	Sent    int    `json:"sent" doc:"How many things have gone there"`
-	Failing int    `json:"failing" doc:"How many are being retried or have been given up on"`
-	Because string `json:"because,omitempty" doc:"Why the last one failed, where one did"`
+	Sent    int    `json:"sent" doc:"The number of things delivered there"`
+	Failing int    `json:"failing" doc:"The number being retried or given up on"`
+	Because string `json:"because,omitempty" doc:"The reason the last one failed, where one did"`
 }
 
 // registerOutbound configures where this deployment sends what it has to say .
@@ -92,8 +92,8 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Body struct {
 			Name   string `json:"name" minLength:"1" maxLength:"191"`
 			Kind   string `json:"kind" minLength:"1" maxLength:"191" doc:"One notification kind, or * for all of them"`
-			URL    string `json:"url" minLength:"1" maxLength:"1000" doc:"Where to send it. https only"`
-			Secret string `json:"secret" minLength:"16" maxLength:"400" doc:"What requests are signed with. Never returned by any endpoint"`
+			URL    string `json:"url" minLength:"1" maxLength:"1000" doc:"The address to send to. https only"`
+			Secret string `json:"secret" minLength:"16" maxLength:"400" doc:"The signing secret. Never returned by any endpoint"`
 		}
 	}) (*struct {
 		Status int

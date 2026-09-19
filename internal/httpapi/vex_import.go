@@ -28,10 +28,10 @@ type statementParts struct {
 
 // StatementsTakenBody is what one VEX document changed.
 type StatementsTakenBody struct {
-	Publisher  string `json:"publisher" doc:"Who the document says it is from"`
+	Publisher  string `json:"publisher" doc:"The publisher the document names"`
 	Recorded   int    `json:"recorded" doc:"Statements taken from it"`
-	Superseded int    `json:"superseded" doc:"What this publisher had said before, set aside rather than deleted"`
-	Digest     string `json:"digest" doc:"What the document hashed to, which is how a revision is noticed later"`
+	Superseded int    `json:"superseded" doc:"This publisher's previous statements, set aside rather than deleted"`
+	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 
 // VexSaidBody is one standing VEX statement, as a finding shows it.
@@ -40,13 +40,13 @@ type VexSaidBody struct {
 	// a revision to it can be noticed later.
 	ID            int64  `json:"id" doc:"Pass as from_statement when starting a decision from this, so a later revision can be noticed"`
 	Publisher     string `json:"publisher"`
-	Status        string `json:"status" doc:"What they said, in the format's own vocabulary"`
+	Status        string `json:"status" doc:"Their statement, in the format's own vocabulary"`
 	Justification string `json:"justification,omitempty" doc:"The term they gave for it, where the status is one that takes one"`
 	// Statement is the reasoning, which is the part worth having: the status
 	// is in the fix state already.
-	Statement string `json:"statement,omitempty" doc:"Why they reached that answer. What a triager otherwise types from memory"`
+	Statement string `json:"statement,omitempty" doc:"Their reasoning. What a triager otherwise types from memory"`
 	Document  string `json:"document" doc:"The document it came from"`
-	At        string `json:"at" doc:"When it was uploaded here"`
+	At        string `json:"at" doc:"The moment it was uploaded here"`
 	// Offers is the outcome this would prefill, where it offers one. A
 	// publisher saying they will not fix something is not the same as saying
 	// it does not apply, so that offers a will-not-fix and never a dismissal.
@@ -104,7 +104,7 @@ func registerVexImport(api huma.API, in Ingest) {
 		Middlewares:  huma.Middlewares{boundedForm(api, maxUpload(in.Limits))},
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Publisher string `query:"publisher" maxLength:"191" doc:"Who published it, where the document does not name itself. At most 191 characters"`
+		Publisher string `query:"publisher" maxLength:"191" doc:"The publisher, where the document does not name itself. At most 191 characters"`
 		RawBody   huma.MultipartFormFiles[statementParts]
 	}) (*struct{ Body StatementsTakenBody }, error) {
 		if err := administrating(ctx); err != nil {

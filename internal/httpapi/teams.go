@@ -15,7 +15,7 @@ import (
 
 // TeamBody is a team and who is on it.
 type TeamBody struct {
-	Name string `json:"name" doc:"What the team is called. Matched without regard to capitals"`
+	Name string `json:"name" doc:"The team's name. Matched without regard to capitals"`
 	// DisplayName is the spelling somebody typed, which is what is shown back.
 	DisplayName string `json:"display_name,omitempty"`
 	// Members are the people on it, by sign-in identity. Membership says where
@@ -25,9 +25,9 @@ type TeamBody struct {
 
 // TeamRecordBody declares a team, and optionally who is on it.
 type TeamRecordBody struct {
-	Name        string   `json:"name" minLength:"1" doc:"What to call the team"`
-	DisplayName string   `json:"display_name,omitempty" doc:"How to spell it when it is shown. Defaults to the name"`
-	Members     []string `json:"members,omitempty" doc:"Who is on it, by sign-in identity. Everybody named must already have been recorded"`
+	Name        string   `json:"name" minLength:"1" doc:"The team's name"`
+	DisplayName string   `json:"display_name,omitempty" doc:"The display spelling. Defaults to the name"`
+	Members     []string `json:"members,omitempty" doc:"The members, by sign-in identity. Everybody named must already have been recorded"`
 }
 
 func registerTeams(api huma.API, a Administering) {

@@ -17,27 +17,27 @@ import (
 
 // TokenBody is somebody's own credential for scripting.
 type TokenBody struct {
-	Name string `json:"name" minLength:"1" maxLength:"191" doc:"What its owner calls it"`
+	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The owner's name for it"`
 	// Product narrows it below its owner. What it reaches is the intersection,
 	// so naming something they cannot read reaches nothing.
 	Product string `json:"product,omitempty" doc:"Optionally, the one product it may reach, by the name that addresses it"`
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: minting a token resolves the field above.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
 	// Holds narrows which of its owner's roles it carries, the same way and
 	// for the same reason Product narrows where. Absent means all of them.
 	Holds []role `json:"holds,omitempty" doc:"Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none"`
 	// Lifetime is how long it lasts, as a duration. There is a maximum, and
 	// there is no way to ask for one that never expires.
-	Lifetime string `json:"lifetime,omitempty" doc:"How long it lasts, such as \"720h\". There is a configured maximum"`
+	Lifetime string `json:"lifetime,omitempty" doc:"The lifetime, such as \"720h\". There is a configured maximum"`
 	// Secret is returned at creation and never again.
 	Secret string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
-	Owner  string `json:"owner,omitempty" doc:"Whose it is. Shown to an administrator listing everybody's"`
+	Owner  string `json:"owner,omitempty" doc:"The owner. Shown to an administrator listing everybody's"`
 	// CreatedAt is when it was minted, beside when it stops working. Both
 	// age, and a review of what is outstanding asks about each.
-	CreatedAt  string `json:"created_at,omitempty" doc:"When it was minted"`
-	ExpiresAt  string `json:"expires_at,omitempty" doc:"When it stops working"`
-	LastUsedAt string `json:"last_used_at,omitempty" doc:"When it was last used"`
+	CreatedAt  string `json:"created_at,omitempty" doc:"The moment it was minted"`
+	ExpiresAt  string `json:"expires_at,omitempty" doc:"The moment it stops working"`
+	LastUsedAt string `json:"last_used_at,omitempty" doc:"The last time it was used"`
 	Withdrawn  bool   `json:"withdrawn,omitempty" doc:"Whether it has been withdrawn"`
 }
 

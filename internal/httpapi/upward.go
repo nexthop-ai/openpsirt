@@ -14,7 +14,7 @@ import (
 type UpwardBody struct {
 	Component string `json:"component"`
 	Version   string `json:"version"`
-	Depth     int    `json:"depth" doc:"How far below the build's root it sits, so the tree is drawn by indenting"`
+	Depth     int    `json:"depth" doc:"The depth below the build's root, so the tree is drawn by indenting"`
 	Findings  int    `json:"findings" doc:"Your own open issues on this component itself"`
 	Beneath   int    `json:"beneath" doc:"Your own open issues at or under it along these chains. Never how much the build holds there"`
 	Placed    bool   `json:"placed" doc:"False for a component the inventory put nowhere. Those sit at the end with no chain"`

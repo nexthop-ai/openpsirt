@@ -19,8 +19,8 @@ import (
 // select.
 type AtComponentBody struct {
 	Vulnerability string `json:"vulnerability"`
-	Severity      string `json:"severity,omitempty" doc:"How bad the report rates it"`
-	Places        int    `json:"places" doc:"How many places in this build it sits at"`
+	Severity      string `json:"severity,omitempty" doc:"The severity the report gives it"`
+	Places        int    `json:"places" doc:"The number of places in this build it sits at"`
 	FixedIn       string `json:"fixed_in,omitempty" doc:"The version the report says fixes it, where it names one"`
 	// Summary is what one judgment is being made on. Deciding in bulk on
 	// less than deciding singly is the wrong way round, and this list
@@ -28,7 +28,7 @@ type AtComponentBody struct {
 	Summary    string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
 	Exploited  bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
-	Due        string  `json:"due,omitempty" doc:"When it runs out, as a date. The earliest among its places here, which is the one that makes it late"`
+	Due        string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its places here, which is the one that makes it late"`
 }
 
 func registerBulk(api huma.API, in Ingest) {
@@ -180,13 +180,13 @@ func registerBulk(api huma.API, in Ingest) {
 		Component string `path:"component"`
 		Body      struct {
 			Vulnerabilities []string      `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this claim covers, by name"`
-			SelectedBy      string        `json:"selected_by" minLength:"1" maxLength:"500" doc:"How you narrowed this set, in your own words. Recorded, and never part of the claim"`
+			SelectedBy      string        `json:"selected_by" minLength:"1" maxLength:"500" doc:"The narrowing, in your own words. Recorded, and never part of the claim"`
 			Contains        string        `json:"contains,omitempty" maxLength:"200" doc:"The text you narrowed the candidate list by, if any. Re-run here rather than believed: what is recorded beside your sentence is how many issues that narrowing reaches against how many you named, so an approver can check the two"`
 			Outcome         outcomeInBulk `json:"outcome"`
 			Justification   justification `json:"justification,omitempty" doc:"Required when it does not apply"`
 			DeferredUntil   string        `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 			FixedVersion    string        `json:"fixed_version,omitempty" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them"`
-			Reasoning       string        `json:"reasoning" minLength:"1" doc:"Why this holds for every issue named"`
+			Reasoning       string        `json:"reasoning" minLength:"1" doc:"The reasoning, holding for every issue named"`
 		}
 	}) (*struct {
 		Body struct {

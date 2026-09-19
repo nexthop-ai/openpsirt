@@ -18,15 +18,15 @@ type BuildStandingBody struct {
 	StreamKind string `json:"stream_kind,omitempty" enum:"branch,tag" doc:"Whether the line moves or is fixed"`
 	Variant    string `json:"variant"`
 	Open       int    `json:"open" doc:"Issues at components, the unit every count here uses"`
-	Overdue    int    `json:"overdue,omitempty" doc:"How many of those are past a deadline"`
-	Exploited  int    `json:"exploited,omitempty" doc:"How many somebody is known to be exploiting"`
-	Undecided  int    `json:"undecided,omitempty" doc:"How many nobody has claimed anything about"`
-	Agreed     int    `json:"agreed,omitempty" doc:"How many are answered at every place by a standing decision"`
+	Overdue    int    `json:"overdue,omitempty" doc:"The number past a deadline"`
+	Exploited  int    `json:"exploited,omitempty" doc:"The number somebody is known to be exploiting"`
+	Undecided  int    `json:"undecided,omitempty" doc:"The number nobody has claimed anything about"`
+	Agreed     int    `json:"agreed,omitempty" doc:"The number answered at every place by a standing decision"`
 	// LastScanAt is when a scan last arrived here, and Retired says the
 	// release is out of support — so a build that stopped being scanned
 	// because it stopped being supported reads as expected rather than as
 	// a fault.
-	LastScanAt string `json:"last_scan_at,omitempty" doc:"When a scan last arrived here. Absent where none ever has"`
+	LastScanAt string `json:"last_scan_at,omitempty" doc:"The last scan to arrive here. Absent where none ever has"`
 	Retired    bool   `json:"retired,omitempty" doc:"This build's release is out of support"`
 }
 
@@ -40,7 +40,7 @@ type OverviewOutput struct {
 		// a number somebody chose and a number nobody noticed are different
 		// facts about the same screen.
 		TriageFloor string              `json:"triage_floor,omitempty" doc:"The least severity this product triages, where the product states one of its own"`
-		EndOfLife   string              `json:"end_of_life,omitempty" doc:"When the product goes out of support, where a date is set"`
+		EndOfLife   string              `json:"end_of_life,omitempty" doc:"The date the product goes out of support, where one is set"`
 		Builds      []BuildStandingBody `json:"builds"`
 		// Open, Overdue and Undecided are the product's own totals, counted
 		// across its builds rather than summed over them. The findings list

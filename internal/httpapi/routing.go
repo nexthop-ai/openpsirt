@@ -19,16 +19,16 @@ import (
 // RuleBody is a standing rule that hands work nobody holds to a team.
 type RuleBody struct {
 	ID   int64  `json:"id"`
-	Name string `json:"name" doc:"What to call it, so a placement can be explained in words"`
-	Team string `json:"team" doc:"Where work lands, by the name that addresses the team"`
+	Name string `json:"name" doc:"The name, so a placement can be explained in words"`
+	Team string `json:"team" doc:"The team work lands on, by the name that addresses it"`
 	// TeamDisplayName is what to show beside it. The field above is what
 	// add-routing-rule resolves through TeamByName, which matches the folded
 	// name column — so a team declared "platform-security" and displayed
 	// "Platform Security" listed as the label, and sending that back found no
 	// team at all.
-	TeamDisplayName string `json:"team_display_name,omitempty" doc:"What to call that team, where it was declared with a display name"`
+	TeamDisplayName string `json:"team_display_name,omitempty" doc:"That team's display name, where it was declared with one"`
 	// Order is the whole of the precedence: first match wins.
-	Order int `json:"order" doc:"Where it sits among the others. The first rule that matches places the work"`
+	Order int `json:"order" doc:"Its position among the others. The first rule that matches places the work"`
 	// Upstream is the key that matters: one rule naming a source package
 	// catches every binary package built from it, wherever they sit.
 	Upstream string `json:"upstream,omitempty" doc:"A source package name. Catches every binary package built from it"`
@@ -39,9 +39,9 @@ type RuleBody struct {
 type CatchesOutput struct {
 	Body struct {
 		Components []string `json:"components" doc:"The components it names, at most twenty"`
-		Total      int      `json:"total" doc:"How many distinct components it matches. More than the list where the list was cut"`
+		Total      int      `json:"total" doc:"The number of distinct components it matches. More than the list where the list was cut"`
 		Work       int      `json:"work" doc:"Pieces of work at those components — one issue in one component, whatever it sits at"`
-		Unheld     int      `json:"unheld" doc:"How many of those nobody holds, which is what a rule may place"`
+		Unheld     int      `json:"unheld" doc:"The number of those nobody holds, which is what a rule may place"`
 	}
 }
 
@@ -183,7 +183,7 @@ func registerRouting(api huma.API, in Ingest) {
 		Product string `path:"product"`
 		Body    struct {
 			Name     string `json:"name" minLength:"1" maxLength:"120"`
-			Team     string `json:"team" minLength:"1" doc:"Where work lands, by team name"`
+			Team     string `json:"team" minLength:"1" doc:"The team work lands on, by name"`
 			Upstream string `json:"upstream,omitempty" doc:"A source package name"`
 			Beneath  string `json:"beneath,omitempty" doc:"A component name, matching it and everything under it"`
 		}

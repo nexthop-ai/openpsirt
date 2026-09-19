@@ -31,14 +31,14 @@ type RunBody struct {
 	RanHere         bool   `json:"ran_here,omitempty" doc:"We ran the scanner, rather than the build sending what its own found"`
 	StartedAt       string `json:"started_at"`
 	FinishedAt      string `json:"finished_at,omitempty" doc:"Absent while it is still going"`
-	Failure         string `json:"failure,omitempty" doc:"Why it produced nothing"`
-	Caution         string `json:"caution,omitempty" doc:"What the scanner said while succeeding — a qualification on what it found rather than a failure"`
+	Failure         string `json:"failure,omitempty" doc:"The reason it produced nothing"`
+	Caution         string `json:"caution,omitempty" doc:"The scanner's own words while succeeding — a qualification on what it found rather than a failure"`
 
 	Opened RunChangeBody `json:"opened"`
 	Closed RunChangeBody `json:"closed"`
 	// OpenedExploited is the one number that decides whether a jump of four
 	// thousand is an evening's work or a night's.
-	OpenedExploited int `json:"opened_exploited,omitempty" doc:"How many of what it opened somebody is known to be exploiting"`
+	OpenedExploited int `json:"opened_exploited,omitempty" doc:"The number it opened that somebody is known to be exploiting"`
 }
 
 // registerRun is what one run of the scanner did.

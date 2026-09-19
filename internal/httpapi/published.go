@@ -17,11 +17,11 @@ type WentBody struct {
 	// Ordinal is which issuance this was, counting from one. Anything above
 	// one is a revision, which is what somebody reading a period is looking
 	// for.
-	Ordinal  int    `json:"ordinal" doc:"Which issuance this was, counting from one. Above one is a revision"`
+	Ordinal  int    `json:"ordinal" doc:"The issuance number, counting from one. Above one is a revision"`
 	Summary  string `json:"summary,omitempty"`
 	IssuedBy string `json:"issued_by"`
 	IssuedAt string `json:"issued_at"`
-	Digest   string `json:"digest" doc:"What the document hashed to when it went out. The published document belongs to whoever published it; this is what makes comparing it possible"`
+	Digest   string `json:"digest" doc:"The document's digest when it went out. The published document belongs to whoever published it; this is what makes comparing it possible"`
 }
 
 // registerPublished answers what advisories went out over a period.

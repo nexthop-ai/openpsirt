@@ -81,7 +81,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Body          struct {
-			Body string `json:"body" minLength:"1" doc:"What to say, in markdown"`
+			Body string `json:"body" minLength:"1" doc:"The text, in markdown"`
 		}
 	}) (*struct{ Body NoteWritten }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -118,7 +118,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		"the path.", triageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			Body string `json:"body" minLength:"1" doc:"What it should say now, in markdown"`
+			Body string `json:"body" minLength:"1" doc:"The replacement text, in markdown"`
 		}
 	}) (*struct{ Body NoteWritten }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -181,10 +181,10 @@ func registerIssueNotes(api huma.API, in Ingest) {
 // NoteBody is one note on an issue in a product.
 type NoteBody struct {
 	ID        int64  `json:"id"`
-	Body      string `json:"body" doc:"What it says, in markdown"`
-	WrittenBy string `json:"written_by" doc:"Who wrote it"`
+	Body      string `json:"body" doc:"The text, in markdown"`
+	WrittenBy string `json:"written_by" doc:"The author"`
 	WrittenAt string `json:"written_at"`
-	EditedAt  string `json:"edited_at,omitempty" doc:"When the author last changed it, where they have"`
+	EditedAt  string `json:"edited_at,omitempty" doc:"The author's last change, where they made one"`
 }
 
 // NoteWritten is what comes back from writing or changing a note.

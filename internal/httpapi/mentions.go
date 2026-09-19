@@ -12,8 +12,8 @@ import (
 // MentionableBody is somebody who could be named in a comment or a
 // justification about this product.
 type MentionableBody struct {
-	Identity string `json:"identity" doc:"What to write after the @"`
-	Name     string `json:"name" doc:"What to show while choosing"`
+	Identity string `json:"identity" doc:"The name written after the @"`
+	Name     string `json:"name" doc:"The label shown while choosing"`
 }
 
 func registerMentions(api huma.API, in Ingest) {
@@ -33,7 +33,7 @@ func registerMentions(api huma.API, in Ingest) {
 	}, perProduct, "Asking about undisclosed findings needs private-read or "+
 		"private-triage.", readRights()...), func(ctx context.Context, input *struct {
 		Product    string `path:"product"`
-		Visibility string `query:"visibility" default:"public" enum:"public,private" doc:"Which kind of finding the text is about"`
+		Visibility string `query:"visibility" default:"public" enum:"public,private" doc:"The kind of finding the text is about"`
 		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name"`
 		Limit      int    `query:"limit" default:"25" minimum:"1" maximum:"100"`
 	}) (*listOutput[MentionableBody], error) {
