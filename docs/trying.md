@@ -25,7 +25,7 @@ one port. The Helm chart is published beside the image, as
     Plain HTTP, and administration handed to whoever a header says they are.
     It is for looking at.
 
-### Something has to say who you are
+### Sign-in
 
 Nothing creates an account and no path admits an unknown arrival, so a
 deployment that cannot tell who is asking serves nobody. There are two ways to

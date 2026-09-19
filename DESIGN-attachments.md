@@ -8,7 +8,7 @@ Satisfies REQ-70.
 ## Contents
 
 - [References in text](#references-in-text)
-- [What an attachment hangs off](#what-an-attachment-hangs-off)
+- [Attachment subjects](#attachment-subjects)
 - [Fetch authorization](#fetch-authorization)
 - [Storage](#storage)
 - [Delivery](#delivery)
@@ -32,7 +32,7 @@ text.
 This is the one scheme added to what a link may use beside `http`, `https` and
 `mailto`. An image may use no other — see `DESIGN-text.md`.
 
-## What an attachment hangs off
+## Attachment subjects
 
 An attachment hangs off **the issue in the product** — the unit a decision, an
 embargo and a comment already use. Not the finding row: text is written against
@@ -89,7 +89,7 @@ by whom; the object-store and filesystem backends implement one interface behind
 it. A separate package would put that interface at a package boundary, where a
 second implementation is tempted to reach past it.
 
-### Reaching the store in the clear
+### Unencrypted store access
 
 An endpoint that is not `https` is refused, and two things lift that (REQ-70).
 

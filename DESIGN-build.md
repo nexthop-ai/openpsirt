@@ -17,7 +17,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Pinned pairs](#pinned-pairs)
 - [Hash pinning per ecosystem](#hash-pinning-per-ecosystem)
 - [Static analysis](#static-analysis)
-- [What a gate reads](#what-a-gate-reads)
+- [Gate inputs](#gate-inputs)
 - [Licenses](#licenses)
 - [The API document](#the-api-document)
 - [Self-inventory](#self-inventory)
@@ -438,7 +438,7 @@ The linter must be built with a Go release at least as new as the code, or it
 cannot read the compiler's export data and fails on every file with a message
 about import versions. The pinned version moves when the language version does.
 
-## What a gate reads
+## Gate inputs
 
 Every gate program written here walks the repository through one reader, which
 holds the default set of directories none of them read: the version history, a

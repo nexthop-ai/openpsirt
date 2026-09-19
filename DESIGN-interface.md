@@ -30,21 +30,21 @@ end rather than left to be found by clicking.
 - [The finding screen](#the-finding-screen)
 - [The decision form](#the-decision-form)
 - [The reach sheet](#the-reach-sheet)
-- [Walking the list](#walking-the-list)
+- [List navigation](#list-navigation)
 - [The dependency tree](#the-dependency-tree)
 - [The review queue](#the-review-queue)
 - [The claim page](#the-claim-page)
 - [Assignments and routing rules](#assignments-and-routing-rules)
 - [Catalog and inventories](#catalog-and-inventories)
 - [Product and scan-run pages](#product-and-scan-run-pages)
-- [Recording a flaw](#recording-a-flaw)
+- [Flaw entry](#flaw-entry)
 - [Disclosure and advisories](#disclosure-and-advisories)
 - [The editor](#the-editor)
 - [Reachable from a keyboard](#reachable-from-a-keyboard)
 - [A read that failed](#a-read-that-failed)
 - [A render that threw](#a-render-that-threw)
 - [An expired session](#an-expired-session)
-- [Attaching a file](#attaching-a-file)
+- [File attachment](#file-attachment)
 - [Mentions and assignment pickers](#mentions-and-assignment-pickers)
 - [The search box](#the-search-box)
 - [A person's own page](#a-persons-own-page)
@@ -53,16 +53,16 @@ end rather than left to be found by clicking.
 - [Reports, settings, inheritance](#reports-settings-inheritance)
 - [The System screen](#the-system-screen)
 - [The administration screens](#the-administration-screens)
-- [Showing the ordering signals](#showing-the-ordering-signals)
+- [The ordering signals](#the-ordering-signals)
 - [Units, dates and copy](#units-dates-and-copy)
-- [What a screen says](#what-a-screen-says)
+- [Screen copy](#screen-copy)
 - [Interface-wide rules](#interface-wide-rules)
 - [The initial load](#the-initial-load)
-- [Running it locally](#running-it-locally)
+- [Local development](#local-development)
 - [Divergence from the mockup](#divergence-from-the-mockup)
 - [Test coverage](#test-coverage)
 - [Not built](#not-built)
-- [What the checks missed](#what-the-checks-missed)
+- [Gaps the checks left](#gaps-the-checks-left)
 - [File organization](#file-organization)
 - [Limits](#limits)
 
@@ -181,7 +181,7 @@ Other bar rules:
   A menu control in the bar and a fourth tab open the whole rail as a panel over
   the page.
 
-### Folding the rail
+### The folded rail
 
 Twenty-four entries ask for about 935 pixels, taller than the window on most
 laptops. A scroll region of its own puts a second scrollbar down the middle of
@@ -781,7 +781,7 @@ written, and only then is anything sent.
 | What counts as nothing is one thing: no build holds this issue at another version | Builds already matching are named on the sheet rather than asked about, so their absence from a skipped sheet costs nothing — the confirmation that follows names them |
 | An unread reach is not an empty one | A query still in flight, or one that failed, contributes no other versions, and treating that silence as "there are none" would submit past a question rather than skip one that was not there. The sheet is skipped only when every one of those reads succeeded |
 
-## Walking the list
+## List navigation
 
 The primary action is above the fold, and the next finding is reachable without
 going back (REQ-60). The decision form sat at about 1,550 pixels on a page
@@ -998,7 +998,7 @@ whether it is getting better or worse. Bars rather than a line, because these
 are separate builds and a line between two releases draws a trend through a gap
 where nothing happened.
 
-## Recording a flaw
+## Flaw entry
 
 A screen of its own, reached from the rail rather than from the findings list.
 What is being recorded is precisely what is **not** in that list, so opening it
@@ -1104,7 +1104,7 @@ the part of a decision that matters most.
 | **A draft keeps the answer as well as the prose** | The outcome, the justification, the date, the fixed version. A draft that kept three paragraphs and lost what they argued for came back as text somebody had to read to find out what they had meant — and the prose is about the answer |
 | It is restored into the form it was typed in, and is not a default | The rule that the decision form opens on nothing chosen is about what somebody has *not* answered. This is their own answer to this exact finding, keyed on every part of it, and an explicit "start from this" beats it |
 
-### Where somebody was
+### Restored position
 
 A browser restores the scroll position on a real navigation and this
 application never makes one.
@@ -1118,7 +1118,7 @@ application never makes one.
 | A handful of pages, and anything that is not a position is the top | The store is the browser's and a person may edit it, and the value goes straight into a scroll call. An unbounded map in storage grows for as long as the tab is open |
 | Cleared with everything else the session holds | The next person on this browser does not land in the middle of somebody else's page |
 
-### Where an answer appears
+### Answer placement
 
 A confirmation belongs where the button that produced it was pressed. The
 decision form's submit sits at the foot of a long form and the confirmation is
@@ -1187,7 +1187,7 @@ row they had open are not a draft.
 | Re-authenticating without leaving the page is not what this does | The requirement allows for that: where a redirect is unavoidable, the draft is saved first and the person returns to what they were writing. It is unavoidable here — a provider sign-in is a redirect to somebody else's host, which cannot be framed and increasingly cannot be done silently in a hidden frame either |
 | Where the address is checked is the server, not here | A sign-in that sends a browser wherever a parameter says makes this deployment's own domain vouch for somebody else's page; see `DESIGN-access.md` |
 
-## Attaching a file
+## File attachment
 
 The editor carries an attach control wherever an issue is in hand — writing a
 justification, writing a comment, editing one. It puts the file against that issue
@@ -1392,7 +1392,7 @@ the three left the credentials on a screen that did not mention them.
 | The branch and the variant on a key are offered from what the product holds | A key names a build that exists: both are resolved through the catalog and refused unless declared. Offered rather than restricting, because the server is what refuses and a name declared between the two requests is not one this should decline. Choosing a product clears them, since a branch belongs to one |
 | The two things held over the deployment are checkboxes beside the grid, not roles in it | A role is held against a product and neither of these is. What each grants is written beside it, because one of them is a reader who changes nothing and that is not what "administrator" reads as |
 
-## Showing the ordering signals
+## The ordering signals
 
 The findings list is ordered by urgency: known-exploited, then whether the build
 reaches customers, then severity, then likelihood. **Every one of those is on the
@@ -1462,7 +1462,7 @@ history before a direction is claimed, because three points is one change plus a
 confirmation. The panels still draw — the chart shows what there is and claims
 nothing; only the sentence is held back.
 
-## What a screen says
+## Screen copy
 
 Screen copy is labels and values. The reasoning behind a screen belongs in this
 document, not on it.
@@ -1527,7 +1527,7 @@ markdown renderer is only needed where somebody reads or writes a justification.
 Measured: one bundle of 820 KB became a 248 KB initial load, with the chart (369
 KB) and the renderer (146 KB) fetched only by the screens that use them.
 
-## Running it locally
+## Local development
 
     make demo                    # build the image, start it, seed it, say where to go
     make demo DEMO_HOST=yourbox  # if you browse by something but localhost
@@ -1611,7 +1611,7 @@ Coverage of the interface is measured and reported by the gate.
 | **A deadline and an owner in the finding's header** | The row carries both; the header does not |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 
-## What the checks missed
+## Gaps the checks left
 
 | | |
 |---|---|

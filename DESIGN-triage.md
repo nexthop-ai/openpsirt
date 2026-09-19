@@ -17,24 +17,24 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Approval](#approval)
 - [Rights](#rights)
 - [Readback](#readback)
-- [Reading a claim whole](#reading-a-claim-whole)
+- [The whole claim](#the-whole-claim)
 - [Claims](#claims)
-- [Approving a claim](#approving-a-claim)
-- [Setting rows aside](#setting-rows-aside)
-- [Holding part of a claim back](#holding-part-of-a-claim-back)
+- [Approval](#approval)
+- [Set-aside rows](#set-aside-rows)
+- [Partial approval](#partial-approval)
 - [Decided elsewhere](#decided-elsewhere)
 - [Extensions](#extensions)
 - [Decision lists on a finding](#decision-lists-on-a-finding)
 - [The review queue](#the-review-queue)
-- [What became of a claim](#what-became-of-a-claim)
-- [Sending a claim back](#sending-a-claim-back)
+- [Claim outcomes](#claim-outcomes)
+- [Sending back](#sending-back)
 - [The deferral threshold](#the-deferral-threshold)
 - [One live claim per key](#one-live-claim-per-key)
 - [The triage line](#the-triage-line)
 - [Issue assessments](#issue-assessments)
 - [Coverage count](#coverage-count)
 - [Reach across builds](#reach-across-builds)
-- [Applying to other builds](#applying-to-other-builds)
+- [Reach across builds](#reach-across-builds)
 - [Bulk claims](#bulk-claims)
 - [Fix bundles](#fix-bundles)
 - [Promised work](#promised-work)
@@ -46,11 +46,11 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [VEX statements as evidence](#vex-statements-as-evidence)
 - [Dates still to come](#dates-still-to-come)
 - [Mitigation-based dismissals](#mitigation-based-dismissals)
-- [What a holder can do instead](#what-a-holder-can-do-instead)
+- [Mitigations](#mitigations)
 - [Outcomes on a tag](#outcomes-on-a-tag)
 - [Tags](#tags)
 - [Rule-prepared claims](#rule-prepared-claims)
-- [Carrying onto a new line](#carrying-onto-a-new-line)
+- [Decisions on a new branch](#decisions-on-a-new-branch)
 - [Not built](#not-built)
 - [Limits](#limits)
 
@@ -213,7 +213,7 @@ holds the ones nobody has agreed to yet.
 | What an undo reports is what returned to waiting | A decision another agreement still stands on is left where it is, so the number of candidates is not the number that moved |
 | Who may read it is the finding's own visibility | The decision, its revisions, the approvals, who acted, and the comments — comments in rather than carved out, because disclosure makes the record mean all three together |
 
-## Reading a claim whole
+## The whole claim
 
 One read answers everything about one claim: what it says, where a
 representative row sits and what that row is about, the reasoning as it stands,
@@ -281,7 +281,7 @@ than quietly taking the first, because a set that disagrees is two claims
 somebody meant to record as one, and taking the first loses whichever half was
 not first.
 
-### Where each act lands
+### Act placement
 
 | Act | On |
 |---|---|
@@ -319,7 +319,7 @@ an identifier before.
 | The builds named are the ones the reader may see | A claim somebody may read matches findings they may not, so the builds, the fix versions behind the outliers and the counts on a card are all narrowed per product |
 | A claim is shown only to somebody who may act on every row of it | Acting on a claim is acting on the argument, which does not come in halves. Shown half, a reader would agree to words whose other half waits on somebody else, and the size beside the card would be wrong |
 
-## Approving a claim
+## Approval
 
 Approving a claim approves every waiting row in it, in one transaction, under the
 rules each row is approved under: by somebody other than whoever wrote the words,
@@ -353,7 +353,7 @@ which one row at a time is 1.4 s on MySQL. The rows are written in batches, the
 shape the scan apply already uses; measured on SQLite, 500 places in 6
 statements, pinned by a test the same way.
 
-## Setting rows aside
+## Set-aside rows
 
 The queue entry carries its **outliers** — the rows that do not look like the
 rest. An approver may set some aside: the rest is approved as one claim, and the
@@ -378,7 +378,7 @@ counts saying how many are behind the cap.
 Without this an approver of a bulk claim chooses between refusing everything and
 agreeing to everything.
 
-## Holding part of a claim back
+## Partial approval
 
 The proposer's side of the same act, and the same mechanism: the rows named move
 into a claim of their own, derived from the original, carrying the argument they
@@ -490,7 +490,7 @@ that not looking is a choice rather than an omission.
 | A run is the second signal | A claim in a run of forty is usually right, and a run is also how forty get waved through |
 | Both are read for the whole page in two statements | Fifty cards read a row at a time is a hundred round trips before the queue draws |
 
-### What waits in the queue
+### Queue contents
 
 | | |
 |---|---|
@@ -503,7 +503,7 @@ that not looking is a choice rather than an omission.
 A claim that needed nobody — a deferral under the threshold — is not here at all,
 by the same rule that keeps unreachable work out.
 
-## What became of a claim
+## Claim outcomes
 
 A person's own page of what they proposed and what happened to it.
 
@@ -512,7 +512,7 @@ A person's own page of what they proposed and what happened to it.
 | Narrowed to what they may still read | Losing the reading of a product does not leave a list of its issues behind on a personal page |
 | **The rows are narrowed as well as the page** | A claim's rows need not agree about visibility and the page lists a claim if any one row is readable, so an unnarrowed row read counted the undisclosed ones into the row, issue and place totals and could hand one of them back as the claim's representative. A count is the leak even where no row is shown |
 
-## Sending a claim back
+## Sending back
 
 Sending a claim back takes it out of the approval queue and returns it when the
 author revises. A reason is required and travels as a comment.
@@ -638,7 +638,7 @@ one statement for the whole deployment, which is the shape this replaced.
 | A claim in force is written as the rating in force for that product | Everything that ranks, filters or clocks reads that one row with the published rating as its fallback, rather than each reader joining the claim and folding it its own way. The product's open findings are reordered and re-clocked when it lands, and no other product's are |
 | A finding opened later picks the product's rating up | The applying path reads the rating for the build's product at the moment it opens findings. A copy written onto each finding would carry it only where something remembered to fetch it |
 
-### What a per-product rating gives up
+### The cost of a per-product rating
 
 Stated so it is decided rather than discovered.
 
@@ -647,7 +647,7 @@ Stated so it is decided rather than discovered.
 | A rating reaching products the issue has not met yet | A deployment-wide rating got ahead of an issue before it arrived anywhere. Each product now rates for itself, and an issue arriving somewhere new arrives unrated |
 | One place to say a published score is simply wrong | A score that assumes the wrong configuration is wrong the same way in three products, and three teams say so separately. That is the cost of the products that genuinely differ being able to differ |
 
-### What agreeing removes
+### Effects of agreement
 
 Agreeing to "look at this in ninety days instead of seven" and agreeing to
 "nobody will look at this" are not the same act. Which one it is depends on
@@ -698,7 +698,7 @@ code, where a tick is a claim about a version nobody has looked at.
 | A list that is hiding something says so, with the count (REQ-30) | |
 | Exceptions are grouped by the layer they come from (REQ-25) | A suppression a build supplied, a decision made here, and a finding below the line are three kinds of "not shown", and one flat list invites reading a build's own claim as a judgment this deployment made. Every kind of variant follows the same model — the machinery does not learn what kind of thing a variant is |
 
-## Applying to other builds
+## Reach across builds
 
 A build running the same versions picks a decision up by lookup. What remains is
 the builds where the versions differ, and somebody has to say whether the same
@@ -1106,7 +1106,7 @@ somebody can go and check and one nobody can, and it is the justification an
 auditor asks about first, because the protection lives outside this software
 entirely.
 
-## What a holder can do instead
+## Mitigations
 
 Two outcomes carry a mitigation and they ask for it differently.
 
@@ -1194,7 +1194,7 @@ puts a configuration file where a name belongs in the record. The difference
 shows up on the day a dismissal turns out to have been wrong and somebody asks
 who made it.
 
-## Carrying onto a new line
+## Decisions on a new branch
 
 What a new line would inherit is shown before anything happens, and what moved is
 chosen rather than taken (REQ-25). Four groups, because they need four different

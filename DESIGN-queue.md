@@ -15,7 +15,7 @@ Satisfies REQ-03, REQ-06, REQ-69.
 - [Leases](#leases)
 - [Backlog refusal](#backlog-refusal)
 - [Bounds a deployment sizes](#bounds-a-deployment-sizes)
-- [What a failed job records](#what-a-failed-job-records)
+- [Failure records](#failure-records)
 - [Transaction boundary](#transaction-boundary)
 - [Limits](#limits)
 
@@ -186,7 +186,7 @@ queue may get is the sixth and is a stored setting.
 | Two pairs are compared as the process starts | A heartbeat no shorter than the claim timeout hands running work to a second worker; a hold ceiling no larger than the claim timeout cancels work that is running normally. Both read as a fault in the work rather than in the configuration, so the process refuses to start and names the pair |
 | The defaults live where the queue is built | Every reader takes them from there rather than carrying its own, so two spellings cannot disagree. The configuration reference prints them in its Default column as it does for every other setting, which is the one restatement and the one an operator reads; the chart carries none, and a deployment that wants one sets the environment variable |
 
-## What a failed job records
+## Failure records
 
 A job that failed keeps the reason, bounded.
 

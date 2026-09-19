@@ -10,7 +10,7 @@ Satisfies REQ-65, REQ-66, REQ-67, REQ-69.
 - [Policy and sanitizing](#policy-and-sanitizing)
 - [Raw markup](#raw-markup)
 - [Link schemes](#link-schemes)
-- [Referring to an issue](#referring-to-an-issue)
+- [Issue references](#issue-references)
 - [Images and attachments](#images-and-attachments)
 - [Representation](#representation)
 - [Rendered and escaped text](#rendered-and-escaped-text)
@@ -104,7 +104,7 @@ Submission and sanitizing must agree on what survives. A link accepted at
 submission and deleted by the sanitizer is a link when it is written and plain
 text when it is read, with nothing reporting the difference.
 
-## Referring to an issue
+## Issue references
 
 `issue:CVE-2026-1234` is one vulnerability, wherever this deployment has it
 (REQ-65). An identifier and never an address, for the reason an attachment is

@@ -7,7 +7,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49.
 ## Contents
 
 - [Events and conditions](#events-and-conditions)
-- [What is told](#what-is-told)
+- [Triggers and kinds](#triggers-and-kinds)
 - [The in-application area](#the-in-application-area)
 - [Mentions](#mentions)
 - [New criticals in a shipped release](#new-criticals-in-a-shipped-release)
@@ -17,8 +17,8 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49.
 - [Work arriving by rule](#work-arriving-by-rule)
 - [Claim outcomes](#claim-outcomes)
 - [The digest](#the-digest)
-- [What leaves the deployment](#what-leaves-the-deployment)
-- [Reading what you were told](#reading-what-you-were-told)
+- [Outbound content](#outbound-content)
+- [The notification list](#the-notification-list)
 - [Delivery](#delivery)
 - [Mail](#mail)
 - [Outbound HTTP](#outbound-http)
@@ -45,7 +45,7 @@ true is cleared, and running the same pass twice changes nothing.
 | A standing condition states what is true now, not what was true when it opened | A condition's sentence carries a count, and the row was written once and left alone, so a queue that grew overnight reported the number it had when somebody first looked. The row stays the same row; the sentence changes |
 | Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a claim to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
 
-## What is told
+## Triggers and kinds
 
 | Trigger | Kind | Notes |
 |---|---|---|
@@ -293,7 +293,7 @@ read these, but the path the message takes to reach them.
 Lateness is excluded. An embargo whose date has passed already raises an alert of
 its own.
 
-## What leaves the deployment
+## Outbound content
 
 A message about an undisclosed finding carries no detail — that there is
 something, and a link. Not the identifier, not the component, not the summary,
@@ -316,7 +316,7 @@ Administrators, and whoever holds it — the second only where they may still re
 undisclosed work in that product. An assignment can outlive the role that
 allowed it.
 
-## Reading what you were told
+## The notification list
 
 Narrowed in the data-access layer, with a subject, like every other read
 (REQ-42 and REQ-43). The list and its badge go through one set of conditions.

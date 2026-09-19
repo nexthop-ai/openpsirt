@@ -19,7 +19,7 @@ REQ-25, REQ-32, REQ-52, REQ-54.
 - [Component identity](#component-identity)
 - [Upstream name and version](#upstream-name-and-version)
 - [The fold](#the-fold)
-- [Merging duplicate descriptions](#merging-duplicate-descriptions)
+- [Duplicate descriptions](#duplicate-descriptions)
 - [History as intervals](#history-as-intervals)
 - [Place identity](#place-identity)
 - [Path traversal](#path-traversal)
@@ -323,7 +323,7 @@ one each. And 54 live edges run between packages of one source package, so a
 folded node would depend on itself and the graph would acquire cycles the
 inventory does not have.
 
-## Merging duplicate descriptions
+## Duplicate descriptions
 
 A document describing the same package twice is describing one component, and the
 two descriptions are not always the same. In the measured image, keeping

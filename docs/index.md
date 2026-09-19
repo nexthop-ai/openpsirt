@@ -16,7 +16,7 @@ somewhere to triage what it finds and follow it through to a fix.
     an upgrade may mean recreating the database. What is here describes the
     system as it is being built, and changes as it is.
 
-## What it does
+## Scope
 
 - **Takes in inventories** pushed by build pipelines, in CycloneDX or SPDX
  form, along with the suppressions the build carries patches for
@@ -32,7 +32,7 @@ somewhere to triage what it finds and follow it through to a fix.
 - **Reports** on what was fixed between releases, what was dismissed and why,
  what is running out of time, and whether the team is keeping pace
 
-## What it does not do
+## Out of scope
 
 - Generate SBOMs — your build does that
 - Work out what is in a product — the component list always comes from the build
@@ -76,7 +76,7 @@ behind every line of it.
 - **OpenPSIRT publishes an inventory of itself**, of the binary and of the
  image, and scans itself with them
 
-### What is tracked
+### The tracked unit
 
 - **The tracked unit is a product, a branch or tag, and a variant.** A release
  carries a reversible end-of-life date, past which nothing is deleted or hidden
@@ -224,7 +224,7 @@ behind every line of it.
 - **Nothing a person typed is lost** — not by a failed submission, a
  navigation, or an expired session
 
-### Running it
+### Operation
 
 - **A container image and a Helm chart.** A configuration that cannot work is
  refused at install time, naming what is missing
@@ -246,7 +246,7 @@ behind every line of it.
  and a license check gate every change**, and every finding reproduces locally
  with one documented command
 
-## Where to go next
+## Next steps
 
 | | |
 |---|---|

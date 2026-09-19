@@ -15,15 +15,15 @@ requires.
 - [Starting and stopping](#starting-and-stopping)
 - [Chart security context](#chart-security-context)
 - [Render-time refusals](#render-time-refusals)
-- [Where a secret comes from](#where-a-secret-comes-from)
+- [Secret sources](#secret-sources)
 - [Self-inventories](#self-inventories)
 - [Inventory composition](#inventory-composition)
 - [Release assets](#release-assets)
-- [Where a version comes from](#where-a-version-comes-from)
+- [Version sources](#version-sources)
 - [Image tags and labels](#image-tags-and-labels)
 - [Chart version stamping](#chart-version-stamping)
 - [Signing and provenance](#signing-and-provenance)
-- [Cutting a release](#cutting-a-release)
+- [The release procedure](#the-release-procedure)
 - [Not built](#not-built)
 - [Limits](#limits)
 
@@ -182,7 +182,7 @@ produces is resolved against the Secrets that same install creates. A list
 written beside the check would give a fifth secret source no row, and stay
 green on the defect it exists for.
 
-## Where a secret comes from
+## Secret sources
 
 | Value | Where it is read from |
 |---|---|
@@ -284,7 +284,7 @@ Both inventories are published rather than left as a workflow artifact that
 expires. We ingest these for other people's software; REQ-04 is the same
 promise kept about our own, and a promise kept where somebody can see it.
 
-## Where a version comes from
+## Version sources
 
 | Rule | Why |
 |---|---|
@@ -370,7 +370,7 @@ that check a download:
 | Issuer | `https://token.actions.githubusercontent.com` |
 | Identity | The release workflow in this repository, at a tag |
 
-## Cutting a release
+## The release procedure
 
 A release is a tag. Everything after it is the `Release` workflow, and there
 is no step anybody performs by hand:

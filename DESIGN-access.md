@@ -13,7 +13,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [The upward tree](#the-upward-tree)
 - [Refusals disclose nothing](#refusals-disclose-nothing)
 - [Assignment](#assignment)
-- [What a sign-in leaves behind](#what-a-sign-in-leaves-behind)
+- [Session state](#session-state)
 - [Departure](#departure)
 - [Statistics and the audit permission](#statistics-and-the-audit-permission)
 - [Somebody who has left](#somebody-who-has-left)
@@ -27,18 +27,18 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [Trusted-header sign-in](#trusted-header-sign-in)
 - [Name and identifier](#name-and-identifier)
 - [Sessions and request forgery](#sessions-and-request-forgery)
-- [How a group name is matched](#how-a-group-name-is-matched)
+- [Group name matching](#group-name-matching)
 - [Role assignment modes](#role-assignment-modes)
 - [The grant grid](#the-grant-grid)
 - [A role across every product](#a-role-across-every-product)
 - [Personal tokens](#personal-tokens)
-- [Where each check is made](#where-each-check-is-made)
+- [Enforcement sites](#enforcement-sites)
 - [Browser headers](#browser-headers)
 - [Sign-in return addresses](#sign-in-return-addresses)
 - [The administration trail](#the-administration-trail)
 - [Secrets and logs](#secrets-and-logs)
 - [Disclosure](#disclosure)
-- [Extending a disclosure date](#extending-a-disclosure-date)
+- [Disclosure extensions](#disclosure-extensions)
 - [Case collaborators](#case-collaborators)
 - [Values a deployment mints](#values-a-deployment-mints)
 - [Mail addresses](#mail-addresses)
@@ -205,7 +205,7 @@ yourself is still doing it.
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
 
-## What a sign-in leaves behind
+## Session state
 
 What a sign-in has to remember while the browser is at the provider stays with
 the browser rather than in a table of half-finished sign-ins that has to be
@@ -268,7 +268,7 @@ grant that opened those was the administrator flag, which is not read-only: the
 record proving nobody moved the goalposts was readable by exactly the population
 able to move them.
 
-### What the audit permission grants
+### The audit permission
 
 | | |
 |---|---|
@@ -289,7 +289,7 @@ rows come back as the asker could have read them on their own account, which is
 the rule the administrator flag already follows — so an auditor who reaches no
 product is answered with nothing.
 
-### Where it lives
+### Storage
 
 Its own column beside administration, not a role.
 
@@ -660,7 +660,7 @@ same person as that username at the provider.
 | A username is folded, an identifier is not | The name is both halves of the rule at once now: an administrator types it to authorize somebody, and a provider reports it at every sign-in. The typed rule wins because the failure runs that way — "Alice" recorded against "alice" reported leaves an authorization nobody can redeem, and under group-bound admission a second account beside the first. Normalized as it is stored, so no engine's collation decides it (REQ-08) |
 | An identifier is unbound by an administrator, never by a sign-in | An identifier belongs to the provider that issued it, so changing provider leaves every account pinned to one that refuses its holder — the name matches and the identifier does not. Clearing it is an administrative act with the authorization left in place; doing it automatically would undo, at the moment it was working, the protection that stops a released name being redeemed by whoever took it |
 
-### Which provider issued an identifier
+### Provider attribution
 
 The issuer is recorded beside the identifier it minted, and written at the
 same moment.
@@ -695,7 +695,7 @@ is what a provider change goes through.
 | A deployment configured for a provider its bound identities do not name refuses to start, and says how to undo it | The refusal is the only place anybody learns that the bindings need withdrawing, so stating the condition without the remedy leaves an operator with a process that will not start and no next step |
 | The window an unredeemed authorization lapses in is charged on every path a name arrives by | The proxy path is the one where a name alone decides who gets the roles, so an authorization nobody redeemed matters most there. The deployment's own way back in is not what this closes: an administrator named in configuration is authorized again at every start, which restarts the window |
 
-### How long a name is redeemable
+### The redemption window
 
 An authorization nobody has redeemed is matched by name alone, because the
 identifier it will be pinned to is not knowable until somebody arrives holding
@@ -709,7 +709,7 @@ it. That window ends.
 | Thirty days where nobody has said | Long enough for somebody authorized ahead of a start date, a notice period or a holiday to arrive; short enough that a grant for a person who never came does not stand for the life of the deployment |
 | A redeemed authorization is not held to it | The identifier decides from then on, and the window was only ever about the name |
 
-### Which claim carries the username
+### The username claim
 
 An OpenID Connect provider is told which claim carries the username, and there
 is no default.
@@ -745,7 +745,7 @@ echoed value has leaked. Requests carrying a key or a token are exempt: nothing
 sends those automatically. Safe methods are named as a list, so a method nobody
 thought of is guarded rather than exempt by having been forgotten.
 
-## How a group name is matched
+## Group name matching
 
 Exactly, with its capitals. A group name is an identity the provider hands over,
 and the rule for those is exact comparison — the same rule that makes a name
@@ -880,7 +880,7 @@ trying each store in turn. A credential that ends up somewhere public is also
 recognizable as one: secret scanners match fixed prefixes, and a bare run of
 base64 matches nothing.
 
-## Where each check is made
+## Enforcement sites
 
 | Decided | Where | Reason |
 |---|---|---|
@@ -984,7 +984,7 @@ record, because it is the same question one layer up.
 | The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |
 | **It is read over a period, and leaves as a file** | An access review asks what changed in the stretch a certificate covers. Capped at fifty rows, undated and unexportable, that question was answered a page at a time on a screen and could not leave it. Asked for no period it answers about everything it holds |
 
-### Which writes leave a row
+### Recorded writes
 
 Every write the server registers is one of two things, and the walk fails on one
 that is neither.
@@ -1054,7 +1054,7 @@ The date arriving tells administrators, and whoever holds the finding where they
 may still read undisclosed work in that product. A condition rather than an
 event: it stands while the date is past and nothing has been decided.
 
-## Extending a disclosure date
+## Disclosure extensions
 
 Needs a reason, and past a threshold that is a setting — thirty days by default —
 a second person (REQ-38). The same shape as a deferral, because it is the same

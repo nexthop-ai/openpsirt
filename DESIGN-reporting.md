@@ -22,17 +22,17 @@ this document is its own.
 - [Holder workload](#holder-workload)
 - [Inheritance preview](#inheritance-preview)
 - [Remediation metrics](#remediation-metrics)
-- [Where the effort went](#where-the-effort-went)
+- [Effort by subject](#effort-by-subject)
 - [Triage latency](#triage-latency)
 - [Repeated deferrals](#repeated-deferrals)
 - [Subtree trends](#subtree-trends)
 - [The disposition register](#the-disposition-register)
-- [Shipping with known issues](#shipping-with-known-issues)
-- [Everything known about one issue](#everything-known-about-one-issue)
+- [Known issues at release](#known-issues-at-release)
+- [One issue across the estate](#one-issue-across-the-estate)
 - [The exception report](#the-exception-report)
 - [Dismissals and scan coverage](#dismissals-and-scan-coverage)
 - [The report catalog](#the-report-catalog)
-- [What a fix-bundle page costs](#what-a-fix-bundle-page-costs)
+- [Fix-bundle page cost](#fix-bundle-page-cost)
 - [Exports](#exports)
 - [Settings](#settings)
 - [Limits](#limits)
@@ -310,7 +310,7 @@ the answer comes back as a fraction of a day: declaring it a whole number scanne
 on none of the four — one refused a float outright and three handed back a
 decimal string.
 
-## Where the effort went
+## Effort by subject
 
 What the judgments in a period were about, most argued first: the component,
 the product, how many arguments were made, how far they reached, how many
@@ -414,7 +414,7 @@ closed after, proposed after. Asking for what closed after a date is the one
 filter that changes what the list is *about* rather than narrowing it, and the
 caller states so by asking for it.
 
-## Shipping with known issues
+## Known issues at release
 
 What a build still carries, with what stands about each. The comparison
 already answers it, so this is that screen's third column rather than a page
@@ -430,7 +430,7 @@ of its own, and the catalog carries it with the selection made.
 | The column narrows to what nobody has agreed to | That is the coordinator's blocker list, and it is the one narrowing the sheet is read for |
 | It is read for the still-present entries alone | What was fixed needs no justification and what is newly present has not been looked at yet |
 
-## Everything known about one issue
+## One issue across the estate
 
 A document: what the issue is, every build of ours that carries it, what was
 decided about each and the argument behind it. The form a customer inquiry is
@@ -606,7 +606,7 @@ What each claim covers now is one statement for the page. A capped section that
 read as complete would mislead the one reader this report is for, so it says it
 was capped.
 
-## What a fix-bundle page costs
+## Fix-bundle page cost
 
 Measured rather than asserted, because it was reported slow on a real
 deployment at 2.2 s and "the design says it should be fine" is a sentence with

@@ -9,8 +9,8 @@ Satisfies REQ-77.
 
 - [Recorded, never computed](#recorded-never-computed)
 - [Three facts that get conflated](#three-facts-that-get-conflated)
-- [What is stored](#what-is-stored)
-- [What a screen shows](#what-a-screen-shows)
+- [Stored facts](#stored-facts)
+- [Screen contents](#screen-contents)
 - [Windows](#windows)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -53,7 +53,7 @@ it is an easy one: both are called "exploited", both raise urgency, and one of
 them arrives automatically. They are kept apart in name as well as in meaning,
 so that no report can read them as one.
 
-## What is stored
+## Stored facts
 
 Facts about moments, which is why they are stored rather than worked out again:
 the moment they describe is gone by the time anybody asks.
@@ -65,7 +65,7 @@ the moment they describe is gone by the time anybody asks.
 | That somebody outside was told | Who, when, and about what. The same shape as the record of an advisory going out |
 | Clearing the exploitation record | An explicit human withdrawal, recorded. Never automatic, and never a side effect of a scan |
 
-## What a screen shows
+## Screen contents
 
 > became aware 14:00 Tuesday, told ENISA 09:00 Wednesday
 

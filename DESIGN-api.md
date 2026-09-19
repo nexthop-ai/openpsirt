@@ -383,7 +383,7 @@ The package's authorization primitives sit beside the declarations they
 enforce. A declaration in one file and the primitive enforcing it in another
 with nothing to do with it is what makes the privilege ladder hard to audit.
 
-### What stays as it is
+### Deliberate omissions
 
 Recorded because the conclusion is the deliverable.
 

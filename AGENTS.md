@@ -463,7 +463,7 @@ them.
 This is the one register here written to be skimmed rather than read, so it
 does not follow the house style the documents use — including the rule against
 contractions below, which is about text read years later. `DESIGN-interface.md`
-§ What a screen says holds the whole of it, with worked examples. Nothing gates
+§ Screen copy holds the whole of it, with worked examples. Nothing gates
 any of it; the copy reached 6,700 words of explanation across 65 files once
 already.
 
@@ -593,7 +593,7 @@ somebody working out later why the code looks like this. Both are in a hurry.
 
 | Rule | |
 |---|---|
-| **Short, and plain spoken English** | The register the interface uses, for the same reason: it is skimmed. `DESIGN-interface.md` § What a screen says has the whole of it |
+| **Short, and plain spoken English** | The register the interface uses, for the same reason: it is skimmed. `DESIGN-interface.md` § Screen copy has the whole of it |
 | **Lists, tables and examples before prose** | A before-and-after pair says what a paragraph about the change does not. A paragraph is for the one thing that is neither a list nor a table |
 | **A measurement where there is one** | "3 ms on PostgreSQL, 11 ms on MySQL", "335,021 findings for one image": a number describing something outside this repository is why the change has the shape it has, and somebody can re-run it |
 | **No count of the tree's own contents** | The same rule code comments and documents are held to, and for a sharper reason: a description is rewritten as the branch is, so "38 trailed acts" or "27 payloads shorter" is stale the next time anybody pushes — and then a reviewer counts them, finds them wrong, and the whole exchange bought nothing. Say the shape. "Every trailed act" stays true through the commit that adds one |

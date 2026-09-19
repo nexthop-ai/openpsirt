@@ -26,7 +26,7 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 - [Indexes](#indexes)
 - [Columns no query reads](#columns-no-query-reads)
 - [Column widths](#column-widths)
-- [Cutting text to a width](#cutting-text-to-a-width)
+- [Text truncation](#text-truncation)
 - [Test harness](#test-harness)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -735,7 +735,7 @@ Measured against the reference producer's real output: 6,845 components, longest
 version 49 characters, longest name 120, longest package identifier 140, nothing
 over 191.
 
-## Cutting text to a width
+## Text truncation
 
 A cut is made on a character boundary, never at a byte offset.
 

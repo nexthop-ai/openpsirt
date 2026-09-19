@@ -16,8 +16,8 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 - [Resolution](#resolution)
 - [Deadlines](#deadlines)
 - [Pending upgrades](#pending-upgrades)
-- [Asking upstream what is current](#asking-upstream-what-is-current)
-- [Ordering the versions a scanner named](#ordering-the-versions-a-scanner-named)
+- [Upstream currency](#upstream-currency)
+- [Version ordering](#version-ordering)
 - [Promise states](#promise-states)
 - [Build-declared suppressions](#build-declared-suppressions)
 - [External links](#external-links)
@@ -87,7 +87,7 @@ A build has one commitment per fold, enforced by the database rather than by a
 check somebody remembers. A release moves a package to one version; two rows
 saying otherwise is a plan a coordinator cannot read.
 
-### Moving a commitment
+### Commitment changes
 
 | Where it came from | How it changes |
 |---|---|
@@ -224,7 +224,7 @@ rather than from anything written down: the distinct issues the upgrade would
 close here, and how many places those sit at. Nothing is declared done by hand — a
 build is clear when it stops holding them.
 
-## Asking upstream what is current
+## Upstream currency
 
 What the public index for an ecosystem says the newest version is, for the
 components this deployment builds rather than the ones a distribution
@@ -258,7 +258,7 @@ not-found for a renamed package and for some transient conditions, and letting
 one of those destroy a version already in hand would sit on the hole for a
 month.
 
-### What leaves, and what does not
+### Names held back
 
 What a request carries is a component's name. One per component, the name
 and nothing else — no version, no build, no product. For an open-source
@@ -288,7 +288,7 @@ So a name this deployment calls its own is never sent. Three sources, unioned:
 | Identifiers are taken newest first | What a build declares itself to be carries its version, so a product built nightly states a new one every night and the bound falls on builds rather than products. Unordered, two callers deriving this separately get different sets and a name held back yesterday goes out today |
 | The roots are read per pass, the rest at startup | A product declared this morning is one whose name should not leave this afternoon. The other two come from configuration and change on a redeploy |
 
-### What has no upstream answer
+### Unanswered components
 
 Two questions that are one report, because they are asked together: what was
 held back says what the default is costing, and what no public index has heard
@@ -316,7 +316,7 @@ Narrowed to the products the reader may read. A package identifier says what a
 build is made of, so a list of them across the estate is an answer about
 products rather than about the deployment (REQ-42).
 
-## Ordering the versions a scanner named
+## Version ordering
 
 Where a component could go is every version the findings open against it name as
 their fix. Two counts are answered for each, because they are two questions.
@@ -444,7 +444,7 @@ held. Nothing is sent anywhere.
 | The document declares the profile it satisfies, worked out from what it turned out to carry | Declared unconditionally, a document missing a profile-mandatory element fails that profile's own tests and is dropped by the tooling that reads it |
 | The security-advisory profile is the product tree, the vulnerabilities, and notes and a status on each | The standard's own list. Notes and references on the *document* belong to the informational advisory — the profile for a document carrying no vulnerabilities at all — and gating on those declared a base document for every flaw of ours that nobody outside had written up yet, which a customer's tooling filtering for security advisories skips |
 
-### What the document carries
+### Document contents
 
 Everything below is already held. Nothing is derived, and a field the standard
 defines and the record cannot answer is left out — an advisory is read by

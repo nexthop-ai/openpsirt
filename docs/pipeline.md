@@ -6,7 +6,7 @@ there is no client to install and no agent to run.
 The short version: **declare what you ship once, mint a key once, and post the
 inventory on every build.**
 
-## What has to exist first
+## Prerequisites
 
 A scan is filed against a product, a stream and a variant, and an upload naming
 something undeclared is refused — the error says which part is missing. That is
@@ -52,7 +52,7 @@ curl -X POST "$OPENPSIRT/v1/products/sonic/streams" \
   -d '{"name": "v2.4.1", "kind": "tag", "parent": "main"}'
 ```
 
-## Minting a key
+## The pipeline key
 
 A pipeline authenticates with an API key, which is a credential rather than a
 person: it may file scans and it holds none of a person's rights.
@@ -81,7 +81,7 @@ against it is not, so a person holds nothing on a product until somebody grants
 it — but a key carries the product it was made for, so a pipeline needs no
 grant of its own.
 
-## Sending the inventory
+## The upload
 
 Your build already produces an SBOM. Send it.
 
@@ -102,7 +102,7 @@ response says the upload arrived and nothing about whether it could be read.
 That is the one thing to get right in a pipeline: a green step here is not a
 green scan.
 
-## Finding out what happened
+## The result
 
 Poll the scans for that build.
 
@@ -170,7 +170,7 @@ says which part is missing rather than making you guess:
 404  product "sonic": stream "nobody-declared-this": not declared
 ```
 
-## What a pipeline is not asked to do
+## Out of a pipeline’s scope
 
 | | |
 |---|---|

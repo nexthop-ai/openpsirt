@@ -2,13 +2,13 @@
 
 ## Contents
 
-- [1. What this is](#1-what-this-is)
-- [2. What we are building](#2-what-we-are-building)
+- [1. Purpose](#1-purpose)
+- [2. The product](#2-the-product)
 - [3. Requirements](#3-requirements)
   - [3.1 Product and delivery](#31-product-and-delivery)
   - [3.2 Ingest](#32-ingest)
   - [3.3 Vulnerability scanning](#33-vulnerability-scanning)
-  - [3.4 What is tracked](#34-what-is-tracked)
+  - [3.4 The tracked unit](#34-the-tracked-unit)
   - [3.5 State and history](#35-state-and-history)
   - [3.6 Triage](#36-triage)
   - [3.7 Ranking and deadlines](#37-ranking-and-deadlines)
@@ -26,7 +26,7 @@
 
 ---
 
-## 1. What this is
+## 1. Purpose
 
 What OpenPSIRT must cover. Not how it covers it — that is in the `DESIGN-*.md`
 documents, which name the requirements they satisfy. What is left to build is
@@ -37,7 +37,7 @@ number is never reused.
 
 ---
 
-## 2. What we are building
+## 2. The product
 
 A tool that takes in the inventory a build produced, scans it for known
 vulnerabilities here rather than in the build, tracks what changes release to
@@ -88,7 +88,7 @@ inputs.
 | REQ-13 | Every finding records what produced it — which scanner, which version, which database, and how the match was made | "Why is this here" is unanswerable afterwards otherwise, and a scanner upgrade changes results |
 | REQ-14 | Static analysis and fuzzing findings are intended scope. **Not built** | The finding model carries a kind from the start, so a second kind needs no rewrite |
 
-### 3.4 What is tracked
+### 3.4 The tracked unit
 
 | # | Requirement | Why |
 |---|---|---|

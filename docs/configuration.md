@@ -58,7 +58,7 @@ writes `text`.
 | `OPENPSIRT_DB_CONN_LIFETIME` | How long a connection is used before it is replaced | `30m` |
 | `OPENPSIRT_DB_REQUIRE_ENCRYPTION` | Refuse to start where the connection to the database is not encrypted. See below | `false` |
 
-### Encrypting the database connection
+### Database connection encryption
 
 The connection carries undisclosed findings, and by default it is encrypted
 only where the server offers it. Opportunistic is not the same as certain: a
@@ -130,7 +130,7 @@ The verification is available there as well as here on purpose. "It built" and
 matters where the bundle is all there is — in the one situation where trying it
 out first is not available.
 
-## Telling people
+## Mail
 
 Mail is how anything leaves the application. A deployment that sets none of
 this tells nobody anything outside it, which is an ordinary way to run: the
@@ -156,7 +156,7 @@ and a link.
 On the Helm chart these are the `mail` values, and the password goes in a
 Secret the chart makes or one you name.
 
-## Publishing advisories
+## Advisory publication
 
 An advisory is a document about a flaw in your own product. It is generated
 from what this deployment already holds and handed to you; nothing is sent
@@ -176,7 +176,7 @@ validation after you have sent it.
 On the Helm chart these go through `extraEnv`, since a deployment that does not
 publish needs none of them.
 
-## Asking public indexes what is current
+## Upstream currency
 
 Off unless an administrator turns it on, under Settings. It is the only thing
 here that reaches the network: everything a scan needs arrives as a file
@@ -232,7 +232,7 @@ the default is costing; names no public index has heard of are private modules
 and vendored forks, and they are the candidates to promote into
 `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
 
-## Who may sign in
+## Sign-in
 
 The process refuses to start until somebody can administer it, and naming
 somebody grants a role — it does not let anybody in without signing in.
@@ -262,7 +262,7 @@ username, and two providers issuing them independently cannot be told apart.
 | `OPENPSIRT_OIDC_USERNAME_CLAIM` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
 | `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it | unset |
 
-### Which claim carries the username
+### The username claim
 
 The claim is not the identity. The provider's subject is, and the first
 sign-in pins it; from then on the subject decides and a rename is followed as
@@ -298,7 +298,7 @@ with a typo in it therefore reads as "this person was never granted access"**,
 not as a configuration error, so check the name against the provider's own
 token before deciding somebody's grant is missing.
 
-### Signing in when the provider is gone
+### Sign-in without a provider
 
 The trusted header below is the way in that does not depend on the provider,
 and it is what a provider change goes through. A pinned identifier does not
@@ -366,7 +366,7 @@ half of one, and the process stops rather than accept a header anybody can set.
 | `OPENPSIRT_TRUSTED_GROUPS_HEADER` | Where that proxy reports group membership, if it does | unset |
 | `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed | `,` |
 
-## Where files hanging off a finding are kept
+## Attachment storage
 
 Absent is ordinary: with none of this set, attachments are off and everything
 else works. An operator who wants none should not have to run a bucket.
@@ -423,7 +423,7 @@ build server and waiting for a restart is not a remedy.
 | `OPENPSIRT_QUEUE_MAX_HOLD` | How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and `OPENPSIRT_SCANNER_TIMEOUT`, which the process checks at startup | `2h` |
 | `OPENPSIRT_QUEUE_BACKOFF` | How long a failed job waits before it is tried again, multiplied by the attempt | `30s` |
 
-## Reading a scan file
+## Scan file limits
 
 A scan file is somebody else's output arriving over a link this deployment does
 not control, so it is read within bounds. These are the ceilings; each is
@@ -451,7 +451,7 @@ the container's memory limit with them.
 | `OPENPSIRT_INGEST_MAX_DEPTH` | How deeply it may nest | 64 |
 | `OPENPSIRT_INGEST_MAX_DOCUMENTS` | How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document | 8 |
 
-## Reading what the scanner reported
+## Scanner output limits
 
 The scanner's report is read in the same process, and its size is components ×
 matches × references — the first of which a producer controls by uploading a

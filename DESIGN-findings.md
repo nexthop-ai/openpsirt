@@ -10,20 +10,20 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [Fan-out](#fan-out)
 - [The row a person reads](#the-row-a-person-reads)
 - [Issue identity](#issue-identity)
-- [What a report supplies](#what-a-report-supplies)
-- [Who supplied a component](#who-supplied-a-component)
-- [Merging later reports](#merging-later-reports)
+- [Report contents](#report-contents)
+- [Component suppliers](#component-suppliers)
+- [Report merging](#report-merging)
 - [Derived addresses](#derived-addresses)
-- [What an index says](#what-an-index-says)
-- [How a match was made](#how-a-match-was-made)
+- [Index responses](#index-responses)
+- [Match methods](#match-methods)
 - [Declared dependency scope](#declared-dependency-scope)
-- [Interning a component](#interning-a-component)
+- [Component interning](#component-interning)
 - [Recorded flaws](#recorded-flaws)
 - [Reporter details](#reporter-details)
 - [Scoring](#scoring)
 - [Affected build sets](#affected-build-sets)
 - [Closure by a person](#closure-by-a-person)
-- [What a scan governs](#what-a-scan-governs)
+- [The authority of a run](#the-authority-of-a-run)
 - [Interval storage](#interval-storage)
 - [Closure reasons](#closure-reasons)
 - [Build-declared claims](#build-declared-claims)
@@ -32,7 +32,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [Urgency](#urgency)
 - [Work across builds](#work-across-builds)
 - [Incomplete upgrades](#incomplete-upgrades)
-- [Scanning as separate work](#scanning-as-separate-work)
+- [Scans as separate work](#scans-as-separate-work)
 - [A year of nightly scans](#a-year-of-nightly-scans)
 - [The total above a list](#the-total-above-a-list)
 - [The severity ladder](#the-severity-ladder)
@@ -98,7 +98,7 @@ names**: every name resolves to one row, and a decision holds across all of them
 | The fold is what a screen reports about | The rows a finding screen shows are the whole fold, so who holds it, what rule placed it and everything else reported beside them is asked of the fold too. Asked of one component, a rule that placed a third of a fold reported as no rule under one name and as the whole thing under another — while the guarantee those reads state is "one name for the whole group, and empty where its places disagree" |
 | **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each place carries |
 
-## What a report supplies
+## Report contents
 
 Everything a report says about an issue is kept. None of it is recoverable
 later, because a report is not kept once read.
@@ -127,7 +127,7 @@ being parsed and thrown away.
 | A group whose places disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing places is a fix attached to a group that does not have one |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered, with the one the data calls the root cause first. It groups findings by the shape of the mistake rather than the package it landed in, and a published advisory states one of them — which is what the order says |
 
-## Who supplied a component
+## Component suppliers
 
 An inventory often says who supplied a component — a distribution, a vendor, a
 project — and that is kept, because a bare name is not enough for a dependency of
@@ -135,14 +135,14 @@ a dependency somebody has never heard of.
 
 | Rule | Reason |
 |---|---|
-| From the inventory, never from an index | It is what the producer of this build said, not what a registry says about a package in general. What an index says has its own section below and covers different fields |
+| From the inventory, never from an index | It is what the producer of this build said, not what a registry says about a package in general. Index responses have their own section below and carry different fields |
 | Absent for most of it, and said so rather than filled in | Measured on a switch image: 759 of 6,866 components carry one. A screen states that nobody said rather than showing a blank |
 | Two ways of saying it, resolved after the whole description is read | One format states an object and a plainer string beside it, and the object wins where a producer fills in both. Resolved while reading, whichever key the producer happened to write first won — and key order is the producer's choice |
 | A party's kind is dropped, its name kept | The other format prefixes it — "Organization: Debian" — and one of the two words is a label rather than a name. The word that format uses for "nobody stated one" is treated as nobody having stated one |
 | Never part of identity | Two producers describing one component name its supplier differently or not at all, and an identity that moved with it would take every triage decision attached along with it |
 | A later report fills it in where the row has none | The rule the section below states for everything else two reports can disagree about. Written only on the insert instead, a component first seen through a producer that stated none never got one, however many later scans said who it was |
 
-## Merging later reports
+## Report merging
 
 Reports disagree and arrive in an order nobody controls. A later one fills in
 what an earlier one did not know and **overwrites nothing**, or what is stored
@@ -217,7 +217,7 @@ else, so a kernel CVE whose upstream record lists eight `git.kernel.org` commits
 showed one tracker link and no patches. References from every identifier an
 issue answers to are kept, deduplicated against the matched record's own.
 
-## What an index says
+## Index responses
 
 A bare name is not enough for a dependency of a dependency. Where an ecosystem
 publishes an index, what it says about a package is asked for alongside the
@@ -241,7 +241,7 @@ distribution's own package index, which is one file per release rather than one
 request per package — a different shape from the per-package asks here, and not
 built.
 
-## How a match was made
+## Match methods
 
 A scanner reaches a finding one of two ways, and on a distribution's package they
 mean very different things (REQ-13).
@@ -303,7 +303,7 @@ Dropping that edge is not acting on a finding. What it changes is where the
 component sits, not whether it is tracked, which is why the rule above and this
 exception agree rather than contradict.
 
-### Where it is surfaced
+### Surfaces
 
 | Surface | What it does |
 |---|---|
@@ -315,7 +315,7 @@ claim, and not as a default narrowing on any list. A person deciding that a
 build-time dependency does not ship is making a judgment, and the judgment stays
 theirs.
 
-## Interning a component
+## Component interning
 
 A component identified by its content is one row whoever writes it, so two
 scans describing the same library at the same version are agreeing rather than
@@ -444,7 +444,7 @@ name that reaches several, a summary of nothing but whitespace, and a build with
 no contents. The third is worth naming — a minimum length passes whitespace, so
 it arrives from a request and used to be answered as a server fault.
 
-## What a scan governs
+## The authority of a run
 
 A run is the authority on what it reported. It opens what it found and **closes
 everything open that it no longer reports**, which is how a component leaving a
@@ -807,7 +807,7 @@ Shown on the finding as the version it arrived from, and in the still-present
 column of a release comparison. Not in the review queue, which lists decisions
 rather than findings.
 
-## Scanning as separate work
+## Scans as separate work
 
 An inventory is read once, when it arrives. It is scanned again and again as the
 vulnerability data moves underneath it, so reading an inventory leaves a scan to
@@ -981,7 +981,7 @@ The narrowing, the page and the component view each have their own test file
 already, which is what says the seam is real rather than a line count. What is
 left beside them is the naming layer they share.
 
-### What stays as it is
+### Deliberate omissions
 
 Recorded because the conclusion is the deliverable: a review that asks the same
 question next year should find the answer rather than the question.
