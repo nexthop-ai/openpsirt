@@ -283,9 +283,9 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		Until         *time.Time `bun:"until"`
 	}
 	q := where(s.db.NewSelect().Model((*Claim)(nil))).
-		// The moment it was first said and the moment it stopped, read off the scans the
-		// interval is held against: the claim itself carries scan identifiers,
-		// and a screen needs moments.
+		// The moment it was first said and the moment it stopped, read off the
+		// scans the interval is held against: the claim itself carries scan
+		// identifiers, and a screen needs moments.
 		Join(`JOIN "scan" AS "opened" ON opened.id = sup.opened_scan_id`).
 		Join(`LEFT JOIN "scan" AS "closed" ON closed.id = sup.closed_scan_id`).
 		ColumnExpr(`sup.vulnerability AS "vulnerability"`).

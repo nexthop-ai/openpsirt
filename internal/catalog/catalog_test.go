@@ -321,8 +321,8 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 	// the parent was refused as a contradiction, which it is not — nothing had
 	// been said for it to contradict.
 	//
-	// A claim that it came from a *different* branch stays refused, because a tag is
-	// one frozen point and it came from wherever it came from.
+	// A claim that it came from a *different* branch stays refused, because a
+	// tag is one frozen point and it came from wherever it came from.
 	each(t, func(t *testing.T, _ *database.DB, store *catalog.Store) {
 		ctx := t.Context()
 		product, err := store.DeclareProduct(ctx, "sonic", "SONiC")

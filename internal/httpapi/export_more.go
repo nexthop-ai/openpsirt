@@ -95,9 +95,8 @@ func registerDueExport(api huma.API, in Ingest) {
 						owners = append(owners, *row.AssignedTo)
 					}
 				}
-				// A person or a team: the column holds a
-				// party, and a file naming only people
-				// reports a team's work as nobody's.
+				// A person or a team: the column holds a party, and a file
+				// naming only people reports a team's work as nobody's.
 				who, err := rights.WhoHolds(ctx, owners)
 				if err != nil {
 					return nil, err
@@ -561,8 +560,8 @@ func registerChangeExport(api huma.API, in Ingest) {
 				if err != nil {
 					return nil, err
 				}
-				// The person, by the identity they sign in under, read a page at a
-				// time like every other name this file carries.
+				// The person, by the identity they sign in under, read a page
+				// at a time like every other name this file carries.
 				who := make([]int64, 0, len(changes))
 				for _, change := range changes {
 					who = append(who, change.By)

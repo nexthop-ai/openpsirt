@@ -447,12 +447,11 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 // force, so an issue reassessed here read one way on one list and another way
 // on the other — which is the whole point of reassessing it.
 //
-// Each list's own additions are what differ between them: the way down,
-// for a list of one build; the product and the build to link to, for a list
-// that spans them.
-// The rating a row reads is the line's product's, because the two are one
-// product's: the word the line states and the word it is compared against are
-// both decisions that team made.
+// Each list's own additions are what differ between them: the way down, for a
+// list of one build; the product and the build to link to, for a list that
+// spans them. The rating a row reads is the line's product's, because the two
+// are one product's: the word the line states and the word it is compared
+// against are both decisions that team made.
 func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]string,
 	shipped map[int64]graph.Component, floor Floor) Group {
 
@@ -493,10 +492,9 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 	}
 	// The reason there is no deadline, stated rather than left as a blank
 	// cell. The reasons are asked narrowest first and the last is what is
-	// left: the line
-	// is a statement about this issue's rating, upstream having nothing to
-	// take is one about this finding, and anything else without a deadline is
-	// in a release nothing is going to be fixed in.
+	// left: the line is a statement about this issue's rating, upstream having
+	// nothing to take is one about this finding, and anything else without a
+	// deadline is in a release nothing is going to be fixed in.
 	//
 	// The line itself belongs to the caller: per product it is the
 	// product's own, and across products it is the deployment's, because one
@@ -658,16 +656,15 @@ type decorated struct {
 // finding's covering index and nothing else, and how many groups there are.
 //
 // The total rides on the page. It is counted through the same filter as the
-// page — a total that ignores the narrowing is worse than no total: it
-// reports how much there is to decide about, which is the figure people
-// quote, while the list beside it shows something else. A second statement
-// makes the same grouping over the same rows to count what the first has just
-// grouped; `COUNT(*) OVER ()` is the number of rows
-// the grouping produced after the HAVING clauses and before the limit,
-// which is exactly that, on all four engines (window functions are in each
-// of them), for the cost of nothing. Where the page comes back empty — an
-// offset past the end — there is no row to carry it and it is counted
-// separately.
+// page — a total that ignores the narrowing is worse than no total: it reports
+// how much there is to decide about, which is the figure people quote, while
+// the list beside it shows something else. A second statement makes the same
+// grouping over the same rows to count what the first has just grouped;
+// `COUNT(*) OVER ()` is the number of rows the grouping produced after the
+// HAVING clauses and before the limit, which is exactly that, on all four
+// engines (window functions are in each of them), for the cost of nothing.
+// Where the page comes back empty — an offset past the end — there is no row
+// to carry it and it is counted separately.
 func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Visibility,
 	limit, offset int, filter Filter) ([]groupHead, int, error) {
 
@@ -839,8 +836,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
 		// The number of builds in the selection holding this group, and one of
 		// them to name. Both are one where the selection is a single build,
-		// which is
-		// why the row says nothing about either there.
+		// which is why the row says nothing about either there.
 		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
 		ColumnExpr(`MIN(f.target_id) AS "target_id"`)
 	// The decision state of each group, counted the way the state filter

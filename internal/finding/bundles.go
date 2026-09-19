@@ -799,8 +799,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	for _, row := range rows {
 		ids = append(ids, row.ComponentID)
 	}
-	// The versions each could go to, per build: the same read the by-component view
-	// takes, narrowed to these builds so a stream's answer is its own.
+	// The versions each could go to, per build: the same read the by-component
+	// view takes, narrowed to these builds so a stream's answer is its own.
 	upgrades, err := s.upgradesPerBuild(ctx, ids, targets, visible, name)
 	if err != nil {
 		return nil, err
@@ -884,8 +884,8 @@ func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
 		return nil, fmt.Errorf("read where a component could go in each build: %w", err)
 	}
 
-	// The versions each build's findings name, one entry per issue so an issue counts
-	// once however many versions its fix names.
+	// The versions each build's findings name, one entry per issue so an issue
+	// counts once however many versions its fix names.
 	per := map[[2]int64][]namedFix{}
 	scheme := map[[2]int64]vercmp.Scheme{}
 	for _, row := range rows {

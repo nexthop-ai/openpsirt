@@ -456,10 +456,10 @@ type Refusal struct {
 // about one build and reads nothing back.
 func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) error {
 	r.At = s.now().Truncate(time.Microsecond)
-	// The sender turned away comes from the subject rather than from the caller.
-	// The caller already has the name in two shapes and would be choosing
-	// between them here, which is one place for the record to disagree with
-	// what the request was actually resolved as.
+	// The sender turned away comes from the subject rather than from the
+	// caller. The caller already has the name in two shapes and would be
+	// choosing between them here, which is one place for the record to
+	// disagree with what the request was actually resolved as.
 	if r.Credential == nil && subject.Identity != "" {
 		identity := subject.Identity
 		r.Credential = &identity

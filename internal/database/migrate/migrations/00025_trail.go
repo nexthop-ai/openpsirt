@@ -16,13 +16,13 @@ func init() {
 
 // Changes somebody made to how this deployment works.
 //
-// The person, the subject, the values before and after, and the moment. Three administrative levers
-// silently rewrite what this tool reports: changing the deadline policy
-// recomputes every open finding's deadline, raising the triage floor takes the
-// deadline off everything below it, and an end-of-life date takes it off
-// everything past it. None of them recorded who moved it — a setting carried
-// when it changed and not by whom, a role grant when it was withdrawn and not
-// who granted it.
+// The person, the subject, the values before and after, and the moment. Three
+// administrative levers silently rewrite what this tool reports: changing the
+// deadline policy recomputes every open finding's deadline, raising the triage
+// floor takes the deadline off everything below it, and an end-of-life date
+// takes it off everything past it. None of them recorded who moved it — a
+// setting carried when it changed and not by whom, a role grant when it was
+// withdrawn and not who granted it.
 //
 // For a tool whose entire output is evidence, that is the evidence being
 // movable with nothing recording that anybody moved it. It is the same gap the

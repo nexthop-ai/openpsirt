@@ -38,12 +38,13 @@ func refused(t *testing.T, err error) bool {
 }
 
 func TestAnOversizedValueIsRefusedRatherThanTruncated(t *testing.T) {
-	// A request to two of the engines for standard identifier quoting nearly cost
-	// this the strictness that makes an oversized value an error. Setting a
-	// mode replaces it rather than adding to it, and what it replaced included
-	// the rule that refuses a value too long for its column — so a nine
-	// character string went into a four character column and came back four
-	// characters long, with no error, on two engines and not on the other two.
+	// A request to two of the engines for standard identifier quoting nearly
+	// cost this the strictness that makes an oversized value an error. Setting
+	// a mode replaces it rather than adding to it, and what it replaced
+	// included the rule that refuses a value too long for its column — so a
+	// nine character string went into a four character column and came back
+	// four characters long, with no error, on two engines and not on the other
+	// two.
 	//
 	// Silent truncation is the worst shape a portability difference can take:
 	// nothing fails, and the data is wrong. This is here so that the quoting

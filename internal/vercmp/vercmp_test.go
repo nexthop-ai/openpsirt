@@ -212,9 +212,9 @@ func TestWhatCannotBeOrderedIsRefusedRatherThanGuessedAt(t *testing.T) {
 }
 
 func TestReachingAVersionReachesEveryEarlierOne(t *testing.T) {
-	// A picker's own question. An issue fixed in an earlier release is closed by a
-	// later one, and the kernel is the case that makes it matter: the newest
-	// release names two of its own and carries every fix before it.
+	// A picker's own question. An issue fixed in an earlier release is closed
+	// by a later one, and the kernel is the case that makes it matter: the
+	// newest release names two of its own and carries every fix before it.
 	if !vercmp.Reaches(vercmp.Debian, "6.12.107-1", "6.12.100-1") {
 		t.Error("the newest release does not reach an earlier one")
 	}

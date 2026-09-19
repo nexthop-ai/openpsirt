@@ -149,9 +149,9 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 
 	now := s.now().UTC()
 	// The releases out of support, read once for the whole list. "Past end of
-	// life" is spelled in the catalog and nowhere
-	// else, because the same fact decides whether a finding carries a
-	// deadline and what this list says about a build.
+	// life" is spelled in the catalog and nowhere else, because the same fact
+	// decides whether a finding carries a deadline and what this list says
+	// about a build.
 	past, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, now)
 	if err != nil {
 		return nil, err

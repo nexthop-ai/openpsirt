@@ -166,9 +166,8 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 	// build's identifier is a number, and comparing them by converting inside
 	// the query keeps one character on PostgreSQL — right for the first nine
 	// builds and wrong for every one after. Every SQLite test starts from a
-	// fresh file at one, so the whole class is invisible unless a test
-	// insists on a two-digit
-	// identifier.
+	// fresh file at one, so the whole class is invisible unless a test insists
+	// on a two-digit identifier.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
 		var tenth int64

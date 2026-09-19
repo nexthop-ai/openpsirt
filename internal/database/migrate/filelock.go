@@ -23,12 +23,12 @@ import (
 // remove, and every start afterwards refuses for a reason that is no longer
 // true.
 //
-// This buys ordering rather than integrity. Four processes migrating one file with
-// no lock were run: one applied the schema and three failed, with "no such
-// table: goose_db_version; table goose_db_version already exists". Nothing was
-// corrupted and the schema ended correct. What the lock changes is that the
-// three wait their turn and find the work already done, rather than crashing
-// on a message about the migration library's bookkeeping.
+// This buys ordering rather than integrity. Four processes migrating one file
+// with no lock were run: one applied the schema and three failed, with "no
+// such table: goose_db_version; table goose_db_version already exists".
+// Nothing was corrupted and the schema ended correct. What the lock changes is
+// that the three wait their turn and find the work already done, rather than
+// crashing on a message about the migration library's bookkeeping.
 func sqliteLock(ctx context.Context, db *database.DB) (unlock, error) {
 	path, err := sqliteFile(ctx, db)
 	if err != nil {

@@ -110,8 +110,8 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	// this finding and differing for another, and the two are different things
 	// to say about it.
 	seen := map[bool]map[string]int{true: {}, false: {}}
-	// The test for two rows being the same entry, which is not the same question for
-	// the two lists.
+	// The test for two rows being the same entry, which is not the same
+	// question for the two lists.
 	//
 	// A build the judgment already reaches is one thing to be told about,
 	// however many places of this finding reach it: keyed on anything finer,

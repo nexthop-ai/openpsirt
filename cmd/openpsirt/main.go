@@ -200,7 +200,7 @@ func run(args []string, stdout, stderr *os.File) error {
 			"because a provider is configured")
 	}
 
-	// The store files hanging off an issue are kept in. Nothing configured is the
+	// The store for files hanging off an issue. Nothing configured is the
 	// ordinary case: attachments are off and everything else works.
 	logger.Info("checking the attachment store")
 	files, err := attachmentStore(ctx, cfg, logger)
@@ -283,10 +283,10 @@ func run(args []string, stdout, stderr *os.File) error {
 		},
 		Mode:  roleMode(settings),
 		Files: files,
-		// The names that never leave, derived once here and read by the pass that
-		// asks and by the report saying what it held back. Two derivations
-		// of one boundary would be two boundaries the first time either
-		// moved.
+		// The names that never leave, derived once here and read by the pass
+		// that asks and by the report saying what it held back. Two
+		// derivations of one boundary would be two boundaries the first time
+		// either moved.
 		Ours: ours,
 	})
 
@@ -318,10 +318,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// sweeps thousands of findings, and saving a form must not hold a
 	// transaction open across the estate.
 	routing := finding.NewSweeper(db, work, logger, name)
-	// The tool's own health. It needs nothing
-	// configured, which is the point: an operator who never set up mail is
-	// exactly the one who would otherwise never hear that a build stopped
-	// being scanned.
+	// The tool's own health. It needs nothing configured, which is the point:
+	// an operator who never set up mail is exactly the one who would otherwise
+	// never hear that a build stopped being scanned.
 	watch := notify.NewWatch(db.DB, logger)
 	// Asks for everything tracked to be scanned again against the day's
 	// vulnerability data. Started on every replica and asking on one, by
@@ -329,9 +328,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// two scans of one build on the queue and the second would find
 	// nothing to do.
 	schedule := scanner.NewSchedule(db, work, logger, name)
-	// The messages that leave the application, where an operator configured somewhere for
-	// it to go. Nil when they did not, which is ordinary rather than broken:
-	// the notification area is the channel that always exists.
+	// The messages that leave the application, where an operator configured
+	// somewhere for it to go. Nil when they did not, which is ordinary rather
+	// than broken: the notification area is the channel that always exists.
 	post := notify.NewPost(db.DB, mailChannel(cfg, logger), cfg.BaseURL, logger, name)
 	// One signed request per notification, to whatever destinations an
 	// administrator configured. Started whatever is configured and does

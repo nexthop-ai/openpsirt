@@ -371,14 +371,13 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		return nil, wentWrong(in.Logger, "the target could not be recorded", err)
 	}
 
-	// The submission and its digest: what it says about
-	// itself comes from the inventory, and whether we already hold it is
-	// asked of everything that arrived.
-	// Every door that turns an upload away records it, not only the last one.
-	// A producer posting a document nothing can read never reaches the arm
-	// below, so the build draws as quiet-and-never-refused — which the coverage
-	// report reads as a pipeline nobody wired up, telling the wrong person
-	// about the commoner of the two failures this record exists for.
+	// The submission and its digest: what it says about itself comes from the
+	// inventory, and whether we already hold it is asked of everything that
+	// arrived. Every door that turns an upload away records it, not only the
+	// last one. A producer posting a document nothing can read never reaches
+	// the arm below, so the build draws as quiet-and-never-refused — which the
+	// coverage report reads as a pipeline nobody wired up, telling the wrong
+	// person about the commoner of the two failures this record exists for.
 	note := func(reason string, builtAt *time.Time, hash *string) {
 		if in.DB == nil {
 			return
@@ -646,9 +645,8 @@ type ReceiptBody struct {
 	Opened *int `json:"opened,omitempty" doc:"Issues this run found that were not open before. Absent where this upload's run is reported against a newer one, or where none has covered it yet"`
 	Closed *int `json:"closed,omitempty" doc:"Issues that were open and are not any more. Absent for the same reasons as the count beside it"`
 	// Sent is the documents the upload was made of. It outlives the files
-	// themselves:
-	// a branch build's contents are let go once they have been read, and this
-	// still says what arrived and what its bytes hashed to.
+	// themselves: a branch build's contents are let go once they have been
+	// read, and this still says what arrived and what its bytes hashed to.
 	Sent []SentBody `json:"sent,omitempty" doc:"The documents this upload was made of"`
 	// Components and Placed are what the inventory described, and how much of
 	// it anything said the position of. Absent until it has been read.
@@ -883,14 +881,13 @@ func registerReceipts(api huma.API, in Ingest) {
 
 		// The tools those numbers were arrived at with. Read separately
 		// because it describes the build rather than any upload, and absent
-		// rather than
-		// invented where nothing has finished running yet.
-		// Not for a credential that is only allowed to see its own uploads.
-		// This endpoint deliberately narrows receipts to what a key sent —
-		// "a key sees the receipts for what it sent and nothing more" — and a
-		// key that has uploaded nothing would otherwise still learn when the
-		// build was last scanned and with what, which is a report about the
-		// product rather than an acknowledgement of its own upload.
+		// rather than invented where nothing has finished running yet. Not for
+		// a credential that is only allowed to see its own uploads. This
+		// endpoint deliberately narrows receipts to what a key sent — "a key
+		// sees the receipts for what it sent and nothing more" — and a key
+		// that has uploaded nothing would otherwise still learn when the build
+		// was last scanned and with what, which is a report about the product
+		// rather than an acknowledgement of its own upload.
 		if sender != "" {
 			return out, nil
 		}

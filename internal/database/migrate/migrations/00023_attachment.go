@@ -87,13 +87,14 @@ func upAttachment(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "attachment_redacted_by_fk" FOREIGN KEY ("redacted_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// Everything hanging off one issue, which is what a finding screen lists.
+		// Everything hanging off one issue, which is what a finding screen
+		// lists.
 		`CREATE INDEX "attachment_issue_idx"
 			ON "attachment" ("product_id", "vulnerability_id")`,
 
-		// Anything nothing points at yet, for the sweep. Leading with the column
-		// the sweep tests for null, so it walks only the candidates rather
-		// than every attachment ever made.
+		// Anything nothing points at yet, for the sweep. Leading with the
+		// column the sweep tests for null, so it walks only the candidates
+		// rather than every attachment ever made.
 		`CREATE INDEX "attachment_unattached_idx"
 			ON "attachment" ("attached_at", "uploaded_at")`,
 	}

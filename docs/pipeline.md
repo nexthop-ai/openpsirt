@@ -170,7 +170,7 @@ says which part is missing rather than making you guess:
 404  product "sonic": stream "nobody-declared-this": not declared
 ```
 
-## Out of a pipeline’s scope
+## Out of a pipeline's scope
 
 | | |
 |---|---|

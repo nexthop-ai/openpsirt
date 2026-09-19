@@ -883,7 +883,8 @@ func TestAnIdentifierThatIsNotOneIsNotPublished(t *testing.T) {
 	}{
 		{"a package identifier", "pkg:generic/sonic-broadcom.bin@1.0", true},
 		{"one with a namespace", "pkg:deb/debian/linux@6.12", true},
-		// Values a producer might reasonably put there and the standard refuses.
+		// Values a producer might reasonably put there and the standard
+		// refuses.
 		{"a path", "/build/out/sonic-broadcom.bin", false},
 		{"a bare name", "sonic-broadcom.bin", false},
 		{"a scheme with nothing after it", "pkg:generic", false},

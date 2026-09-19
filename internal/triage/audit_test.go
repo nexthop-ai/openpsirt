@@ -9,10 +9,10 @@ import (
 )
 
 func TestTheRecordCarriesWhoProposedAndWhoAgreed(t *testing.T) {
-	// The things an auditor asks for: the judgment, the words it rests on, and two
-	// different people with the date each of them acted. Assembled for a page
-	// rather than looked up one decision at a time, because the question is
-	// about a period rather than about a row.
+	// The things an auditor asks for: the judgment, the words it rests on, and
+	// two different people with the date each of them acted. Assembled for a
+	// page rather than looked up one decision at a time, because the question
+	// is about a period rather than about a row.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		// A finding at the place, because a decision stores a hash of names

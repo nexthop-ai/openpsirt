@@ -9,14 +9,13 @@ import (
 )
 
 func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
-	// A publisher's judgment reaching a finding is an equality test
-	// on three columns. Spelled as a LOWER() the engine performs, the four do
-	// not agree: SQLite folds ASCII and nothing else, so a component named
-	// with any letter outside it matches on three engines and not on the
-	// fourth, and which one a deployment runs
-	// decided whether the statement was seen. Folded on write instead, the
-	// comparison is the same everywhere and the index over the three
-	// columns is usable.
+	// A publisher's judgment reaching a finding is an equality test on three
+	// columns. Spelled as a LOWER() the engine performs, the four do not
+	// agree: SQLite folds ASCII and nothing else, so a component named with
+	// any letter outside it matches on three engines and not on the fourth,
+	// and which one a deployment runs decided whether the statement was seen.
+	// Folded on write instead, the comparison is the same everywhere and the
+	// index over the three columns is usable.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PrivateTriage)

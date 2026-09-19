@@ -165,13 +165,12 @@ func (s *Store) carrying() int {
 // them, which is a preview rather than a thing to publish, and it is refused
 // for anybody who may not.
 //
-// Two statuses, and silence for everything else. `not_affected` and
-// `fixed` are what a generated VEX document names, and they are the two a
-// customer's scanner can act on. A deferral is deliberately absent rather than
-// exported as anything: a deferred item exports as affected and never as
-// not-affected, and silence already reads as
-// affected in this format, which is the honest answer for something we have
-// only postponed.
+// Two statuses, and silence for everything else. `not_affected` and `fixed`
+// are what a generated VEX document names, and they are the two a customer's
+// scanner can act on. A deferral is deliberately absent rather than exported
+// as anything: a deferred item exports as affected and never as not-affected,
+// and silence already reads as affected in this format, which is the honest
+// answer for something we have only postponed.
 func (s *Store) For(ctx context.Context, subject access.Subject, publisher publisher.Named,
 	product, stream, variant string, undisclosed bool) (*Statements, error) {
 

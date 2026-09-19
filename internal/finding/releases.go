@@ -164,8 +164,8 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 
 // LatestRun is the most recent finished scan run against a build.
 //
-// The tooling the numbers on a screen were measured with: which scanner, at which
-// version, reading which vulnerability database. The scan run has always
+// The tooling the numbers on a screen were measured with: which scanner, at
+// which version, reading which vulnerability database. The scan run has always
 // carried it and nothing showed it, so a reader had no way to tell a build
 // with nothing wrong from one last measured against a database from March.
 func (s *Store) LatestRun(ctx context.Context, subject access.Subject,

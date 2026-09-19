@@ -251,10 +251,9 @@ func IsDuplicate(err error) bool {
 // which is what it looks like and not what it is. Named, it says which of the
 // two it is doing.
 //
-// The rule about reads is unchanged, and it reaches further here: fn may
-// be re-run by a retry it cannot see, so everything it depends on is read
-// inside it.
-// Each handle it may be given is named. This package's own handle embeds
+// The rule about reads is unchanged, and it reaches further here: fn may be
+// re-run by a retry it cannot see, so everything it depends on is read inside
+// it. Each handle it may be given is named. This package's own handle embeds
 // `*bun.DB` rather than being one, so a type assertion for `*bun.DB` alone is
 // failed by the very handle Open returns — and a fallthrough answering that by
 // running each statement as its own autocommit is no transaction, no retry and

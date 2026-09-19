@@ -189,11 +189,11 @@ func (d *Documents) Open(ctx context.Context, documentID int64) io.Reader {
 
 // Discard lets go of a scan's contents, keeping the record of what arrived.
 //
-// A nightly build's documents are superseded the next night, so keeping them costs
-// storage that grows with the calendar. What a tagged release sent is kept,
-// because re-scanning it years from now needs both what it contained and what
-// the build had already argued about its own patches — so this is called for
-// one and not the other.
+// A nightly build's documents are superseded the next night, so keeping them
+// costs storage that grows with the calendar. What a tagged release sent is
+// kept, because re-scanning it years from now needs both what it contained and
+// what the build had already argued about its own patches — so this is called
+// for one and not the other.
 //
 // The rows describing the documents stay either way, marked as let go. They
 // are a few hundred bytes against tens of megabytes, and they carry the hash

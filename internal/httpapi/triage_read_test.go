@@ -1126,8 +1126,8 @@ func TestOnlyPeopleWhoCanAlreadySeeItAreOfferedAsMentions(t *testing.T) {
 			t.Error("nobody at all may be mentioned on an undisclosed finding")
 		}
 
-		// A request for who may be told about an undisclosed finding is itself a
-		// question about undisclosed findings, so somebody who cannot read
+		// A request for who may be told about an undisclosed finding is itself
+		// a question about undisclosed findings, so somebody who cannot read
 		// them is answered as though the product were not there.
 		if got := asPerson(t, r, "triager", http.MethodGet,
 			"/v1/products/mine/mentionable?visibility=private", ""); got.Code != http.StatusNotFound {

@@ -173,10 +173,10 @@ type At struct {
 // DeadlineAt is the earliest deadline among the open findings at these places,
 // in these builds.
 //
-// The gate a promise already recorded is measured against, asked again rather than
-// remembered: the deadline moves when the policy or the rating moves, so a
-// promise being edited is gated against the deadline in force now and not the
-// one in force when it was first made.
+// The gate a promise already recorded is measured against, asked again rather
+// than remembered: the deadline moves when the policy or the rating moves, so
+// a promise being edited is gated against the deadline in force now and not
+// the one in force when it was first made.
 //
 // Narrowed by what the subject may see, like every other read here, and taking
 // a handle because the caller opens the transaction: resolved beforehand, a

@@ -185,8 +185,9 @@ func main() {
 		reserved[word] = true
 	}
 
-	// The objects the migrations made, read first, because the check below tells a
-	// table from a keyword by asking whether this schema has one of that name.
+	// The objects the migrations made, read first, because the check below
+	// tells a table from a keyword by asking whether this schema has one of
+	// that name.
 	schema := map[string]bool{}
 	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
 		if !strings.Contains(path, "database/migrate/migrations/") {
@@ -440,8 +441,8 @@ func assembledFrom(arg ast.Expr) string {
 // this function, which is a name somebody wrote bare either way — and reading
 // too little is what left three assembled clauses unread.
 //
-// Everything the statement pass has already read is left out, so a clause written
-// whole and then handed over as a variable is one defect and not two.
+// Everything the statement pass has already read is left out, so a clause
+// written whole and then handed over as a variable is one defect and not two.
 func assembled(fset *token.FileSet, fn *ast.FuncDecl, seen map[int]bool) map[string]string {
 	pieces := map[string]string{}
 	keep := func(name string, from ast.Expr) {

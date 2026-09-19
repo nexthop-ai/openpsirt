@@ -141,11 +141,10 @@ var ErrNothingScanned = errors.New(
 // does. The identifier is the product's own name, the year, and a number —
 // `SONIC-2026-481907` — which is the shape a vendor advisory already takes.
 // The number is drawn rather than counted, so it is not a running total of
-// what this product has kept quiet.
-// A CVE assigned later is recorded as another name for the same
-// issue, and the issue is then filed under the CVE; nothing about the finding,
-// the decisions or the approvals moves, because they are keyed on the issue
-// rather than on what it is called.
+// what this product has kept quiet. A CVE assigned later is recorded as
+// another name for the same issue, and the issue is then filed under the CVE;
+// nothing about the finding, the decisions or the approvals moves, because
+// they are keyed on the issue rather than on what it is called.
 //
 // It opens with no run, and everything that asks when a finding opened
 // reads the row rather than the run. A scan will not close it either: a run is

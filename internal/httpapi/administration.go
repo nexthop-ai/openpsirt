@@ -413,13 +413,12 @@ func registerAdministration(api huma.API, a Administering) {
 		// that says nothing about it leaves it alone, and the store is what
 		// knows that — computed here from a read taken before the write, two
 		// requests at once would have the second write back the value it saw
-		// before the first.
-		// Recording somebody, the way to reach them and what they hold is one
-		// act. Written as a statement each, a product name nobody has declared
-		// answers 422 with the person recorded and the roles named before it
-		// granted — so an administrator correcting a typo and sending the
-		// request again grants the earlier ones twice, and a request they give
-		// up on leaves access nobody asked for.
+		// before the first. Recording somebody, the way to reach them and what
+		// they hold is one act. Written as a statement each, a product name
+		// nobody has declared answers 422 with the person recorded and the
+		// roles named before it granted — so an administrator correcting a
+		// typo and sending the request again grants the earlier ones twice,
+		// and a request they give up on leaves access nobody asked for.
 		var person *access.Account
 		var recorded bool
 		if err := store.Within(ctx, func(ctx context.Context, store *access.Store,

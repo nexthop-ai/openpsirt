@@ -549,7 +549,7 @@ components:
           description: That product's display name, where it was declared with one
           type: string
         role:
-          description: The roles membership of this group grants
+          description: The role membership of this group grants
           enum:
             - approver
             - assigner
@@ -704,7 +704,7 @@ components:
           format: int64
           type: integer
         last_scan_at:
-          description: The last scan to arrive here. Absent where none ever has
+          description: The moment a scan last arrived here. Absent where none ever has
           type: string
         open:
           description: Issues at components, the unit every count here uses
@@ -912,7 +912,7 @@ components:
           description: The claim arrived attached to a component — a carried patch saying what it fixes — rather than in a document of its own
           type: boolean
         since:
-          description: The scan the build first said it in
+          description: The date the build first said it, by the scan it arrived in
           type: string
         statement:
           description: The build's own reasoning, shown as written and never rendered
@@ -1044,7 +1044,7 @@ components:
             - alias
           type: string
         unset:
-          description: The setting held nothing before this
+          description: Whether nothing had been set before this, as distinct from a value stored empty
           type: boolean
         was:
           type: string
@@ -1370,7 +1370,7 @@ components:
           description: The comment text, in markdown
           type: string
         edited_at:
-          description: The author's last change to it, if they made one
+          description: The moment the author last changed it, if they did
           type: string
         id:
           format: int64
@@ -1522,10 +1522,10 @@ components:
       additionalProperties: false
       properties:
         last_received_at:
-          description: The last arrival of a scan. Absent where none ever has
+          description: The moment a scan last arrived. Absent where none ever has
           type: string
         last_refused_at:
-          description: The last upload against this build to be turned away. Absent where none has been
+          description: The moment an upload against this build was last turned away. Absent where none has been
           type: string
         product:
           type: string
@@ -3270,10 +3270,10 @@ components:
           description: The person who made the change
           type: string
         now:
-          description: The roles held after. Absent means a withdrawal
+          description: The role held after. Absent means a withdrawal
           type: string
         was:
-          description: The roles held before. Absent means nothing
+          description: The role held before. Absent means they held none
           type: string
       required:
         - at
@@ -5061,7 +5061,7 @@ components:
           description: The text, in markdown
           type: string
         edited_at:
-          description: The author's last change, where they made one
+          description: The moment the author last changed it, where they have
           type: string
         id:
           format: int64
@@ -5237,7 +5237,7 @@ components:
         vulnerability:
           type: string
         why:
-          description: The signal that made it stand out
+          description: The signals that made it stand out
           items:
             type: string
           type:
@@ -5508,7 +5508,7 @@ components:
           description: Whether any of what is open here is known to be exploited, which outranks everything else about it
           type: boolean
         first_seen:
-          description: The first scan of this deployment to report the component
+          description: The moment a scan of this deployment first reported the component
           format: date-time
           type: string
         fixable:
@@ -5893,7 +5893,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         outcome:
-          description: The reasoning it offers
+          description: The outcome it offers
           enum:
             - affected
             - not-applicable
@@ -5932,7 +5932,7 @@ components:
           description: The date support ends for releases that have not stated their own, as YYYY-MM-DD
           type: string
         last_scan_at:
-          description: The last scan to arrive for any of its builds
+          description: The moment a scan last arrived for any of its builds
           type: string
         name:
           description: The name scans use for this product
@@ -7883,7 +7883,7 @@ components:
             - tag
           type: string
         last_scan_at:
-          description: The last scan to arrive for any build of it
+          description: The moment a scan last arrived for any build of it
           type: string
         name:
           description: The name scans use for this branch or tag
@@ -8440,7 +8440,7 @@ components:
           readOnly: true
           type: string
         moved_at:
-          description: "The data's last move: the most recent time any version was seen for the first time. A version that comes back is not a change"
+          description: "The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"
           format: date-time
           type: string
         stale:

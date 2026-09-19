@@ -632,9 +632,10 @@ func TestASignedPendingCookieFromAnotherSignInIsNotYours(t *testing.T) {
 
 		r.provider.says = &signin.Identity{Subject: "2", Username: "other"}
 
-		// The person the provider names as signed in: the attacker, because this is
-		// the attacker's sign-in. The victim is somebody else entirely, and
-		// the point is that the session that comes back is never theirs.
+		// The person the provider names as signed in: the attacker, because
+		// this is the attacker's sign-in. The victim is somebody else
+		// entirely, and the point is that the session that comes back is never
+		// theirs.
 
 		// Planted in the victim's browser, which then completes it.
 		req := httptest.NewRequest(http.MethodGet,

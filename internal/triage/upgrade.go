@@ -226,10 +226,10 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 			}
 			out.Targets += n
 		}
-		// The person carrying it, where somebody said. Part of the same act rather
-		// than a second one: a bump nobody is holding is a promise with no
-		// owner, and the screen that records it is the screen that knows who
-		// the owner is.
+		// The person carrying it, where somebody said. Part of the same act
+		// rather than a second one: a bump nobody is holding is a promise with
+		// no owner, and the screen that records it is the screen that knows
+		// who the owner is.
 		if up.HoldBy != nil {
 			held, err := findings.HandOverWithin(ctx, tx, subject, up.ProductID, work, up.HoldBy)
 			if err != nil {

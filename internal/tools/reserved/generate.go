@@ -30,11 +30,11 @@ import (
 //     from here means the driver's own translation of libsqlite3 rather than
 //     anything reachable over SQL. Its words are typed, from its documentation.
 //
-// An indirect question to SQLite does not work: it accepts most of its own keywords
-// as an alias, so putting each back as "SELECT 1 AS word" reports nearly all of
-// them as unreserved. The list here is wider than what any one engine rejects —
-// it is what is reserved on *any* of the four — so that probe answers a
-// different question.
+// An indirect question to SQLite does not work: it accepts most of its own
+// keywords as an alias, so putting each back as "SELECT 1 AS word" reports
+// nearly all of them as unreserved. The list here is wider than what any one
+// engine rejects — it is what is reserved on *any* of the four — so that probe
+// answers a different question.
 
 // generateURLEnv names where the generator finds each engine it asks. The same
 // variables the test harness reads, so "make engines-up" configures both.

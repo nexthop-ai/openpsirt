@@ -83,24 +83,24 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	// across every revision of the fixture so far.
 	//
 	// The earlier counts, and where they went. The document described 7,693,
-	// then 7,035,
-	// then 6,845, and each drop is the producer being fixed. The 658 that went
-	// first are the build container's own toolchain — Go and Rust dependencies
-	// harvested from `usr/` and `root/.cargo` trees inside the build slaves,
-	// which the image does not ship. The 190 that went next are lockfile
-	// entries under source trees this image does not build at all. Both are
-	// still in the document, moved to `formulation`, which is where CycloneDX
-	// puts how a thing was built: the data stays answerable for a build-chain
-	// question and stops being scanned as though it shipped. Marking them
-	// `scope: excluded` instead is correct for a human and inert for the
-	// scanner, which ignores scope entirely.
+	// then 7,035, then 6,845, and each drop is the producer being fixed. The
+	// 658 that went first are the build container's own toolchain — Go and
+	// Rust dependencies harvested from `usr/` and `root/.cargo` trees inside
+	// the build slaves, which the image does not ship. The 190 that went next
+	// are lockfile entries under source trees this image does not build at
+	// all. Both are still in the document, moved to `formulation`, which is
+	// where CycloneDX puts how a thing was built: the data stays answerable
+	// for a build-chain question and stops being scanned as though it shipped.
+	// Marking them `scope: excluded` instead is correct for a human and inert
+	// for the scanner, which ignores scope entirely.
 	//
 	// Nothing in this fixture is merged by name. An earlier revision spelled
 	// 516 packages twice, under two package-URL namespaces for one .deb, and
-	// the generator now merges them at the source (sonic-buildimage #29237).
-	// So the two assertions below prove a narrower thing than the merge: that
-	// this fixture arrives as one component per package, and that the reader
-	// adds no duplicates of its own. The merge itself is proved by
+	// the generator now merges them at the source. So the two assertions below
+	// prove a narrower thing than the merge: deleting the merging code
+	// entirely leaves both of them passing, verified by doing it. What they
+	// prove is that this fixture arrives as one component per package, and
+	// that the reader adds no duplicates of its own. The merge itself is proved by
 	// TestTwoSpellingsOfOnePackageAreOneComponent below, which constructs the
 	// duplicates rather than depending on a fixture to contain them — which is
 	// where a rule of this kind belongs, because a fixture is somebody else's
@@ -110,14 +110,14 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	// change in it is a change in what identity means, and that is something
 	// to look at rather than absorb. It has earned that twice. 6,845 became
 	// 6,854 when the generator started describing the programs in the image,
-	// by the number of
-	// distinct program names rather than the number of programs — 13 programs
-	// under 9 names — because a program arrives with no version and no package
-	// identifier, and identity is a name and a version. 6,854 became 6,866 on
-	// the next build for the same reason: 21 programs under 21 names, twelve
-	// more than before, as the image began describing the containerd shims and
-	// `ctr`, and the gNMI, gNOI and telemetry binaries in the gnmi container.
-	// Twelve Go modules that had no consumer at all now hang off one of them.
+	// by the number of distinct program names rather than the number of
+	// programs — 13 programs under 9 names — because a program arrives with no
+	// version and no package identifier, and identity is a name and a version.
+	// 6,854 became 6,866 on the next build for the same reason: 21 programs
+	// under 21 names, twelve more than before, as the image began describing
+	// the containerd shims and `ctr`, and the gNMI, gNOI and telemetry
+	// binaries in the gnmi container. Twelve Go modules that had no consumer
+	// at all now hang off one of them.
 	//
 	// Two programs of one name still collapse into one component, and the fix
 	// is not available here: the only field free to tell them apart is
@@ -295,7 +295,7 @@ func TestWhatAPackageWasBuiltFromIsReadHoweverItIsStated(t *testing.T) {
 	// Fewer than the previous fixture states, and not because anything is
 	// lost: 565 becomes 551 where the generator stops describing one package
 	// as two components. A pair with a pedigree on one half and an
-	// `upstream=` qualifier on the other counts twice; merged, it is one
+	// `upstream=` qualifier on the other would count twice; merged, it is one
 	// component carrying both and counted once. Checked rather than assumed:
 	// no package states an upstream that stated none before, and 548 distinct
 	// packages state one against 547.

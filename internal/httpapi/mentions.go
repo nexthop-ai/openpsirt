@@ -46,8 +46,8 @@ func registerMentions(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		// A request for who may be told about an undisclosed finding is itself a
-		// question about undisclosed findings. Somebody who cannot read them
+		// A request for who may be told about an undisclosed finding is itself
+		// a question about undisclosed findings. Somebody who cannot read them
 		// is answered as though the product were not there, which is the same
 		// answer every other path gives.
 		wanted := access.AsVisibility(input.Visibility)

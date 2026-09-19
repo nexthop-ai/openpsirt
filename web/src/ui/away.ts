@@ -2,7 +2,7 @@ import { useEffect, type RefObject } from "react";
 
 // Closing something open when the reader's attention leaves it.
 //
-// The behaviour a list drawn over the page needs, where blur alone is not
+// The behavior a list drawn over the page needs, where blur alone is not
 // enough:
 // picking an item is a click inside, and a blur handler that closed first
 // would take the list away before the click landed. So it listens for a press

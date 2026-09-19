@@ -168,8 +168,8 @@ func TestWhatUpstreamCouldNotAnswerIsNarrowedToWhatMayBeRead(t *testing.T) {
 			t.Errorf("somebody holding nothing here was told about %q: %v",
 				"unannounced-corp", body.Ours)
 		}
-		// The deployment's own configuration is not product data and stays, so an
-		// empty list would pass this test for the wrong reason.
+		// The deployment's own configuration is not product data and stays, so
+		// an empty list would pass this test for the wrong reason.
 		if !slices.Contains(body.Ours, "example") {
 			t.Errorf("the deployment's own namespace is missing from %v", body.Ours)
 		}

@@ -414,8 +414,8 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`f.due_at AS "due_at"`).
-		// The reason it closed, in both the words the tool chose and the words a
-		// person typed. A closure with no reason was refused of whoever
+		// The reason it closed, in both the words the tool chose and the words
+		// a person typed. A closure with no reason was refused of whoever
 		// wrote it and then readable by nobody, so the refusal was a promise
 		// the tool did not keep.
 		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
@@ -455,9 +455,9 @@ func disposedFrom(row registerRow) Disposed {
 	default:
 		one.State = "waiting"
 	}
-	// A deadline met, which is answerable only for
-	// something that closed: an open row has not missed its deadline, it
-	// has not reached the end of the question.
+	// A deadline met, which is answerable only for something that closed: an
+	// open row has not missed its deadline, it has not reached the end of the
+	// question.
 	//
 	// Closed exactly at the deadline met it. The rate reads the boundary
 	// that way — something open at its deadline instant is not yet

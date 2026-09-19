@@ -36,10 +36,10 @@ func TestOnlyAnAdministratorReadsAPersonWhole(t *testing.T) {
 	})
 }
 
-// The record of what somebody was told is not narrowed by what they may read now — that is
-// the whole point of asking — but it is still only an administrator who may
-// ask. The narrowing that does apply is on the area they read themselves,
-// which is pinned in the notify package.
+// The record of what somebody was told is not narrowed by what they may read
+// now — that is the whole point of asking — but it is still only an
+// administrator who may ask. The narrowing that does apply is on the area they
+// read themselves, which is pinned in the notify package.
 func TestAPersonPageCarriesWhatTheyHoldAndWhatTheyWereTold(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		var body struct {

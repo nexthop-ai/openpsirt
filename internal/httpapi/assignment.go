@@ -125,10 +125,10 @@ func registerAssigning(api huma.API, in Ingest) {
 		}
 
 		var to *int64
-		// whoToTell is the person to tell. The column
-		// holds the party they are assignable as, and a notification
-		// goes to somebody. A team tells nobody: a queue filling up is
-		// digest content rather than an interruption.
+		// whoToTell is the person to tell. The column holds the party they are
+		// assignable as, and a notification goes to somebody. A team tells
+		// nobody: a queue filling up is digest content rather than an
+		// interruption.
 		var whoToTell int64
 		rights := access.NewStore(in.DB.DB)
 		switch {
@@ -137,13 +137,11 @@ func registerAssigning(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, noSuchPerson()
 			}
-			// An assignment carries visibility of what was
-			// assigned, so the check is against the level rather
-			// than against their present sight of the row — which,
-			// before the assignment, they do not have.
-			// Handing an embargoed finding to somebody cleared for
-			// nothing embargoed would make the assignment the
-			// disclosure.
+			// An assignment carries visibility of what was assigned, so the
+			// check is against the level rather than against their present
+			// sight of the row — which, before the assignment, they do not
+			// have. Handing an embargoed finding to somebody cleared for
+			// nothing embargoed would make the assignment the disclosure.
 			strictest, err := finding.NewStore(in.DB.DB).StrictestOf(ctx, subject,
 				target, issue, component)
 			if err != nil {
@@ -433,16 +431,13 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 			rights := access.NewStore(in.DB.DB)
 			person, err := rights.ByIdentity(ctx, input.Identity)
 			if err != nil {
-				// A name nobody holds answers exactly as a
-				// name somebody holds whose work this caller
-				// cannot see: an empty list. Refusing instead
-				// would answer "does this person have an
-				// account here" for any credential at all,
-				// including one holding no product — a
-				// directory of the organization for the price
-				// of one request. This read is narrowed by
-				// what the caller may see anyway, so nothing
-				// is lost by answering it for a name that
+				// A name nobody holds answers exactly as a name somebody holds
+				// whose work this caller cannot see: an empty list. Refusing
+				// instead would answer "does this person have an account here"
+				// for any credential at all, including one holding no product
+				// — a directory of the organization for the price of one
+				// request. This read is narrowed by what the caller may see
+				// anyway, so nothing is lost by answering it for a name that
 				// reaches nobody.
 				holders = []int64{nobody}
 			} else {

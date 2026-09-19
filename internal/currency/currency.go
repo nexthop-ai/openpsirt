@@ -102,10 +102,10 @@ type Client struct {
 	// Agent identifies us to the indexes. crates.io refuses a request that
 	// does not say who is asking, and it is right to.
 	Agent string
-	// The address of each index. Fields rather than constants so a test can point
-	// them at a local server: without this the only way to exercise any of
-	// this code is to call somebody else's service, whose answers change, so
-	// in practice it was not exercised at all.
+	// The address of each index. Fields rather than constants so a test can
+	// point them at a local server: without this the only way to exercise any
+	// of this code is to call somebody else's service, whose answers change,
+	// so in practice it was not exercised at all.
 	GoProxy, NPM, PyPI, Crates string
 }
 

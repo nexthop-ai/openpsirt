@@ -295,12 +295,12 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		}
 
 		// A question with nowhere to send it is still answered. Unrecorded, a
-		// component whose ecosystem has no index stays due for ever, and
-		// `due` takes the oldest 200 with never-asked first — so on a real
-		// image, where 3,929
-		// components are `generic`, `oci`, `github` or `maven` against 3,010
-		// that are askable, the window filled with rows nothing ever wrote and
-		// the pass asked upstream about nothing at all, every cycle, forever.
+		// component whose ecosystem has no index stays due for ever, and `due`
+		// takes the oldest 200 with never-asked first — so on a real image,
+		// where 3,929 components are `generic`, `oci`, `github` or `maven`
+		// against 3,010 that are askable, the window filled with rows nothing
+		// ever wrote and the pass asked upstream about nothing at all, every
+		// cycle, forever.
 		ecosystem, name, ok := Asked(component.Purl)
 		if !ok || r.Index(ecosystem) == nil {
 			if err := r.record(ctx, component.ID, Latest{}); err != nil {
@@ -453,9 +453,9 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 		return nil
 	}
 	q = q.Set("latest_version = ?", latest.Version)
-	// The index's description of the package, and where it is developed. Both are
-	// somebody else's text arriving over the network and rendered to staff who
-	// hold the most access, so both are bounded and the address is judged
+	// The index's description of the package, and where it is developed. Both
+	// are somebody else's text arriving over the network and rendered to staff
+	// who hold the most access, so both are bounded and the address is judged
 	// before it is stored rather than only before it is drawn.
 	//
 	// Absent is normal and overwrites nothing: three of the four indexes serve

@@ -147,12 +147,11 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			return fmt.Errorf("read when this run started: %w", err)
 		}
 
-		// The product's triage line. Below that line
-		// nothing carries a deadline: a line says "this is not work"
-		// and a deadline says "this is work, and it is late", and
-		// holding both means one of them is lying — within a year the
-		// overdue figure would be thousands of things nobody ever
-		// intended to look at.
+		// The product's triage line. Below that line nothing carries a
+		// deadline: a line says "this is not work" and a deadline says "this
+		// is work, and it is late", and holding both means one of them is
+		// lying — within a year the overdue figure would be thousands of
+		// things nobody ever intended to look at.
 		floor, err := FloorFor(ctx, tx, productID)
 		if err != nil {
 			return err

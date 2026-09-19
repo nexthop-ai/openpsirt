@@ -72,8 +72,7 @@ type csafReader struct {
 // Charged on the way in, before anything is kept. The claim count is the only
 // other bound either VEX reader carries, and it counts vulnerability objects —
 // so one claim listing ten million product identifiers is under it, and the
-// map holding them is charged against nothing. What a bound has to stop is
-// the
+// map holding them is charged against nothing. What a bound has to stop is the
 // walk, and a count taken after the walk has already done the work.
 //
 // Against the component bound, because these are what a suppression document

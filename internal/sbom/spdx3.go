@@ -106,8 +106,8 @@ type spdx3Element struct {
 	created     string
 	specVersion string
 
-	// The elements a document or an inventory element points at, and the creation
-	// information it was made under.
+	// The elements a document or an inventory element points at, and the
+	// creation information it was made under.
 	rootElements []string
 	creationInfo string
 

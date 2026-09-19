@@ -189,10 +189,10 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		res, err := db.NewUpdate().Model((*Filter)(nil)).
 			Set("query = ?", kept.Query).
 			Set("display_name = ?", kept.DisplayName).
-			// The claim it prepares is replaced too, including with nothing: saving
-			// over a name is deciding what that name means now, and a prefill
-			// that survived being taken off would fire on a filter somebody
-			// thought they had made ordinary.
+			// The claim it prepares is replaced too, including with nothing:
+			// saving over a name is deciding what that name means now, and a
+			// prefill that survived being taken off would fire on a filter
+			// somebody thought they had made ordinary.
 			Set("outcome = ?", kept.Outcome).
 			Set("justification = ?", kept.Justification).
 			Set("reasoning = ?", kept.Reasoning).

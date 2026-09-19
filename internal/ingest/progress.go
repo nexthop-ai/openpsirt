@@ -213,8 +213,8 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 		state, failure, caution, run := progressOf(sc, read[strconv.FormatInt(sc.ID, 10)], runs)
 		receipt := Receipt{Scan: sc, State: state, Failure: failure, Caution: caution}
 		if run != nil {
-			// The tooling it was measured with, on every receipt the run answers —
-			// and the counts only on the one it is attributed to.
+			// The tooling it was measured with, on every receipt the run
+			// answers — and the counts only on the one it is attributed to.
 			for i := range runs {
 				if runs[i].ID == *run {
 					receipt.Measured = &runs[i]

@@ -221,9 +221,9 @@ func TestWhatItIsIsDecidedHereAndNotByWhoeverUploadedIt(t *testing.T) {
 }
 
 func TestAFileIsAsReadableAsTheIssueItHangsOff(t *testing.T) {
-	// The reason a fetch is authorized before any URL is issued, and the reason the
-	// visibility is not stored on the attachment: whoever may read the text may
-	// read what it refers to, and nobody else.
+	// The reason a fetch is authorized before any URL is issued, and the
+	// reason the visibility is not stored on the attachment: whoever may read
+	// the text may read what it refers to, and nobody else.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		undisclosed := f.anIssue(t, "CVE-2026-9001", access.Private)

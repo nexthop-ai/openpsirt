@@ -4848,7 +4848,7 @@ export interface components {
             /** @description That product's display name, where it was declared with one */
             product_display_name?: string;
             /**
-             * @description The roles membership of this group grants
+             * @description The role membership of this group grants
              * @enum {string}
              */
             role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin" | "audit";
@@ -4929,7 +4929,7 @@ export interface components {
              * @description The number somebody is known to be exploiting
              */
             exploited?: number;
-            /** @description The last scan to arrive here. Absent where none ever has */
+            /** @description The moment a scan last arrived here. Absent where none ever has */
             last_scan_at?: string;
             /**
              * Format: int64
@@ -5046,7 +5046,7 @@ export interface components {
             justification?: string;
             /** @description The claim arrived attached to a component — a carried patch saying what it fixes — rather than in a document of its own */
             pedigree: boolean;
-            /** @description The scan the build first said it in */
+            /** @description The date the build first said it, by the scan it arrived in */
             since: string;
             /** @description The build's own reasoning, shown as written and never rendered */
             statement?: string;
@@ -5122,7 +5122,7 @@ export interface components {
              * @enum {string}
              */
             kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
-            /** @description The setting held nothing before this */
+            /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
         };
@@ -5322,7 +5322,7 @@ export interface components {
         CommentBody: {
             /** @description The comment text, in markdown */
             body: string;
-            /** @description The author's last change to it, if they made one */
+            /** @description The moment the author last changed it, if they did */
             edited_at?: string;
             /** Format: int64 */
             id: number;
@@ -5398,9 +5398,9 @@ export interface components {
             undecided?: number;
         };
         CoverageBody: {
-            /** @description The last arrival of a scan. Absent where none ever has */
+            /** @description The moment a scan last arrived. Absent where none ever has */
             last_received_at?: string;
-            /** @description The last upload against this build to be turned away. Absent where none has been */
+            /** @description The moment an upload against this build was last turned away. Absent where none has been */
             last_refused_at?: string;
             product: string;
             /** @description Whether that is longer than this deployment allows */
@@ -6406,9 +6406,9 @@ export interface components {
             at: string;
             /** @description The person who made the change */
             by: string;
-            /** @description The roles held after. Absent means a withdrawal */
+            /** @description The role held after. Absent means a withdrawal */
             now?: string;
-            /** @description The roles held before. Absent means nothing */
+            /** @description The role held before. Absent means they held none */
             was?: string;
         };
         HolderBody: {
@@ -7308,7 +7308,7 @@ export interface components {
         NoteBody: {
             /** @description The text, in markdown */
             body: string;
-            /** @description The author's last change, where they made one */
+            /** @description The moment the author last changed it, where they have */
             edited_at?: string;
             /** Format: int64 */
             id: number;
@@ -7412,7 +7412,7 @@ export interface components {
             fixed_in?: string;
             severity?: string;
             vulnerability: string;
-            /** @description The signal that made it stand out */
+            /** @description The signals that made it stand out */
             why: string[] | null;
         };
         OutliersBody: {
@@ -7570,7 +7570,7 @@ export interface components {
             exploited: boolean;
             /**
              * Format: date-time
-             * @description The first scan of this deployment to report the component
+             * @description The moment a scan of this deployment first reported the component
              */
             first_seen: string;
             /**
@@ -7812,7 +7812,7 @@ export interface components {
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /**
-             * @description The reasoning it offers
+             * @description The outcome it offers
              * @enum {string}
              */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
@@ -7835,7 +7835,7 @@ export interface components {
             display_name?: string;
             /** @description The date support ends for releases that have not stated their own, as YYYY-MM-DD */
             end_of_life?: string;
-            /** @description The last scan to arrive for any of its builds */
+            /** @description The moment a scan last arrived for any of its builds */
             last_scan_at?: string;
             /** @description The name scans use for this product */
             name: string;
@@ -8986,7 +8986,7 @@ export interface components {
              * @enum {string}
              */
             kind: "branch" | "tag";
-            /** @description The last scan to arrive for any build of it */
+            /** @description The moment a scan last arrived for any build of it */
             last_scan_at?: string;
             /** @description The name scans use for this branch or tag */
             name: string;
@@ -9287,7 +9287,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: date-time
-             * @description The data's last move: the most recent time any version was seen for the first time. A version that comes back is not a change
+             * @description The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change
              */
             moved_at?: string;
             /** @description Whether it has been that long. The same question the condition told to administrators asks */

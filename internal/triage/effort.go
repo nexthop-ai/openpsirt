@@ -94,9 +94,9 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
 		ColumnExpr(`COUNT(DISTINCT de.id) AS "decisions"`).
 		ColumnExpr(`COUNT(DISTINCT de.proposed_by) AS "people"`).
-		// The upgrades that came out of them, each counted as claims: the outcome is the
-		// claim's, and counting its rows would weigh a judgment by how far
-		// its component happens to fan out.
+		// The upgrades that came out of them, each counted as claims: the
+		// outcome is the claim's, and counting its rows would weigh a judgment
+		// by how far its component happens to fan out.
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome IN (?) THEN de.claim_id END)`+
 			` AS "promised"`, bun.List([]Outcome{UpgradeNeeded, PatchNeeded})).
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome IN (?) THEN de.claim_id END)`+

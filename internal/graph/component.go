@@ -321,11 +321,11 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			FirstSeenAt:    now,
 		})
 	}
-	// Anything a later report knows and an earlier one did not. A component row is
-	// content-addressed and not edited, but a column nobody has filled in is
-	// not an edit: a producer stating a supplier where the producer that wrote
-	// the row stated none is the merge rule every other field here follows, and
-	// filling it in overwrites nothing.
+	// Anything a later report knows and an earlier one did not. A component
+	// row is content-addressed and not edited, but a column nobody has filled
+	// in is not an edit: a producer stating a supplier where the producer that
+	// wrote the row stated none is the merge rule every other field here
+	// follows, and filling it in overwrites nothing.
 	if err := c.fillSuppliers(ctx, byIdentity, known); err != nil {
 		return nil, err
 	}
@@ -494,10 +494,11 @@ func PartsOfPurl(purl string) Parts {
 
 // FoldKey is the key the binary packages of one source package share.
 //
-// The grouping it makes. A distribution cuts many binary packages from one source
-// package and they move together: curl, libcurl4t64 and libcurl3t64 are one
-// bump, and treating them as three is three acts that can disagree with each
-// other. The key is what makes them one row, one judgment and one upgrade.
+// The grouping it makes. A distribution cuts many binary packages from one
+// source package and they move together: curl, libcurl4t64 and libcurl3t64 are
+// one bump, and treating them as three is three acts that can disagree with
+// each other. The key is what makes them one row, one judgment and one
+// upgrade.
 //
 // Four parts, because the source package name alone is not enough. Measured
 // on a public switch operating-system image: keyed on the name alone, 47 groups

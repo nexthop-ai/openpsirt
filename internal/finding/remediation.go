@@ -162,8 +162,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		}
 	}
 
-	// Everything opened in the same window, as distinct issues, so the two figures
-	// are in the same unit and can be read against each other.
+	// Everything opened in the same window, as distinct issues, so the two
+	// figures are in the same unit and can be read against each other.
 	opened := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).

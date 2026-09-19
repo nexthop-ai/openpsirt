@@ -116,11 +116,11 @@ type Ranked struct {
 // the higher signal wins outright.
 //
 // Multiplying the two is the published practice for these two scores, and the
-// same image argues against it: 95% of its issues
-// sit between 0.001 and 0.01 likelihood, one order of magnitude, where the
-// differences are not differences anybody should act on. Multiplied, that 4.5×
-// ratio inside the spike outweighs the 2× between a medium and a critical, so
-// mediums would jump criticals constantly and on noise.
+// same image argues against it: 95% of its issues sit between 0.001 and 0.01
+// likelihood, one order of magnitude, where the differences are not
+// differences anybody should act on. Multiplied, that 4.5× ratio inside the
+// spike outweighs the 2× between a medium and a critical, so mediums would
+// jump criticals constantly and on noise.
 //
 // So severity leads and likelihood orders what is equally severe. It gives up
 // letting a very likely medium jump a high — on this data almost always noise,

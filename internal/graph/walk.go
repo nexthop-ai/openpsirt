@@ -26,15 +26,15 @@ const depth = 64
 // membership test: what the findings list narrows by when asked for
 // everything the tree's number counts, so the two agree.
 //
-// One recursive statement rather than a walk in memory bound back as a list
-// of identifiers. The subtree under a build's root is every component in the
-// build, and binding six thousand identifiers into a statement was the cost
-// of asking for it; the engine walking its own edges is the same set with
-// nothing crossing the wire.
-// Bounded on depth and not on rows, and a caller that materializes it has
-// to say what it does past a size. The subtree under a build's root is every
-// component in the build, so scanning this into a slice is unbounded by
-// construction; the two callers that pass it into a subquery never hold it.
+// One recursive statement rather than a walk in memory bound back as a list of
+// identifiers. The subtree under a build's root is every component in the
+// build, and binding six thousand identifiers into a statement was the cost of
+// asking for it; the engine walking its own edges is the same set with nothing
+// crossing the wire. Bounded on depth and not on rows, and a caller that
+// materializes it has to say what it does past a size. The subtree under a
+// build's root is every component in the build, so scanning this into a slice
+// is unbounded by construction; the two callers that pass it into a subquery
+// never hold it.
 func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 	return WithinAny(db, targetID, []int64{componentID})
 }

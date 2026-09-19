@@ -495,10 +495,10 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`f.visibility AS "visibility"`).
 		ColumnExpr(`f.disclose_at AS "disclose_at"`).
-		// The moment it runs out, and the reason it does not where it has none. The
-		// list carries both and the finding's own screen carried
-		// neither, so somebody looking at the one row that matters had
-		// to go back to the list to find out when it was due.
+		// The moment it runs out, and the reason it does not where it has
+		// none. The list carries both and the finding's own screen carried
+		// neither, so somebody looking at the one row that matters had to go
+		// back to the list to find out when it was due.
 		ColumnExpr(`f.due_at AS "due_at"`).
 		// A live claim standing at this place, whatever its state. Proposed
 		// and waiting counts: it is answered as far as the person looking at
@@ -687,10 +687,10 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 
 	evidence.Places = placesOf(rows, chains, shipped, scopes)
 
-	// The party dealing with it. Read here rather than left to a caller, so that
-	// the screen somebody reads a finding on is the screen they can hand it
-	// over from — being able to record a judgment about something and not to
-	// say who is dealing with it is a strange half of the same job.
+	// The party dealing with it. Read here rather than left to a caller, so
+	// that the screen somebody reads a finding on is the screen they can hand
+	// it over from — being able to record a judgment about something and not
+	// to say who is dealing with it is a strange half of the same job.
 	//
 	// One name for the whole finding, and empty where the places disagree: the
 	// assignment is set for a group at once, so a disagreement is a state

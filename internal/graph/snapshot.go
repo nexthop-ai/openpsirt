@@ -422,11 +422,12 @@ type Neighbor struct {
 	// Purl is the package identifier, which is where the kind of package it is
 	// comes from.
 	//
-	// The field that tells two components of one name and one version apart. A build
-	// ships `opennsl-modules` twice at 15.2.0.0.0.0.0.0, and asking about
-	// either by name is refused — rightly, since they are two components — so
-	// a screen listing them without this could name neither. The refusal even
-	// says which field to send, and nothing offering the choice was saying it.
+	// The field that tells two components of one name and one version apart. A
+	// build ships `opennsl-modules` twice at 15.2.0.0.0.0.0.0, and asking
+	// about either by name is refused — rightly, since they are two components
+	// — so a screen listing them without this could name neither. The refusal
+	// even says which field to send, and nothing offering the choice was
+	// saying it.
 	//
 	// Carried as the identifier rather than as the word, and turned into the
 	// word by the one function that knows how, where every other reader of a
@@ -643,11 +644,10 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
 		// Everything open against it here, so descending follows the findings
-		// rather than being exploration.
-		// Narrowed like every other count. Without this a reader browsing the
-		// tree gets an accurate count of the undisclosed findings under each
-		// component and can bisect down to which one holds them — a leak that
-		// needs no row to be shown.
+		// rather than being exploration. Narrowed like every other count.
+		// Without this a reader browsing the tree gets an accurate count of
+		// the undisclosed findings under each component and can bisect down to
+		// which one holds them — a leak that needs no row to be shown.
 		//
 		// Counted once for the build and joined, like the children below,
 		// rather than asked per row. As a correlated subquery this had two
@@ -682,8 +682,8 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		// the rule strictly will not take a column from a joined subquery on
 		// the strength of a primary key belonging to a different table.
 		GroupExpr("c.id, c.name, c.version, kids.n, open.n").
-		// Anything that opens comes before anything that does not, and within each the most
-		// findings first.
+		// Anything that opens comes before anything that does not, and within
+		// each the most findings first.
 		//
 		// Ordering by findings alone buries the structure: a container holds
 		// no findings of its own, so on a real image the root's 5,270

@@ -579,14 +579,14 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	} else if under := strings.TrimSpace(f.Under); under != "" {
 		q = q.Where("f.consumer_id IN (?)", componentsWhere(q, "c.name = ?", under))
 	}
-	// The party dealing with it. Set for the whole group at once, so a group is
-	// held when its places are — asked as MIN and MAX rather than as one row,
-	// because a group whose places disagree is not "mine" and saying so would
-	// hand somebody work that is half theirs.
-	// Several answers OR together, and each keeps its own meaning inside the
-	// OR — which is why they are assembled as one condition rather than
-	// applied one at a time. Applied one at a time they would AND, and "mine
-	// or nobody's" would be a list of nothing.
+	// The party dealing with it. Set for the whole group at once, so a group
+	// is held when its places are — asked as MIN and MAX rather than as one
+	// row, because a group whose places disagree is not "mine" and saying so
+	// would hand somebody work that is half theirs. Several answers OR
+	// together, and each keeps its own meaning inside the OR — which is why
+	// they are assembled as one condition rather than applied one at a time.
+	// Applied one at a time they would AND, and "mine or nobody's" would be a
+	// list of nothing.
 	q = f.heldBy(q)
 	// This product's own word on the issue, as against what was published. A
 	// rating of its own is the record of a priority somebody changed here —
@@ -687,10 +687,10 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			  AND ft.component_id = f.component_id
 			  AND ft.tag IN (?))`, append(args, bun.List(words))...)
 	}
-	// The places a promised upgrade covers, or the ones none does. A condition over the
-	// group rather than over a place, like every other decision predicate
-	// here: a group is planned when a promise reaches it, and unplanned when
-	// none reaches any of it.
+	// The places a promised upgrade covers, or the ones none does. A condition
+	// over the group rather than over a place, like every other decision
+	// predicate here: a group is planned when a promise reaches it, and
+	// unplanned when none reaches any of it.
 	if f.Planned != PlannedEither {
 		if f.Planned == PlannedOnly {
 			q = q.Having("SUM(COALESCE(dd.planned, 0)) > 0")
@@ -1024,8 +1024,8 @@ const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 // a correlated lookup per finding row, it runs once for every open row in the
 // build to say which groups have nothing: 241,479 probes to answer "undecided"
 // on a build with no decisions at all. The counts are the same either way; a
-// place with two decisions is
-// one place, which is what folding to one row per finding keeps true.
+// place with two decisions is one place, which is what folding to one row per
+// finding keeps true.
 //
 // A decision belongs to a product and the two keys linking one to a finding do
 // not: an issue is one row per identifier for the whole deployment, and a
@@ -1097,12 +1097,11 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS "approved"`,
 			approved).
 		ColumnExpr(`MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS "lapsed"`, lapsed).
-		// A promise to upgrade standing over this place. Counted
-		// only for the claim that currently stands, like "approved"
-		// above: a promise that was withdrawn is not one, and a finding
-		// it covered is unplanned again with nothing to clean up. That
-		// is the whole argument for deriving this
-		// rather than writing a tag.
+		// A promise to upgrade standing over this place. Counted only for the
+		// claim that currently stands, like "approved" above: a promise that
+		// was withdrawn is not one, and a finding it covered is unplanned
+		// again with nothing to clean up. That is the whole argument for
+		// deriving this rather than writing a tag.
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
 			` AND cl.outcome = ? THEN 1 ELSE 0 END) AS "planned"`,
 			append(append([]any{}, inForce...), string(upgradeNeeded))...).

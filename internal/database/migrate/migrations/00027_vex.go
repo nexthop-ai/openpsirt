@@ -86,8 +86,8 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vex_statement_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// The key a finding looks one up by: the product, the issue's name and the
-		// component's. Only what still stands, which is the common read.
+		// The key a finding looks one up by: the product, the issue's name and
+		// the component's. Only what still stands, which is the common read.
 		`CREATE INDEX "vex_statement_about_idx"
 			ON "vex_statement" ("product_id", "vulnerability", "component", "superseded_at")`,
 	}

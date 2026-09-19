@@ -310,8 +310,8 @@ exception agree rather than contradict.
 | A filter on the findings list | The only way to ask about the deferral class at all. Asked of the component's incoming edges in the build, so one reached from two consumers scoped differently answers to both words — a place is a pair of columns, and no engine here compares a pair against a set the same way |
 | An evidence line on the finding's dependency path | Beside the place it is about, in the producer's word, next to what the build's own VEX said. Which is where somebody deciding reads it |
 
-Nowhere else. Not in the urgency ranking, not as a prefilled outcome on a
-claim, and not as a default narrowing on any list. A person deciding that a
+It appears nowhere else: not in the urgency ranking, not as a prefilled
+outcome on a claim, and not as a default narrowing on any list. A person deciding that a
 build-time dependency does not ship is making a judgment, and the judgment stays
 theirs.
 
@@ -896,9 +896,9 @@ identifiers in whichever order they reach the table, and "the newest upload this
 run covered" is a question about arrival. The runs are ordered by when they
 finished rather than by identifier, which is the order the page reads them in.
 
-What this does not measure. It is read as an administrator, who sees every
-product, so the queries run with no narrowing by product — the cheapest plan
-available. One build, not the several a deployment tracks. And it assumes a
+Three things it does not measure. It is read as an administrator, who sees
+every product, so the queries run with no narrowing by product — the cheapest
+plan available. One build, not the several a deployment tracks. And it assumes a
 churn rate rather than observing one. `make measure` re-runs it, and the
 constants at the top of the harness are the model.
 

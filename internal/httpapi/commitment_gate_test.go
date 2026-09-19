@@ -88,10 +88,10 @@ func TestAPromiseInsideTheDeadlineTheFindingHasStandsOnItsOwn(t *testing.T) {
 	})
 }
 
-// With nothing the act covers carrying a deadline, there is no date the promise can
-// be inside, so the exemption has nothing to measure against and a second
-// person agrees. A product below its own triage line was the one place a
-// promise could hide a finding for years on one signature.
+// With nothing the act covers carrying a deadline, there is no date the
+// promise can be inside, so the exemption has nothing to measure against and a
+// second person agrees. A product below its own triage line was the one place
+// a promise could hide a finding for years on one signature.
 func TestAPromiseCoveringWorkWithNoDeadlineIsGated(t *testing.T) {
 	eachReach(t, func(t *testing.T, r *reach) {
 		place := r.scanned(t)

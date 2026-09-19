@@ -65,7 +65,8 @@ every decision already made alone.
 
 ## The SPDX 3.0 fixtures
 
-Four, and none from a producer. Every other format here is read against
+There are four, and none from a producer. Every other format here is read
+against
 somebody's own output as well as against a written specification. Nothing this
 deployment ingests emits 3.0 — the scanner it ships emits 2.3 and tag-value —
 so these are the specification's own documents, which are hand-written and
@@ -101,12 +102,12 @@ producer quirk worth handling.
 it is here because a hand-written one cannot stand in for it. What it holds
 that nothing written on purpose would:
 
-A graph rather than a tree. 1,168 of its components have more than one
+It is a graph rather than a tree: 1,168 of its components have more than one
 direct consumer, which is what makes "why is this here" a question with more
 than one answer, and what a reader assuming a tree gets wrong.
 
-A hierarchy rather than a root with everything under it. The image root has 30
-direct children — 29 containers and the host filesystem — and the packages
+It is a hierarchy rather than a root with everything under it. The image root
+has 30 direct children — 29 containers and the host filesystem — and the packages
 installed on the host hang off the host rather than off the image. A flat
 shape, which an earlier build had at 5,198 direct children and 237 components
 with no consumer at all, answers "why is this here" for none of them. 27 are
@@ -114,7 +115,7 @@ still unreached: 22 lockfile and recipe fragments the build emits
 without saying what consumed them, and 5 container layer records the document
 names but hangs off nothing.
 
-Build tooling kept apart from what ships. 849 components sit under
+It keeps build tooling apart from what ships: 849 components sit under
 `formulation` — Go and Rust dependencies harvested from inside the build
 containers — rather than in `components` beside the image's contents. The
 question a scanner answers is what shipped; the question a build-chain

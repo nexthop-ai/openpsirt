@@ -18,11 +18,10 @@ import (
 // Exporting writes a list out as it is read.
 //
 // The subject travels through the stream. An export is the easiest place in
-// this codebase to build a list first and narrow it
-// afterwards, which is exactly the failure the narrowing helper's own comment
-// warns about — so this is the same query with the same subject, paged and
-// written as it goes, and there is no point at which a whole unnarrowed list
-// exists.
+// this codebase to build a list first and narrow it afterwards, which is
+// exactly the failure the narrowing helper's own comment warns about — so this
+// is the same query with the same subject, paged and written as it goes, and
+// there is no point at which a whole unnarrowed list exists.
 //
 // Paged rather than unbounded. A year of a real deployment is more rows
 // than a process should hold, and the page is the same page the screen reads:

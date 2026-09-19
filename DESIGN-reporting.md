@@ -456,8 +456,8 @@ It exists to show that no dismissal sits in that population.
 Not-applicable, will-not-fix and already-fixed all require approval, so that
 query should return nothing, and a row in it is a control that failed.
 
-Which is why nobody has to open it to find out. The same question is asked
-as a condition and told to administrators when it stops answering nothing —
+That is why nobody has to open it to find out. The same question is asked as
+a condition and told to administrators when it stops answering nothing —
 because a report that is empty every time is one nobody opens, and it is then
 read only after something has already gone wrong. `DESIGN-notifications.md`
 § Reports that must come back empty holds the rest, including why the

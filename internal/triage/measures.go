@@ -257,9 +257,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	}
 	out.Throughput = worked
 
-	// The claims that came back. Sending a claim back is the approver's other answer
-	// and nothing counted it, so a queue that is moving because claims are
-	// good and one that is moving because nobody reads them looked alike.
+	// The claims that came back. Sending a claim back is the approver's other
+	// answer and nothing counted it, so a queue that is moving because claims
+	// are good and one that is moving because nobody reads them looked alike.
 	back := s.db.NewSelect().TableExpr(`"decision" AS "de"`).
 		ColumnExpr(`COUNT(*) AS "number"`).
 		Where("de.sent_back_at IS NOT NULL").

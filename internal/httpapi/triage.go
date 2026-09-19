@@ -810,9 +810,9 @@ func refusedDecision(logger *slog.Logger, err error) error {
 //
 // Each fault travels as its own detail, carrying the line and the text that
 // caused it. Flattened into one sentence they leave an interface with nothing
-// to point at: "remote images are not
-// allowed" against a forty-line justification means somebody hunting for it by
-// eye, which is the whole reason positions are gathered in the first place.
+// to point at: "remote images are not allowed" against a forty-line
+// justification means somebody hunting for it by eye, which is the whole
+// reason positions are gathered in the first place.
 func refusedText(faults markdown.Faults) error {
 	details := make([]error, 0, len(faults))
 	for _, fault := range faults {

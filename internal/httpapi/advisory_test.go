@@ -60,10 +60,10 @@ type csaf struct {
 func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *testing.T) {
 	// The two halves of publishing only our own flaws in one test, because the
 	// boundary is the whole point: an advisory is about a vulnerability in our
-	// own product, and a
-	// known CVE in a shipped third-party component is dependency hygiene a
-	// consumer can already read out of the inventory. A document that looked
-	// the same for both would mean something different in each case.
+	// own product, and a known CVE in a shipped third-party component is
+	// dependency hygiene a consumer can already read out of the inventory. A
+	// document that looked the same for both would mean something different in
+	// each case.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		const findings = "/v1/products/mine/findings"

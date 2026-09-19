@@ -210,10 +210,10 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	// time, in a column heading, disagrees with this one.
 	comparison.Fixed, comparison.Closed = partition(comparison.Fixed)
 
-	// Judgments standing over what is still there. Read only for the still-present
-	// entries, because that is the list somebody signs a release off against
-	// — what was fixed needs no justification and what is newly present has
-	// not been looked at yet.
+	// Judgments standing over what is still there. Read only for the
+	// still-present entries, because that is the list somebody signs a release
+	// off against — what was fixed needs no justification and what is newly
+	// present has not been looked at yet.
 	if len(comparison.Still) > 0 {
 		stands, err := s.whatStands(ctx, toProduct, toTarget, visible)
 		if err != nil {

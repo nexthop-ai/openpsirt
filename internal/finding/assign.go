@@ -528,17 +528,16 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		held[i].Places = places[held[i].PartyID]
 	}
 
-	// counted is how much of it is late. One pass, against the deadline
-	// stored on the finding. Derived instead it is a pass per urgency band,
-	// each with its own cutoff. Overdue has
-	// to mean the same thing here as on the screen that lists what is
-	// running out, and the surest way to keep two answers equal is for
-	// there to be one of them: the deadline is the stored one, and what
-	// takes a finding off the clock is the one condition both read — a
-	// decision that applies, and nothing the build argued away. Counting
-	// every late finding regardless made a dismissed finding overdue
-	// against whoever held it while the list of what is running out,
-	// rightly, left it off.
+	// counted is how much of it is late. One pass, against the deadline stored
+	// on the finding. Derived instead it is a pass per urgency band, each with
+	// its own cutoff. Overdue has to mean the same thing here as on the screen
+	// that lists what is running out, and the surest way to keep two answers
+	// equal is for there to be one of them: the deadline is the stored one,
+	// and what takes a finding off the clock is the one condition both read —
+	// a decision that applies, and nothing the build argued away. Counting
+	// every late finding regardless made a dismissed finding overdue against
+	// whoever held it while the list of what is running out, rightly, left it
+	// off.
 	var counted []struct {
 		PersonID int64 `bun:"person_id"`
 		Overdue  int   `bun:"overdue"`

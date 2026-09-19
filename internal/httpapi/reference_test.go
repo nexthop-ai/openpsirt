@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/danielgtaylor/huma/v2"
 )
 
 // namesADecision matches a decision identifier, which belongs in
@@ -157,7 +159,29 @@ func TestThePublishedDocumentCarriesNoBold(t *testing.T) {
 				t.Errorf("%s: the %s carries a bold span: %q", where, what, text)
 			}
 		}
+		// Walked rather than listed: a schema states its description on
+		// itself, on each property and on an array's items, and a request or
+		// response body declared inline — every multipart form here — never
+		// reaches components.schemas at all.
+		var walk func(where string, schema *huma.Schema, depth int)
+		walk = func(where string, schema *huma.Schema, depth int) {
+			if schema == nil || depth > 8 {
+				return
+			}
+			bold(where, "description", schema.Description)
+			for field, property := range schema.Properties {
+				walk(where+"."+field, property, depth+1)
+			}
+			walk(where+"[]", schema.Items, depth+1)
+		}
+		bodies := func(where string, content map[string]*huma.MediaType) {
+			for kind, media := range content {
+				walk(where+" "+kind, media.Schema, 0)
+			}
+		}
+
 		document := r.api.OpenAPI()
+		bold("info", "description", document.Info.Description)
 		for path, item := range document.Paths {
 			for method, op := range operations(item) {
 				where := method + " " + path
@@ -166,13 +190,18 @@ func TestThePublishedDocumentCarriesNoBold(t *testing.T) {
 				for _, parameter := range op.Parameters {
 					bold(where+" "+parameter.Name, "parameter", parameter.Description)
 				}
+				if op.RequestBody != nil {
+					bodies(where+" request", op.RequestBody.Content)
+				}
+				for code, response := range op.Responses {
+					if response != nil {
+						bodies(where+" "+code, response.Content)
+					}
+				}
 			}
 		}
 		for name, schema := range document.Components.Schemas.Map() {
-			bold(name, "schema description", schema.Description)
-			for field, property := range schema.Properties {
-				bold(name+"."+field, "field description", property.Description)
-			}
+			walk(name, schema, 0)
 		}
 		if checked < 500 {
 			t.Fatalf("only %d strings checked: this is not walking the document", checked)

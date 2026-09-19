@@ -16,9 +16,8 @@ import (
 // next handler forgets.
 
 func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
-	// Visibility on the query. The enforcement is
-	// on the query, so this tests the query rather than a handler that
-	// remembered to ask.
+	// Visibility on the query. The enforcement is on the query, so this tests
+	// the query rather than a handler that remembered to ask.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),

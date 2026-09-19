@@ -251,12 +251,12 @@ type Proposal struct {
 	UpgradeTo string
 	// Binding is the earliest deadline among the findings this act covers.
 	//
-	// The gate the commitment is measured against. Inside it, promising to act by a
-	// date is ordinary triage — the work is already allowed to stay open that
-	// long. Past it, the promise is a deferral of the worst thing the act
+	// The gate the commitment is measured against. Inside it, promising to act
+	// by a date is ordinary triage — the work is already allowed to stay open
+	// that long. Past it, the promise is a deferral of the worst thing the act
 	// covers, and a second person agrees. Computed over the whole set by the
-	// caller, because one act covering a critical and a medium is gated by
-	// the critical however many mediums are in it.
+	// caller, because one act covering a critical and a medium is gated by the
+	// critical however many mediums are in it.
 	Binding *time.Time
 	// BindingAcross is the builds the act covers, for a caller that cannot
 	// resolve the binding itself inside the transaction.
@@ -352,10 +352,10 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 // while somebody presses a button.
 //
 // Atomic for a better reason than speed. One action writes one record per
-// place; half of them written and the rest
-// abandoned is not that, and it leaves a finding that is neither answered nor
-// open with nothing saying which places were which. The same holds across
-// builds, where one judgment covers a place in each of several.
+// place; half of them written and the rest abandoned is not that, and it
+// leaves a finding that is neither answered nor open with nothing saying which
+// places were which. The same holds across builds, where one judgment covers a
+// place in each of several.
 func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposals []Proposal,
 	cap int) ([]*Decision, error) {
 

@@ -148,7 +148,7 @@ A finding with no deadline states which reason applies:
 | **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
 | Its release is past end-of-life (REQ-15) | `out-of-support` | |
 
-Four reasons and three words. A tag reports as out of support, which is not
+Four reasons share three words. A tag reports as out of support, which is not
 what it is — a supported tag carries no deadline for a more fundamental reason
 than a retired one does. Stated here rather than left as a difference between
 this table and the wire, and a word of its own is worth adding the day somebody
@@ -302,8 +302,8 @@ somebody knows the promotion worked.
 | No index knows it | Sent, and nothing had heard of it. A private module and a vendored fork both look like this, and neither is a fault |
 | The identifier cannot be read | Nothing can turn it into a request. Kept apart from the one above because it is a fault in a document this deployment accepted rather than a fact about the world, and reading it as "no index knows this" would put it on the list of names somebody is about to hold back, where it means nothing |
 
-Derived rather than stored. A held-back name and one no index knows are
-recorded identically, because the pass must record both. What tells them apart
+The classification is derived rather than stored. A held-back name and one no
+index knows are recorded identically, because the pass must record both. What tells them apart
 is the same list applied again at read time, which also means the report
 follows a change to the list immediately instead of waiting for a month of
 backoff to expire.
@@ -409,8 +409,8 @@ on them. Saying which releases the work is meant to reach is done to the work.
 
 ## Publication
 
-Not built, apart from the document. A CSAF document is generated and
-reachable at the advisory routes; nothing sends it anywhere. The rules below are
+Nothing here is built apart from the document. A CSAF document is generated
+and reachable at the advisory routes; nothing sends it anywhere. The rules below are
 what publication would be, kept here because the document they are about exists
 and the shape it would be published in is what makes its content right.
 

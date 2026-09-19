@@ -1488,8 +1488,9 @@ Measured before the sweep that applied this: 262 standing strings, about
 somebody opens every day. The copy had drifted into explaining the design to
 the reader, which is what a design document is for.
 
-Contractions. The rule against them covers the durable documents, which are
-read years later by somebody deciding whether a decision still holds. Screen
+Contractions are allowed here. The rule against them covers the durable
+documents, which are read years later by somebody deciding whether a decision
+still holds. Screen
 copy is not one of those and is written as spoken. In practice it rarely needs
 one: plain and short gets there without.
 

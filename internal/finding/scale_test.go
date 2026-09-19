@@ -175,9 +175,9 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 
 		// Then a year of them. A component whose version moves closes every
 		// finding at it and opens the same number again, which is the whole of
-		// what a quiet night costs.
-		// Each component's version, carried forward. A bump is permanent: a
-		// package that moved to 1.5 does not go back to 1.0 tomorrow.
+		// what a quiet night costs. Each component's version, carried forward.
+		// A bump is permanent: a package that moved to 1.5 does not go back to
+		// 1.0 tomorrow.
 		//
 		// The first version of this slid a window and left everything outside
 		// it at 1.0, so last night's components reverted — fourteen identities
@@ -337,11 +337,11 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 	}
 	out := time.Since(start)
 
-	// The findings one bump would close, which is the screen a person works down.
-	// Measured slow on a real deployment at 2.2 s, which is why it is here:
-	// the group is over every open fixable row of every build in scope, and
-	// what a page costs is a question about the whole set rather than about
-	// the fifty rows it answers with.
+	// The findings one bump would close, which is the screen a person works
+	// down. Measured slow on a real deployment at 2.2 s, which is why it is
+	// here: the group is over every open fixable row of every build in scope,
+	// and what a page costs is a question about the whole set rather than
+	// about the fifty rows it answers with.
 	start = time.Now()
 	bumps, bundles, err := store.Bundles(ctx, who, scope, 50, 0, finding.Filter{})
 	if err != nil {

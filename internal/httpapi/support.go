@@ -169,11 +169,10 @@ type retiredOutput struct {
 		Total int           `json:"total" doc:"The number of releases out of support"`
 		Open  int           `json:"open" doc:"Issues open across all of them"`
 		// Ending is the releases that have not crossed yet, kept apart rather
-		// than mixed in.
-		// The day a release crosses, the deadline comes off every open
-		// finding on it and the work leaves every overdue count at once —
-		// so the two are a warning and an exposure, and reading them as one
-		// list is how the warning is missed.
+		// than mixed in. The day a release crosses, the deadline comes off
+		// every open finding on it and the work leaves every overdue count at
+		// once — so the two are a warning and an exposure, and reading them as
+		// one list is how the warning is missed.
 		Ending     []RetiredBody `json:"ending" doc:"Releases whose date has not arrived yet, soonest first. Empty unless within was asked for"`
 		EndingOpen int           `json:"ending_open" doc:"Issues open across those, which is what leaves every overdue count on the day they cross"`
 		Within     int           `json:"within" doc:"The days ahead this looked"`

@@ -111,9 +111,8 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			}
 			// Changed rather than set, because the prior value is not
 			// derivable afterwards and is half of what the trail is asked:
-			// read in a
-			// statement of its own it would be the value at some earlier
-			// moment.
+			// read in a statement of its own it would be the value at some
+			// earlier moment.
 			before, had, err := store.Change(ctx, setting.RoleMode, string(wanted))
 			if err != nil {
 				return recording(a.Logger, "cannot record where roles come from", err)

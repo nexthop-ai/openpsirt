@@ -22,10 +22,10 @@ import (
 // a document with thousands of components has very few shapes — and why the
 // ones that appear once are the interesting ones.
 //
-// This pins something other than the reader being right. It is what the reader has
-// been shown. A path a producer emits that nothing here has decided about is
-// the gap that matters: a field we do not read because we chose not to and one
-// we do not read because we never knew it was there look identical in the
+// This pins something other than the reader being right. It is what the reader
+// has been shown. A path a producer emits that nothing here has decided about
+// is the gap that matters: a field we do not read because we chose not to and
+// one we do not read because we never knew it was there look identical in the
 // code.
 
 // pathsFile records every path the fixtures contain and what is done with it.

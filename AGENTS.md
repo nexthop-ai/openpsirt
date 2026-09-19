@@ -473,7 +473,7 @@ contractions below, which is about text read years later. `DESIGN-interface.md`
 any of it; the copy reached 6,700 words of explanation across 65 files once
 already.
 
-American spelling, everywhere. License, not licence. Catalog, normalize,
+American spelling everywhere: license, not licence; catalog, normalize,
 behavior, color, authorize. It applies to prose, comments and identifiers
 alike — a codebase that spells one word two ways makes both unsearchable, and
 the choice matters less than the consistency.
@@ -625,7 +625,7 @@ Never force-push. As long as history is only ever added to, everything is
 recoverable, and a mistake is fixed by a commit on top rather than by
 rewriting what somebody else may already have pulled.
 
-Where it goes. A branch, and a pull request from it. The work is pushed as
+Work goes on a branch, with a pull request from it. The work is pushed as
 it lands and the pull request is where it is reviewed; the queue is what puts
 it on `main`. The gate runs before the push regardless of what CI will do
 afterwards: `make gate` for a commit, `make gate full` for a push carrying
@@ -728,8 +728,9 @@ slip there is, and it reports fully green to a grep.
 `make check` names the engines it did not test, rather than staying silent
 unless all three are missing.
 
-What it does not cover. It asserts three test functions in three packages,
-and that the committed reserved-word list is what the engines answer today. The
+It does not cover everything. It asserts three test functions in three
+packages, and that the committed reserved-word list is what the engines answer
+today. The
 rest of the suite runs against whatever is configured, so `check-engines`
 passing does not prove that every test ran on every engine — it proves the
 configuration is real and that the migrations, the lock, the identity checks

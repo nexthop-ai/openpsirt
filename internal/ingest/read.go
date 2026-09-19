@@ -273,9 +273,9 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// The build's own argument is stored against the target, not against the
 	// scan, because it is what the next scan run has to apply.
 	//
-	// The places this scan could have made a claim are passed with it. A claim in a
-	// document of its own can always be restated, so not restating one is a
-	// withdrawal; a claim attached to a component can only be restated by a
+	// The places this scan could have made a claim are passed with it. A claim
+	// in a document of its own can always be restated, so not restating one is
+	// a withdrawal; a claim attached to a component can only be restated by a
 	// format that can attach one, and one of the two cannot. Without that, a
 	// product's first scan in the other format closes every carried patch it
 	// had and reopens every finding they suppressed.
@@ -283,11 +283,11 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		sbom.FromStatement: true,
 		sbom.FromPedigree:  doc.Format.StatesCarriedPatches(),
 	}
-	// The documents the inventory was made of, kept on the scan so a receipt can say
-	// it. The log line said it and nothing else did, which meant an operator
-	// could only learn that a document placed none of its components by going
-	// and finding the line — on the screen that exists to answer what became
-	// of an upload.
+	// The documents the inventory was made of, kept on the scan so a receipt
+	// can say it. The log line said it and nothing else did, which meant an
+	// operator could only learn that a document placed none of its components
+	// by going and finding the line — on the screen that exists to answer what
+	// became of an upload.
 	components, placed := len(doc.Components), len(doc.Components)-doc.Unrooted
 	// The document's own name for the thing it is about, which a published
 	// advisory offers a reader to match a release against.

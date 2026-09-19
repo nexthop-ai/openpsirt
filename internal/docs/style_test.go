@@ -177,6 +177,5 @@ var interrogative = map[string]bool{
 // the alternative is refusing a correct heading. Each entry is a word somebody
 // had to add deliberately, which is the point.
 var adjectival = map[string]bool{
-	"routing": true, "pending": true, "ranking": true, "sorting": true,
-	"starting": true, "signing": true, "sending": true,
+	"routing": true, "pending": true, "sending": true,
 }

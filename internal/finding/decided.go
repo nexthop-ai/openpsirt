@@ -14,10 +14,9 @@ import "github.com/uptrace/bun"
 // row requiring a live key for "waiting" where the filter does not puts a
 // claim proposed and then withdrawn in the filter's waiting bucket, with no
 // state word on the row that comes back. The filter's own counts keep a
-// different shape on
-// purpose — a joined derived table rather than a correlated subquery, because
-// asking per row was 241,479 probes to say "nothing has been decided here" —
-// and it is the conditions that have to agree, not the shape.
+// different shape on purpose — a joined derived table rather than a correlated
+// subquery, because asking per row was 241,479 probes to say "nothing has been
+// decided here" — and it is the conditions that have to agree, not the shape.
 
 // decisionState is one of those counts: the column it lands in, the condition
 // that recognizes it, and the words that condition binds.

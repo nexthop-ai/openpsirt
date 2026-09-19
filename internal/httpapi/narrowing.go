@@ -34,9 +34,8 @@ type listing struct {
 // filter that changes the population rather than narrowing it, like asking for
 // what has closed, silently produces a file that cannot contain a single row
 // of what was asked for. A sixth copy is a sixth chance at that, and the parts
-// that must not be forgotten —
-// the floor, the whole filter, the subtree resolution — are exactly the parts
-// a copy drops quietly.
+// that must not be forgotten — the floor, the whole filter, the subtree
+// resolution — are exactly the parts a copy drops quietly.
 //
 // The scope is resolved and authorized together, so a product somebody may not
 // see reads as one that was never declared. A selection matching no build —

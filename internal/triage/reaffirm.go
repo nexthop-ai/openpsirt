@@ -142,15 +142,14 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	}
 
 	// The need for a second person is decided before this is written, and
-	// recorded on the claim. Without it the claim was stored as needing
-	// nobody — so a re-affirmation sent back for full approval suppressed the
-	// finding the moment it was made and never appeared in the review queue,
-	// which is one person's action producing a live dismissal no second person
-	// ever sees.
-	// An agreement to carry at all, asked of the approvals
-	// rather than inferred from the state. A claim lapses from Proposed as
-	// well as from Approved (the code moved out from under it either way), so
-	// "it lapsed" says nothing about whether anybody ever agreed to it.
+	// recorded on the claim. Without it the claim was stored as needing nobody
+	// — so a re-affirmation sent back for full approval suppressed the finding
+	// the moment it was made and never appeared in the review queue, which is
+	// one person's action producing a live dismissal no second person ever
+	// sees. An agreement to carry at all, asked of the approvals rather than
+	// inferred from the state. A claim lapses from Proposed as well as from
+	// Approved (the code moved out from under it either way), so "it lapsed"
+	// says nothing about whether anybody ever agreed to it.
 	carryable, err := s.approvalToCarry(ctx, previous.ClaimID, subject.ID)
 	if err != nil {
 		return nil, err
@@ -533,8 +532,9 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 				return fmt.Errorf("mark what the code moved out from under: %w", err)
 			}
 			moved = n
-			// The people to tell, read back inside the same act. The identifiers
-			// are this pass's own, so nothing another sweep marked is in it.
+			// The people to tell, read back inside the same act. The
+			// identifiers are this pass's own, so nothing another sweep marked
+			// is in it.
 			if err := tx.NewSelect().Model((*Decision)(nil)).
 				ColumnExpr("de.id").
 				Where("de.id IN (?)", bun.List(ids)).

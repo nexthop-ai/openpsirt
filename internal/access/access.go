@@ -366,8 +366,7 @@ func NewPipeline(id int64, name string, scope Scope) Subject {
 // reached by presenting anything.
 //
 // It is not confined to background work. One request path builds one: naming
-// the
-// products that group bindings already refer to, where the caller has been
+// the products that group bindings already refer to, where the caller has been
 // authorized to administer bindings and the answer is a list of names rather
 // than anything about what those products hold. Every such use carries a
 // sentence saying what it is for, and a use that cannot write one is a use
