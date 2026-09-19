@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="../built/">
+        <link rel="prev" href="../trying/">
       
       
-        <link rel="next" href="../pipeline/">
+        <link rel="next" href="../configuration/">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Trying it - OpenPSIRT</title>
+        <title>Sending a build - OpenPSIRT</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#trying-it" class="md-skip">
+        <a href="#sending-a-builds-inventory" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Trying it
+              Sending a build
             
           </span>
         </div>
@@ -309,6 +309,33 @@
       
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../trying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trying it
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -328,7 +355,7 @@
   <span class="md-ellipsis">
     
   
-    Trying it
+    Sending a build
   
 
     
@@ -346,7 +373,7 @@
   <span class="md-ellipsis">
     
   
-    Trying it
+    Sending a build
   
 
     
@@ -372,69 +399,79 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-published-image" class="md-nav__link">
+  <a href="#what-has-to-exist-first" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The published image
+        What has to exist first
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="The published image">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#something-has-to-say-who-you-are" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Something has to say who you are
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#from-a-checkout" class="md-nav__link">
+  <a href="#minting-a-key" class="md-nav__link">
     <span class="md-ellipsis">
       
-        From a checkout
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="From a checkout">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#one-person-cannot-demonstrate-this" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        One person cannot demonstrate this
+        Minting a key
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#the-rest-of-the-commands" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#sending-the-inventory" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The rest of the commands
+        Sending the inventory
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#finding-out-what-happened" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding out what happened
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gitlab-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitLab CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-pipeline-is-not-asked-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a pipeline is not asked to do
+      
+    </span>
+  </a>
   
 </li>
       
@@ -442,33 +479,6 @@
   
 </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../pipeline/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Sending a build
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -581,69 +591,79 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-published-image" class="md-nav__link">
+  <a href="#what-has-to-exist-first" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The published image
+        What has to exist first
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="The published image">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#something-has-to-say-who-you-are" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Something has to say who you are
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#from-a-checkout" class="md-nav__link">
+  <a href="#minting-a-key" class="md-nav__link">
     <span class="md-ellipsis">
       
-        From a checkout
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="From a checkout">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#one-person-cannot-demonstrate-this" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        One person cannot demonstrate this
+        Minting a key
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#the-rest-of-the-commands" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#sending-the-inventory" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The rest of the commands
+        Sending the inventory
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#finding-out-what-happened" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finding out what happened
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#github-actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub Actions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gitlab-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitLab CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-pipeline-is-not-asked-to-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a pipeline is not asked to do
+      
+    </span>
+  </a>
   
 </li>
       
@@ -667,32 +687,16 @@
   
 
 
-<h1 id="trying-it">Trying it<a class="headerlink" href="#trying-it" title="Permanent link">&para;</a></h1>
-<p>Two ways, for two different questions. The published image answers "what does
-this thing do"; the checkout answers "what does my change do".</p>
-<h2 id="the-published-image">The published image<a class="headerlink" href="#the-published-image" title="Permanent link">&para;</a></h2>
-<pre><code>docker run -p 8080:8080 \
-  -v &quot;$PWD/openpsirt-data:/data&quot; \
-  -e OPENPSIRT_DATABASE_URL=&quot;sqlite:///data/openpsirt.db&quot; \
-  -e OPENPSIRT_ADDR=&quot;0.0.0.0:8080&quot; \
-  -e OPENPSIRT_PLAIN_HTTP=1 \
-  -e OPENPSIRT_BOOTSTRAP_ADMINS=&quot;you&quot; \
-  -e OPENPSIRT_TRUSTED_HEADER=&quot;X-User&quot; \
-  -e OPENPSIRT_TRUSTED_SOURCES=&quot;172.16.0.0/12,10.0.0.0/8,fd00::/8&quot; \
-  ghcr.io/nexthop-ai/openpsirt:0.1.0
-</code></pre>
-<p>It creates its own schema on startup and serves the interface and the API on
-one port. The Helm chart is published beside the image, as
-<code>openpsirt-0.1.0.tgz</code> on the same release.</p>
-<div class="admonition warning">
-<p class="admonition-title">Not a small production deployment</p>
-<p>Plain HTTP, and administration handed to whoever a header says they are.
-It is for looking at.</p>
-</div>
-<h3 id="something-has-to-say-who-you-are">Something has to say who you are<a class="headerlink" href="#something-has-to-say-who-you-are" title="Permanent link">&para;</a></h3>
-<p>Nothing creates an account and no path admits an unknown arrival, so a
-deployment that cannot tell who is asking serves nobody. There are two ways to
-tell it, and the command above uses the second.</p>
+<h1 id="sending-a-builds-inventory">Sending a build's inventory<a class="headerlink" href="#sending-a-builds-inventory" title="Permanent link">&para;</a></h1>
+<p>What a build pipeline does, end to end. Everything here is one HTTP request;
+there is no client to install and no agent to run.</p>
+<p>The short version: <strong>declare what you ship once, mint a key once, and post the
+inventory on every build.</strong></p>
+<h2 id="what-has-to-exist-first">What has to exist first<a class="headerlink" href="#what-has-to-exist-first" title="Permanent link">&para;</a></h2>
+<p>A scan is filed against a product, a stream and a variant, and an upload naming
+something undeclared is refused — the error says which part is missing. That is
+deliberate: a typo in a pipeline would otherwise create a fourth product nobody
+meant, and the first anybody would know is a screen with four of everything.</p>
 <table>
 <thead>
 <tr>
@@ -702,74 +706,73 @@ tell it, and the command above uses the second.</p>
 </thead>
 <tbody>
 <tr>
-<td>A sign-in provider</td>
-<td>One OpenID Connect provider, or GitHub. Configured at startup, and needed for anybody to sign in through a browser normally</td>
+<td><strong>Product</strong></td>
+<td>The thing you ship. <code>sonic</code></td>
 </tr>
 <tr>
-<td>A trusted header</td>
-<td>A reverse proxy authenticates and passes the username on. Honored only from addresses you name, because reaching the container directly bypasses the proxy</td>
+<td><strong>Stream</strong></td>
+<td>A branch that keeps moving, or a tag that was built once. <code>main</code>, <code>v2.4.1</code></td>
+</tr>
+<tr>
+<td><strong>Variant</strong></td>
+<td>How it was built. <code>broadcom</code>, <code>amd64</code>, <code>container</code></td>
 </tr>
 </tbody>
 </table>
-<p><strong>A browser cannot set a header</strong>, so the command above gives you an API to
-drive with <code>curl</code> rather than an interface to click:</p>
-<pre><code>curl -H &quot;X-User: you&quot; http://localhost:8080/v1/people
+<p>Declaring is three requests, and you make them once rather than per build.
+Each is administration, so each needs an administrator — a pipeline's key
+cannot declare anything.</p>
+<p><strong>Scripting these needs an <code>Origin</code> header.</strong> A write arriving with no session
+of ours behind it is guarded against forgery by the origin it states, so a
+request made from a shell through a trusted-header proxy is refused as "not
+from a page this deployment served" until it says where it came from. Add
+<code>-H "Origin: $OPENPSIRT"</code> to each of the three. Making them from the interface
+needs nothing extra.</p>
+<pre><code class="language-bash">curl -X POST &quot;$OPENPSIRT/v1/products&quot; \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;name&quot;: &quot;sonic&quot;, &quot;display_name&quot;: &quot;SONiC&quot;}'
+
+curl -X POST &quot;$OPENPSIRT/v1/products/sonic/streams&quot; \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;name&quot;: &quot;main&quot;, &quot;kind&quot;: &quot;branch&quot;}'
+
+curl -X POST &quot;$OPENPSIRT/v1/products/sonic/variants&quot; \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;name&quot;: &quot;broadcom&quot;, &quot;customer_facing&quot;: true}'
 </code></pre>
-<p>To browse it you need something in front that sets the header — which is what
-the demo below stands up, and what a real deployment does with its ingress.</p>
-<div class="admonition note">
-<p class="admonition-title">Name the addresses the header arrives from, not the ones you expect</p>
-<p>The source is whatever presents the request to the container, which on a
-dual-stack docker host is often an IPv6 address rather than the bridge
-range. A header from anywhere else is refused and logged, and the refusal
-says only "not authorized" — the log is where it says why.</p>
-</div>
-<h2 id="from-a-checkout">From a checkout<a class="headerlink" href="#from-a-checkout" title="Permanent link">&para;</a></h2>
-<pre><code>make demo                    # build, start, seed two products, print the address
-make demo DEMO_HOST=yourbox  # if you browse by something other than localhost
+<p>A tag names the branch it was cut from, which is what release comparison reads:</p>
+<pre><code class="language-bash">curl -X POST &quot;$OPENPSIRT/v1/products/sonic/streams&quot; \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;name&quot;: &quot;v2.4.1&quot;, &quot;kind&quot;: &quot;tag&quot;, &quot;parent&quot;: &quot;main&quot;}'
 </code></pre>
-<p>Docker is all you need, plus <code>curl</code> and <code>xz</code> to read the compressed fixtures.
-The image builds the interface and the binary inside itself and carries the
-scanner, and it builds from your working tree — so what comes up is your
-change.</p>
-<p>It seeds two products: a real switch image, and OpenPSIRT itself, from the
-inventory the image carries of what it ships, so the screens that compare
-across products have something to compare.</p>
-<h3 id="one-person-cannot-demonstrate-this">One person cannot demonstrate this<a class="headerlink" href="#one-person-cannot-demonstrate-this" title="Permanent link">&para;</a></h3>
-<p>A judgment is proposed by one person and agreed to by another, and approving
-your own is refused. So the demo opens a door per person, and two browser
-windows are two people:</p>
-<table>
-<thead>
-<tr>
-<th>Door</th>
-<th>Arrives as</th>
-<th>May</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>http://localhost:8080</code></td>
-<td>an administrator</td>
-<td>administer the deployment</td>
-</tr>
-<tr>
-<td><code>http://localhost:8081</code></td>
-<td>Ana</td>
-<td>triage, and approve somebody else's</td>
-</tr>
-<tr>
-<td><code>http://localhost:8082</code></td>
-<td>Ben</td>
-<td>triage, and approve somebody else's</td>
-</tr>
-</tbody>
-</table>
-<p>Change the cast with <code>DEMO_CAST</code>, which takes <code>port:name:roles</code> entries:</p>
-<pre><code>make demo DEMO_CAST=&quot;8091:ana:public-read,public-triage,approver \
-                     8092:ben:public-read,public-triage,approver&quot;
+<h2 id="minting-a-key">Minting a key<a class="headerlink" href="#minting-a-key" title="Permanent link">&para;</a></h2>
+<p>A pipeline authenticates with an API key, which is a credential rather than a
+person: it may file scans and it holds none of a person's rights.</p>
+<pre><code class="language-bash">curl -X POST &quot;$OPENPSIRT/v1/keys&quot; \
+  -H &quot;Origin: $OPENPSIRT&quot; \
+  -H 'Content-Type: application/json' \
+  -d '{&quot;name&quot;: &quot;sonic-ci&quot;, &quot;product&quot;: &quot;sonic&quot;}'
 </code></pre>
-<h3 id="the-rest-of-the-commands">The rest of the commands<a class="headerlink" href="#the-rest-of-the-commands" title="Permanent link">&para;</a></h3>
+<p><strong>A key is scoped to one product</strong>, which is required rather than optional, and
+may be narrowed further to one stream and one variant. So a deployment shipping
+three products has three keys, and a key that leaks reaches one of them.</p>
+<p>The secret comes back once in <code>item.secret</code>, begins <code>opk_</code>, and is stored hashed — a credential
+store that can hand back what it holds gives up every pipeline's key with a copy
+of the database. Put it in your CI's secret store on the way past; there is no
+second chance to read it.</p>
+<p>Creating one needs a session, not another key: a credential cannot create
+another, and one that could would outlive the person who made it.</p>
+<p>Nothing further is granted. Declaring a product is administration and filing
+against it is not, so a person holds nothing on a product until somebody grants
+it — but a key carries the product it was made for, so a pipeline needs no
+grant of its own.</p>
+<h2 id="sending-the-inventory">Sending the inventory<a class="headerlink" href="#sending-the-inventory" title="Permanent link">&para;</a></h2>
+<p>Your build already produces an SBOM. Send it.</p>
+<pre><code class="language-bash">curl -X POST \
+  &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans&quot; \
+  -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
+  -F &quot;inventory=@sbom.cdx.json&quot;
+</code></pre>
 <table>
 <thead>
 <tr>
@@ -779,50 +782,91 @@ windows are two people:</p>
 </thead>
 <tbody>
 <tr>
-<td><code>make demo-status</code></td>
-<td>What it found, and every door</td>
+<td><code>inventory</code></td>
+<td>The SBOM. CycloneDX 1.x, SPDX 2.x or SPDX 3.x — the format is read from the document, not declared</td>
 </tr>
 <tr>
-<td><code>make demo-down</code></td>
-<td>Stops it</td>
-</tr>
-<tr>
-<td><code>make demo-reset</code></td>
-<td>Starts over, keeping the scanner's vulnerability database, which is large and slow to fetch</td>
-</tr>
-<tr>
-<td><code>make demo-triage</code></td>
-<td>A few judgments once the scans have landed: a dismissal, a deferral and a backport proposed by one of the cast and agreed to by another, plus an upgrade carried by a team</td>
-</tr>
-<tr>
-<td><code>make demo-vex</code></td>
-<td>A VEX document attributed to a distribution, written from what the scans actually found</td>
-</tr>
-<tr>
-<td><code>make demo-flaw</code></td>
-<td>One flaw in what this deployment ships, recorded by hand and undisclosed</td>
-</tr>
-<tr>
-<td><code>make dev</code></td>
-<td>This machine's binary plus the interface's own dev server, for editing the interface and watching it reload</td>
+<td><code>suppressions</code></td>
+<td>Optional, repeatable. OpenVEX documents stating what this build has already dealt with</td>
 </tr>
 </tbody>
 </table>
-<ul>
-<li><strong>A demo where every figure reads zero demonstrates nothing.</strong> Without
-  <code>demo-triage</code> the review queue, the record of judgments, how long triage is
-  taking and what is planned are all empty, and the screens answering those
-  questions look broken rather than idle. It records through the cast's own
-  doors, because one person proposing and a second agreeing is the control the
-  whole tool rests on.</li>
-<li><strong><code>demo-vex</code> is separate from the seed</strong> because the scans run in the
-  background, and a document written before them would name issues this
-  deployment does not have.</li>
-<li><strong><code>make dev</code> needs Go, node and a scanner installed locally</strong>, and it does
-  not exercise the interface the binary embeds. <code>make demo</code> does.</li>
-<li><strong>Everything the demo writes stays in a git-ignored directory</strong> in the
-  checkout.</li>
-</ul>
+<p><strong>A 202 means accepted, not valid.</strong> The documents are parsed afterwards, so the
+response says the upload arrived and nothing about whether it could be read.
+That is the one thing to get right in a pipeline: a green step here is not a
+green scan.</p>
+<h2 id="finding-out-what-happened">Finding out what happened<a class="headerlink" href="#finding-out-what-happened" title="Permanent link">&para;</a></h2>
+<p>Poll the scans for that build.</p>
+<pre><code class="language-bash">curl -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
+  &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans&quot;
+</code></pre>
+<p>Each entry carries <code>state</code>, and where something went wrong, <code>failure</code> — in the
+words the screen shows, so the person reading the failed step and the person
+opening the interface are reading the same sentence.</p>
+<pre><code class="language-json">{&quot;scan_id&quot;: 1, &quot;state&quot;: &quot;failed&quot;,
+ &quot;failure&quot;: &quot;run grype: exec: \&quot;grype\&quot;: executable file not found in $PATH&quot;,
+ &quot;components&quot;: 106, &quot;placed&quot;: 106}
+</code></pre>
+<p><code>components</code> against <code>placed</code> is worth watching: it is the difference between a
+document describing a graph and one that is a list. One component placed
+nowhere is ordinary; a document placing none of them produces findings that are
+each correct and cannot answer "why is this here" about any of them.</p>
+<p>Reading the inventory and scanning it are separate work with different rhythms:
+an inventory is read once, and scanned again whenever the vulnerability data
+moves. So a scan appearing is not the same as findings appearing.</p>
+<h2 id="github-actions">GitHub Actions<a class="headerlink" href="#github-actions" title="Permanent link">&para;</a></h2>
+<pre><code class="language-yaml">- name: Send the inventory to OpenPSIRT
+  env:
+    OPENPSIRT: ${{ vars.OPENPSIRT_URL }}
+    OPENPSIRT_KEY: ${{ secrets.OPENPSIRT_KEY }}
+  run: |
+    curl --fail-with-body -X POST \
+      &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/${{ matrix.variant }}/scans&quot; \
+      -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
+      -F &quot;inventory=@sbom.cdx.json&quot;
+</code></pre>
+<p><code>--fail-with-body</code> rather than <code>--fail</code>, so a refusal prints why rather than
+only failing the step.</p>
+<h2 id="gitlab-ci">GitLab CI<a class="headerlink" href="#gitlab-ci" title="Permanent link">&para;</a></h2>
+<pre><code class="language-yaml">send-inventory:
+  stage: .post
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl --fail-with-body -X POST \
+        &quot;$OPENPSIRT/v1/products/sonic/streams/$CI_COMMIT_BRANCH/variants/broadcom/scans&quot; \
+        -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
+        -F &quot;inventory=@sbom.cdx.json&quot;
+</code></pre>
+<p>Naming the stream from <code>$CI_COMMIT_BRANCH</code> is the shape that bites: <strong>the
+stream has to have been declared.</strong> A pipeline running on a branch nobody
+declared is refused, every build, until somebody declares it — and the refusal
+says which part is missing rather than making you guess:</p>
+<pre><code>404  product &quot;sonic&quot;: stream &quot;nobody-declared-this&quot;: not declared
+</code></pre>
+<h2 id="what-a-pipeline-is-not-asked-to-do">What a pipeline is not asked to do<a class="headerlink" href="#what-a-pipeline-is-not-asked-to-do" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>No scanning</strong></td>
+<td>The deployment scans what you send, on its own schedule, against the vulnerability data of the day. A release that is never rebuilt has the same components and a different answer next month</td>
+</tr>
+<tr>
+<td><strong>No results in the build log</strong></td>
+<td>Nothing is returned for a pipeline to print. A build log is readable by everybody with access to CI, and a pre-triage count is both sensitive and wrong</td>
+</tr>
+<tr>
+<td><strong>No pass or fail</strong></td>
+<td>There is no build gate. What a scan reports depends on what the vulnerability data knows that day rather than on what the commit changed, so the same commit would pass today and fail tomorrow — which is the property that makes a gate get switched off. A build that introduces a known-exploited critical tells somebody instead</td>
+</tr>
+</tbody>
+</table>
 
 
 
