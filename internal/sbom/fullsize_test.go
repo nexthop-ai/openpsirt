@@ -74,71 +74,56 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	}
 
 	// Measured against this image when the fixture was taken. The document
-	// describes 6,845 components and they name 6,845 packages — the reader
+	// describes 6,866 components and they name 6,866 packages — the reader
 	// collapses nothing, because there is nothing left to collapse.
 	//
-	// It described 7,693, then 7,035, and now 6,845, and each drop was the
-	// producer being fixed. The 658 that went first are the build container's
-	// own toolchain — Go and Rust dependencies harvested from `usr/` and
-	// `root/.cargo` trees inside the build slaves, which the image does not
-	// ship. The 190 that went next are lockfile entries under source trees
-	// this image does not build at all. Both are still in the document, moved
-	// to `formulation`, which is where CycloneDX puts how a thing was built:
-	// the data stays answerable for a build-chain question and stops being
-	// scanned as though it shipped. Marking them `scope: excluded` instead
-	// would have been correct for a human and inert for the scanner, which
-	// ignores scope entirely.
+	// The count is the only assertion in this file that moves. What a package
+	// says it was built from and what identifier a scanner matches on are
+	// checked rather than assumed, and the three constants further down hold
+	// across every revision of the fixture so far.
 	//
-	// The count below is the only assertion in this file that moved. What a
-	// package says it was built from and what identifier a scanner matches on
-	// did not, and that is checked rather than assumed: none of the 190 states
-	// an upstream or carries a CPE, so the three constants further down stayed
-	// where they were.
+	// Where the earlier counts went. The document described 7,693, then 7,035,
+	// then 6,845, and each drop is the producer being fixed. The 658 that went
+	// first are the build container's own toolchain — Go and Rust dependencies
+	// harvested from `usr/` and `root/.cargo` trees inside the build slaves,
+	// which the image does not ship. The 190 that went next are lockfile
+	// entries under source trees this image does not build at all. Both are
+	// still in the document, moved to `formulation`, which is where CycloneDX
+	// puts how a thing was built: the data stays answerable for a build-chain
+	// question and stops being scanned as though it shipped. Marking them
+	// `scope: excluded` instead is correct for a human and inert for the
+	// scanner, which ignores scope entirely.
 	//
-	// That is the change, and it is upstream rather than here. The previous
-	// fixture spelled 516 packages twice, under two package-URL namespaces for
-	// one .deb, and this reader absorbed it; the generator now merges them at
-	// the source (sonic-buildimage #29237).
-	//
-	// So this test no longer proves the merge works, and saying otherwise
-	// was the mistake in the last version of this comment. With nothing left
-	// to merge, deleting the merging code entirely leaves both assertions
-	// below passing — verified by doing it. What they prove now is narrower
-	// and still worth having: that this fixture arrives as one component per
-	// package and that the reader adds no duplicates of its own.
-	//
-	// The merge itself is proved by TestTwoSpellingsOfOnePackageAreOneComponent
-	// below, which constructs the duplicates rather than depending on a
-	// fixture to contain them — which is where a rule of this kind belongs,
-	// because a fixture is somebody else's output and can stop exercising it
-	// without anybody deciding to.
+	// Nothing in this fixture is merged by name. An earlier revision spelled
+	// 516 packages twice, under two package-URL namespaces for one .deb, and
+	// the generator now merges them at the source (sonic-buildimage #29237).
+	// So the two assertions below prove a narrower thing than the merge: that
+	// this fixture arrives as one component per package, and that the reader
+	// adds no duplicates of its own. The merge itself is proved by
+	// TestTwoSpellingsOfOnePackageAreOneComponent below, which constructs the
+	// duplicates rather than depending on a fixture to contain them — which is
+	// where a rule of this kind belongs, because a fixture is somebody else's
+	// output and can stop exercising it without anybody deciding to.
 	//
 	// The number is written down rather than expressed as a tolerance: a
 	// change in it is a change in what identity means, and that is something
-	// to look at rather than absorb. It has earned that twice. 6,845 became
-	// 6,854 when the generator started describing the programs in the image
-	// (sonic-buildimage #29237), and the prediction written down beforehand
-	// was that it would rise by the number of programs; it rose by the number
-	// of distinct program names, because a program arrives with no version
-	// and no package identifier, so identity — a name and a version — cannot
-	// tell two of the same name apart. That was 13 programs under 9 names.
+	// to look at rather than absorb. It has earned that twice. 6,845 became 6,854 when the
+	// generator started describing the programs in the image, by the number of
+	// distinct program names rather than the number of programs — 13 programs
+	// under 9 names — because a program arrives with no version and no package
+	// identifier, and identity is a name and a version. 6,854 became 6,866 on
+	// the next build for the same reason: 21 programs under 21 names, twelve
+	// more than before, as the image began describing the containerd shims and
+	// `ctr`, and the gNMI, gNOI and telemetry binaries in the gnmi container.
+	// Twelve Go modules that had no consumer at all now hang off one of them.
 	//
-	// 6,854 became 6,866 on the next build for the same reason and the
-	// prediction held: 21 programs under 21 names, twelve more than before.
-	// The image describes the containerd shims and `ctr`, and the gNMI, gNOI
-	// and telemetry binaries in the gnmi container, none of which it described
-	// before. Twelve Go modules that had no consumer at all now hang off one
-	// of them.
-	//
-	// Nothing in this fixture is merged by name any more, so it no longer
-	// shows what the paragraph above describes: the four programs that
-	// appeared twice each did so because the otel container shipped its own
-	// `dockerd`, `containerd` and `runc`, and it no longer ships them. The
-	// property is still real and still unfixable from here — the only field
-	// free to tell two programs of one name apart is `version`, where a scope
-	// name would be a lie every consumer has to know to ignore, and the honest
-	// fix is a hash on the program component. It is written down because the
-	// next build could bring it back, not because this one has it.
+	// Two programs of one name still collapse into one component, and the fix
+	// is not available here: the only field free to tell them apart is
+	// `version`, where a scope name is a lie every consumer has to know to
+	// ignore, and the honest fix is a hash on the program component. This
+	// fixture no longer contains a case of it — the otel container shipped its
+	// own `dockerd`, `containerd` and `runc` and no longer does — and the next
+	// build can bring one back.
 	const packages = 6866
 	if len(snapshot.Components) != packages {
 		t.Errorf("the image read as %d components, expected %d — has the fixture or the rule changed?",

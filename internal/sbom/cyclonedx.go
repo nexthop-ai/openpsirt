@@ -251,9 +251,9 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		described.Supplier = strings.TrimSpace(publisher)
 	}
 
-	// Where a pedigree said what this was built from, it stands: it is the
+	// Where a pedigree states what this was built from, it stands: it is the
 	// format's own way of saying so, and it carries more than a name. Where
-	// there was none, the identifier is asked — which is where most producers
+	// there is none, the identifier is asked — which is where most producers
 	// actually put it.
 	if described.UpstreamName == "" {
 		described.UpstreamName, described.UpstreamVersion = graph.UpstreamFromPurl(described.Purl)

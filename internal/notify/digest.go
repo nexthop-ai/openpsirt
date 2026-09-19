@@ -193,8 +193,8 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	// page and stopping. What is being answered is "the things nothing else
 	// told you about", and the things it told you about are exactly what the
 	// filter removes — so a holder with a page's worth of already-told work
-	// got an empty digest and was never told about anything behind it,
-	// however much there was. Routed work is the case that matters: it is
+	// gets an empty digest and is never told about anything behind it,
+	// however much there is. Routed work is the case that matters: it is
 	// deliberately silent, so the digest is the only place it is ever
 	// mentioned.
 	//

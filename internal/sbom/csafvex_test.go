@@ -184,9 +184,9 @@ const csafNamedOnly = `{
 func TestAClaimNamingNoPackageIdentifierStillCoversWhatItNames(t *testing.T) {
 	// The producer's automatically extracted claims name source trees rather
 	// than packages, so a product with no purl helper is the ordinary case and
-	// not the exception. Read as covering nothing, every one of these was
-	// accepted, stored, reported as recorded, and silently had no effect: the
-	// finding the build had already answered stayed open as noise.
+	// not the exception. Read as covering nothing, every one of these is
+	// accepted, stored, reported as recorded and silently without effect: the
+	// finding the build has already answered stays open as noise.
 	got, err := sbom.ReadSuppressions(strings.NewReader(csafNamedOnly), sbom.Limits{})
 	if err != nil {
 		t.Fatalf("read: %v", err)

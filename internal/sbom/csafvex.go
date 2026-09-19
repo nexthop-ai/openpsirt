@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// Reading CSAF-VEX, which a supplier's VEX as evidence named alongside OpenVEX
-// from the start and which was refused with a sentence until now.
+// Reading CSAF-VEX, the second of the two shapes a supplier's VEX as evidence
+// names alongside OpenVEX.
 //
 // The two formats say the same thing in different shapes. OpenVEX puts a
 // status, a justification and the products on one statement; CSAF puts the
@@ -70,9 +70,10 @@ type csafReader struct {
 // name charges one more identifier this document makes the reader hold.
 //
 // Charged on the way in, before anything is kept. The claim count is the only
-// bound either VEX reader had, and it counts vulnerability objects — so one
-// claim listing ten million product identifiers was under it, and the map
-// holding them was charged against nothing. What a bound has to stop is the
+// other bound either VEX reader carries, and it counts vulnerability objects —
+// so one claim listing ten million product identifiers is under it, and the
+// map holding them is charged against nothing. What a bound has to stop is
+// the
 // walk, and a count taken after the walk has already done the work.
 //
 // Against the component bound, because these are what a suppression document

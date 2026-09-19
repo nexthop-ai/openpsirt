@@ -365,8 +365,8 @@ func sqliteTemplate() ([]byte, error) {
 //
 // The database is kept between runs and reused. Applying the migrations is
 // nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
-// MariaDB, once per package per engine, which was 475 s of server work in a
-// run that spent 43 s of processor time — and none of it tests anything the
+// MariaDB, once per package per engine, which is 475 s of server work in a run
+// that spends 43 s of processor time — and none of it tests anything the
 // migration tests do not. What makes reuse safe is that the name carries a
 // fingerprint of the migration sources: a schema change edits the migration
 // that created the thing rather than adding one beside it, so the applied
@@ -727,8 +727,8 @@ func TablesIn(t *testing.T, ctx context.Context, db *database.DB) []string {
 // Reset empties every table, leaving the schema in place.
 //
 // It lives here rather than in each test package so that adding a table is one
-// change instead of one per package. Before this, a new table with a foreign
-// key silently broke the cleanup of every package that predated it.
+// change instead of one per package. A new table with a foreign key otherwise
+// breaks the cleanup of every package that predates it, silently.
 func Reset(t *testing.T, db *database.DB) {
 	t.Helper()
 	if err := clear(context.Background(), db); err != nil {
@@ -739,15 +739,15 @@ func Reset(t *testing.T, db *database.DB) {
 // clear is Reset without a test to fail: the harness empties a database it
 // kept from an earlier run before any test sees it.
 func clear(ctx context.Context, db *database.DB) error {
-	// One transaction, not thirty statements. SQLite in its default mode
-	// syncs the file at every commit, and thirty commits of that between
-	// every pair of tests was a large part of what a test on SQLite cost.
+	// One transaction, not thirty statements. SQLite in its default mode syncs
+	// the file at every commit, and thirty commits of that between every pair
+	// of tests is a large part of what a test on SQLite costs.
 	//
 	// And one statement per table that holds something, rather than one per
 	// table. A statement costs a round trip whether or not it changes a row —
 	// 203 µs on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL — and a test
-	// touches a handful of the fifty-odd tables, so most of the work was
-	// emptying tables that were already empty. Which ones hold anything is one
+	// touches a handful of the fifty-odd tables, so most of the work is
+	// emptying tables that are already empty. Which ones hold anything is one
 	// more statement, asked before the deletes and inside the same transaction.
 	return database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
 		occupied, err := occupied(ctx, tx)

@@ -611,9 +611,9 @@ func TestReadsTheRevisionEveryShippedInventoryStates(t *testing.T) {
 	// The reader checks the major version and accepts any minor revision,
 	// which is deliberate: a revision of the format adds fields rather than
 	// moving the ones read. What that leaves is a revision accepted by
-	// construction rather than by evidence, and the one every inventory this
-	// deployment ships now states was exactly that — the producer moved to
-	// 1.7 while every fixture here said 1.6.
+	// construction rather than by evidence, and the revision every inventory
+	// this deployment ships states is exactly that: the producer states 1.7
+	// while the other fixtures here state 1.6.
 	//
 	// So this is the same document the image carries and the demo ingests,
 	// read through the same reader, asserting the parts a revision could move:

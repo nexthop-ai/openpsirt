@@ -501,10 +501,10 @@ type Retired struct {
 // support.
 //
 // Which releases those are is asked of StreamsEndingBy rather than spelled
-// again. The date comparison lives in exactly one place. A report
-// that worked it out for itself would eventually describe a different set of
-// releases from the one whose deadlines were stripped, and it is the report
-// people would believe.
+// again. The date comparison lives in exactly one place. A report that works
+// it out for itself eventually describes a different set of releases from the
+// one whose deadlines were stripped, and it is the report people believe.
+//
 // A release whose date has not arrived is included where `by` is later than
 // `at`, so one call answers both what has ended and what is about to. Which of
 // the two a row is, is the caller's to read off the date it carries.

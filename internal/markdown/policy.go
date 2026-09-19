@@ -55,9 +55,9 @@ const Issue = "issue"
 // inspect reports what is wrong with submitted text.
 //
 // The document is parsed and its structure examined, not scanned as lines.
-// The first version of this matched regular expressions against each line, and
-// that is a different question from the one that matters: what the renderer
-// will make of it. The two came apart in every direction —
+// Matching regular expressions against each line asks a different question
+// from the one that matters: what the renderer will make of it. The two come
+// apart in every direction —
 //
 //   - A destination is entity-decoded before it becomes a link, so
 //     `&#106;avascript:` reads as nothing dangerous to a pattern and as
@@ -68,7 +68,7 @@ const Issue = "issue"
 //   - A link may be written across several lines, which a line-by-line reader
 //     cannot see as one thing.
 //   - And `<https://example.com>` — the standard way to write a bare link —
-//     looks exactly like a markup tag to a pattern, so honest text was refused.
+//     looks exactly like a markup tag to a pattern, so honest text is refused.
 //
 // Asking the parser removes the whole class. What is checked here is what will
 // be rendered, because it is the same parse.

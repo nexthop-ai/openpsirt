@@ -46,15 +46,15 @@ import (
 // answer move forward only when something genuinely new arrives, and never
 // backward.
 //
-// Read as the first sighting of whichever version ran most recently, it did
-// both. A data bundle is a build stamp for the scanner this ships with, so
-// restoring last quarter's data reproduces a version string exactly, and the
-// age was then measured from the first time that string was ever seen — an
-// air-gapped deployment re-importing an old bundle was told the data had not
-// moved in seven months and sent somebody looking for a fetch that never
-// failed. Worse, the chart ships two replicas with a cache each, so two of
-// them can hold different versions and both keep scanning: whichever ran last
-// decided the answer, the condition held on one sweep and not the next, and a
+// Read as the first sighting of whichever version ran most recently, it moves
+// both ways. A data bundle is a build stamp for the scanner this ships with,
+// so restoring last quarter's data reproduces a version string exactly, and
+// the age is then measured from the first time that string was ever seen — an
+// air-gapped deployment re-importing an old bundle is told the data has not
+// moved in seven months and sent looking for a fetch that never failed.
+// Worse, the chart ships two replicas with a cache each, so two of them can
+// hold different versions and both keep scanning: whichever ran last decides
+// the answer, the condition holds on one sweep and not the next, and a
 // condition that clears and re-raises is a fresh unread alert for ever, which
 // is what REQ-49 is about.
 func (w *Watch) dataStale(ctx context.Context) ([]Holds, error) {
