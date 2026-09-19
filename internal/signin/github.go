@@ -35,10 +35,9 @@ type GitHub struct {
 	// api is where the account and the teams are read from.
 	//
 	// A field rather than a literal so that this adapter can be driven against
-	// a stand-in, which is the only way anything here runs at all: every
-	// method of this type was unexecuted. Unexported, so nothing outside this
-	// package can point it anywhere — the guarded client still refuses any
-	// host but GitHub's in a real deployment.
+	// a stand-in, which is the only way anything here runs at all. Unexported,
+	// so nothing outside this package can point it anywhere, and the guarded
+	// client still refuses any host but GitHub's in a real deployment.
 	api string
 }
 

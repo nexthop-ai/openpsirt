@@ -57,9 +57,9 @@ func beginPKCE(config oauth2.Config, redirectURI string,
 // timeout at all, follows up to ten redirects — re-sending the authorization
 // code, and downgrading to plain HTTP if told to — and resolves the issuer's
 // name afresh on every sign-in with nothing checking what it resolves to. That
-// is the defect this file exists to stop having twice: the key fetches were
-// guarded because the verifier kept the client, and the token exchange was the
-// one call that did not.
+// is the defect this file exists to stop having twice: a key fetch is guarded
+// because the verifier keeps the client, and the token exchange is the call
+// with nothing keeping one for it.
 func exchangePKCE(ctx context.Context, config oauth2.Config, client *http.Client,
 	code, redirectURI string, pending Pending) (*oauth2.Token, error) {
 

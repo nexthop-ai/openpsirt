@@ -329,7 +329,7 @@ func splitSemantic(v string) (release []string, pre string, ok bool) {
 	}
 	// An empty version needs no guard of its own: Split gives one empty part,
 	// which is not digits, and the loop below answers with the same nil, "",
-	// false. The branch that stood here was a second spelling of that.
+	// false. A branch here would be a second spelling of that.
 	release = strings.Split(v, ".")
 	for _, part := range release {
 		if !digits(part) {

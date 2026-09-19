@@ -193,9 +193,9 @@ func TestWhatCannotBeOrderedIsRefusedRatherThanGuessedAt(t *testing.T) {
 		// Nothing to compare.
 		{vercmp.Debian, "", "1.0"},
 		// A word an advisory wrote where a version belongs. The comparison
-		// answers for any pair of strings, so this read as an ordered scheme
-		// that never fails: a letter outranks a digit, so "unfixed" sorted
-		// above every real release and was recommended as the upgrade.
+		// answers for any pair of strings, which reads as a scheme that never
+		// fails: a letter outranks a digit, so "unfixed" sorts above every
+		// real release and is recommended as the upgrade.
 		{vercmp.Debian, "unfixed", "1.0-1"},
 		{vercmp.Debian, "TBD", "1.0-1"},
 		{vercmp.Debian, "see the advisory", "1.0-1"},
