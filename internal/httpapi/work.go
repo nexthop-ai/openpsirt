@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
@@ -56,7 +57,61 @@ type QueuedBody struct {
 	Limit   int    `json:"limit" doc:"How much of this kind may wait before more is refused"`
 }
 
+// VulnerabilityDataBody is what this deployment's scans are answering against.
+type VulnerabilityDataBody struct {
+	Version string `json:"version,omitempty" doc:"What the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said"`
+	// Since is when the data last moved, which is the most recent time any
+	// version was seen for the first time. A version that comes back was not a
+	// change the second time.
+	Since   *time.Time `json:"moved_at,omitempty" doc:"When the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"`
+	StaleAt string     `json:"stale_after" doc:"How long without moving counts as stopped, as this deployment has it set"`
+	Stale   bool       `json:"stale" doc:"Whether it has been that long. The same question the condition told to administrators asks"`
+}
+
 func registerWork(api huma.API, in Ingest) {
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "get-vulnerability-data", Method: http.MethodGet,
+		Path:    "/v1/vulnerability-data",
+		Summary: "Show what the scans are answering against",
+		Description: "The vulnerability data version this deployment's scans are running " +
+			"against, and when it last moved.\n\n" +
+			"**Nothing here is a version anybody can order.** What a scanner reports is an " +
+			"opaque string — a date for one, a schema revision and a build stamp for " +
+			"another — so the only question that can be asked of it is whether it changed. " +
+			"That is enough: what matters is that it moved, not which is newer.\n\n" +
+			"`moved_at` is the most recent time any version was seen for the first time. A " +
+			"version that comes back was not a change the second time, which is what an " +
+			"air-gapped deployment re-importing an older bundle looks like.\n\n" +
+			"Absent everywhere means nothing has finished a scan and stated a version, which " +
+			"is a deployment nobody has pointed at anything yet rather than data that has " +
+			"gone stale.",
+		Tags: []string{"Administration"},
+	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*struct {
+		Body VulnerabilityDataBody
+	}, error) {
+		type answer = struct{ Body VulnerabilityDataBody }
+		if err := administrating(ctx); err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return &answer{}, nil
+		}
+		data, err := notify.NewWatch(in.DB.DB, in.logger()).DataInForce(ctx)
+		if err != nil {
+			return nil, wentWrong(in.Logger,
+				"what the scans are answering against could not be read", err)
+		}
+		out := &answer{}
+		out.Body.Version = data.Version
+		out.Body.Since = data.Since
+		out.Body.StaleAt = data.After.String()
+		// Answered here as well as said by the condition, because a screen
+		// somebody opens after being told is a screen that has to agree with
+		// what told them.
+		out.Body.Stale = data.Since != nil && time.Since(*data.Since) >= data.After
+		return out, nil
+	})
+
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-set-aside-work", Method: http.MethodGet, Path: "/v1/work/set-aside",
 		Summary: "List work that stopped being retried",

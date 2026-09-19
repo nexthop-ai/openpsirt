@@ -14,12 +14,12 @@ import (
 
 // Work that has stopped moving.
 //
-// Four conditions, and they are conditions because of what is wrong with each:
-// nothing has happened. No message driven by an event can ever report that, so
-// the four things that go quietly wrong in a triage workflow — a claim nobody
-// approves, a claim sent back that nobody revises, a deferral running out, and
-// a team's queue nobody empties — are invisible to a tool that only reports
-// what somebody did.
+// They are conditions because of what is wrong with each: nothing has happened.
+// No message driven by an event can ever report that, so what goes quietly
+// wrong in a triage workflow — a claim nobody approves, a claim sent back that
+// nobody revises, a deferral running out, a team's queue nobody empties, a
+// report nobody answered — is invisible to a tool that reports only what
+// somebody did.
 //
 // Each clears by the thing happening, which is the conditions clearing, events
 // acknowledged shape: nobody dismisses these, the world does.

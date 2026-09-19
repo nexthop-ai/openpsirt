@@ -57,6 +57,7 @@ func Kinds() []Kind {
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
+		VulnerabilityDataStale, RiskUnagreed,
 	}
 }
 
@@ -183,6 +184,25 @@ const (
 	// is raised from the moment a report is recorded rather than after a
 	// threshold, and clears when somebody records that they answered.
 	Unanswered Kind = "unanswered-report"
+
+	// The two conditions about the deployment rather than about anybody's
+	// work. Both are a report that has to come back empty, asked as a
+	// condition instead — because a report that is empty every time is one
+	// nobody opens, and mailing it on a schedule cannot tell "the control
+	// held" from "the job did not run".
+	//
+	// VulnerabilityDataStale is the scanner's data having stopped moving.
+	// Nothing fails: every scan since answers as confidently as ever, against
+	// what was known a month ago, and a finding that newer data would have
+	// opened simply has not.
+	VulnerabilityDataStale Kind = "vulnerability-data-stale"
+	// RiskUnagreed is something hidden with nobody's agreement behind it.
+	//
+	// The one outcome-shaped failure the record cannot find on its own
+	// afterwards: the three claims that say no further work is needed each
+	// require a second person, so one standing alone means the write path was
+	// got around rather than that somebody is behind.
+	RiskUnagreed Kind = "risk-unagreed"
 )
 
 // Notification is one thing somebody was told.
