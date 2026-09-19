@@ -40,10 +40,10 @@ this document is its own.
 ## The counting unit
 
 Every rate and count is one issue at one component, never one place. The
-deadline is stored per place, but a place is not a piece of work: one flaw in one
-library that forty-five packages pull in is one decision. Counted per place it
-was forty-five late things beside one late thing on the findings list, both
-labeled the same, and on a real kernel the two numbers were about thirty-seven
+deadline is stored per place, but a place is not a piece of work: one flaw in
+one library that forty-five packages pull in is one decision. Counted per place
+it is forty-five late things beside one late thing on the findings list, both
+labeled the same, and on a real kernel the two numbers are about thirty-seven
 apart.
 
 Where a report groups places first, it states what a group means rather than
@@ -125,7 +125,7 @@ getting worse, and one line hides that.
 
 | Rule | Reason |
 |---|---|
-| Answered against today's vulnerability data, not as of the day each was cut | That is what re-scanning a shipped release is for. A chart that froze the answer would hide the advisory published after it shipped |
+| Answered against today's vulnerability data, not as of the day each was cut | That is what re-scanning a shipped release is for. A chart freezing the answer hides the advisory published after it shipped |
 | Rates stay on calendar | How much appeared and was resolved between two releases is an artifact of how far apart somebody cut them |
 | A product must be named, and two releases is the fewest that is a shape | Across products the tags interleave by date and mean nothing side by side; one bar reads as broken rather than as sparse |
 | A release with nothing open is still a release | The figures are read from every build that has been *scanned*, with counts attached to that list rather than the list derived from the counts. Driven from findings alone, a clean release had no row, and absent is how this list says "never scanned" |
@@ -153,13 +153,13 @@ last release a customer actually has, which is rarely the previous one.
 | Ordered worst first and stably | A release note that reorders between reads is one nobody can diff |
 | Bounded by the size of a build, not the calendar | Every open entry of both builds, which is what diffing them means. There is no page of a diff |
 | What left the affected list is two sets | An upgrade, a carried patch, a component no longer shipped and a recorded flaw declared fixed are fixes. A bump that carried the issue with it, a record taken back, and a closure nothing explains are not — the last means the component is unchanged and the scanner stopped reporting it, which is a fault to investigate. One list, and the number a release coordinator quotes includes them |
-| The split is made once, where the release note and the remediation rate read it | The screen made the same judgment a second time, in a column heading, and the two disagreed: a column headed "Fixed" carried two unexplained closures with an explanatory note about the one reason not in it |
+| The split is made once, where the release note and the remediation rate read it | A screen making the same judgment a second time in a column heading disagrees with it: a column headed "Fixed" then carries unexplained closures, under an explanatory note about the one reason not in it |
 | An entry that left says which run stopped reporting it | An unexplained closure is a fault, and the first question about one is which run. Told it is unexplained and given nowhere to look, a reader has the fault and no way to start on it. Absent where a person closed the finding, which is the other way one closes |
 | Each fixed entry states why | "Fixed by upgrading to 2.4" and "fixed by a carried patch" are different sentences, and the closure reason distinguishes them. `superseded` means the version moved and the issue came with it — before that reason existed, such a bump put one issue in both the fixed and the newly-present column of the same document |
 | A fixed entry states what it moved to | "The component was upgraded, 3.7.0 → 3.9.0". That pair is written when the scan closes the finding, because the component that carried the issue is gone from the inventory by then and anything asking later holds one version and not two |
 | Each still-present entry states whether somebody tried | It carries the version its place arrived from where the version moved since. On the still-present column only: a fixed entry's closure reason already says what happened, and a new one had nothing to bump |
 | Explanations are read once for the whole list, not once per entry | A comparison against a release a customer has been on for a year has as many fixed entries as the note is long. The statement narrows by the issues and the components separately rather than by the pairs, because no engine here spells a comparison against a pair of columns the same way, so what comes back is a superset and the pairing is done on the way out |
-| Each entry is rated as its own product rates it | Read from the published rating alone, the document contradicted the findings list it was written from wherever a product had re-rated an issue — and this is the copy that leaves the building. The two builds can be in two products, so each half of the comparison is rated by its own |
+| Each entry is rated as its own product rates it | Read from the published rating alone, the document contradicts the findings list it was written from wherever a product has re-rated an issue — and this is the copy that leaves the building. The two builds can be in two products, so each half of the comparison is rated by its own |
 
 ## The release note
 
@@ -192,7 +192,7 @@ builds, and this is a document going to a customer.
 | A bullet carries the score, whether it is known exploited, and where it is written up | The name and the word do not say whether the upgrade is taken tonight or next month, and all three are already held. The address goes through the rule an address stored beside a claim does, because this document leaves the building and a scheme a reader's machine acts on is not something to hand them |
 | The description is not in the bullet | One upgrade closes hundreds of issues and they are listed under it, so a sentence apiece is a document nobody reads to the end. The description is behind the link, which is what the link is for |
 | An empty section is not written | A heading with nothing under it is a question about whether something is missing |
-| A release that fixed nothing says so, in a sentence | The operation answered nothing at all, and zero bytes is also what a truncated response, the wrong pair of builds and a request that went astray look like. A sentence is not a heading over nothing, so the rule above still holds: what comes back names the two builds and what measured them, and carries no section |
+| A release that fixed nothing says so, in a sentence | Answering nothing at all is indistinguishable from a truncated response, the wrong pair of builds and a request that went astray. A sentence is not a heading over nothing, so the rule above still holds: what comes back names the two builds and what measured them, and carries no section |
 | What was left out is counted | A reader cannot otherwise tell a release that fixed nothing undisclosed from one whose undisclosed fixes were taken off the page. A number and never the entries, and zero for a reader who could not have seen them anyway |
 | The count is of fixes, by the same rule the listed entries are | A pair open in one build and not the next has left the affected list, which is not the same as having been fixed: an invalid record means the build was never affected, a superseded row means a bump carried the issue along, and an unexplained closure says nothing at all. The listed half excluded all three; the counted half was a plain set difference that never read a closure reason, so the sentence beneath the note told a customer each of those was a security fix. Both halves go through one function |
 
@@ -209,7 +209,7 @@ automatically.
 | Days remaining are rounded down rather than truncated toward zero | Truncation reports something twelve hours overdue as having zero days left, which reads as due today |
 | Stored at ingest, recomputed when the policy changes (REQ-33) | Computing it per request costs a pass over every open finding *per urgency band*, because each band allows a different number of days — measured at about eight seconds over 441,108 findings. Stored, it is an indexed range scan |
 | The clock runs on what nobody has answered | A dismissal takes a finding off it entirely; a deferral replaces the deadline with its own date. It stops only for a decision that *applies*: approved, or proposed where no second person is required, at the versions this build ships, and a deferral only until its date. A proposal still waiting for an approver stops nothing, and "who is holding what" counts overdue by the same condition, spelled once |
-| One range scan ordered on the stored deadline | It was asked band by band before that — once per window, each with its own first-sighting cutoff, merged afterwards — because ordering by a deadline meant date arithmetic, which has no portable spelling across the four engines. Before that it took the oldest findings and discarded whatever was not due in a loop, so an exploited finding first seen yesterday and due tomorrow lost its place to a low from two years ago that filled the buffer. A list ordered on a proxy for the answer is not the list it claims to be |
+| One range scan ordered on the stored deadline | Asked band by band instead — once per window, each with its own first-sighting cutoff, merged afterwards — because ordering by a deadline means date arithmetic, which has no portable spelling across the four engines. Taking the oldest findings and discarding whatever is not due loses an exploited finding first seen yesterday and due tomorrow to a low from two years ago that filled the buffer. A list ordered on a proxy for the answer is not the list it claims to be |
 | A person is named on a row only where every place has the same one | Reporting one of several would say a finding is being dealt with when most of it is not |
 
 Urgency is stored at ingest for the same reason and carries the same staleness,
@@ -229,7 +229,7 @@ keeps its deadline; only open rows lose one at end-of-life or below the floor.
 | The report says what carries no deadline | A rate about dates is silent about the populations that were never due: below the product's line, in a tag, in a release out of support, and with nothing upstream to take. The third has a report of its own and is linked from here |
 | Taking a population off the clock moves the rate, and upward | A row needs a deadline to be judged at all, so one losing its deadline leaves the numerator and the denominator together — and the rows leaving are disproportionately the late ones. The figure rises with no work done, which is a correction rather than an improvement, and anybody tracking it is told why. A rate over a period spanning such a change is computed from two rules, because only open rows are re-clocked |
 | Only the whole-of-it figure opens a list | The findings list reads a severity as that band or worse, so a link from one band's row would open more than the row counts — and a figure whose list holds something else is the failure a report is easiest to ship |
-| What is still open at all is a column, beside deferred and overdue | Those two were numerators with no denominator, so "eleven overdue" could not be read as a share of anything, which is what a rate is |
+| What is still open at all is a column, beside deferred and overdue | Those two alone are numerators with no denominator, so "eleven overdue" cannot be read as a share of anything, which is what a rate is |
 
 ## Release readiness
 
@@ -267,9 +267,8 @@ as the findings they cover, so the figure agrees with the list behind it.
 It carries the same narrowing every other query does. A count is as much a
 disclosure as a row.
 
-It is bounded, worst first, like every other list. It was the one name-yielding
-projection with no ceiling at all — no limit parameter, no default, one row per
-person holding open work as the deployment grows.
+It is bounded, worst first, like every other list. Unbounded it is one row per
+person holding open work, growing with the deployment, and it yields names.
 
 ## Inheritance preview
 
@@ -286,7 +285,7 @@ to and a carry that happens silently is one nobody reviews.
 | Rule | Reason |
 |---|---|
 | Which product this is about is read from the build, not from the caller | The first version selected by live key and matching place alone, and a place is a hash of component names carrying no product — so a shared distribution package matched across products, and the reasoning of undisclosed claims came back to anybody who could read one product |
-| Both upstream versions are compared, not just the component's | Comparing only one reported a build whose *consumer* had moved as already covered, when the claim does not reach it |
+| Both upstream versions are compared, not just the component's | Comparing only one reports a build whose consumer has moved as already covered, when the claim does not reach it |
 | A deferral states how long it has already run, across every line it has been carried through | Four consecutive carries of "not this release" are a year nobody decided on, and each looks reasonable alone. Withdrawn deferrals are not counted |
 
 ## Remediation metrics
@@ -350,7 +349,7 @@ had.
 | Bounded, and it says so | At most the most recent few thousand claims in the window, with the answer stating how many and whether the ceiling was reached |
 | Throughput is per person, counted where the work happened | A claim belongs to the window it was proposed in, and an agreement to the window it was given in |
 | Send-backs are counted for the deployment, not per person | The record holds that a claim came back and not who sent it. Attributing it by finding the comment written at that moment would be a guess presented as a figure |
-| It narrows to one product, or to one team's people | Without a scope there were no per-team figures at all, so a manager asking how their own people were doing read the deployment's numbers with their name on them |
+| It narrows to one product, or to one team's people | Without a scope there are no per-team figures, so a manager asking how their own people are doing reads the deployment's numbers with their name on them |
 | A team narrows the two waits by who **proposed**, and its throughput by who did each piece of work | A claim belongs to whoever argued it, which is the rule the record of judgments dates by — narrowed by the approver, a team's time to agree would be about claims its people agreed to for somebody else. Throughput is a row per person, so it is narrowed by the person the row is about |
 | A team with nobody on it measures nothing | A narrowing that silently widens to the deployment is the one mistake a narrowing must not make |
 
@@ -402,7 +401,7 @@ deadline, and whether the deadline was met.
 | A state word it does not recognize keeps nothing | A filter that silently widens is how a register reads as complete about rows it left out. The route's own vocabulary refuses one at the door; this is the guard behind it |
 | Provenance never fails the report | A build nothing has finished scanning is the one somebody is most likely asking about, so what cannot be read is absent rather than an error |
 
-Current state, with no `as_of`. Reconstructing the view as of a past date was
+Current state, with no `as_of`. Reconstructing the view as of a past date is
 refused on two grounds. Each row carries the timestamps that evidence the thing
 being checked — that a decision predates the ship date. And the reconstruction
 would be least trustworthy on the column it would be checked hardest on:
@@ -432,9 +431,9 @@ of its own, and the catalog carries it with the selection made.
 
 ## One issue across the estate
 
-A document: what the issue is, every build of ours that carries it, what was
-decided about each and the argument behind it. The form a customer inquiry is
-answered from, which was four screens and a copy-paste — so the answer was
+A document: the issue, every build of ours that carries it, what was decided
+about each and the argument behind it. The form a customer inquiry is answered
+from. Assembled out of four screens and a copy-paste instead, the answer is
 assembled differently every time.
 
 | Rule | Reason |
@@ -597,20 +596,20 @@ to, for the reason the record is: a judgment belongs to when it was argued, and
 dating it by its agreement moves it out of that period whenever an approval
 comes late.
 
-Every section is bounded and says when it reached the bound. None of them was:
-a deployment that had been triaging for a while answered one row per approved
-claim in force, and the last section then asked three more questions about each
-of them one at a time — thirty thousand sequential statements in one request on
-ten thousand claims, with nothing checking whether the caller was still there.
-What each claim covers now is one statement for the page. A capped section that
-read as complete would mislead the one reader this report is for, so it says it
+Every section is bounded and says when it reached the bound. Unbounded, a
+deployment that has been triaging for a while answers one row per approved
+claim in force, and the last section asks three more questions about each of
+them one at a time — thirty thousand sequential statements in one request on
+ten thousand claims, with nothing checking whether the caller is still there.
+What each claim covers now is one statement for the page. A capped section
+reading as complete misleads the one reader this report is for, so it says it
 was capped.
 
 ## Fix-bundle page cost
 
-Measured rather than asserted, because it was reported slow on a real
-deployment at 2.2 s and "the design says it should be fine" is a sentence with
-a word doing too much work in it.
+Measured rather than asserted. It runs at 2.2 s on a real deployment, and "the
+design says it should be fine" is a sentence with a word doing too much work in
+it.
 
 One build, 204,000 open findings, 136,000 of them naming a version that fixes
 them, folding to 700 bumps — the same two-thirds-fixable ratio a real switch
@@ -644,8 +643,8 @@ findings list, the cross-product findings list, the record of judgments, the
 review queue, the by-component view, what is running out of time, scan coverage,
 what is out of support, a comparison of two builds, the fix bundles, the
 upgrades one build is waiting on, what keeps being put off, the backlog over
-time, what has been changed administratively, and the disposition register —
-which is the one an auditor asks for first, and which the count left out.
+time, what has been changed administratively, and the disposition register,
+which is the one an auditor asks for first.
 
 The subject travels through the stream. An export is the easiest place to
 build the list first and narrow it afterwards, so it is the same query with the
