@@ -1,11 +1,13 @@
 // Package currency asks each ecosystem's index what the newest version of
 // something is, and when it shipped.
 //
-// **This is the one thing here that reaches the network.** Every other outside
-// answer arrives as a file somebody imports, deliberately, so that a
-// deployment can run somewhere sealed off. This is the exception: it
-// is off unless a deployment turns it on, and a deployment that cannot reach
-// out loses this answer and nothing else.
+// **This is the one thing here that reaches the network.** Everything a scan
+// needs arrives as a file somebody imports, deliberately, so that a scan
+// answers the same way twice and nothing it depends on is somebody else's
+// server being up (REQ-12). That rule is about the scan path, and this is not
+// on it: it asks a public index what the newest version of something is, it is
+// off unless a deployment turns it on, and a deployment that cannot reach out
+// loses this answer and nothing else.
 //
 // Two facts and no judgment. The newest version says whether we are behind;
 // its date says whether the thing is still moving. Together they say why there

@@ -124,8 +124,13 @@ func TestAWeaknessIsMatchedWholeAndNotAsAPrefix(t *testing.T) {
 			Scan(t.Context(), &issueID); err != nil {
 			t.Fatal(err)
 		}
-		for _, cwe := range []string{"CWE-125", "CWE-787"} {
-			row := map[string]any{"vulnerability_id": issueID, "cwe": cwe}
+		for i, cwe := range []string{"CWE-125", "CWE-787"} {
+			// Which is the root cause is not what this is about, and the
+			// column is stated rather than defaulted so that no insert path
+			// can leave it unanswered.
+			row := map[string]any{
+				"vulnerability_id": issueID, "cwe": cwe, "is_primary": i == 0,
+			}
 			if _, err := r.db.DB.NewInsert().Model(&row).
 				TableExpr("\"vulnerability_weakness\"").Exec(t.Context()); err != nil {
 				t.Fatal(err)

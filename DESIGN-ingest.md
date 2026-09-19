@@ -335,6 +335,21 @@ has no single root — the tracked unit stands in, as it does for a document
 naming none — because picking one of them states a hierarchy the producer did
 not.
 
+**What the document called that component is kept on the scan.** The root is
+stored by name alone, because a package identifier carries the version, the
+root's version moves every build, and the root's identity moving takes every
+edge hanging off it with it. So the declared identifier is kept as a fact about
+the document, beside its serial and what the inventory was made of, and never as
+an identity.
+
+It is what a published advisory offers a reader to match a release against, and
+only what the producer wrote can serve: an identifier helps only if it appears
+on both sides, and one invented here appears on ours. So it is read off the
+document rather than off the resolved graph, which is the same condition stated
+once — where the document named nothing, what stands in is the tracked unit,
+and that is ours. A declared root carrying no package identifier keeps nothing
+for the same reason.
+
 **What is counted is what the pointers resolve to, not how many there are.** A
 format offers more than one place to state the root — a list beside the
 contents, and a relationship saying the same thing — and a producer that fills

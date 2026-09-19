@@ -89,7 +89,9 @@ behind every line of it.
  discover
 - **A build's own suppressions are applied and never re-decided**
 - **The scanner, its vulnerability database and the exploitation feeds all work
- with no network**, so an air-gapped install uses the same path as any other
+ with no network**, so a scan answers the same way twice and no content network
+ sits in the path it is available through. An air-gapped install uses the same
+ path as any other
 - **Every finding records what produced it** — which scanner, which version,
  which database, and how the match was made
 - **OpenPSIRT publishes an inventory of itself**, of the binary and of the
@@ -373,6 +375,7 @@ each is built:
 | [DESIGN-ingest.md](DESIGN-ingest.md) | What happens to a scan when it arrives, and how one is read |
 | [DESIGN-interface.md](DESIGN-interface.md) | The web interface, how it is built and how it reaches the server |
 | [DESIGN-notifications.md](DESIGN-notifications.md) | What people are told about, and what they are not |
+| [DESIGN-obligations.md](DESIGN-obligations.md) | The facts a regulatory report needs, and why none of them is computed |
 | [DESIGN-packaging.md](DESIGN-packaging.md) | Container image and Helm chart |
 | [DESIGN-queue.md](DESIGN-queue.md) | How work waiting to be done is held and picked up |
 | [DESIGN-remediation.md](DESIGN-remediation.md) | Which releases a fix is meant to reach, and how the scans answer |

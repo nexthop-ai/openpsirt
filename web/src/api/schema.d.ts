@@ -5539,7 +5539,7 @@ export interface components {
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other */
+            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
             mitigation?: string;
             /** @description Whether a second person has to agree before it takes effect */
             needs_approval?: boolean;
@@ -6182,7 +6182,7 @@ export interface components {
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other */
+            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "patch-needed";
@@ -6385,6 +6385,9 @@ export interface components {
             /** @description This is a team's queue rather than one person's work */
             team?: boolean;
         };
+        IdentificationHelper: {
+            purl?: string;
+        };
         Info: {
             /**
              * Format: uri
@@ -6506,7 +6509,7 @@ export interface components {
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks */
+            /** @description What a holder can do about it. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
@@ -7202,6 +7205,7 @@ export interface components {
         Named: {
             name: string;
             product_id: string;
+            product_identification_helper?: components["schemas"]["IdentificationHelper"];
         };
         NeighborBody: {
             /**
@@ -8060,7 +8064,7 @@ export interface components {
             vector?: string;
             /** @description Which one, where the build holds that name at several versions */
             version?: string;
-            /** @description What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given */
+            /** @description What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which */
             weaknesses?: string[] | null;
         };
         RecordBody: {
@@ -8852,6 +8856,7 @@ export interface components {
             state: "proposed" | "approved";
         };
         Statement: {
+            action_statement?: string;
             impact_statement?: string;
             justification?: string;
             products: components["schemas"]["Shipped"][] | null;
@@ -9175,6 +9180,7 @@ export interface components {
         Vulnerability: {
             acknowledgments?: components["schemas"]["Acknowledgment"][] | null;
             cve?: string;
+            cwe?: components["schemas"]["Weakness"];
             discovery_date?: string;
             ids?: components["schemas"]["Issued"][] | null;
             notes?: components["schemas"]["Note"][] | null;
@@ -9235,6 +9241,10 @@ export interface components {
              * @description Which version this was, counting from one
              */
             version: number;
+        };
+        Weakness: {
+            id: string;
+            name: string;
         };
         WentBody: {
             /** @description What the document hashed to when it went out. The published document belongs to whoever published it; this is what makes comparing it possible */

@@ -126,9 +126,9 @@ make scanner-db-verify BUNDLE=openpsirt-scanner-db-<date>.tar.gz
 ```
 
 The verification is available there as well as here on purpose. "It built" and
-"it loads where it has to" are different claims, and the second is the one an
-air-gapped install depends on — in the one situation where trying it out first
-is not available.
+"it loads where it has to" are different claims, and the second is the one that
+matters where the bundle is all there is — in the one situation where trying it
+out first is not available.
 
 ## Telling people
 

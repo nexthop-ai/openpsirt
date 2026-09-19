@@ -1832,7 +1832,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         mitigation:
-          description: What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other
+          description: What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise
           maxLength: 65536
           type: string
         needs_approval:
@@ -2951,7 +2951,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         mitigation:
-          description: What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other
+          description: What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise
           maxLength: 65536
           type: string
         outcome:
@@ -3325,6 +3325,12 @@ components:
         - places
         - overdue
       type: object
+    IdentificationHelper:
+      additionalProperties: false
+      properties:
+        purl:
+          type: string
+      type: object
     Info:
       additionalProperties: false
       properties:
@@ -3581,7 +3587,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         mitigation:
-          description: What stops it, where the reason is that a control already does. Nothing here notices that control being removed, so this is the record somebody checks
+          description: What a holder can do about it. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks
           type: string
         outcome:
           enum:
@@ -4975,6 +4981,8 @@ components:
           type: string
         product_id:
           type: string
+        product_identification_helper:
+          $ref: "#/components/schemas/IdentificationHelper"
       required:
         - name
         - product_id
@@ -6369,7 +6377,7 @@ components:
           description: Which one, where the build holds that name at several versions
           type: string
         weaknesses:
-          description: What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given
+          description: What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which
           items:
             type: string
           type:
@@ -7730,6 +7738,8 @@ components:
     Statement:
       additionalProperties: false
       properties:
+        action_statement:
+          type: string
         impact_statement:
           type: string
         justification:
@@ -8322,6 +8332,8 @@ components:
             - "null"
         cve:
           type: string
+        cwe:
+          $ref: "#/components/schemas/Weakness"
         discovery_date:
           type: string
         ids:
@@ -8436,6 +8448,17 @@ components:
         - version
         - body
         - replaced_at
+      type: object
+    Weakness:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
       type: object
     WentBody:
       additionalProperties: false

@@ -59,6 +59,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/outward/` | The one HTTP client this process reaches the internet with. See `DESIGN-access.md` |
 | `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes without splitting a character |
 | `internal/webui/` | The built interface, embedded. See `DESIGN-interface.md` |
+| `internal/weakness/` | What the weakness catalog calls each identifier, read from what it publishes. See `DESIGN-remediation.md` |
 | `internal/docs/`, `internal/build/`, `internal/tools/` | Document checks, makefile checks, and the gates that are not linters |
 | `web/` | The interface source. See `DESIGN-interface.md` |
 | `deploy/helm/openpsirt/` | The chart. See `DESIGN-packaging.md` |
@@ -123,6 +124,7 @@ of ours needs no edit.
 | `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
 | `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
+| `make weakness-names` | Rewrites the weakness names from the catalog that publishes them. In no gate, unlike the word list: the engines that one asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes |
 | `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
 | `make check-packaging` | The container image and the Helm chart. Needs docker and helm |
 | `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `DESIGN-packaging.md` |

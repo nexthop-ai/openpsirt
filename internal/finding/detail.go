@@ -586,7 +586,10 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	var weaknesses []Weakness
 	if err := s.db.NewSelect().Model(&weaknesses).
 		Where("vulnerability_id = ?", vulnerabilityID).
-		Order("cwe").Scan(ctx); err != nil {
+		// The root cause first, the same order the advisory states from. Two
+		// readers of one table answering differently is a screen and a
+		// published document disagreeing about the same issue.
+		OrderExpr("is_primary DESC, cwe").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what kind of flaw this is: %w", err)
 	}
 
