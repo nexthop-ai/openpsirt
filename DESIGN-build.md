@@ -284,7 +284,7 @@ something it cannot see.
 
 ## Database engines
 
-The suite runs against SQLite alone unless pointed at real servers, and **a
+The suite runs against SQLite alone unless pointed at real servers, and a
 skipped engine passes. A green run does not mean four engines agreed; it means
 nothing failed, which is also what running almost nothing looks like.
 
@@ -511,8 +511,8 @@ documented API and must never grow a response body describing the system's
 contents.
 
 They are not the only routes answering without a credential; the sign-in paths
-and the interface's assets do too. **None of them reads anything from the
-database about what this deployment holds** (REQ-43).
+and the interface's assets do too. None of them reads anything from the
+database about what this deployment holds (REQ-43).
 
 ## Documentation
 
