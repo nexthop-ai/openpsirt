@@ -18,20 +18,19 @@ import (
 
 // The lists that could be read on a screen and not taken away.
 //
-// **An export is not a convenience here.** The record of judgments is what an
+// An export is not a convenience here. The record of judgments is what an
 // auditor is given, the review queue is what a manager reports a backlog from,
-// and the by-component view is what a release meeting argues over — and all
-// three were screens somebody had to copy out of by hand.
+// and the by-component view is what a release meeting argues over — none of
+// the three a screen somebody should copy out of by hand.
 //
-// **The subject travels through the stream**, as it does for the findings
-// export: the same query the screen reads, paged and written out as it goes,
-// with no point at which a whole unnarrowed list exists to be filtered
-// afterwards. That is the failure an export is the easiest place to make.
+// The subject travels through the stream, as it does for the findings export:
+// the same query the screen reads, paged and written out as it goes, with no
+// point at which a whole unnarrowed list exists to be filtered afterwards.
+// That is the failure an export is the easiest place to make.
 //
-// **The same filters as the screen, from the same struct.** An export taking a
-// smaller set would be a file that quietly answers a different question from
-// the one on screen, which is worse than no export: nothing about the file
-// says it.
+// The same filters as the screen, from the same struct. An export taking a
+// smaller set is a file that quietly answers a different question from the one
+// on screen, which is worse than no export: nothing about the file says it.
 
 func registerMoreExports(api huma.API, in Ingest) {
 	registerAuditExport(api, in)
@@ -45,9 +44,8 @@ func registerMoreExports(api huma.API, in Ingest) {
 
 // registerDueExport writes out what is running out of time.
 //
-// The deadline report is the one somebody takes to a meeting about dates, and
-// it was the one list that could not leave the screen — which meant the answer
-// to "what is late" was retyped, and a retyped list is one that is wrong by the
+// The deadline report is the one somebody takes to a meeting about dates.
+// Without a file the late list is retyped, and a retyped list is wrong by the
 // meeting after next.
 func registerDueExport(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
@@ -98,8 +96,8 @@ func registerDueExport(api huma.API, in Ingest) {
 					}
 				}
 				// A person or a team: the column holds a
-				// party, and a file naming only people would
-				// report a team's work as nobody's .
+				// party, and a file naming only people
+				// reports a team's work as nobody's.
 				who, err := rights.WhoHolds(ctx, owners)
 				if err != nil {
 					return nil, err
@@ -135,9 +133,8 @@ func registerDueExport(api huma.API, in Ingest) {
 
 // registerComparisonExport writes out what changed between two builds.
 //
-// The comparison is what a release note is written from, and its destination is
-// usually a document somebody else edits — so the one thing it needed was to
-// leave the screen, and it could not.
+// The comparison is what a release note is written from, and its destination
+// is usually a document somebody else edits — so it has to leave the screen.
 //
 // One file rather than three, with a column saying which of the three each row
 // belongs to: what is fixed, newly present and still present is one comparison,
@@ -233,8 +230,8 @@ func registerComparisonExport(api huma.API, in Ingest) {
 				} {
 					// Read through the same function the screen reads, so the
 					// file cannot come to answer less than the screen it was
-					// taken from — which is what it did: an approved
-					// not-applicable and a row nobody had looked at were the
+					// taken from. Read apart from it, an approved
+					// not-applicable and a row nobody has looked at are the
 					// same nine columns.
 					for _, body := range changed(group.of, true, group.stands) {
 						closedRun := ""
@@ -329,9 +326,9 @@ func registerAuditExport(api huma.API, in Ingest) {
 					}
 					// And the whole of the record beside it, dates and all.
 					// The column above is who agrees now, which is what an
-					// auditor reads first; what somebody agreed to and then
-					// stopped agreeing to is what an audit is looking for,
-					// and the file carried neither it nor any date at all.
+					// auditor reads first; an agreement somebody made and
+					// then took back is what an audit is looking for, and
+					// this column and the dates beside it are what carry it.
 					every := make([]string, 0, len(body.Approvals))
 					for _, one := range body.Approvals {
 						said := one.By + " " + one.At
@@ -517,10 +514,10 @@ func registerComponentExport(api huma.API, in Ingest) {
 
 // registerChangeExport writes out what has been changed administratively.
 //
-// The change log was capped at fifty rows, undated and unexportable, and
-// reached by scrolling past a hundred audit cards. What an audit asks of it —
-// "show me every grant made in the year the certificate covers" — could be
-// read a page at a time on a screen and could not leave it.
+// An audit asks for every grant made in the year a certificate covers. Read a
+// page at a time on a screen, capped at fifty rows, undated and reached by
+// scrolling past a hundred audit cards, that answer cannot leave the
+// application at all.
 func registerChangeExport(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-administrative-changes", Method: http.MethodGet,
@@ -595,10 +592,9 @@ func registerChangeExport(api huma.API, in Ingest) {
 
 // registerTrendExport writes out the backlog over time.
 //
-// The trend was a panel on one screen at a fixed twelve weeks: no catalog
-// entry, no window, and no file. It is the first question a manager asks —
-// whether the backlog is growing — and the answer could be looked at and not
-// taken to the meeting it was asked in.
+// A growing backlog is the first thing a manager asks about. As a panel on one
+// screen at a fixed twelve weeks — no catalog entry, no window, no file — the
+// answer can be looked at and not taken to the meeting it was asked in.
 func registerTrendExport(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "export-trend", Method: http.MethodGet, Path: "/v1/trend.{format}",

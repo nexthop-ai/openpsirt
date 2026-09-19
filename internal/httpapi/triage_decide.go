@@ -57,9 +57,9 @@ type FindingDecisionBody struct {
 	// are already reached by lookup and a second claim about them would be
 	// refused.
 	Remaining bool `json:"remaining,omitempty" doc:"Decide only the places nothing currently stands at, and leave the rest as they are. For applying a decision to another build, where some of its places are already reached by lookup"`
-	// FromStatement cites a VEX statement this was started
-	// from. A citation and never an application: what they said is not this
-	// claim, and recording it is what lets a later revision be noticed.
+	// FromStatement cites a VEX statement this was started from. A citation
+	// and never an application: their statement is not this claim, and the
+	// citation is what lets a later revision be noticed.
 	FromStatement int64 `json:"from_statement,omitempty" doc:"A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the claim rests on"`
 	// Also carries the same judgment to other builds of this product, in
 	// the same transaction as the build in the path.
@@ -85,20 +85,20 @@ type DecidedBody struct {
 	Recorded int   `json:"recorded" doc:"The number of places it was written against"`
 	Covered  int   `json:"covered" doc:"The number of findings those places hold"`
 	// Every place this judgment did not reach, whatever kept it from
-	// reaching. "Because they were not named" described one of the two:
-	// with `remaining` it also counts places a decision reached through
-	// lookup already suppressed, which is deliberate — a caller deciding
+	// reaching. Not being named describes one of the two: with `remaining`
+	// it also counts places a decision reached through lookup already
+	// suppressed, which is deliberate — a caller deciding
 	// what is left to do wants the number that is left to do, not the
 	// number they could have named.
 	Left          int     `json:"left" doc:"Places of this finding this judgment did not reach: ones it did not name, and ones a decision already standing there covers"`
 	NeedsApproval bool    `json:"needs_approval" doc:"Whether a second person has to agree"`
 	IDs           []int64 `json:"ids"`
-	// Also is what the same judgment wrote in each other build named, in the
+	// Also is the same judgment's record in each other build named, in the
 	// order they were named. Absent where none were.
 	Also []CoveredBuild `json:"also,omitempty" doc:"The rows this judgment wrote in each other build it reached"`
 }
 
-// CoveredBuild is what one judgment wrote in one other build.
+// CoveredBuild is one judgment's record in one other build.
 //
 // There is no per-build outcome to report, because there is no per-build
 // outcome to have: the whole judgment is written or none of it is.
@@ -196,8 +196,8 @@ func registerFindingDecision(api huma.API, in Ingest) {
 
 		out := &struct{ Body DecidedBody }{}
 		var proposals []triage.Proposal
-		// What each build contributes, so that the judgment can report per
-		// build once the whole of it has been written.
+		// Each build's contribution, so the judgment can report per build
+		// once the whole of it has been written.
 		writes := make([]int, len(asked))
 		holds := make([]int, len(asked))
 		sits := 0
@@ -205,8 +205,8 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		// resolves.
 		seen := 0
 		reached := make([][]finding.Deciding, len(asked))
-		// The builds a promise made here is gated across. What it is gated
-		// against — the earliest deadline among them — is a stored value that
+		// The builds a promise made here is gated across. The gate itself —
+		// the earliest deadline among them — is a stored value that
 		// a re-rating or an arriving scan moves, so it is resolved inside the
 		// transaction rather than here: read now, a promise would be gated
 		// against a deadline that may be gone by the time it is written, and a
@@ -300,8 +300,8 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		if out.Body.IDs == nil {
 			out.Body.IDs = []int64{}
 		}
-		// The counts on the body itself are about the build in the path, which
-		// is what they have always been about; the others report themselves.
+		// The counts on the body itself are about the build in the path; the
+		// others report themselves.
 		out.Body.Recorded = writes[0]
 		out.Body.Covered = holds[0]
 		out.Body.Left = sits - out.Body.Recorded
@@ -318,9 +318,9 @@ func registerFindingDecision(api huma.API, in Ingest) {
 // placesToDecide resolves one build's places for a finding, narrowed the way
 // the caller asked for.
 //
-// Returns what to write against and how many places the finding sits at there.
-// The two differ whenever something was left out, and the difference is what
-// says how much of the finding is still open.
+// Returns the places to write against and the number the finding sits at
+// there. The two differ whenever something was left out, and the difference
+// states how much of the finding is still open.
 func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, store *triage.Store,
 	product, stream, variant, vulnerability, component, version string,
 	wanted []string, remaining bool) ([]finding.Deciding, int, int64, error) {

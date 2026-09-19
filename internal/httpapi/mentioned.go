@@ -11,19 +11,19 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// mentionTarget is what a piece of text is about, for deciding who may be told
-// they were named in it.
+// mentionTarget is the subject of a piece of text, for deciding who may be
+// told they were named in it.
 //
 // The four things that decide it, rather than the row one of the callers
 // happens to hold. A mention in a claim's comment is about a place and a
-// mention in an issue's note is about an issue in a product, and both ask the
-// same question: who among the names typed may read the thing being written
-// about, at its visibility.
+// mention in an issue's note is about an issue in a product, and both resolve
+// to one set: the names typed that may read the thing being written about, at
+// its visibility.
 type mentionTarget struct {
 	ProductID       int64
 	VulnerabilityID int64
 	Visibility      access.Visibility
-	// About is what the notification calls the thing, in a few words: the
+	// About is the notification's own name for the thing, in a few words: the
 	// start of a place identity for a claim, the issue's name for a note.
 	About string
 }
@@ -37,7 +37,7 @@ const mentionCap = 20
 
 // MentionsBody says which names in a piece of text reached nobody.
 //
-// **Reported rather than refused**, and without saying why. The words are
+// Reported rather than refused, and without saying why. The words are
 // worth keeping either way, and a comment rejected because one name in it was
 // wrong loses the paragraph to fix a word. A name nobody holds and a name held
 // by somebody who may not read this are the same answer here, because telling
@@ -49,10 +49,10 @@ type MentionsBody struct {
 
 // tellMentioned tells whoever a decision's new text named.
 //
-// The decision is read back rather than carried out of the write, because what
-// the notification needs — which product, which issue, how disclosed — is what
+// The decision is read back rather than carried out of the write, because the
+// notification's own fields — the product, the issue, the disclosure — are what
 // the reader is authorized against, and reading it through the same store the
-// write went through means one answer to "may this person reach it".
+// write went through gives one answer for the reader's reach.
 //
 // Failing to tell somebody never fails the write. The words are on record by
 // the time this runs, and losing a comment because a notification could not be
@@ -86,12 +86,12 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 
 // mentioned tells whoever a piece of text named that it named them.
 //
-// **Only people who could already read it.** The set is exactly the set the
+// Only people who could already read it. The set is exactly the set the
 // editor offers, from the same query, so a mention cannot tell somebody that a
 // finding exists when they may not see it — on an undisclosed one the
 // notification itself would be the disclosure.
 //
-// **Never the author.** Somebody writing their own name is not asking
+// Never the author. Somebody writing their own name is not asking
 // themselves a question, and a tool that tells you what you just typed is one
 // people stop reading.
 //
@@ -101,11 +101,11 @@ func tellMentioned(ctx context.Context, in Ingest, subject access.Subject,
 // and the caller logs. It returns the names that reached nobody, so the caller
 // can say so.
 //
-// **Reached nobody, without saying why.** A name nobody holds and a name held
+// Reached nobody, without saying why. A name nobody holds and a name held
 // by somebody who may not read this stay indistinguishable, because telling
 // them apart would answer "can this person see undisclosed work" one comment
-// at a time. What the author is told is that their mention did not land, which
-// is what they can act on — and it discloses nothing they could not already
+// at a time. The author is told the mention did not land, which is what they
+// can act on — and it discloses nothing they could not already
 // learn by asking who may be mentioned here, which they may, because they can
 // read the thing they are writing about.
 //
@@ -122,7 +122,7 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	// Reported rather than discarded, in both directions. A name past the cap
 	// and a name written where there is no product to read them against are
 	// both names that reached nobody, which is what this answer is for — and
-	// the author was told every mention landed.
+	// without it the author is told every mention landed.
 	if about.ProductID == 0 {
 		return names, nil
 	}
@@ -132,12 +132,12 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 		names = names[:mentionCap]
 	}
 
-	// Who among the names typed may read this, at the visibility of the thing
-	// the text is about. Asked of the same rule the editor's list uses rather
-	// than spelled again here, so the two cannot come to disagree about who
-	// may be named — and asked about these names rather than by paging that
-	// list, which answered from the alphabetically-first hundred readers and
-	// silently reached nobody for anyone sorting past them.
+	// The names typed that may read this, at the visibility of the thing the
+	// text is about. Asked of the same rule the editor's list uses rather than
+	// spelled again here, so the two cannot come to disagree about who may be
+	// named — and asked about these names rather than by paging that list,
+	// which answers from the alphabetically-first hundred readers and silently
+	// reaches nobody sorting past them.
 	readers, err := access.NewStore(in.DB.DB).ReadersNamed(ctx, subject,
 		about.ProductID, about.Visibility, names)
 	if err != nil {
@@ -182,7 +182,7 @@ func mentioned(ctx context.Context, in Ingest, subject access.Subject,
 	return dropped, nil
 }
 
-// whoever is what to call the person who wrote the text.
+// whoever is the name for the person who wrote the text.
 func whoever(subject access.Subject) string {
 	if name := strings.TrimSpace(subject.Identity); name != "" {
 		return name
