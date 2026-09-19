@@ -65,7 +65,7 @@ every decision already made alone.
 
 ## The SPDX 3.0 fixtures
 
-**Four, and none from a producer.** Every other format here is read against
+Four, and none from a producer. Every other format here is read against
 somebody's own output as well as against a written specification. Nothing this
 deployment ingests emits 3.0 — the scanner it ships emits 2.3 and tag-value —
 so these are the specification's own documents, which are hand-written and
@@ -75,8 +75,8 @@ They are worth having anyway, because two of them pair with a 2.3 fixture
 describing the same application, which is a comparison no single document
 offers.
 
-**`maven-app.spdx3.json` states its structure backwards, and nothing here
-corrects it.** The 2.3 version says the application dynamically links each
+`maven-app.spdx3.json` states its structure backwards, and nothing here
+corrects it. The 2.3 version says the application dynamically links each
 library; the 3.0 version says each library dynamically links the application,
 which is the opposite of what the relationship means — `hasDynamicLink` reads
 from the thing doing the linking. So the same four edges exist in both and
@@ -85,12 +85,11 @@ document has four of them under the application.
 
 That is what the unplaced count is for: a number that should be stable build to
 build, so a change in it says the producer changed. Here it says the conversion
-did, and it says so loudly — 1 becomes 5. A reader that quietly flipped the
-edge to make the two agree would have hidden exactly the thing the count
-exists to show.
+did, and it says so loudly — 1 becomes 5. A reader quietly flipping the edge to
+make the two agree hides exactly the thing the count exists to show.
 
-**`rust-app.spdx3.json` carries a package identifier that belongs to a
-different package.** Its root is a Rust application and its identifier names a
+`rust-app.spdx3.json` carries a package identifier that belongs to a different
+package. Its root is a Rust application and its identifier names a
 Debian development package, which is a copy-and-paste in the example rather
 than anything about the format. Nothing here depends on it, and it is written
 down so the next person reads it as the example's mistake rather than as a
@@ -102,57 +101,57 @@ producer quirk worth handling.
 it is here because a hand-written one cannot stand in for it. What it holds
 that nothing written on purpose would:
 
-**A graph rather than a tree.** 1,168 of its components have more than one
+A graph rather than a tree. 1,168 of its components have more than one
 direct consumer, which is what makes "why is this here" a question with more
 than one answer, and what a reader assuming a tree gets wrong.
 
-**A hierarchy rather than a root with everything under it.** The image root has
-30 direct children — 29 containers and the host filesystem — and the packages
-installed on the host hang off the host rather than off the image. An earlier
-build gave the root 5,198 direct children and left 237 components with no
-consumer at all, which is a shape no reader can answer "why is this here" from.
-27 are still unreached: 22 lockfile and recipe fragments the build emits
+A hierarchy rather than a root with everything under it. The image root has 30
+direct children — 29 containers and the host filesystem — and the packages
+installed on the host hang off the host rather than off the image. A flat
+shape, which an earlier build had at 5,198 direct children and 237 components
+with no consumer at all, answers "why is this here" for none of them. 27 are
+still unreached: 22 lockfile and recipe fragments the build emits
 without saying what consumed them, and 5 container layer records the document
 names but hangs off nothing.
 
-**Build tooling kept apart from what ships.** 849 components sit under
+Build tooling kept apart from what ships. 849 components sit under
 `formulation` — Go and Rust dependencies harvested from inside the build
 containers — rather than in `components` beside the image's contents. The
 question a scanner answers is what shipped; the question a build-chain
 compromise asks is what built it, and the document now answers both without
 either being mistaken for the other.
 
-**What it no longer holds is worth writing down**, because this file used to be
-the evidence for a rule and is not any more. It carried the same package twice,
-516 times over, spelled two ways — once with a platform identifier and an
-upstream qualifier, once with only an architecture, and sometimes escaping the
-`+` in a version and sometimes not. That was one producer's merge step, fixed
-upstream in sonic-buildimage #29237, and this fixture now arrives as one
-component per package. **So it no longer exercises the merging rule it was
-originally kept for** — deleting that code entirely leaves the full-size test
-passing. The rule is proved by a test that constructs the duplicates instead,
-which is where a rule of this kind belongs: a fixture is somebody else's output
-and can stop exercising a rule without anybody deciding it should.
+One component per package, which is what it no longer holds that is worth
+writing down. An earlier revision carried the same package twice, 516 times
+over, spelled two ways — once with a platform identifier and an upstream
+qualifier, once with only an architecture, and sometimes escaping the `+` in a
+version and sometimes not. That was one producer's merge step, fixed upstream
+in sonic-buildimage #29237.
 
-**It describes the programs in the image**: twenty-one `application`
+So this fixture no longer exercises the merging rule it was kept for: deleting
+that code entirely leaves the full-size test passing. The rule is proved by a
+test that constructs the duplicates instead, which is where a rule of this kind
+belongs — a fixture is somebody else's output and can stop exercising a rule
+without anybody deciding it should.
+
+It describes the programs in the image: twenty-one `application`
 components — `/usr/bin/dockerd`, `/usr/bin/containerd`, `/usr/sbin/rest_server`,
 the containerd shims, the gNMI and gNOI binaries and the rest — with the Go
 modules linked into each hanging off the program rather than off the filesystem
-that holds it. Four different Go runtimes appear here, and before that change
-all four were children of a container or of the host with nothing saying which
-program each belonged to.
+that holds it. Four different Go runtimes appear here; described any other way
+all four are children of a container or of the host, with nothing saying which
+program each belongs to.
 
-**All twenty-one survive as components**, which was not true of the build
-before this one. That one described thirteen programs under nine names:
-`/usr/bin/dockerd`, `/usr/bin/containerd`, `/usr/bin/runc` and
-`/usr/sbin/dialout_client_cli` each appeared in two images and merged into one
-component apiece, because a program arrives with no version and no package
-identifier and identity is a name and a version. They appeared twice because
-the otel container shipped its own copies of the docker binaries, and it no
-longer does.
+All twenty-one survive as components. The build before this one described
+thirteen programs under nine names: `/usr/bin/dockerd`, `/usr/bin/containerd`,
+`/usr/bin/runc` and `/usr/sbin/dialout_client_cli` each appeared in two images
+and merged into one component apiece, because a program arrives with no version
+and no package identifier and identity is a name and a version. They appeared
+twice because the otel container shipped its own copies of the docker binaries,
+and it no longer does.
 
-**So this fixture no longer shows that merge**, and the property it showed is
-still real: two programs of one name anywhere in a document are one component,
+So this fixture no longer shows that merge, and the property it showed is still
+real: two programs of one name anywhere in a document are one component,
 and what is linked into one reads as being in the other. It collapses only what
 is genuinely alike — a place is a component and its direct consumer, so two
 modules under two same-named programs are one place only where both ship the
@@ -175,15 +174,15 @@ the upstream versions match it reaches the other variant by lookup, and where a
 version differs it is the build the guided review walks. The demo and the dev loop seed both, as two variants of one branch,
 from `DEMO_BUILDS` in the Makefile.
 
-**Both fixtures are from the same producer revision**, which is what makes them
+Both fixtures are from the same producer revision, which is what makes them
 comparable as variants. They drifted apart twice — mellanox was a build ahead
 for a day, then broadcom was a build ahead for an afternoon — and each time the
 difference was the same thing: whether the build describes the programs in the
 image and hangs the modules compiled into them off the program. Both do now, and
 both describe the same twenty-one programs under twenty-one names.
 
-**The platform difference is what a comparison of the variants is about**, and
-it is measured rather than assumed: 6,671 package identifiers in common, 54 only
+The platform difference is the subject of a comparison of the variants, and it
+is measured rather than assumed: 6,671 package identifiers in common, 54 only
 in mellanox, 172 only in broadcom.
 
 Those three numbers are byte for byte what they were at the previous shared
