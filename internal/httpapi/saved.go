@@ -25,12 +25,12 @@ type SavedBody struct {
 
 // PreparedBody is the claim a saved filter prepares.
 //
-// **A rule prepares a claim; a person proposes it.** These are offered
-// prefilled and a named person submits the claim as their own, for a second
-// person to approve. The wider form — a rule proposing its own pending claim,
-// marked as proposed by the rule — was argued for and refused: it leaves the
-// approver as the only human judgment on the claim, which is what making the
-// claim the approver's unit was meant to prevent, and it puts a configuration file where a name belongs in
+// A rule prepares a claim; a person proposes it. These are offered prefilled
+// and a named person submits the claim as their own, for a second person to
+// approve. The wider form — a rule proposing its own pending claim, marked as
+// proposed by the rule — is refused: it leaves the approver as the only human
+// judgment on the claim, which is what making the claim the approver's unit
+// exists to prevent, and it puts a configuration file where a name belongs in
 // the record. The difference shows up on the day a dismissal turns out to have
 // been wrong and somebody asks who made it.
 type PreparedBody struct {
@@ -110,9 +110,9 @@ func registerSaved(api huma.API, in Ingest) {
 			Query string `json:"query" maxLength:"2000" doc:"The list's query string, without a leading ?"`
 			// Prepares is what the filter should offer to claim
 			// about what it catches. Left out, it prepares nothing
-			// — and left out on a filter that used to prepare
-			// something takes that off, because saving over a name
-			// is deciding what the name means now.
+			// — and left out on a filter that prepares something
+			// takes that off, because saving over a name is
+			// deciding what the name means now.
 			Prepares *PreparedBody `json:"prepares,omitempty" doc:"The claim this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to"`
 		}
 	}) (*struct{}, error) {

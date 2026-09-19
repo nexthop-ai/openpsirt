@@ -41,7 +41,7 @@ type ReadinessBody struct {
 	// Floor is the line both counts are at or above, named so a shared number
 	// says whose it is.
 	Floor string `json:"floor,omitempty" doc:"The least severity counted, or empty where everything is"`
-	// Blocking is what the count is made of, worst first: the work nobody has
+	// Blocking is the work behind the count, worst first: what nobody has
 	// agreed to ship with. A number with no list behind it is a number
 	// somebody has to go and assemble by hand before they can do anything
 	// about it, and this is read at exactly the moment there is no time for
@@ -59,7 +59,7 @@ type BlockingBody struct {
 	// Version is what tells one of these from another. A group is keyed on the
 	// issue and the fold — the source package at the version it was built at —
 	// so one issue at three versions of one component is three rows here.
-	// Without it they arrived identical: four rows reading "CVE-2026-46595
+	// Without it they arrive identical: four rows reading "CVE-2026-46595
 	// golang.org/x/crypto", differing only in a count the panel does not draw.
 	Version   string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
 	Severity  string `json:"severity,omitempty"`
@@ -76,8 +76,8 @@ type BlockingBody struct {
 // The worst few: against a blocker count in the thousands, a longer list is an
 // arbitrary page of the findings list rather than what the count is made of,
 // and it costs the panel the comparison it is named after — which is what the
-// rest of the panel draws. What is asked for here is a number somebody can act
-// on without going and assembling it, and the worst few are that.
+// rest of the panel draws. What this answers is a number somebody can act on
+// without assembling it, and the worst few are that.
 const blocking = 5
 
 func registerReadiness(api huma.API, in Ingest) {

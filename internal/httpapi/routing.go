@@ -21,10 +21,10 @@ type RuleBody struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name" doc:"The name, so a placement can be explained in words"`
 	Team string `json:"team" doc:"The team work lands on, by the name that addresses it"`
-	// TeamDisplayName is what to show beside it. The field above is what
+	// TeamDisplayName is the label shown beside it. The field above is the one
 	// add-routing-rule resolves through TeamByName, which matches the folded
 	// name column — so a team declared "platform-security" and displayed
-	// "Platform Security" listed as the label, and sending that back found no
+	// "Platform Security" lists as the label, and sending that back finds no
 	// team at all.
 	TeamDisplayName string `json:"team_display_name,omitempty" doc:"That team's display name, where it was declared with one"`
 	// Order is the whole of the precedence: first match wins.
@@ -73,9 +73,9 @@ func registerRouting(api huma.API, in Ingest) {
 		// A rule is configuration rather than a finding, so there is nothing
 		// in it for the data layer to narrow: a reader either gets the whole
 		// precedence order or none of it. The declaration says triage and its
-		// three siblings enforce it, so this one does too — read against
-		// each other, they said different things, which is the whole failure
-		// mode this pair is kept in step to avoid.
+		// three siblings enforce it, so this one does too — read against each
+		// other they say different things, which is the whole failure mode
+		// this pair is kept in step to avoid.
 		if !subject.Triages(access.Public, product.ID) {
 			return nil, noSuchProduct()
 		}

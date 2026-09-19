@@ -35,8 +35,8 @@ type OverviewOutput struct {
 	Body struct {
 		Name        string `json:"name"`
 		DisplayName string `json:"display_name,omitempty"`
-		// TriageFloor is what this product considers worth triaging, or empty
-		// where it inherits the deployment's line. Said rather than left out:
+		// TriageFloor is the least severity this product triages, or empty
+		// where it inherits the deployment's line. Stated rather than left out:
 		// a number somebody chose and a number nobody noticed are different
 		// facts about the same screen.
 		TriageFloor string              `json:"triage_floor,omitempty" doc:"The least severity this product triages, where the product states one of its own"`
@@ -60,11 +60,11 @@ type OverviewOutput struct {
 
 // registerOverview is one product's own page.
 //
-// **There was no page for one product**, only a table of all of them with
-// administration controls in the cells. "How is SONiC doing" was five requests
-// and a spreadsheet — what is open per build, how much is overdue, how much
-// has been decided, when each build was last scanned — every piece of which
-// existed and none of which sat together.
+// One product's own page, rather than a table of all of them with
+// administration controls in the cells. The state of one product is otherwise
+// five requests and a spreadsheet — what is open per build, how much is
+// overdue, how much has been decided, when each build was last scanned — every
+// piece of which exists and none of which sits together.
 func registerOverview(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-product-overview", Method: http.MethodGet,

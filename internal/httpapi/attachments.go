@@ -74,8 +74,8 @@ type attachmentParts struct {
 	//
 	// Declared as a boolean so the framework parses it and refuses what is
 	// not one. Compared against the literal "true", every other spelling —
-	// "True", "1", "yes" — read as false and marked the file for deletion a
-	// day later, with the uploader told it had worked.
+	// "True", "1", "yes" — reads as false and marks the file for deletion a
+	// day later, with the uploader told it worked.
 	Evidence bool `form:"evidence"`
 }
 

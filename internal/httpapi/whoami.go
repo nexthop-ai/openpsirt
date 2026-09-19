@@ -19,7 +19,7 @@ import (
 // Named for the question it answers rather than for "reach", which already
 // means something else here — how far a single judgment travels.
 //
-// What they *may do*, not which roles they hold. A screen needs to know
+// The acts they may perform, not the roles they hold. A screen needs to know
 // whether to offer an action, and answering that from a role list means every
 // client re-implementing the mapping from roles to capabilities — which is the
 // server's rule, and the copy that drifts is the one that offers a button
@@ -43,9 +43,9 @@ type WhoBody struct {
 	Audits   bool      `json:"audits,omitempty" doc:"May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them"`
 	Kind     string    `json:"kind" enum:"person,key" doc:"A person who signed in, or a credential"`
 	Reach    []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
-	// Digest is what they asked to be sent. Answered here because a screen
-	// offering the switches has to know their state, and because a person
-	// is the only one who decides them.
+	// Digest is the daily summary they asked for. Answered here because a
+	// screen offering the switches has to know their state, and because a
+	// person is the only one who decides them.
 	Digest           bool `json:"digest,omitempty" doc:"They asked for a daily digest"`
 	DigestUnassigned bool `json:"digest_unassigned,omitempty" doc:"Their digest lists findings nobody owns as well as their own outstanding work"`
 	// Reachable says there is somewhere to send it. Without an address a
@@ -99,9 +99,9 @@ func registerWhoAmI(api huma.API, in Ingest) {
 				body.BulkCap = cap
 			}
 		}
-		// What they asked to be sent, where they are a person and this
-		// process has somewhere to read it from. A credential asks for
-		// nothing and is sent nothing.
+		// The digest they asked for, where they are a person and this process
+		// has somewhere to read it from. A credential asks for nothing and is
+		// sent nothing.
 		if in.DB != nil && subject.Kind == access.Person {
 			if me, err := access.NewStore(in.DB.DB).ByIdentity(ctx, subject.Identity); err == nil {
 				body.Digest = me.Digest
@@ -151,8 +151,8 @@ func registerWhoAmI(api huma.API, in Ingest) {
 				// operation accepts, and what makes a two-person team where
 				// neither holds the capability able to review at all. Asked
 				// of the capability alone, a screen drawing its controls
-				// from this hid approve and reject from somebody the server
-				// would have accepted, with nothing saying why.
+				// from this hides approve and reject from somebody the
+				// server accepts, with nothing saying why.
 				MayAgree: subject.Holds(access.Approver, product.ID) || triages,
 			})
 		}

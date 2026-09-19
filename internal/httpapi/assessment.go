@@ -12,12 +12,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// AssessmentBody is what one product thinks of an issue, as against what was
-// published.
+// AssessmentBody is one product's rating of an issue, against the published
+// one.
 type AssessmentBody struct {
 	ID            int64  `json:"id,omitempty"`
 	Vulnerability string `json:"vulnerability,omitempty" doc:"The issue this is about"`
-	// Product is whose rating it is. Carried on every row because two
+	// Product is the owner of the rating. Carried on every row because two
 	// products may rate one issue differently, so a rating shown without one
 	// is a word nobody can act on.
 	//
@@ -31,8 +31,8 @@ type AssessmentBody struct {
 	Reasoning     string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"The reasoning. It outlives the version it was made about, so the next person needs the argument"`
 	State         string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
 	NeedsApproval bool   `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
-	// Open is what agreeing would do beyond moving things down a list, on
-	// the claims that are waiting for somebody to agree. Absent on the
+	// Open is the effect of agreeing beyond moving things down a list, on
+	// the claims waiting for somebody to agree. Absent on the
 	// rest: it is a question about a decision nobody has taken yet, and
 	// answering it for every historical claim would cost a query each to
 	// say nothing.

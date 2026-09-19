@@ -16,7 +16,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// What people write about an issue in a product, and what they wrote before.
+// The notes people write about an issue in a product, and their earlier
+// revisions.
 //
 // Apart from the claim comments beside them, because they hang off different
 // things: a comment is about one argument at one place, and a note is about
@@ -187,7 +188,7 @@ type NoteBody struct {
 	EditedAt  string `json:"edited_at,omitempty" doc:"The author's last change, where they made one"`
 }
 
-// NoteWritten is what comes back from writing or changing a note.
+// NoteWritten is the answer to writing or changing a note.
 type NoteWritten struct {
 	ID          int64    `json:"id"`
 	NotNotified []string `json:"not_notified,omitempty" doc:"Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the note is about — deliberately not said which"`
@@ -201,11 +202,11 @@ type NoteWritten struct {
 // an account, which is what authorizing before resolving a name forbids
 // (REQ-42).
 //
-// **A name nobody has filed answers exactly as one this product cannot reach.**
-// Answered apart, anybody holding read on a single product could tell the two
-// apart and walk identifiers — including ones this deployment minted for a
-// flaw nobody has announced. It is the same collapse recording a rating makes,
-// and for the same reason.
+// A name nobody has filed answers exactly as one this product cannot reach.
+// Answered apart, anybody holding read on a single product tells the two apart
+// and walks identifiers — including ones this deployment minted for a flaw
+// nobody has announced. It is the same collapse recording a rating makes, and
+// for the same reason.
 //
 // The identifier comes back as the issue is filed under here rather than as it
 // was typed. A note may be reached through any name the issue answers to, and

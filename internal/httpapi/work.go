@@ -14,9 +14,9 @@ import (
 
 // Work that stopped being retried, and putting it back.
 //
-// The queue sets a job aside once it has run out of attempts, and until there
-// was somewhere to see that, a deployment learned about it from a build that
-// had quietly stopped being scanned. The two routes here are the whole of the
+// The queue sets a job aside once it has run out of attempts. Without
+// somewhere to see that, a deployment learns about it from a build that has
+// quietly stopped being scanned. The two routes here are the whole of the
 // operator surface over the dead state: what stopped, and try it again.
 //
 // Deliberately not a general view of the queue. Work that is waiting or
@@ -27,7 +27,7 @@ import (
 // SetAsideBody is one piece of work that stopped being retried.
 type SetAsideBody struct {
 	ID int64 `json:"id" doc:"The job, for putting it back"`
-	// Kind and Reference are what the work was, in the queue's own words. No
+	// Kind and Reference are the work itself, in the queue's own words. No
 	// attempt is made to resolve the reference into whatever it points at:
 	// the thing may have been deleted since, and a list of set-aside work
 	// that fails to render because one row points at nothing is worse than
@@ -35,7 +35,7 @@ type SetAsideBody struct {
 	Kind      string `json:"kind" doc:"The worker the job was for"`
 	Reference string `json:"reference" doc:"The subject of the work"`
 	Attempts  int    `json:"attempts" doc:"The number of attempts"`
-	// LastError is what a worker reported, which is not one of this
+	// LastError is the worker's own report, which is not one of this
 	// deployment's own records: a failed parse quotes the cause it was given,
 	// and that can carry a component name or a package address out of an
 	// SBOM. It is why this route asks for administration rather than for the
@@ -57,7 +57,8 @@ type QueuedBody struct {
 	Limit   int    `json:"limit" doc:"The depth of this kind allowed before more is refused"`
 }
 
-// VulnerabilityDataBody is what this deployment's scans are answering against.
+// VulnerabilityDataBody is the vulnerability data this deployment's scans
+// answer against.
 type VulnerabilityDataBody struct {
 	Version string `json:"version,omitempty" doc:"The version the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said"`
 	// Since is when the data last moved, which is the most recent time any

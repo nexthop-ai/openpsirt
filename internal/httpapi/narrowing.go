@@ -14,9 +14,9 @@ import (
 // is a route registered without one rather than anything a caller did.
 var errNoProduct = errors.New("no product in scope")
 
-// listing is everything a handler answering about one product's findings works
-// out before it asks its question: who is asking, which builds that means, the
-// line the product triages at, the filter, and the store to ask.
+// listing is what a handler answering about one product's findings works out
+// before it asks its question: the subject, the builds that means, the line
+// the product triages at, the filter, and the store to ask.
 type listing struct {
 	Subject access.Subject
 	Scope   finding.Scope
@@ -28,13 +28,13 @@ type listing struct {
 // narrowing does the eight steps every such handler does, in the order they
 // have to happen in.
 //
-// Copied at five sites before this. The cost of that is on the record: a
-// hand-copied version of the mapping left nineteen filters out, with no error,
-// so a screen's Export link produced a file answering a different question
-// than the screen it came from — and a filter that changes the population
-// rather than narrowing it, like asking for what has closed, silently produced
-// a file that could not contain a single row of what was asked for. A sixth
-// copy is a sixth chance at that, and the parts that must not be forgotten —
+// One function rather than a copy at five sites. A hand-copied mapping leaves
+// nineteen filters out, with no error, so a screen's Export link produces a
+// file answering a different question from the screen it came from — and a
+// filter that changes the population rather than narrowing it, like asking for
+// what has closed, silently produces a file that cannot contain a single row
+// of what was asked for. A sixth copy is a sixth chance at that, and the parts
+// that must not be forgotten —
 // the floor, the whole filter, the subtree resolution — are exactly the parts
 // a copy drops quietly.
 //
@@ -43,8 +43,8 @@ type listing struct {
 // declared and never scanned — comes back empty from the store rather than as
 // a refusal: nothing is open because nothing has run.
 //
-// `whyFloor` is what a failure reading the line says, because two of these
-// answer a list and three answer a file and the sentence differs.
+// `whyFloor` is the sentence a failure reading the line answers with, because
+// two of these answer a list and three answer a file and the wording differs.
 func narrowing(ctx context.Context, in Ingest, q ScopeQuery,
 	at AtOneBuild, by Narrowing, whyFloor string) (listing, error) {
 
@@ -72,8 +72,8 @@ func narrowing(ctx context.Context, in Ingest, q ScopeQuery,
 // scopedFloor is the first half of that, for a handler that builds its own
 // filter out of parameters of its own rather than taking the list's.
 //
-// Who is asking, which builds that means, and the line the product triages at,
-// in the order they have to happen in: the scope is what says the product
+// The subject, the builds that means, and the line the product triages at, in
+// the order they have to happen in: the scope is what says the product
 // exists and may be reached, and the line is read against the product the
 // scope resolved to.
 func scopedFloor(ctx context.Context, in Ingest, q ScopeQuery,
@@ -109,8 +109,8 @@ func scopedFloor(ctx context.Context, in Ingest, q ScopeQuery,
 // Telling somebody is never what the request was for, so a failure here does
 // not fail the act: the work stays assigned, the claim stays sent back, the
 // agreement stays undone. What it must not do is disappear — an operator whose
-// notification writes are failing finds out from a log line, and each call
-// site had written its own.
+// notification writes are failing finds out from a log line, written once here
+// rather than at each call site.
 //
 // `why` is the sentence for that line and `about` the pairs that say which
 // act it was, in the logger's own key-and-value form.

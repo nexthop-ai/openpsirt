@@ -16,8 +16,8 @@ type AgreedBody struct {
 	By string `json:"by" doc:"Their sign-in identity"`
 	At string `json:"at" doc:"The moment they agreed"`
 	// WithdrawnAt is part of the record rather than a reason to leave the
-	// agreement out: what somebody agreed to and then stopped agreeing to is
-	// what an audit is looking for.
+	// agreement out: an agreement somebody made and then took back is what an
+	// audit is looking for.
 	WithdrawnAt string `json:"withdrawn_at,omitempty" doc:"The moment the agreement was taken back, by the approver or by somebody editing the words it was given for"`
 	// Carried says this agreement was given for an earlier claim and carried
 	// onto this one, which is what a re-affirmation stands on. The person
@@ -30,7 +30,7 @@ type JudgedBody struct {
 	ID      int64  `json:"id"`
 	Issue   string `json:"issue" doc:"The vulnerability, under the name it is filed here"`
 	Product string `json:"product"`
-	// Component is what it was about. Named from a finding at the place,
+	// Component is the judgment's subject. Named from a finding at the place,
 	// in any state — a judgment about something since fixed or removed is
 	// exactly what an audit asks for, so it is named rather than left
 	// blank.
@@ -59,7 +59,8 @@ type JudgedBody struct {
 	TwoPeople bool `json:"two_people" doc:"Whether somebody other than the proposer has a standing agreement on it"`
 }
 
-// Auditing is what narrows the record, for the screen and for the file.
+// Auditing is the narrowing the record takes, for the screen and for the
+// file.
 //
 // One struct because they are one question. An export that took a smaller set
 // of filters than the screen would be a file that quietly answers something
@@ -86,7 +87,7 @@ type Auditing struct {
 	Variant string `query:"variant" doc:"The build of that stream. Needs exactly one product and a stream"`
 }
 
-// narrow turns what was asked for into what the store reads by, resolving the
+// narrow turns the request's parameters into the store's filter, resolving the
 // product against what the caller may see.
 func (a Auditing) narrow(ctx context.Context, in Ingest,
 	subject access.Subject) (triage.Filter, time.Time, time.Time, error) {

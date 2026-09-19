@@ -10,7 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// ScopeQuery is what the picker selected, as the screens that span products
+// ScopeQuery is the picker's selection, as the screens that span products
 // receive it.
 //
 // Every level is optional and empty means all of them, which is what an
@@ -49,9 +49,9 @@ func scoped(ctx context.Context, in Ingest, subject access.Subject, q ScopeQuery
 // scopedByHolding is scoped for a read narrowed by what somebody holds rather
 // than by what they may read.
 //
-// **A capability held without a read role reaches no product**, and what gives
-// it content is what has been assigned to them. Refusing the scope
-// because they cannot read the product refuses them their own work, which is
+// A capability held without a read role reaches no product, and what gives it
+// content is what has been assigned to them. Refusing the scope because they
+// cannot read the product refuses them their own work, which is
 // the one thing they do have — so the check moves to the answer: it is the
 // caller's job to turn an empty result for a product they cannot see back into
 // "no such product", which keeps the property the ordinary check exists for.

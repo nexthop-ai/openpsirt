@@ -22,7 +22,7 @@ type AtComponentBody struct {
 	Severity      string `json:"severity,omitempty" doc:"The severity the report gives it"`
 	Places        int    `json:"places" doc:"The number of places in this build it sits at"`
 	FixedIn       string `json:"fixed_in,omitempty" doc:"The version the report says fixes it, where it names one"`
-	// Summary is what one judgment is being made on. Deciding in bulk on
+	// Summary is the text one judgment is made on. Deciding in bulk on
 	// less than deciding singly is the wrong way round, and this list
 	// narrows by the description while showing none of it.
 	Summary    string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
@@ -60,8 +60,8 @@ func registerBulk(api huma.API, in Ingest) {
 			Total int               `json:"total"`
 			// Findings is how many rows the whole narrowed set
 			// holds, and Cap how many one action may write. The
-			// two are what sizing a claim needs and what counting
-			// issues cannot say: a bound on rows written means a
+			// two are what sizing a claim needs and what a count of
+			// issues cannot state: a bound on rows written means a
 			// screen counting issues reports 44 where the answer
 			// is 2,000.
 			Findings int `json:"findings"`
@@ -81,8 +81,8 @@ func registerBulk(api huma.API, in Ingest) {
 			return nil, noSuchFinding()
 		}
 
-		// One call, which already counts both. It was two, and the second ran
-		// the whole narrowing again for a number the first had in hand.
+		// One call, which counts both. Two calls run the whole narrowing again
+		// for a number the first has in hand.
 		at, total, reaching, err := finding.NewStore(in.DB.DB).AtComponent(ctx, subject,
 			target, component, input.Contains, input.Limit, input.Offset)
 		if err != nil {
@@ -238,8 +238,8 @@ func registerBulk(api huma.API, in Ingest) {
 			issues = append(issues, id)
 		}
 		if len(unknown) > 0 {
-			// Named individually, because a person who pasted a list wants to fix the
-			// list rather than bisect it.
+			// Named individually, because a person who pasted a list wants to
+			// fix the list rather than bisect it.
 			return nil, huma.Error404NotFound(
 				"no issue is filed under " + strings.Join(clipped(unknown), ", "))
 		}
@@ -294,11 +294,10 @@ func registerBulk(api huma.API, in Ingest) {
 
 // deferredUntil reads the date a postponement runs to.
 //
-// Required when something is deferred, and refused otherwise. "Deferred" was
-// offered as an outcome here with nowhere to say until when, which recorded a
-// postponement with no end — the one thing a deferral has to have, since the
-// threshold that decides whether a second person must agree is measured
-// against it.
+// Required when something is deferred, and refused otherwise. Offered as an
+// outcome with nowhere to say until when, a deferral records a postponement
+// with no end — the one thing a deferral has to have, since the threshold that
+// decides whether a second person must agree is measured against it.
 func deferredUntil(outcome, stated string) (*time.Time, error) {
 	if outcome != string(triage.Deferred) {
 		if stated != "" {

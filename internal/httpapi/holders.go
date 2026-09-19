@@ -26,23 +26,23 @@ const teamShare = 5
 
 // registerHolders answers who may be given work here.
 //
-// **Assigning and mentioning are different questions**, and the interface was
-// asking the mentions endpoint both. That endpoint answers who can already
-// *read* a finding, which is right for offering a name inside text and wrong
-// here twice over: a team cannot be mentioned in prose but is a perfectly good
+// Assigning and mentioning are different questions. Asked of the mentions
+// endpoint, both get one answer: that endpoint answers who can already *read*
+// a finding, which is right for offering a name inside text and wrong here
+// twice over — a team cannot be mentioned in prose but is a perfectly good
 // holder of work, and being able to read something is not the same as being
-// somebody you may hand it to. The consequence was that no finding could be
-// assigned to a team from the interface at all, though the API has taken one
-// from the start.
+// somebody you may hand it to. Under one endpoint no finding can be assigned
+// to a team from the interface at all, though the API has taken one from the
+// start.
 //
-// **It inherits what the mentions endpoint was built to avoid**. Per
-// product, capped, an identity and a name and nothing else, narrowed on the
-// server so a picker at a hundred people does not fetch them all. It is not a
-// view over the people list, which is the administrator's directory: a lookup
-// answering "does this person have an account here" to anybody who may triage
-// is a staff directory for the price of one request.
+// It inherits what the mentions endpoint was built to avoid: per product,
+// capped, an identity and a name and nothing else, narrowed on the server so a
+// picker at a hundred people does not fetch them all. It is not a view over
+// the people list, which is the administrator's directory: a lookup answering
+// "does this person have an account here" to anybody who may triage is a staff
+// directory for the price of one request.
 //
-// **Teams are named to anybody**, which is already true of the teams list: a
+// Teams are named to anybody, which is already true of the teams list: a
 // team grants no role, no visibility and no capability, so its name discloses
 // nothing that its existence does not. Membership stays an administrator's.
 func registerHolders(api huma.API, in Ingest) {
@@ -110,9 +110,9 @@ func registerHolders(api huma.API, in Ingest) {
 		// and a picker that buries three teams under twenty-five names is one
 		// where the team is never found — but one that spends the whole bound
 		// on teams is worse: with the bound applied to the merged answer, a
-		// deployment holding twenty-five teams opened this on twenty-five
-		// teams and no people at all, which is a harder failure than the
-		// unbounded list it replaced.
+		// deployment holding twenty-five teams opens this on twenty-five
+		// teams and no people at all, which is a harder failure than an
+		// unbounded list.
 		named := make([]HolderBody, 0, len(teams))
 		for _, team := range teams {
 			shown := team.DisplayName

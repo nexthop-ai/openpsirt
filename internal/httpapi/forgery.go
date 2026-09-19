@@ -77,12 +77,12 @@ func sameOrigin(r *http.Request, base string) bool {
 
 // origins is where this deployment answers, as a browser would name it.
 //
-// **A configured address that yields no host matches nothing**, rather than
-// falling through to the request's own. Falling through turned the check into
-// an echo of the Host header the request supplied — the guard still ran, still
-// passed, and guarded nothing, while the operator believed they had pinned the
-// origin. `config.Load` refuses such a value at startup now, so reaching here
-// with one means it arrived another way; answering nothing is the safe half of
+// A configured address that yields no host matches nothing, rather than
+// falling through to the request's own. Falling through turns the check into
+// an echo of the Host header the request supplied — the guard runs, passes and
+// guards nothing, while the operator believes they have pinned the origin.
+// `config.Load` refuses such a value at startup, so reaching here with one
+// means it arrived another way; answering nothing is the safe half of
 // that, and it is a refusal a person meets immediately rather than a hole
 // nobody meets at all.
 func origins(r *http.Request, base string) []string {
