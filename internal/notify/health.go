@@ -170,10 +170,10 @@ func (w *Watch) dataLastMoved(ctx context.Context) (*time.Time, error) {
 // dataInForce is the version the newest finished run stated.
 //
 // Read apart from when the data last moved, because they are answers to
-// different questions and one statement answering both is what made the age
-// wrong: what the newest run is carrying says nothing about when that string
-// first appeared, and on a deployment running two replicas with a cache each
-// it is whichever of them happened to finish last.
+// different questions and one statement answering both gets the age wrong:
+// what the newest run is carrying says nothing about when that string first
+// appeared, and on a deployment running two replicas with a cache each it is
+// whichever of them finished last.
 func (w *Watch) dataInForce(ctx context.Context) (string, error) {
 	var version string
 	err := w.db.NewSelect().

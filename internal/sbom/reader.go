@@ -237,15 +237,15 @@ func (c *reader) add(described graph.Described) error {
 // count charges one more thing the document describes against the component
 // bound.
 //
-// Charged on the way in, before anything is held. The bound used to be charged
-// where components are recorded, which returns at once on the header-only read
-// — so a document putting its components inside the root component's own array
-// was walked in full during a read that happens synchronously inside the
-// upload request, binding every one of them, with nothing but the byte limit
-// saying how many there could be. Ten million of them at twenty-six bytes each
-// is a quarter of a gigabyte of file and several gigabytes of process, which is
-// the failure this bound exists to prevent, arriving in the request rather than
-// in a background reader.
+// Charged on the way in, before anything is held. Charged where components are
+// recorded instead, the header-only read returns at once and a document
+// putting its components inside the root component's own array is walked in
+// full during a read that happens synchronously inside the upload request,
+// binding every one of them with nothing but the byte limit saying how many
+// there could be. Ten million of them at twenty-six bytes each is a quarter of
+// a gigabyte of file and several gigabytes of process — the failure this bound
+// exists to prevent, arriving in the request rather than in a background
+// reader.
 func (c *reader) count() error {
 	c.stated++
 	if c.stated > c.lim.MaxComponents {

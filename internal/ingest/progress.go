@@ -262,15 +262,14 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 	// finish time, so the last assignment in each branch below is the earliest
 	// of its kind.
 	//
-	// **A run that failed only answers an upload while nothing has succeeded
-	// since.** A scan run covers a build rather than an upload, and this
-	// upload is the newest document the build holds, so a later run that
-	// finished cleanly did read this document — saying otherwise makes one bad
-	// night permanent. That was the first version of this: the earliest run
-	// after parsing was taken whatever became of it, so a scanner that fell
-	// over once poisoned every receipt already waiting on it, for ever,
-	// however many green runs came afterwards, and the scans screen got
-	// steadily more wrong the longer a deployment ran.
+	// A run that failed only answers an upload while nothing has succeeded
+	// since. A scan run covers a build rather than an upload, and this upload
+	// is the newest document the build holds, so a later run that finished
+	// cleanly did read this document, and saying otherwise makes one bad night
+	// permanent. Taking the earliest run after parsing whatever became of it,
+	// a scanner that falls over once poisons every receipt already waiting on
+	// it for ever, however many green runs come afterwards, and the scans
+	// screen gets steadily more wrong the longer a deployment runs.
 	//
 	// Still Refused while every run since has failed, which is the honest
 	// answer to "did anything come of my upload" at that point.

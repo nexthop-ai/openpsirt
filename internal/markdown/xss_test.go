@@ -20,11 +20,9 @@ type payload struct {
 
 // corpus is read from the file the interface's renderer reads.
 //
-// **One file, because it was two.** This list called itself "the same corpus"
-// as the one in `web/src/ui/markdown.test.ts` and was 27 payloads shorter —
-// two copies of a security corpus diverge in the direction of the one nobody
-// is adding to, and the comment saying they were the same is what stopped
-// anybody checking.
+// One file, read by both renderers. Two copies of a security corpus diverge in
+// the direction of the one nobody is adding to, and a comment calling them the
+// same corpus is what stops anybody checking.
 func corpus(t *testing.T) []payload {
 	t.Helper()
 	// A literal path, in this file, for the reason the settings gate uses

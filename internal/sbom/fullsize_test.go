@@ -284,9 +284,8 @@ func TestWhatAPackageWasBuiltFromIsReadHoweverItIsStated(t *testing.T) {
 	// twentieth of what is there.
 	//
 	// The counts below are asserted; this sentence is not computed from
-	// anything, so it is a claim about the fixture that goes stale silently.
-	// It said 30 and 535 — which add to the number this file used to assert —
-	// after the fixture had moved.
+	// anything, so it is a claim about the fixture that goes stale silently
+	// when the fixture moves under it.
 	f := openFullSize(t)
 	snapshot, err := sbom.Read(f, sbom.Limits{})
 	if err != nil {
@@ -306,13 +305,13 @@ func TestWhatAPackageWasBuiltFromIsReadHoweverItIsStated(t *testing.T) {
 		}
 	}
 
-	// Fewer than the previous fixture stated, and not because anything was
-	// lost: 565 became 551 when the generator stopped describing one package
-	// as two components. A pair where one half carried a pedigree and the
-	// other carried an `upstream=` qualifier used to be counted twice; merged,
-	// it is one component carrying both and counted once. Checked rather than
-	// assumed — **no package states an upstream now that stated none before**,
-	// and 548 distinct packages state one against 547 before.
+	// Fewer than the previous fixture states, and not because anything is
+	// lost: 565 becomes 551 where the generator stops describing one package
+	// as two components. A pair with a pedigree on one half and an
+	// `upstream=` qualifier on the other counts twice; merged, it is one
+	// component carrying both and counted once. Checked rather than assumed:
+	// no package states an upstream that stated none before, and 548 distinct
+	// packages state one against 547.
 	const (
 		upstreams = 551  // every component that states one, either way
 		versions  = 106  // those stating a version with it
