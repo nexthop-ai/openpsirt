@@ -260,13 +260,13 @@ The `reporting` role was retired for the same reason (REQ-42).
 
 ### The administrative half
 
-That held for findings, decisions and reports, and never for the administrative
-half. An auditor could read every decision and not the deadline policy those
-decisions were measured against, who held which role when they were made, or
-whether any of it changed — three of the four things an audit checks. The only
-grant that opened those was the administrator flag, which is not read-only: the
-record proving nobody moved the goalposts was readable by exactly the population
-able to move them.
+That holds for findings, decisions and reports, and not for the administrative
+half. Without a permission of its own, an auditor reads every decision and not
+the deadline policy those decisions were measured against, who held which role
+when they were made, or whether any of it changed — three of the four things an
+audit checks. The only grant that opens those is the administrator flag, which
+is not read-only, so the record proving nobody moved the goalposts is readable
+by exactly the population able to move them.
 
 ### The audit permission
 
@@ -442,23 +442,23 @@ subject is exactly what a leak looks like from the outside.
 3. A question whose answer does not vary by who is asking. Whether a finding is
    suppressed is the same fact for everybody.
 
-Anything else takes a subject. Two did not and should have: what a routing rule
-would catch, and which words are in use on a product. Both read findings, both
-answered for the whole product, and both were reached straight from a request.
+Anything else takes a subject. What a routing rule would catch and which words
+are in use on a product both read findings and both answer for the whole
+product, so a reader reached straight from a request is a product-wide read
+with nobody attached.
 
-The trail's two readers were a third. A row there names who was brought into
-which case, undisclosed ones among them, so the only thing between that and a
-caller was a line in the handler. Both now take a subject and refuse one that
-does not administer the deployment — a refusal rather than an empty page, since
-a deployment where nobody has ever changed anything is a different statement
-from one somebody may not read.
+The trail's readers are the same shape. A row there names who was brought into
+which case, undisclosed ones among them, so a line in the handler is the only
+thing between that and a caller. Each takes a subject and refuses one that does
+not administer the deployment — a refusal rather than an empty page, since a
+deployment where nobody has ever changed anything is a different statement from
+one somebody may not read.
 
 Whether somebody may read, and whether they may argue, are one question each,
-asked in one place. The reading rule lived on the subject from the start; the
-writing rule was written out byte for byte in two packages and open-coded at six
-more sites. They stay two questions rather than one: triage implies reading and
-reading does not imply triage, so a single answer would have to be qualified at
-every call site.
+asked in one place. Both live on the subject: a rule written out per package is
+a rule with a spelling per package. They stay two questions rather than one,
+because triage implies reading and reading does not imply triage, so a single
+answer would have to be qualified at every call site.
 
 ## Judgments about an issue
 
@@ -473,9 +473,9 @@ what a product's people work on.
 | Agreeing to a milder one | That, or the approver capability, on the product the rating belongs to |
 
 A rating sets the deadline and can push a finding below the line that product
-triages at. Asked anywhere, somebody holding one product moved both in a
-product they cannot see — and a second team was refused any rating of their
-own, because one live rating stood for the deployment.
+triages at. Asked anywhere, somebody holding one product moves both in a
+product they cannot see; held deployment-wide, one live rating stands for every
+product and a second team is refused any rating of their own.
 
 The role is not the whole of it: the issue has to be one the person may be told
 about **in that product**. A role answers which right is asked for, not which
@@ -591,11 +591,11 @@ and the calls made to a forge go through a client that talks to the configured
 host and nowhere else, does not follow a redirect, and does not connect to an
 address inside this network.
 
-One client, in one place, for every fetch out of this process. It was written
-twice and forgotten a third time: the sign-in fetches had it, the
-upstream-currency asker had a bare client with a timeout and nothing else, and
-the token exchange — the one call carrying a client secret — fell back to the
-library's default client, which has no timeout and follows ten redirects.
+One client, in one place, for every fetch out of this process. Written per
+caller it is forgotten by one of them: a bare client with a timeout and nothing
+else, or the library's default, which has no timeout and follows ten redirects
+— and the call that falls back is as likely to be the token exchange, the one
+carrying a client secret, as any other.
 
 The exchange matters more than the rest: it carries the client secret and the
 authorization code, it happens on every sign-in rather than once at startup, and
@@ -797,19 +797,18 @@ database by hand.
 | Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
 | A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
 
-The session lifetime has a ceiling of thirty days. It is the window in which
-a role a group withdrew can still be held, and it was whatever an administrator
-typed: a lifetime of a year made every browser sign-in last a year. Refused
+The session lifetime has a ceiling of thirty days. It is the window in which a
+role a group withdrew can still be held, so left to whatever an administrator
+types, a lifetime of a year makes every browser sign-in last a year. Refused
 rather than quietly shortened, at the settings write and at startup, so that
 somebody who asks for more hears the limit rather than discovering it later.
 
 A grant a group derived grants through a token only while it is younger than
 this window. Membership is read at sign-in and a sign-in replaces somebody's
-derived grants whole, so a browser's are never older than its session. A token never signs in: it resolves
-through its owner and reads whatever their last sign-in wrote. So a derived
-grant is in force for a token only while it is younger than this window, and a
-group somebody left stops granting them roles through a token even if they never
-sign in again. What an administrator assigned is untouched — that is a standing
+derived grants whole, so a browser's are never older than its session. A token
+never signs in: it resolves through its owner and reads whatever their last
+sign-in wrote. So a group somebody left stops granting them roles through a
+token even if they never sign in again. What an administrator assigned is untouched — that is a standing
 decision rather than a reading of somebody's membership.
 
 Thirty is a judgment rather than a commitment. Nothing has been decided about
@@ -818,12 +817,11 @@ owner's to settle, and `TODO.md` carries it until they do.
 
 ## The grant grid
 
-Products down and capabilities across (REQ-42), one checkbox per pair. It
-replaced a run of chips shaped "product · role" beside a form of three controls,
-because two ordinary questions were unanswerable: "who can approve on this
-product" meant reading every chip on every person's row, and "what does this
-person hold" meant reading a list as long as products times capabilities, in no
-order.
+Products down and capabilities across (REQ-42), one checkbox per pair. Drawn as
+a run of chips shaped "product · role" beside a form of three controls, two
+ordinary questions are unanswerable: "who can approve on this product" means
+reading every chip on every person's row, and "what does this person hold"
+means reading a list as long as products times capabilities, in no order.
 
 | Feature | Reason |
 |---|---|
@@ -899,12 +897,11 @@ A pipeline is refused a read rather than shown an empty one, receipts for its
 own uploads excepted. "Here is nothing" and "you cannot ask" are different
 statements, and the first invites a caller to believe the list is empty.
 
-Refused where the read is, not only at the edge. Roughly twenty store reads
-answered a credential that is not a person with an empty result, so the
-invariant the design places in the data layer was in fact enforced by one
-function in a handler — and a check in a handler is the one somebody forgets.
-`Subject.Kind` is a string, so the zero subject took every one of those
-branches as well.
+Refused where the read is, not only at the edge. A store read answering a
+credential that is not a person with an empty result leaves the invariant the
+design places in the data layer enforced by one function in a handler, and a
+check in a handler is the one somebody forgets. `Subject.Kind` is a string, so
+the zero subject takes those branches as well.
 
 The two halves are separate questions and are answered separately. A credential
 that is not a person is refused. A *person* who holds nothing is answered with
@@ -998,12 +995,12 @@ absorbing a route that should leave a row is the failure the walk exists to
 make visible — and the way that happens is somebody adding a line to the list
 instead of a call to the recorder.
 
-The walk is what makes this true rather than intended. It reads the
-operations the server registered, so a route in neither list fails it; the
-driving half then exercises each trailed route and reads the row back. What it
-replaced was a literal of twelve acts beside a comment claiming a route walk,
-and nine administrative writes recorded nothing with the suite green — a group
-bound to administration among them.
+The walk is what makes this true rather than intended. It reads the operations
+the server registered, so a route in neither list fails it, and the driving
+half exercises each trailed route and reads the row back. A literal list of
+acts beside a comment claiming a route walk leaves administrative writes
+recording nothing with the suite green — a group bound to administration among
+them.
 
 Three levers silently rewrite what this tool reports: changing the deadline policy
 recomputes every open finding's deadline, raising the triage floor removes
@@ -1100,11 +1097,11 @@ private access.
 | Asked once the row is in hand | It needs the issue, which a bare product-and-visibility rule cannot see. That is the opposite order from a name somebody typed, and safe for the same reason it is necessary: the row is already established as existing |
 | Adding somebody is an access change | It lands in the administration trail, tells them at once in the area inside the application, and the finding shows how many collaborators it has. It stops meaning anything at disclosure |
 | Whoever reads the product the case is in manages its list, rather than an administrator | Knowing who is needed on a case is knowing the case, and routing it through somebody who does not read it makes them the bottleneck on every embargo. A collaborator is not that reader: the grant is one issue, so it carries the finding and not the list of who else was brought in |
-| The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator was refused the path to the component their own case sits in and the finding answered as though it were not there |
-| Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faulted on the row the grant exists to open |
-| How far a decision would reach is asked about that issue | The reach reads are about one case and nothing else: the same issue at the same place, held at a version the decision would not already cover. Asked product-wide they refused the collaborator, and a refusal from the store with no arm in the handler answers as a fault — so the two screens that offer to carry a judgment across builds faulted on the one finding the grant exists to open |
+| The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator is refused the path to the component their own case sits in, and the finding answers as though it were not there |
+| Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faults on the row the grant exists to open |
+| How far a decision would reach is asked about that issue | The reach reads are about one case and nothing else: the same issue at the same place, held at a version the decision would not already cover. Asked product-wide they refuse the collaborator, and a refusal from the store with no arm in the handler answers as a fault — so the screens offering to carry a judgment across builds fault on the one finding the grant exists to open |
 | Resolving a build's names admits a collaborator; reading what that build holds does not | The names their own issue sits at have to resolve, or the grant refuses them the one thing it gave. So every read reached through that lookup puts the product-wide question for itself, and a document about the whole build is not a question about one named issue |
-| That every read past it does put the question is checked | The sentence beside the resolver was the whole of the safety and nothing enforced it: one read asked whether a single issue was undisclosed and never whether the subject could read the product, so a collaborator on one case received the approved statements for the whole build. A gate reads where a resolved build is used, and reports one handed to something that carries no subject where nothing refused first |
+| That every read past it does put the question is checked | A sentence beside the resolver is not enforcement: a read asking whether a single issue is undisclosed and never whether the subject may read the product hands a collaborator on one case the approved statements for the whole build. A gate reads where a resolved build is used, and reports one handed to something that carries no subject where nothing refused first |
 
 The product-wide question keeps answering no, and that is the whole of the
 safety. Every list, count, report and export narrows by whether somebody reads
@@ -1193,10 +1190,10 @@ notice the absence and say so.
 - Proxies that deliver identity in a signed token are not supported by that
   path, because reading a header cannot verify a signature. Such deployments
   configure a provider instead.
-- A saved filter is not a permission. It lived in this package because it hangs
-  off a person, which is the wrong reason. What it cost was that the triage
-  vocabulary a filter can prepare was defined a second time inside the package
-  about permissions, which is the last place somebody looks for it.
+- A saved filter is not a permission. Held in this package because it hangs off
+  a person — which is the wrong reason — it defines the triage vocabulary a
+  filter can prepare a second time inside the package about permissions, which
+  is the last place somebody looks for it.
 - A key is honored from anywhere. It holds a credential rather than being
   vouched for by position; where it connects from says nothing about whether it
   is genuine.
