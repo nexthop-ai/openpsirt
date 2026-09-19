@@ -263,14 +263,14 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 // undecided against a tag, against the people who should hear about it.
 //
 // Tags only. A critical on a branch is ordinary work in progress; the same
-// issue against something customers are running is the case a new critical as an alert exists for,
-// and the difference between them is the whole signal. Sending both would make
+// issue against something customers are running is the case this alert exists
+// for, and the difference between them is the whole signal. Sending both makes
 // the alert as common as the findings list and therefore ignorable.
 //
 // Undecided only, and derived rather than remembered, so it leaves the
 // list when the finding closes or when somebody answers it — neither of which
-// is a thing to be dismissed. That is the conditions clearing, events acknowledged shape: nobody clears this,
-// the world does.
+// is a thing to be dismissed. It is a condition rather than an event: nobody
+// clears this, the world does.
 //
 // Whoever may read it and may act on it. Every other operational
 // alert goes to administrators because it is about the tool rather than about

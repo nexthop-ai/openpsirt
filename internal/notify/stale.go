@@ -21,8 +21,8 @@ import (
 // report nobody answered — is invisible to a tool that reports only what
 // somebody did.
 //
-// Each clears by the thing happening, which is the conditions clearing, events
-// acknowledged shape: nobody dismisses these, the world does.
+// Each clears by the thing happening: a condition clears itself where an event
+// is acknowledged, so nobody dismisses these — the world does.
 //
 // Who hears follows who may read and act, and it differs by
 // condition rather than being one rule. A claim waiting is the approver's to

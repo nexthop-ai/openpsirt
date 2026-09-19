@@ -22,9 +22,8 @@ import (
 func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 	// The pass that makes a condition real. A build nothing has been filed
 	// against is something an administrator is told; when a scan arrives
-	// the alert goes without anybody dismissing it, which is the whole of
-	// conditions clearing, events acknowledged and the reason these are
-	// not events.
+	// the alert goes without anybody dismissing it, which is the whole of a
+	// condition clearing itself and the reason these are not events.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))

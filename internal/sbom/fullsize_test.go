@@ -107,8 +107,9 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	//
 	// The number is written down rather than expressed as a tolerance: a
 	// change in it is a change in what identity means, and that is something
-	// to look at rather than absorb. It has earned that twice. 6,845 became 6,854 when the
-	// generator started describing the programs in the image, by the number of
+	// to look at rather than absorb. It has earned that twice. 6,845 became
+	// 6,854 when the generator started describing the programs in the image,
+	// by the number of
 	// distinct program names rather than the number of programs — 13 programs
 	// under 9 names — because a program arrives with no version and no package
 	// identifier, and identity is a name and a version. 6,854 became 6,866 on
