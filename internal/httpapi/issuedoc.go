@@ -113,7 +113,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	fmt.Fprintf(&out, "\nAssembled %s.\n", time.Now().UTC().Format(time.DateOnly))
 
 	// The issue itself, from what the feeds said.
-	out.WriteString("\n## What it is\n\n")
+	out.WriteString("\n## The issue\n\n")
 	if known.Description != "" {
 		fmt.Fprintf(&out, "%s\n\n", known.Description)
 	}
@@ -147,7 +147,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	}
 
 	// Its places, which are what the inquiry actually asks for.
-	fmt.Fprintf(&out, "\n## Where it is\n\n%s\n\n", howManyCarry(total, len(rows)))
+	fmt.Fprintf(&out, "\n## Its places\n\n%s\n\n", howManyCarry(total, len(rows)))
 	for _, row := range rows {
 		fmt.Fprintf(&out, "- %s %s (%s) — %s %s",
 			row.Product, row.Stream, row.Variant, row.Component, row.Version)
@@ -171,7 +171,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	if err != nil {
 		return "", wentWrong(in.Logger, "what was decided could not be read", err)
 	}
-	out.WriteString("\n## What was decided\n\n")
+	out.WriteString("\n## The decisions\n\n")
 	if len(judged) == 0 {
 		out.WriteString("Nothing. Every place of it is open and undecided.\n")
 		return out.String(), nil

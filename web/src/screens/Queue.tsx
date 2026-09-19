@@ -895,7 +895,7 @@ function Card({
             draftKey={draftKey}
             rows={4}
             label="Reason for rejection"
-            placeholder="What is missing or wrong."
+            placeholder="The part that is missing or wrong."
           />
           <div className="actions" style={{ marginTop: 8 }}>
             <button

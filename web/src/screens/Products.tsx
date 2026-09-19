@@ -218,7 +218,7 @@ export function Products({ who }: { who: Who }) {
           value={name}
           onChange={setName}
           placeholder="sonic"
-          hint="How scans name it. Capitals do not matter."
+          hint="The name scans use for it. Capitals do not matter."
         />
         <Field
           label="Display name"

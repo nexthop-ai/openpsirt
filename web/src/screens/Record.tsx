@@ -336,11 +336,11 @@ export function Record() {
             onChange={setSummary}
             draftKey={`record:${product}`}
             rows={6}
-            label="What the flaw is"
+            label="The flaw"
             placeholder="The management socket answers a request before anyone has authenticated."
             mentions={mentioning(product, !disclosed)}
           />
-          <span className="hint">What a triager reads first.</span>
+          <span className="hint">The first line a triager reads.</span>
         </div>
 
         <div className="field">
@@ -377,7 +377,7 @@ export function Record() {
         </div>
 
         <div className="field">
-          <label htmlFor="rec-component">What carries it</label>
+          <label htmlFor="rec-component">The component carrying it</label>
           {/* Shown as a list rather than left to the browser's datalist, which
               has no affordance at all: no arrow, nothing until two characters,
               and nothing to say whether anything matched. This is the input in
@@ -446,7 +446,7 @@ export function Record() {
         <Scoring vector={vector} onChange={setVector} />
 
         <div className="field">
-          <label htmlFor="rec-files">What proves it</label>
+          <label htmlFor="rec-files">Evidence</label>
           <p className="hint" style={{ marginTop: 0 }}>
             Optional. Readable by whoever can read the issue, so an undisclosed flaw&rsquo;s
             evidence is undisclosed too.
@@ -515,7 +515,7 @@ export function Record() {
             the embargo runs from, and how they wish to be credited is what an
             advisory's acknowledgments say. */}
         <div className="field">
-          <span className="l">Who told us</span>
+          <span className="l">The reporter</span>
           <span className="hint" style={{ marginBottom: 6 }}>
             Optional. Only where somebody outside reported it.
           </span>
@@ -531,7 +531,7 @@ export function Record() {
               />
             </label>
             <label className="field" style={{ margin: 0 }}>
-              <span>How to reach them</span>
+              <span>Contact</span>
               <input
                 {...notACredential}
                 type="text"

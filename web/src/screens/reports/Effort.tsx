@@ -78,7 +78,7 @@ export function Effort() {
   return (
     <Sheet
       settled={spent.isSuccess}
-      name="Where the effort went"
+      name="The destination of the effort"
       answers="what the judgments in this period were about."
       asked={coveringPeriod(period, days)}
     >
@@ -112,7 +112,7 @@ export function Effort() {
       {spent.isPending ? (
         <Loading />
       ) : spent.isError ? (
-        <Failed error={spent.error} what="Where the work went could not be read." />
+        <Failed error={spent.error} what="The destination of the work could not be read." />
       ) : rows.length === 0 ? (
         <section className="panel">
           <Empty

@@ -68,7 +68,7 @@ function WhatUpstreamCouldNotAnswer() {
 
   if (asked.isPending) return <Loading />;
   if (asked.isError) {
-    return <Failed error={asked.error} what="What upstream could not answer could not be read." />;
+    return <Failed error={asked.error} what="The components upstream could not answer for could not be read." />;
   }
   const rows = asked.data?.items ?? [];
   const total = asked.data?.total ?? 0;
@@ -157,7 +157,7 @@ function VulnerabilityData() {
   if (data.isPending) return <Loading />;
   if (data.isError) {
     return (
-      <Failed error={data.error} what="What the scans are answering against could not be read." />
+      <Failed error={data.error} what="The vulnerability data the scans answer against could not be read." />
     );
   }
   const version = data.data?.version ?? "";
@@ -237,7 +237,7 @@ function TheQueue() {
 
   if (work.isPending) return <Loading />;
   if (work.isError) {
-    return <Failed error={work.error} what="What the queue is doing could not be read." />;
+    return <Failed error={work.error} what="The queue's own state could not be read." />;
   }
   const waiting = work.data?.waiting ?? [];
   const rows = work.data?.items ?? [];

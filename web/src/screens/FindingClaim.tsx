@@ -296,7 +296,7 @@ export function Standing({
           className="linkish"
           onClick={() => {
             const where = window.prompt(
-              "Where is this being worked on? A ticket, a thread, a change.",
+              "The place this is being worked on: a ticket, a thread, a change.",
               summary?.elsewhere ?? "",
             );
             if (where !== null) point.mutate(where.trim());

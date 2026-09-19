@@ -130,7 +130,7 @@ export function Review({
 
   const progress = (
     <div className="revprog">
-      {["Where it applies", "Confirm"].map((label, i) => (
+      {["Its reach", "Confirm"].map((label, i) => (
         <span key={label} className={i === step ? "on" : i < step ? "done" : ""}>
           {label}
         </span>
@@ -143,7 +143,7 @@ export function Review({
   let foot: React.ReactNode;
 
   if (step === 0) {
-    title = "Where this decision applies";
+    title = "The reach of this decision";
     body = (
       <>
         {progress}

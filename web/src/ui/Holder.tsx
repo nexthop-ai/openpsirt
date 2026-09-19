@@ -131,7 +131,7 @@ export function Holder({
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
-        aria-label="Who holds this"
+        aria-label="The holder of this"
         disabled={disabled}
         placeholder={holder ? "" : placeholder}
         value={open || typed !== "" ? typed : holder}

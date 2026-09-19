@@ -141,7 +141,7 @@ export function App() {
     return (
       <div className="flex min-h-dvh items-center justify-center">
         <div style={{ maxWidth: 520 }}>
-          <Failed error={who.error} what="Who is signed in could not be read." />
+          <Failed error={who.error} what="The signed-in person could not be read." />
           <div className="actions" style={{ marginTop: 12 }}>
             <button type="button" className="btn" onClick={() => void who.refetch()}>
               Try again

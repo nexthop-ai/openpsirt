@@ -64,11 +64,11 @@ export function Coverage() {
       {coverage.isPending ? (
         <Loading />
       ) : coverage.isError ? (
-        <Failed error={coverage.error} what="What has been scanned could not be read." />
+        <Failed error={coverage.error} what="The scan coverage could not be read." />
       ) : (
         <>
           <section className="panel">
-            <h3>Where the estate stands</h3>
+            <h3>Estate coverage</h3>
             <div className="kpis" style={{ marginTop: 8 }}>
               <div className="kpi">
                 <span className="l">Being scanned</span>

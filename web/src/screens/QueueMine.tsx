@@ -32,7 +32,7 @@ export function Became({
 }) {
   if (query.isPending) return <Loading />;
   if (query.isError) {
-    return <Failed error={query.error} what="What you proposed could not be read." />;
+    return <Failed error={query.error} what="The claims you proposed could not be read." />;
   }
   if (rows.length === 0) {
     return (
@@ -47,7 +47,7 @@ export function Became({
       <table>
         <thead>
           <tr>
-            <th>What became of it</th>
+            <th>Outcome</th>
             <th>Issue</th>
             <th>Component</th>
             <th>Where</th>

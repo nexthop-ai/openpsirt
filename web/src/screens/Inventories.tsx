@@ -144,7 +144,7 @@ export function Inventories() {
                           `/streams/${encodeURIComponent(stream)}` +
                           `/variants/${encodeURIComponent(variant)}/runs/${scan.run_id}`
                         }
-                        title="What this run opened and closed, and what it was measured with"
+                        title="The change this run made, and the tooling it was measured with"
                       >
                         <State state={scan.state} />
                       </Link>

@@ -139,7 +139,7 @@ export function AffectedBuilds({
       ) : builds.isError || holds.isError ? (
         <Failed
           error={builds.error ?? holds.error}
-          what="What this is filed against could not be read."
+          what="The builds this is filed against could not be read."
         />
       ) : partial ? (
         <div className="alert">

@@ -94,7 +94,7 @@ export function Collaborators({
     return notYours(on.error) ? null : (
       <div className="card">
         <h3>On this case</h3>
-        <Failed error={on.error} what="Who is on this case could not be read." />
+        <Failed error={on.error} what="The people on this case could not be read." />
       </div>
     );
   }
@@ -368,7 +368,7 @@ export function Attachments({
     return notYours(listed.error) ? null : (
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Attached files</h3>
-        <Failed error={listed.error} what="What is attached could not be read." />
+        <Failed error={listed.error} what="The attachments could not be read." />
       </section>
     );
   }
@@ -413,7 +413,7 @@ export function Attachments({
             )}
             {removing === file.token && (
               <div className="field" style={{ margin: "6px 0 0", maxWidth: "60ch" }}>
-                <label>Why it is being removed</label>
+                <label>Reason for removal</label>
                 <input
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}

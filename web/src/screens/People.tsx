@@ -193,7 +193,7 @@ export function People({ who: me }: { who: Who }) {
     <>
       <div className="screen-head">
         <h2>Access</h2>
-        <p>Who can read and decide what</p>
+        <p>Access by product</p>
         {/* Offered only to somebody the server will take it from. A control
             that changes nothing is worse than a control that is not there,
             because pressing it looks like it worked. */}
@@ -245,7 +245,7 @@ export function People({ who: me }: { who: Who }) {
         <Failed error={endSessions.error} what="Their sessions could not be ended." />
       )}
       {reach.error != null && (
-        <Failed error={reach.error} what="Where to reach them could not be recorded." />
+        <Failed error={reach.error} what="The address to reach them could not be recorded." />
       )}
 
       {rows.length === 0 ? (
@@ -406,7 +406,7 @@ export function People({ who: me }: { who: Who }) {
                             : derived
                               ? "Roles come from provider groups and would be overwritten"
                               : unreadMode
-                                ? "Where roles come from could not be read"
+                                ? "The source of roles could not be read"
                                 : "Every product against every capability, as a grid"
                         }
                         onClick={() =>
@@ -541,7 +541,7 @@ export function People({ who: me }: { who: Who }) {
 
       {mode.isError && (
         <div className="alert" style={{ marginTop: 12 }}>
-          <strong>Where roles come from could not be read</strong>
+          <strong>The source of roles could not be read</strong>
           <span>
             Granting one here would be overwritten at the next sign-in if this deployment takes
             roles from provider groups, so the grids stay closed until it answers.

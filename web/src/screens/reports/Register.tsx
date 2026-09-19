@@ -114,7 +114,7 @@ export function Register() {
               open". The register applies no triage line whatever is picked
               here, which is what it is for. */}
           <div className="controls">
-            <div className="seg" role="group" aria-label="What stands">
+            <div className="seg" role="group" aria-label="The decision standing">
               {STATES.map((word) => (
                 <button
                   key={word}

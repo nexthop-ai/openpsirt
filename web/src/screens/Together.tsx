@@ -501,7 +501,7 @@ function Claim({
             draftKey={draftKey}
             label="Reasoning"
             mentions={mentions}
-            placeholder="What makes this true of all of them? A search term is not a reason."
+            placeholder="The reason this is true of all of them. A search term is not a reason."
           />
         </div>
 

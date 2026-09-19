@@ -72,7 +72,7 @@ export const CATALOG: Report[] = [
   },
   {
     slug: "where-the-effort-went",
-    name: "Where the effort went",
+    name: "The destination of the effort",
     answers:
       "What the judgments in a period were about, most argued first: which component, how many arguments, how far they reached, and what came out of them. Every other report counts the backlog; this one says what the quarter went into.",
   },

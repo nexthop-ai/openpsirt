@@ -274,7 +274,7 @@ export function Streams() {
           value={name}
           onChange={setName}
           placeholder="202411"
-          hint="How scans name it"
+          hint="The name scans use for it"
         />
         <div className="field">
           <label htmlFor="declare-kind">Kind</label>

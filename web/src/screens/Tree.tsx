@@ -112,7 +112,7 @@ export function Tree() {
   // failed identity read is not an answer: falling through drew the whole
   // build's inventory for a subject nobody had established may see it.
   if (who.isError) {
-    return <Failed error={who.error} what="What you may see here could not be read." />;
+    return <Failed error={who.error} what="Your reach here could not be read." />;
   }
   if (who.data && !who.data.reach.some((each) => each.product === product)) return <Yours />;
   return <Whole />;

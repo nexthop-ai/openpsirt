@@ -452,7 +452,7 @@ legitimate population: an outcome that hides nothing needs no second person, and
 a short deferral stands on its own until the cumulative time crosses the
 threshold. The screen states which of the two questions is being asked.
 
-What it is for is showing that no dismissal sits in that population.
+It exists to show that no dismissal sits in that population.
 Not-applicable, will-not-fix and already-fixed all require approval, so that
 query should return nothing, and a row in it is a control that failed.
 

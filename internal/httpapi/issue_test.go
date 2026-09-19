@@ -236,7 +236,7 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 		// And says nothing about the issue itself, for the reason the issue's
 		// own route says nothing: the two ways of not being affected answer
 		// alike.
-		if strings.Contains(none.Body.String(), "## What it is") {
+		if strings.Contains(none.Body.String(), "## The issue") {
 			t.Errorf("an unaffected document describes the issue:\n%s", none.Body.String())
 		}
 	})

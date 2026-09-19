@@ -218,7 +218,7 @@ export function Component() {
 
         <div>
           <div className="card">
-            <h3>What this package is</h3>
+            <h3>The package</h3>
             {here.summary && <p className="reading">{here.summary}</p>}
             <dl className="facts">
               <dt>Identifier</dt>
@@ -358,7 +358,7 @@ function Sits({
           <label className="hint" style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
             <span>Build</span>
             <select
-              aria-label="Which build"
+              aria-label="The build"
               style={{ width: "auto" }}
               value={buildKey(here, here.version)}
               onChange={(event) => {
@@ -379,7 +379,7 @@ function Sits({
       </div>
 
       {around.isError ? (
-        <Failed error={around.error} what="Where it sits could not be read." />
+        <Failed error={around.error} what="Its place could not be read." />
       ) : (
         <ol className="sits">
           <li>
@@ -515,7 +515,7 @@ function Landed({ here }: { here: Build }) {
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
-        <h3>Where the fixes landed</h3>
+        <h3>Releases carrying fixes</h3>
         {landed.length > 0 && (
           <span className="eyebrow" style={{ marginLeft: "auto" }}>
             {landed.length} {landed.length === 1 ? "release" : "releases"}
@@ -532,7 +532,7 @@ function Landed({ here }: { here: Build }) {
               <thead>
                 <tr>
                   <th>Release</th>
-                  <th className="num" title="How many of what is open here that release fixed">
+                  <th className="num" title="The findings open here that release fixes">
                     Fixed here
                   </th>
                   {ordered && (
@@ -838,7 +838,7 @@ function Upgrade({
         </p>
       </div>
 
-      <Editor value={because} onChange={setBecause} placeholder="Why this is the answer here." />
+      <Editor value={because} onChange={setBecause} placeholder="The reason this is the answer here." />
 
       <div className="actions" style={{ marginTop: 10 }}>
         <button
@@ -869,7 +869,7 @@ function Ships({
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
-        <h3>Where it ships</h3>
+        <h3>Releases shipping it</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
           {rows.length} {rows.length === 1 ? "release" : "releases"}
         </span>

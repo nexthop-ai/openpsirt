@@ -73,7 +73,7 @@ export function Disclosing() {
 
   if (rows.isPending) return <Loading />;
   if (rows.isError) {
-    return <Failed error={rows.error} what="What is approaching disclosure could not be read." />;
+    return <Failed error={rows.error} what="The findings approaching disclosure could not be read." />;
   }
   const items = rows.data?.items ?? [];
   const total = rows.data?.total;
@@ -197,8 +197,8 @@ export function Disclosing() {
                             value={because}
                             onChange={setBecause}
                             rows={3}
-                            label="Why it is being extended"
-                            placeholder="Why the date is moving, and what has to happen before the new one."
+                            label="The reason for the extension"
+                            placeholder="The reason the date is moving, and what has to happen before the new one."
                           />
                           <div className="actions" style={{ marginTop: 8 }}>
                             <button

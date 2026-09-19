@@ -11,10 +11,10 @@ import { Wide } from "../ui/Wide";
 
 // One product's own page.
 //
-// There was no page for one product. "How is SONiC doing" was five
-// requests and a spreadsheet — what is open per build, how much is overdue,
-// how much has been decided, when each build was last scanned — every piece of
-// which existed and none of which sat together. The products table is an
+// The state of one product is otherwise five requests and a spreadsheet —
+// what is open per build, how much is overdue, how much has been decided, when
+// each build was last scanned — every piece of which exists and none of which
+// sits together. The products table is an
 // administration surface: a triage line in a select and an end-of-support date
 // in an input, which is a different job from reading how something is going.
 //

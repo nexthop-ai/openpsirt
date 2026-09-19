@@ -101,11 +101,11 @@ export function Scrutiny() {
       {got.isPending ? (
         <Loading />
       ) : got.isError ? (
-        <Failed error={got.error} what="How approvals are going could not be read." />
+        <Failed error={got.error} what="The state of approvals could not be read." />
       ) : (
         <>
           <section className="panel">
-            <h3>What the control cannot do</h3>
+            <h3>Limits of the control</h3>
             <p className="reading">
               Neither control can be waived. Read this for where they did not apply, or applied in
               form only.
@@ -173,7 +173,7 @@ export function Scrutiny() {
               />
             )}
 
-            <h4 style={{ marginTop: 16 }}>Where the rule did not apply</h4>
+            <h4 style={{ marginTop: 16 }}>Exceptions to the rule</h4>
             <p className="hint">
               Short deferrals stand on their own, measured against the total already deferred.
             </p>
@@ -206,7 +206,7 @@ export function Scrutiny() {
           </section>
 
           <section className="panel" style={{ marginTop: 14 }}>
-            <h3>Who agrees with whom</h3>
+            <h3>Proposer and approver pairs</h3>
             <p className="hint" style={{ marginTop: 0 }}>
               Concentration is the signal, and a count alone does not carry it: fifty out of
               fifty-two and fifty out of nine hundred are the same number and not the same

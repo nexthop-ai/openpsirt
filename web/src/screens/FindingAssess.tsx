@@ -88,7 +88,7 @@ export function Assess({
           id="why"
           style={{ minHeight: 64 }}
           value={reasoning}
-          placeholder="Why the published rating is wrong here"
+          placeholder="The reason the published rating is wrong here"
           onChange={(event) => setReasoning(event.target.value)}
         />
       </div>

@@ -143,7 +143,7 @@ export function ByComponent({
 
   if (grouped.isPending) return <Loading />;
   if (grouped.isError) {
-    return <Failed error={grouped.error} what="What is open could not be read by component." />;
+    return <Failed error={grouped.error} what="The open findings could not be read by component." />;
   }
 
   const rows = grouped.data?.items ?? [];
@@ -410,7 +410,7 @@ export function ByBump({
 
   if (bundles.isPending) return <Loading />;
   if (bundles.isError) {
-    return <Failed error={bundles.error} what="What is open could not be read by upgrade." />;
+    return <Failed error={bundles.error} what="The open findings could not be read by upgrade." />;
   }
   const rows = bundles.data?.items ?? [];
   const total = bundles.data?.total ?? 0;

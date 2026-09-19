@@ -82,7 +82,7 @@ export function Places({
                         "Build-time only" is the largest deferral class a
                         vendor has, and it is a person's to make. */}
                     {last && place.declared_as && (
-                      <span className="state" title="What the producer called this dependency">
+                      <span className="state" title="The producer's own name for this dependency">
                         producer said {place.declared_as}
                       </span>
                     )}
@@ -208,7 +208,7 @@ export function HowMatched({
         </p>
       )}
       {from && (
-        <p className="hint" title="Where the match data came from">
+        <p className="hint" title="The source of the match data">
           Source <Away url={from} />
         </p>
       )}
@@ -299,7 +299,7 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
         // for "you do not hold triage here" — so folding them told a case
         // collaborator the flaw was found in-house, which is a false claim
         // about a security record rather than a quiet card.
-        <Failed error={told.error} what="Who reported this could not be read." />
+        <Failed error={told.error} what="The reporter could not be read." />
       ) : !report ? (
         <p className="reading">No outside reporter recorded.</p>
       ) : (

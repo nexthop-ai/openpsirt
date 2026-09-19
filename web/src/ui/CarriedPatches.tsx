@@ -68,7 +68,7 @@ export function CarriedPatches({
         </button>
       </h3>
       {!open ? null : carried.isError ? (
-        <Failed error={carried.error} what="What this build carries could not be read." />
+        <Failed error={carried.error} what="The patches this build carries could not be read." />
       ) : (
         <>
           <div className="filters">

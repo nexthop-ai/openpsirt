@@ -130,7 +130,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
   return (
     <div className={`card standing ${stripe(claim.happened)}`}>
       <header className="dhead">
-        <h3>What was decided</h3>
+        <h3>The decision</h3>
         <Happened word={claim.happened} by={claim.by} />
       </header>
       {claim.happened === "sent-back" && (
@@ -184,7 +184,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
               the binaries that fold holds and the things that pull them in —
               never a place count, which is a unit nobody acts in and a reader
               cannot reconcile with anything else on the screen. */}
-          <span className="l">What it covers now</span>
+          <span className="l">Present reach</span>
           <span className="v" title={`${claim.places} written at, ${claim.findings} findings`}>
             {bulk ? (
               <>
@@ -310,7 +310,7 @@ function Reaffirm({
       <textarea
         rows={3}
         value={reasoning}
-        placeholder="Why it still holds, having checked again"
+        placeholder="The reason it still holds, having checked again"
         onChange={(event) => setReasoning(event.target.value)}
       />
       <div className="actions" style={{ marginTop: 10 }}>
@@ -493,7 +493,7 @@ function Answer({
           <Editor
             value={because}
             onChange={setBecause}
-            placeholder="What you need before you would agree."
+            placeholder="The evidence you need before you would agree."
           />
           <div className="actions" style={{ marginTop: 8 }}>
             <button
@@ -593,7 +593,7 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
           {split.error != null && (
             <Failed error={split.error} what="Those rows could not be held back." />
           )}
-          <Editor value={because} onChange={setBecause} label="Why these are different" rows={2} />
+          <Editor value={because} onChange={setBecause} label="The reason these are different" rows={2} />
           <div className="actions" style={{ marginTop: 8 }}>
             <button
               type="button"

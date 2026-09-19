@@ -932,7 +932,7 @@ function Status() {
         <h3>System status</h3>
       </header>
       {scanning.isError && (
-        <Failed error={scanning.error} what="What has been scanned could not be read." />
+        <Failed error={scanning.error} what="The scan coverage could not be read." />
       )}
       {quiet.slice(0, 3).map((build) => (
         <div className="alert" key={`${build.product}\u0000${build.stream}\u0000${build.variant}`}>

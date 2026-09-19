@@ -74,7 +74,7 @@ export function Support() {
       {ended.isPending ? (
         <Loading />
       ) : ended.isError ? (
-        <Failed error={ended.error} what="What is out of support could not be read." />
+        <Failed error={ended.error} what="The releases out of support could not be read." />
       ) : (
         <section className="panel">
           <h3>

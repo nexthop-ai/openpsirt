@@ -94,7 +94,7 @@ export function Thread({
                     <button
                       type="button"
                       className="edited"
-                      title="What it said before"
+                      title="Its earlier wording"
                       aria-expanded={showing === each.id}
                       onClick={() => setShowing(showing === each.id ? null : (each.id ?? null))}
                     >
@@ -187,7 +187,7 @@ function Earlier({ history }: { history: UseQueryResult<{ items?: Version[] | nu
   const rows = history.data?.items ?? [];
   if (history.isPending) return <Loading />;
   if (history.isError) {
-    return <Failed error={history.error} what="What it said before could not be read." />;
+    return <Failed error={history.error} what="The earlier wording could not be read." />;
   }
   if (rows.length === 0) return null;
   return (

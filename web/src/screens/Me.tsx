@@ -57,7 +57,7 @@ export function Me() {
               <thead>
                 <tr>
                   <th>Product</th>
-                  <th>What you may do</th>
+                  <th>Your reach</th>
                 </tr>
               </thead>
               <tbody>
@@ -382,7 +382,7 @@ function Tokens() {
         <label className="field" style={{ margin: 0 }}>
           <span>Reaches</span>
           <select
-            aria-label="What the token may reach"
+            aria-label="The token's reach"
             {...notACredential}
             style={{ width: "auto" }}
             value={product}
@@ -399,7 +399,7 @@ function Tokens() {
         <label className="field" style={{ margin: 0 }}>
           <span>Carries</span>
           <select
-            aria-label="What the token may do"
+            aria-label="The token's roles"
             {...notACredential}
             style={{ width: "auto" }}
             value={readOnly ? "read" : "all"}

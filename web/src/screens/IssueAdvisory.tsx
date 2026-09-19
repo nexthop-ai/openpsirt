@@ -183,7 +183,7 @@ export function IssueAdvisory({
               </pre>
               <div className="filters" style={{ marginTop: 10 }}>
                 <label className="field" style={{ flex: 1, minWidth: 240 }}>
-                  <span>What this revision says</span>
+                  <span>This revision</span>
                   <input
                     type="text"
                     value={summary}

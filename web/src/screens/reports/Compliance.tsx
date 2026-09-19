@@ -75,7 +75,7 @@ export function Compliance() {
       ) : (
         <>
           <section className="panel">
-            <h3>What closed, and whether it closed in time</h3>
+            <h3>Closures, and their timeliness</h3>
             <div className="kpis" style={{ marginTop: 8 }}>
               <div className="kpi">
                 <span className="l">Met its deadline</span>
@@ -160,7 +160,7 @@ export function Compliance() {
               design, so none of them is in any figure above — and one of them
               has a report of its own. */}
           <section className="panel" style={{ marginTop: 14 }}>
-            <h3>What is not in these figures</h3>
+            <h3>Exclusions</h3>
             <p className="hint" style={{ marginTop: 0 }}>
               These carry no deadline, so nothing about them can be late.
             </p>

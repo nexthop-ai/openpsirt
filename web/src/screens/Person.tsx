@@ -98,7 +98,7 @@ export function Person() {
       )}
 
       <section className="panel">
-        <h3>What they hold</h3>
+        <h3>Grants in force</h3>
         {/* "In force" is about the grant, not about them. Sitting under "they
             have left" it reads as a contradiction unless it says which. */}
         {who.deactivated_at && (
@@ -123,7 +123,7 @@ export function Person() {
                     <th>Product</th>
                     <th>Role</th>
                     <th>In force</th>
-                    <th>Where it came from</th>
+                    <th>Origin</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,7 +228,7 @@ export function Person() {
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
-        <h3>What they were told</h3>
+        <h3>Notifications sent</h3>
         <p className="hint" style={{ marginTop: 0 }}>
           Everything sent, including what they have read and what has cleared. Not narrowed by what
           they may read now.
@@ -275,7 +275,7 @@ export function Person() {
 
       {!who.deactivated_at && (
         <section className="panel" style={{ marginTop: 14 }}>
-          <h3>When they leave</h3>
+          <h3>Departure</h3>
           <p className="hint" style={{ marginTop: 0 }}>
             Providers do not report disabled accounts, so mark departures here. Refuses them from
             the next request, ends their sessions, and unassigns their work.

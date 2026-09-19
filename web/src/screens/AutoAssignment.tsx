@@ -359,7 +359,7 @@ export function AutoAssignment() {
             {asked && (
               <div className="tier auto" style={{ marginTop: 10 }}>
                 {catches.isError ? (
-                  <Failed error={catches.error} what="What that would catch could not be read." />
+                  <Failed error={catches.error} what="The findings that would catch could not be read." />
                 ) : catches.isFetching ? (
                   <p className="said">Working out what that catches…</p>
                 ) : (catches.data?.total ?? 0) === 0 ? (

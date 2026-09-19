@@ -105,7 +105,7 @@ export function Release({ product, stream }: { product: string; stream: string }
       </div>
 
       <section className="panel">
-        <h3>What this is</h3>
+        <h3>The variants</h3>
         <p className="hint" style={{ marginTop: 0 }}>
           The variants this release was built as.
         </p>
@@ -167,7 +167,7 @@ export function Release({ product, stream }: { product: string; stream: string }
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
-        <h3>What is true of it now</h3>
+        <h3>Open now</h3>
         <p className="hint" style={{ marginTop: 0 }}>
           Open across every variant, by severity. Tags never change, so nothing here has a deadline.
         </p>
@@ -178,7 +178,7 @@ export function Release({ product, stream }: { product: string; stream: string }
             error={counts.find((one) => one.isError)?.error}
             what={
               unread === counts.length
-                ? "What is open here could not be read."
+                ? "The findings open here could not be read."
                 : `${unread} of these variants could not be read, so there is no total to give.`
             }
           />
@@ -205,7 +205,7 @@ export function Release({ product, stream }: { product: string; stream: string }
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
-        <h3>What changed</h3>
+        <h3>Changes</h3>
         {previous ? (
           <>
             <p className="hint" style={{ marginTop: 0 }}>
@@ -230,9 +230,9 @@ export function Release({ product, stream }: { product: string; stream: string }
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
-        <h3>What we told customers</h3>
+        <h3>Customer documents</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          What goes out with a release, in the order it is usually needed.
+          The documents that go out with a release, in the order they are usually needed.
         </p>
         <ul className="files catalog">
           <li>

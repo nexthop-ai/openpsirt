@@ -161,7 +161,7 @@ export function Overview() {
         {pace.isPending ? (
           <Loading />
         ) : pace.isError ? (
-          <Failed error={pace.error} what="How fast things are fixed could not be read." />
+          <Failed error={pace.error} what="The remediation rate could not be read." />
         ) : (
           <>
             <div className="kpis" style={{ marginTop: 8 }}>
@@ -208,7 +208,7 @@ export function Overview() {
               </ul>
             )}
 
-            <h4 style={{ marginTop: 14 }}>What is aging</h4>
+            <h4 style={{ marginTop: 14 }}>Aging work</h4>
             {/* One number per bucket says a hundred things are over three
                 months old and neither whether any of them matters nor
                 whether anybody has looked. A bucket of lows that were all
@@ -286,7 +286,7 @@ export function Overview() {
           different place depending on whether things sit in it for a day or a
           quarter. */}
       <section className="panel" style={{ marginTop: 14 }}>
-        <h3>How long triage is taking</h3>
+        <h3>Triage times</h3>
         {/* Said inside the printing area rather than behind noprint: the
             printed header states the sheet's scope over every section, and
             this one does not take it. A sheet that states a scope three of its
@@ -297,7 +297,7 @@ export function Overview() {
         {measures.isPending ? (
           <Loading />
         ) : measures.isError ? (
-          <Failed error={measures.error} what="How triage is going could not be read." />
+          <Failed error={measures.error} what="The state of triage could not be read." />
         ) : (measures.data?.sampled ?? 0) === 0 ? (
           <p className="hint">Nothing was proposed in this window.</p>
         ) : (
@@ -372,7 +372,7 @@ export function Overview() {
               good and one moving because nobody reads them look alike without it.
             </p>
 
-            <h4 style={{ marginTop: 14 }}>Who got through what</h4>
+            <h4 style={{ marginTop: 14 }}>Throughput by person</h4>
             {(measures.data?.throughput ?? []).length === 0 ? (
               <p className="hint">Nobody in this window.</p>
             ) : (
@@ -482,7 +482,7 @@ export function Overview() {
         {argued.isPending ? (
           <Loading />
         ) : argued.isError ? (
-          <Failed error={argued.error} what="What was argued away could not be read." />
+          <Failed error={argued.error} what="The findings argued away could not be read." />
         ) : (argued.data?.items ?? []).length === 0 ? (
           <Empty
             title="Nothing has been argued away in this window."

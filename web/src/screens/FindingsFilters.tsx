@@ -518,7 +518,7 @@ export function Filters({
       <Group legend="Upstream fix">
         <Choices
           label="Fix status"
-          hint="What upstream has done"
+          hint="Upstream's own answer"
           chosen={all("fix_state")}
           options={FIX_STATES}
           onChange={(chosen) => setMany("fix_state", chosen)}
@@ -672,7 +672,7 @@ export function Filters({
         </Field>
         <Flag
           label="Held directly by the build"
-          hint="What has no container above it"
+          hint="Components with no container above them"
           on={at("under_build") === "yes"}
           onChange={(on) => set("under_build", on ? "yes" : "")}
         />

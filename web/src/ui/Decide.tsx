@@ -596,7 +596,7 @@ export function Decide({
       {offerMitigation && (
         <div className="field">
           <label htmlFor={`${draftKey}-mit`}>
-            {needsMitigation ? "What stops it" : "What to do instead"}
+            {needsMitigation ? "The mitigation" : "The advice instead"}
           </label>
           <input
             id={`${draftKey}-mit`}
@@ -688,7 +688,7 @@ export function Decide({
           label="Reasoning"
           mentions={mentioning(at.product, undisclosed)}
           attachTo={{ product: at.product, vulnerability: at.vulnerability }}
-          placeholder="Why this decision holds, and what to re-check later."
+          placeholder="The reasoning this decision holds on, and what to re-check later."
         />
       </div>
 

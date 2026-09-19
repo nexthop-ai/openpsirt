@@ -123,13 +123,13 @@ export function Backlog() {
           </section>
 
           <section className="panel">
-            <h3>What is open, by severity</h3>
+            <h3>Open by severity</h3>
             <Mix points={points} />
             <p className="hint">The share matters as much as the total.</p>
           </section>
 
           <section className="panel">
-            <h3>What arrived, and what was answered</h3>
+            <h3>Arrivals and departures</h3>
             <p className="hint" style={{ marginTop: 0 }}>
               Both flows, split the same way.
             </p>

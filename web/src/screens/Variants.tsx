@@ -164,7 +164,7 @@ export function Variants() {
           value={name}
           onChange={setName}
           placeholder="broadcom"
-          hint="What the build targets: chip, architecture or OS"
+          hint="The build's target: chip, architecture or OS"
         />
         <div className="field">
           <label htmlFor="declare-facing">Ships to customers</label>

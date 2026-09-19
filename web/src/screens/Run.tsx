@@ -124,12 +124,12 @@ export function Run() {
             problem this screen exists to fix, and "opened after a date" is the
             wrong question when two runs landed the same day. */}
         <Shape
-          title="What it opened"
+          title="The findings it opened"
           changed={it.opened}
           exploited={it.opened_exploited}
           to={`${build}/findings?opened_by_run=${encodeURIComponent(run)}`}
         />
-        <Shape title="What it closed" changed={it.closed} />
+        <Shape title="The findings it closed" changed={it.closed} />
       </div>
 
       <p className="hint" style={{ marginTop: 10 }}>

@@ -182,7 +182,7 @@ export function Webhooks() {
           value={name}
           onChange={setName}
           placeholder="security-channel"
-          hint="What a log line and this screen call it."
+          hint="The name a log line and this screen use for it."
         />
         <Field
           label="Kind"

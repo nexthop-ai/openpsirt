@@ -68,7 +68,7 @@ export function Published() {
       {gone.isPending ? (
         <Loading />
       ) : gone.isError ? (
-        <Failed error={gone.error} what="What has been published could not be read." />
+        <Failed error={gone.error} what="The published advisories could not be read." />
       ) : rows.length === 0 ? (
         <section className="panel">
           <Empty

@@ -230,7 +230,7 @@ function ByPerson({
 
   if (query.isPending) return <Loading />;
   if (query.isError) {
-    return <Failed error={query.error} what="What people are holding could not be read." />;
+    return <Failed error={query.error} what="The holdings could not be read." />;
   }
   if (rows.length === 0) {
     return (
@@ -345,7 +345,7 @@ function Held({
 }) {
   if (query.isPending) return <Loading />;
   if (query.isError) {
-    return <Failed error={query.error} what="What is assigned could not be read." />;
+    return <Failed error={query.error} what="The assigned work could not be read." />;
   }
   if (rows.length === 0) return <Empty title={empty} detail={detail} />;
 

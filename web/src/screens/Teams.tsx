@@ -88,7 +88,7 @@ export function Teams() {
       {rows.length === 0 ? (
         <Empty
           title="No teams are recorded."
-          detail="Where work goes when it belongs to a group rather than a person."
+          detail="The queues work goes to when it belongs to a group rather than a person."
         />
       ) : (
         <Wide>
@@ -193,7 +193,7 @@ export function Teams() {
           value={name}
           onChange={setName}
           placeholder="platform"
-          hint="What a rule names it by. Capitals do not matter."
+          hint="The name a rule uses for it. Capitals do not matter."
         />
         <Field
           label="Shown as"

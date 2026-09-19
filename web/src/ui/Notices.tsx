@@ -60,7 +60,7 @@ export function Notices() {
       </button>
 
       {open && (
-        <div className="noticelist" role="dialog" aria-label="What is waiting on you">
+        <div className="noticelist" role="dialog" aria-label="The notices waiting on you">
           <header>
             <b>Waiting on you</b>
             {total > 0 && (
