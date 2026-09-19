@@ -30,7 +30,7 @@ export type At = {
   version: string;
 };
 
-// Which outcomes may say what a holder can do about it, and which must.
+// The outcomes that may carry advice for a holder, and the ones that must.
 //
 // Two of them carry a mitigation and they ask for it differently. A claim that
 // something already stops it *is* the mitigation, so it is required there. A
@@ -51,7 +51,7 @@ export function mayMitigate(outcome: string, justification: string): boolean {
   return mustMitigate(outcome, justification) || outcome === "wont-fix";
 }
 
-// Where the reasoning typed about one thing is kept.
+// The place the reasoning typed about one thing is kept.
 //
 // Every part of what is being decided, the version included. A build ships one
 // name at more than one version often enough that leaving it out shares a
@@ -65,7 +65,7 @@ export function draftKeyFor(at: At): string {
   );
 }
 
-// What to call an outcome in a sentence about what happens next.
+// An outcome's name in a sentence about what happens next.
 //
 // A deferral and a dismissal both wait for a second person and are not the
 // same act: one says "later" and the other says "no", and calling both a
@@ -98,13 +98,13 @@ export type Recorded = {
   // on: it is one transaction, so there is no per-build outcome to have.
   applied: string[];
   matching: number;
-  // What was decided, so a confirmation can name it. Without this every
+  // The outcome recorded, so a confirmation can name it. Without this every
   // outcome that waits for a second person was called a dismissal, and a
   // deferral is not one — it says "later", not "no".
   outcome: string;
 };
 
-// What this form offers, which is not every outcome: upgrading answers a
+// The outcomes this form offers, which are not all of them: upgrading answers a
 // component and everything open on it, so it is recorded from the component's
 // own screen. The words come from the one map rather than being written here —
 // this list had its own name for the backport answer, and every screen that
@@ -150,7 +150,8 @@ const OFFERED = Object.keys(OFFERS) as OneAtATime[];
 // Per session rather than remembered: what somebody was doing this morning is
 // not what they are doing now, and a default that survives a night is a
 // default nobody chose.
-// Where the tab remembers the last judgment, to offer back. Named beside the
+// The place the tab remembers the last judgment, to offer back. Named beside
+// the
 // sign-out clear that takes it away, so the two cannot drift apart.
 const LAST = DECIDE_KEPT;
 
@@ -175,7 +176,7 @@ function rememberUsed(said: Same) {
   }
 }
 
-// How far out a date is, in whole days from today. Rounded up, the way a
+// The distance out to a date, in whole days from today. Rounded up, the way a
 // person reads a calendar: a date tomorrow is one day out.
 function deferredDays(until: string): number {
   const then = Date.parse(until + "T00:00:00Z");
@@ -194,10 +195,10 @@ export function Decide({
 }: {
   at: At;
   places: Sitting[];
-  // Who is dealing with it, drawn at the head of the same pane. Triage is
+  // The person dealing with it, drawn at the head of the same pane. Triage is
   // both questions: who is on it, and what was decided.
   assigning?: ReactNode;
-  // Whether the finding has been announced, which decides who may be offered
+  // The finding's disclosure, which decides who may be offered
   // after an @ in the reasoning: naming somebody who cannot read it calls them
   // to something they will be refused.
   undisclosed?: boolean;
@@ -210,7 +211,7 @@ export function Decide({
     outcome?: string;
     justification?: string;
     reasoning?: string;
-    // How long a deferral it prepares, counted from whenever somebody
+    // The length of the deferral it prepares, counted from whenever somebody
     // submits it. A saved rule means "put this off for a quarter" rather than
     // "until 3 March", so a date would be wrong the week after it was saved
     // and the days are turned into one here.
@@ -226,7 +227,7 @@ export function Decide({
   // the form again, and the fields below seed themselves from it.
   const queries = useQueryClient();
   const draftKey = draftKeyFor(at);
-  // What was chosen here and not sent, read once as the form is built.
+  // The draft chosen here and not sent, read once as the form is built.
   //
   // A prefill wins over it, because a prefill is somebody pressing "start
   // from this" and a draft is what they left behind — an explicit choice beats
@@ -311,7 +312,7 @@ export function Decide({
   const needsMitigation = mustMitigate(outcome, justification);
   const offerMitigation = mayMitigate(outcome, justification);
 
-  // Where a judgment here lands beyond this build, answered whole by the
+  // A judgment's reach beyond this build, answered whole by the
   // server rather than sampled here.
   //
   // Asked per place and sampled — a kernel flaw sits at sixty places, and
@@ -359,7 +360,7 @@ export function Decide({
     {
       for (const m of reach.data?.automatic ?? []) auto.set(`${m.stream} · ${m.variant}`, true);
       for (const m of reach.data?.differing ?? []) {
-        // Where it is, said as an aside. What is being asked about is the
+        // Its place, said as an aside. The subject of the question is the
         // version — a build at matching versions never reaches this list — so
         // "this build" is the honest label for another version sitting beside
         // the one in hand, rather than the build's own name repeated back.
@@ -389,9 +390,9 @@ export function Decide({
     };
   }, [reach.data]);
 
-  // What is still missing, which is both what the form says and what stops it
-  // being submitted. Two lists of the same conditions is how one of them comes
-  // to hold a question the other does not.
+  // The answers still missing, which are both what the form says and what
+  // stops it being submitted. Two lists of the same conditions is how one of
+  // them comes to hold a question the other does not.
   const waiting = waitingFor({
     outcome,
     needsJustification,
@@ -476,7 +477,7 @@ export function Decide({
       };
     },
     onSuccess: (recorded) => {
-      // What was chosen, for the next one — offered there and never applied.
+      // The choice, kept for the next one — offered there and never applied.
       rememberUsed({ outcome, justification });
       forget(draftKey);
       setReviewing(false);
@@ -492,7 +493,7 @@ export function Decide({
   startRef.current = start;
 
   function start() {
-    // Where the reach is known and empty the sheet asks nothing, so the
+    // With the reach known and empty the sheet asks nothing, so the
     // decision goes straight through. What it would have said is still said
     // afterwards: the confirmation names the builds reached by lookup and the
     // places written.

@@ -1,4 +1,4 @@
-// What the decision form is still waiting for.
+// The answers the decision form is still waiting for.
 //
 // Nothing is chosen for anybody, so an empty form is the ordinary state and
 // the button is refused until each question being asked has an answer. A form
@@ -26,7 +26,7 @@ export type Asked = {
   needsDate: boolean;
   until: string;
   reasoning: string;
-  // How many places the claim would cover. Excluding every one of them leaves
+  // The places the claim would cover. Excluding every one of them leaves
   // a form with every answer and nothing to record.
   covering: number;
 };

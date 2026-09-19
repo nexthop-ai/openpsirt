@@ -21,14 +21,14 @@ export type Who = {
   identity: string;
   name: string;
   admin: boolean;
-  // Whether they may read this deployment's own records and write none of
+  // Their reach over this deployment's own records, which grants no write to
   // them. A separate answer from admin: one of them changes things.
   audits?: boolean;
   kind: "person" | "key";
   reach: Can[];
-  // What they asked to be sent, and whether anything can be: a screen offering
-  // the switches has to know their state, and a switch that changes nothing is
-  // worse than no switch.
+  // The digest they asked for, and whether anything can be sent: a screen
+  // offering the switches has to know their state, and a switch that changes
+  // nothing is worse than no switch.
   digest?: boolean;
   digest_unassigned?: boolean;
   reachable?: boolean;
@@ -37,14 +37,14 @@ export type Who = {
   // decides whether a second person has to agree, and reading that off the
   // response is reading it after the fact.
   deferral_days?: number;
-  // How many rows one action may write here. A screen acting on a selection
+  // The rows one action may write here. A screen acting on a selection
   // bounds it by this and says so, rather than turning one click into as many
   // round trips as a filter matched — a page nobody can use and nothing can
   // cancel.
   bulk_cap?: number;
 };
 
-// Who is asking, and what they may do. Asked once and shared, because every
+// The caller, and their reach. Asked once and shared, because every
 // screen needs it to decide what to draw and asking per screen would put a
 // round trip in front of every navigation.
 //

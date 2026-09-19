@@ -55,7 +55,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   // tab bar carries the three places somebody reviews and responds from , and
   // everything else is one tap further rather than absent.
   const [menu, setMenu] = useState(false);
-  // Which groups are folded away, kept in the browser like the look: it
+  // The groups folded away, kept in the browser like the look: it
   // changes what one person sees and nothing anybody else is shown.
   const [shut, setShut] = useState<Set<string>>(() => folded());
   function toggleGroup(name: string) {
@@ -350,7 +350,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   );
 }
 
-// What is running here.
+// The version running here.
 function Version() {
   const version = useQuery({
     queryKey: ["version"],
@@ -388,11 +388,11 @@ function Rail({
   icon: string;
   label: string;
   count?: number;
-  // Whether the count could not be read. A badge is gated on being above zero,
+  // An unreadable count. A badge is gated on being above zero,
   // so a failed or refused count draws exactly like "nothing waiting" — which
   // on the review queue is the answer somebody acts on by not looking.
   unread?: boolean;
-  // What the badge is a count of. The rail has room for a number and not for a
+  // The thing the badge counts. The rail has room for a number and not for a
   // noun, so the unit rides on the title and on what a screen reader is given
   // — enough that "Unassigned 7,616" beside "5,803 open issues" stops being
   // two numbers that look like they should agree.
@@ -479,7 +479,7 @@ function Rail({
 // picker has selected — and across every product a reader can see where it has
 // selected nothing, which is the same list at its widest address.
 //
-// Which of the two it is, is decided by asking: a term that resolves to an
+// The choice between the two is decided by asking: a term that resolves to an
 // issue goes to the issue page, and everything else falls through to the list.
 // Guessing from the shape of the text would be a second, worse copy of the
 // server's own name resolution — one that is wrong about every identifier a
@@ -603,10 +603,10 @@ function Group({
   );
 }
 
-// Who you are, with the look menu and the way out underneath.
+// The signed-in person, with the look menu and the way out underneath.
 function Me({ who }: { who: Who }) {
   const [open, setOpen] = useState(false);
-  // What was asked for, and what the machine says. They differ for somebody who
+  // The choice made, and the machine's own answer. They differ for somebody who
   // has chosen nothing: the operating system is answering, and the menu has to
   // show which of the two that came out as while still marking the choice as
   // unmade. What is drawn is the one worked out from the two.

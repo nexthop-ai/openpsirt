@@ -1,4 +1,4 @@
-// How far a place has been decided, in the words every screen says it in.
+// A place's decision state, in the words every screen says it in.
 //
 // One vocabulary, because a register, a comparison and a document all state
 // the same four words about the same fact — and three copies is three edits

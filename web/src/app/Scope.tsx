@@ -13,7 +13,7 @@ import {
   type Scoped,
 } from "./scope";
 
-// What you are looking at, and how to change it.
+// The selection in hand, and the control that changes it.
 //
 // The choosing happens inside the panel rather than by walking through
 // listing screens: picking a product narrows the branches beside it, picking a
@@ -27,7 +27,7 @@ export function Scope() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  // What has been picked in here but not yet gone anywhere. Seeded from the
+  // The picks made in here and not yet gone anywhere. Seeded from the
   // address so opening the panel starts where you are.
   const [product, setProduct] = useState(at.product ?? "");
   const [stream, setStream] = useState(at.stream ?? "");
@@ -46,12 +46,12 @@ export function Scope() {
   useClickAway(box, open, () => setOpen(false));
 
   const { products, streams, variants: declared } = useCatalog(open, product);
-  // What one release was built as. With a branch or tag chosen this is the set
-  // to offer; with every branch selected it is the product's own, which is
-  // what `declared` holds — the per-release list would be an arbitrary one of
-  // them.
+  // The variants one release was built as. With a branch or tag chosen this is
+  // the set to offer; with every branch selected it is the product's own, which
+  // is what `declared` holds — the per-release list would be an arbitrary one
+  // of them.
   const variants = useReleaseVariants(open, product, stream);
-  // What the variant column draws, which is not simply whichever of the two
+  // The variant column's own rows, which are not simply whichever of the two
   // the branch selects.
   //
   // The two are different questions and different cache entries, so choosing a

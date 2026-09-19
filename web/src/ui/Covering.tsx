@@ -2,7 +2,7 @@ import { notACredential } from "./noautofill";
 import { useEffect, useRef, useState } from "react";
 import type { Body } from "../api/client";
 
-// Which places a decision covers.
+// The places a decision covers.
 //
 // All of them by default, which is the rule a decision is written under. A
 // checkbox per place is a summary line instead, and excluding is a deliberate
@@ -142,7 +142,7 @@ export function Covering({
             />
           )}
           {groups.map((group) => {
-            // What is on screen under this consumer, which is what the
+            // The rows on screen under this consumer, which are what the
             // checkbox beside it acts on and what the count beside that says.
             // The three read the same rows, so the number names what the
             // click will do.

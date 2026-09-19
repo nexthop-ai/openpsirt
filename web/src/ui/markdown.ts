@@ -7,7 +7,7 @@ import DOMPurify from "dompurify";
 // reference resolves to — still runs on the server before anything is stored,
 // because it needs data and authorization checks no browser holds.
 //
-// What is asserted about this is the *output*, not the configuration. Asking
+// The assertions are about the *output*, not the configuration. Asking
 // the allowlist whether it allows something proves only that it agrees with
 // itself.
 
@@ -155,13 +155,13 @@ const ATTACHMENT = /^attachment:([0-9a-f]{32})$/;
 // a broken reference rather than something to resolve.
 const ISSUE = /^issue:([A-Za-z][A-Za-z0-9._-]{2,63})$/;
 
-// Where an issue is read. A page of this deployment, so it keeps its href and
-// the router follows it without a reload.
+// The page an issue is read on. A page of this deployment, so it keeps its
+// href and the router follows it without a reload.
 function issuePath(identifier: string): string {
   return `/issues/${encodeURIComponent(identifier)}`;
 }
 
-// Where one is actually fetched from. Same origin, so the content security
+// The address one is actually fetched from. Same origin, so the content security
 // policy permits it and the request carries who is asking.
 function fetchPath(token: string): string {
   return `/v1/attachments/${token}`;

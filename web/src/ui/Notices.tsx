@@ -8,7 +8,7 @@ import { unwrap } from "../api/queries";
 import { Failed } from "./Failed";
 import { label, waiting } from "./notices";
 
-// What is waiting on you, with the count on the way in.
+// The notices waiting on you, with the count on the way in.
 //
 // Everyone has one, and what appears differs by what they hold rather than by
 // which feature they were given: work arriving, a claim sent back, an approval

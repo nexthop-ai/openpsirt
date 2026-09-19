@@ -1,7 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Failed } from "../ui/Failed";
 
-// What a render-time throw reaches.
+// The boundary a render-time throw reaches.
 //
 // Without one, React unmounts the whole tree: a screen that threw takes the
 // rail, the scope bar and every other screen with it, and what is left is a

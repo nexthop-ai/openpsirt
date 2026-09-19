@@ -90,7 +90,7 @@ export function useNote() {
 
 // Replacing the text of a note somebody already wrote.
 //
-// What it said before is kept and read back behind the "edited" mark, the way
+// The earlier wording is kept and read back behind the "edited" mark, the way
 // a claim comment's is: a note goes public at disclosure with the rest of the
 // record, and a record whose earlier text is unrecoverable is readable rather
 // than checkable.

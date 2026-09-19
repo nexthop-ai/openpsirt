@@ -6,7 +6,7 @@ import { Failed } from "./Failed";
 import { Outcome } from "./Outcome";
 import { Wide } from "./Wide";
 
-// What triage a line would inherit from another, and which of it to take .
+// The triage a line inherits from another, and the part of it to take.
 //
 // The reach is computed either way; what this adds is the choosing. A carry
 // that happened silently would be one nobody reviewed, and the four groups are

@@ -10,10 +10,10 @@ function tagsIn(rendered: string): string[] {
   return rendered.match(/<[^>]*>/g) ?? [];
 }
 
-// What must not survive rendering, whatever route it takes in. Deliberately
-// crude and deliberately broad: nothing executable, nothing that fetches, and
-// no attribute a browser will run. A subtle check here would be a second place
-// to get the rules wrong.
+// The things that must not survive rendering, whatever route they take in.
+// Deliberately crude and deliberately broad: nothing executable, nothing that
+// fetches, and no attribute a browser will run. A subtle check here would be a
+// second place to get the rules wrong.
 //
 // Checked against the output rather than against the configuration — asking
 // the allowlist whether it allows something proves only that it agrees with

@@ -32,7 +32,8 @@ export type Kept = Body<"SavedBody">;
 // copy rather than three.
 const DEFER_DAYS = { min: 1, max: 3650 };
 
-// What somebody has kept for a product. One reader rather than one per screen:
+// The filters somebody has kept for a product. One reader rather than one per
+// screen:
 // the list, the dropdown and a finding opened under a rule all ask the same
 // question, and a second spelling of the key is a second cache.
 export function useKept(product: string, when = true) {
@@ -63,7 +64,7 @@ export function ruleIn(kept: Kept[], params: URLSearchParams): Kept | undefined 
 // about whose filter is authoritative — which is also what lets somebody keep
 // one that is half-formed, the state most of them are in most of the time.
 //
-// What is kept is the list's own address, so opening one is going back to
+// The list's own address is what is kept, so opening one is going back to
 // exactly the list that was on screen. A filter naming something the list no
 // longer offers simply stops narrowing by it, which is a slightly wider list
 // rather than a refusal to open one.
@@ -96,7 +97,7 @@ export function Saved({
   const [outcome, setOutcome] = useState("");
   const [justification, setJustification] = useState("");
   const [reasoning, setReasoning] = useState("");
-  // How long a deferral it prepares, as a number of days. A length rather than
+  // The length of the deferral it prepares, in days. A length rather than
   // a date, because a rule saved in March means "put this off for a quarter"
   // and a date would be wrong the week after it was saved.
   const [days, setDays] = useState("");
@@ -320,7 +321,7 @@ export function Saved({
   );
 }
 
-// Whether a typed length is one the endpoint will take. Whole days, because a
+// A typed length the endpoint will take. Whole days, because a
 // fractional one passes a range check and comes back refused after a round
 // trip.
 function whole(days: string): boolean {

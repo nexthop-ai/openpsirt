@@ -1,4 +1,4 @@
-// How a person is offered in a picker, and how what was typed resolves back.
+// A person's form in a picker, and the resolution of what was typed.
 //
 // The name is what somebody recognizes and the identity is what the server
 // takes, so an offer carries both where they differ: two colleagues can share
@@ -7,7 +7,7 @@
 
 export type Person = { identity?: string; name?: string };
 
-// What one person is offered as.
+// The form one person is offered as.
 export function offeredAs(person: Person): string {
   const identity = person.identity ?? "";
   const name = person.name ?? "";

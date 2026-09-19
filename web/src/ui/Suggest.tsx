@@ -39,7 +39,7 @@ export function Suggest({
   disabled?: boolean;
   placeholder?: string;
   loading?: boolean;
-  // How many characters before anything is looked up. A list of thousands is
+  // The characters typed before anything is looked up. A list of thousands is
   // searched rather than loaded, and one letter matches most of it.
   from?: number;
   label?: string;

@@ -1,7 +1,7 @@
 import { Outward } from "./Outward";
 import { nameOf, readAbout, unclassified } from "./cwe";
 
-// What kind of flaw this is, as a reader can use it.
+// The kind of flaw, as a reader can use it.
 //
 // A finding showed the first identifier and dropped the rest, as a bare
 // number: "CWE-401" is not something anybody knows, and the four most common

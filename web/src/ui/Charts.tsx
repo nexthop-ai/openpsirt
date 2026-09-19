@@ -246,7 +246,7 @@ export function Mix({ points }: { points: Point[] }) {
   );
 }
 
-// What is open right now. A ring on its own says what somebody already knows,
+// The open count right now. A ring on its own says what somebody already knows,
 // so the numbers are beside it rather than inside it.
 export function Ring({ point }: { point?: Point }) {
   const by = folded(point?.by_severity ?? {});
@@ -298,7 +298,7 @@ export function Ring({ point }: { point?: Point }) {
 // it was re-introduced in the same change that declared the class fixed.
 export type Release = Body<"ReleaseBody">;
 
-// What is open at each build, side by side.
+// The open count at each build, side by side.
 //
 // Bars rather than a line: these are separate builds, not one thing measured
 // over time, and a line between two releases draws a trend through a gap where
@@ -331,7 +331,7 @@ export function Across({ releases }: { releases: Release[] }) {
   );
 }
 
-// What each release shipped with.
+// The counts each release shipped with.
 //
 // Bars rather than a line, because a release is a frozen point and a line
 // between two of them draws a path nothing travelled. The gap between two

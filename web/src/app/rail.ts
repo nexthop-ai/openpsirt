@@ -1,4 +1,4 @@
-// Which groups of the rail are folded away.
+// The groups of the rail that are folded away.
 //
 // The rail asks for about 935 pixels of entries, which is taller than the
 // window on most laptops. Giving it a scroll region of its own put a second

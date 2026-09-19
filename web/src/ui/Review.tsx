@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Failed } from "./Failed";
 import { useReseed } from "./reseed";
 
-// Where a decision applies beyond this build, as a guided review.
+// A decision's reach beyond this build, as a guided review.
 //
 // Two kinds of other build, and only one of them is a choice: builds already
 // matching are covered by lookup and are named, not asked about; builds
@@ -16,7 +16,7 @@ import { useReseed } from "./reseed";
 // thing left over rather than the code, so it goes with it; if the endpoint
 // grows the bucket the card comes back with it.
 //
-// What is offered is a version, not a variant, and it says so. The same
+// The offer is a version, not a variant, and it says so. The same
 // product built two ways is one piece of work — a matching build is reached by
 // lookup and never asked about — so anything that reaches this list is here
 // because the code differs. Labeling those entries by their build read as
@@ -76,7 +76,7 @@ export function Review({
     setApplied(new Set());
   });
 
-  // What the sheet does to the page underneath it, which is the document's
+  // The sheet's effect on the page underneath it, which is the document's
   // rather than the sheet's and so belongs in an effect.
   useEffect(() => {
     if (!open) return;

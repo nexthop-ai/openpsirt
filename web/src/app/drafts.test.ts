@@ -15,11 +15,11 @@ beforeEach(() => {
   belongTo(undefined);
 });
 
-// Where the one draft in the store is, found rather than restated. The key's
-// shape is the module's business — its identity segment is encoded, so a
-// colon in an identity cannot be read as the separator — and a test that
-// retyped it would break on a change that is not a defect and would say
-// nothing about the property it is actually pinning.
+// The key the one draft in the store sits under, found rather than restated.
+// The key's shape is the module's business — its identity segment is encoded,
+// so a colon in an identity cannot be read as the separator — and a test that
+// retyped it would break on a change that is not a defect and would say nothing
+// about the property it is actually pinning.
 function theOnlyKey(): string {
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = window.localStorage.key(i);
@@ -98,9 +98,9 @@ describe("drafts", () => {
   });
 
   it("clears every draft on the browser, whoever wrote them", () => {
-    // What signing out rests on. Drafts hold triage text, private findings
-    // included, so text surviving a sign-out would be exposed in a way the
-    // application itself is not — and a draft left by an earlier session is
+    // The premise signing out rests on. Drafts hold triage text, private
+    // findings included, so text surviving a sign-out would be exposed in a way
+    // the application itself is not — and a draft left by an earlier session is
     // exactly the one nobody would think to clear.
     belongTo("oidc:ana");
     keep("revise:7", "Ana's");
@@ -170,7 +170,7 @@ describe("drafts", () => {
   });
 
   it("does not reach the session's own state, which has its own clear", () => {
-    // Where the scope actually lives, asserted against the store it is in.
+    // The store the scope actually lives in, asserted against it.
     // forgetAll walks the local store alone; what the tab holds is taken away
     // by forgetSession, and sign-out calls both.
     window.sessionStorage.setItem("openpsirt.scope", '{"product":"sonic"}');

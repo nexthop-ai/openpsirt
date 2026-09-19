@@ -1,4 +1,4 @@
-// How far a group of findings has been decided, as the one word a row shows.
+// A group's decision state, as the one word a row shows.
 //
 // Written twice, and the two copies already disagreed. The findings list
 // and the issue screen show the same rows, and a group with some places

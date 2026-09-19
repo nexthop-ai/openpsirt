@@ -1,4 +1,4 @@
-// Where somebody was on a page, kept so that coming back is coming back.
+// The place somebody was on a page, kept so that coming back is coming back.
 //
 // A browser restores scroll on a real navigation and an application like this
 // one never makes one. Going into a finding and pressing back rebuilds the
@@ -16,7 +16,7 @@
 // The namespace, beside the other two things kept per session.
 const PREFIX = "openpsirt.place.";
 
-// How many pages are remembered. A handful, because what is wanted is the list
+// The number of pages remembered. A handful, because what is wanted is the list
 // somebody came from rather than every list they have ever read — and an
 // unbounded map in storage is one that grows for as long as the tab is open.
 const KEEP = 12;

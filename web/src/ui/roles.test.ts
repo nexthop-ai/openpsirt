@@ -48,7 +48,7 @@ describe("granting somebody an empty tool", () => {
   });
 
   it("does not count a grant that has been withdrawn", () => {
-    // Saying somebody reads a product because they used to is the same
+    // A claim that somebody reads a product because they used to is the same
     // mistake as not warning at all, in the direction that hides it.
     expect(wouldReachNothing("approver", [{ role: "public-read", effective: false }])).toBe(true);
   });

@@ -1,4 +1,4 @@
-// What the notification area says, apart from how it draws it.
+// The words of the notification area, apart from its drawing.
 //
 // Here rather than inside the component so both can be tested without a DOM:
 // these two are where saying the wrong thing is a defect rather than a matter

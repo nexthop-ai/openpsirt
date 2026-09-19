@@ -5,7 +5,7 @@ export class Refused extends Error {
   constructor(
     readonly status: number,
     message: string,
-    // What the server said was wrong, item by item, where it said so. A
+    // The server's own faults, item by item, where it stated them. A
     // refusal that names fifteen versions is a paragraph as a sentence and a
     // list of choices as a list — the screen can only offer the second.
     readonly details: {
@@ -29,7 +29,7 @@ export function statusOf(error: unknown): number | undefined {
   return error instanceof Refused ? error.status : undefined;
 }
 
-// Whether a refusal is the server saying this is not somebody's to see.
+// A refusal that is the server saying this is not somebody's to see.
 //
 // A card that is quiet for one person and drawn for another is the shape
 // several screens want, and the test for it has to be the status rather than
@@ -66,7 +66,7 @@ export function unwrap<T>({ data, error, response }: Answer<T>): T {
   return data as T;
 }
 
-// What to show when the server refused. Its own sentence where it wrote one,
+// The sentence to show when the server refuses. Its own where it wrote one,
 // the reason phrase where it did not — and the status on its own where there
 // is no reason phrase either, which is every HTTP/2 response: the protocol
 // carries the code and dropped the phrase, so `statusText` is the empty

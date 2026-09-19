@@ -1,4 +1,4 @@
-// What the trend panels say in words, and when they say nothing.
+// The words the trend panels use, and the cases where they say nothing.
 //
 // Kept out of the screen so the sentences can be tested as sentences. A figure
 // that is arithmetically correct and says something false is worse than a
@@ -12,7 +12,7 @@ export type Step = {
   by_severity?: Record<string, number>;
 };
 
-// How many steps of real history a sentence about a trend needs.
+// The steps of real history a sentence about a trend needs.
 //
 // Four, because the statement is about a direction, and three points is one
 // change plus a confirmation. Below it the panels still draw — the chart shows
@@ -38,7 +38,7 @@ export function settled<T extends Step>(points: T[]): T[] {
   return began < 0 ? [] : points.slice(began);
 }
 
-// Which way the backlog is going, or that it is too early to say.
+// The direction of the backlog, or too little history to say.
 export function paceReading(points: Step[]): string {
   const range = settled(points);
   if (range.length < ENOUGH) return "Not enough history.";
@@ -52,7 +52,7 @@ export function paceReading(points: Step[]): string {
   ).toLocaleString()} · new exceeded resolved in ${outran} of ${range.length} weeks`;
 }
 
-// What the critical share did, over the same history.
+// The critical share's direction, over the same history.
 export function mixReading(points: Step[]): string {
   const range = settled(points);
   if (range.length < ENOUGH) return "Not enough history yet.";

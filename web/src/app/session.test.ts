@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { signOut } from "./session";
 import { belongTo, keep, restore } from "./drafts";
 
-// What signing out does, and in what order.
+// The sequence a sign-out runs, and its order.
 //
 // The order is the whole of it: drafts hold triage text, private findings
 // included, and text that survived a sign-out would be exposed in a way the

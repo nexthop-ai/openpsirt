@@ -15,7 +15,7 @@ import { initials } from "./initials";
 // diverge: the timestamp is formatted in four places, so a fix to it lands in
 // whichever file the author had open.
 //
-// What genuinely differs is the endpoint, and that stays with each caller: the
+// The endpoint is what genuinely differs, and it stays with each caller: the
 // query, the two mutations and the history read arrive as props rather than
 // being built here from a word.
 
@@ -51,12 +51,12 @@ export function Thread({
   history,
 }: {
   items: Said[];
-  // Whether a piece was written by whoever is reading. The identity alone: a
+  // A piece written by whoever is reading. The identity alone: a
   // display name anybody can be given would make ownership turn on a label.
   mine: (writtenBy: string) => boolean;
   about: { product: string; vulnerability: string };
   undisclosed?: boolean;
-  // What one piece is called, and what adding one does not do. The two words
+  // The name for one piece, and what adding one does not do. The two words
   // that are genuinely a caller's, so the wording stays deliberate rather than
   // drifting together by accident.
   word: "Comment" | "Note";
@@ -176,7 +176,7 @@ export function Thread({
 
 export type Version = { version?: number; body?: string; replaced_at?: string };
 
-// What a piece said before it was changed.
+// A piece's earlier wording, before it was changed.
 //
 // A thread goes public at disclosure with the rest of the record, so one whose
 // earlier text is unrecoverable is one somebody can read and nobody can check.

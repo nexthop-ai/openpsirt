@@ -133,9 +133,9 @@ describe("changing scope stays on the screen", () => {
   });
 });
 
-// What every narrowed screen sends, straight into a request. A level that
-// cannot stand alone leaking into the query is a refusal from the server for a
-// selection nobody can make in the interface.
+// The parameters every narrowed screen sends, straight into a request. A level
+// that cannot stand alone leaking into the query is a refusal from the server
+// for a selection nobody can make in the interface.
 describe("the selection as a request", () => {
   it("sends nothing at all where nothing is selected", () => {
     expect(scopeQuery({})).toEqual({});

@@ -16,7 +16,7 @@ import { Markdown } from "./Markdown";
 //
 // Revising keeps the old words readable, takes back the approval given for
 // them, and returns the claim to the queue. Withdrawing needs nobody.
-// What is finished, and therefore has nothing left to revise or withdraw.
+// The words that are finished, and so have nothing left to revise or withdraw.
 //
 // Said as what is over rather than as what is open, because the two screens
 // that draw this control reach the claim by different routes and had each
@@ -47,17 +47,17 @@ export function ReasonEditor({
 }: {
   claimId: number;
   reasoning: string;
-  // What became of the claim, as the record words it. Whether revising and
+  // The claim's fate, as the record words it. Whether revising and
   // withdrawing are offered is decided here from that, rather than by each
   // screen deciding for itself.
   state: string;
-  // What the consequence line says, which differs for a claim somebody has
+  // The consequence line's own words, which differ for a claim somebody has
   // already agreed to.
   approved: boolean;
   about: { product: string; vulnerability: string };
   onDone: () => void;
   spaced?: boolean;
-  // Whether what is being argued about has been announced, which decides who
+  // The disclosure of the thing being argued about, which decides who
   // may be offered after an @. This is the same text the decision form writes.
   undisclosed?: boolean;
 }) {

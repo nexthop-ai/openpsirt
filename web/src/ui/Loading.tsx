@@ -1,4 +1,4 @@
-// What a screen shows while it is waiting.
+// The placeholder a screen shows while it is waiting.
 //
 // One component rather than the sentence typed out thirty-nine times in four
 // spellings. Nothing about it is clever: the point is that a screen which

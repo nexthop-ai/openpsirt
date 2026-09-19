@@ -2,7 +2,7 @@ import { matchPath, useLocation } from "react-router-dom";
 
 import { SCOPE_KEPT } from "./drafts";
 
-// What you are looking at.
+// The selection in hand.
 //
 // Read from the path rather than with useParams, because the frame is drawn
 // outside the routes it wraps — useParams there is always empty, which is a
@@ -31,7 +31,7 @@ const SHAPES = [
 
 export type Scoped = { product?: string; stream?: string; variant?: string };
 
-// Whether the screen at this path needs a whole build.
+// A screen at this path that needs a whole build.
 //
 // Five of them do, and their data exists for one build and no other: each is
 // about a way down, and there is no dependency graph across branches. So the
@@ -48,7 +48,7 @@ export function needsBuild(pathname: string): boolean {
   return matchPath(`${BUILD}/*`, pathname) !== null || matchPath(BUILD, pathname) !== null;
 }
 
-// Whether this is the findings list, at any of its three addresses: a build's,
+// The findings list, at any of its three addresses: a build's,
 // a product's, and every product's.
 export function onFindings(pathname: string): boolean {
   return (
@@ -58,7 +58,7 @@ export function onFindings(pathname: string): boolean {
   );
 }
 
-// Where the findings list for a selection lives.
+// The address of the findings list for a selection.
 //
 // A whole build keeps the path it has, because the screens around it — the
 // finding, the tree, the inventories — are that build's and share the prefix.
@@ -96,7 +96,7 @@ export function findingsPath(at: Scoped, unnarrowed = false): string {
   return `${product}/findings${rest ? `?${rest}` : ""}`;
 }
 
-// Where the tab remembers what somebody is looking at. Named beside the
+// The place the tab remembers a selection. Named beside the
 // sign-out clear that takes it away, so the two cannot drift apart.
 const KEPT = SCOPE_KEPT;
 
@@ -111,7 +111,7 @@ export function remember(scope: Scoped) {
   }
 }
 
-// What was kept, checked rather than asserted.
+// The kept selection, checked rather than asserted.
 //
 // The value reaches a URL path segment and a request's query string, and it
 // comes from browser storage — which an older build of this application wrote,
@@ -180,7 +180,7 @@ export function useScope(): Scoped {
   return remembered();
 }
 
-// What survives a product change, per address that names a product.
+// The parts that survive a product change, per address that names a product.
 //
 // The name in the path is what these screens read, so remembering a different
 // product and staying put means the path re-supplies the old one and the

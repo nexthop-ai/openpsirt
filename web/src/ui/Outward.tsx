@@ -11,16 +11,16 @@ import { linkable } from "./addressable";
 // who opened the finding. Two of three is what a rule enforced by memory looks
 // like.
 //
-// What fails the judgment is shown and not linked, so nothing disappears from
-// the page: a reader still sees what was written, and can see that it is not
-// an address.
+// An address that fails the judgment is shown and not linked, so nothing
+// disappears from the page: a reader still sees what was written, and can see
+// that it is not an address.
 export function Outward({
   href,
   children,
   className = "linkish",
 }: {
   href: string | undefined | null;
-  // What the link says. The raw value is what a failed address falls back to,
+  // The link's own text. The raw value is what a failed address falls back to,
   // whatever this is.
   children?: ReactNode;
   className?: string;

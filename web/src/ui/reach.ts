@@ -1,4 +1,4 @@
-// Whether the guided review has anything to ask, decided apart from the sheet
+// The guided review's own question, decided apart from the sheet
 // that draws it.
 //
 // The review exists to confirm one thing: builds holding this issue at another

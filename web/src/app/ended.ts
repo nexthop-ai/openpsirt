@@ -1,4 +1,4 @@
-// Whether the session ended under somebody who is still on a screen.
+// A session ended under somebody who is still on a screen.
 //
 // The person is looking at a drawn screen, and quite possibly halfway through
 // typing into it. Replacing all of that with a sign-in page loses their place

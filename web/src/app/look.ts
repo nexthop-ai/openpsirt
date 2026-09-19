@@ -1,4 +1,4 @@
-// Which of the two looks this browser draws.
+// The look this browser draws, of the two.
 //
 // A look is a token set on the root element and nothing else — the markup is
 // the same under both. It is a personal preference kept in the browser, the
@@ -26,7 +26,7 @@ export type Look = (typeof LOOKS)[number]["name"];
 
 const KEPT = "openpsirt.look";
 
-// What the operating system says, for somebody who has not chosen.
+// The operating system's own answer, for somebody who has not chosen.
 export function systemLook(): Look {
   try {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -36,7 +36,7 @@ export function systemLook(): Look {
   }
 }
 
-// What somebody chose, or nothing if they have not.
+// The choice somebody made, or nothing where they have not.
 export function chosenLook(): Look | null {
   try {
     const kept = window.localStorage.getItem(KEPT);

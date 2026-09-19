@@ -20,12 +20,12 @@
 // on a shared machine, sat there for anybody who opened the tools. Anything
 // past the age below goes on the first read of a page load.
 //
-// What that still leaves, said rather than glossed: a draft written and
+// The gap that still leaves, stated rather than glossed: a draft written and
 // abandoned inside the window is readable by whoever reaches the profile
 // before it lapses. The window is what bounds that, and clearing on sign-out
 // is what ends it for somebody who leaves deliberately.
 
-// Where somebody was in each list, cleared with everything else the session
+// The place somebody was in each list, cleared with everything else the session
 // holds.
 import { forgetPlaces } from "./place";
 
@@ -35,7 +35,7 @@ import { forgetPlaces } from "./place";
 // take either with it.
 const PREFIX = "openpsirt.draft.";
 
-// How long a draft outlives being written.
+// The life of a draft after it is written.
 //
 // A day, which is the span a piece of unsent triage text is plausibly still
 // wanted over — somebody writing a justification before a meeting and
@@ -44,7 +44,7 @@ const PREFIX = "openpsirt.draft.";
 // what this bound is for.
 const KEEP_FOR = 24 * 60 * 60 * 1000;
 
-// Who the drafts on this page belong to. Set once the session is known and
+// The owner of the drafts on this page. Set once the session is known and
 // cleared when it is not, so a draft written before anybody was recognized is
 // not silently attributed to whoever signs in next.
 let writer = "";
@@ -267,7 +267,7 @@ export function forgetSession() {
   } catch {
     // A browser that refuses storage has nothing to clear.
   }
-  // Where somebody was in each list they were reading. Its own module because
+  // The place somebody was in each list they were reading. Its own module because
   // it is written on every scroll and this one is loaded with the frame, and
   // cleared from here because sign-out is the one place that knows every
   // session-scoped thing has to go.

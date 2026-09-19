@@ -46,7 +46,7 @@ export const ROLES = [
 
 export type Role = (typeof ROLES)[number]["role"];
 
-// What to call one, wherever a stored role is read back. A role this does not
+// The name for one, wherever a stored role is read back. A role this does not
 // know is shown as it arrived: a deployment that grows one before the
 // interface does should leave somebody reading something unfamiliar rather
 // than a blank.
@@ -54,7 +54,7 @@ export function called(role?: string): string {
   return ROLES.find((each) => each.role === role)?.label ?? role ?? "";
 }
 
-// Whether a role reaches anything on its own. Approver and assigner are
+// A role's own reach. Approver and assigner are
 // capabilities bounded by what their holder may read, so granted alone they
 // reach nothing — which was accepted in silence and read as working until
 // somebody signed in to an empty tool.
@@ -62,11 +62,11 @@ function reaches(role?: string): boolean {
   return ROLES.find((each) => each.role === role)?.grants ?? true;
 }
 
-// What somebody holds that bears on one product: a role on the product itself,
+// The grants that bear on one product: a role on the product itself,
 // or one held across the estate.
 export type Holding = { role?: string; effective?: boolean; everywhere?: boolean };
 
-// Whether granting a role would give somebody nothing at all: a capability,
+// A grant that gives somebody nothing at all: a capability,
 // on a product where they hold no role that reaches anything.
 //
 // An estate grant counts. A read held everywhere is a read held here, so a

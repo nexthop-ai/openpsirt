@@ -1,6 +1,6 @@
 import { ROLLED } from "./severities";
 
-// What a count is made of, as one bar whose widths are the counts.
+// The parts of a count, as one bar whose widths are the counts.
 //
 // The shape is the answer: a bar that is mostly one color says where the weight
 // is before a number is read, which a chip per band at a fixed width does not.

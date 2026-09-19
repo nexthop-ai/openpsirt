@@ -54,9 +54,9 @@ export function useCatalog(
   return { products, streams, variants };
 }
 
-// What one release was built as, which is a different question from what the
-// product is built as — and a different route. Only the scope picker asks it,
-// once a branch or tag is chosen.
+// The variants one release was built as, which is a different question from
+// what the product is built as — and a different route. Only the scope picker
+// asks it, once a branch or tag is chosen.
 //
 // Nothing here holds a previous key's rows on screen. Three of these four
 // are keyed on something the picker changes, so keeping the last answer would

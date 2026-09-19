@@ -8,7 +8,7 @@ import { notACredential } from "../ui/noautofill";
 import { Paged } from "../ui/Paged";
 import { Wide } from "./Wide";
 
-// What a build says it deals with itself, over time.
+// The claims a build makes about dealing with things itself, over time.
 //
 // The one thing a version comparison can never see. A distribution carries
 // a fix into a package without moving its version, so the only evidence is the
