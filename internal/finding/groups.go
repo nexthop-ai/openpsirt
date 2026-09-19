@@ -505,7 +505,12 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		switch {
 		case !floor.Admits(group.Exploited, group.Severity):
 			group.NoDeadline = BelowTheLine
-		case !Closable(group.FixState):
+		// Asked of both ends rather than of the word they agree on. A group
+		// whose places disagree reports "mixed", which is not a state upstream
+		// is ever in — and reading it as one tells a reader that a supported
+		// release is past its end of life, on the ordinary shape where a
+		// scanner says one thing in one build and another in the next.
+		case !Closable(FixState(row.FixStateLeast)) && !Closable(FixState(row.FixStateMost)):
 			group.NoDeadline = NothingToTake
 		default:
 			group.NoDeadline = OutOfSupport

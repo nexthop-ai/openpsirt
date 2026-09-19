@@ -352,9 +352,12 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 		// The same issue in two builds of the product: the branch that is
 		// scanned nightly, and a release that was scanned once.
 		tag := f.anotherBuild(t, "24.06")
+		// Fixed upstream, stated rather than incidental: a deadline is only
+		// meetable where there is a version to take, so this test's subject
+		// needs a finding that carries one at all.
 		quiet := finding.Reported{
 			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
-			Component: libnl, FixState: finding.NoFix,
+			Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
 		}
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(ctx, f.target, f.run(t),
@@ -667,4 +670,60 @@ func ppm(value *int) string {
 		return "nothing"
 	}
 	return fmt.Sprint(*value)
+}
+
+func TestLearningSomethingIsExploitedDoesNotHandBackAClockNothingCouldMeet(t *testing.T) {
+	// Exploitation says how long there is. It does not say there is a version
+	// to take — so an issue upstream has released no fix for stays off the
+	// clock, however urgent it becomes.
+	//
+	// The build that matters is the one nobody rescans. A branch corrects
+	// itself the next night; a tag was built once, so a deadline handed back
+	// here is one it keeps for as long as the finding is open, and it is a
+	// date nobody could ever have met.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		tag := f.anotherBuild(t, "24.06")
+		nothing := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-NOFIX", Severity: "high"},
+			Component: libnl, FixState: finding.NoFix,
+		}
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{nothing}); err != nil {
+			t.Fatal(err)
+		}
+		f.shippedTo(t, tag, twoConsumers())
+		if _, err := f.store.Apply(ctx, tag, f.runOn(t, tag),
+			[]finding.Reported{nothing}); err != nil {
+			t.Fatal(err)
+		}
+
+		exploited := nothing
+		exploited.Issue.Exploited = true
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{exploited}); err != nil {
+			t.Fatal(err)
+		}
+
+		var rows []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&rows).
+			Where("closed_at IS NULL").Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) == 0 {
+			t.Fatal("nothing is open")
+		}
+		for _, row := range rows {
+			// It is still exploited, still ranked for it, and still has no
+			// deadline: what ends is the clock, not the finding.
+			if !row.RankExploited {
+				t.Error("a finding of an exploited issue is not marked exploited")
+			}
+			if row.DueAt != nil {
+				t.Errorf("a finding with nothing to take carries a deadline of %s",
+					row.DueAt.Format(time.RFC3339))
+			}
+		}
+	})
 }

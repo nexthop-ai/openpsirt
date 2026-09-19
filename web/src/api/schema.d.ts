@@ -5952,7 +5952,7 @@ export interface components {
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life. Every reason is deliberate, and where more than one holds the narrowest is stated. Blank would read as missing data on the row somebody is deciding about
+             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
@@ -6095,7 +6095,7 @@ export interface components {
              */
             middle?: number;
             /**
-             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life. Every reason is deliberate, and where more than one holds the narrowest is stated
+             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";

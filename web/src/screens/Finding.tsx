@@ -77,7 +77,7 @@ function whyNone(reason: string | undefined): string {
     case "below-the-line":
       return "below what this product triages at. Recorded and counted; nothing is late.";
     case "nothing-to-take":
-      return "upstream has released no fix, so there is no version that would close it.";
+      return "upstream has released no fix, or has declined to, so there is no version that would close it.";
     case "out-of-support":
       return "the release is past its end of life, so nothing here will be fixed.";
     default:

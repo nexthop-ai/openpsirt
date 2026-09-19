@@ -141,12 +141,18 @@ and never arriving.
 
 A finding with no deadline states which reason applies:
 
-| Reason | Precedence |
-|---|---|
-| Below the line its product triages at | The narrowest statement about this finding, so it is the one stated |
-| **Upstream has released no fix, or has declined to** | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
-| **Its release is a tag, so it cannot change** | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
-| Its release is past end-of-life (REQ-15) | |
+| Reason | Reported as | Precedence |
+|---|---|---|
+| Below the line its product triages at | `below-the-line` | The narrowest statement about this finding, so it is the one stated |
+| **Upstream has released no fix, or has declined to** | `nothing-to-take` | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
+| **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
+| Its release is past end-of-life (REQ-15) | `out-of-support` | |
+
+**Four reasons and three words.** A tag reports as out of support, which is not
+what it is — a supported tag carries no deadline for a more fundamental reason
+than a retired one does. Stated here rather than left as a difference between
+this table and the wire, and a word of its own is worth adding the day somebody
+needs to tell the two apart.
 
 There is no further reason, because a deadline is worked out at ingest for
 everything else. Left blank, the column reads as missing data on the one screen

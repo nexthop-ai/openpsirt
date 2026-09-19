@@ -400,8 +400,13 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// because a person typed it would be a second policy nobody chose.
 			ranked := Ranked{Shipped: true}
 			if row.Urgency = int64(ranked.Rank()); floor.Admits(false, severity) {
-				due := now.Add(windows.For(false, severity))
-				row.DueAt = &due
+				// Through the one rule rather than worked out here. The two
+				// agree today only because a flaw somebody recorded carries no
+				// fix state and no fix date, which is exactly the condition
+				// that stops holding the first time the form gains one — and
+				// the comment above promises they cannot differ.
+				row.DueAt = Deadline(row.FixState, now, now, nil, row.FixedAt,
+					windows.For(false, severity))
 			}
 			rows = append(rows, row)
 		}

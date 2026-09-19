@@ -911,9 +911,8 @@ func TestAFixThatLandedBeforeWeSawItLeavesTheDeadlineWhereItWas(t *testing.T) {
 func TestNothingUpstreamWouldCloseItSoItCarriesNoDeadline(t *testing.T) {
 	// A deadline nobody can meet is not a deadline. Where upstream has
 	// released nothing, and where upstream has declined, there is no version
-	// to take — and the clock runs anyway, so a third of the overdue list is
-	// red for reasons no upgrade would answer, which is how people stop
-	// reading the colour.
+	// to take — and the clock runs anyway, so the overdue list carries rows no
+	// upgrade would answer, which is how people stop reading the color.
 	//
 	// A scanner that did not answer is a different thing, and stays on the
 	// clock: reading silence as "nothing exists" is a claim about the world
@@ -1016,6 +1015,121 @@ func TestUpstreamWithdrawingAFixStopsTheClock(t *testing.T) {
 		}
 		if due := f.deadlineOrZero(t, "CVE-2026-WITHDRAWN"); !due.IsZero() {
 			t.Errorf("the fix went away and the deadline of %s stayed", due.Format(time.RFC3339))
+		}
+	})
+}
+
+func TestNoOtherPathHandsBackAClockNothingCouldMeet(t *testing.T) {
+	// The rule landed on the scan path and three other places write a
+	// deadline. Each of them is reached by an ordinary act — somebody rating
+	// an issue, an administrator saving a window, a feed reporting
+	// exploitation — so a rule enforced on one of four is a rule that holds
+	// until somebody does their job.
+	//
+	// Worse on a tag, which is scanned once: a branch corrects itself the next
+	// night, and a tag keeps whatever it was handed for as long as the finding
+	// is open.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		nothing := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-STUCK", Severity: "high"},
+			Component: libnl, FixState: finding.NoFix,
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t),
+			[]finding.Reported{nothing}); err != nil {
+			t.Fatal(err)
+		}
+		if due := f.deadlineOrZero(t, "CVE-2026-STUCK"); !due.IsZero() {
+			t.Fatalf("a finding with nothing to take opened with a deadline of %s", due)
+		}
+
+		for _, act := range []struct {
+			what string
+			do   func(t *testing.T)
+		}{
+			{
+				// Somebody rates the issue, which recounts every deadline it
+				// is open against. Through the store rather than by writing a
+				// rating row, because the recount is what is being tested and
+				// a row written straight to the table never reaches it.
+				"somebody rates the issue",
+				func(t *testing.T) {
+					t.Helper()
+					f.recorded(t, 1, "someone")
+					if _, err := f.store.Assess(ctx, f.holding(t, access.PublicTriage),
+						f.productID, f.issue(t, "CVE-2026-STUCK"), "critical",
+						"Reachable from the network in how we ship it."); err != nil {
+						t.Fatal(err)
+					}
+				},
+			},
+			{
+				// An administrator saves a remediation window, which recounts
+				// every deadline in the deployment.
+				"an administrator saves a window",
+				func(t *testing.T) {
+					t.Helper()
+					shorter := testWindows
+					shorter.High = 15 * 24 * time.Hour
+					if _, err := f.store.Recompute(ctx, shorter); err != nil {
+						t.Fatal(err)
+					}
+				},
+			},
+			{
+				// A feed reports it as exploited, which sets an exploited
+				// clock on every build it is open in.
+				"a feed reports it exploited",
+				func(t *testing.T) {
+					t.Helper()
+					exploited := nothing
+					exploited.Issue.Exploited = true
+					if _, err := f.store.Apply(ctx, f.target, f.run(t),
+						[]finding.Reported{exploited}); err != nil {
+						t.Fatal(err)
+					}
+				},
+			},
+		} {
+			act.do(t)
+			if due := f.deadlineOrZero(t, "CVE-2026-STUCK"); !due.IsZero() {
+				t.Errorf("after %s, a finding with nothing to take carries %s",
+					act.what, due.Format(time.RFC3339))
+			}
+		}
+	})
+}
+
+func TestAFixDatedAfterWeSawItIsNotWhatTheClockRunsFrom(t *testing.T) {
+	// The fix date is a feed's, parsed and never checked, and this rule made
+	// it load-bearing. One entry dated two centuries out would carry the
+	// deadline with it — and the finding would leave the overdue list and the
+	// compliance rate for as long as it stayed open, which is the silent
+	// disappearance this whole rule exists to stop, arriving through the field
+	// that implements it.
+	//
+	// A fix cannot have arrived after the moment we saw that it had, so that
+	// is the ceiling.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		ahead := time.Now().UTC().Add(180 * 365 * 24 * time.Hour)
+		absurd := finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2026-AHEAD", Severity: "high"},
+			Component: libnl, FixState: finding.FixedUpstream,
+			FixedIn: "3.9.0", FixedAt: &ahead,
+		}
+		opening := f.run(t)
+		if _, err := f.store.Apply(t.Context(), f.target, opening,
+			[]finding.Reported{absurd}); err != nil {
+			t.Fatal(err)
+		}
+		// Counted from when we saw it, as though the feed had said nothing.
+		want := f.startedAt(t, opening).Add(finding.DefaultWindows().High)
+		got := f.deadline(t, "CVE-2026-AHEAD")
+		if !got.Equal(want) {
+			t.Errorf("the deadline is %s, want %s — the fix date is in the future",
+				got.Format(time.RFC3339), want.Format(time.RFC3339))
 		}
 	})
 }
