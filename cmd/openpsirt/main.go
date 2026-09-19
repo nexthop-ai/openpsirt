@@ -682,24 +682,24 @@ func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside 
 
 	// And give the workers the same bound, rather than none.
 	//
-	// An unbounded wait follows from the reasoning above — a worker mid-query
-	// should not have the database pulled from under it — and that reasoning
-	// holds; what it lacks is an end. On SQLite
-	// the pool is one connection by design, so an HTTP handler running a slow
-	// statement blocks every worker behind it, and a worker that cannot get a
-	// connection cannot notice it has been asked to stop. Waiting for it then
-	// waits for the request, and shutting down takes as long as the slowest
-	// thing in the process.
+	// A worker mid-query should not have the database pulled from under it,
+	// which argues for waiting; an unbounded wait is that argument with no
+	// end. On SQLite the pool is one connection by design, so an HTTP handler
+	// running a slow statement blocks every worker behind it, and a worker
+	// that cannot get a connection cannot notice it has been asked to stop.
+	// Waiting for it then waits for the request, and shutting down takes as
+	// long as the slowest thing in the process.
 	//
-	// Observed: a query that should have taken milliseconds ran for over an
+	// Measured: a query that should have taken milliseconds ran for over an
 	// hour, SIGTERM did nothing, and the process had to be killed. A shutdown
 	// that cannot be completed by the signal meant for it is not a shutdown.
-	// Both halves of the grace answer the same way. An overrun request makes
-	// Shutdown return an error and the process exit 1; an overrun worker
-	// logging a warning and returning nil exits 0 — and
-	// `docs/configuration.md` describes the two as one setting applied twice.
-	// A supervisor reading the exit code was told that half of a shutdown
-	// that did not finish had finished.
+	//
+	// Both halves of the grace answer the same way, which is why
+	// workersStopped returns an error rather than logging a warning: an
+	// overrun request makes Shutdown return an error and the process exit 1,
+	// and an overrun worker does the same. `docs/configuration.md` describes
+	// the two as one setting applied twice, and a supervisor reads the exit
+	// code.
 	workerErr := workersStopped(workers, cfg, logger)
 	if shutdownErr != nil {
 		shutdownErr = fmt.Errorf("shutdown: %w", shutdownErr)

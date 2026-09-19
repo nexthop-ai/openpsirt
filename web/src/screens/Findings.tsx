@@ -107,11 +107,11 @@ export function Findings() {
   // above the list names it; the query it narrows is built elsewhere.
   const beneath = params.get("beneath") ?? "";
   // Everything else the list narrows by is read where the panel draws it.
-  // Pulled apart here, one variable per filter, each has to be threaded
-  // through to the control that sets it, and the count of what is on becomes a
-  // hand-kept list that falls behind the filters it counts: a count omitting
-  // the component name, the subtree, the exclusions and the text search says a
-  // list narrowed by those is narrowed by nothing.
+  // Pulled apart here, one variable per filter, each would have to be threaded
+  // through to the control that sets it, and the count of what is on would
+  // become a hand-kept list falling behind the filters it counts: a count
+  // omitting the component name, the subtree, the exclusions and the text
+  // search says a list narrowed by those is narrowed by nothing.
   //
   // The address as the list actually reads it, which is not quite what the
   // address says: the by-issue view leaves out what a promised upgrade already

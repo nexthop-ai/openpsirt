@@ -467,10 +467,10 @@ function Rail({
 // search, reached without going there first.
 //
 // It asks at whatever scope is chosen, which is the product as readily as a
-// single build. Disabled unless all three are picked, the most common question
-// a PSIRT is asked — where is this advisory in what we ship — cannot be typed
-// at all without first choosing a variant, and answers nothing when it can,
-// because the term is matched against component names alone.
+// single build. Were it disabled unless all three were picked, the most common
+// question a PSIRT is asked — where is this advisory in what we ship — could
+// not be typed at all without a variant chosen first, and would answer nothing
+// when it could, matching the term against component names alone.
 //
 // An issue name goes to the issue, wherever it sits, and needs no
 // product picked: "a critical just landed in openssl — which of our products

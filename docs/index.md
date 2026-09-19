@@ -46,9 +46,10 @@ behind every line of it.
 
 ### Ingest
 
-- Inventories arrive from the build, in CycloneDX form, one adapter per
-  producer. A vulnerability report or a third party's VEX document may be
-  uploaded alongside. SPDX is intended and not built
+- Inventories arrive from the build, in CycloneDX, SPDX 2.x or SPDX 3.x form,
+  one adapter per producer. A vulnerability report or a third party's VEX
+  document may be uploaded alongside. The document says which format it is and
+  the reader is chosen from that, so one upload takes any of them
 - An upload is accepted, queued and answered later. A scan applies whole or
   changes nothing, and only a scan newer than the state it replaces is taken
 - Releases and variants are declared before a scan may name one, so a

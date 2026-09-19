@@ -118,11 +118,11 @@ func (in Ingest) settings(db bun.IDB) *setting.Store {
 
 // logger is where this process writes, and never nil.
 //
-// A handler that logs must not have to remember. Sixty-three sites guard the
-// field with `if in.Logger != nil` and two do not, so a process built without
-// one — the one that renders the API document — panics into the recovery
-// middleware and answers 500 where the route has words for a refusal. A no-op
-// logger makes the omission impossible rather than rare.
+// A handler that logs must not have to remember. A process built without a
+// logger — the one that renders the API document — panics into the recovery
+// middleware and answers 500 where the route has words for a refusal, wherever
+// a site forgets the `if in.Logger != nil` guard. A no-op logger makes the
+// omission impossible rather than rare.
 func (in Ingest) logger() *slog.Logger {
 	if in.Logger != nil {
 		return in.Logger

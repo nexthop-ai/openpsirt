@@ -5,7 +5,7 @@ import type { Body } from "../api/client";
 // The places a decision covers.
 //
 // All of them by default, which is the rule a decision is written under. A
-// checkbox per place is a summary line instead, and excluding is a deliberate
+// summary line rather than a checkbox per place, and excluding is a deliberate
 // second step that groups places by what pulls the component in —
 // so leaving out a whole container is one click, leaving out one module is
 // still possible, and the result reads back as "59 of 62, three left open

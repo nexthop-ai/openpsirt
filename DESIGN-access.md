@@ -1198,8 +1198,9 @@ notice the absence and say so.
 - A key is honored from anywhere. It holds a credential rather than being
   vouched for by position; where it connects from says nothing about whether it
   is genuine.
-- The stored key digest is compared again in constant time. Finding a row by
-  digest is not by itself a statement that two secrets match.
+- The stored key digest is matched by SQL equality on the whole digest, which
+  is the comparison. A constant-time compare over the row that equality has
+  already selected cannot fail, so there is none.
 - A person holding triage may send a scan. Somebody re-uploading a build by
   hand is doing triage work.
 - A pipeline sees the product it may send to. Pretending otherwise would make

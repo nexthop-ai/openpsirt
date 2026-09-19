@@ -1006,13 +1006,13 @@ const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 // so they are HAVING clauses: a group is undecided when none of its places has
 // a decision, not when one of them does not.
 //
-// These read the decision table and nothing else. Read from `suppressed_by`
-// instead — which is not a decision of ours at all: it points at a
-// suppression, and a suppression is a claim the *build* made in its own scan
-// file (only internal/sbom ever writes one) — "agreed" means "the vendor's
-// SBOM argued this away", a claim by a different author that nobody here
-// reviewed, and a decision actually approved by a second person matches none
-// of the four states. What the build argued away is a real number and the row
+// These read the decision table and nothing else. `suppressed_by` is not a
+// decision of ours at all: it points at a suppression, and a suppression is a
+// claim the *build* made in its own scan file (only internal/sbom ever writes
+// one), so reading it would make "agreed" mean "the vendor's SBOM argued this
+// away" — a claim by a different author that nobody here reviewed — and would
+// leave a decision actually approved by a second person matching none of the
+// four states. What the build argued away is a real number and the row
 // already carries it separately, as how many places are answered; it is not
 // how far *we* have decided.
 //

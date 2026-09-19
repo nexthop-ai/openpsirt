@@ -76,9 +76,9 @@ export const UNNARROWED = "on=branch&on=tag&support=in-support&support=past-eol&
 
 export function findingsPath(at: Scoped, unnarrowed = false): string {
   // Without a product it is the list across every product somebody can read,
-  // which is the same screen. Sent to the catalog instead — the
-  // cross-product list being a screen of its own, reached from its own rail
-  // entry — one list has two doors, and the one in the scope group is dead
+  // which is the same screen. Sent to the catalog instead — the cross-product
+  // list being a screen of its own, reached from its own rail entry — one list
+  // would have two doors, and the one in the scope group would be dead
   // whenever no product is picked.
   const also = unnarrowed ? UNNARROWED : "";
   if (!at.product) return also ? `/findings?${also}` : "/findings";

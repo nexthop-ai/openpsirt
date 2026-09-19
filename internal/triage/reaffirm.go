@@ -857,16 +857,15 @@ type Reaffirmed struct {
 
 // ReaffirmClaim re-makes every lapsed row of one action, in one act.
 //
-// A decision is bulk-capable at three grains and a re-decision at
-// none. A team answering one kernel issue writes a decision at each of its 45
-// places in one action; when the kernel moves, those 45 lapse and restoring
-// them was 45 requests with 45 separately typed justifications. This is the one
-// path that is safe to make cheap — a version bump is a prompt to re-check
-// rather than a new claim, and the earlier agreement is already carried
-// forward — and it was the one path with no bulk form.
+// Bulk at the same three grains deciding has. A team answering one kernel
+// issue writes a decision at each of its 45 places in one action; when the
+// kernel moves, those 45 lapse, and restoring them one at a time is 45
+// requests with 45 separately typed justifications. This is the one path that
+// is safe to make cheap: a version bump is a prompt to re-check rather than a
+// new claim, and the earlier agreement is already carried forward.
 //
-// It also breaks nothing REQ-28 asks for: approval, send-back and undo already
-// operate on the claim, and re-affirmation operated on the row.
+// It also breaks nothing REQ-28 asks for: approval, send-back and undo operate
+// on the claim, and this brings re-affirmation to the same grain.
 //
 // Every escalation rule the single form applies is applied here, per row, and
 // any one of them puts the whole act through full approval. An act whose rows

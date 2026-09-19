@@ -692,9 +692,9 @@ queue its work is sitting in.
 Which run answers an upload is a rule rather than a lookup, because a run covers
 a build rather than an upload: the earliest successful run to finish after
 that upload was parsed. A run that failed answers it only while nothing has
-succeeded since. Taking the earliest run to finish after parsing
-whatever became of it, so a scanner that fell over once poisoned every receipt
-already waiting on it, permanently.
+succeeded since. Taking the earliest run to finish after parsing whatever
+became of it, a scanner that falls over once poisons every receipt already
+waiting on it, permanently.
 
 What each run changed is counted when asked for rather than stored, from the
 runs the findings already point at, as issues at components rather than places.
