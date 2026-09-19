@@ -34,25 +34,24 @@ import (
 // readiness probe only reflects the process being up.
 type Ready func(context.Context) error
 
-// contentSecurityPolicy is what a page served here may load and run: what the
-// bundled interface ships, and nothing from anywhere else.
+// contentSecurityPolicy is the sources a page served here may load and run:
+// the files the bundled interface ships, and nothing from anywhere else.
 //
 // Scripts, fonts and stylesheets are its own files; images may also be
 // data: URIs, which is how an inline SVG reaches an img element; requests go
 // to this origin only; and no page anywhere may frame it. Inline styles are
 // the one concession — the chart library writes them — and it is styles
 // rather than scripts, which is the half that matters. It is the second line
-// policy on the server at submission accepted behind the sanitizer: a bug there lands in a page that can
-// run no inline script it did not hash.
+// behind the markdown sanitizer: a bug there lands in a page that can run no
+// inline script it did not hash.
 //
-// **The page's own inline script is allowed by its hash, and by nothing
-// wider.** This said "the interface has no inline script", which was true when
-// it was written and stopped being true when the page grew one — the snippet
-// that reads the chosen theme before the first paint. Nothing said so: the
-// browser refused it silently, the theme was applied a moment later by the
-// bundle instead, and what the snippet exists to prevent — a flash of the
-// wrong one — happened on every load. The hash is taken from what is actually
-// served rather than written down beside it, so the two cannot drift again.
+// The page's own inline script is allowed by its hash and by nothing wider.
+// The page carries one — the snippet that reads the chosen theme before the
+// first paint — and a policy written for a page with none refuses it silently:
+// the theme is applied a moment later by the bundle, and the flash of the
+// wrong one the snippet exists to prevent happens on every load. The hash is
+// taken from what is served rather than written down beside it, so the two
+// cannot drift.
 const baseContentSecurityPolicy = "default-src 'self'; img-src 'self' data:; " +
 	// The bundler inlines the small font files as data URIs, so fonts are
 	// allowed from the page itself as well as from the origin.
@@ -64,16 +63,16 @@ const baseContentSecurityPolicy = "default-src 'self'; img-src 'self' data:; " +
 	// turns a link this deployment wrote into somebody else's address
 	// without any of the directives above being violated; and a form's
 	// action is not a fetch, so connect-src says nothing about where a
-	// submission goes. Both are the shape policy on the server at
-	// submission accepted this policy as a second line for: something that
-	// got past the sanitizer lands in a page that can do neither.
+	// submission goes. Both are the shape this policy is a second line
+	// against: something past the sanitizer lands in a page that can do
+	// neither.
 	"base-uri 'none'; form-action 'self'"
 
 // inlineScript finds the bodies of any inline <script> in a page.
 //
-// Written against the served bytes rather than against the source, because
-// what a browser enforces the policy over is what was served — a build step
-// that inlines something is exactly the case a hash written by hand misses.
+// Written against the served bytes rather than against the source, because a
+// browser enforces the policy over the bytes it was served — a build step that
+// inlines something is exactly the case a hash written by hand misses.
 var inlineScript = regexp.MustCompile(`(?s)<script(?:\s[^>]*)?>(.*?)</script>`)
 
 // policyFor is the policy with the page's own inline scripts allowed by hash.
@@ -160,9 +159,9 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 			// Named exceptions rather than a guarded prefix. Guarding one
 			// prefix leaves everything else open by default, and the
 			// framework registers routes of its own: the API document and
-			// the schemas it references were served to anybody who asked,
-			// including the running version that the endpoint reporting it
-			// is authenticated to withhold.
+			// the schemas it references are served to anybody who asks,
+			// including the running version the endpoint reporting it is
+			// authenticated to withhold.
 			//
 			// The probes are the exception, because a container probe cannot
 			// sign in and they report nothing beyond whether this process can
@@ -178,8 +177,8 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 			// page. Asked of the router rather than by matching a prefix, so
 			// this cannot shadow a route: anything registered, including the
 			// framework's own document and schema routes, still goes through
-			// the check below. What is served here is a compiled page and its
-			// assets, which carry no data.
+			// the check below. Served here is a compiled page and its assets,
+			// which carry no data.
 			if in.Interface.Files != nil && !reserved(r.URL.Path) &&
 				!router.Match(chi.NewRouteContext(), r.Method, r.URL.Path) {
 				next.ServeHTTP(w, r)
@@ -238,11 +237,11 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 			}
 			carrying := r.WithContext(ctx)
 			// The server removes spooled multipart parts from the request it
-			// handed us, and what parses a form is this copy — so the copy's
-			// temporary files belong to nobody and stayed on disk for the life
-			// of the container. A refused upload leaked them just as well as
-			// an accepted one, which is a disk anybody with a credential can
-			// fill by repeating a request that fails.
+			// handed us, and this copy is what parses a form — so the copy's
+			// temporary files belong to nobody and stay on disk for the life
+			// of the container. A refused upload leaks them just as well as an
+			// accepted one, which is a disk anybody with a credential can fill
+			// by repeating a request that fails.
 			defer func() {
 				if carrying.MultipartForm != nil {
 					_ = carrying.MultipartForm.RemoveAll()
@@ -406,10 +405,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerTeams(api, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
-	// The people on one undisclosed case. It takes both: the grant is managed
-	// by whoever reads the case rather than by an administrator, and it
-	// lands in the administration trail like every other access change.
-	// Who told us, and the names an issue goes by.
+	// The record of who told us, and the names an issue goes by.
 	registerWhoTold(api, in)
 	// Standing claims about the third-party components a build ships.
 	registerVEX(api, in)
@@ -422,10 +418,13 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerUpward(api, in)
 	// The place a claim's work is happening, stored and never sent to.
 	registerClaimLink(api, in)
+	// The people on one undisclosed case. It takes both: the grant is managed
+	// by whoever reads the case rather than by an administrator, and it lands
+	// in the administration trail like every other access change.
 	registerCollaborators(api, in, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
-	// One person, whole: what they hold, what they used to hold, their part
+	// One person, whole: the grants in force, the grants withdrawn, their part
 	// in the record, and what they were told.
 	registerPerson(api, in, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
@@ -452,11 +451,11 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 // tried. Whoever operates this deployment needs that; whoever is asking does
 // not.
 //
-// **The cause travels with the refusal and is not part of it.** An act is a
-// transaction now, and the helper that opened it asks whether what came back
-// is worth going again — a deadlock on one engine, a lost race on another.
+// The cause travels with the refusal and is not part of it. An act is a
+// transaction, and the helper that opened it asks whether what came back is
+// worth going again — a deadlock on one engine, a lost race on another.
 // Answered with a refusal built fresh, that question is asked of an error
-// wrapping nothing, so a mid-transaction deadlock was reported to an
+// wrapping nothing, so a mid-transaction deadlock is reported to an
 // administrator instead of taken again.
 func wentWrong(logger *slog.Logger, what string, err error) error {
 	if logger != nil {
@@ -470,8 +469,8 @@ func wentWrong(logger *slog.Logger, what string, err error) error {
 // The refusal is what a caller is told and is the whole of what they are told:
 // the framework resolves a returned error to the first status error it finds,
 // which is the refusal inside this, so nothing a driver wrote reaches a
-// response. What the cause is for is the retry helper, which reads the
-// driver's own types through the wrapping.
+// response. The cause is there for the retry helper, which reads the driver's
+// own types through the wrapping.
 type carried struct {
 	said  error
 	cause error
@@ -490,10 +489,9 @@ func (c carried) Unwrap() []error { return []error{c.said, c.cause} }
 // A store returns two kinds of error through one return: a sentence written
 // for a person — a decision already standing here, a version that is not a
 // version, a threshold crossed — and a query that failed, which carries the
-// statement text and whatever the driver put in its message. Thirty handlers
-// answered both the same way, as a 422 with the message in it, so a lost
-// connection reached whoever asked as a bad request carrying the address the
-// driver had tried.
+// statement text and whatever the driver put in its message. Answered the same
+// way, as a 422 with the message in it, a lost connection reaches whoever
+// asked as a bad request carrying the address the driver tried.
 //
 // The engine's own error types decide which it is, rather than the message,
 // and where it cannot tell it errs toward treating it as a refusal — the
@@ -501,11 +499,11 @@ func (c carried) Unwrap() []error { return []error{c.said, c.cause} }
 // thing that reaches the caller.
 func asked(logger *slog.Logger, err error) error {
 	// An authorization refusal is not somebody having asked for the
-	// impossible. Without this arm it fell to the sentence below and came back
-	// 422 carrying the store's own words — which name the product identifier
-	// the refusal exists to withhold. `add-alias` is the live case: recording
-	// another name asks for triage in every product the issue is open in, and
-	// the route guard can only authorize the one in the path.
+	// impossible. Without this arm it falls to the sentence below and comes
+	// back 422 carrying the store's own words — which name the product
+	// identifier the refusal exists to withhold. `add-alias` is the live
+	// case: recording another name asks for triage in every product the issue
+	// is open in, and the route guard can only authorize the one in the path.
 	if errors.Is(err, access.ErrDenied) {
 		return huma.Error403Forbidden("not authorized")
 	}
@@ -518,11 +516,11 @@ func asked(logger *slog.Logger, err error) error {
 // noDatabase is the answer when this process has no database behind it.
 //
 // One sentence rather than twenty-one. Every handler guards against it,
-// because a nil pointer inside one is worse than a refusal, and each guard had
-// invented its own wording — "cannot read findings", "cannot record
+// because a nil pointer inside one is worse than a refusal, and a guard per
+// handler invents its own wording — "cannot read findings", "cannot record
 // decisions", "cannot list teams" — which reads as twenty-one conditions and
-// is one. None of them was logged either, so the only trace of a deployment
-// wired up wrong was a 500 with a sentence in it.
+// is one. Unlogged, the only trace of a deployment wired up wrong is a 500
+// with a sentence in it.
 //
 // It says nothing about what the caller asked for, because the caller did not
 // cause it and cannot fix it: this is a process that came up without the thing
@@ -552,15 +550,13 @@ var open = map[string]bool{
 // because sign-in cannot name its routes in advance: the provider is part of
 // the path and the set of providers is configuration.
 //
-// It is narrow on purpose, and **not empty of reads**: everything under it is
-// sign-in machinery, which reads and writes the deployment's own sign-in key,
-// the session it is creating and the account row a first arrival needs. It
-// reaches no product, finding, issue or credential.
+// It is narrow on purpose, and it is not empty of reads: everything under it
+// is sign-in machinery, which reads and writes the deployment's own sign-in
+// key, the session it is creating and the account row a first arrival needs.
+// It reaches no product, finding, issue or credential.
 //
-// The sentence that stood here said nothing under it reads anything, which was
-// an absolute and was false — and it sat beside the constant it was wrong
-// about. A route added here is checked against what sign-in actually touches;
-// it is not harmless by construction.
+// A route added here is checked against what sign-in touches. Nothing under
+// this prefix is harmless by construction.
 const openPrefix = "/v1/sign-in/"
 
 // refuse answers somebody unrecognized.
@@ -574,20 +570,21 @@ func refuse(w http.ResponseWriter) {
 
 // Problem writes a refusal in the shape every other refusal here takes.
 //
-// The API answers `application/problem+json` for everything it refuses, and
-// the handlers in front of the router — the credential check, and the sign-in
+// The API answers `application/problem+json` for everything it refuses. The
+// handlers in front of the router — the credential check, and the sign-in
 // callbacks, which are ordinary handlers because a redirect from a provider is
-// not an API call — answered `text/plain`. A client that parses one shape and
-// gets the other reads a failure as a transport fault, and the shape of a
-// refusal is part of the answer.
+// not an API call — write their refusals through this rather than as
+// `text/plain`: a client that parses one shape and gets the other reads a
+// failure as a transport fault, and the shape of a refusal is part of the
+// answer.
 //
 // One field it still cannot carry: the schema link, which the API's response
 // transformer adds and which nothing in front of the router reaches.
 func Problem(w http.ResponseWriter, status int, detail string) {
 	// The shape huma writes, built by huma, rather than a literal beside it.
-	// The commonest of these is every request arriving without a credential —
+	// The commonest of these is every request arriving without a credential,
 	// the first thing a client written against the documented error model
-	// meets, and once the one answer not built from that model.
+	// meets.
 	body, err := json.Marshal(huma.NewError(status, detail))
 	if err != nil {
 		// Marshaling a fixed value cannot fail; if it somehow does, the status

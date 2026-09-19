@@ -16,12 +16,11 @@ import (
 // sortOrder is the query parameter for which order to page in, and it takes
 // the orders it offers from the store rather than naming them again.
 //
-// The list a caller sees was a literal in a struct tag, and `finding.SortKeys`
-// — which says it is the one list "so the two cannot disagree" — was reached
-// from nothing but a test asserting the two matched. That is a second copy
-// kept in step by a check rather than by construction, and the check is the
-// thing that goes missing. The framework asks a type for its own schema, so
-// the enum is built from the same slice the store looks the ordering up in.
+// A literal in a struct tag beside `finding.SortKeys` — which declares itself
+// the one list "so the two cannot disagree" — is a second copy kept in step by
+// a test rather than by construction, and the check is the thing that goes
+// missing. The framework asks a type for its own schema, so the enum is built
+// from the same slice the store looks the ordering up in.
 type sortOrder string
 
 // Schema answers with the orders the store knows, in its order.
@@ -68,8 +67,8 @@ type FindingBody struct {
 	// telling two rows apart costs a click each.
 	Summary string `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding"`
 	// The rating in force rather than the published one, which is what the
-	// row is ranked, filtered and clocked by — so a word that said "as the
-	// scanner rated it" meant the published rating on the evidence and the
+	// row is ranked, filtered and clocked by — so a word saying "as the
+	// scanner rated it" means the published rating on the evidence and the
 	// in-force one here, which is the disagreement this list exists not to
 	// have.
 	Severity  string `json:"severity,omitempty" doc:"The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score"`
@@ -80,15 +79,15 @@ type FindingBody struct {
 	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"`
 	FixState  string `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Upstream's answer about it"`
 	FixedIn   string `json:"fixed_in,omitempty" doc:"The version that resolves it, where one exists"`
-	// Matched says how the scanner reached this, and it is the question to ask
-	// about a distribution's packages. "advisory" is the people who package it
+	// Matched is the route the scanner reached this by, the thing to ask about
+	// a distribution's packages. "advisory" is the people who package it
 	// saying so, and what they say about a fix is about the version actually
 	// installed. "identifier" is a published identifier compared against an
 	// upstream version range, which cannot see a backported patch: a
 	// distribution that has already fixed this looks the same as one that has
 	// not. Empty where the scanner said nothing.
 	Matched string `json:"matched,omitempty" enum:"advisory,identifier" doc:"The scanner's route to this"`
-	// Places is how many consumers pull this component in here, and
+	// Places counts the consumers that pull this component in here, and
 	// Answered how many of those the build has already argued about. Both
 	// ends of the way down, with the middle collapsed. Those two are what
 	// differ between sibling rows; the steps between them rarely
@@ -109,14 +108,14 @@ type FindingBody struct {
 	// and a mark only the detail screen shows is one nobody sees.
 	Tags []string `json:"tags,omitempty" doc:"Words somebody put on this. Free text, no fixed vocabulary"`
 
-	// Fold is what the row is about: the source package at the version it was
+	// Fold is the row's subject: the source package at the version it was
 	// built at. Two binaries of one source are one row, because deciding about
 	// them is one judgment, upgrading them is one act and routing them is one
 	// rule.
 	Fold string `json:"fold" doc:"The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from"`
 	// Packages and Consumers are the numbers a reader is shown, counted in
-	// the units they act in. Places is what the bulk cap is measured against
-	// and what the disposition register expands to.
+	// the units they act in. Places is the unit the bulk cap is measured in
+	// and the unit the disposition register expands to.
 	Packages  int `json:"packages" doc:"The number of binaries of the source package here. More than one means deciding on this row decides about all of them"`
 	Consumers int `json:"consumers" doc:"The number of things pulling those in here. The build itself counts as one where anything is pulled in directly"`
 	Places    int `json:"places" doc:"The number of findings under this row. The bulk cap counts these, and the disposition register expands to them, so it is not a number to reconcile with the two above"`
@@ -141,15 +140,15 @@ type FindingBody struct {
 	DiscloseAt  string `json:"disclose_at,omitempty" doc:"The date the embargo ends. Reaching it discloses nothing by itself"`
 
 	NoDeadline string `json:"no_deadline,omitempty" enum:"below-the-line,nothing-to-take,out-of-support" doc:"The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
-	// Exploited is why something is at the top when it is. A position nobody
+	// Exploited is the reason a row sits at the top. A position nobody
 	// can explain is one people stop trusting, and then they sort by something
 	// else and lose the point of the order entirely.
 	Exploited bool `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	// Likelihood is why one medium sits above another, and above a high. It
-	// ranks between whether something reaches customers and how severe it is,
-	// so a list that orders by it and does not show it reads as unsorted.
+	// Likelihood separates one medium from another, and from a high. It ranks
+	// between reachability and severity, so a list ordering by it and not
+	// showing it reads as unsorted.
 	Likelihood float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
-	// Score is what the ordering compares. The word beside it comes from
+	// Score is the number the ordering compares. The word beside it comes from
 	// whichever scoring generation rated it — 10.0 reads "high" under CVSS v2
 	// and "critical" under v3 — so two rows can tie on the number while their
 	// words disagree, and without the number that looks mis-sorted.
@@ -160,12 +159,12 @@ type FindingBody struct {
 type FindingsOutput struct {
 	Body struct {
 		Items []FindingBody `json:"items"`
-		// Total is how many things there are to decide about, which is not the
-		// number of findings: one issue in one component can occupy sixty
+		// Total counts the things to decide about, which is not the number of
+		// findings: one issue in one component can occupy sixty
 		// places and is one decision.
 		Total int `json:"total"`
-		// Hidden is what the triage line kept out, and Floor is the
-		// line itself. Said rather than silently subtracted: a list
+		// Hidden counts the rows the triage line keeps out, and Floor
+		// is the line itself. Stated rather than silently subtracted: a list
 		// showing a smaller number with nothing explaining it is how
 		// two people quote different figures for one question.
 		Hidden int    `json:"hidden,omitempty" doc:"Findings this product does not consider worth triaging, kept out of the list. Still recorded and still counted"`
@@ -195,14 +194,14 @@ type ComponentFindingBody struct {
 	Issues    int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
 	Places    int    `json:"places" doc:"The number of times those sit somewhere in the build"`
 	Exploited bool   `json:"exploited" doc:"Whether any of them is known-exploited"`
-	// BySeverity and Worst are what the weight is made of. Ranking by count
+	// BySeverity and Worst are the parts of the weight. Ranking by count
 	// alone answers this view's own question with the opposite of what
 	// somebody needs: a package with forty-four issues outranks one with three
 	// criticals, and the count says nothing about which.
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Those issues by how they were rated. 'unrated' is what nobody scored"`
 	Worst      string         `json:"worst,omitempty" enum:"critical,high,medium,low" doc:"The highest band among them. Absent where nothing here was rated"`
-	// Upgrades is where this could go, which is what somebody reading a
-	// package is deciding about.
+	// Upgrades is the versions this can move to, the decision somebody reading
+	// a package is making.
 	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, furthest along first where the ecosystem defines an ordering and unranked where it does not"`
 }
 
@@ -214,7 +213,7 @@ type ComponentFindingsOutput struct {
 	}
 }
 
-// planned is what a promised upgrade should do to the list. "either" is a word
+// planned is the effect a promised upgrade has on the list. "either" is a word
 // in the request and the absence of a filter in the store, because a screen
 // that narrows by default needs a way to say "stop" that is distinguishable
 // from having said nothing — the address is what a reader sends somebody else,
@@ -236,11 +235,11 @@ func fixStates(words []string) []finding.FixState {
 	return out
 }
 
-// filter turns what was asked for into what the store narrows by.
+// filter turns the request's parameters into the store's narrowing.
 //
 // One mapping for both lists, for the same reason the parameters are one
-// struct: two of these would drift, and the drift would be a filter that
-// answers on one list and is quietly ignored on the other.
+// struct: two of these drift, and the drift is a filter that answers on one
+// list and is quietly ignored on the other.
 func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 	narrowed := finding.Filter{
 		MinSeverity:   n.Severity,
@@ -266,7 +265,7 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		Workable:      finding.Working(n.On, n.Support),
 		// Straight through: what reaches the statement is the
 		// allowlist's own expression, chosen by this key, never the
-		// key itself . A word that is not one of them is not a sort
+		// key itself. A word that is not one of them is not a sort
 		// and the list comes back in its own order.
 		SortBy:    finding.SortKey(n.Sort),
 		Ascending: n.Ascending,
@@ -292,8 +291,8 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 	} {
 		when, err := finding.Since(each.text)
 		if err != nil {
-			// No store was reached, so there is nothing an engine could have
-			// broken: this is a date nothing can read, which is the caller's.
+			// No store was reached, so no engine is involved: this is a date
+			// nothing can read, which is the caller's.
 			return narrowed, huma.Error422UnprocessableEntity(err.Error())
 		}
 		*each.at = when
@@ -304,17 +303,17 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 // Narrowing is the filters both findings lists take: the per-product one and
 // the one that spans products.
 //
-// Named once and embedded in both, because two lists that narrowed by slightly
-// different sets of words would be two answers to the same question side by
-// side — and the drift would arrive one forgotten parameter at a time. What is
-// *not* here is what belongs to one build: a subtree is a walk over one
-// build's edges, and "differs between builds" is a statement about a
-// selection.
-// Every array here carries a bound and every free-text field a length, for the
-// reason the ones that already did carry theirs: each element becomes a member
-// of an IN clause on the findings, the counts and every export, and four of
-// the seven were bounded by nothing at all — which is an inconsistency before
-// it is a limit, and the inconsistency is what says nobody decided.
+// Named once and embedded in both, because two lists narrowing by slightly
+// different sets of words are two answers to the same question side by side,
+// and the drift arrives one forgotten parameter at a time. Absent here is
+// everything belonging to one build: a subtree is a walk over one build's
+// edges, and "differs between builds" is a statement about a selection.
+//
+// Every array here carries a bound and every free-text field a length. Each
+// element becomes a member of an IN clause on the findings, the counts and
+// every export, and a set where four of seven carry no bound is an
+// inconsistency before it is a limit — the inconsistency being the part that
+// says nobody decided.
 type Narrowing struct {
 	Severity   string   `query:"severity" enum:"low,medium,high,critical" doc:"Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating"`
 	Exploited  bool     `query:"exploited" doc:"Keep only issues somebody is known to be exploiting"`
@@ -368,8 +367,8 @@ type Paging struct {
 	Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 }
 
-// AtOneBuild is what narrows a list within a single product's builds, and has
-// no meaning across products: a subtree is a walk over one build's edges, and
+// AtOneBuild narrows a list within a single product's builds, and has no
+// meaning across products: a subtree is a walk over one build's edges, and
 // "differs between builds" is a statement about a selection.
 type AtOneBuild struct {
 	Beneath string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused"`
@@ -622,7 +621,7 @@ type StepBody struct {
 // SittingBody is one place a component occupies in this build.
 type SittingBody struct {
 	Place string `json:"place" doc:"Name this when recording a decision about it"`
-	// Component is which package of the fold this place is. A finding covers
+	// Component is the package of the fold this place holds. A finding covers
 	// every binary one source package was built at one version, so a place
 	// named only by its consumer leaves a reader unable to tell one from
 	// another.
@@ -646,7 +645,7 @@ type EvidenceBody struct {
 	Vulnerability string   `json:"vulnerability"`
 	Aliases       []string `json:"aliases,omitempty" doc:"Other names the same issue is known by"`
 	Severity      string   `json:"severity,omitempty" doc:"As the data rates it. A word"`
-	// Assessed is what we say instead, where somebody has said something.
+	// Assessed is our own rating, where somebody has recorded one.
 	// Both are carried and both are shown: a rating of ours put where the
 	// world's goes reads as the world's, and the first person to check
 	// against the public record finds a discrepancy nobody declared.
@@ -655,16 +654,16 @@ type EvidenceBody struct {
 	Vector   string  `json:"vector,omitempty" doc:"The score's assumptions — reachability, privilege, interaction"`
 	// ScoreVersion is where the number came from. Everything else a scan
 	// says carries its provenance; the one number a deadline is set from
-	// carried none.
+	// carries none.
 	ScoreVersion string  `json:"score_version,omitempty" doc:"The scoring system the number is on, as the report states it"`
 	ScoreSource  string  `json:"score_source,omitempty" doc:"The publisher, where the report names them"`
 	ScoreKind    string  `json:"score_kind,omitempty" doc:"The rating's rank: primary or secondary"`
 	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
-	// LikelihoodPercentile is what the estimate means and whether it is
-	// current. The probability alone is unreadable — nobody acts on
-	// 0.00042 — and it is a thirty-day forecast recomputed daily, so the
-	// day it is about is part of it.
+	// LikelihoodPercentile ranks the estimate against every other published
+	// one, and the day beside it dates the forecast. The probability alone is
+	// unreadable — nobody acts on 0.00042 — and it is a thirty-day forecast
+	// recomputed daily, so the day it covers is part of it.
 	LikelihoodPercentile float64  `json:"likelihood_percentile,omitempty" doc:"The estimate's standing among all published ones, 0 to 1"`
 	LikelihoodOn         string   `json:"likelihood_on,omitempty" doc:"The day the estimate was computed for, as a date"`
 	Weaknesses           []string `json:"weaknesses,omitempty" doc:"The kind of flaw, as CWE identifiers"`
@@ -684,11 +683,11 @@ type EvidenceBody struct {
 	Upstream  string `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
 	FixState  string `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed"`
 	FixedIn   string `json:"fixed_in,omitempty" doc:"The version that resolves it"`
-	// Matched and MatchedFrom are how this place was reached and where that
-	// match came from. The source is here rather than on the issue because one
-	// issue reached through two ecosystems has two answers, and the issue can
-	// hold only one — which is how a package from one distribution came to
-	// link to another's tracker.
+	// Matched is the route this place was reached by and MatchedFrom the data
+	// that supplied it. The source sits here rather than on the issue because
+	// one issue reached through two ecosystems has two answers and the issue
+	// holds one, which is how a package from one distribution links to
+	// another's tracker.
 	Matched     string `json:"matched,omitempty" enum:"advisory,identifier"`
 	MatchedFrom string `json:"matched_from,omitempty" doc:"The source of this match"`
 	// The evidence for the judgment `matched` asks for, rather than a second
@@ -708,20 +707,20 @@ type EvidenceBody struct {
 
 	// Opened and FoundBy are when this first appeared here and what
 	// produced it. The run that answered is not the run that answers now,
-	// so this cannot be worked out again later — and without it, "which
-	// scanner and which vulnerability database produced the finding you
-	// dismissed on 3 March" has no answer at all.
+	// so this cannot be worked out again later — and without it the scanner
+	// and vulnerability database behind a finding dismissed on 3 March have no
+	// record at all.
 	Opened string `json:"opened,omitempty" doc:"The earliest of these places first appearing here, as a date"`
-	// Due and NoDeadline are the same pair the list carries, and the screen
-	// somebody actually decides on carried neither.
+	// Due and NoDeadline are the same pair the list carries. The screen
+	// somebody decides on needs both.
 	Due      string `json:"due,omitempty" doc:"The date it runs out. The earliest among its places, which is the one that makes the whole finding late"`
 	DaysLeft *int   `json:"days_left,omitempty" doc:"Negative once it is overdue"`
-	// The same two words the list body declares. This said
-	// `past-end-of-life`, which nothing produces, and omitted
-	// `out-of-support`, which the store emits on every finding whose release
-	// is past end of life — so a consumer validating against the published
-	// document rejected the body, and a TypeScript one could not narrow on
-	// the value it actually receives. Two bodies for one value, disagreeing.
+	// The same two words the list body declares. Spelled `past-end-of-life`
+	// here, which nothing produces, and omitting `out-of-support`, which the
+	// store emits on every finding whose release is past end of life, a
+	// consumer validating against the published document rejects the body and
+	// a TypeScript one cannot narrow on the value it receives. Two bodies for
+	// one value, disagreeing.
 	NoDeadline string        `json:"no_deadline,omitempty" enum:"below-the-line,nothing-to-take,out-of-support" doc:"The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	FoundBy    *MeasuredBody `json:"found_by,omitempty" doc:"The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 
@@ -759,7 +758,7 @@ type EvidenceBody struct {
 	// can correct.
 	RoutedBy string `json:"routed_by,omitempty" doc:"The standing rule that placed this, where one did. Empty means a person did, or nobody has"`
 
-	// Standing is what has been decided here, so the finding is the
+	// Standing is the decisions in force here, so the finding is the
 	// working screen after a decision as well as before it: the live
 	// claims covering any of its places, the decisions that stopped
 	// applying with their reasoning offered back, and approved claims
@@ -767,15 +766,15 @@ type EvidenceBody struct {
 	Standing []StandingClaimBody `json:"standing" doc:"Live claims covering any of this finding's places, newest first. A proposed one is waiting for a second person"`
 	Previous []EarlierBody       `json:"previous" doc:"Decisions made at these places that lapsed or were withdrawn, newest first, with their reasoning"`
 	Similar  []SimilarBody       `json:"similar" doc:"Approved not-applicable claims about other issues at the same component and consumer, which extends can carry to this one. At most five"`
-	// Elsewhere is what another product decided about this same issue at this
-	// same place. Evidence and a prefill, never an outcome: what is shipped
-	// around a component differs between products, which is the whole reason a
-	// place is a component at a position.
+	// Elsewhere is another product's decision about this same issue at this
+	// same place. Evidence and a prefill, never an outcome: the software
+	// shipped around a component differs between products, which is the whole
+	// reason a place is a component at a position.
 	Elsewhere []ElsewhereBody `json:"elsewhere" doc:"Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five"`
 
-	// Vex is the third layer beside the build's own claims and our
-	// decisions : what a distribution or an upstream security team has
-	// published about this component in a VEX document. Evidence and a
+	// Vex is the third layer beside the build's own claims and our decisions:
+	// the claims a distribution or an upstream security team has published
+	// about this component in a VEX document. Evidence and a
 	// prefill; never applied to anything by itself, because a third
 	// party's claim standing as ours would put somebody else's judgment
 	// inside a number we quote.
@@ -889,10 +888,9 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what was decided here could not be read", err)
 		}
 
-		// VEX statements, matched on every name the issue is
-		// known by: which identifier a publisher chose is a preference of
-		// whichever database they consulted rather than a property of the
-		// issue.
+		// VEX statements, matched on every name the issue is known by: the
+		// identifier a publisher chose is a preference of whichever database
+		// they consulted rather than a property of the issue.
 		said, err := finding.NewStore(in.DB.DB).SaidAbout(ctx, subject, named.ProductID,
 			issue, append([]string{body.Vulnerability}, body.Aliases...),
 			body.Component, evidence.Purl)

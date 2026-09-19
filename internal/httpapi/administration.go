@@ -17,9 +17,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// described says who somebody is, how they can arrive and what they hold, by
-// reading it. named maps a product to what it is called, because a grant
-// stores an identifier and a reader wants a name.
+// described reads a person into their identity, their sign-in routes and their
+// grants. named maps a product to its label, because a grant stores an
+// identifier and a reader wants a name.
 func described(ctx context.Context, a Administering, store *access.Store,
 	person *access.Account,
 ) (*PersonBody, error) {
@@ -69,11 +69,11 @@ func described(ctx context.Context, a Administering, store *access.Store,
 	return body, nil
 }
 
-// Administering is what the endpoints for people and credentials need.
+// Administering carries what the endpoints for people and credentials run on.
 type Administering struct {
-	// DB is what an administrative act and the record of it are written in
-	// one transaction on. Nil where this process has no database, and then
-	// every route here refuses rather than changing anything.
+	// DB is the database an administrative act and the record of it are
+	// written on, in one transaction. Nil where this process has no database,
+	// and then every route here refuses rather than changing anything.
 	DB *database.DB
 	// Access and Catalog are built over whatever handle the caller is
 	// writing on: the transaction, where the act is being made, and the
@@ -81,10 +81,10 @@ type Administering struct {
 	Access  func(bun.IDB) *access.Store
 	Catalog func(bun.IDB) *catalog.Store
 	Logger  *slog.Logger
-	// Findings is what withdrawing somebody's last role on a product
-	// needs: their work there goes back to the unassigned list rather than
-	// staying where nobody can reach it. Nil where this process has no
-	// database, and then nothing is released.
+	// Findings is the store the withdrawal of somebody's last role on a
+	// product runs against: their work goes back to the unassigned list
+	// rather than staying where nobody can reach it. Nil where this process
+	// has no database, and then nothing is released.
 	//
 	// Over the pooled handle rather than the act's transaction: handing work
 	// back is a consequence of the withdrawal rather than part of it, and it
@@ -95,9 +95,8 @@ type Administering struct {
 	// redeemable for is read. Nil where this process has no database, and
 	// then the built-in window applies.
 	Settings func(bun.IDB) *setting.Store
-	// Groups says whether anything configured here can hand over group
-	// membership: a provider with a source of groups, or a trusted proxy that
-	// reports them.
+	// Groups reports a source of group membership: a provider carrying one, or
+	// a trusted proxy that states it.
 	//
 	// Asked before roles are switched to group-bound. Without a source every
 	// arrival reports belonging to nothing, so nobody derives any role and the
@@ -105,7 +104,7 @@ type Administering struct {
 	Groups func() bool
 }
 
-// handle is what a route that only reads builds its stores over.
+// handle is the database a read-only route builds its stores over.
 //
 // Named rather than written as a.DB at each site: a nil *database.DB handed to
 // an interface parameter is an interface that is not nil, so every check below
@@ -134,27 +133,22 @@ type PersonBody struct {
 	// is a question about the list — and a list that answers it only one row
 	// at a time is one nobody asks it of.
 	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"The date they left. Absent means they may still sign in"`
-	// Email is how somebody signs in is SignsInBy below, which carries the
-	// username and whether the provider's own identifier has been pinned
-	// to it. Two fields here said the same thing, were documented as
-	// though a request set them, and were assigned on no path at all — so
-	// every client written against the published document read them as
-	// absent for everybody.
+	// Email is the address, and the field beside it names the source that
+	// last decided the address. The sign-in route is SignsInBy below.
 	//
-	// Email, and whether a provider gave it. The second is worth answering:
-	// an address a provider supplied is one a later sign-in may change, and
-	// one recorded here is not.
+	// The source is worth reporting: an address a provider supplied is one a
+	// later sign-in may change, and one recorded here is not.
 	Email       string `json:"email,omitempty" doc:"The address they are reached at outside the application"`
 	EmailSource string `json:"email_source,omitempty" enum:"provider,recorded" doc:"The source that last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten"`
-	// Holds is what they may do, listed as product and role.
+	// Holds is the grants in force, listed as product and role.
 	Holds []HeldBody `json:"holds,omitempty"`
 	// SeesNothing says every role they hold is a capability, so they reach
 	// no product at all.
 	//
 	// A capability is bounded by what its holder may read, so `approver`
 	// or `assigner` on its own grants nothing: the person is recorded, the
-	// grant is in force, and every screen is empty. It was accepted in
-	// silence, which reads as working until somebody signs in. Answered
+	// grant is in force, and every screen is empty. Accepted in silence, the
+	// grant reads as working until somebody signs in. Answered
 	// here rather than left for a reader to work out from the list,
 	// because working it out means knowing which roles grant visibility.
 	SeesNothing bool `json:"sees_nothing,omitempty" doc:"Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing"`
@@ -185,19 +179,19 @@ func seesNothing(held []HeldBody) bool {
 // RecordBody is somebody being recorded, and what they are to hold.
 //
 // Separate from PersonBody because a request states less than an answer
-// reports. Reading a person also says how they sign in and whether each role
-// is in force; neither is anything a caller can decide, and one type for both
-// directions put them in the request — where "effective" was required, so
-// granting a role meant stating whether the role you are granting works.
-// Everything that granted one sent "effective": true to be allowed to, and
-// the reply then echoed that back as though it were the answer.
+// reports. Reading a person also states the sign-in routes and the force of
+// each role; neither is anything a caller decides. One type for both
+// directions puts them in the request, where "effective" is required — so
+// granting a role means stating that the role being granted works, every
+// caller sends "effective": true to be allowed to, and the reply echoes that
+// back as though it were the answer.
 type RecordBody struct {
 	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"The name for them here"`
 	DisplayName string `json:"display_name,omitempty" doc:"The label shown instead of the identity"`
 	// Admin is a pointer so that three things stay distinguishable: making
 	// somebody an administrator, taking it away, and saying nothing about it.
 	// A plain bool decodes an absent field as false, so granting a role — a
-	// request that says nothing about administration — withdrew it.
+	// request that says nothing about administration — withdraws it.
 	Admin *bool `json:"admin,omitempty" doc:"Whether they administer this deployment. Omit it to leave it as it is"`
 	// Audits is the same shape for the other thing held over the deployment:
 	// reading its own records and writing none of them.
@@ -241,10 +235,10 @@ type HeldBody struct {
 	// Product is the one it is held against, absent where it is held across
 	// every product.
 	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it. Absent where it is held across every product"`
-	// ProductDisplayName is what to show beside it. The field above is what
-	// the withdraw route resolves, so it carries the address and this carries
-	// the label — a screen rendering the label and sending it back is how a
-	// role could be granted and not withdrawn.
+	// ProductDisplayName is the label shown beside it. The field above is the
+	// one the withdraw route resolves, so it carries the address and this
+	// carries the label — a screen rendering the label and sending it back
+	// grants a role it cannot withdraw.
 	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
 	// Everywhere says it is held across the estate, covering products
 	// declared afterwards. Reported rather than left to be inferred from an
@@ -258,9 +252,9 @@ type HeldBody struct {
 	// shown as what it is. An access review that counted it would be recording
 	// access that does not exist.
 	Effective bool `json:"effective" doc:"Whether this grants anything right now"`
-	// Source says where it came from: assigned by an administrator, or derived
-	// from a group. "Where did this access come from" is the question an audit
-	// asks first.
+	// Source is the origin: assigned by an administrator, or derived from a
+	// group. The origin of a grant is the first thing an access review asks
+	// for.
 	Source string `json:"source,omitempty" enum:"assigned,derived" doc:"Whether an administrator assigned this or a group derived it"`
 }
 
@@ -293,9 +287,9 @@ type KeyBody struct {
 
 // People and the roles they hold.
 //
-// Pipeline keys were here too. They share the administration gate and nothing
-// else: a person is recorded once and holds roles that change under them, and
-// a key is minted, used by a build server and revoked.
+// Pipeline keys live in a file of their own. They share the administration
+// gate and nothing else: a person is recorded once and holds roles that change
+// under them, and a key is minted, used by a build server and revoked.
 func registerAdministration(api huma.API, a Administering) {
 	registerKeys(api, a)
 
@@ -343,7 +337,7 @@ func registerAdministration(api huma.API, a Administering) {
 			return nil, err
 		}
 		// Read once for everybody, like the per-product grants beside it. A
-		// query per person is what makes a long list slow.
+		// query per person makes a long list slow.
 		everywhere, err := store.EveryEstateGrant(ctx)
 		if err != nil {
 			return nil, wentWrong(a.Logger, "cannot list what people hold everywhere", err)
@@ -358,8 +352,8 @@ func registerAdministration(api huma.API, a Administering) {
 				// Their address, and which of the two sources said
 				// so. On the list as well as on the one-person read: the
 				// screen that records an address is the list, and a column
-				// that drew "none" over an address somebody had just typed
-				// reads as the write having been refused.
+				// drawing "none" over an address somebody has just typed
+				// reads as a refused write.
 				Email: person.Email, EmailSource: string(person.EmailSource),
 			}
 			doors, err := store.Identities(ctx, person.ID)
@@ -420,12 +414,12 @@ func registerAdministration(api huma.API, a Administering) {
 		// knows that — computed here from a read taken before the write, two
 		// requests at once would have the second write back the value it saw
 		// before the first.
-		// Recording somebody, how they may be reached and what they hold is
-		// one act. Written as a statement each, a product name nobody has
-		// declared answered 422 with the person recorded and the roles named
-		// before it granted — so an administrator correcting a typo and
-		// sending the request again granted the earlier ones twice, and a
-		// request they gave up on left access nobody asked for.
+		// Recording somebody, the way to reach them and what they hold is one
+		// act. Written as a statement each, a product name nobody has declared
+		// answers 422 with the person recorded and the roles named before it
+		// granted — so an administrator correcting a typo and sending the
+		// request again grants the earlier ones twice, and a request they give
+		// up on leaves access nobody asked for.
 		var person *access.Account
 		var recorded bool
 		if err := store.Within(ctx, func(ctx context.Context, store *access.Store,
@@ -436,18 +430,16 @@ func registerAdministration(api huma.API, a Administering) {
 			// The source of roles, and how long an authorization stays
 			// redeemable, read inside the act that decides from them (REQ-71).
 			//
-			// Read before it opened, a mode switch landing between the two let
+			// Read before it opens, a mode switch landing between the two lets
 			// an assignment be written into a deployment where nothing derives
-			// one — and nothing re-derives an assignment, so the grant would
-			// outlive every group change without a group ever having been
+			// one — and nothing re-derives an assignment, so the grant
+			// outlives every group change without a group ever having been
 			// behind it.
 			//
-			// Through the transaction's own handle, which is what the comment
-			// that stood here had wrong: the stall it described came from
-			// reading through the *root* handle while the closure held
-			// SQLite's one connection, not from reading inside the
-			// transaction at all. Unbinding a group already reads the mode
-			// exactly this way.
+			// Through the transaction's own handle. The stall to avoid comes
+			// from reading through the *root* handle while the closure holds
+			// SQLite's one connection, not from reading inside the transaction
+			// at all. Unbinding a group reads the mode exactly this way.
 			deriving, err := roleModeIn(a.Settings)(ctx, db)
 			if err != nil {
 				return wentWrong(a.Logger, "cannot read where roles come from", err)
@@ -466,8 +458,8 @@ func registerAdministration(api huma.API, a Administering) {
 			// Nobody recorded under that name, and a read that failed, are
 			// different answers. Told apart by the sentinel rather than by
 			// "any error at all": read as "this person is new", a dropped
-			// connection took administration away from somebody who had it,
-			// recorded nothing saying so, and answered 201.
+			// connection takes administration away from somebody who has it,
+			// records nothing saying so, and answers 201.
 			//
 			// Read here rather than before the transaction, because what the
 			// record at the foot of it says depends on the answer and a retry
@@ -490,7 +482,7 @@ func registerAdministration(api huma.API, a Administering) {
 				return asked(a.Logger, err)
 			}
 			// Recorded here, so it outranks whatever a provider states
-			// later . A request that says nothing about an address leaves
+			// later. A request that says nothing about an address leaves
 			// the stored one alone rather than clearing it: this endpoint
 			// records somebody, and an omission is silence rather than an
 			// instruction. An address stated is recorded; an address
@@ -503,11 +495,11 @@ func registerAdministration(api huma.API, a Administering) {
 			}
 			if len(in.Body.Holds) > 0 && deriving == access.GroupBound {
 				// Roles come from one place at a time. Assigning one while
-				// groups decide would produce exactly the hybrid that has no
-				// answer to "where did this access come from" — and worse than
-				// the drift that rule anticipates, since nothing re-derives an
-				// assignment, so it would outlive every group change without
-				// ever having had a group behind it.
+				// groups decide produces exactly the hybrid that can name no
+				// origin for its access — and worse than the drift that rule
+				// anticipates, since nothing re-derives an assignment, so it
+				// outlives every group change without ever having had a group
+				// behind it.
 				return huma.Error409Conflict(
 					"roles are derived from groups here, so they are granted by binding a group rather than a person")
 			}
@@ -566,10 +558,10 @@ func registerAdministration(api huma.API, a Administering) {
 			return nil, err
 		}
 
-		// Read back rather than echoed. What is in force and where a role came
-		// from are answers, and a reply that repeated the request reported the
+		// Read back rather than echoed. The force of a grant and the origin of
+		// a role are answers, and a reply repeating the request reports the
 		// caller's own words as the state of the deployment — including for a
-		// grant set aside by group-bound mode, which the request had just been
+		// grant set aside by group-bound mode, which the request has just been
 		// told grants nothing.
 		body, err := described(ctx, a, store, person)
 		if err != nil {
@@ -629,10 +621,9 @@ func registerAdministration(api huma.API, a Administering) {
 				return huma.Error422UnprocessableEntity("that is not a role")
 			}
 			// Mapped before the trail row and before the work is handed back.
-			// A withdrawal that matched nothing did neither of those things,
-			// and doing them anyway wrote a record of an act that never
-			// happened and unassigned everything the person was dealing with
-			// there.
+			// A withdrawal that matches nothing does neither, and doing them
+			// anyway writes a record of an act that never happened and
+			// unassigns everything the person is dealing with there.
 			switch err := store.Withdraw(ctx, person.ID, product.ID, role); {
 			case errors.Is(err, access.ErrNothingMatched):
 				return noSuchGrant()
@@ -837,6 +828,7 @@ func mintable(ctx context.Context, a Administering, db bun.IDB) (*access.Store, 
 // Managing who may do what is the one thing that must never be reachable by a
 // role granted on a product: somebody who may triage a product must not be
 // able to grant themselves more of it.
+//
 // db is the handle it builds those over: the transaction an act is being made
 // in, or handle() where the route only reads.
 func administerable(ctx context.Context, a Administering, db bun.IDB) (*access.Store, *catalog.Store, error) {
@@ -868,11 +860,11 @@ type held struct {
 
 // moved is the two of those, for a person who was already recorded.
 //
-// **Both, rather than whichever matched first.** Written as arms of one switch
-// beside "this person is new", a request granting both recorded one of them —
-// and the audit permission, which is the one grant that opens the change log,
-// was the arm that never ran at all, so the permission to read the record was
-// the change the record did not hold.
+// Both, rather than whichever matches first. Written as arms of one switch
+// beside "this person is new", a request granting both records one of them —
+// and the audit permission, the one grant that opens the change log, is the
+// arm that never runs, so the permission to read the record is the change the
+// record does not hold.
 //
 // Nothing for somebody who has just been recorded: their creation is the row,
 // and a second line saying a brand-new account went from holding nothing is a
@@ -889,8 +881,8 @@ func moved(before *access.Account, asked RecordBody) []held {
 
 // holding reports whether what somebody holds matches the narrowing asked for.
 //
-// Applied to the bodies rather than in the query, because what is being
-// narrowed is what the list already says: a role held across every product
+// Applied to the bodies rather than in the query, because the narrowing runs
+// over what the list already states: a role held across every product
 // matches a named one, and a grant out of force matches nothing. Both of those
 // are decided above, and asking the database again would be a second rule that
 // can disagree with the first.
@@ -900,8 +892,8 @@ func holding(holds []HeldBody, productID int64, named map[int64]named, role stri
 	}
 	address := named[productID].Address
 	for _, held := range holds {
-		// Not in force is not held. What somebody holds is a statement about
-		// now, and a review asking who approves here must not be handed
+		// A grant out of force is not held. Holding is a statement about now,
+		// and a review of who approves here must not be handed
 		// somebody whose grant a change of mode set aside.
 		if !held.Effective {
 			continue
