@@ -59,8 +59,8 @@ type FindingBody struct {
 	// Product is present only where the list spans products. Inside one
 	// product every row would repeat it, and a column every row agrees
 	// about is width the parts that differ need.
-	Product     string `json:"product,omitempty" doc:"Which product this is open in. Present only on the list that spans products"`
-	ProductName string `json:"product_name,omitempty" doc:"What that product is called, where it has a display name"`
+	Product     string `json:"product,omitempty" doc:"The product this is open in. Present only on the list that spans products"`
+	ProductName string `json:"product_name,omitempty" doc:"That product's display name, where it has one"`
 
 	Vulnerability string `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
 	// Summary is the one line of the issue's own words the row shows. Without
@@ -73,12 +73,12 @@ type FindingBody struct {
 	// in-force one here, which is the disagreement this list exists not to
 	// have.
 	Severity  string `json:"severity,omitempty" doc:"The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score"`
-	Component string `json:"component" doc:"What carries it"`
+	Component string `json:"component" doc:"The component that carries it"`
 	Version   string `json:"version" doc:"The version that ships"`
-	Upstream  string `json:"upstream,omitempty" doc:"What a fork was made from, where it is one"`
+	Upstream  string `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
 	Source    string `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"`
 	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"`
-	FixState  string `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed" doc:"What upstream has done about it"`
+	FixState  string `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Upstream's answer about it"`
 	FixedIn   string `json:"fixed_in,omitempty" doc:"The version that resolves it, where one exists"`
 	// Matched says how the scanner reached this, and it is the question to ask
 	// about a distribution's packages. "advisory" is the people who package it
@@ -87,20 +87,20 @@ type FindingBody struct {
 	// upstream version range, which cannot see a backported patch: a
 	// distribution that has already fixed this looks the same as one that has
 	// not. Empty where the scanner said nothing.
-	Matched string `json:"matched,omitempty" enum:"advisory,identifier" doc:"How the scanner reached this"`
+	Matched string `json:"matched,omitempty" enum:"advisory,identifier" doc:"The scanner's route to this"`
 	// Places is how many consumers pull this component in here, and
 	// Answered how many of those the build has already argued about. Both
 	// ends of the way down, with the middle collapsed. Those two are what
 	// differ between sibling rows; the steps between them rarely
 	// distinguish anything, so they are counted rather than named.
 	Owner  string `json:"owner,omitempty" doc:"The part of the product this belongs to. Absent where the inventory placed the component nowhere"`
-	Parent string `json:"parent,omitempty" doc:"What directly pulls it in, which is what a decision is about"`
-	Middle int    `json:"middle,omitempty" doc:"How many steps sit between those two"`
-	Chains int    `json:"chains,omitempty" doc:"How many distinct ways down there are. More than one means the pair above is one of them"`
+	Parent string `json:"parent,omitempty" doc:"The component that directly pulls it in, which is what a decision is about"`
+	Middle int    `json:"middle,omitempty" doc:"The number of steps between those two"`
+	Chains int    `json:"chains,omitempty" doc:"The number of distinct ways down. More than one means the pair above is one of them"`
 	// Builds is where the selection is more than one build, the four above
 	// are absent — a chain belongs to one build's graph — and these three
 	// take their place.
-	Builds  int    `json:"builds,omitempty" doc:"How many builds in the selection hold this. Absent where the selection is one build"`
+	Builds  int    `json:"builds,omitempty" doc:"The number of builds in the selection holding this. Absent where the selection is one build"`
 	Stream  string `json:"stream,omitempty" doc:"A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"`
 	Variant string `json:"variant,omitempty" doc:"The variant of that build"`
 
@@ -113,34 +113,34 @@ type FindingBody struct {
 	// built at. Two binaries of one source are one row, because deciding about
 	// them is one judgment, upgrading them is one act and routing them is one
 	// rule.
-	Fold string `json:"fold" doc:"What this row is about: the source package at the version it was built at, in the ecosystem and distribution it came from"`
+	Fold string `json:"fold" doc:"The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from"`
 	// Packages and Consumers are the numbers a reader is shown, counted in
 	// the units they act in. Places is what the bulk cap is measured against
 	// and what the disposition register expands to.
-	Packages  int `json:"packages" doc:"How many binaries of the source package sit here. More than one means deciding on this row decides about all of them"`
-	Consumers int `json:"consumers" doc:"How many things pull those in here. The build itself counts as one where anything is pulled in directly"`
-	Places    int `json:"places" doc:"How many findings sit under this row. What the bulk cap counts and what the disposition register expands to, rather than a number to reconcile with the two above"`
-	Answered  int `json:"answered,omitempty" doc:"How many of those the build has already argued do not apply"`
+	Packages  int `json:"packages" doc:"The number of binaries of the source package here. More than one means deciding on this row decides about all of them"`
+	Consumers int `json:"consumers" doc:"The number of things pulling those in here. The build itself counts as one where anything is pulled in directly"`
+	Places    int `json:"places" doc:"The number of findings under this row. The bulk cap counts these, and the disposition register expands to them, so it is not a number to reconcile with the two above"`
+	Answered  int `json:"answered,omitempty" doc:"The number of those the build has already argued do not apply"`
 	// State is how far we have decided this group, by the definition the
 	// state filter uses, so a row and the filter that found it agree.
-	State    string `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"How far this has been decided: undecided when no place has a decision of any kind, waiting when a claim stands proposed and nobody has agreed, agreed when every place is answered by a standing decision, lapsed when a decision here stopped applying and nothing replaced it. Absent where some places are approved and the rest never decided"`
+	State    string `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state: undecided when no place has a decision of any kind, waiting when a claim stands proposed and nobody has agreed, agreed when every place is answered by a standing decision, lapsed when a decision here stopped applying and nothing replaced it. Absent where some places are approved and the rest never decided"`
 	SentBack bool   `json:"sent_back,omitempty" doc:"A live claim at one of these places is currently with its author, sent back for more"`
 
 	// Opened, Due and NoDeadline are the clock on the row. The age is this
 	// finding's own rather than the year in the identifier, which the
 	// identifier already carries: an issue assigned in 2019 that first
 	// appeared here last week has been somebody's problem for a week.
-	Opened   string `json:"opened,omitempty" doc:"When the earliest of these places opened here, as a date. The age a deadline relates to"`
-	Due      string `json:"due,omitempty" doc:"When it is due, as a date. Absent where there is none, and then no_deadline says why"`
+	Opened   string `json:"opened,omitempty" doc:"The earliest of these places opening here, as a date. The age a deadline relates to"`
+	Due      string `json:"due,omitempty" doc:"The date it is due. Absent where there is none, and then no_deadline gives the reason"`
 	DaysLeft *int   `json:"days_left,omitempty" doc:"Negative once it is overdue. Absent where there is no deadline"`
 	// Undisclosed says nothing here has been announced, and DiscloseAt
 	// when the embargo ends. On the row because a person deciding what may
 	// be said about something has to be told before they say it, and the
 	// finding screen's notice is the primary signal rather than this.
 	Undisclosed bool   `json:"undisclosed,omitempty" doc:"Nothing here has been announced. Anything said about it outside this deployment discloses it"`
-	DiscloseAt  string `json:"disclose_at,omitempty" doc:"When the embargo ends, as a date. Reaching it discloses nothing by itself"`
+	DiscloseAt  string `json:"disclose_at,omitempty" doc:"The date the embargo ends. Reaching it discloses nothing by itself"`
 
-	NoDeadline string `json:"no_deadline,omitempty" enum:"below-the-line,nothing-to-take,out-of-support" doc:"Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline string `json:"no_deadline,omitempty" enum:"below-the-line,nothing-to-take,out-of-support" doc:"The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	// Exploited is why something is at the top when it is. A position nobody
 	// can explain is one people stop trusting, and then they sort by something
 	// else and lose the point of the order entirely.
@@ -179,8 +179,8 @@ type UpgradeBody struct {
 	// Two counts, because they answer different questions and confusing them
 	// reads backwards: a quiet release late on a maintained line fixes two of
 	// its own while carrying every fix before it.
-	FixedHere int  `json:"fixed_here" doc:"How many of what is open here name this exact version as their fix — that release's own security content"`
-	Reached   int  `json:"reached" doc:"How many moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered"`
+	FixedHere int  `json:"fixed_here" doc:"The number of open findings naming this exact version as their fix — that release's own security content"`
+	Reached   int  `json:"reached" doc:"The number moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered"`
 	Ordered   bool `json:"ordered" doc:"Whether these versions could be ordered at all. False means the list is not ranked and reached says no more than fixed_here"`
 }
 
@@ -189,11 +189,11 @@ type UpgradeBody struct {
 type ComponentFindingBody struct {
 	Component string `json:"component"`
 	Version   string `json:"version"`
-	Upstream  string `json:"upstream,omitempty" doc:"What a fork was cut from, where one is known"`
+	Upstream  string `json:"upstream,omitempty" doc:"The upstream a fork was cut from, where one is known"`
 	Source    string `json:"source_package,omitempty" doc:"The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary"`
 	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it. With the component and version it tells one row from another, which those two alone do not"`
 	Issues    int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
-	Places    int    `json:"places" doc:"How many times those sit somewhere in the build"`
+	Places    int    `json:"places" doc:"The number of times those sit somewhere in the build"`
 	Exploited bool   `json:"exploited" doc:"Whether any of them is known-exploited"`
 	// BySeverity and Worst are what the weight is made of. Ranking by count
 	// alone answers this view's own question with the opposite of what
@@ -355,7 +355,7 @@ type Narrowing struct {
 	Planned      string      `query:"planned" enum:"planned,unplanned,either" doc:"Keep only what a promised upgrade covers, or only what none covers. Derived from the decisions rather than stored, so withdrawing a promise puts what it covered back with nothing to clean up. 'unplanned' is the working list once planned work is out of view, and is what the by-issue list asks unless told otherwise; 'either' is how a reader asks for it back, and is what leaving this out means"`
 	Unconfirmed  bool        `query:"unconfirmed" doc:"Keep only groups a scanner reached by comparing a published identifier against an upstream version range, never against an advisory for the package in its own ecosystem. A distribution backports fixes without moving the upstream version, so these are neither confirmed nor refuted — somebody has to look, and finding them one at a time is not a thing anybody does"`
 	Exclude      []string    `query:"exclude,explode" maxItems:"200" maxLength:"191" doc:"Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows"`
-	Sort         sortOrder   `query:"sort" doc:"Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"`
+	Sort         sortOrder   `query:"sort" doc:"The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"`
 	Ascending    bool        `query:"asc" doc:"Order the other way — oldest, nearest deadline, fewest places, lowest first"`
 }
 
@@ -364,8 +364,8 @@ type Narrowing struct {
 // filter without also offering a page size it does not honor. A parameter that
 // changes nothing is worse than one that is missing.
 type Paging struct {
-	Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many to return"`
-	Offset int `query:"offset" minimum:"0" doc:"How many to skip"`
+	Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
+	Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 }
 
 // AtOneBuild is what narrows a list within a single product's builds, and has
@@ -603,14 +603,14 @@ func beneathIn(ctx context.Context, in Ingest, scope finding.Scope, name string)
 // ReferenceBody is somewhere an issue is written up, or fixed.
 type ReferenceBody struct {
 	URL  string `json:"url"`
-	Kind string `json:"kind" enum:"patch,advisory,report,other" doc:"What it appears to be. A patch is the change itself"`
+	Kind string `json:"kind" enum:"patch,advisory,report,other" doc:"The kind of reference. A patch is the change itself"`
 }
 
 // LinkBody is somewhere to read about this issue or this package, worked out
 // from the identifiers held here.
 type LinkBody struct {
 	URL  string `json:"url"`
-	Name string `json:"name" doc:"What is at the other end — the issue's record, a distribution's answer about it, or the package's own page"`
+	Name string `json:"name" doc:"The destination — the issue's record, a distribution's answer about it, or the package's own page"`
 }
 
 // StepBody is one component on the way down to another.
@@ -626,12 +626,12 @@ type SittingBody struct {
 	// every binary one source package was built at one version, so a place
 	// named only by its consumer leaves a reader unable to tell one from
 	// another.
-	Component string `json:"component" doc:"Which package of the source package this place is"`
-	Consumer  string `json:"consumer,omitempty" doc:"What pulls the component in here. Absent under the product itself"`
+	Component string `json:"component" doc:"The package of the source package this place is"`
+	Consumer  string `json:"consumer,omitempty" doc:"The consumer that pulls the component in here. Absent under the product itself"`
 	// DeclaredAs is the producer's own word and nothing here reads it. It is
 	// not a rank input, not a prefilled outcome, and nothing is hidden by it:
 	// reading "build" as "does not ship" is wrong for every compiled language.
-	DeclaredAs string `json:"declared_as,omitempty" doc:"What the producer called this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"`
+	DeclaredAs string `json:"declared_as,omitempty" doc:"The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"`
 	Suppressed bool   `json:"suppressed,omitempty" doc:"The build has already argued this place away"`
 	Decision   int64  `json:"decision,omitempty" doc:"The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument"`
 	Claim      int64  `json:"claim,omitempty" doc:"The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them"`
@@ -650,14 +650,14 @@ type EvidenceBody struct {
 	// Both are carried and both are shown: a rating of ours put where the
 	// world's goes reads as the world's, and the first person to check
 	// against the public record finds a discrepancy nobody declared.
-	Assessed string  `json:"assessed,omitempty" doc:"What we rate it, where we have said something. This is what ranks; severity is what was published"`
+	Assessed string  `json:"assessed,omitempty" doc:"This deployment's own rating, where somebody has said something. This is what ranks; severity is the published word"`
 	Score    float64 `json:"score,omitempty" doc:"The same judgment as a number, where one is published"`
-	Vector   string  `json:"vector,omitempty" doc:"What the score assumes — reachability, privilege, interaction"`
+	Vector   string  `json:"vector,omitempty" doc:"The score's assumptions — reachability, privilege, interaction"`
 	// ScoreVersion is where the number came from. Everything else a scan
 	// says carries its provenance; the one number a deadline is set from
 	// carried none.
-	ScoreVersion string  `json:"score_version,omitempty" doc:"Which scoring system the number is on, as the report states it"`
-	ScoreSource  string  `json:"score_source,omitempty" doc:"Who published it, where the report names them"`
+	ScoreVersion string  `json:"score_version,omitempty" doc:"The scoring system the number is on, as the report states it"`
+	ScoreSource  string  `json:"score_source,omitempty" doc:"The publisher, where the report names them"`
 	ScoreKind    string  `json:"score_kind,omitempty" doc:"Whether it is the primary rating or a secondary one"`
 	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
@@ -665,11 +665,11 @@ type EvidenceBody struct {
 	// current. The probability alone is unreadable — nobody acts on
 	// 0.00042 — and it is a thirty-day forecast recomputed daily, so the
 	// day it is about is part of it.
-	LikelihoodPercentile float64  `json:"likelihood_percentile,omitempty" doc:"Where that estimate stands among all published ones, 0 to 1"`
+	LikelihoodPercentile float64  `json:"likelihood_percentile,omitempty" doc:"The estimate's standing among all published ones, 0 to 1"`
 	LikelihoodOn         string   `json:"likelihood_on,omitempty" doc:"The day the estimate was computed for, as a date"`
-	Weaknesses           []string `json:"weaknesses,omitempty" doc:"What kind of flaw this is, as CWE identifiers"`
+	Weaknesses           []string `json:"weaknesses,omitempty" doc:"The kind of flaw, as CWE identifiers"`
 	Description          string   `json:"description,omitempty"`
-	Advisory             string   `json:"advisory,omitempty" doc:"Where the issue is written up"`
+	Advisory             string   `json:"advisory,omitempty" doc:"The issue's write-up"`
 	// References carries patches first, because for somebody deciding whether
 	// to backport rather than upgrade, the change itself is the answer.
 	References []ReferenceBody `json:"references,omitempty"`
@@ -681,7 +681,7 @@ type EvidenceBody struct {
 
 	Component string `json:"component"`
 	Version   string `json:"version"`
-	Upstream  string `json:"upstream,omitempty" doc:"What a fork was made from, where it is one"`
+	Upstream  string `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
 	FixState  string `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed"`
 	FixedIn   string `json:"fixed_in,omitempty" doc:"The version that resolves it"`
 	// Matched and MatchedFrom are how this place was reached and where that
@@ -690,14 +690,14 @@ type EvidenceBody struct {
 	// hold only one — which is how a package from one distribution came to
 	// link to another's tracker.
 	Matched     string `json:"matched,omitempty" enum:"advisory,identifier"`
-	MatchedFrom string `json:"matched_from,omitempty" doc:"Where this match came from"`
+	MatchedFrom string `json:"matched_from,omitempty" doc:"The source of this match"`
 	// The evidence for the judgment `matched` asks for, rather than a second
 	// way of making it. Recorded as the scanner wrote them and never parsed:
 	// deciding whether a version falls inside a range needs an ordering per
 	// ecosystem, which this does not have and does not attempt.
-	MatchedIn    string `json:"matched_in,omitempty" doc:"Which body of vulnerability data answered, as the scanner names it — an ecosystem's own advisories against the national database's identifiers"`
+	MatchedIn    string `json:"matched_in,omitempty" doc:"The body of vulnerability data that answered, as the scanner names it — an ecosystem's own advisories against the national database's identifiers"`
 	MatchedRange string `json:"matched_range,omitempty" doc:"The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix"`
-	FixedAt      string `json:"fixed_at,omitempty" doc:"When that version became available"`
+	FixedAt      string `json:"fixed_at,omitempty" doc:"The date that version became available"`
 	// ArrivedFrom says somebody moved this version and the issue came with it.
 	// A different sentence aimed at a different person: whoever did the bump,
 	// rather than whoever triages.
@@ -711,10 +711,10 @@ type EvidenceBody struct {
 	// so this cannot be worked out again later — and without it, "which
 	// scanner and which vulnerability database produced the finding you
 	// dismissed on 3 March" has no answer at all.
-	Opened string `json:"opened,omitempty" doc:"When the earliest of these places first appeared here, as a date"`
+	Opened string `json:"opened,omitempty" doc:"The earliest of these places first appearing here, as a date"`
 	// Due and NoDeadline are the same pair the list carries, and the screen
 	// somebody actually decides on carried neither.
-	Due      string `json:"due,omitempty" doc:"When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late"`
+	Due      string `json:"due,omitempty" doc:"The date it runs out. The earliest among its places, which is the one that makes the whole finding late"`
 	DaysLeft *int   `json:"days_left,omitempty" doc:"Negative once it is overdue"`
 	// The same two words the list body declares. This said
 	// `past-end-of-life`, which nothing produces, and omitted
@@ -722,8 +722,8 @@ type EvidenceBody struct {
 	// is past end of life — so a consumer validating against the published
 	// document rejected the body, and a TypeScript one could not narrow on
 	// the value it actually receives. Two bodies for one value, disagreeing.
-	NoDeadline string        `json:"no_deadline,omitempty" enum:"below-the-line,nothing-to-take,out-of-support" doc:"Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
-	FoundBy    *MeasuredBody `json:"found_by,omitempty" doc:"What produced this: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
+	NoDeadline string        `json:"no_deadline,omitempty" enum:"below-the-line,nothing-to-take,out-of-support" doc:"The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	FoundBy    *MeasuredBody `json:"found_by,omitempty" doc:"The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 
 	// Recorded says a person entered this rather than a scanner reporting it,
 	// which is the one thing that decides whether it can be closed by hand.
@@ -733,13 +733,13 @@ type EvidenceBody struct {
 	// embargo ends. The screen's standing notice is what somebody has to
 	// be unable to miss before they say anything about it.
 	Undisclosed bool   `json:"undisclosed,omitempty" doc:"This has not been announced. Anything said about it outside this deployment discloses it"`
-	DiscloseAt  string `json:"disclose_at,omitempty" doc:"When the embargo ends, as a date. Reaching it discloses nothing by itself"`
+	DiscloseAt  string `json:"disclose_at,omitempty" doc:"The date the embargo ends. Reaching it discloses nothing by itself"`
 
 	// LatestVersion is what upstream has released. Absent unless this
 	// deployment has turned asking on, which is off by default because it
 	// is the only thing here that reaches the network.
 	LatestVersion    string `json:"latest_version,omitempty" doc:"The newest version the ecosystem's own index knows of"`
-	LatestReleasedAt string `json:"latest_released_at,omitempty" doc:"When that version shipped"`
+	LatestReleasedAt string `json:"latest_released_at,omitempty" doc:"The date that version shipped"`
 	NothingSince     bool   `json:"nothing_since,omitempty" doc:"Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned"`
 
 	Places []SittingBody `json:"places"`
@@ -753,7 +753,7 @@ type EvidenceBody struct {
 	// One name for the whole finding, because assignment is set for the whole
 	// group at once. Where the places somehow disagree it is left empty rather
 	// than naming one of them, which is the same rule the deadline list uses.
-	AssignedTo string `json:"assigned_to,omitempty" doc:"Who is dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person"`
+	AssignedTo string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person"`
 	// RoutedBy names the standing rule that placed this, where a rule did
 	// rather than a person. A placement nobody can explain is one nobody
 	// can correct.
@@ -779,7 +779,7 @@ type EvidenceBody struct {
 	// prefill; never applied to anything by itself, because a third
 	// party's claim standing as ours would put somebody else's judgment
 	// inside a number we quote.
-	Vex []VexSaidBody `json:"vex" doc:"What VEX documents uploaded here say about this. Evidence, never applied"`
+	Vex []VexSaidBody `json:"vex" doc:"Statements from VEX documents uploaded here. Evidence, never applied"`
 }
 
 func registerFindingDetail(api huma.API, in Ingest) {
@@ -806,8 +806,8 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component's name, as the findings list gives it"`
-		Version       string `query:"version" doc:"Which version, where the build ships that name at more than one"`
-		Ecosystem     string `query:"ecosystem" doc:"Which ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it"`
+		Version       string `query:"version" doc:"The version, where the build ships that name at more than one"`
+		Ecosystem     string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it"`
 	}) (*struct{ Body EvidenceBody }, error) {
 		subject, err := reading(ctx)
 		if err != nil {
