@@ -124,6 +124,19 @@ const (
 	// findings and fails nothing, which is why silence has to be looked for
 	// rather than waited for.
 	QuietAfter = "scanning.quiet-after"
+	// VulnerabilityDataStaleAfter is how long the vulnerability data may go
+	// without moving before the deployment is told.
+	//
+	// A scan whose data has not moved in a month answers the same way it did a
+	// month ago, and it answers with the same confidence — which is the whole
+	// danger. Nothing fails, no scan is refused, and every finding on every
+	// screen is as old as the data behind it without saying so.
+	//
+	// How long is a judgment about how a deployment gets its data: one that
+	// downloads nightly expects it to move most days, and one that carries a
+	// bundle across an air gap on a schedule expects otherwise. So it is tuned
+	// here rather than compiled in.
+	VulnerabilityDataStaleAfter = "scanning.data-stale-after"
 	// ScanEvery is how often everything tracked is scanned again against
 	// the vulnerability data of the day.
 	//
@@ -145,6 +158,15 @@ const (
 	// stands outside that: it is not part of a scan, it is asked of a public
 	// index, and a deployment that cannot reach out loses this answer and
 	// nothing else.
+	//
+	// **What goes out is a component's name.** One request per component to
+	// that ecosystem's public index, carrying the name and nothing else — no
+	// version, no build, no product, nothing about who is asking beyond the
+	// request itself. For an open-source dependency that is public knowledge.
+	// For something built here it is the name of a project, a team or a
+	// product nobody has announced, and a public index records every request
+	// made of it, so names this deployment calls its own are held back and the
+	// report says which.
 	UpstreamCurrency = "upstream.currency"
 	// AttachmentMaxSize is the largest single file this deployment
 	// accepts, in bytes, and AttachmentQuota is how much it will hold in
@@ -329,6 +351,15 @@ const DefaultAttachmentShare = 1 << 30
 // scanned, and the pass that turns going quiet into something somebody is
 // told. Two copies of a default is two policies that agree until one moves.
 const DefaultQuietAfter = 7 * 24 * time.Hour
+
+// DefaultVulnerabilityDataStaleAfter is how long the vulnerability data may go
+// without moving before the deployment is told, where it has not said
+// otherwise.
+//
+// A week, for the reason the quiet-build window is a week: long enough that a
+// publisher having a slow few days is not an alert, short enough that a feed
+// that stopped being fetched is noticed in the week it stopped.
+const DefaultVulnerabilityDataStaleAfter = 7 * 24 * time.Hour
 
 // DefaultScanEvery is how often everything tracked is scanned again, where a
 // deployment has not said otherwise.

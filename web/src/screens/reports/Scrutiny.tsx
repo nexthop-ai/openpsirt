@@ -22,9 +22,15 @@ import {
 import { Wide } from "../../ui/Wide";
 
 // How long back to look. Ninety days is a quarter, which is the period an
-// audit asks about; the other two are here because a control question is
+// audit asks about; the others are here because a control question is
 // sometimes about this month and sometimes about the whole record.
-const WINDOWS = [30, 90, 365] as const;
+//
+// **Everything is offered because a condition points here.** The notification
+// saying risk is standing with nobody's agreement counts across the whole
+// record, and with nothing longer than a year offered, an administrator sent
+// here by it could be told a control failed and shown a page that cannot
+// contain the failure at any setting.
+const WINDOWS = [30, 90, 365, 3650] as const;
 
 // The three outcomes that hide risk and need a second person. Named here
 // because a deferral standing alone reads very differently from a dismissal

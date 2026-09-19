@@ -21,6 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -71,6 +72,11 @@ type Ingest struct {
 	// naming no publisher is not a CSAF document, and handing one over would
 	// fail wherever somebody took it next.
 	Publisher publisher.Named
+	// Ours is what this deployment calls its own, and so never sends to a
+	// public package index. The same value the asking pass holds, derived
+	// once where the configuration is read: two derivations of one boundary
+	// would be two boundaries the first time either moved.
+	Ours currency.Ours
 	// Mode says where roles come from. Read per request rather than held, so
 	// an administrator turning group binding off takes effect at once.
 	Mode func(context.Context) access.Mode

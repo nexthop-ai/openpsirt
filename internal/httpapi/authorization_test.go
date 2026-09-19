@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
@@ -407,6 +408,10 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 			// and a VEX document need. Passed in, because the deployment that
 			// has not been told is a case of its own.
 			Publisher: as,
+			// What this deployment calls its own, derived from the namespace
+			// it publishes under exactly as the binary derives it. Restated
+			// here it would be a second boundary that agreed until one moved.
+			Ours: currency.Ourselves(as.Namespace, nil),
 		})
 		fn(t, &reach{handler: handler, key: secret, revoked: revokedSecret,
 			rights: rights, db: db, api: api})

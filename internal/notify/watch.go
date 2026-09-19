@@ -70,8 +70,8 @@ func (w *Watch) Run(ctx context.Context, interval time.Duration) {
 	})
 }
 
-// tellAdministrators derives the two conditions that go to administrators and
-// to nobody else.
+// tellAdministrators derives the conditions that go to administrators and to
+// nobody else.
 //
 // The same list to each of them. An alert about the tool's health is not
 // somebody's personal work item, and the first administrator to look should
@@ -102,6 +102,31 @@ func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened,
 		}
 		opened += o
 		cleared += c
+	}
+
+	// The tool's own health, and a control that did not hold. Both are a
+	// report that has to come back empty, asked as a condition — see health.go
+	// for why that is not the same as mailing the report.
+	for _, each := range []struct {
+		kind Kind
+		of   func(context.Context) ([]Holds, error)
+		what string
+	}{
+		{VulnerabilityDataStale, w.dataStale, "that the vulnerability data has stopped moving"},
+		{RiskUnagreed, w.riskUnagreed, "what stands with nobody agreeing"},
+	} {
+		holding, err := each.of(ctx)
+		if err != nil {
+			return opened, cleared, err
+		}
+		for _, admin := range admins {
+			o, c, err := NewStore(w.db).Reconcile(ctx, admin, each.kind, holding)
+			if err != nil {
+				return opened, cleared, fmt.Errorf("tell %d %s: %w", admin, each.what, err)
+			}
+			opened += o
+			cleared += c
+		}
 	}
 	return opened, cleared, nil
 }
@@ -184,8 +209,8 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		cleared += c
 	}
 
-	// Work that has stopped moving. Four passes rather than one, because
-	// they are four different waits with four different audiences — and
+	// Work that has stopped moving. A pass each rather than one over all of
+	// them, because they are different waits with different audiences — and
 	// each is reconciled on its own kind, so a person holding two of them
 	// keeps both.
 	for _, sitting := range []struct {
@@ -379,11 +404,15 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 		}
 		where := row.Product + " " + row.Stream + " " + row.Variant
 		days := int(row.Since.Hours() / 24)
-		body := fmt.Sprintf("%s has not been scanned for %d days. Nothing has failed — "+
-			"nothing has arrived.", where, days)
+		// Put into words rather than printed, because "0 days" is what
+		// arithmetic gives for a threshold measured in hours and is not
+		// something anybody says. The quiet window is a setting and nothing
+		// stops a deployment scanning hourly from setting one.
+		body := fmt.Sprintf("%s has not been scanned for %s. Nothing has failed — "+
+			"nothing has arrived.", where, plainly(days))
 		if row.LastReceivedAt == nil {
-			body = fmt.Sprintf("%s was declared %d days ago and nothing has ever been "+
-				"filed against it.", where, days)
+			body = fmt.Sprintf("%s was declared %s ago and nothing has ever been "+
+				"filed against it.", where, plainly(days))
 		}
 		// Something did arrive and was turned away, which is the opposite of
 		// nothing having failed. This is the one surface that reaches a person
@@ -394,8 +423,8 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 			if row.RefusedBecause != nil {
 				why = ": " + *row.RefusedBecause
 			}
-			body = fmt.Sprintf("%s has not been scanned for %d days, and an upload "+
-				"against it was turned away on %s%s", where, days,
+			body = fmt.Sprintf("%s has not been scanned for %s, and an upload "+
+				"against it was turned away on %s%s", where, plainly(days),
 				row.LastRefusedAt.Format("2006-01-02"), why)
 		}
 		holding = append(holding, Holds{

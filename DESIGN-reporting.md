@@ -457,6 +457,21 @@ What it is for is showing that no dismissal sits in that population.
 Not-applicable, will-not-fix and already-fixed all require approval, so that
 query should return nothing, and a row in it is a control that failed.
 
+**Which is why nobody has to open it to find out.** The same question is asked
+as a condition and told to administrators when it stops answering nothing —
+because a report that is empty every time is one nobody opens, and it is then
+read only after something has already gone wrong. `DESIGN-notifications.md`
+§ Reports that must come back empty holds the rest, including why the
+condition carries a count and a link and never these rows.
+
+**The rubber-stamp report is not the same shape**, despite asking the same
+question in one of its sections. Only what stands with nobody agreeing has to
+be empty; bulk agreement is the control working at the grain somebody acted at,
+an approval from a role since withdrawn is correct behavior, and the same two
+people agreeing is what a small team looks like. A condition over any of those
+would be permanently true in a deployment with two triagers, which is an alert
+nobody can clear (REQ-49).
+
 Four filters: who proposed it, who has a standing agreement on it, which issue,
 and which component. An agreement later taken back does not match the approver
 filter, because answering otherwise would make a withdrawal invisible to the one
@@ -675,7 +690,7 @@ reach the filesystem and restart the process.
 | The triage floor | The severity below which findings are recorded and counted but kept off the working list. A product may state its own |
 | Quiet after | How long a build may go without a scan before it is reported as quiet |
 | Scan every | How often everything tracked is scanned again |
-| Upstream currency | Whether to ask public package indexes for the newest version. Off unless turned on: the only thing here that reaches the network |
+| Upstream currency | Whether to ask public package indexes for the newest version. Off unless turned on: the only thing here that reaches the network, and what goes out is a component's name. Names this deployment calls its own are held back, and the report of what has no upstream answer says which |
 | The two attachment bounds | The largest single file, and the deployment total |
 | Absent after | How long somebody may go without signing in before work they hold is raised |
 | The three disclosure periods | How long a finding stays undisclosed, how much that date may move in total before a second person agrees, and the lead time before it |

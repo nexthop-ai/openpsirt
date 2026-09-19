@@ -176,6 +176,62 @@ validation after you have sent it.
 On the Helm chart these go through `extraEnv`, since a deployment that does not
 publish needs none of them.
 
+## Asking public indexes what is current
+
+Off unless an administrator turns it on, under Settings. It is the only thing
+here that reaches the network: everything a scan needs arrives as a file
+somebody imported, and a deployment that cannot reach out loses this answer and
+nothing else.
+
+**What goes out is a component's name.** One request per component to that
+ecosystem's public index, carrying the name and nothing else — no version, no
+build, no product. For an open-source dependency that is public knowledge. For
+something built here it is the name of a project, a team, or a product nobody
+has announced, and a public index records every request made of it.
+
+So names this deployment calls its own are never sent. Three sources, unioned:
+
+| Source | What it yields |
+|---|---|
+| `OPENPSIRT_PUBLISHER_NAMESPACE` | The organization, spelled the three ways the ecosystems spell one: the host, the host reversed, which is what a Maven group is, and each label short of the top-level domain. A label naming a kind of registration or a forge rather than an organization is dropped, so `example.github.io` does not hold back everything under `github.com` |
+| What each build declared itself to be | The account, scope or group that identifier is published under, where an inventory names one. Read from the scans rather than from here, so a product declared this morning is one whose name does not leave this afternoon |
+| `OPENPSIRT_UPSTREAM_INTERNAL` | Whatever else you name, separated by commas |
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `OPENPSIRT_UPSTREAM_INTERNAL` | Names never sent to a public index, separated by commas, on top of the two derived sources above. Here rather than among the settings an administrator tunes, beside the namespace the default is derived from: asking upstream is a switch an administrator throws, and what leaves the deployment when it is on is a boundary you drew | unset |
+
+A name matches each part of a package's own name, either exactly or followed by
+`-`, `.` or `_`. A name carrying a dot also covers a host under it. So a
+deployment publishing under `example.test` holds back:
+
+| Identifier | On the label |
+|---|---|
+| `pkg:npm/@example/agent` | `example` |
+| `pkg:golang/github.com/example-corp/thing` | `example` |
+| `pkg:golang/test.example/lib` | `test.example`, the same organization spelled the way a module path spells it |
+| `pkg:golang/go.example.test/team/agent` | `example.test`, which covers a host under it |
+
+`pkg:npm/exampler` is left alone. Case does not decide.
+
+**This is a better default, not a control.** A deployment that needs certainty
+about what leaves it leaves the whole feature off, which is where it ships. It
+is biased toward holding back: over-excluding loses an answer, which is visible
+on the screen that would have shown it, and under-excluding sends a name to
+somebody else's service, which is visible nowhere.
+
+**Turning it off again drops what was fetched.** On a deployment that had
+asking on before a name was held back, the version an index gave for that name
+is removed the next time the pass reaches it, along with the summary and the
+project address. All of it came from sending the name. Nothing else is
+affected and no upgrade step is needed.
+
+**Read what it held back, and what no index knew.** The report is at
+`/v1/upstream/unanswered` and on the System screen. Held-back names say what
+the default is costing; names no public index has heard of are private modules
+and vendored forks, and they are the candidates to promote into
+`OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
+
 ## Who may sign in
 
 The process refuses to start until somebody can administer it, and naming

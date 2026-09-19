@@ -4390,6 +4390,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/upstream/unanswered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List components with no upstream answer
+         * @description What asking public package indexes did not answer, and why of each.
+         *
+         *     Asking sends a component's name to that ecosystem's index, so names this deployment calls its own are never sent. `ours` is what they were matched against, narrowed to the products you may read.
+         *
+         *     `unknown` is a component no public index has heard of — a private module or a vendored fork — and is the candidate list for `OPENPSIRT_UPSTREAM_INTERNAL`. `unreadable` is an identifier nothing can turn into a request.
+         *
+         *     A component the pass has not reached is not here. It is waiting rather than unanswered.
+         *
+         *     Answers only components in products you may read.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-unanswered-upstream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/version": {
         parameters: {
             query?: never;
@@ -4404,6 +4434,34 @@ export interface paths {
          *     **Requires:** any signed-in person, and not a pipeline key. A person rather than a pipeline: a build server has no business asking what version is running.
          */
         get: operations["get-version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/vulnerability-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show what the scans are answering against
+         * @description The vulnerability data version this deployment's scans are running against, and when it last moved.
+         *
+         *     **Nothing here is a version anybody can order.** What a scanner reports is an opaque string — a date for one, a schema revision and a build stamp for another — so the only question that can be asked of it is whether it changed. That is enough: what matters is that it moved, not which is newer.
+         *
+         *     `moved_at` is the most recent time any version was seen for the first time. A version that comes back was not a change the second time, which is what an air-gapped deployment re-importing an older bundle looks like.
+         *
+         *     Absent everywhere means nothing has finished a scan and stated a version, which is a deployment nobody has pointed at anything yet rather than data that has gone stale.
+         *
+         *     **Requires:** administrator
+         */
+        get: operations["get-vulnerability-data"];
         put?: never;
         post?: never;
         delete?: never;
@@ -9046,6 +9104,37 @@ export interface components {
              */
             rows: number;
         };
+        UnansweredBody: {
+            /** @description When the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked */
+            checked: string;
+            /** @description Which ecosystem the identifier names, read out of it rather than stored */
+            ecosystem?: string;
+            /** @description The package identifier, which is the name that would be sent */
+            purl: string;
+            /**
+             * @description 'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and no index had heard of it. 'unreadable' is an identifier nothing can turn into a request
+             * @enum {string}
+             */
+            why: "ours" | "unknown" | "unreadable";
+        };
+        UnansweredOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UnansweredOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["UnansweredBody"][] | null;
+            /** @description The names this deployment holds back, from its publisher namespace, from what it stated, and from what the builds you may read declared themselves to be. A name here is matched against each part of a package's name, either exactly or followed by one of - . _, and a name carrying a dot also covers a host under it */
+            ours: string[] | null;
+            /**
+             * Format: int64
+             * @description How many there are in all, through the same filter as the page
+             */
+            total: number;
+            /** @description Whether every candidate was examined. False means the estate is past what one read classifies, and the total is a floor */
+            whole: boolean;
+        };
         UnassignedBody: {
             /**
              * Format: int64
@@ -9188,6 +9277,25 @@ export interface components {
             remediations?: components["schemas"]["Remediation"][] | null;
             scores?: components["schemas"]["Score"][] | null;
             title?: string;
+        };
+        VulnerabilityDataBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/VulnerabilityDataBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: date-time
+             * @description When the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change
+             */
+            moved_at?: string;
+            /** @description Whether it has been that long. The same question the condition told to administrators asks */
+            stale: boolean;
+            /** @description How long without moving counts as stopped, as this deployment has it set */
+            stale_after: string;
+            /** @description What the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said */
+            version?: string;
         };
         WaitingBody: {
             /**
@@ -16202,6 +16310,40 @@ export interface operations {
             };
         };
     };
+    "list-unanswered-upstream": {
+        parameters: {
+            query?: {
+                /** @description How many to return */
+                limit?: number;
+                /** @description How many to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnansweredOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-version": {
         parameters: {
             query?: never;
@@ -16218,6 +16360,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Info"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-vulnerability-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VulnerabilityDataBody"];
                 };
             };
             /** @description Error */

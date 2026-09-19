@@ -106,6 +106,28 @@ func OutcomesThatHideRisk() []Outcome {
 	return kept
 }
 
+// OutcomesDismissing are the outcomes that claim no further work is needed:
+// it does not apply, it will not be fixed, the fix is already here.
+//
+// Told apart from the rest of what hides risk by carrying no date. A deferral
+// says when somebody will look again and a commitment says when the work
+// lands, so each of those is a statement about the future that something later
+// checks; these three close the question, and nothing re-opens it.
+//
+// Named rather than written out at each site. It was spelled as a literal
+// triple in three places, and a fourth dismissing outcome added to two of them
+// would have gone quietly uncounted in the third — which is a condition
+// reporting that a control held.
+func OutcomesDismissing() []Outcome {
+	kept := make([]Outcome, 0, len(Outcomes()))
+	for _, each := range Outcomes() {
+		if each.HidesRisk() && !each.Dated() {
+			kept = append(kept, each)
+		}
+	}
+	return kept
+}
+
 // Valid reports whether o is one we recognize.
 func (o Outcome) Valid() bool {
 	for _, known := range Outcomes() {

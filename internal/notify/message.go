@@ -52,6 +52,9 @@ var called = map[Kind]string{
 	ClaimLapsed:       "A decision of yours stopped applying",
 	BroughtIn:         "You have been brought into a case",
 	Unanswered:        "Somebody's report has not been answered",
+
+	VulnerabilityDataStale: "The vulnerability data has stopped moving",
+	RiskUnagreed:           "Something is hidden with nobody agreeing",
 }
 
 // generalSubject is what a notification of no known kind is called.
