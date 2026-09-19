@@ -3,10 +3,13 @@ package currency
 import (
 	"context"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 // Ours is the set of names this deployment does not send to a public index.
@@ -66,13 +69,6 @@ func (o Ours) With(purls ...string) Ours {
 // was held back.
 func (o Ours) Labels() []string { return append([]string(nil), o.labels...) }
 
-// Stated reports whether anything is held back at all.
-//
-// A deployment that has configured no publisher and scanned nothing with a
-// namespace of its own holds nothing back, which is the honest answer rather
-// than a guess at who it might be.
-func (o Ours) Stated() bool { return len(o.labels) > 0 }
-
 // HeldBack reports whether this component's name stays inside.
 //
 // Matched a segment at a time rather than anywhere in the string, so "nexthop"
@@ -103,12 +99,14 @@ func (o *Ours) add(labels ...string) {
 		if label == "" {
 			continue
 		}
-		if at := sort.SearchStrings(o.labels, label); at < len(o.labels) && o.labels[at] == label {
-			continue
-		}
 		o.labels = append(o.labels, label)
 	}
+	// Sorted before the duplicates are dropped, because dropping them is a
+	// walk over neighbours. Searched first, the search ran against a slice
+	// this loop had already left unsorted, and a name stated twice in two
+	// spellings reached the report twice.
 	sort.Strings(o.labels)
+	o.labels = slices.Compact(o.labels)
 }
 
 // separators are what a name is built from between one word and the next.
@@ -117,10 +115,19 @@ func (o *Ours) add(labels ...string) {
 // "nexthop.tools" and "nexthop_internal" and not "nexthopper".
 const separators = "-._"
 
-// matches reports whether one segment of a name is this label, or is a name
-// beginning with it.
+// matches reports whether one segment of a name is this label, is a name
+// beginning with it, or sits under it as a host.
+//
+// The third only applies to a label that is itself a host, which is what the
+// dot tells it. A vanity import path and a self-hosted forge both put the
+// organization's host in front of the package — "go.example.test/team/agent" —
+// and a label matched only where it begins a segment covers neither. Bounded
+// to a dot so that "example" does not take "notexample".
 func matches(segment, label string) bool {
 	if segment == label {
+		return true
+	}
+	if strings.Contains(label, ".") && strings.HasSuffix(segment, "."+label) {
 		return true
 	}
 	rest, begins := strings.CutPrefix(segment, label)
@@ -181,6 +188,13 @@ func Owner(purl string) string {
 var generic = map[string]bool{
 	"ac": true, "co": true, "com": true, "edu": true,
 	"gov": true, "net": true, "org": true,
+	// A forge names nobody's organization either. Publishing at
+	// "example.github.io" yields the bare label "github", which matches
+	// "github.com" because a dot is a separator — and that holds back most of
+	// a Go estate while reporting that it protects one name. The rule against
+	// taking a shared forge already holds where an owner is read out of an
+	// identifier; this is the other path to the same mistake.
+	"github": true, "gitlab": true, "bitbucket": true, "sourceforge": true,
 }
 
 // fromNamespace reads an organization out of the identifier this deployment
@@ -250,34 +264,69 @@ func publisherHost(namespace string) string {
 // RootOwners reads who publishes the things the scans were about.
 //
 // **From what each document called itself, not from the stored root.** The
-// component standing for the product is stored by its name alone on purpose —
-// a version on it would give the product a new identity every night — so the
-// package identifier a build declared for itself lives on the scan record
-// instead. That identifier is the one this needs: a root is the product this
-// deployment builds, so the account, scope or group it is published under is
-// this deployment's own by construction.
+// component standing for the product is stored by its name alone — a version
+// on it would give the product a new identity every night — so the package
+// identifier a build declared for itself lives on the scan record instead.
+// That identifier is the one this needs: a root is the product this deployment
+// builds, so the account, scope or group it is published under is this
+// deployment's own by construction.
 //
 // Read each pass rather than at startup, because a product declared this
 // morning is one whose name should not leave this afternoon.
-//
-// Bounded, because it is a read over every scan ever taken. Far above the
-// number of distinct things a deployment builds, which is what the answer is:
-// past it a root declared long ago stops being derived from, and what an
-// operator states covers it.
 func RootOwners(ctx context.Context, db bun.IDB) ([]string, error) {
-	var declared []string
-	err := db.NewSelect().
+	return rootOwners(ctx, db, nil, true)
+}
+
+// RootOwnersFor is RootOwners narrowed to the products a subject may read.
+//
+// What a build declared itself to be is a product's name, so the labels
+// derived from it are an answer about products rather than about the
+// deployment (REQ-42). The pass holds a name back against every root; what
+// travels back to a reader is only the part of that they may be told.
+func RootOwnersFor(ctx context.Context, db bun.IDB,
+	subject access.Subject) ([]string, error) {
+
+	products, all := subject.Products()
+	if !all && len(products) == 0 {
+		return nil, nil
+	}
+	return rootOwners(ctx, db, products, all)
+}
+
+// MostRoots bounds how many declared identifiers one derivation reads.
+//
+// **Identifiers, not products.** What a build declares itself to be carries
+// its version, so a product built nightly states a new one every night and a
+// handful of products cross this inside a year. Taken newest first, so the
+// bound falls on identifiers nothing has built in a long time and never on
+// what a deployment is shipping now.
+//
+// Ordered as well as bounded, because two callers derive this separately — the
+// pass that asks and the report that says what was held back — and an
+// unordered limit lets the engine hand them different thousands. A name held
+// back yesterday would go to a public index today.
+const MostRoots = 1000
+
+// rootOwners is both readings of the same question.
+func rootOwners(ctx context.Context, db bun.IDB, products []int64,
+	all bool) ([]string, error) {
+
+	q := db.NewSelect().
 		TableExpr(`"scan" AS "sc"`).
-		ColumnExpr(`DISTINCT sc.root_identifier`).
+		ColumnExpr(`sc.root_identifier AS "root_identifier"`).
 		Where("sc.root_identifier IS NOT NULL").
 		Where("sc.root_identifier <> ''").
-		Limit(MostRoots).
-		Scan(ctx, &declared)
-	if err != nil {
+		GroupExpr("sc.root_identifier").
+		OrderExpr("MAX(sc.id) DESC").
+		Limit(MostRoots)
+	if !all {
+		q = q.Join(`JOIN "target" AS "tg" ON tg.id = sc.target_id`).
+			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+			Where("st.product_id IN (?)", bun.List(products))
+	}
+	var declared []string
+	if err := q.Scan(ctx, &declared); err != nil {
 		return nil, err
 	}
 	return declared, nil
 }
-
-// MostRoots bounds how many declared roots one derivation reads.
-const MostRoots = 1000

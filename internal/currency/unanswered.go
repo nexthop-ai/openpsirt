@@ -109,16 +109,10 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		// day, which is the day somebody reads it.
 		Where("c.latest_checked_at IS NOT NULL").
 		Where("c.latest_version IS NULL").
-		// Only what there is an index for, built from the list of those for
-		// the reason the pass's own condition is: every other ecosystem is
-		// unanswerable by definition and saying so of each would bury the
-		// handful of rows this is for.
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			for _, each := range Askable() {
-				q = q.WhereOr("LOWER(c.purl) LIKE ?", "pkg:"+each+"/%")
-			}
-			return q
-		}).
+		// Only what there is an index for. One spelling with the pass's own
+		// condition, because the report has to describe the same candidates
+		// the pass asks about.
+		WhereGroup(" AND ", askableOnly).
 		// Ordered before it is cut, so a deployment past the ceiling reads
 		// the same part of the list twice rather than whatever the engine
 		// happened to hand over.

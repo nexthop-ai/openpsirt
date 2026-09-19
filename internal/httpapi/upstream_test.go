@@ -142,15 +142,36 @@ func TestWhatUpstreamCouldNotAnswerIsNarrowedToWhatMayBeRead(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// What the build declared itself to be, which is a product's own name.
+		if _, err := r.db.DB.NewUpdate().Table("scan").
+			Set("root_identifier = ?", "pkg:golang/github.com/unannounced-corp/product@v1").
+			Where("content_hash = ?", "upstream-narrowing").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
 		var body struct {
 			Items []struct {
 				Purl string `json:"purl"`
 			} `json:"items"`
-			Total int `json:"total"`
+			Total int      `json:"total"`
+			Ours  []string `json:"ours"`
 		}
 		read(t, r, "outsider", "/v1/upstream/unanswered", &body)
 		if body.Total != 0 || len(body.Items) != 0 {
 			t.Fatalf("somebody holding nothing here read %d of %d", len(body.Items), body.Total)
+		}
+		// The names travel back narrowed as well as the rows. A label derived
+		// from a root is the name a product is published under, so the whole
+		// list tells a reader the scope of a product nobody announced to them
+		// — the exact name this change exists to keep out of an index's logs.
+		if slices.Contains(body.Ours, "unannounced-corp") {
+			t.Errorf("somebody holding nothing here was told about %q: %v",
+				"unannounced-corp", body.Ours)
+		}
+		// What the deployment configured is not product data and stays, so an
+		// empty list would pass this test for the wrong reason.
+		if !slices.Contains(body.Ours, "example") {
+			t.Errorf("the deployment's own namespace is missing from %v", body.Ours)
 		}
 	})
 }

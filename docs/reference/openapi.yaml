@@ -8163,7 +8163,7 @@ components:
             - array
             - "null"
         ours:
-          description: The names this deployment holds back, from its publisher namespace, from what the scans were about, and from what it stated. A name here is matched against each part of a package's name, either exactly or followed by one of - . _
+          description: The names this deployment holds back, from its publisher namespace, from what it stated, and from what the builds you may read declared themselves to be. A name here is matched against each part of a package's name, either exactly or followed by one of - . _, and a name carrying a dot also covers a host under it
           items:
             type: string
           type:
@@ -20742,13 +20742,11 @@ paths:
       description: |-
         What asking public package indexes did not answer, and why of each.
 
-        **Asking is the one thing here that reaches the network, and what it sends is a component's name.** For an open-source dependency that is public knowledge; for something built here it is the name of a project, a team, or a product nobody has announced. So names this deployment calls its own are never sent, and `ours` is what they were matched against.
+        Asking sends a component's name to that ecosystem's index, so names this deployment calls its own are never sent. `ours` is what they were matched against, narrowed to the products you may read.
 
-        **Held back is biased toward holding back.** Over-excluding loses an answer, which is visible here and on the screen that would have shown it. Under-excluding sends a name to somebody else's service, which is visible nowhere.
+        `unknown` is a component no public index has heard of — a private module or a vendored fork — and is the candidate list for `OPENPSIRT_UPSTREAM_INTERNAL`. `unreadable` is an identifier nothing can turn into a request.
 
-        `unknown` is the candidate list: a component no public index has heard of is a private module or a vendored fork, and the names on it are what an operator promotes into `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
-
-        **A component the pass has not reached yet is not here.** It is waiting rather than unanswered, and reporting a first day's backlog as though the indexes had failed would make the list useless on the day somebody reads it.
+        A component the pass has not reached is not here. It is waiting rather than unanswered.
 
         Answers only components in products you may read.
 

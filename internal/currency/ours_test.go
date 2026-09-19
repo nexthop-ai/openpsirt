@@ -36,6 +36,11 @@ func TestTheNamespaceYieldsThreeSpellings(t *testing.T) {
 			[]string{"example", "example.co.uk", "uk.co.example"}},
 		{"one label reverses to itself, and is not repeated",
 			"http://localhost", []string{"localhost"}},
+		{"a forge is nobody's organization",
+			"https://example.github.io",
+			[]string{"example", "example.github.io", "io.github.example"}},
+		{"a name stated twice in two spellings is held once",
+			"https://acme.test", []string{"acme", "acme.test", "test.acme"}},
 		{"nothing configured holds nothing back", "", nil},
 		{"whitespace is nothing configured", "   ", nil},
 	} {
@@ -59,8 +64,8 @@ func TestTheNamespaceYieldsThreeSpellings(t *testing.T) {
 // is — is the one that silently stops answering about real packages.
 func TestNothingStatedHoldsNothingBack(t *testing.T) {
 	var none currency.Ours
-	if none.Stated() {
-		t.Fatal("a deployment that has configured nothing reports holding something back")
+	if got := none.Labels(); len(got) != 0 {
+		t.Fatalf("a deployment that has configured nothing holds back %q", got)
 	}
 	if none.HeldBack("pkg:golang/github.com/nexthop-ai/openpsirt") {
 		t.Fatal("a name was held back against an empty list")
@@ -112,6 +117,13 @@ func TestALabelMatchesAtSeparators(t *testing.T) {
 			"not-a-purl", false},
 		{"the case it is written in does not decide",
 			"pkg:golang/github.com/NextHop-AI/Thing", true},
+		// A vanity import path and a self-hosted forge both put the
+		// organization's host in front of the package, and a label matched
+		// only where it begins a segment covers neither.
+		{"a module under a subdomain of our own host",
+			"pkg:golang/go.nexthop.ai/team/agent", true},
+		{"a host that merely ends the same way is somebody else",
+			"pkg:golang/notnexthop.ai/thing", false},
 	} {
 		t.Run(each.name, func(t *testing.T) {
 			if got := ours.HeldBack(each.purl); got != each.want {
@@ -135,6 +147,12 @@ func TestWhatTheDeploymentStatedIsHeldBackToo(t *testing.T) {
 	}
 	if got := ours.Labels(); !reflect.DeepEqual(got, []string{"acme-internal", "skunkworks"}) {
 		t.Fatalf("the labels read back as %q", got)
+	}
+	// Stated twice in two spellings, which reached the report twice: the
+	// duplicate check searched a slice the loop had not sorted yet.
+	twice := currency.Ourselves("", []string{"Widgets", "acme", "ACME", "widgets"})
+	if got := twice.Labels(); !reflect.DeepEqual(got, []string{"acme", "widgets"}) {
+		t.Fatalf("a name stated twice reads back as %q", got)
 	}
 }
 

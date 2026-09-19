@@ -56,7 +56,7 @@ const MOST = 100;
 // promotion worked.
 //
 // Nothing here is a fault, which is why the empty state is the good news and
-// the table is not drawn in a failing colour. A private module, a vendored
+// the table is not drawn in a failing color. A private module, a vendored
 // fork and a name this deployment publishes under all reach it.
 function WhatUpstreamCouldNotAnswer() {
   const asked = useQuery({
@@ -79,17 +79,14 @@ function WhatUpstreamCouldNotAnswer() {
   return (
     <section className="panel">
       <h3>Upstream</h3>
-      <p className="hint" style={{ marginTop: 0 }}>
-        Asking public package indexes sends a component&rsquo;s name, one request per component.
-        Names this deployment calls its own are never sent. Nothing here is a fault.
-      </p>
-      <p className="hint">
+      <p
+        className="hint"
+        style={{ marginTop: 0 }}
+        title="Asking a public package index sends the component's name. A name matching one of these is never sent."
+      >
         Held back:{" "}
         {ours.length === 0 ? (
-          <span>
-            nothing. This deployment has no publisher namespace configured, has scanned nothing
-            published under one, and has stated no names of its own.
-          </span>
+          <span>nothing</span>
         ) : (
           ours.map((name) => (
             <span key={name} className="id" style={{ marginRight: "0.75ch" }}>
@@ -100,8 +97,8 @@ function WhatUpstreamCouldNotAnswer() {
       </p>
       {rows.length === 0 ? (
         <Empty
-          title="Every component has an upstream answer."
-          detail="Nothing was held back, and no name went unrecognized. A component the pass has not reached yet is not counted here."
+          title="Nothing here has gone unanswered."
+          detail="Only components in products you may read are counted, and only after the pass has reached them — a deployment that has not turned asking on has reached none of them yet."
         />
       ) : (
         <>

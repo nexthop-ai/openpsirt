@@ -754,9 +754,13 @@ func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
 // pass against a version that asked and then threw the answer away.
 func TestANameOfOursIsNotAskedAbout(t *testing.T) {
 	each(t, func(t *testing.T, db *database.DB) {
+		// The second one already has an answer, which is the deployment that
+		// had asking turned on before any of this existed. Everything stored
+		// against it came from sending the name that stops here.
+		had, shipped := "1.4.0", time.Now().UTC().Add(-90*24*time.Hour)
 		r, asked := seed(t, db, []component{
 			{purl: "pkg:golang/github.com/nexthop-ai/openpsirt@v1.0.0"},
-			{purl: "pkg:npm/%40nexthop/agent@1.0.0"},
+			{purl: "pkg:npm/%40nexthop/agent@1.0.0", checked: &shipped, version: &had},
 			{purl: "pkg:cargo/serde@1.0.0"},
 		}, map[string]currency.Latest{"serde": {Version: "1.0.230"}}, nil)
 		r.Ours = currency.Ourselves("https://nexthop.ai", nil)
@@ -783,8 +787,16 @@ func TestANameOfOursIsNotAskedAbout(t *testing.T) {
 			if got[purl].Checked == nil {
 				t.Errorf("%s was held back and left due for ever", purl)
 			}
+			// Dropped rather than left. Kept, the version stays on the
+			// screen with nothing that will ever refresh it, the component
+			// never reaches the report of what was held back, and the row
+			// goes stale in a day rather than in thirty — one of the two
+			// hundred slots every day for ever, sending nothing.
 			if got[purl].Version != nil {
-				t.Errorf("%s was held back and has a version anyway", purl)
+				t.Errorf("%s was held back and keeps the version an index gave it", purl)
+			}
+			if got[purl].Released != nil || got[purl].Summary != nil || got[purl].Project != nil {
+				t.Errorf("%s was held back and keeps what an index said about it", purl)
 			}
 		}
 	})

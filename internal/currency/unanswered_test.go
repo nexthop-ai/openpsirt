@@ -7,6 +7,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -194,7 +196,13 @@ func resolved(t *testing.T, w *fixture.World, identity string, role access.Role)
 // because reaching it honestly means seeding twenty thousand components on
 // four engines, which is a test nobody runs and therefore not a test.
 func TestPastTheCeilingTheCountSaysSo(t *testing.T) {
-	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+	// Alone, because the ceiling is a word the whole process shares and the
+	// rest of this package runs beside it: SQLite-only runs go parallel, so a
+	// sibling would see a ceiling of two and report a handful of rows as past
+	// it, and the race detector has a real write against read on the same
+	// word.
+	dbtest.Alone(t, func(t *testing.T, db *database.DB) {
+		w := fixture.New(t, db)
 		currency.Examining(t, 2)
 		asked := time.Now().UTC().Add(-time.Hour)
 		purls := []string{

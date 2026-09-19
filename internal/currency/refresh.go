@@ -280,8 +280,15 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		// afterwards with the components behind it never reached. What tells
 		// the two apart afterwards is the same list applied again, which is
 		// what the report of what was held back is.
+		//
+		// **Anything an index said is dropped.** It was obtained by sending
+		// this name, which is the thing that stops here. Kept, the version
+		// stays on the screen with nothing that will ever refresh it, the
+		// component never reaches the report of what was held back, and the
+		// row goes stale in a day rather than in thirty — so it takes one of
+		// the two hundred slots every day for ever and sends nothing.
 		if ours.HeldBack(component.Purl) {
-			if err := r.record(ctx, component.ID, Latest{}); err != nil {
+			if err := r.forget(ctx, component.ID); err != nil {
 				return asked, err
 			}
 			continue
@@ -375,29 +382,7 @@ func (r *Refresher) due(ctx context.Context) ([]stale, error) {
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.purl AS "purl"`).
 		Where("c.purl <> ''").
-		// Only what there is an index for, built from the list of those
-		// rather than from its complement. Maintained as a complement — one
-		// entry excluding distribution packages — every other unaskable
-		// ecosystem passed this filter, reached the asker, found none and was
-		// recorded empty, spending one of the two hundred slots a pass has.
-		//
-		// A distribution package is the case the complement was written for
-		// and is still excluded by being absent from the list: for one of
-		// those the distribution is the maintainer, and the date it released
-		// says nothing about the age of the software inside it — Debian
-		// shipping a security update today does not mean upstream is moving.
-		//
-		// Lowercased, because `Asked` lowercases the ecosystem and these two
-		// have to agree. They did not: `pkg:DEB/...` was excluded by SQLite's
-		// case-insensitive LIKE and kept by PostgreSQL's and MariaDB's, so the
-		// same document behaved differently per engine — and the row that got
-		// through then had no index and stuck.
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			for _, each := range Askable() {
-				q = q.WhereOr("LOWER(c.purl) LIKE ?", "pkg:"+each+"/%")
-			}
-			return q
-		}).
+		WhereGroup(" AND ", askableOnly).
 		// Never asked, or asked long enough ago — where "long enough" depends
 		// on whether we got an answer. A version we have goes stale in a day;
 		// a package the index has never heard of is left for a month.
@@ -416,6 +401,30 @@ func (r *Refresher) due(ctx context.Context) ([]stale, error) {
 		return nil, fmt.Errorf("read what has not been asked about lately: %w", err)
 	}
 	return rows, nil
+}
+
+// askableOnly narrows to the ecosystems there is an index for.
+//
+// One spelling, because the pass that asks and the report that says what went
+// unanswered have to describe the same set of candidates.
+//
+// Built from the list of those ecosystems rather than from its complement. A
+// distribution package is the case a complement was written for and is still
+// excluded by being absent from the list: for one of those the distribution is
+// the maintainer, and the date it released says nothing about the age of the
+// software inside it. Every other unaskable ecosystem is excluded too, which a
+// complement did not do — each of them reached the asker, found none and was
+// recorded empty, spending one of the two hundred slots a pass has.
+//
+// Lowercased, because Asked lowercases the ecosystem and the two have to
+// agree. SQLite's LIKE is case-insensitive and PostgreSQL's is not, so
+// "pkg:DEB/..." was excluded by one engine and kept by another, and the row
+// that got through had no index and stuck.
+func askableOnly(q *bun.SelectQuery) *bun.SelectQuery {
+	for _, each := range Askable() {
+		q = q.WhereOr("LOWER(c.purl) LIKE ?", "pkg:"+each+"/%")
+	}
+	return q
 }
 
 // record writes what an index said.
@@ -465,6 +474,33 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 	}
 	if _, err := q.Exec(ctx); err != nil {
 		return fmt.Errorf("record what upstream has released: %w", err)
+	}
+	return nil
+}
+
+// forget records that a component was held back, and drops what an index had
+// said about it.
+//
+// The opposite of record's rule that an empty answer overwrites nothing. That
+// rule is about an index having a bad day, where a previous answer is still
+// the best thing known; this is a name that is not asked about at all any
+// more, and everything stored against it came from asking.
+//
+// The time of asking is written, because "held back" and "not looked at yet"
+// are different states and only one of them belongs at the head of the next
+// pass.
+func (r *Refresher) forget(ctx context.Context, id int64) error {
+	_, err := r.db.NewUpdate().
+		Table("component").
+		Set("latest_checked_at = ?", r.Now().UTC()).
+		Set("latest_version = NULL").
+		Set("latest_released_at = NULL").
+		Set("summary = NULL").
+		Set("project_url = NULL").
+		Where("id = ?", id).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("drop what an index said about a name of ours: %w", err)
 	}
 	return nil
 }
