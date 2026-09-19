@@ -442,7 +442,7 @@ still reading as present, invisibly.
 Each refusal is the caller's to fix and says so: a name that reaches nothing, a
 name that reaches several, a summary of nothing but whitespace, and a build with
 no contents. The third is worth naming — a minimum length passes whitespace, so
-it arrives from a request and used to be answered as a server fault.
+it arrives from a request and is refused rather than answered as a server fault.
 
 ## The authority of a run
 
@@ -770,11 +770,11 @@ names.
 | A claim standing on either row stands at the place, the lowest identifier first | A decision is keyed on the place and expires on the versions, and the two rows need not hold the same versions — a source package and the distribution's package of one name differ by a packaging revision, so a decision matches one row and not the other |
 
 A row names what pulls it in even where the route up is unknown. Where the walk
-up reaches nothing, both ends used to be blank and the row read "nothing records
-what pulls this in" — two different statements, and the second was false. The
-finding records its consumer whatever the graph managed; what was missing was
+up reaches nothing, the finding still records its consumer: what is missing is
 the route up, which happens where an inventory describes something under a
-component not itself reachable from the root. A row with no walkable chain names
+component not itself reachable from the root. Blank at both ends a row says
+nothing records what pulls this in, which is a different statement and a false
+one. A row with no walkable chain names
 its consumer and leaves the owner empty.
 
 A place names the claim standing on it, not only the decision. At most one live

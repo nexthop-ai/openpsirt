@@ -382,11 +382,10 @@ tests run against, this answers what the release is built from. It found drift o
 its first run — the image carried two defaults for the version passed in, so a
 build with none reported `dev` in the binary and `0.0.0` in its own inventory.
 
-The Go patch counts, and it did not used to. The image built from
-`golang:1.27-alpine`, which floats, and the check truncated `go.mod` to the
-minor so the two could be compared at all. The first release shipped a tarball
-built by 1.27.0 and an image built by 1.27.1 — one Go patch apart, and green.
-The image now names the patch `go.mod` declares and the check compares the whole
+The Go patch counts. A floating base image and a comparison truncated to the
+minor cannot tell one patch apart, so a tarball and an image built from the same
+commit are a release built twice by two toolchains with the gate green. The
+image names the patch `go.mod` declares and the check compares the whole
 version.
 
 | What that costs | What answers it |

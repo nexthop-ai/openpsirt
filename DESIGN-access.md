@@ -1082,8 +1082,7 @@ of the case.
 
 ## Case collaborators
 
-Everybody holding private triage on a product used to see every embargoed finding
-in it, and there was no smaller unit than the product.
+The product is not the smallest unit access is granted in.
 
 A collaborator is granted one issue in one product (REQ-43). They see that issue
 everywhere it sits in that product and nothing else — not the rest of the

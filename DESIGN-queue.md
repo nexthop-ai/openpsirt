@@ -124,11 +124,11 @@ non-positive interval takes the pass's own default; the context ends the loop.
 | Reporting stays with each pass | They log different things — what was collected, what was sent and what failed, a line per unit of work. A helper that owned the logging would be the call site written out again with a worse vocabulary |
 | A failed pass is logged and the loop goes on | A pass that cannot run is not a reason to stop serving, and what it failed to do is still there next time |
 
-It was written out once per pass, and some of those copies had already diverged
-over whether the log line carries the trace context. Anything about how passes
-are scheduled — spreading goroutines that would otherwise wake together on a
-cold start, a measurement per pass, a first-run delay — was an edit per copy,
-and a missed one would have diverged in silence because nothing tested any of
+One implementation, not one per pass. Written out per pass, the copies diverge
+over what nothing tests: whether the log line carries the trace context, how
+goroutines that would otherwise wake together on a cold start are spread, where
+a measurement or a first-run delay sits. Each is an edit per copy, and a missed
+one diverges in silence, because nothing tests any of
 them.
 
 ## Leases

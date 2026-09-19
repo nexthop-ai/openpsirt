@@ -198,8 +198,8 @@ the operator's key name there asks for a key that is not there — which renders
 perfectly and produces a pod that never starts.
 
 A Secret is written only while the thing that reads it is configured.
-Turning a provider off by clearing its issuer used to leave the Secret behind,
-holding a live credential nothing reads.
+Clearing a provider's issuer removes its Secret. One left behind holds a live
+credential nothing reads.
 
 The same pair answers for the database URL, both client secrets and the mail
 password, because what differs between them is the name of the Secret and the

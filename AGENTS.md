@@ -98,6 +98,10 @@ The last row is the only place prior behavior belongs. A document and a comment
 describe the system as it is now, and a reader years later needs the
 constraint.
 
+The exception is an upgrade note, where the change is the subject. A section
+telling an operator that a configuration accepted before is refused now states
+both, because what they have to act on is the difference.
+
 | Rule | |
 |---|---|
 | **A heading names a thing** | A noun phrase, six words at most. No question, no wh-word, and no gerund taking an object — "Upstream currency", not "Asking upstream what is current"; "Index responses", not "What an index says"; "Version ordering", not "Ordering the versions a scanner named". A bare gerund naming a process is a noun and is fine: "Parsing", "Scanning" |

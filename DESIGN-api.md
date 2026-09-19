@@ -55,7 +55,7 @@ The application serves no documentation of its own, leaving no unauthenticated
 route that reads domain data: no product, finding, issue, person or credential
 is readable without a credential.
 
-Sign-in is not nothing, and the absolute this used to state was false. It reads
+Sign-in is not nothing. It reads
 and writes the deployment's own sign-in key, the session it is creating and the
 account row a first arrival needs — its own machinery, and nothing beyond it. A
 route added under that prefix is checked against that; it is not harmless by
