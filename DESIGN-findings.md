@@ -396,14 +396,40 @@ A public intake form is out of scope. This is the inside half.
 |---|---|
 | A score is never taken alongside a vector | Two values a caller states separately can disagree, and afterwards nothing says which was meant. The number sorts and the vector is what somebody can argue with |
 | Base metrics only | Temporal and environmental scores describe a moment and a deployment, and the deployment reading a finding is not the one it is about |
-| **The formula is here and nowhere else** | A screen composing a vector shows what it will score by asking, rather than holding a second copy: two implementations of a score disagree eventually, and what somebody saw while choosing would not be what was stored. That is what the scoring operation is for — it reads nothing, writes nothing and is reachable by any recognized credential, because a vector is not a secret |
-| Version 3.0 and 3.1; anything else refused by name | They share a base formula, version 4 does not, and version 2 is a different scheme. A vector scored with the wrong formula produces a number nothing downstream can tell from a real one |
-| Rounding is the scheme's own, in integer arithmetic | Floating point gets a different answer for some inputs: a value that should be exactly 8.6 is not representable, and a naive ceiling returns 8.7 |
+| The formula is here and nowhere else | A screen composing a vector shows what it will score by asking, rather than holding a second copy: two implementations of a score disagree eventually, and what somebody saw while choosing would not be what was stored. That is what the scoring operation is for — it reads nothing, writes nothing and is reachable by any recognized credential, because a vector is not a secret |
+| Version 3.0, 3.1 and 4.0; anything else refused by name | Version 2 is a different scheme, and a vector scored with the wrong formula produces a number nothing downstream can tell from a real one |
+| Each scheme rounds its own way | Version 3 rounds up to a tenth, in integer arithmetic, because floating point gets a different answer for some inputs: a value that should be exactly 8.6 is not representable, and a naive ceiling returns 8.7. Version 4 rounds to the nearest tenth |
 | An unstated vector is not a score of zero | Zero says "harmless", a judgment nobody made during early triage |
 | A severity may be left unstated (REQ-18) | Making somebody choose a word to get the record written is how a guess ends up stored as a judgment. It is not given *no* deadline: the windows answer for a severity they do not recognize |
 | A person's severity is checked against the words rather than folded | A report's is folded, because a scanner that rated nothing is silent and silence is not a claim that something is mild. A person typing "urgent" is not silent; they are wrong, and folding would replace their judgment with one nobody made |
+| The scheme a score is on travels with it | A number alone is not readable across schemes. It is recorded from the vector on a flaw assessed here, and from what the report states on one a scan brought in |
 | Weaknesses are recorded as given, against no catalog | Trimmed, upper-cased, de-duplicated. A list refusing an identifier it had not heard of would refuse next year's. Where a published document has to name one, the name is looked up then rather than checked now, and an identifier no catalog assigns is left out of that document rather than out of the record |
 | Which one is the root cause is carried rather than picked | A published advisory states one weakness and an issue is commonly classified as several. The feeds say which they call primary, and a person recording a flaw names theirs first — the same statement made by hand. Choosing the lowest number or the earliest string instead is an answer with nothing behind it, and the two disagree: `CWE-20` is the lower number and `CWE-119` the earlier string |
+
+### Version 4 classes
+
+The version 4 base score is a lookup. Every vector falls into one of a few
+hundred equivalence classes, each carrying a published score, and a vector
+scores its class less how far it sits from the worst member of that class. The
+distance is taken one class at a time, scaled by the drop to the class below,
+and averaged over the classes that have something below them.
+
+| Rule | |
+|---|---|
+| The classes carried are the ones a base vector reaches | Ninety-six of the published two hundred and seventy. The rest are reached once the threat and environmental metrics are scored, and the table grows with the code that reads them: a transcribed number nothing runs is a number nobody would find wrong |
+| A flaw with no impact anywhere scores zero before the tables | The lowest class is worth more than zero, so the one honest zero has to be recognized ahead of the lookup |
+| A distance is measured from the first worst vector the class lists | Every member of a class that has a step below it is the same distance from the class floor. A class with nothing below it contributes no distance, and two of those list members that disagree |
+
+### One ladder for every scheme
+
+The five severity words over the same five ranges, in version 3 and version 4
+alike. That is the whole of what makes a list holding both orderable.
+
+| Rule | |
+|---|---|
+| Two scores under different schemes compare as bands, never as numbers | The schemes weigh reachability and impact differently, so 7.5 under version 3 and 7.5 under version 4 are two different judgments that are both high |
+| A score is shown with the scheme it is on | A reader comparing two rows needs to know whether they are the same kind of number. Ranking treats them as one ladder, which only holds while the bands are the common ground |
+| The back catalog never moves | A scan over a distribution base turns up issues rated under whichever scheme was current when they were published. Both scorers stand indefinitely, so the ladder is load-bearing for as long as the deployment runs |
 
 ## Affected build sets
 
@@ -689,7 +715,7 @@ Four signals, in this order:
 |---|---|
 | Known to be exploited | The difference between a risk and an incident |
 | Reaches customers | A critical in something only the build system runs matters less than a medium in what people install |
-| Severity | How bad it would be if it happened |
+| Severity | How bad it would be if it happened. Scores from two schemes rank against one another as bands — see § One ladder for every scheme |
 | Likelihood of exploitation | Which of two equally severe things to look at first |
 
 Severity above likelihood, measured rather than assumed. The original order had

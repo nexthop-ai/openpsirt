@@ -187,6 +187,14 @@ func (s *Store) creditedFor(ctx context.Context, productID,
 	return []Acknowledgment{{Names: names, Summary: "Reported this flaw"}}, nil
 }
 
+// carriedByCSAF is the scoring schemes a CSAF 2.0 document has a field for.
+//
+// The standard's score object holds a version 2 score and a version 3 score,
+// and version 4 arrives with CSAF 2.1. So a flaw assessed under version 4 is
+// published with no score at all: the number is recorded and shown here, and
+// the document states what it has a place to state.
+var carriedByCSAF = map[string]bool{"3.0": true, "3.1": true}
+
 // scoresFor is what the flaw scored, stated for every release the document
 // names.
 //
@@ -195,8 +203,8 @@ func (s *Store) creditedFor(ctx context.Context, productID,
 // disagree have nothing to say which was meant, and the standard's own
 // consumers recompute.
 //
-// A vector under a scheme this deployment does not score — version 2, version
-// 4 — yields nothing rather than a number under the wrong formula.
+// A vector under a scheme this deployment does not score, or one the document
+// has no field for, yields nothing rather than a number in the wrong place.
 func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 	if len(products) == 0 || strings.TrimSpace(issue.Vector) == "" {
 		return nil
@@ -205,13 +213,12 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 	if err != nil || scored == nil {
 		return nil
 	}
-	scheme, _, found := strings.Cut(scored.Vector, "/")
-	if !found {
+	if !carriedByCSAF[scored.Scheme()] {
 		return nil
 	}
 	return []Score{{
 		CVSSv3: &CVSSv3{
-			Version:      strings.TrimPrefix(scheme, "CVSS:"),
+			Version:      scored.Scheme(),
 			VectorString: scored.Vector,
 			BaseScore:    float64(scored.ScoreCenti) / 100,
 			BaseSeverity: strings.ToUpper(scored.Severity),

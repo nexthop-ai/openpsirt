@@ -3951,7 +3951,9 @@ export interface paths {
          * Score a CVSS vector
          * @description Returns the base score and the severity band a vector works out to. It reads nothing and records nothing.
          *
-         *     CVSS 3.0 and 3.1 only. Version 4 has a different base formula and version 2 is a different scheme, and scoring either with this one produces a number nothing downstream could tell apart from a real one.
+         *     CVSS 3.0, 3.1 and 4.0. A vector on any other scheme is refused, including version 2. Metrics outside the base set are read and ignored, so a vector carrying threat or environmental metrics scores as the base vector in it.
+         *
+         *     Scores from two schemes are not comparable as numbers. The severity band is, and it is the same five words over the same five ranges under both.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers a calculation, and reads nothing.
          */
@@ -6182,6 +6184,8 @@ export interface components {
              * @description The severity as a number, which is what the order compares
              */
             score?: number;
+            /** @description The scoring system the number is on */
+            score_version?: string;
             /** @description A live claim at one of these places is currently with its author, sent back for more */
             sent_back?: boolean;
             /** @description The rating in force: what we rate it where we have said something, and what was published otherwise. A word, not a score */
@@ -8549,6 +8553,8 @@ export interface components {
             severity: "none" | "low" | "medium" | "high" | "critical";
             /** @description As it was read, upper-cased */
             vector: string;
+            /** @description The scheme the vector is on */
+            version: string;
         };
         ScrutinyOutputBody: {
             /**
@@ -15653,7 +15659,7 @@ export interface operations {
     "score-vector": {
         parameters: {
             query: {
-                /** @description A CVSS 3.0 or 3.1 base vector */
+                /** @description A CVSS 3.0, 3.1 or 4.0 base vector */
                 vector: string;
             };
             header?: never;

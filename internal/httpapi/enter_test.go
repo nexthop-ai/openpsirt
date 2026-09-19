@@ -432,11 +432,62 @@ func TestAVectorThisCannotScoreIsTheCallersToFix(t *testing.T) {
 		const at = "/v1/products/mine/findings"
 		got := asPerson(t, r, "private-triage", http.MethodPost, at,
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Something is wrong.",`+
-				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"}`)
+				`"vector":"AV:N/AC:L/Au:N/C:P/I:P/A:P"}`)
 		if got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("a version this cannot score answered %d, want it named as the caller's"+
+			t.Errorf("a scheme this cannot score answered %d, want it named as the caller's"+
 				" to fix: %s", got.Code, got.Body.String())
 		}
+	})
+}
+
+func TestAFlawAssessedUnderVersionFourIsRecordedWithTheSchemeItWasAssessedUnder(t *testing.T) {
+	// The population a deployment writes advisories about is the one it
+	// assesses itself, so this is the scheme that matters most. A number
+	// recorded without it cannot be placed: 7.5 under version 3 and 7.5 under
+	// version 4 are two different judgments.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		made := asPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		var listed struct {
+			Items []struct {
+				Vulnerability string  `json:"vulnerability"`
+				Severity      string  `json:"severity"`
+				Score         float64 `json:"score"`
+				ScoreVersion  string  `json:"score_version"`
+			} `json:"items"`
+		}
+		read(t, r, "private-triage",
+			"/v1/products/mine/findings?stream=master&variant=broadcom", &listed)
+		for _, item := range listed.Items {
+			if item.Vulnerability != recorded.Identifier {
+				continue
+			}
+			if item.ScoreVersion != "4.0" {
+				t.Errorf("the list says the score is on %q, want the 4.0 it was assessed under",
+					item.ScoreVersion)
+			}
+			// 10.0 by the published tables, which is "critical".
+			if item.Severity != "critical" {
+				t.Errorf("the vector said critical and the finding reads %q", item.Severity)
+			}
+			if item.Score < 9.9 || item.Score > 10 {
+				t.Errorf("the score is %v, want the 10.0 the vector works out to", item.Score)
+			}
+			return
+		}
+		t.Error("what was recorded is not in the list")
 	})
 }
 

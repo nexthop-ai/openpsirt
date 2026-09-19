@@ -16,15 +16,18 @@ func registerScoring(api huma.API, in Ingest) {
 		Summary: "Score a CVSS vector",
 		Description: "Returns the base score and the severity band a vector works out to. " +
 			"It reads nothing and records nothing.\n\n" +
-			"CVSS 3.0 and 3.1 only. Version 4 has a different base formula and version 2 is a " +
-			"different scheme, and scoring either with this one produces a number nothing " +
-			"downstream could tell apart from a real one.",
+			"CVSS 3.0, 3.1 and 4.0. A vector on any other scheme is refused, including " +
+			"version 2. Metrics outside the base set are read and ignored, so a vector " +
+			"carrying threat or environmental metrics scores as the base vector in it.\n\n" +
+			"Scores from two schemes are not comparable as numbers. The severity band is, " +
+			"and it is the same five words over the same five ranges under both.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers a calculation, and reads nothing."), func(ctx context.Context, input *struct {
-		Vector string `query:"vector" required:"true" doc:"A CVSS 3.0 or 3.1 base vector"`
+		Vector string `query:"vector" required:"true" doc:"A CVSS 3.0, 3.1 or 4.0 base vector"`
 	}) (*struct {
 		Body struct {
 			Vector   string  `json:"vector" doc:"As it was read, upper-cased"`
+			Version  string  `json:"version" doc:"The scheme the vector is on"`
 			Score    float64 `json:"score"`
 			Severity string  `json:"severity" enum:"none,low,medium,high,critical" doc:"The band the score falls in"`
 		}
@@ -42,12 +45,14 @@ func registerScoring(api huma.API, in Ingest) {
 		out := &struct {
 			Body struct {
 				Vector   string  `json:"vector" doc:"As it was read, upper-cased"`
+				Version  string  `json:"version" doc:"The scheme the vector is on"`
 				Score    float64 `json:"score"`
 				Severity string  `json:"severity" enum:"none,low,medium,high,critical" doc:"The band the score falls in"`
 			}
 		}{}
 		if scored != nil {
 			out.Body.Vector = scored.Vector
+			out.Body.Version = scored.Scheme()
 			out.Body.Score = float64(scored.ScoreCenti) / 100
 			out.Body.Severity = scored.Severity
 		}

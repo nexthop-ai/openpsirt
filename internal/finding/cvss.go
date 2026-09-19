@@ -37,6 +37,16 @@ type Scored struct {
 	Severity string
 }
 
+// Scheme is the version of the scheme the vector is on, spelled the way a
+// report spells it.
+//
+// A number alone is not readable across schemes, so this travels with the
+// score wherever one is shown.
+func (s *Scored) Scheme() string {
+	named, _, _ := strings.Cut(s.Vector, "/")
+	return strings.TrimPrefix(named, "CVSS:")
+}
+
 // The base metrics, and what each value weighs.
 //
 // Spelled as tables rather than as a switch so that the vector's grammar and
@@ -54,27 +64,53 @@ var (
 	privilegesChanged   = map[string]float64{"N": 0.85, "L": 0.68, "H": 0.50}
 )
 
+// baseThree is every metric a version 3 base vector states, all required.
+var baseThree = []string{"AV", "AC", "PR", "UI", "S", "C", "I", "A"}
+
+// schemes are the vector prefixes that name a formula this works out.
+//
+// Two formulas behind three names: 3.0 and 3.1 share a base equation, and 4.0
+// is a lookup over equivalence classes. All three band the result the same
+// way, which is what lets one list sort scores from all of them.
+var schemes = map[string]bool{"CVSS:3.0": true, "CVSS:3.1": true, "CVSS:4.0": true}
+
 // Score reads a CVSS base vector and works out what it says.
 //
-// Version 3.0 and 3.1 only, and anything else is refused by name. They
-// share a base formula; version 4 does not, and version 2 is a different
-// scheme entirely. Scoring an unrecognized vector with whatever formula is to
-// hand produces a number that looks like every other number here.
+// Version 3.0, 3.1 and 4.0. Anything else is refused by name — version 2 is a
+// different scheme, and scoring an unrecognized vector with whichever formula
+// is to hand produces a number that looks like every other number here.
+//
+// Metrics outside the base set are read and ignored, so a vector carrying
+// threat or environmental metrics beside the base ones scores as the base
+// vector it contains.
 func Score(vector string) (*Scored, error) {
 	vector = strings.ToUpper(strings.TrimSpace(vector))
 	if vector == "" {
 		return nil, nil
 	}
 	parts := strings.Split(vector, "/")
-	if len(parts) < 2 || (parts[0] != "CVSS:3.1" && parts[0] != "CVSS:3.0") {
+	if len(parts) < 2 || !schemes[parts[0]] {
 		return nil, fmt.Errorf(
-			"%w: a score is worked out from a CVSS 3.0 or 3.1 base vector, and scoring "+
-				"anything else with that formula would produce a number nothing could tell "+
-				"apart from a real one", ErrNotAVector)
+			"%w: a score is worked out from a CVSS 3.0, 3.1 or 4.0 base vector, and scoring "+
+				"anything else with one of those formulas would produce a number nothing could "+
+				"tell apart from a real one", ErrNotAVector)
 	}
+	given, err := stated(parts[1:])
+	if err != nil {
+		return nil, err
+	}
+	if parts[0] == "CVSS:4.0" {
+		return scoreFour(vector, given)
+	}
+	return scoreThree(vector, given)
+}
 
+// stated reads the metrics a vector names, refusing one it says twice.
+//
+// A metric given twice has two answers and no way to say which was meant.
+func stated(parts []string) (map[string]string, error) {
 	given := map[string]string{}
-	for _, part := range parts[1:] {
+	for _, part := range parts {
 		metric, value, found := strings.Cut(part, ":")
 		if !found || metric == "" || value == "" {
 			return nil, fmt.Errorf("%w: %q is not a metric and a value", ErrNotAVector, part)
@@ -84,14 +120,27 @@ func Score(vector string) (*Scored, error) {
 		}
 		given[metric] = value
 	}
+	return given, nil
+}
 
-	// Every base metric, all required. A vector missing one is not a base
-	// vector, and filling in a default would be choosing the answer.
-	for _, metric := range []string{"AV", "AC", "PR", "UI", "S", "C", "I", "A"} {
+// missing names a base metric the vector leaves out, and is empty where all of
+// them are stated.
+//
+// Filling in a default would be choosing the answer.
+func missing(given map[string]string, base []string) string {
+	for _, metric := range base {
 		if _, held := given[metric]; !held {
-			return nil, fmt.Errorf("%w: it states no %s, and a base score needs all eight",
-				ErrNotAVector, metric)
+			return metric
 		}
+	}
+	return ""
+}
+
+// scoreThree works out a version 3.0 or 3.1 base vector.
+func scoreThree(vector string, given map[string]string) (*Scored, error) {
+	if metric := missing(given, baseThree); metric != "" {
+		return nil, fmt.Errorf("%w: it states no %s, and a base score needs all eight",
+			ErrNotAVector, metric)
 	}
 
 	changed := given["S"] == "C"
@@ -154,6 +203,13 @@ func roundUp(x float64) float64 {
 }
 
 // bandOf is the word a score falls in, by the published bands.
+//
+// One ladder for every scheme here. The bands are the same five words over the
+// same five ranges in version 3 and version 4, which is what makes a list
+// holding both orderable: two findings at 7.5 assessed under different schemes
+// are both high. The numbers underneath are not comparable — the schemes
+// weigh reachability and impact differently — so the scheme travels with the
+// score wherever one is shown.
 func bandOf(score float64) string {
 	switch {
 	case score == 0:

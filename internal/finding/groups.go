@@ -132,6 +132,10 @@ type Group struct {
 	// included by every filter asking for a score below anything.
 	ScoreCenti int
 	Scored     bool
+	// ScoreVersion is the scheme the number is on. Two schemes are scorable
+	// and their numbers are not comparable, so a list showing one without the
+	// other invites a reader to compare them.
+	ScoreVersion string
 	// Owner and Parent are the two ends of the way down to this component:
 	// the part of the product it belongs to, and what directly pulls it in
 	// . Those two are what differ between sibling rows — the top says
@@ -460,13 +464,14 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		Places: row.Places, Answered: row.Answered,
 		Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
-		Scored:   row.Scored == 1,
-		FixState: agreedFixState(row.FixStateLeast, row.FixStateMost),
-		FixedIn:  agreedFixedIn(row.FixStateLeast, row.FixStateMost, row.FixedIn),
-		Matched:  Matched(row.Matched),
-		State:    stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
-		SentBack: row.SentBack > 0,
-		OpenedAt: row.OpenedAt, DueAt: row.DueAt,
+		Scored:       row.Scored == 1,
+		ScoreVersion: row.ScoreVersion,
+		FixState:     agreedFixState(row.FixStateLeast, row.FixStateMost),
+		FixedIn:      agreedFixedIn(row.FixStateLeast, row.FixStateMost, row.FixedIn),
+		Matched:      Matched(row.Matched),
+		State:        stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
+		SentBack:     row.SentBack > 0,
+		OpenedAt:     row.OpenedAt, DueAt: row.DueAt,
 		Undisclosed: row.Undisclosed,
 		DiscloseAt:  row.DiscloseAt,
 	}
@@ -633,6 +638,7 @@ type decorated struct {
 	LikelihoodPPM int        `bun:"likelihood_ppm"`
 	ScoreCenti    int        `bun:"score_centi"`
 	Scored        int        `bun:"scored"`
+	ScoreVersion  string     `bun:"score_version"`
 	FixStateLeast string     `bun:"fix_state_least"`
 	FixStateMost  string     `bun:"fix_state_most"`
 	FixedIn       string     `bun:"fixed_in"`
@@ -788,6 +794,9 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// Written as a number rather than as a boolean, because the four
 		// engines do not agree about what a boolean out of an aggregate is.
 		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
+		// The scheme that score is on. A group is one issue, so every row it
+		// folds carries the same one and the aggregate is that value.
+		ColumnExpr(`MAX(COALESCE(v.score_version, '')) AS "score_version"`).
 		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
 		// The earliest opening among these places, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not
