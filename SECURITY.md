@@ -1,4 +1,4 @@
-# Reporting a security issue
+# Security reports
 
 OpenPSIRT is in early development. Every version below 1.0 is alpha, there is
 no supported version yet, and no deployment we are aware of.
