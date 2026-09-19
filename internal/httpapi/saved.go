@@ -34,7 +34,7 @@ type SavedBody struct {
 // the record. The difference shows up on the day a dismissal turns out to have
 // been wrong and somebody asks who made it.
 type PreparedBody struct {
-	Outcome       outcomeInBulk `json:"outcome" doc:"The reasoning it offers"`
+	Outcome       outcomeInBulk `json:"outcome" doc:"The outcome it offers"`
 	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, where the outcome takes one"`
 	// Reasoning is required, because it is what somebody will be putting
 	// their name to: a prefill with an empty argument is a button that

@@ -947,12 +947,12 @@ type CoverageBody struct {
 	Variant    string `json:"variant"`
 	// LastReceivedAt is absent where nothing has ever been filed against this
 	// build, which is a different situation from a scan that failed.
-	LastReceivedAt string `json:"last_received_at,omitempty" doc:"The last arrival of a scan. Absent where none ever has"`
+	LastReceivedAt string `json:"last_received_at,omitempty" doc:"The moment a scan last arrived. Absent where none ever has"`
 	// LastRefusedAt tells a build nobody uploads to apart from one whose
 	// uploads are being turned away. Both are quiet and they are different
 	// faults: a pipeline nobody wired up, against one failing nightly and
 	// telling its own log that it succeeded.
-	LastRefusedAt  string `json:"last_refused_at,omitempty" doc:"The last upload against this build to be turned away. Absent where none has been"`
+	LastRefusedAt  string `json:"last_refused_at,omitempty" doc:"The moment an upload against this build was last turned away. Absent where none has been"`
 	RefusedBecause string `json:"refused_because,omitempty" doc:"The words the producer was given the last time one was turned away, in the same words they were given"`
 	QuietDays      int    `json:"quiet_days" doc:"The span since, in days, measured from the last arrival or from when the build was declared"`
 	Quiet          bool   `json:"quiet,omitempty" doc:"Whether that is longer than this deployment allows"`

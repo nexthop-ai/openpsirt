@@ -55,8 +55,8 @@ type HeldChangeBody struct {
 	At    string `json:"at"`
 	By    string `json:"by" doc:"The person who made the change"`
 	About string `json:"about" doc:"The subject, as the trail records it"`
-	Was   string `json:"was,omitempty" doc:"The roles held before. Absent means nothing"`
-	Now   string `json:"now,omitempty" doc:"The roles held after. Absent means a withdrawal"`
+	Was   string `json:"was,omitempty" doc:"The role held before. Absent means they held none"`
+	Now   string `json:"now,omitempty" doc:"The role held after. Absent means a withdrawal"`
 }
 
 // PersonRecordBody is how much of the triage record rests on one person.

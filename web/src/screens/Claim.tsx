@@ -371,7 +371,7 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
         className="linkish"
         onClick={() => {
           const to = window.prompt(
-            "Where is this being worked on? A ticket, a thread, a change. Nothing is ever sent to it.",
+            "The place this is being worked on: a ticket, a thread, a change. Nothing is ever sent to it.",
             where,
           );
           if (to !== null) point.mutate(to.trim());

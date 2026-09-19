@@ -184,7 +184,7 @@ export function AffectedBuilds({
           {removing.length > 0 && (
             <div className="field">
               <label htmlFor="affects-because">
-                Why{" "}
+                The reason{" "}
                 {removing.length === 1 ? "that build was" : `those ${removing.length} builds were`}{" "}
                 never affected{" "}
                 <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>

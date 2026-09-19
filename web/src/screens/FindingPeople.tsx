@@ -291,7 +291,7 @@ export function Resolve({
         <>
           <div className="field">
             <label htmlFor="res-because">
-              What fixed it{" "}
+              The fix{" "}
               <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
                 required
               </span>

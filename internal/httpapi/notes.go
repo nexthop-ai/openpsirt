@@ -185,7 +185,7 @@ type NoteBody struct {
 	Body      string `json:"body" doc:"The text, in markdown"`
 	WrittenBy string `json:"written_by" doc:"The author"`
 	WrittenAt string `json:"written_at"`
-	EditedAt  string `json:"edited_at,omitempty" doc:"The author's last change, where they made one"`
+	EditedAt  string `json:"edited_at,omitempty" doc:"The moment the author last changed it, where they have"`
 }
 
 // NoteWritten is the answer to writing or changing a note.

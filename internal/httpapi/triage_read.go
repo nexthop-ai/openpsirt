@@ -137,7 +137,7 @@ type CommentBody struct {
 	Body      string `json:"body" doc:"The comment text, in markdown"`
 	WrittenBy string `json:"written_by"`
 	WrittenAt string `json:"written_at"`
-	EditedAt  string `json:"edited_at,omitempty" doc:"The author's last change to it, if they made one"`
+	EditedAt  string `json:"edited_at,omitempty" doc:"The moment the author last changed it, if they did"`
 }
 
 func registerTriageReading(api huma.API, in Ingest) {

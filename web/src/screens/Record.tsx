@@ -322,7 +322,7 @@ export function Record() {
 
         <div className="field">
           <label htmlFor="rec-summary">
-            What the flaw is{" "}
+            The flaw{" "}
             <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
               required
             </span>

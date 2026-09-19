@@ -25,7 +25,7 @@ type CarriedClaimBody struct {
 	// Suppresses says the claim takes a finding off the list rather than
 	// merely recording what the build thinks.
 	Suppresses bool   `json:"suppresses" doc:"Whether it takes a finding off the list. 'affected' and 'under investigation' are information, not answers"`
-	Since      string `json:"since" doc:"The scan the build first said it in"`
+	Since      string `json:"since" doc:"The date the build first said it, by the scan it arrived in"`
 	Until      string `json:"until,omitempty" doc:"The moment it stopped saying it. Absent while it is still being said"`
 }
 

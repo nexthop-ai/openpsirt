@@ -185,7 +185,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
                     <Failed error={split.error} what="Those rows could not be held back." />
                   )}
                   <label className="block text-sm" htmlFor={`hold-${claimId}`}>
-                    Why these are different
+                    The reason these are different
                   </label>
                   <textarea
                     id={`hold-${claimId}`}

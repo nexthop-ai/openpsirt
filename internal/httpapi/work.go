@@ -64,7 +64,7 @@ type VulnerabilityDataBody struct {
 	// Since is when the data last moved, which is the most recent time any
 	// version was seen for the first time. A version that comes back was not a
 	// change the second time.
-	Since   *time.Time `json:"moved_at,omitempty" doc:"The data's last move: the most recent time any version was seen for the first time. A version that comes back is not a change"`
+	Since   *time.Time `json:"moved_at,omitempty" doc:"The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"`
 	StaleAt string     `json:"stale_after" doc:"The span without moving that counts as stopped, as this deployment has it set"`
 	Stale   bool       `json:"stale" doc:"Whether it has been that long. The same question the condition told to administrators asks"`
 }

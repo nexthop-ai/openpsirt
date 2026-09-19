@@ -164,7 +164,7 @@ a hash on the program component.
 It is stored compressed. The uncompressed document is 18 MB, which is a size
 worth reading once in a test and not a size worth keeping in every checkout.
 
-## A second variant of the same image
+## The mellanox variant
 
 `switch-image-mellanox.cdx.json.xz` is the mellanox build of the same switch
 image, compressed the same way: 6,748 components and 17,141 edges, from

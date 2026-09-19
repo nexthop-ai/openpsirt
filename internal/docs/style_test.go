@@ -55,6 +55,8 @@ func everyDocument(t *testing.T) map[string]string {
 	for _, pattern := range []string{
 		filepath.Join("..", "..", "*.md"),
 		filepath.Join("..", "..", "docs", "*.md"),
+		filepath.Join("..", "..", "docs", "*", "*.md"),
+		filepath.Join("..", "..", "internal", "*", "testdata", "*.md"),
 	} {
 		for name, text := range documents(t, pattern) {
 			docs[name] = text
@@ -78,7 +80,10 @@ func documents(t *testing.T, pattern string) map[string]string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		docs[filepath.Base(path)] = fence.ReplaceAllString(string(body), "")
+		// Keyed by the path rather than the base name. Two directories hold a
+		// README.md and two hold an api.md, so a base-name key silently drops
+		// one of each — a walk that reads fewer files than it matched.
+		docs[filepath.ToSlash(path)] = fence.ReplaceAllString(string(body), "")
 	}
 	return docs
 }

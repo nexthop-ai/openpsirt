@@ -202,7 +202,7 @@ type OutlierBody struct {
 	Exploited     bool     `json:"exploited,omitempty"`
 	FixedIn       string   `json:"fixed_in,omitempty"`
 	Description   string   `json:"description,omitempty" doc:"The first two hundred characters of what the report says"`
-	Why           []string `json:"why" doc:"The signal that made it stand out"`
+	Why           []string `json:"why" doc:"The signals that made it stand out"`
 }
 
 // BecameBody is one claim somebody proposed and what happened to it.

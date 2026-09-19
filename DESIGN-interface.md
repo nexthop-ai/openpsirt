@@ -1267,7 +1267,7 @@ other, and two that could not be asked at all.
 
 | Section | What it answers |
 |---|---|
-| What they hold | The roles in force, and whether a role they hold grants nothing — which reads very differently from holding none |
+| Grants in force | The roles in force, and whether a role they hold grants nothing — which reads very differently from holding none |
 | Their part in the record | How many claims they argued, how many they agreed to that still stand, and how many agreements they took back. What the rubber-stamp report asks across a program, asked about one person |
 | Roles granted and withdrawn | Every change against them, newest first, with who made it. Absent before means nobody had set it; absent after means it was withdrawn, and a blank cannot tell the two apart |
 | Notifications sent | Everything sent to them, acknowledged and cleared included |
@@ -1298,10 +1298,10 @@ goes out with the release, which sat in four places reached four ways.
 
 | Section | What it answers |
 |---|---|
-| What this is | The variants it was actually built as, each with what is open in it |
-| What is true of it now | Open across every variant, by severity |
-| What changed | The release before this one, and the comparison against it |
-| What we told customers | The release note, the advisories, and a VEX document per variant |
+| The variants | The variants it was actually built as, each with what is open in it |
+| Open now | Open across every variant, by severity |
+| Changes | The release before this one, and the comparison against it |
+| Customer documents | The release note, the advisories, and a VEX document per variant |
 | The record | The disposition register per variant |
 
 | Rule | |

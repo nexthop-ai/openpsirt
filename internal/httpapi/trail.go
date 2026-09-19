@@ -114,7 +114,7 @@ type ChangeBody struct {
 	Became string `json:"became,omitempty"`
 	// Unset and Cleared say which of those an absent value is, because a
 	// value that is genuinely the empty string is also absent in JSON.
-	Unset   bool `json:"unset,omitempty" doc:"The setting held nothing before this"`
+	Unset   bool `json:"unset,omitempty" doc:"Whether nothing had been set before this, as distinct from a value stored empty"`
 	Cleared bool `json:"cleared,omitempty" doc:"This change cleared it"`
 }
 

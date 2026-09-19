@@ -81,7 +81,7 @@ type ProductBody struct {
 	Open *int `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for"`
 	// LastScanAt is absent where nothing has ever been filed against any of
 	// this product's builds.
-	LastScanAt string `json:"last_scan_at,omitempty" doc:"The last scan to arrive for any of its builds"`
+	LastScanAt string `json:"last_scan_at,omitempty" doc:"The moment a scan last arrived for any of its builds"`
 	// TriageFloor is the least severity this product triages, where it has
 	// said something of its own. Absent means it follows the deployment, which
 	// is a different statement from stating the same word — a product that
@@ -122,7 +122,7 @@ type StreamBody struct {
 	// a line that has stopped being built looks identical to a healthy one
 	// until somebody opens it.
 	Open       *int   `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for"`
-	LastScanAt string `json:"last_scan_at,omitempty" doc:"The last scan to arrive for any build of it"`
+	LastScanAt string `json:"last_scan_at,omitempty" doc:"The moment a scan last arrived for any build of it"`
 	// EndOfLife is the date support ends and whether this release stated it.
 	// Absent with Inherited set means it follows its product; absent with
 	// neither means nothing has said one anywhere.

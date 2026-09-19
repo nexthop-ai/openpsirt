@@ -596,7 +596,7 @@ export function Decide({
       {offerMitigation && (
         <div className="field">
           <label htmlFor={`${draftKey}-mit`}>
-            {needsMitigation ? "The mitigation" : "The advice instead"}
+            {needsMitigation ? "The mitigation" : "Advice for customers"}
           </label>
           <input
             id={`${draftKey}-mit`}

@@ -51,7 +51,7 @@ type PerBuildBody struct {
 	// one was asked.
 	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
 	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
-	FirstSeen time.Time  `json:"first_seen" doc:"The first scan of this deployment to report the component"`
+	FirstSeen time.Time  `json:"first_seen" doc:"The moment a scan of this deployment first reported the component"`
 	Issues    int        `json:"issues" doc:"Distinct vulnerabilities open against it here"`
 	// Consumers is the unit somebody acts in: one judgment covers the whole
 	// fold, and what varies underneath it is the set of consumers pulling the

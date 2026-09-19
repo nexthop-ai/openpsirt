@@ -361,7 +361,7 @@ export function AutoAssignment() {
                 {catches.isError ? (
                   <Failed
                     error={catches.error}
-                    what="The findings that would catch could not be read."
+                    what="The components this rule would catch could not be read."
                   />
                 ) : catches.isFetching ? (
                   <p className="said">Working out what that catches…</p>

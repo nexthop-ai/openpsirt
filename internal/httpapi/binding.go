@@ -28,7 +28,7 @@ type BindingBody struct {
 	// ProductDisplayName is the label shown beside it, for the reason HeldBody
 	// carries one: unbind resolves the field above.
 	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
-	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"The roles membership of this group grants"`
+	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"The role membership of this group grants"`
 }
 
 func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *setting.Store) {

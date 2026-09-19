@@ -26,7 +26,7 @@ type BuildStandingBody struct {
 	// release is out of support — so a build that stopped being scanned
 	// because it stopped being supported reads as expected rather than as
 	// a fault.
-	LastScanAt string `json:"last_scan_at,omitempty" doc:"The last scan to arrive here. Absent where none ever has"`
+	LastScanAt string `json:"last_scan_at,omitempty" doc:"The moment a scan last arrived here. Absent where none ever has"`
 	Retired    bool   `json:"retired,omitempty" doc:"This build's release is out of support"`
 }
 
