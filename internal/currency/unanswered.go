@@ -43,15 +43,6 @@ type Unanswered struct {
 	Checked time.Time
 }
 
-// MostUnanswered bounds one read of the report.
-//
-// A real image carries thousands of components in these ecosystems, and the
-// ones with no answer are a small part of that — but a deployment that has
-// just turned asking on and configured nothing has every one of them here. A
-// list is read by a person deciding what to hold back, and a page of it is
-// what they can act on; the count beside it says how much there is.
-const MostUnanswered = 500
-
 // MostExamined bounds how many components one read of the report classifies.
 //
 // The classification is applied after the rows arrive, because it is a list of
@@ -62,6 +53,15 @@ const MostUnanswered = 500
 // an inventory rather than the whole of it — and the answer says when it was
 // reached rather than quietly reporting a count that is a floor.
 const MostExamined = 20000
+
+// mostExamined is that ceiling, in a variable only so that a test can lower
+// it.
+//
+// Nothing in production writes it. Seeding twenty thousand components to reach
+// the arm past it is a test nobody runs, and what that arm does is report a
+// count as a floor — a claim about the answer's own accuracy, which is exactly
+// the kind that has to be exercised rather than reasoned about.
+var mostExamined = MostExamined
 
 // unanswered is one row as the database hands it over.
 type unanswered struct {
@@ -125,7 +125,7 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		OrderExpr("c.purl ASC").
 		// One more than the ceiling, so reaching it is told apart from
 		// landing exactly on it.
-		Limit(MostExamined + 1)
+		Limit(mostExamined + 1)
 	if !all {
 		q = q.Where("st.product_id IN (?)", bun.List(products))
 	}
@@ -135,9 +135,9 @@ func Unanswerable(ctx context.Context, db bun.IDB, subject access.Subject, ours 
 		return nil, 0, false, fmt.Errorf("read what has no upstream answer: %w", err)
 	}
 
-	whole = len(found) <= MostExamined
+	whole = len(found) <= mostExamined
 	if !whole {
-		found = found[:MostExamined]
+		found = found[:mostExamined]
 	}
 	for _, row := range found {
 		ecosystem, _, readable := Asked(row.Purl)

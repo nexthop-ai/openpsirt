@@ -78,10 +78,6 @@ func registerUpstream(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		limit := input.Limit
-		if limit <= 0 || limit > currency.MostUnanswered {
-			limit = currency.MostUnanswered
-		}
 		// The roots are folded in here as well as in the pass, for the same
 		// reason and from the same statement: a name is held back because of
 		// what this deployment builds, and reading the report against a
@@ -93,7 +89,7 @@ func registerUpstream(api huma.API, in Ingest) {
 		}
 		ours := in.Ours.With(roots...)
 		rows, total, whole, err := currency.Unanswerable(
-			ctx, in.DB.DB, subject, ours, limit, input.Offset)
+			ctx, in.DB.DB, subject, ours, input.Limit, input.Offset)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "cannot read what has no upstream answer", err)
 		}

@@ -186,3 +186,81 @@ func resolved(t *testing.T, w *fixture.World, identity string, role access.Role)
 	}
 	return subject
 }
+
+// Past the ceiling, the count says it is a floor.
+//
+// The one arm that makes a claim about the answer's own accuracy, so it is
+// exercised rather than reasoned about. The ceiling is lowered for the test
+// because reaching it honestly means seeding twenty thousand components on
+// four engines, which is a test nobody runs and therefore not a test.
+func TestPastTheCeilingTheCountSaysSo(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		currency.Examining(t, 2)
+		asked := time.Now().UTC().Add(-time.Hour)
+		purls := []string{
+			"pkg:npm/one@1.0.0", "pkg:npm/two@1.0.0", "pkg:npm/three@1.0.0",
+		}
+		for _, purl := range purls {
+			put(t, w, purl, &asked, nil)
+		}
+		carried(t, w, "", purls...)
+
+		rows, total, whole, err := currency.Unanswerable(
+			t.Context(), w.DB.DB, everything(t, w), currency.Ours{}, 50, 0)
+		if err != nil {
+			t.Fatalf("read what has no upstream answer: %v", err)
+		}
+		if whole {
+			t.Error("three rows against a ceiling of two reported as everything examined")
+		}
+		if total != 2 || len(rows) != 2 {
+			t.Fatalf("read %d of %d, expected the ceiling's two", len(rows), total)
+		}
+	})
+}
+
+// What the pass held back is what the report calls ours.
+//
+// **The two halves are joined by nothing but the same list applied twice**, so
+// they are asserted together as well as apart. The pass records a held-back
+// name exactly as it records one no index knows, and every other test here
+// seeds that recording by hand — which would pass against a pass that recorded
+// something the report's own query cannot see.
+func TestWhatThePassHeldBackIsWhatTheReportCallsOurs(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		r, asked := seed(t, w.DB, []component{
+			{purl: "pkg:golang/github.com/example-corp/internal-lib@v1.0.0"},
+			{purl: "pkg:npm/private-fork@0.1.0"},
+		}, nil, nil)
+		r.Ours = currency.Ourselves("https://example-corp.test", nil)
+		carried(t, w, "",
+			"pkg:golang/github.com/example-corp/internal-lib@v1.0.0",
+			"pkg:npm/private-fork@0.1.0")
+
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		if len(*asked) != 1 || (*asked)[0] != "private-fork" {
+			t.Fatalf("asked about %v, expected only the name that is not ours", *asked)
+		}
+
+		rows, total, _, err := currency.Unanswerable(t.Context(), w.DB.DB,
+			everything(t, w), r.Ours, 50, 0)
+		if err != nil {
+			t.Fatalf("read what has no upstream answer: %v", err)
+		}
+		if total != 2 {
+			t.Fatalf("the pass recorded two and the report reads %d: %v", total, rows)
+		}
+		why := map[string]currency.Why{}
+		for _, row := range rows {
+			why[row.Purl] = row.Why
+		}
+		if got := why["pkg:golang/github.com/example-corp/internal-lib@v1.0.0"]; got != currency.WhyOurs {
+			t.Errorf("what the pass held back reads as %q", got)
+		}
+		if got := why["pkg:npm/private-fork@0.1.0"]; got != currency.WhyUnknown {
+			t.Errorf("what the pass asked about and got nothing for reads as %q", got)
+		}
+	})
+}

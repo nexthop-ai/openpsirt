@@ -116,8 +116,8 @@ func Identified(identifier string) int {
 // project that shipped six weeks ago, and telling somebody that waiting for a
 // fix is unlikely to work is a strong claim to make on that. Requiring a full
 // year to have passed makes the message rarer and leaves it worth believing,
-// which is the trade the one thing that reaches the network already implied by saying the gap that matters is
-// measured in years.
+// which is the trade this already implied by saying that the gap which matters
+// is measured in years.
 func NothingSince(identifier string, released time.Time) bool {
 	year := Identified(identifier)
 	if year == 0 || released.IsZero() {
