@@ -21,7 +21,7 @@ place to triage what it finds and track it through to a fix.
 - [Features](#features)
   - [Ingest](#ingest)
   - [Scanning](#scanning)
-  - [What is tracked](#what-is-tracked)
+  - [The tracked unit](#the-tracked-unit)
   - [State and history](#state-and-history)
   - [Triage](#triage)
   - [Ranking and remediation](#ranking-and-remediation)
@@ -97,7 +97,7 @@ behind every line of it.
 - OpenPSIRT publishes an inventory of itself, of the binary and of the image,
   and scans itself with them
 
-### What is tracked
+### The tracked unit
 
 - The tracked unit is a product, a branch or tag, and a variant. A release
   carries a reversible end-of-life date, past which nothing is deleted or

@@ -202,7 +202,7 @@ unpick later.
 | **A name people type is matched without regard to capitals; an identity a provider hands over is matched exactly.** Normalize the stored value rather than asking an engine to compare loosely — the engines default differently, and a normalized value compares the same under any of them | REQ-08 |
 | **A name a query invents is named around the reserved words as well as quoted.** A derived table called `groups` is a syntax error on MySQL 8 and fine on the other three, and quoting makes it legal rather than readable | REQ-71 |
 
-## Nothing is made faster until it is measured slow
+## Measurement before optimization
 
 Work out an answer when it is asked for. No caching, no precomputed
 totals, no refresh job, no denormalized copy — until somebody has measured a
@@ -233,7 +233,7 @@ is what left urgency as three policies at once, none of them chosen. The test is
 what the storing is *for*: correctness keeps it, speed has to earn it, and
 neither buys the right to go stale.
 
-## Two limits that erode if they are not rules
+## Two eroding limits
 
 A short-bump flag is inequality, never ordering. Saying "this moved and is
 still not the version that fixes it" needs no version comparison. Adding one is
@@ -346,7 +346,7 @@ Append, sort, and use a cross-reference to point at the related decision.
 Identifiers never change. Renumbering breaks every commit message and design
 document that cites one.
 
-## Nothing is compatible with anything yet
+## Compatibility below 1.0
 
 Below 1.0 there is no schema compatibility and no API compatibility (REQ-76).
 A schema change edits the migration that created the thing rather than
@@ -357,7 +357,7 @@ The migrations that exist are kept only because walking the chain up and down
 catches an ordering mistake between them. They collapse into one before 1.0
 (REQ-72), which `TODO.md` records so it happens rather than being remembered.
 
-## Decisions carry the evidence that forced them
+## Evidence beside a decision
 
 Where a decision was settled by a measurement, the measurement goes in the
 justification. Not "the fan-out is large" but "335,021 findings for one
@@ -683,7 +683,7 @@ At the end of a session, and before a push carrying accumulated work, run
 gets the same answer from `make gate`, because there is nothing there to choose
 from.
 
-### The tier is chosen by what the change touches
+### Tier selection
 
 `DESIGN-build.md` holds the table; the point of the target is that nobody has
 to consult it. Two things about it are worth knowing here.

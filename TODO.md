@@ -62,7 +62,7 @@ gap somebody rediscovers by auditing.
 | A prepared claim is one person's, so several triagers on one backlog drift | Saved filters and the claims they prepare are personal by design — no ownership, no permissions, and no arguing about whose filter is authoritative. What that costs is a shared vocabulary: "when you see this shape, here is the argument we have agreed on" is per person, so three triagers means three hand-copies drifting apart with no way to see that they have. It needs several people working one backlog to appear, which is the trigger for revisiting it. The line it is not about stays where it is: a rule prepares a claim and a person proposes it, and a rule proposing its own pending claim stays refused |
 | The twelve-week history cannot mark where a version moved | The chart draws what opened and closed; what it cannot draw is the release the build was shipping at the time, which is the thing that says whether the last upgrade worked. Counts are what the trend answers, and a version for each week is a new read over the scan history. The build comparison gives one pairwise `from` and `to`, never a series |
 
-## Waiting on the owner, from the interface audit
+## Waiting on the owner
 
 Each is a proposal rather than a change. **One of them is a wrong answer on
 screen rather than a question** — the team queue below — and is marked as such,
