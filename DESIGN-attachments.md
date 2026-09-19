@@ -40,9 +40,9 @@ a decision, a decision covers every place an issue sits at, and binding a file t
 one of forty-eight rows would make it unreachable the day that row closed while
 its siblings stayed open.
 
-Visibility is the issue's and is never stored on the attachment. Storing a
-visibility at upload would freeze it: an embargo ends, and the file documenting
-it becomes readable along with the words describing it.
+Visibility is the issue's and is never stored on the attachment. A visibility
+stored at upload freezes it, and an embargo ends: the file documenting one
+becomes readable along with the words describing it.
 
 | State | Meaning |
 |---|---|
@@ -95,7 +95,7 @@ An endpoint that is not `https` is refused, and two things lift that (REQ-70).
 
 | Lifts it | |
 |---|---|
-| The endpoint reaches no further than this machine | Nothing crosses a network, so there is no path to be on. This is the development backend's neighbor and needs no saying. Asked of the address rather than compared against a table of three spellings, which left the rest of `127.0.0.0/8` and the IPv6 forms outside it — a local store given its own loopback address was refused, and the only way past it recorded in the deployment log that a plaintext store had been accepted across a network |
+| The endpoint reaches no further than this machine | Nothing crosses a network, so there is no path to be on. This is the development backend's neighbor and needs no saying. Asked of the address rather than matched against a table of spellings: a table leaves the rest of `127.0.0.0/8` and the IPv6 forms outside it, so a local store on its own loopback address is refused and the only way past records in the deployment log that a plaintext store was accepted across a network |
 | An operator states that the network is one they accept it on | The store somebody already runs is the constraint. An installation with no TLS in front of its object store should be able to run this, rather than be told it configured the tool wrongly |
 
 | Rule | |
@@ -140,7 +140,7 @@ stored, so both survive the redirect.
 
 | Rule | Detail |
 |---|---|
-| Whether a file hangs off the issue is a boolean the framework parses | Compared against the literal "true", every other spelling read as false and marked the file for deletion a day later, with the uploader told it had worked |
+| Whether a file hangs off the issue is a boolean the framework parses | Compared against the literal "true", every other spelling reads as false: the file is marked for deletion a day later and the uploader is told it worked |
 | A maximum file size, a per-deployment quota, and one person's share of it | All three configurable. The deployment-wide ceiling is one account's to reach alone, and what reaching it costs is everybody else's next upload — a triager's evidence on an active embargo in another product answering "no room" |
 | Never deleted while anything references it | Removal is an explicit administrative redaction, recorded, leaving the reference and a tombstone |
 | Unattached uploads are reaped | A file attached to an abandoned form is bytes nothing will ever reach |
@@ -150,11 +150,11 @@ Both bounds are checked twice: before anything is carried, so an upload that
 cannot be kept is refused rather than transferred and discarded; and inside the
 writing transaction, because the first answer was read before the bytes were.
 
-Attaching is triage work. It asked the read test — whether the subject may see
-the issue the file hangs off — so a role granting nothing but the ability to
-read disclosed findings on one product could write files into the store. A
-collaborator brought onto the case may attach, because evidence is usually why
-they were brought in.
+Attaching is triage work rather than read work. Tested as a read — whether the
+subject may see the issue the file hangs off — a role granting nothing but the
+ability to read disclosed findings on one product writes files into the store.
+A collaborator brought onto the case may attach, because evidence is usually
+why they were brought in.
 
 ## Write and delete ordering
 
@@ -166,7 +166,7 @@ way out.
 | Operation | Order | Reason |
 |---|---|---|
 | Redaction | Row, then file | A file removed with nothing saying so reads as a store that lost it |
-| Reaper | Row, then file | The row carries the guard, and a guard run after the unlink can only fail to clean up after the loss it exists to prevent: text naming the file between the reaper's page and its delete left the bytes gone, the delete matching nothing, and the record standing over nothing — reported as a collection that happened |
+| Reaper | Row, then file | The row carries the guard, and a guard run after the unlink can only fail to clean up after the loss it exists to prevent. Text naming the file between the reaper's page and its delete leaves the bytes gone, the delete matching nothing, and the record standing over nothing, reported as a collection that happened |
 
 Inverting the reaper's order inverts which side can be orphaned. Bytes
 surviving a deleted row are recoverable, because the key is named in the log;
@@ -175,8 +175,8 @@ a record surviving its bytes is not, and it is what a person clicks.
 | Rule | Reason |
 |---|---|
 | A row the reaper could not claim leaves its bytes alone | Somebody attached it while the pass was running, which is the ordinary case rather than a contrived one: text naming an attachment is saved after the transaction that wrote it |
-| A row the reaper could not finish does not end the pass | Returning on the first failure abandoned every row after it in the page, so one undeletable object stalled collection for ever |
-| What it destroyed and what it could not are named, not counted | It is the only writer here that destroys somebody's data and the only one that kept no record of it. A key is what an orphan can be found by |
+| A row the reaper could not finish does not end the pass | Returning on the first failure abandons every row after it in the page, so one undeletable object stalls collection for ever |
+| What it destroyed and what it could not are named, not counted | It is the only writer here that destroys somebody's data, and a key is what an orphan can be found by |
 
 The local store is confined structurally: names go through a directory handle
 that cannot be escaped, rather than a path comparison this package performs.

@@ -1,10 +1,10 @@
-# What is built
+# Current state
 
 OpenPSIRT is in early development. Nothing is compatible with anything yet: a
 schema change edits the migration that created the thing, and a development
 database is recreated rather than migrated.
 
-| Area | Where it has got to |
+| Area | State |
 |---|---|
 | Build and validation | The pipeline, and a gate that runs the tier a change lands in |
 | Database | All four engines, with the schema created and migrated at startup |

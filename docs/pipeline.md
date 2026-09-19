@@ -1,4 +1,4 @@
-# Sending a build's inventory
+# Build pipelines
 
 What a build pipeline does, end to end. Everything here is one HTTP request;
 there is no client to install and no agent to run.

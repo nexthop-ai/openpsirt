@@ -68,11 +68,11 @@ It seeds two products: a real switch image, and OpenPSIRT itself, from the
 inventory the image carries of what it ships, so the screens that compare
 across products have something to compare.
 
-### One person cannot demonstrate this
+### The two-person control
 
 A judgment is proposed by one person and agreed to by another, and approving
-your own is refused. So the demo opens a door per person, and two browser
-windows are two people:
+your own is refused, so one person cannot demonstrate this. The demo opens a
+door per person, and two browser windows are two people:
 
 | Door | Arrives as | May |
 |---|---|---|

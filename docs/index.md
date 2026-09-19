@@ -40,7 +40,7 @@ somewhere to triage what it finds and follow it through to a fix.
 
 ## Features
 
-What the tool is specified to do. [What is built](built.md) says how far
+What the tool is specified to do. [Current state](built.md) says how far
 each area has got, and [REQUIREMENTS.md](https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md) carries the reasoning
 behind every line of it.
 
@@ -248,9 +248,9 @@ behind every line of it.
 
 | | |
 |---|---|
-| [What is built](built.md) | How far each area has actually got |
+| [Current state](built.md) | How far each area has actually got |
 | [Trying it](trying.md) | Standing one up to look at |
-| [Sending a build](pipeline.md) | What a pipeline does: declare, mint a key, post the inventory |
+| [Build pipelines](pipeline.md) | A pipeline declares the target, mints a key and posts the inventory |
 | [Configuration](configuration.md) | Every setting, and what reads it |
 | [API reference](reference/api.md) | Every operation, generated from the server |
 | [Privileges](reference/privileges.md) | Which role reaches which endpoint |
