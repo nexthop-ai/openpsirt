@@ -1351,7 +1351,7 @@ export interface paths {
          *
          *     Nobody appears here by having authenticated. Access is granted in advance, so this list is what an administrator has decided rather than who has turned up.
          *
-         *     `product` and `role` narrow it to who holds what. "Who approves on this product" is the question an access review asks, and reading it off a list of everybody is reading the grid sideways. A grant that is not in force does not match: what somebody holds is a statement about now.
+         *     `product` and `role` narrow it to the grants in force. The approvers on one product are what an access review asks for, and reading that off a list of everybody is reading the grid sideways. A grant that is not in force does not match: holding is a statement about now.
          *
          *     Requires: administrator, or the audit permission over this deployment's own records
          */
