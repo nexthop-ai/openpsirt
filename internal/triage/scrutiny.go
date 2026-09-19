@@ -421,3 +421,65 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 	}
 	return covered, nil
 }
+
+// HiddenWithNobodyAgreeing counts the claims that hide risk with no second
+// person behind them, and the decisions they wrote.
+//
+// **This should answer zero, and a number is a control that did not hold.** The
+// three outcomes that claim something needs no further work — it does not
+// apply, it will not be fixed, the fix is already here — each require a second
+// person, so a claim of one of them standing alone is not a backlog item. It is
+// the write path having been got around, and it is the one failure the record
+// cannot find on its own afterwards.
+//
+// **A deferral and a promise to act are here too, but only where the gate
+// caught them.** Both hide risk and both are approved conditionally, on where
+// the date sits against the deadline already set — so a short deferral
+// standing alone is the rule working rather than failing. What tells the two
+// apart is the gate's own verdict, written onto the decision as it was
+// proposed: a deferral past the threshold needed a second person as surely as
+// a dismissal did, and left standing with nobody agreeing it is the same write
+// path got around. Asked as the outcome alone this saw none of them, and said
+// so in a design document.
+//
+// **Whether somebody agreed is asked of the record, never of a flag.** No
+// approval from anybody other than the proposer, and none taken back, which is
+// the same question the report that shows these rows asks — the test that
+// matters writes a self-approval straight to the table, and a flag would be
+// the row's own account of itself.
+//
+// The gate's verdict is a flag, and it is read for the opposite half on
+// purpose. Nothing a caller passes reaches it: a proposal's own answer is
+// re-worked against the policy in force when the write lands. And the three
+// that dismiss are counted whatever it says, so a write path that got around
+// the gate by clearing it is still caught — the flag only ever widens the
+// question and never narrows it.
+//
+// Counted rather than listed, and unnarrowed. What it feeds is a condition told
+// to administrators, which carries the fact and a link and never the rows —
+// which is also why no subject is taken: administering grants no reading, so a
+// narrowed count would answer about whichever products an administrator
+// happened to hold.
+func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int, err error) {
+	standing, held := finding.InForce()
+	var counted struct {
+		Claims int `bun:"claims"`
+		Rows   int `bun:"written"`
+	}
+	err = s.db.NewSelect().
+		TableExpr(`"decision" AS "de"`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
+		ColumnExpr(`COUNT(*) AS "written"`).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr("cl.outcome IN (?)", bun.List(OutcomesDismissing())).
+				WhereOr("de.needs_approval = ?", true)
+		}).
+		Where(standing, held...).
+		Where(standingAlone).
+		Scan(ctx, &counted)
+	if err != nil {
+		return 0, 0, fmt.Errorf("count what hides risk with nobody agreeing: %w", err)
+	}
+	return counted.Claims, counted.Rows, nil
+}

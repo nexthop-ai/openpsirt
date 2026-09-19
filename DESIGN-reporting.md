@@ -457,6 +457,21 @@ What it is for is showing that no dismissal sits in that population.
 Not-applicable, will-not-fix and already-fixed all require approval, so that
 query should return nothing, and a row in it is a control that failed.
 
+**Which is why nobody has to open it to find out.** The same question is asked
+as a condition and told to administrators when it stops answering nothing —
+because a report that is empty every time is one nobody opens, and it is then
+read only after something has already gone wrong. `DESIGN-notifications.md`
+§ Reports that must come back empty holds the rest, including why the
+condition carries a count and a link and never these rows.
+
+**The rubber-stamp report is not the same shape**, despite asking the same
+question in one of its sections. Only what stands with nobody agreeing has to
+be empty; bulk agreement is the control working at the grain somebody acted at,
+an approval from a role since withdrawn is correct behavior, and the same two
+people agreeing is what a small team looks like. A condition over any of those
+would be permanently true in a deployment with two triagers, which is an alert
+nobody can clear (REQ-49).
+
 Four filters: who proposed it, who has a standing agreement on it, which issue,
 and which component. An agreement later taken back does not match the approver
 filter, because answering otherwise would make a withdrawal invisible to the one

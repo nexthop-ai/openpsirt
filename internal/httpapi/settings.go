@@ -143,6 +143,8 @@ var settable = []struct {
 		aWord, theFloor, func(Ingest) string { return theFloor[0] }, true},
 	{setting.QuietAfter, "How long a build may go without a scan arriving before it is reported as having gone quiet. Measured from the last arrival, or from when the build was declared where nothing has ever arrived",
 		aDuration, nil, func(Ingest) string { return setting.DefaultQuietAfter.String() }, false},
+	{setting.VulnerabilityDataStaleAfter, "How long the vulnerability data may go without moving before the deployment is told. A scan against data that has not moved answers the same way it did last month, with the same confidence and nothing saying so",
+		aDuration, nil, func(Ingest) string { return setting.DefaultVulnerabilityDataStaleAfter.String() }, false},
 	{setting.ScanEvery, "How often everything tracked is scanned again against the vulnerability data of the day. A release that is never rebuilt has the same components it always had and a different answer every month, so this is what finds an advisory published after it shipped",
 		aDuration, nil, func(Ingest) string { return setting.DefaultScanEvery.String() }, false},
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else",

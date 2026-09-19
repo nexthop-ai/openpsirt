@@ -100,7 +100,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome IN (?) THEN de.claim_id END)`+
 			` AS "promised"`, bun.List([]Outcome{UpgradeNeeded, PatchNeeded})).
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome IN (?) THEN de.claim_id END)`+
-			` AS "dismissed"`, bun.List([]Outcome{NotApplicable, WontFix, AlreadyFixed})).
+			` AS "dismissed"`, bun.List(OutcomesDismissing())).
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome = ? THEN de.claim_id END)`+
 			` AS "deferred"`, Deferred).
 		Where("de.proposed_at < ?", until).
