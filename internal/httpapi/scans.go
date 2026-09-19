@@ -228,7 +228,7 @@ func registerScans(api huma.API, in Ingest) {
 			"this does not read is rejected by name.\n\n" +
 			"The product, branch and variant must already exist; an upload naming something " +
 			"undeclared is rejected and the error says which part is missing.\n\n" +
-			"**Returns 202 before the documents are parsed.** A success here means they were " +
+			"Returns 202 before the documents are parsed. A success here means they were " +
 			"accepted for processing, not that they were valid. Poll `GET .../scans` to find out " +
 			"whether they parsed and what the scan found.",
 		Tags: []string{"Ingest"},

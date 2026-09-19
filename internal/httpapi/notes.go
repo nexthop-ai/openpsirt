@@ -32,7 +32,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 			"when it was last changed.\n\n" +
 			"A note records no judgment and changes nothing: not what ranks, not a deadline, " +
 			"not a triage line. It is context for whoever decides.\n\n" +
-			"**It is about the issue in this product, not about one component.** A row in the " +
+			"It is about the issue in this product, not about one component. A row in the " +
 			"findings list is one issue at one source package, and one issue is often several " +
 			"rows — so a note kept against a row would be written on one of them and hidden " +
 			"from the rest. What is about a judgment at a place is a comment on that claim " +
@@ -66,7 +66,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		Description: "Adds a markdown note about this issue in this product. It records no " +
 			"judgment: nothing about what ranks, what a deadline is, or what the product " +
 			"triages changes because somebody wrote one.\n\n" +
-			"**This is the way to leave something for whoever decides without deciding.** A " +
+			"This is the way to leave something for whoever decides without deciding. A " +
 			"comment hangs off a claim; a note does not, so nothing has to be judged before " +
 			"anything can be said.\n\n" +
 			"It reaches every build of the product and does not lapse when a version moves. " +
@@ -107,7 +107,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		Summary: "Edit a note on an issue",
 		Description: "Replaces the text of a note. Only its author may do this: an edit " +
 			"another person could make is not a correction.\n\n" +
-			"**What it said before is kept**, and read back with " +
+			"What it said before is kept, and read back with " +
 			"`GET /v1/notes/{id}/history`. A note is part of the record that goes public at " +
 			"disclosure, and a record whose earlier text is unrecoverable is readable rather " +
 			"than checkable.\n\n" +

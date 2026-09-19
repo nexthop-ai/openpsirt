@@ -164,7 +164,7 @@ func registerBulk(api huma.API, in Ingest) {
 			"has an answer later — but it is never the claim. The reasoning has to hold for " +
 			"every issue in the list, since \"these matched a word\" is not a defense anybody " +
 			"would accept.\n\n" +
-			"**`contains` is the same question an approver can re-run.** Send the text you " +
+			"`contains` is the same question an approver can re-run. Send the text you " +
 			"narrowed the candidate list by; the claim records how many issues that narrowing " +
 			"reaches, read here, against how many you named. Equal, the claim is exactly what " +
 			"that narrowing returns; far apart, the sentence does not describe the set.\n\n" +

@@ -246,7 +246,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"all end the same way — and `argument` names no decision, because nothing here " +
 			"acts on one.\n\n" +
 			"`rows`, `issues` and `places` are what it wrote. `folds`, `packages`, " +
-			"`consumers` and `findings` are what it covers **now**, which grows as builds " +
+			"`consumers` and `findings` are what it covers now, which grows as builds " +
 			"appear with nobody acting; what somebody consented to is on the approval, at " +
 			"`GET /v1/claims/{id}/approvals`.\n\n" +
 			"For the earlier justifications see `GET /v1/claims/{id}/revisions` and for the " +
@@ -363,7 +363,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 			"`carried_from` is the approval where those are.\n\n" +
 			"A withdrawn approval is kept rather than deleted: who agreed to what, and when it " +
 			"stopped counting, is part of the record.\n\n" +
-			"`covered` is how many findings the claim covered **when it was agreed to**. A claim " +
+			"`covered` is how many findings the claim covered when it was agreed to. A claim " +
 			"applies to every build running the same versions, so it covers more as builds " +
 			"appear — with nobody acting, and nobody having agreed to the larger number. " +
 			"Comparing this against what it covers now is the point of keeping it.",

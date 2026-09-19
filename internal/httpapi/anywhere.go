@@ -27,16 +27,16 @@ func registerAnywhere(api huma.API, in Ingest) {
 		OperationID: "list-findings-anywhere", Method: http.MethodGet, Path: "/v1/findings",
 		Summary: "List findings across every product",
 		Description: "The findings list, without a product picked.\n\n" +
-			"**One row per product, issue and component.** The same library carrying the same " +
+			"One row per product, issue and component. The same library carrying the same " +
 			"issue in two products is two pieces of work, decided separately by different " +
 			"people; in three builds of one product it is one row, and `builds` says how " +
 			"many. Each row names one of those builds so there is somewhere to link to.\n\n" +
-			"**Every product's own triage line still applies.** `severity` raises the line " +
+			"Every product's own triage line still applies. `severity` raises the line " +
 			"for the whole page and never lowers it below what a product decided; " +
 			"`below_floor` turns every line off, which is how the rows a line keeps out are " +
 			"asked for.\n\n" +
-			"**An issue that exists only in products you hold nothing on answers as an " +
-			"issue that does not exist**, and `total` says the same.\n\n" +
+			"An issue that exists only in products you hold nothing on answers as an " +
+			"issue that does not exist, and `total` says the same.\n\n" +
 			"`beneath` is not offered: a subtree is a walk over one build's edges. Neither is " +
 			"`differs`, which is a statement about a selection of builds. Both are on the " +
 			"per-product list, which is where a build can be named.",

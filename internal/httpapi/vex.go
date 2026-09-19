@@ -21,9 +21,9 @@ func registerVEX(api huma.API, in Ingest) {
 			"components this build ships: every approved `not applicable` and `already fixed` " +
 			"claim, as `not_affected` and `fixed` statements with the justification and the " +
 			"reasoning somebody wrote.\n\n" +
-			"**Approved claims only**, and a deferral is absent rather than exported as " +
+			"Approved claims only, and a deferral is absent rather than exported as " +
 			"anything — silence already reads as affected in this format.\n\n" +
-			"**Public findings only.** `undisclosed=true` includes the rest for somebody who " +
+			"Public findings only. `undisclosed=true` includes the rest for somebody who " +
 			"may read them, which is a preview rather than a thing to publish.\n\n" +
 			"Requires a publisher configured for this deployment: a document naming none has " +
 			"nobody as its author.",

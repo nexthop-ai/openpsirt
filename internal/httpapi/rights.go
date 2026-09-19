@@ -146,7 +146,7 @@ func declaring(op huma.Operation, asks requires, roles ...access.Role) huma.Oper
 		op.Extensions = map[string]any{}
 	}
 	op.Extensions[requiresExtension] = asks
-	op.Description = strings.TrimRight(op.Description, "\n ") + "\n\n**Requires:** " + asks.said()
+	op.Description = strings.TrimRight(op.Description, "\n ") + "\n\nRequires: " + asks.said()
 	return op
 }
 

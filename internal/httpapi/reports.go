@@ -70,7 +70,7 @@ func registerReports(api huma.API, in Ingest) {
 		Summary: "Show new, resolved and open over time",
 		Description: "Returns the three counts per step, with open split by severity, across " +
 			"every product you can see.\n\n" +
-			"**Narrowable to part of a tree.** `component` keeps one package at any version; " +
+			"Narrowable to part of a tree. `component` keeps one package at any version; " +
 			"`beneath` keeps a component and everything under it, which needs a branch and a " +
 			"variant naming exactly one build. A team that owns one area asks for its own " +
 			"three lines this way.\n\n" +
@@ -136,7 +136,7 @@ func registerReports(api huma.API, in Ingest) {
 		Path:    "/v1/products/{product}/releases",
 		Summary: "Report what is open in each build of a product",
 		Description: "One number per build, which is what a release-over-release chart is " +
-			"drawn from. The comparison endpoint says what changed between **two** builds; " +
+			"drawn from. The comparison endpoint says what changed between two builds; " +
 			"this says whether the estate is getting better or worse across all of them.\n\n" +
 			"Counted before any triage line is applied, so it agrees with the findings list " +
 			"rather than with whatever a product has decided is worth working on — a line is " +
@@ -183,7 +183,7 @@ func registerReports(api huma.API, in Ingest) {
 		Summary: "Compare two builds",
 		Description: "Returns what was fixed, what is newly present, and what is still there " +
 			"between two builds of one product.\n\n" +
-			"Between **any** two, not only adjacent ones: what a release note has to answer is " +
+			"Between any two, not only adjacent ones: what a release note has to answer is " +
 			"usually about the last release a customer has, which is rarely the previous one.\n\n" +
 			"Each fixed entry says why it went, because \"fixed by upgrading\" and \"fixed by a " +
 			"carried patch\" are different sentences to a reader. `superseded` is the one to " +
@@ -192,7 +192,7 @@ func registerReports(api huma.API, in Ingest) {
 			"A still-present entry carrying `arrived_from` is the same failure seen from the " +
 			"other side: somebody moved that version since the earlier build and the issue came " +
 			"with it, so the upgrade did not reach the fix.\n\n" +
-			"**Public findings only unless you ask otherwise.** Its destination is usually a " +
+			"Public findings only unless you ask otherwise. Its destination is usually a " +
 			"public document, so including something undisclosed should be deliberate rather " +
 			"than something pasted in without noticing.",
 		Tags: []string{"Findings"},
@@ -257,14 +257,14 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		Summary: "Show what each release shipped with",
 		Description: "One point per tagged release of one product, oldest first, with what is " +
 			"open against it now.\n\n" +
-			"**The axis follows what is being viewed.** A branch is scanned nightly and has " +
+			"The axis follows what is being viewed. A branch is scanned nightly and has " +
 			"continuous data, so a calendar reads correctly on it. A tag never moves again, and " +
 			"releases months apart make a calendar count read as slow drift rather than the " +
 			"step change it was — the gaps are the chart's whole shape and they are gaps in " +
 			"nothing.\n\n" +
-			"**Answered against today's vulnerability data**, not as of the day each was cut. " +
+			"Answered against today's vulnerability data, not as of the day each was cut. " +
 			"That is what re-scanning a shipped release is for.\n\n" +
-			"**No rates here.** How many appeared and were resolved between two releases is an " +
+			"No rates here. How many appeared and were resolved between two releases is an " +
 			"artifact of how far apart somebody cut them; rates always plot on calendar. And a " +
 			"product must be named: two products' tags interleave by date and mean nothing side " +
 			"by side.",
@@ -326,7 +326,7 @@ func registerNotes(api huma.API, in Ingest) {
 		Description: "The same comparison as markdown, in the form somebody pastes into a " +
 			"release note. Returned as `text/markdown` rather than as a string in a JSON " +
 			"field, because the point of it is that it goes straight in.\n\n" +
-			"**It carries what was fixed and nothing else.** Not what is still present, not " +
+			"It carries what was fixed and nothing else. Not what is still present, not " +
 			"what newly appeared, and not an upgrade that carried the issue with it — those are " +
 			"statements about what a build contains, and the document for them is a VEX, " +
 			"which a customer's own scanner reads. The comparison itself still answers all " +
@@ -334,7 +334,7 @@ func registerNotes(api huma.API, in Ingest) {
 			"Worst first and stably ordered, so two runs over the same pair of builds produce " +
 			"the same document. A lead line names both builds, the day, and the scanner and " +
 			"vulnerability-database versions the later build was last measured with.\n\n" +
-			"**Public findings only unless you ask otherwise**, as the comparison itself is. " +
+			"Public findings only unless you ask otherwise, as the comparison itself is. " +
 			"Where fixes are left out for not having been disclosed, the note says how many " +
 			"and never which.\n\n" +
 			"A release that fixed nothing answers with a sentence saying so, not with an " +
@@ -473,7 +473,7 @@ func registerCarry(api huma.API, in Ingest) {
 			"Four groups, because they need four different things:\n\n" +
 			"`applying` reach this line by matching, and there is nothing to choose.\n\n" +
 			"`moved` held a claim at a version this line does not have. Each would come " +
-			"across as a **proposal carrying the old reasoning**, never as a decision.\n\n" +
+			"across as a proposal carrying the old reasoning, never as a decision.\n\n" +
 			"`postponed` were deferrals. Each says how long it has already been put off " +
 			"across every line it has come through, which is the total that carrying it " +
 			"again agrees to.\n\n" +
@@ -520,11 +520,11 @@ func registerCarrying(api huma.API, in Ingest) {
 		Summary: "Carry chosen triage onto a new line",
 		Description: "Takes the judgments named onto this build as claims waiting for " +
 			"agreement, each carrying the words from the line it came from.\n\n" +
-			"**Reasoning travels and conclusions do not.** Every one arrives needing approval, " +
+			"Reasoning travels and conclusions do not. Every one arrives needing approval, " +
 			"however confident whoever carried it was: a version moved, which is exactly what " +
 			"made the old judgment stop applying, so somebody has to look at the new code. " +
 			"What is inherited is the thinking rather than the answer.\n\n" +
-			"**Only what the preview offered.** A judgment that already applies here has " +
+			"Only what the preview offered. A judgment that already applies here has " +
 			"nothing to agree to, and one covering nothing here has nothing to apply to; " +
 			"naming either is refused rather than skipped, because a caller that got the set " +
 			"wrong should hear so.\n\n" +

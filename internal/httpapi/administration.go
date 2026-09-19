@@ -306,7 +306,7 @@ func registerAdministration(api huma.API, a Administering) {
 			"the products those apply to.\n\n" +
 			"Nobody appears here by having authenticated. Access is granted in advance, so this " +
 			"list is what an administrator has decided rather than who has turned up.\n\n" +
-			"**`product` and `role` narrow it to who holds what.** \"Who approves on this " +
+			"`product` and `role` narrow it to who holds what. \"Who approves on this " +
 			"product\" is the question an access review asks, and reading it off a list of " +
 			"everybody is reading the grid sideways. A grant that is not in force does not " +
 			"match: what somebody holds is a statement about now.",
@@ -398,7 +398,7 @@ func registerAdministration(api huma.API, a Administering) {
 		Summary: "Create a user and grant roles",
 		Description: "Records somebody so that they may sign in, and optionally what they hold. " +
 			"Recording the same person again confirms them and adds any roles named.\n\n" +
-			"**Requires a session.** A personal token cannot record a person, because the " +
+			"Requires a session. A personal token cannot record a person, because the " +
 			"account it would create outlives the token and is not bounded by it.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
@@ -682,7 +682,7 @@ func registerAdministration(api huma.API, a Administering) {
 		Description: "Clears the identifier a sign-in provider pinned to somebody, so that the " +
 			"next person to arrive under their username binds it again. Their authorization and " +
 			"their roles are untouched.\n\n" +
-			"**Use it after changing sign-in provider.** An identifier belongs to the provider " +
+			"Use it after changing sign-in provider. An identifier belongs to the provider " +
 			"that issued it, so every account pinned to the old one is refused once a new one is " +
 			"configured: the name matches and the identifier does not.\n\n" +
 			"It re-opens the window a pinned identifier closes, in which whoever arrives under " +

@@ -73,11 +73,11 @@ func registerOverview(api huma.API, in Ingest) {
 		Description: "One product, with each of its builds: what is open, how much is overdue, " +
 			"how much is exploited, how much nobody has claimed anything about, how much is " +
 			"answered at every place, and when a scan last arrived.\n\n" +
-			"**Counted as issues at components**, the unit every other count here uses. A " +
+			"Counted as issues at components, the unit every other count here uses. A " +
 			"component reached twenty ways carries the same issue twenty times, so counting " +
 			"rows would make a build look twenty times worse than the list somebody opens " +
 			"next.\n\n" +
-			"**\"Undecided\" and \"agreed\" are the findings list's own words**, by the same " +
+			"\"Undecided\" and \"agreed\" are the findings list's own words, by the same " +
 			"definition and read from the same expression: undecided means no place has a " +
 			"decision, agreed means every place is answered by one that stands. Two screens " +
 			"with two definitions of \"decided\" is how they come to disagree in front of " +

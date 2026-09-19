@@ -28,11 +28,11 @@ func registerRetained(api huma.API, in Ingest) {
 		Description: "Returns the bytes as they arrived, byte for byte: the hash on the receipt " +
 			"is over what comes back from here, so a copy can be checked against what was " +
 			"actually read.\n\n" +
-			"**A tagged release keeps its documents and a branch build does not.** A nightly " +
+			"A tagged release keeps its documents and a branch build does not. A nightly " +
 			"build's contents are let go once they have been read, because keeping them costs " +
 			"storage that grows with the calendar; a tag's are kept because re-scanning it " +
 			"years from now needs both what it contained and what the build had already argued " +
-			"about its own patches. One that was let go answers **410**, which says the bytes " +
+			"about its own patches. One that was let go answers 410, which says the bytes " +
 			"went on purpose — the record of what arrived is still on the receipt.\n\n" +
 			"Named through the scan it belongs to rather than on its own, so whoever may read " +
 			"the receipt may read what it describes and there is one rule rather than two.",

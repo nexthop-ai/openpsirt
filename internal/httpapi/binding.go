@@ -185,7 +185,7 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			"Every role names the product it applies to. Administration and the audit " +
 			"permission are bound without one, because they are held over the deployment " +
 			"rather than against a product.\n\n" +
-			"**The group is matched exactly, including its capitals.** It is an identity the " +
+			"The group is matched exactly, including its capitals. It is an identity the " +
 			"provider hands over rather than a name anybody here types, so it is stored as " +
 			"given and compared as given — `Security` and `security` are two bindings, and a " +
 			"binding whose capitals do not match what the provider sends grants nothing. The " +

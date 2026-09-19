@@ -440,7 +440,7 @@ func registerExport(api huma.API, in Ingest) {
 		Summary: "Export the findings list",
 		Description: "The findings list as a file: every row the same filters would show, not " +
 			"one page of them.\n\n" +
-			"**Read with your own visibility, as it streams.** It is the same query the screen " +
+			"Read with your own visibility, as it streams. It is the same query the screen " +
 			"reads, paged and written out as it goes — there is no point at which a whole " +
 			"unnarrowed list exists to be filtered afterwards, which is the failure an export " +
 			"is the easiest place in a codebase to make.\n\n" +
@@ -530,7 +530,7 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 		Summary: "Export findings across every product",
 		Description: "The cross-product findings list as a file: every row the same filters " +
 			"would show, not one page of them.\n\n" +
-			"**Read with your own visibility, as it streams.** It is the same query the " +
+			"Read with your own visibility, as it streams. It is the same query the " +
 			"screen reads, paged and written out as it goes.\n\n" +
 			"Each product applies its own triage line, so the file states that rather than " +
 			"naming one line, and `product` is a column.\n\n" +

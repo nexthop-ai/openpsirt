@@ -45,8 +45,8 @@ func registerNotifications(api huma.API, in Ingest) {
 			"Everyone has one of these, and what appears in it differs by what you hold: work " +
 			"arriving, a dismissal sent back, an approval an edit withdrew, or — for an " +
 			"administrator — that the tool itself is unwell.\n\n" +
-			"Two lifetimes, and the difference matters to a caller. An **event** happened once " +
-			"and goes away when you acknowledge it. A **condition** is true while something is " +
+			"Two lifetimes, and the difference matters to a caller. An event happened once " +
+			"and goes away when you acknowledge it. A condition is true while something is " +
 			"true and clears itself when that stops, so a build that resumes being scanned " +
 			"leaves this list without anybody dismissing it.",
 		Tags: []string{"Notifications"},

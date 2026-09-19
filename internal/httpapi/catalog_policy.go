@@ -145,15 +145,15 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		Summary: "Set when a release went out and what it was cut from",
 		Description: "Records the day a tag actually shipped, and the branch it was cut " +
 			"from.\n\n" +
-			"**Both are settable after the fact, because that is when they are usually " +
-			"known.** A tag is declared here so scans can be filed against it, which happens " +
+			"Both are settable after the fact, because that is when they are usually " +
+			"known. A tag is declared here so scans can be filed against it, which happens " +
 			"whenever somebody gets to it — before the release, months after, or while " +
 			"backfilling a year. Fixed at declaration, a release recorded late ordered after " +
 			"ones that came out before it, and a year entered in an afternoon plotted as a " +
 			"single day.\n\n" +
 			"The date orders and labels the release-over-release chart. Left unset, the day " +
 			"the release was declared here stands in.\n\n" +
-			"**The parent fills in, and never changes.** It is what a branch is " +
+			"The parent fills in, and never changes. It is what a branch is " +
 			"compared against for release notes, and a pipeline that does not know declares " +
 			"the tag without it — so saying it late is the same act arriving late, because " +
 			"nothing had been said for it to contradict. Naming a different branch is refused, " +

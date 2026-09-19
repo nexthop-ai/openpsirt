@@ -56,8 +56,8 @@ func registerAssessment(api huma.API, in Ingest) {
 		OperationID: "assess-issue", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/issues/{vulnerability}/assessment",
 		Summary: "Record what a product thinks of an issue, as against what was published",
-		Description: "Recorded against the **issue**, not against a place, and against **one " +
-			"product**. A published rating being wrong, or a report being disputed, is one " +
+		Description: "Recorded against the issue, not against a place, and against one " +
+			"product. A published rating being wrong, or a report being disputed, is one " +
 			"statement about the vulnerability in this product — true in every build of it, " +
 			"including builds it has not reached yet, and it does not stop being true " +
 			"because somebody rebuilt something.\n\n" +
@@ -67,9 +67,9 @@ func registerAssessment(api huma.API, in Ingest) {
 			"different ratings of the same issue, and neither reaches the other. A product " +
 			"nobody has rated the issue in reads the published rating.\n\n" +
 			"It changes the order, which is what makes it worth having rather than a note " +
-			"nobody acts on. Rating something **worse** than published takes effect at " +
+			"nobody acts on. Rating something worse than published takes effect at " +
 			"once: nobody needs protecting from being told something is worse than the " +
-			"world says. Rating it **milder** waits for a second person, because that is " +
+			"world says. Rating it milder waits for a second person, because that is " +
 			"the direction that hides things — and it hides more than a position in a " +
 			"list. Severity sets the deadline, so calling a high a low pushes its deadline " +
 			"out by months, and where a product has said what is worth triaging at all, a " +
@@ -129,7 +129,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		Description: "Only a milder rating waits for this. Somebody other than whoever " +
 			"proposed it, for the same reason every other second person here is somebody " +
 			"else: a control one person can complete alone is not a control.\n\n" +
-			"The second person holds their role **on the product the rating belongs to**. " +
+			"The second person holds their role on the product the rating belongs to. " +
 			"Agreeing is what puts a milder rating into force, so it moves that product's " +
 			"deadlines and its triage line; a rating in a product you hold nothing on " +
 			"answers as one that is not there.",
@@ -163,7 +163,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			"everything that reads it — where a finding sits in the list, how long it has, " +
 			"whether it is above the line the product triages — follows it back. No other " +
 			"product is touched.\n\n" +
-			"Asked of triage **on the product the rating belongs to**: taking a rating back " +
+			"Asked of triage on the product the rating belongs to: taking a rating back " +
 			"is making one.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
 	}, perProduct, "The product is the rating's own, not one in the path.",

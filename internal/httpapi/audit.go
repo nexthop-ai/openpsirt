@@ -170,7 +170,7 @@ func registerAudit(api huma.API, in Ingest) {
 		Description: "Every judgment recorded in a period, newest first, with what it was " +
 			"about, the reasoning it rests on, who proposed it and when, and who agreed and " +
 			"when — including agreements later taken back.\n\n" +
-			"The period is the date a judgment was **proposed**, not approved: a judgment " +
+			"The period is the date a judgment was proposed, not approved: a judgment " +
 			"belongs to when it was argued, and dating it by its agreement would move it out " +
 			"of that period whenever an approval came late, which is the ordinary case.\n\n" +
 			"Narrowed by what you may see, like every other list here. Nothing about this view " +

@@ -65,7 +65,7 @@ func registerOutOfSupport(api huma.API, in Ingest) {
 			"`inherited` means the date came from the product rather than from the release " +
 			"itself. `open` counts issues at components, not one per place — the same unit " +
 			"every release-level count here uses.\n\n" +
-			"**`within` asks what is about to go**, in days ahead. Those come back under " +
+			"`within` asks what is about to go, in days ahead. Those come back under " +
 			"`ending`, soonest first and never mixed into what has already gone: the day a " +
 			"release crosses, the deadline comes off every open finding on it and that work " +
 			"leaves every overdue count at once, so a warning and an exposure are two lists " +

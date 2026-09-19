@@ -38,7 +38,7 @@ func registerTeams(api huma.API, a Administering) {
 			"A team holds work and grants nothing: no role, no visibility, no capability. " +
 			"One team therefore carries mixed clearance as a matter of course, and what each " +
 			"member sees of the work routed to it is what they could see anyway.\n\n" +
-			"**Names to anybody, membership to an administrator.** Routing work to a team " +
+			"Names to anybody, membership to an administrator. Routing work to a team " +
 			"means naming one, so anybody who may hand work around has to be able to see the " +
 			"names; who is on it is the same question as who is here, and that is answered " +
 			"where the rest of the record is.",

@@ -210,7 +210,7 @@ func registerAttachments(api huma.API, in Ingest) {
 		Summary: "Fetch an attached file",
 		Description: "Authorized against the issue the file hangs off — whoever may read the " +
 			"text may read what it refers to — and only then served.\n\n" +
-			"**Two shapes, and a caller has to follow both.** An image displayed in the page is " +
+			"Two shapes, and a caller has to follow both. An image displayed in the page is " +
 			"sent from here; everything else answers 303 with a short-lived address at the " +
 			"store. Either way the content type and the disposition are the ones decided at " +
 			"upload, never the ones the file arrived with.\n\n" +

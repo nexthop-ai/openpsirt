@@ -45,11 +45,11 @@ func registerCarried(api huma.API, in Ingest) {
 		Summary: "List what a build says it deals with itself",
 		Description: "Everything this build has argued about in its own inventories: carried " +
 			"patches saying what they fix, and statements it sent alongside.\n\n" +
-			"**A history rather than a list of what is true tonight.** Each row says when the " +
+			"A history rather than a list of what is true tonight. Each row says when the " +
 			"build first said it and when it stopped, because a claim that stopped is the " +
 			"interesting one — somebody dropped a patch, and the finding it answered is " +
 			"back. A list of what is current would not have that row at all.\n\n" +
-			"**A carried patch is the only way a backport can be seen here.** No version " +
+			"A carried patch is the only way a backport can be seen here. No version " +
 			"comparison finds one: the fix is in the package and the version has not moved, " +
 			"so unless the build declares it, the finding sits open with nothing true to say " +
 			"about it.\n\n" +

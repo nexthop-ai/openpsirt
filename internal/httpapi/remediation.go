@@ -63,16 +63,16 @@ func registerRemediation(api huma.API, in Ingest) {
 		Summary: "Report how fast findings are being fixed",
 		Description: "Fix velocity, average time to remediate by severity, and what is aging, " +
 			"over a period and narrowed by the scope picker.\n\n" +
-			"**A period or a rolling window.** `from` and `to` name a stretch — a quarter, a " +
+			"A period or a rolling window. `from` and `to` name a stretch — a quarter, a " +
 			"financial year — and `days` is the rolling window ending now. They are two ways " +
-			"of saying when, so only one may be sent. What is **aging** is a statement about " +
+			"of saying when, so only one may be sent. What is aging is a statement about " +
 			"now whatever period was asked for: how long something has been open is answered " +
 			"by the clock.\n\n" +
-			"**A closure only counts as a fix if the issue actually went away.** An upgrade that " +
+			"A closure only counts as a fix if the issue actually went away. An upgrade that " +
 			"carried the issue into the next version, and a finding a scanner silently stopped " +
 			"reporting, are not fixes — counting them measures churn and reports it as " +
 			"progress, so the figure moves in the right direction while nothing improves.\n\n" +
-			"**Counted in issues, not in places.** One kernel flaw across sixty modules is one " +
+			"Counted in issues, not in places. One kernel flaw across sixty modules is one " +
 			"thing that was fixed; an average weighted by how far a component fans out measures " +
 			"the dependency graph rather than anybody's work.\n\n" +
 			"Asked for neither a period nor a window, this is the last 30 days.",

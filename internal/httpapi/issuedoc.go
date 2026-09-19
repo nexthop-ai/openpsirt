@@ -43,10 +43,10 @@ func registerIssueDocument(api huma.API, in Ingest) {
 		Description: "What the issue is, every build of yours that carries it, what was " +
 			"decided about each and the reasoning behind it, as markdown — the form a " +
 			"customer inquiry is answered from.\n\n" +
-			"**It is an internal document and says so.** The reasoning is this deployment's " +
+			"It is an internal document and says so. The reasoning is this deployment's " +
 			"own argument; what goes to a customer is the advisory or the VEX document, both " +
 			"of which are assembled elsewhere and say less on purpose.\n\n" +
-			"**Narrowed by what you may see**, like every other read: two people asking get " +
+			"Narrowed by what you may see, like every other read: two people asking get " +
 			"different documents rather than one of them getting an error.\n\n" +
 			"Nothing of yours affected is an answer, and the document says that rather than " +
 			"refusing — which is what the inquiry is usually asking.",
@@ -149,7 +149,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	// Where it sits, which is the question the inquiry actually asks.
 	fmt.Fprintf(&out, "\n## Where it is\n\n%s\n\n", howManyCarry(total, len(rows)))
 	for _, row := range rows {
-		fmt.Fprintf(&out, "- **%s** %s (%s) — %s %s",
+		fmt.Fprintf(&out, "- %s %s (%s) — %s %s",
 			row.Product, row.Stream, row.Variant, row.Component, row.Version)
 		if row.Places > 1 {
 			fmt.Fprintf(&out, ", at %d places", row.Places)
@@ -191,7 +191,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	})
 	for _, one := range judged {
 		body := judgedBody(one)
-		fmt.Fprintf(&out, "- **%s** in %s — %s", body.Outcome, body.Product, body.State)
+		fmt.Fprintf(&out, "- %s in %s — %s", body.Outcome, body.Product, body.State)
 		if body.Standing {
 			out.WriteString(", standing")
 		}

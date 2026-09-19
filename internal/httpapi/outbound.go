@@ -41,7 +41,7 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Summary: "List where this deployment sends things",
 		Description: "The destinations configured, which kinds go to each, and whether they " +
 			"are working.\n\n" +
-			"**The signing secret is never returned.** It signs our requests rather than " +
+			"The signing secret is never returned. It signs our requests rather than " +
 			"authenticating anybody to us, so it has to be stored recoverably — and showing " +
 			"it would put a shared secret on a page.",
 		Tags: []string{"Administration"},
@@ -73,18 +73,18 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Summary: "Send a kind of notification somewhere",
 		Description: "Records a destination: a URL, a shared secret to sign with, and which " +
 			"kinds go there — one kind by name, or `*` for all of them.\n\n" +
-			"**One signed request, not an adapter each.** Slack, Teams, a tracker driven by " +
+			"One signed request, not an adapter each. Slack, Teams, a tracker driven by " +
 			"automation and paging all take an HTTP request with a JSON body, so one shape " +
 			"reaches all of them.\n\n" +
-			"**What it carries is what the channel rules already allow.** A notification " +
+			"What it carries is what the channel rules already allow. A notification " +
 			"about a finding nobody has announced carries the fact that there is something " +
 			"and a link, and nothing else — the same body a mail would carry, composed by the " +
 			"same code.\n\n" +
-			"**Every request is signed.** `X-OpenPSIRT-Timestamp` and " +
+			"Every request is signed. `X-OpenPSIRT-Timestamp` and " +
 			"`X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the " +
 			"body — so a receiver can tell one of ours from one anybody could make, and " +
 			"cannot replay yesterday's.\n\n" +
-			"**https only, and a redirect is refused rather than followed.** The body is " +
+			"https only, and a redirect is refused rather than followed. The body is " +
 			"signed and not encrypted, and a redirect asks us to send a signed request " +
 			"somewhere else, which is what the restriction exists to prevent.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,

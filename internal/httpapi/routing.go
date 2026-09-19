@@ -52,7 +52,7 @@ func registerRouting(api huma.API, in Ingest) {
 		OperationID: "list-routing-rules", Method: http.MethodGet, Path: path,
 		Summary: "List the rules that route work to teams",
 		Description: "The standing rules for this product, in the order they are tried.\n\n" +
-			"**First match wins**, and which rule placed a finding is recorded on the finding: " +
+			"First match wins, and which rule placed a finding is recorded on the finding: " +
 			"an unwritten precedence is forgettable, and the question it answers — where did " +
 			"this come from — is asked months later by somebody who was not there.",
 		Tags: []string{"Administration"},
@@ -105,11 +105,11 @@ func registerRouting(api huma.API, in Ingest) {
 		Description: "Answers what a rule with these keys matches, without recording " +
 			"anything: the components it names, how many pieces of work sit at them, and how " +
 			"many of those nobody holds.\n\n" +
-			"**A rule whose reach nobody can see before saving is a rule that sweeps the " +
-			"estate on a guess**, and one naming something nothing is called places nothing, " +
+			"A rule whose reach nobody can see before saving is a rule that sweeps the " +
+			"estate on a guess, and one naming something nothing is called places nothing, " +
 			"silently — which is the worst way for a rule to be wrong, because it still looks " +
 			"like a rule. `*` matches any run of characters in either key.\n\n" +
-			"**It does not account for the rules already there.** First match wins, so what " +
+			"It does not account for the rules already there. First match wins, so what " +
 			"this catches is what it would place only where no earlier rule claimed it first.",
 		Tags: []string{"Administration"},
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
@@ -166,14 +166,14 @@ func registerRouting(api huma.API, in Ingest) {
 		OperationID: "add-routing-rule", Method: http.MethodPost, Path: path,
 		Summary: "Add a rule that routes work to a team",
 		Description: "Records a standing rule and queues it against what is already open.\n\n" +
-			"**It matches on component identity as well as on a place in the tree.** The " +
+			"It matches on component identity as well as on a place in the tree. The " +
 			"source package is the key that matters: one rule naming it catches every binary " +
 			"package built from it, wherever they sit — a kernel is one source package " +
 			"appearing at many places under many consumers, and a subtree rule would need a " +
 			"line per place and would still miss tomorrow's.\n\n" +
-			"**It places only work nobody holds.** A human assignment always wins, and " +
+			"It places only work nobody holds. A human assignment always wins, and " +
 			"adding a rule never takes something out of somebody's hands.\n\n" +
-			"**Turning one on is a bulk write**, so it is queued rather than done here: one " +
+			"Turning one on is a bulk write, so it is queued rather than done here: one " +
 			"rule naming a source package sweeps thousands of existing findings, and saving " +
 			"a form must not hold a transaction open across the estate. The reply says the " +
 			"rule was recorded, not that the sweep has finished.",
@@ -228,7 +228,7 @@ func registerRouting(api huma.API, in Ingest) {
 		OperationID: "retire-routing-rule", Method: http.MethodDelete,
 		Path:    path + "/{id}",
 		Summary: "Retire a routing rule",
-		Description: "Takes a rule out of use. **What it already placed stays placed**: " +
+		Description: "Takes a rule out of use. What it already placed stays placed: " +
 			"changing a rule never takes something out of somebody's hands, and that holds " +
 			"for a team's queue as much as for a person.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,

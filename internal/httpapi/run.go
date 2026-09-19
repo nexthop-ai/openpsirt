@@ -50,7 +50,7 @@ func registerRun(api huma.API, in Ingest) {
 		Description: "One run, with what it was measured with and what it changed — broken " +
 			"down by the rating in force, and with how much of what it opened is known to be " +
 			"exploited.\n\n" +
-			"**A receipt says a run happened; this says what it did.** A row reading \"7,604 " +
+			"A receipt says a run happened; this says what it did. A row reading \"7,604 " +
 			"opened\" is a number with no shape, and somebody looking at a build that jumped " +
 			"overnight is asking which of them matter.\n\n" +
 			"Counted as issues at components, the unit every other count here uses: a " +

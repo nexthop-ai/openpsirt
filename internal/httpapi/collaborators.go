@@ -42,7 +42,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 		OperationID: "list-collaborators", Method: http.MethodGet, Path: path,
 		Summary: "List who has been brought into a case",
 		Description: "Everybody granted this one issue in this product, oldest first.\n\n" +
-			"**Being on a case is not reading the product.** A collaborator sees this issue " +
+			"Being on a case is not reading the product. A collaborator sees this issue " +
 			"wherever it sits here and nothing else, may argue about it and comment on it, " +
 			"and may not agree to anybody's claim.",
 		Tags: []string{"Findings"},
@@ -77,7 +77,7 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 		Summary: "Bring somebody into a case",
 		Description: "Grants one person this one issue in this product, without granting them " +
 			"private reading on the product.\n\n" +
-			"**It is an access change and is recorded as one**: it lands in the " +
+			"It is an access change and is recorded as one: it lands in the " +
 			"administration trail, and they are told at once — in the notification area " +
 			"inside the application, where an undisclosed finding may be named.\n\n" +
 			"They must already have been recorded here: this grants access to somebody who " +

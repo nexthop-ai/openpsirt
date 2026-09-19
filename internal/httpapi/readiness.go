@@ -88,7 +88,7 @@ func registerReadiness(api huma.API, in Ingest) {
 		Description: "Answers the question asked before shipping: is what we are about to " +
 			"ship better or worse than what we last shipped. \"8 criticals now, v2.4.1 " +
 			"shipped with 4.\"\n\n" +
-			"The release is the newest one cut from this branch, **built the same way**, that " +
+			"The release is the newest one cut from this branch, built the same way, that " +
 			"has been scanned here — a branch built for one chip beside a release built for " +
 			"another compares two different pieces of software and reads as a regression " +
 			"somebody then goes looking for.\n\n" +
@@ -98,7 +98,7 @@ func registerReadiness(api huma.API, in Ingest) {
 			"that shipped clean and a release nobody scanned are not the same answer.\n\n" +
 			"Counted as issues at components at or above the deployment's line, which `floor` " +
 			"names.\n\n" +
-			"**`blocking` is the worst few of what the count is made of**: the work nobody has agreed to ship " +
+			"`blocking` is the worst few of what the count is made of: the work nobody has agreed to ship " +
 			"with, worst first, read through the findings list's own reader with the same " +
 			"line — so the list it opens is the list it counts. Anything agreed is absent, " +
 			"because agreeing is the decision to ship with it. `blockers` says how many " +

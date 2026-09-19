@@ -81,7 +81,7 @@ func registerBundles(api huma.API, in Ingest) {
 		Summary: "List findings by upgrade",
 		Description: "One row per upstream upgrade, with the issues it closes.\n\n" +
 
-			"Keyed on the **source package** where one is recorded and on the component's " +
+			"Keyed on the source package where one is recorded and on the component's " +
 			"own name otherwise, so packages built from one source are one row — curl, " +
 			"libcurl4t64 and libcurl3t64 are upgraded once.\n\n" +
 			"Only what has a fix: a bundle is a version to move to, so a finding upstream has " +
@@ -258,18 +258,18 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		Description: "Everything committed for this build, one row per upgrade — a source package " +
 			"at the version it was built at, moving to another version — with what it would " +
 			"still close here.\n\n" +
-			"**What it covers is a match, not a list.** A finding is covered when its " +
+			"What it covers is a match, not a list. A finding is covered when its " +
 			"component folds to the same key in this build, so changing the version a release " +
 			"is moving to is one row, and an issue published tonight against the same package " +
 			"is covered by this morning's commitment with nobody acting.\n\n" +
-			"**The fix-bundle query read from the other end.** A triager reads an upgrade and the " +
+			"The fix-bundle query read from the other end. A triager reads an upgrade and the " +
 			"issues it closes; a coordinator reads a build and the upgrades it is waiting on. One " +
 			"query rather than two reports that will eventually disagree.\n\n" +
-			"**Nothing here is declared done.** A piece of work has landed when the build " +
+			"Nothing here is declared done. A piece of work has landed when the build " +
 			"stops holding it, which the scans already say — a declared fix that is still " +
 			"open after a scan has run is a missed target, and the scan is independent " +
 			"evidence against the claim.\n\n" +
-			"**Each row says where it stands** — planned, landed, or lapsed — derived on every " +
+			"Each row says where it stands — planned, landed, or lapsed — derived on every " +
 			"read from the scans and the date the promise named, and set by nobody. A lapsed " +
 			"upgrade returns as one item to whoever holds it: the findings it covers stay " +
 			"covered, because deciding them again one at a time is the thing the promise was " +

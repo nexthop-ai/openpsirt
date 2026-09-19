@@ -149,7 +149,7 @@ func registerGraph(api huma.API, in Ingest) {
 			"A component reached several ways appears once with several parents. It is a graph " +
 			"rather than a tree, so anything drawing it has to expect the same component under " +
 			"many places.\n\n" +
-			"**A component name is not unique within a build.** Where one ships at several " +
+			"A component name is not unique within a build. Where one ships at several " +
 			"versions, `version` says which — without it, a name that matches more than one is " +
 			"refused with 409, naming the choices, rather than guessed at.",
 		Tags: []string{"Findings"},

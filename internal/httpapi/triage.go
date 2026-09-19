@@ -264,7 +264,7 @@ func registerTriage(api huma.API, in Ingest) {
 			"rest, which is what to read instead of all of them.\n\n" +
 			"Approve, send back or set rows aside with `POST /v1/claims/{id}/approval` and " +
 			"`POST /v1/claims/{id}/send-back`.\n\n" +
-			"**Your own claims are not here.** Approving your own is refused, so a queue " +
+			"Your own claims are not here. Approving your own is refused, so a queue " +
 			"containing them is a list of work you cannot do. Ask for `mine=true` to see what " +
 			"you proposed and nobody has agreed to yet, which is a different question.",
 		Tags: []string{"Triage"},
@@ -342,7 +342,7 @@ func registerTriage(api huma.API, in Ingest) {
 		Summary: "Change what a release is moving to",
 		Description: "Changes the version a promised upgrade moves to, or the date it is " +
 			"promised by, on the claim and on every commitment it wrote.\n\n" +
-			"**This withdraws any existing approval** and returns every row of the claim to " +
+			"This withdraws any existing approval and returns every row of the claim to " +
 			"the review queue. An approver agreed to a version by a date; changing either is " +
 			"changing what they agreed to, so it goes through the same act revising the words " +
 			"does.\n\n" +
@@ -498,7 +498,7 @@ func registerTriage(api huma.API, in Ingest) {
 		Description: "Replaces the justification text with a new revision. Earlier revisions are " +
 			"kept and remain readable.\n\n" +
 			"A claim is one argument however many places it covers, so this revises all of it. " +
-			"**It withdraws any existing approval** and returns every row of the claim to the " +
+			"It withdraws any existing approval and returns every row of the claim to the " +
 			"review queue, marked as previously approved. Requires no approval of its own.\n\n" +
 			"The text is markdown and is validated before it is stored; a 422 names the line and " +
 			"the offending text.",
@@ -649,7 +649,7 @@ func registerProposing(api huma.API, in Ingest) {
 			"`deferred` requires `deferred_until` as a date. `already-fixed` requires " +
 			"`fixed_version`, the version whoever packages the component states the fix " +
 			"arrived in — it is recorded for a reader and never compared against what ships.\n\n" +
-			"**`patch-needed` is the backport case**: a fix is being carried into this build " +
+			"`patch-needed` is the backport case: a fix is being carried into this build " +
 			"and the version does not move. It requires `committed_to`, the date the work " +
 			"lands, and it closes the only way a backport can — the next inventory declares " +
 			"the patch it carries and says what that patch resolves, so the finding goes " +

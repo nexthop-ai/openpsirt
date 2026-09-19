@@ -35,7 +35,7 @@ func registerEffort(api huma.API, in Ingest) {
 		Description: "What the judgments in a period were about, most argued first: which " +
 			"component in which product, how many arguments were made, how many places they " +
 			"reached, how many people made them, and what came out of them.\n\n" +
-			"**Counted in claims, not in the rows they wrote.** A claim is one person's act; " +
+			"Counted in claims, not in the rows they wrote. A claim is one person's act; " +
 			"counting its rows measures how far a component fans out through an image. Both " +
 			"numbers come back.\n\n" +
 			"Dated by when a judgment was proposed. Asked for neither a period nor a window, " +

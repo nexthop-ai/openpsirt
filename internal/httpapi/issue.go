@@ -54,13 +54,13 @@ func registerIssue(api huma.API, in Ingest) {
 		Summary: "List findings for one issue across every product",
 		Description: "Every build that carries this issue, across every product you may see, " +
 			"with how far it has been decided in each.\n\n" +
-			"**One row per build and component**, not per place: the same component in two " +
+			"One row per build and component, not per place: the same component in two " +
 			"builds is two things somebody ships, and sixty places of it in one build is one " +
 			"piece of work with a count.\n\n" +
-			"**Narrowed the way every other read is**, per product and per visibility. A page " +
+			"Narrowed the way every other read is, per product and per visibility. A page " +
 			"that spans products is exactly where filtering afterwards gets forgotten, and " +
 			"the count is the leak even when no row is shown.\n\n" +
-			"**Nothing affected is an answer**, not a 404: `total` is zero and `items` is " +
+			"Nothing affected is an answer, not a 404: `total` is zero and `items` is " +
 			"empty, which is what a customer inquiry is asking for. An identifier nobody " +
 			"here has seen answers the same way as one that sits only in products you " +
 			"cannot read — told apart, the pair would say which issues this deployment " +

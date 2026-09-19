@@ -49,13 +49,13 @@ func registerSaved(api huma.API, in Ingest) {
 		Path:    "/v1/products/{product}/saved-filters",
 		Summary: "List your saved filters",
 		Description: "The narrowings you have kept, by name.\n\n" +
-			"**Personal, and nothing is shared.** No ownership, no permissions and no arguing " +
+			"Personal, and nothing is shared. No ownership, no permissions and no arguing " +
 			"about whose filter is authoritative — which is also what lets somebody keep one " +
 			"that is half-formed. Yours are the only ones this answers with, whoever asks.\n\n" +
 			"A saved filter naming something the list no longer offers simply stops narrowing " +
 			"by it, which is a way back to a slightly wider list rather than a refusal to open " +
 			"one.\n\n" +
-			"**Kept per product.** A filter narrows one product's findings list and its query " +
+			"Kept per product. A filter narrows one product's findings list and its query " +
 			"names branches and variants that usually exist in no other, so one offered " +
 			"everywhere would be offered where it matches nothing.",
 		Tags: []string{"Findings"},

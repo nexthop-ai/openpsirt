@@ -78,7 +78,7 @@ func registerKeys(api huma.API, a Administering) {
 		Description: "Creates a credential a build may send scans with, and returns its secret. " +
 			"The secret is shown once and stored hashed: a credential store that can hand back " +
 			"what it holds gives up every pipeline's key with a copy of the database.\n\n" +
-			"**Requires a session.** A credential cannot create another, and a key created by " +
+			"Requires a session. A credential cannot create another, and a key created by " +
 			"one would outlive it.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {

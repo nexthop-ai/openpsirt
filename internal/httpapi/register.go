@@ -182,11 +182,11 @@ func registerRegister(api huma.API, in Ingest) {
 		Description: "One row per issue and place in this build, with its state, what was " +
 			"claimed, who claimed it, who agreed, when each of those happened, its deadline " +
 			"and whether that was met.\n\n" +
-			"**The complement of the audit list, not a variant of it.** The audit list says " +
+			"The complement of the audit list, not a variant of it. The audit list says " +
 			"what was decided; an auditor's first question is what was *known*, decided or " +
 			"not — so `undecided` rows are in here, and closed ones too. A register of only " +
 			"what is still open answers a different question.\n\n" +
-			"**Current state, and no `as_of`.** Reconstructing the view as of a past date was " +
+			"Current state, and no `as_of`. Reconstructing the view as of a past date was " +
 			"asked for and refused: each row already carries the dates that evidence what is " +
 			"being checked, and a reconstruction would be a second answer about the past that " +
 			"has to be kept honest against the first.",
@@ -363,7 +363,7 @@ func registerCompliance(api huma.API, in Ingest) {
 		Summary: "Report what proportion of work met its deadline",
 		Description: "By severity: how much closed inside its deadline, how much did not, how " +
 			"much is deferred by decision, and how much is plainly late.\n\n" +
-			"**A deferral is its own number and not a failure**, so `deferred` is neither " +
+			"A deferral is its own number and not a failure, so `deferred` is neither " +
 			"met nor late.\n\n" +
 			"Counted in the same unit as every other screen: one issue at one component, not " +
 			"one row per place. A group is closed when no place is still open, met when none " +
@@ -372,13 +372,13 @@ func registerCompliance(api huma.API, in Ingest) {
 			"uncovered.\n\n" +
 			"A closed finding keeps the deadline it carried; only open ones lose theirs at " +
 			"end of life or below the triage line.\n\n" +
-			"**A product is required** — a place identity carries no product, so this cannot " +
+			"A product is required — a place identity carries no product, so this cannot " +
 			"be asked across the deployment.\n\n" +
-			"**A period, or the whole of it.** `from` and `to` bound what closed in them, " +
+			"A period, or the whole of it. `from` and `to` bound what closed in them, " +
 			"which is the number a report on a quarter or a financial year is about; `days` " +
 			"is the rolling window, and only one of the two may be sent. Asked for neither, " +
 			"this is the lifetime figure.\n\n" +
-			"**What is open is always now.** Deadlines are recomputed as the policy moves and " +
+			"What is open is always now. Deadlines are recomputed as the policy moves and " +
 			"dropped below the line and past end of life, so what stood open on a date gone " +
 			"by is not recoverable and is not reconstructed.",
 		Tags: []string{"Reports"},

@@ -20,15 +20,15 @@ func registerAdvisory(api huma.API, in Ingest) {
 		Summary: "Generate a CSAF advisory for an issue",
 		Description: "Returns a CSAF 2.0 document for a flaw in this product: what it is, and " +
 			"which releases hold it and which no longer do.\n\n" +
-			"**The document is generated, not published.** Nothing is sent anywhere. " +
+			"The document is generated, not published. Nothing is sent anywhere. " +
 			"Recording that a document was issued is a separate request, and what it keeps " +
 			"is the digest of what was generated, so that whether what you published is " +
 			"still what this would generate can be answered.\n\n" +
-			"**Only for a flaw in what you ship.** An issue a scanner reported against a " +
+			"Only for a flaw in what you ship. An issue a scanner reported against a " +
 			"third-party component is refused: that is dependency hygiene a consumer can " +
 			"already read out of the inventory, and a vendor advisory for every upstream CVE " +
 			"in a dependency is not what an advisory is.\n\n" +
-			"**A document about an undisclosed flaw is a draft**, and says so in `tracking." +
+			"A document about an undisclosed flaw is a draft, and says so in `tracking." +
 			"status`. Reaching a disclosure date discloses nothing, so nothing here does " +
 			"either.\n\n" +
 			"Requires a publisher configured for this deployment: a document naming none is " +
@@ -74,7 +74,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 		Summary: "List the advisories that went out for a flaw",
 		Description: "What has been published about this flaw in this product, newest first: " +
 			"which revision, when, and what the document hashed to at the time.\n\n" +
-			"**Readable without generating a document.** Every issuance is in the document's " +
+			"Readable without generating a document. Every issuance is in the document's " +
 			"own revision history, which is right for a reader of the document — but it made " +
 			"\"has an advisory gone out, and is what is published still what we would " +
 			"generate\" a question you had to build a CSAF document to answer, and somebody " +
@@ -123,11 +123,11 @@ func registerAdvisory(api huma.API, in Ingest) {
 		Summary: "Record that an advisory went out",
 		Description: "Records that an advisory for this flaw was published: when, by whom, and " +
 			"a digest of the document as it stands now.\n\n" +
-			"**A fact about a moment rather than a derived value.** What was published on a " +
+			"A fact about a moment rather than a derived value. What was published on a " +
 			"date cannot be worked out again once the record it came from has moved on — a " +
 			"release is added, a decision is revised, a fix lands — so if it is not written " +
 			"down when it happens it is gone.\n\n" +
-			"**It is what lets a second document be a revision.** Without it a second advisory " +
+			"It is what lets a second document be a revision. Without it a second advisory " +
 			"for the same flaw cannot carry a revision history or a higher version, and both " +
 			"are things CSAF validators check; a document that fails validation is one a " +
 			"customer's tooling drops.\n\n" +

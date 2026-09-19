@@ -51,11 +51,11 @@ func registerHolders(api huma.API, in Ingest) {
 		Path:    "/v1/products/{product}/holders",
 		Summary: "List who work here can be given to",
 		Description: "People and teams that can hold work in this product, for a picker.\n\n" +
-			"**People are those who can already read what they would be given**, at the " +
+			"People are those who can already read what they would be given, at the " +
 			"visibility asked for. Offering somebody who cannot open what they are handed " +
 			"is how work arrives with a person who cannot act on it — and on an undisclosed " +
 			"finding the offer itself would say a finding exists.\n\n" +
-			"**Teams are listed whole.** A team holds work and grants nothing, so one " +
+			"Teams are listed whole. A team holds work and grants nothing, so one " +
 			"carries mixed clearance as a matter of course and what each member sees of " +
 			"what is routed to it is what they could see anyway.\n\n" +
 			"Narrow with `q`, which matches the identity and the displayed name without " +

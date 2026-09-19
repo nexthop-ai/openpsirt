@@ -65,7 +65,7 @@ func registerComments(api huma.API, in Ingest) {
 		OperationID: "edit-comment", Method: http.MethodPut, Path: "/v1/comments/{id}",
 		Summary: "Edit a comment",
 		Description: "Replaces the text of a comment. Only its author may do this.\n\n" +
-			"**What it said before is kept**, and read back with " +
+			"What it said before is kept, and read back with " +
 			"`GET /v1/comments/{id}/history`. A comment is part of the record that goes " +
 			"public at disclosure, and a record whose earlier text is unrecoverable is " +
 			"readable rather than checkable — which is the property the whole append-only " +

@@ -80,11 +80,11 @@ func registerComponent(api huma.API, in Ingest) {
 		Summary: "Show a component across the builds that carry it",
 		Description: "What each build ships, what is open against it there, where it could " +
 			"go, and what has already been promised.\n\n" +
-			"**Answered per build, because the answer differs by build.** A stream staying " +
+			"Answered per build, because the answer differs by build. A stream staying " +
 			"on a maintained older line and a stream that has moved on are different work " +
 			"with different testing, and one target across both would be wrong for one of " +
 			"them.\n\n" +
-			"**Where it could go carries two counts.** `fixed_here` is how many of what is " +
+			"Where it could go carries two counts. `fixed_here` is how many of what is " +
 			"open name that exact version as their fix, which is the release's own security " +
 			"content; `reached` is how many the upgrade closes altogether, counting " +
 			"everything fixed at or before it. The second is the one somebody choosing a " +
@@ -92,11 +92,11 @@ func registerComponent(api huma.API, in Ingest) {
 			"not defined the two counts are equal, `ordered` is false, and the list is not " +
 			"ranked. Ranked on `fixed_here` a quiet release late on a maintained line sorts " +
 			"near the bottom while carrying every fix before it.\n\n" +
-			"**A build is listed because it ships the component**, not because something is " +
+			"A build is listed because it ships the component, not because something is " +
 			"open against it. A package carrying nothing of its own still answers with the " +
 			"version it ships and how many things pull it in, which is the ordinary case for " +
 			"anything vendored in pre-built.\n\n" +
-			"**One entry per version rather than per build.** A build shipping a name at two " +
+			"One entry per version rather than per build. A build shipping a name at two " +
 			"versions holds two components, and they are two different pieces of code to " +
 			"decide about.\n\n" +
 			"`due_at` is what a commitment about that build is gated against, and is absent " +
@@ -198,17 +198,17 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 		Description: "Answers everything open against a component in the releases named, in one " +
 			"act: each is recorded as `upgrade-needed`, carrying the version it moves to and " +
 			"the date the work will be done.\n\n" +
-			"**Coverage is the component, not a version pair.** Moving to 3.5.2 is a claim " +
+			"Coverage is the component, not a version pair. Moving to 3.5.2 is a claim " +
 			"that it answers what is open on the package — including findings recorded as " +
 			"fixed in 3.5.0 — and the next scan says which of that was true. Deciding it " +
 			"from the versions would need an ordering per ecosystem this does not have.\n\n" +
-			"**Whether a second person agrees depends on the date.** At or before the " +
+			"Whether a second person agrees depends on the date. At or before the " +
 			"earliest deadline among what this covers, it stands on its own: nothing is " +
 			"hidden for longer than the policy already allowed. Past it, the promise defers " +
 			"the worst thing it covers and it waits for approval. The response says which.\n\n" +
-			"**Not bounded**, unlike a bulk judgment: this one writes as many rows as the " +
+			"Not bounded, unlike a bulk judgment: this one writes as many rows as the " +
 			"component has open findings in the releases named.\n\n" +
-			"**Saying who carries it is part of the act**, not a second one: name a `person` " +
+			"Saying who carries it is part of the act, not a second one: name a `person` " +
 			"or a `team`, and every finding the promise covers is handed to them in the same " +
 			"transaction, so a promise nobody is carrying and a holder with no promise are " +
 			"both impossible. A team is a perfectly good holder — moving a package is work a " +

@@ -67,7 +67,7 @@ func registerAssigning(api huma.API, in Ingest) {
 			"/findings/{vulnerability}/components/{component}/assignment",
 		Summary: "Assign a finding to somebody",
 		Description: "Records who is dealing with this issue in this component.\n\n" +
-			"**It covers the product, not the build named in the path.** The path says which " +
+			"It covers the product, not the build named in the path. The path says which " +
 			"finding is being looked at; what is assigned is every build of the product " +
 			"holding the same component, and every place that component sits at.\n\n" +
 			"Send `person` as an empty string to hand it back to nobody, which is this same " +
@@ -333,7 +333,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 			"most urgent first.\n\n" +
 			"Deliberately not scoped to one product: work falling between people is exactly what " +
 			"hides when every screen shows one product and nobody looks at the others.\n\n" +
-			"**One item per issue in a component in a product, not one per build.** The same code " +
+			"One item per issue in a component in a product, not one per build. The same code " +
 			"built as several variants is one piece of work — a judgment is keyed on the product " +
 			"and the code rather than on the build, so answering it once answers every build " +
 			"holding the same versions. `builds` says how many that is. Where two builds ship " +
@@ -386,8 +386,8 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		Path:    "/v1/people/{identity}/assignments",
 		Summary: "List what one person is dealing with",
 		Description: "The open findings assigned to somebody, most urgent first, in the same " +
-			"units as what nobody is dealing with: **one item per issue in a component in a " +
-			"product**, not one per build. The same code built several ways is one piece of " +
+			"units as what nobody is dealing with: one item per issue in a component in a " +
+			"product, not one per build. The same code built several ways is one piece of " +
 			"work, and it was taken on as one.\n\n" +
 			"Send `me` as the identity for your own.\n\n" +
 			"An identity nobody holds answers with an empty list rather than a 404, which is " +
@@ -492,7 +492,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		Path:    "/v1/teams/{team}/assignments",
 		Summary: "List what one team is dealing with",
 		Description: "The open findings routed to a team, most urgent first, in the same units " +
-			"as everywhere else: **one item per issue in a component in a product**.\n\n" +
+			"as everywhere else: one item per issue in a component in a product.\n\n" +
 			"Work goes to a team by standing rule and by an assignment naming one, so a team " +
 			"holds work the way a person does — and the totals list says so. This is the list " +
 			"behind that number.\n\n" +

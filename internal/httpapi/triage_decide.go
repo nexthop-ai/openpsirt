@@ -118,7 +118,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		Summary: "Record one judgment about a finding, covering its places",
 		Description: "Records the same claim against every place this issue occupies in this " +
 			"component. Naming `places` narrows it; leaving it out covers all of them.\n\n" +
-			"**A place left out stays open.** Nothing is recorded against it and nothing is " +
+			"A place left out stays open. Nothing is recorded against it and nothing is " +
 			"asked about it.\n\n" +
 			"One record is written per place, each keyed and expiring on its own, so this " +
 			"reads later as the several decisions it is rather than as one.\n\n" +
@@ -135,7 +135,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 			"justification must match it. The new claim is recorded as an extension of it and " +
 			"still waits for a second person. `similar` on `GET .../findings/{vulnerability}/" +
 			"components/{component}` lists the claims that qualify.\n\n" +
-			"**`patch-needed` is the backport case**: a fix is being carried into this build " +
+			"`patch-needed` is the backport case: a fix is being carried into this build " +
 			"and the version does not move, so it requires `committed_to`, the date the work " +
 			"lands. `upgrade-needed` is not recorded here — an upgrade answers a component and " +
 			"everything open on it, so it is recorded from the component.",

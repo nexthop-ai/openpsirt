@@ -55,10 +55,10 @@ func registerEntry(api huma.API, in Ingest) {
 		Summary: "Record a flaw in what this product ships",
 		Description: "Records a vulnerability in your own product — one no scanner reported, " +
 			"usually because nobody outside knows about it yet.\n\n" +
-			"**It starts undisclosed**, which needs the private triage role on the product. " +
+			"It starts undisclosed, which needs the private triage role on the product. " +
 			"Send `disclosed` for one that is already public, which needs the ordinary " +
 			"one.\n\n" +
-			"**It is filed under an identifier this deployment mints** — the product's name, " +
+			"It is filed under an identifier this deployment mints — the product's name, " +
 			"the year and a number. A CVE assigned later becomes another name for the same " +
 			"issue; nothing about the finding, the decisions or the approvals moves.\n\n" +
 			"`component` names what in the build carries it, as the build calls it. Leave it " +
@@ -67,7 +67,7 @@ func registerEntry(api huma.API, in Ingest) {
 			"choices rather than resolved to one; send `version`, and `ecosystem` where two " +
 			"share a version.\n\n" +
 			"From here it behaves like any other finding: triaged, assigned, decided, on the " +
-			"same clock and in the same reports. **No scan will close it**, so it is closed " +
+			"same clock and in the same reports. No scan will close it, so it is closed " +
 			"by a person through the resolve endpoint or it stays open.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, perProduct, "private-triage where the finding is undisclosed.", triageRights()...), func(ctx context.Context, input *struct {
@@ -205,14 +205,14 @@ func registerResolution(api huma.API, in Ingest) {
 		Summary: "Close a recorded flaw as fixed in this build",
 		Description: "Closes a flaw somebody recorded here, in one build, because it has been " +
 			"fixed there. Every location of the issue in that build is closed together.\n\n" +
-			"**Only a flaw somebody recorded.** Everywhere else, resolution is computed from " +
+			"Only a flaw somebody recorded. Everywhere else, resolution is computed from " +
 			"scans rather than declared, which is what stops a fix being reported that shipped " +
 			"in nobody's release. A flaw recorded by hand is the one case with no such " +
 			"evidence and no prospect of any — no scan reports it — so a person closes it or " +
 			"nothing does. An issue a scanner found is refused.\n\n" +
-			"**A reason is required.** A closure with no reason is a record saying somebody " +
+			"A reason is required. A closure with no reason is a record saying somebody " +
 			"closed it and nothing else.\n\n" +
-			"**Nothing reopens one.** Closing is a considered act, and this is the way it is " +
+			"Nothing reopens one. Closing is a considered act, and this is the way it is " +
 			"undone: it is not.",
 		Tags: []string{"Findings"},
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
@@ -272,11 +272,11 @@ func registerDisclosure(api huma.API, in Ingest) {
 		Summary: "List what is approaching disclosure",
 		Description: "Returns findings nobody has announced whose embargo is running out, " +
 			"soonest first, and the ones whose date has already arrived.\n\n" +
-			"**Before the date, not on it.** The date arriving is the last moment to act on " +
+			"Before the date, not on it. The date arriving is the last moment to act on " +
 			"something rather than the first useful warning, and a list that only ever showed " +
 			"what was already past would be a list of decisions somebody has already failed to " +
 			"make.\n\n" +
-			"**Nothing here discloses anything.** Reaching the date escalates: the row appears " +
+			"Nothing here discloses anything. Reaching the date escalates: the row appears " +
 			"and the people who can act on it are told. Publishing embargoed detail because a " +
 			"timer expired is the wrong default — if the fix is not ready, disclosing anyway is " +
 			"a decision a person makes.\n\n" +
@@ -385,13 +385,13 @@ func registerExtensions(api huma.API, in Ingest) {
 		Summary: "Ask to move a disclosure date later",
 		Description: "Moves the end of an embargo, across every undisclosed finding of this " +
 			"issue in this product.\n\n" +
-			"**A reason is required, always**, however short the extension. One with no reason " +
+			"A reason is required, always, however short the extension. One with no reason " +
 			"is a record saying somebody moved it and nothing else.\n\n" +
-			"**Past a threshold it needs a second person**, and the threshold is measured " +
+			"Past a threshold it needs a second person, and the threshold is measured " +
 			"against everything this embargo has already been moved by rather than against " +
 			"this request alone — measured per request, the exception swallows the rule three " +
 			"weeks at a time. It is the same act a deferral is, and the same shape.\n\n" +
-			"**An extension that needs agreement moves nothing until it has it.** The request " +
+			"An extension that needs agreement moves nothing until it has it. The request " +
 			"is on record either way; `in_force` says whether the date follows it.\n\n" +
 			"A date only ever moves later. Bringing one forward is disclosing sooner, which is " +
 			"a different act.",
@@ -470,12 +470,12 @@ func registerExtensions(api huma.API, in Ingest) {
 		Summary: "List extension requests waiting for a second person",
 		Description: "Every request to move a disclosure date that nobody has agreed to yet, " +
 			"across the products you may read undisclosed work in, newest first.\n\n" +
-			"**Until this there was nowhere to be that second person.** A request could be " +
+			"Until this there was nowhere to be that second person. A request could be " +
 			"read on the finding it belongs to and nowhere else, so the only way to find one " +
 			"was to already know it existed — which is the failure the review queue exists to " +
 			"prevent, in the one place where what is being agreed to is how long something " +
 			"stays hidden.\n\n" +
-			"**Your own requests are here too**, marked as yours. You cannot agree to one — " +
+			"Your own requests are here too, marked as yours. You cannot agree to one — " +
 			"the endpoint refuses it — but a proposer looking for what is holding a case up " +
 			"should not have their own request hidden from them.\n\n" +
 			"Agree with `POST /v1/disclosure-extensions/{id}/approval`.",
@@ -624,11 +624,11 @@ func registerAffects(api huma.API, in Ingest) {
 		Summary: "Set which builds a recorded flaw affects",
 		Description: "Makes the builds this flaw is filed against exactly the ones " +
 			"named.\n\n" +
-			"**Widening opens findings; narrowing closes them as `invalid`** — never " +
+			"Widening opens findings; narrowing closes them as `invalid` — never " +
 			"affected rather than no longer affected, so they count as no fix and appear in " +
 			"no release note. The record stays, with the reason.\n\n" +
-			"**A reason is required whenever anything is taken out.**\n\n" +
-			"**Only a flaw recorded here.** Which builds hold an issue a scanner reported is " +
+			"A reason is required whenever anything is taken out.\n\n" +
+			"Only a flaw recorded here. Which builds hold an issue a scanner reported is " +
 			"what the scans found, and this would overwrite it.\n\n" +
 			"`invalid` never means the finding exists but does not apply. That is a triage " +
 			"decision of `not-applicable` with the justification that fits.",

@@ -75,7 +75,7 @@ func registerWork(api huma.API, in Ingest) {
 		Summary: "Show what the scans are answering against",
 		Description: "The vulnerability data version this deployment's scans are running " +
 			"against, and when it last moved.\n\n" +
-			"**Nothing here is a version anybody can order.** What a scanner reports is an " +
+			"Nothing here is a version anybody can order. What a scanner reports is an " +
 			"opaque string — a date for one, a schema revision and a build stamp for " +
 			"another — so the only question that can be asked of it is whether it changed. " +
 			"That is enough: what matters is that it moved, not which is newer.\n\n" +

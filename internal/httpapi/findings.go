@@ -386,7 +386,7 @@ func registerFindings(api huma.API, in Ingest) {
 			"how many of those the build's VEX documents already answer.\n\n" +
 			"Ordered by urgency — known-exploited first, then whether the build ships to " +
 			"customers, then severity, then likelihood. Supports limit and offset.\n\n" +
-			"**Every filter is applied here, and `total` counts what it admits** rather than " +
+			"Every filter is applied here, and `total` counts what it admits rather than " +
 			"what the page holds.\n\n" +
 			"`under` keeps what one container holds directly; `beneath` keeps what sits at a " +
 			"component or anywhere under it, which is what the dependency tree's cumulative " +
@@ -796,7 +796,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			"This is what a triage decision is made from, so it is gathered into one request. " +
 			"Each entry in `places` carries the `place` identity to name when recording a " +
 			"decision about it.\n\n" +
-			"**A component name is not unique within a build.** Where one ships at several " +
+			"A component name is not unique within a build. Where one ships at several " +
 			"versions, `version` says which — without it, a name that matches more than one is " +
 			"refused rather than guessed at.",
 		Tags: []string{"Findings"},

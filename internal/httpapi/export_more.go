@@ -156,7 +156,7 @@ func registerComparisonExport(api huma.API, in Ingest) {
 			"version moved and the issue came with it, so it was not fixed at all. A " +
 			"still-present row carrying `arrived from` is that same failure from the other " +
 			"side.\n\n" +
-			"**Public findings only unless you ask otherwise**, because the destination is " +
+			"Public findings only unless you ask otherwise, because the destination is " +
 			"usually a public document.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
@@ -274,16 +274,16 @@ func registerAuditExport(api huma.API, in Ingest) {
 		Summary: "Export the record of judgments",
 		Description: "The audit list as a file: every judgment the same filters would show, " +
 			"not one page of them.\n\n" +
-			"**One row per judgment**, with who proposed it, who has a standing agreement on " +
+			"One row per judgment, with who proposed it, who has a standing agreement on " +
 			"it, and whether a second person does. Approvals are joined with `;` in the CSV " +
 			"because a spreadsheet has one cell per column and an auditor reads them as a " +
 			"list; the JSON keeps them as one field of the same shape.\n\n" +
-			"**`agreements` is the whole of the record**, with dates: who agreed, when, " +
+			"`agreements` is the whole of the record, with dates: who agreed, when, " +
 			"whether the agreement was carried from an earlier claim, and when it was taken " +
 			"back. `approved by` stays who agrees *now*, because those are different " +
 			"questions and a column mixing them is the one answer an auditor must not be " +
 			"given.\n\n" +
-			"**Read with your own visibility, as it streams.** Nothing about a report is " +
+			"Read with your own visibility, as it streams. Nothing about a report is " +
 			"exempt from the rules the screens follow — a file showing more than the screen " +
 			"that summarizes it would be a way around them.\n\n" +
 			"Takes every filter the audit list takes, including the period.",
@@ -371,7 +371,7 @@ func registerQueueExport(api huma.API, in Ingest) {
 		Summary: "Export the review queue",
 		Description: "What is waiting for a second person, as a file: every claim, not one " +
 			"page of them.\n\n" +
-			"**One row per claim**, the way the screen counts them — one proposer's action, " +
+			"One row per claim, the way the screen counts them — one proposer's action, " +
 			"however many decisions it wrote — with how much it covers and how old it is. " +
 			"A backlog is reported in claims because that is the unit somebody works " +
 			"through.\n\n" +
@@ -528,7 +528,7 @@ func registerChangeExport(api huma.API, in Ingest) {
 		Summary: "Export administrative changes",
 		Description: "Every administrative change the same filters would show, as a file, " +
 			"rather than one page of them.\n\n" +
-			"**One row per change**, with who made it, what it was about, and what it held " +
+			"One row per change, with who made it, what it was about, and what it held " +
 			"before and after. An absent value is not an empty one: `unset` says nobody had " +
 			"set it, and `cleared` that the change removed it.\n\n" +
 			"Takes the kind and the period the list takes. Asked for no period it writes " +
@@ -605,7 +605,7 @@ func registerTrendExport(api huma.API, in Ingest) {
 		Summary: "Export new, resolved and open over time",
 		Description: "One row per step, with what arrived, what was answered and what stood " +
 			"open at the end of it — each split by severity.\n\n" +
-			"**The two flows are what the backlog is read for.** Ten arriving and ten " +
+			"The two flows are what the backlog is read for. Ten arriving and ten " +
 			"answered is a team keeping pace where both are low, and a team losing ground " +
 			"where what arrives is critical and what leaves is not.\n\n" +
 			"Takes the window and the narrowings the trend takes. Read with your own " +

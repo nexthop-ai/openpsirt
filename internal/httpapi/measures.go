@@ -54,19 +54,19 @@ func registerMeasures(api huma.API, in Ingest) {
 			"holds: how long a finding sits before anybody proposes anything, how long a " +
 			"claim waits for a second person, what each person got through, and how much " +
 			"came back.\n\n" +
-			"**The two waits come back three ways each** — the middle, what nine in ten came " +
+			"The two waits come back three ways each — the middle, what nine in ten came " +
 			"in under, and the longest — so a caller reads three numbers per wait rather " +
 			"than one.\n\n" +
-			"**Per severity**, because a critical waiting a week and a low waiting a week " +
+			"Per severity, because a critical waiting a week and a low waiting a week " +
 			"are not the same fact.\n\n" +
-			"**A period or a rolling window.** `from` and `to` name the stretch a manager or " +
+			"A period or a rolling window. `from` and `to` name the stretch a manager or " +
 			"an auditor is reporting on; `days` is the rolling window, and the two are ways " +
 			"of saying the same thing so only one may be sent.\n\n" +
-			"**Bounded, and it says so.** The two waits are worked out from at most the most " +
+			"Bounded, and it says so. The two waits are worked out from at most the most " +
 			"recent few thousand claims in the window; `sampled` says how many and `capped` " +
 			"says whether the ceiling was reached. A figure quoted from part of a window " +
 			"without saying so is the one thing a number like this must not be.\n\n" +
-			"**Send-backs are counted for the deployment rather than per person**: the record " +
+			"Send-backs are counted for the deployment rather than per person: the record " +
 			"holds that a claim was sent back and not by whom, and the reason travels as a " +
 			"comment.\n\n" +
 			"Narrowed to what you may read, like every count here — so two people asking get " +

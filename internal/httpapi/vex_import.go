@@ -76,15 +76,15 @@ func registerVexImport(api huma.API, in Ingest) {
 		Summary: "Upload a VEX document",
 		Description: "Takes one OpenVEX document of what a distribution or an upstream " +
 			"security team has published about components this product ships.\n\n" +
-			"**Nothing is applied.** What arrives is a third layer beside the build's own " +
+			"Nothing is applied. What arrives is a third layer beside the build's own " +
 			"claims and our decisions: shown as evidence, offered as a prefill, and never " +
 			"standing as our judgment by itself.\n\n" +
 			"What a document adds over what the scanner already reports is the " +
-			"**reasoning**. The status is in the fix state already.\n\n" +
+			"reasoning. The status is in the fix state already.\n\n" +
 			"Uploading again from the same publisher sets aside what they said before rather " +
 			"than deleting it, so what an approval was granted on the strength of stays " +
 			"readable.\n\n" +
-			"**OpenVEX and CSAF-VEX both read.** The two say the same thing in different " +
+			"OpenVEX and CSAF-VEX both read. The two say the same thing in different " +
 			"shapes — one puts the status on a statement, the other in which list a product " +
 			"identifier appears in — and both become the same claim here, because what a " +
 			"publisher is saying does not depend on which file they wrote it in. Which of the " +

@@ -223,18 +223,18 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 		Description: "Re-makes every row of this claim that stopped applying because an " +
 			"upstream version moved, at the versions each place has now, as one act with one " +
 			"reasoning.\n\n" +
-			"**Deciding is bulk-capable and re-deciding was not.** A team answering one kernel " +
+			"Deciding is bulk-capable and re-deciding was not. A team answering one kernel " +
 			"issue writes a decision at each of its places in one action; when the kernel " +
 			"moves, those lapse, and restoring them was one request each with a separately " +
 			"typed justification.\n\n" +
 			"Only the person who made the original may do this. It normally needs no second " +
 			"approver, for the reason the single form does not: two people already agreed, and " +
 			"a version upgrade is a prompt to re-check rather than a new claim.\n\n" +
-			"**One act, one approval.** Where any row would need approval again — the " +
+			"One act, one approval. Where any row would need approval again — the " +
 			"severity has risen since it was agreed to, or nothing was ever agreed to — the " +
 			"whole act does. An approver works at the unit the proposer acted at, and agreeing " +
 			"to part of an argument they were shown whole is not review.\n\n" +
-			"**Bounded like the judgment it re-makes.** The outcome comes from the claim, so " +
+			"Bounded like the judgment it re-makes. The outcome comes from the claim, so " +
 			"re-affirming a bulk dismissal is a bulk judgment and is held to " +
 			"`triage.together-cap`; only a promise to upgrade goes through unbounded, because " +
 			"the next scan re-checks it.\n\n" +

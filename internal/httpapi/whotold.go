@@ -39,7 +39,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 		Summary: "Show who reported a flaw",
 		Description: "Who reported it, how to reach them, when it arrived, when somebody " +
 			"answered them, and how they wish to be credited.\n\n" +
-			"**The received date is what the embargo runs from**: a report arriving " +
+			"The received date is what the embargo runs from: a report arriving " +
 			"on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the " +
 			"one the reporter has a publication scheduled against, and they are the party who " +
 			"will publish regardless.\n\n" +
@@ -73,7 +73,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 		Path:    path + "/acknowledgement",
 		Summary: "Record that the reporter was answered",
 		Description: "Records that somebody replied to whoever reported this, and when.\n\n" +
-			"**It records that it happened rather than doing it.** What reaches a researcher " +
+			"It records that it happened rather than doing it. What reaches a researcher " +
 			"is a mail somebody sends from an address they already have; recording it is what " +
 			"turns \"somebody probably replied\" into a date the timeline can be evidenced " +
 			"from, and what clears the condition an unanswered report opens.\n\n" +
@@ -108,13 +108,13 @@ func registerWhoTold(api huma.API, in Ingest) {
 		Summary: "Record another name for an issue",
 		Description: "Records that this issue is also known by another identifier — a CVE or " +
 			"a GHSA assigned after we minted our own.\n\n" +
-			"**Nothing about the finding, the decisions or the approvals moves**, because " +
+			"Nothing about the finding, the decisions or the approvals moves, because " +
 			"they are keyed on the issue rather than on what it is called. What changes is " +
 			"that the name travels with it: a report arriving under the new name resolves " +
 			"here rather than opening a second issue, the finding shows it, and the advisory " +
 			"carries it in the field a reader looks in — which is the one lookup a published " +
 			"advisory exists to serve.\n\n" +
-			"**A name is identity, and identity is deployment-wide.** From here on a scan of " +
+			"A name is identity, and identity is deployment-wide. From here on a scan of " +
 			"any product reporting that name resolves to this issue and inherits its " +
 			"decisions. So this asks for the right to triage the issue in every product it " +
 			"is currently open in, at the visibility each one carries, and is refused rather " +
