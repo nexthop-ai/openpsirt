@@ -21,11 +21,11 @@ type DecisionDetail struct {
 	Place    PlaceBody    `json:"place"`
 	// Finding is what the decision is about, where an open finding still
 	// sits at its place. Absent where none does.
-	Finding    *FindingRefBody `json:"finding,omitempty" doc:"What the decision is about — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there"`
+	Finding    *FindingRefBody `json:"finding,omitempty" doc:"The decision's subject — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there"`
 	Reasoning  string          `json:"reasoning" doc:"The justification as it currently stands, in markdown"`
 	ProposedBy string          `json:"proposed_by"`
-	ProposedAt string          `json:"proposed_at" doc:"When the claim was made, as a date and time"`
-	AgeDays    int             `json:"age_days" doc:"How long the claim has stood. An old judgment should look like one"`
+	ProposedAt string          `json:"proposed_at" doc:"The moment the claim was made"`
+	AgeDays    int             `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
 }
 
 // ClaimDetail is one claim, whole: what it says, where it lands, what it
@@ -36,34 +36,34 @@ type DecisionDetail struct {
 // row approved beside forty-three sent back reading as approved, which is the
 // defect the claim grain exists to prevent.
 type ClaimDetail struct {
-	Claim ClaimBody `json:"claim" doc:"Who acted, when, what sort of action it was, how a bulk set was narrowed, and where the work is happening"`
+	Claim ClaimBody `json:"claim" doc:"The actor, the moment, the sort of action, the narrowing behind a bulk set, and where the work is happening"`
 	// Argument is what the claim says, reasoning included. It names no
 	// decision and carries no state: those belong to rows, and nothing here
 	// acts on one.
-	Argument DecisionBody `json:"argument" doc:"What the claim says: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands"`
+	Argument DecisionBody `json:"argument" doc:"The claim's contents: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands"`
 	// Place is where a representative row sits — the earliest — and Finding
 	// is what it is about, so the page has somewhere to link to.
 	Place   PlaceBody       `json:"place"`
-	Finding *FindingRefBody `json:"finding,omitempty" doc:"What a representative row is about — build, issue, component, where it sits. Absent where no open finding sits at its place"`
-	AgeDays int             `json:"age_days" doc:"How long the claim has stood. An old judgment should look like one"`
+	Finding *FindingRefBody `json:"finding,omitempty" doc:"A representative row's subject — build, issue, component, where it sits. Absent where no open finding sits at its place"`
+	AgeDays int             `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
 	// Happened is what became of the claim, read from its rows.
-	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"What became of the claim. mixed is a claim whose rows did not all end the same way"`
-	When     string `json:"when,omitempty" doc:"When it became that. Absent while it is waiting: nothing has happened to it"`
-	By       string `json:"by,omitempty" doc:"Who did it, where a person did"`
+	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"The claim's outcome. mixed is a claim whose rows did not all end the same way"`
+	When     string `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
+	By       string `json:"by,omitempty" doc:"The person who did it, where a person did"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
 	// Rows is what the claim wrote.
-	Rows   int `json:"rows" doc:"How many decisions the claim wrote"`
-	Issues int `json:"issues" doc:"How many distinct issues it covers"`
-	Places int `json:"places" doc:"How many distinct places it wrote at. What the bulk cap is measured against"`
+	Rows   int `json:"rows" doc:"The number of decisions the claim wrote"`
+	Issues int `json:"issues" doc:"The number of distinct issues it covers"`
+	Places int `json:"places" doc:"The number of distinct places it wrote at. The bulk cap is measured against this"`
 	// Folds is what it covers now. A claim reaches by matching, so this
 	// grows as builds appear with nobody acting; what somebody agreed to
 	// covering is on the approval.
-	Folds     int      `json:"folds" doc:"How many things there are to decide about"`
-	Packages  int      `json:"packages" doc:"How many binaries those fold together"`
-	Consumers int      `json:"consumers" doc:"How many things pull them in"`
-	Findings  int      `json:"findings" doc:"How many findings sit underneath, which is what the disposition register expands to"`
+	Folds     int      `json:"folds" doc:"The number of things to decide about"`
+	Packages  int      `json:"packages" doc:"The number of binaries those fold together"`
+	Consumers int      `json:"consumers" doc:"The number of things pulling them in"`
+	Findings  int      `json:"findings" doc:"The number of findings underneath, which is what the disposition register expands to"`
 	Builds    []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
 	// Outliers is what in a bulk set does not look like the rest.
 	Outliers *OutliersBody `json:"outliers,omitempty" doc:"For a claim over many issues: the rows that do not look like the rest, and how many there are"`
@@ -106,8 +106,8 @@ func claimArgument(c triage.Claim, reasoning string) DecisionBody {
 
 // RevisionBody is one statement of a justification.
 type RevisionBody struct {
-	ID        int64  `json:"id" doc:"What an approval names when it says which words were agreed to"`
-	Ordinal   int64  `json:"ordinal" doc:"Which revision this is, counting from one"`
+	ID        int64  `json:"id" doc:"The identifier an approval names when it says which words were agreed to"`
+	Ordinal   int64  `json:"ordinal" doc:"The revision number, counting from one"`
 	Body      string `json:"body" doc:"The justification text, in markdown"`
 	WrittenBy string `json:"written_by"`
 	WrittenAt string `json:"written_at"`
@@ -116,10 +116,10 @@ type RevisionBody struct {
 // ApprovalBody is one person agreeing to one revision of a justification.
 type ApprovalBody struct {
 	ID          int64  `json:"id"`
-	RevisionID  int64  `json:"revision_id" doc:"Which revision of the justification was agreed to"`
+	RevisionID  int64  `json:"revision_id" doc:"The revision of the justification that was agreed to"`
 	ApprovedBy  string `json:"approved_by"`
 	ApprovedAt  string `json:"approved_at"`
-	WithdrawnAt string `json:"withdrawn_at,omitempty" doc:"When this approval was taken back, if it was"`
+	WithdrawnAt string `json:"withdrawn_at,omitempty" doc:"The moment this approval was taken back, if it was"`
 	Batch       string `json:"batch,omitempty" doc:"The batch it was approved under, if it was a bulk approval"`
 	// Covered is how many findings the claim covered when this approval was
 	// given. A decision reaches by matching, so it covers more as builds
@@ -138,7 +138,7 @@ type CommentBody struct {
 	Body      string `json:"body" doc:"The comment text, in markdown"`
 	WrittenBy string `json:"written_by"`
 	WrittenAt string `json:"written_at"`
-	EditedAt  string `json:"edited_at,omitempty" doc:"When the author last changed it, if they did"`
+	EditedAt  string `json:"edited_at,omitempty" doc:"The author's last change to it, if they made one"`
 }
 
 func registerTriageReading(api huma.API, in Ingest) {
@@ -536,7 +536,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 		Stream        string `path:"stream"`
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
-		Place         string `path:"place" doc:"Which place, as the findings list gives it"`
+		Place         string `path:"place" doc:"The place, as the findings list gives it"`
 	}) (*struct{ Body StandingBody }, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {
@@ -611,7 +611,7 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 		Place         string `path:"place"`
 		Body          struct {
 			Previous  int64  `json:"previous" doc:"The decision being re-made"`
-			Reasoning string `json:"reasoning" minLength:"1" doc:"Why it still holds, in markdown"`
+			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason it still holds, in markdown"`
 		}
 	}) (*struct{ Body DecisionBody }, error) {
 		subject, store, err := triaging(ctx, in)

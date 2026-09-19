@@ -209,7 +209,7 @@ type UploadResult struct {
 	// Outcome says what happened, in the producer's terms rather than ours.
 	Outcome string `json:"outcome" enum:"queued,already_held" doc:"Whether this upload was taken or matched one already held"`
 	Serial  string `json:"serial,omitempty" doc:"The identity the inventory carries for itself"`
-	BuiltAt string `json:"built_at,omitempty" doc:"When the producer says the build was made"`
+	BuiltAt string `json:"built_at,omitempty" doc:"The build time the producer states"`
 }
 
 func registerScans(api huma.API, in Ingest) {
@@ -624,16 +624,16 @@ func store(ctx context.Context, documents *ingest.Documents, scanID int64, kind 
 type ReceiptBody struct {
 	ScanID     int64  `json:"scan_id" doc:"The scan this upload became"`
 	Serial     string `json:"serial,omitempty" doc:"The identity the inventory carries for itself"`
-	BuiltAt    string `json:"built_at,omitempty" doc:"When the producer says the build was made"`
-	ReceivedAt string `json:"received_at" doc:"When it arrived here"`
-	State      string `json:"state" enum:"reading,scanning,scanned,failed" doc:"How far it has got"`
+	BuiltAt    string `json:"built_at,omitempty" doc:"The build time the producer states"`
+	ReceivedAt string `json:"received_at" doc:"The moment it arrived here"`
+	State      string `json:"state" enum:"reading,scanning,scanned,failed" doc:"The state it has reached"`
 	// Failure is the producer's own text back at them — what could not be read
 	// and where. It is not a fault in this deployment, so it is reported
 	// rather than logged away.
-	Failure string `json:"failure,omitempty" doc:"Why it could not be used, where it could not"`
+	Failure string `json:"failure,omitempty" doc:"The reason it could not be used, where it could not"`
 	// Caution qualifies the answer rather than saying there is none, so it is
 	// reported beside a scan that succeeded rather than instead of one.
-	Caution string `json:"caution,omitempty" doc:"What the scanner said while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours"`
+	Caution string `json:"caution,omitempty" doc:"The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours"`
 	// Opened is what the run covering this upload changed, counted as
 	// issues at components rather than as places. Absent where no run has
 	// covered it yet, and absent on an upload whose run was already
@@ -658,15 +658,15 @@ type ReceiptBody struct {
 	// document that places none of its components produces findings that are
 	// each correct and cannot answer "why is this here" about any of them —
 	// and nothing else on this screen tells the two apart.
-	Components *int `json:"components,omitempty" doc:"How many components the inventory described"`
-	Placed     *int `json:"placed,omitempty" doc:"How many of them something placed in the graph"`
+	Components *int `json:"components,omitempty" doc:"The number of components the inventory described"`
+	Placed     *int `json:"placed,omitempty" doc:"The number of them something placed in the graph"`
 	// Measured is what the run answering *this* upload was made with,
 	// rather than what the newest run was. On every receipt the run
 	// answers, unlike opened and closed: the versions are a property of
 	// the run rather than a change it made, and a page spanning a scanner
 	// upgrade or a vulnerability database that stopped moving is exactly
 	// what somebody reads this screen to notice.
-	Measured *MeasuredBody `json:"measured,omitempty" doc:"What the run answering this upload was measured with. Absent until a run has covered it"`
+	Measured *MeasuredBody `json:"measured,omitempty" doc:"The tools the run answering this upload was measured with. Absent until a run has covered it"`
 	// RunID is the run that answered this upload, so what it did can be
 	// asked for. On every receipt that run answers, like the versions beside
 	// it — the counts above are the thing that belongs to one upload only.
@@ -685,9 +685,9 @@ type SentBody struct {
 	// whether or not they are still here, because it is also what a caller
 	// names to be told the contents were let go rather than guessing from a
 	// 404.
-	DocumentID int64  `json:"document_id" doc:"What to name to read this document back"`
-	Kind       string `json:"kind" enum:"inventory,suppressions" doc:"What the document is"`
-	SizeBytes  int64  `json:"size_bytes" doc:"How large it was"`
+	DocumentID int64  `json:"document_id" doc:"The name that reads this document back"`
+	Kind       string `json:"kind" enum:"inventory,suppressions" doc:"The kind of document"`
+	SizeBytes  int64  `json:"size_bytes" doc:"Its size"`
 	Hash       string `json:"hash" doc:"SHA-256 of the bytes as they arrived"`
 	// Held says the contents are still here. A tagged release keeps them,
 	// because re-scanning it years from now needs what it contained; a branch
@@ -701,10 +701,10 @@ type SentBody struct {
 // against a vulnerability database from March look identical on every screen
 // without this, and they are not the same statement at all.
 type MeasuredBody struct {
-	Scanner         string `json:"scanner" doc:"Which scanner produced the findings"`
+	Scanner         string `json:"scanner" doc:"The scanner that produced the findings"`
 	ScannerVersion  string `json:"scanner_version,omitempty"`
 	DatabaseVersion string `json:"database_version,omitempty" doc:"The vulnerability database it read"`
-	RanAt           string `json:"ran_at,omitempty" doc:"When that run finished"`
+	RanAt           string `json:"ran_at,omitempty" doc:"The moment that run finished"`
 	// RanHere says we ran it rather than a build sending what its own scanner
 	// found. Counts are only comparable between builds measured the same way,
 	// so a report mixing the two without saying would be a rumor.
@@ -720,7 +720,7 @@ type MeasuredBody struct {
 	Run          int64  `json:"run,omitempty" doc:"The scanner run these came from"`
 	Scan         int64  `json:"scan,omitempty" doc:"The upload the build's contents came from, as the receipt names it"`
 	ScanHash     string `json:"scan_hash,omitempty" doc:"The hash of what was uploaded"`
-	BuiltAt      string `json:"built_at,omitempty" doc:"When the build it describes was built"`
+	BuiltAt      string `json:"built_at,omitempty" doc:"The build time it describes"`
 	Document     int64  `json:"document,omitempty" doc:"The inventory that was read, as the receipt names it"`
 	DocumentHash string `json:"document_hash,omitempty" doc:"The hash of the inventory as it arrived"`
 	// DocumentHeld distinguishes an inventory whose bytes were let go from one
@@ -728,7 +728,7 @@ type MeasuredBody struct {
 	// build does not, and a hash nobody can fetch the bytes for is a claim
 	// rather than evidence.
 	DocumentHeld *bool  `json:"document_held,omitempty" doc:"Whether the inventory itself is still here"`
-	DocumentAt   string `json:"document_at,omitempty" doc:"Where to fetch the inventory that was read. Absent where its contents were let go"`
+	DocumentAt   string `json:"document_at,omitempty" doc:"The address of the inventory that was read. Absent where its contents were let go"`
 }
 
 // ReceiptsOutput is a page of what has been filed against a build.
@@ -739,7 +739,7 @@ type ReceiptsOutput struct {
 		// MeasuredAgainst describes the build's last finished run rather than
 		// any one upload, which is why it sits beside the page instead of on
 		// each row.
-		MeasuredAgainst *MeasuredBody `json:"measured_against,omitempty" doc:"What the last completed run was measured with"`
+		MeasuredAgainst *MeasuredBody `json:"measured_against,omitempty" doc:"The tools the last completed run was measured with"`
 	}
 }
 
@@ -758,8 +758,8 @@ func registerReceipts(api huma.API, in Ingest) {
 		Product string `path:"product"`
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many to return"`
-		Offset  int    `query:"offset" minimum:"0" doc:"How many to skip"`
+		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
+		Offset  int    `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*ReceiptsOutput, error) {
 		subject, err := requester(ctx)
 		if err != nil {
@@ -928,14 +928,14 @@ type coverageOutput struct {
 		Items []CoverageBody `json:"items"`
 		// Quiet is how many of the rows are, so a caller can say so without
 		// counting them again.
-		Quiet int `json:"quiet" doc:"How many have gone quiet, across every build and not only this page"`
+		Quiet int `json:"quiet" doc:"The number gone quiet, across every build and not only this page"`
 		// Never and Unsupported are counted here for the same reason, and
 		// because a caller recomputing either from the page it was handed
 		// states a figure about the page under a heading about the estate.
-		Never          int `json:"never" doc:"How many in support have never been scanned, across every build and not only this page"`
-		Unsupported    int `json:"unsupported" doc:"How many are out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet"`
-		Total          int `json:"total" doc:"How many builds there are to report on"`
-		QuietAfterDays int `json:"quiet_after_days" doc:"How long this deployment allows, in days"`
+		Never          int `json:"never" doc:"The number in support never scanned, across every build and not only this page"`
+		Unsupported    int `json:"unsupported" doc:"The number out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet"`
+		Total          int `json:"total" doc:"The number of builds to report on"`
+		QuietAfterDays int `json:"quiet_after_days" doc:"The span this deployment allows, in days"`
 	}
 }
 
@@ -947,14 +947,14 @@ type CoverageBody struct {
 	Variant    string `json:"variant"`
 	// LastReceivedAt is absent where nothing has ever been filed against this
 	// build, which is a different situation from a scan that failed.
-	LastReceivedAt string `json:"last_received_at,omitempty" doc:"When a scan last arrived. Absent where none ever has"`
+	LastReceivedAt string `json:"last_received_at,omitempty" doc:"The last arrival of a scan. Absent where none ever has"`
 	// LastRefusedAt tells a build nobody uploads to apart from one whose
 	// uploads are being turned away. Both are quiet and they are different
 	// faults: a pipeline nobody wired up, against one failing nightly and
 	// telling its own log that it succeeded.
-	LastRefusedAt  string `json:"last_refused_at,omitempty" doc:"When an upload against this build was last turned away. Absent where none has been"`
-	RefusedBecause string `json:"refused_because,omitempty" doc:"What the producer was told the last time one was turned away, in the same words they were given"`
-	QuietDays      int    `json:"quiet_days" doc:"How long it has been, in days, measured from the last arrival or from when the build was declared"`
+	LastRefusedAt  string `json:"last_refused_at,omitempty" doc:"The last upload against this build to be turned away. Absent where none has been"`
+	RefusedBecause string `json:"refused_because,omitempty" doc:"The words the producer was given the last time one was turned away, in the same words they were given"`
+	QuietDays      int    `json:"quiet_days" doc:"The span since, in days, measured from the last arrival or from when the build was declared"`
 	Quiet          bool   `json:"quiet,omitempty" doc:"Whether that is longer than this deployment allows"`
 	// Retired is reported rather than the row being left out. A release that
 	// stopped being scanned because it stopped being supported is expected
@@ -976,8 +976,8 @@ func registerCoverage(api huma.API, in Ingest) {
 		Tags: []string{"Scans"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
-		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"How many to return. Quietest first, so the default is the answer for any estate somebody reads by hand"`
-		Offset int `query:"offset" minimum:"0" doc:"How many to skip"`
+		Limit  int `query:"limit" default:"200" minimum:"1" maximum:"500" doc:"The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand"`
+		Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*coverageOutput, error) {
 		subject, err := reading(ctx)
 		if err != nil {
