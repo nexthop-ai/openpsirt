@@ -348,7 +348,7 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 			t.Fatal("a tag declared without a parent has one")
 		}
 
-		// Told afterwards, which used to be refused.
+		// Told afterwards, which fills the parent in rather than refusing.
 		filled, created, err := store.EnsureStream(ctx, product.ID, "v1.0", catalog.Tag, &branch.ID)
 		if err != nil {
 			t.Fatalf("filling in what it was cut from: %v", err)

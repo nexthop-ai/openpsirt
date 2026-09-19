@@ -588,7 +588,7 @@ const twoWeaknesses = `{
 func TestWhichWeaknessTheDataCallsTheRootCauseIsRead(t *testing.T) {
 	// A published advisory states one weakness and a report commonly carries
 	// several, so something has to say which. The feeds say it, in a word
-	// beside each entry that was being read and dropped.
+	// beside each entry.
 	//
 	// Carried apart from the list rather than as its first entry, because a
 	// list cannot say "nobody said" — and the difference between "this is the

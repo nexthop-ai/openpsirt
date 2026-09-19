@@ -162,12 +162,12 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 	// the queue has not reached yet would otherwise collect one job per cycle,
 	// each of which does the same work when it finally runs.
 	//
-	// **Driven past the tenth build on purpose.** A job's reference is text
-	// and a build's identifier is a number, and the first version of this
-	// compared them by converting inside the query — which on PostgreSQL kept
-	// one character, so it was right for the first nine builds and wrong for
-	// every one after. Every SQLite test starts from a fresh file at one, so
-	// the whole class is invisible unless a test insists on a two-digit
+	// Driven past the tenth build on purpose. A job's reference is text and a
+	// build's identifier is a number, and comparing them by converting inside
+	// the query keeps one character on PostgreSQL — right for the first nine
+	// builds and wrong for every one after. Every SQLite test starts from a
+	// fresh file at one, so the whole class is invisible unless a test
+	// insists on a two-digit
 	// identifier.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()

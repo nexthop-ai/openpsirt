@@ -242,10 +242,10 @@ type grypeMatch struct {
 type grypeDescriptor struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
-	// DB is where the database describes itself moved between versions of
-	// the scanner: it used to sit directly under db and now sits under a
-	// status within it. Both are read, because an operator running an
-	// older build should not silently lose the record of what their
+	// DB is where the database describes itself. The place moved between
+	// versions of the scanner — directly under db in one, under a status
+	// within it in the next — and both are read, because an operator running
+	// an older build should not silently lose the record of what their
 	// findings were matched against.
 	DB struct {
 		Built  string `json:"built"`

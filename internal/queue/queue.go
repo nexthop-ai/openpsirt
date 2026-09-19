@@ -799,10 +799,9 @@ type Ending struct {
 //
 // Here rather than in each worker. The sequence — open a context that outlives
 // a cancellation, record the ending against it, tell a stale claim apart from
-// a write that failed, and notice a takeover — was written out in both workers
-// down to the comment paragraph, and they had begun to disagree. A third
-// worker would have been a third copy, and the rule for a job finished by a
-// worker that no longer holds it would then have three readings.
+// a write that failed, and notice a takeover — written out per worker is a
+// copy per worker, down to the comment paragraph, and the rule for a job
+// finished by a worker that no longer holds it acquires a reading per copy.
 //
 // noun is what the reference is called in a log line, because "scan" and
 // "target" are the same field to this package and not to an operator reading
