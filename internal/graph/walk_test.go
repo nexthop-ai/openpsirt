@@ -15,9 +15,8 @@ import (
 // subtree with a shared library in it counted once, and a document in a loop.
 
 // everyone is somebody granted reading on the product a fixture builds, for
-// the walks whose subject is incidental. An administrator used to stand here,
-// which stopped working when administering stopped meaning reading — and an
-// administrator was never what these tests meant anyway.
+// the walks whose subject is incidental. Not an administrator: administering
+// is not reading, and reading is what these tests mean.
 func everyone(f *fixture) access.Subject {
 	return access.NewPerson(1, "tester", false,
 		map[int64][]access.Role{*f.scope.ProductID: {access.PrivateRead}}, 0)

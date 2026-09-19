@@ -80,13 +80,13 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // scan ends and drifts from the screen beside it thereafter, which is a screen
 // quoting yesterday's answer with nothing saying so.
 //
-// **Distinct issues, not finding rows.** A finding is one issue at one place,
-// and a library at thirty-six places with two issues is seventy-two rows —
-// which is what every parent it sat beneath used to read, where somebody who
-// drilled down one path is looking at one place and expects two. The issues
-// open against a component are the same at every place it sits, so counting
-// them once per component answers per path without a walk per path. And
-// **counted over distinct components, not summed along edges**: a library
+// Distinct issues, not finding rows. A finding is one issue at one place, and
+// a library at thirty-six places with two issues is seventy-two rows — which
+// is what a parent reads if it counts findings, where somebody who drilled
+// down one path is looking at one place and expects two. The issues open
+// against a component are the same at every place it sits, so counting them
+// once per component answers per path without a walk per path. And counted
+// over distinct components, not summed along edges: a library
 // reached by twenty containers is one thing inside each of them. The
 // statement says exactly that: the subtree as a set of components, joined to
 // the distinct (component, issue) pairs open in the build, counted per start.

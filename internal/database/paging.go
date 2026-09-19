@@ -23,11 +23,11 @@ func PageSize(asked, most, byDefault int) int {
 
 // Page is how much of a list a read gives, named rather than spelled.
 //
-// Six pairs of numbers were in use across twenty-two reads and nothing said
-// which list gets which — so a screen could not know what to expect, and two
-// lists that should have agreed differed by a number nobody chose. Naming them
-// makes the choice a decision somebody made rather than a literal somebody
-// typed, and the four kinds below are what the reads actually divide into.
+// Spelled as literals, a pair of numbers per read says nothing about which
+// list gets which: a screen cannot know what to expect, and two lists that
+// should agree differ by a number nobody chose. Naming them makes the choice a
+// decision somebody made, and the four kinds below are what the reads divide
+// into.
 type Page struct {
 	// Most is the largest page this kind of read will give, and ByDefault what
 	// it gives when nobody says.

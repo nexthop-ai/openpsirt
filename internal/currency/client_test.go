@@ -13,10 +13,10 @@ import (
 
 // answering is a stand-in for one public index.
 //
-// The whole HTTP half of this package had no test at all: the only thing
-// exercising it was a manual test that talks to the real services, skipped
-// unless an environment variable is set, which nothing sets. So a request
-// built wrongly reached nobody's attention until somebody read it.
+// Without one, the HTTP half of this package is exercised only by a manual
+// test that talks to the real services, skipped unless an environment variable
+// is set. A request built wrongly then reaches nobody's attention until
+// somebody reads it.
 type answering struct {
 	*httptest.Server
 	// asked records every path requested, which is the point: what this code

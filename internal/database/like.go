@@ -11,9 +11,9 @@ import "strings"
 // makes a backslash mean one thing on three engines and another on the fourth.
 //
 // Here rather than in each package that searches, because it is an engine
-// difference and this package is where those live. It was written out once per
-// package that had it — unexported in one and copied into another — while the
-// packages that had neither escaped nothing at all.
+// difference and this package is where those live. Written out per package it
+// is unexported in one and copied into the next, and the package after that
+// escapes nothing at all.
 const LikeEscape = "#"
 
 // LikeClause is the clause every predicate using these helpers carries.

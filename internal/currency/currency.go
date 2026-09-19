@@ -89,12 +89,11 @@ var ErrUnaskable = fmt.Errorf("this name cannot be asked about")
 // answer at all.
 //
 // The one class that is worth coming back to, and the reason the others are
-// told apart from it. Everything that is *not* one of these three is a
-// refusal the index will repeat every time — a package withdrawn, a region
-// blocked, a document nothing can read — and it used to take this arm: the
-// component was left unrecorded, and the window that takes the never-asked
-// first put it at the head of every pass afterwards, for ever, with the
-// components behind it never reached.
+// told apart from it. Everything that is not one of these three is a refusal
+// the index will repeat every time — a package withdrawn, a region blocked, a
+// document nothing can read — and taking this arm leaves the component
+// unrecorded, at the head of every pass afterwards for ever, because the
+// window takes the never-asked first.
 var ErrNotAnswering = fmt.Errorf("the index is not answering")
 
 // Client asks the public index for an ecosystem.

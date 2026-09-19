@@ -462,9 +462,9 @@ func PartsOfPurl(purl string) Parts {
 
 	// The scheme is fixed by the specification and is compared without regard
 	// to capitals, which is what the specification says of it — and what the
-	// canonical form beside this already did. Matched against two spellings,
-	// `Pkg:` got a real identity from one and an empty fold basis from the
-	// other, so the same component was two things depending on which asked.
+	// canonical form beside this does. Matched against two spellings, `Pkg:`
+	// takes a real identity from one and an empty fold basis from the other,
+	// and the same component is two things depending on which asked.
 	scheme, rest, found := strings.Cut(body, ":")
 	if !found || !strings.EqualFold(scheme, "pkg") {
 		return Parts{}

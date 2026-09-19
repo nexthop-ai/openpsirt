@@ -190,11 +190,11 @@ func IsNoRows(err error) bool {
 // the asking package's own sentinel, worded however that package words it.
 // reading names the act, for the line an operator reads: "look up product 12".
 //
-// One spelling, because the difference is a status code at every caller and it
-// was being made by hand wherever it was made at all. A reader that wraps every
-// failure alike answers "that does not exist" for a database it could not
-// reach, and every caller above it repeats that to whoever asked — so an outage
-// tells an authenticated reader their products, builds and findings are gone.
+// One spelling, because the difference is a status code at every caller and
+// made by hand it is made differently. A reader wrapping every failure alike
+// answers "that does not exist" for a database it could not reach, and every
+// caller above it repeats that to whoever asked — so an outage tells an
+// authenticated reader their products, builds and findings are gone.
 func FromRead(err error, absent error, reading string) error {
 	if IsNoRows(err) {
 		return absent
@@ -254,11 +254,11 @@ func IsDuplicate(err error) bool {
 // **The rule about reads is unchanged**, and it reaches further here: fn may
 // be re-run by a retry it cannot see, so everything it depends on is read
 // inside it.
-// **Each handle it may be given is named.** This package's own handle embeds
+// Each handle it may be given is named. This package's own handle embeds
 // `*bun.DB` rather than being one, so a type assertion for `*bun.DB` alone is
-// failed by the very handle Open returns — and the fallthrough that answered
-// it ran every statement as its own autocommit, with no transaction, no retry
-// and nothing said. The two spellings differ by four characters and both
+// failed by the very handle Open returns — and a fallthrough answering that by
+// running each statement as its own autocommit is no transaction, no retry and
+// nothing said, while the two spellings differ by four characters and both
 // compile. Anything this does not recognize is a fault rather than a fifth
 // silent path.
 func Within(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB) error) error {

@@ -294,10 +294,10 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			continue
 		}
 
-		// **A question with nowhere to send it is still answered.** Not
-		// recording here is what made this feature do nothing: a component
-		// whose ecosystem has no index stayed due forever, and `due` takes the
-		// oldest 200 with never-asked first — so on a real image, where 3,929
+		// A question with nowhere to send it is still answered. Unrecorded, a
+		// component whose ecosystem has no index stays due for ever, and
+		// `due` takes the oldest 200 with never-asked first — so on a real
+		// image, where 3,929
 		// components are `generic`, `oci`, `github` or `maven` against 3,010
 		// that are askable, the window filled with rows nothing ever wrote and
 		// the pass asked upstream about nothing at all, every cycle, forever.
