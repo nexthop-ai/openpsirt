@@ -1,4 +1,4 @@
-# Trying it
+# Evaluation
 
 Two ways, for two different questions. The published image answers "what does
 this thing do"; the checkout answers "what does my change do".

@@ -30,9 +30,9 @@ place to triage what it finds and track it through to a fix.
   - [Notifications](#notifications)
   - [Reporting](#reporting)
   - [Interface and API](#interface-and-api)
-  - [Running it](#running-it)
+  - [Operation](#operation)
 - [Components](#components)
-- [Trying it](#trying-it)
+- [Evaluation](#evaluation)
 - [Documentation](#documentation)
 - [License](#license)
 
@@ -245,7 +245,7 @@ behind every line of it.
 - Nothing a person typed is lost — not by a failed submission, a navigation, or
   an expired session
 
-### Running it
+### Operation
 
 - A container image and a Helm chart. A configuration that cannot work is
   refused at install time, naming what is missing
@@ -290,7 +290,7 @@ Not built: every adapter that would send an advisory somewhere, the VEX
 profile of the CSAF document, chat, hand-off to an external tracker, findings
 from a static analyzer, and images for any architecture but `amd64`.
 
-## Trying it
+## Evaluation
 
 ```
 make demo                    # build the image, start it, seed two products, print the address

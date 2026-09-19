@@ -41,7 +41,7 @@ plugins:
 nav:
   - Home: index.md
   - Current state: built.md
-  - Trying it: trying.md
+  - Evaluation: trying.md
   - Build pipelines: pipeline.md
   - Configuration: configuration.md
   - API reference: reference/api.md

@@ -839,7 +839,7 @@ rather than a tag across every row.
 | The default is written into the address | A chip above the list like every other filter, removable by clicking, traveling with a link somebody sends. That is why the parameter has a word for "either" |
 | Only the claim that currently stands counts | A promise that was withdrawn is not one |
 
-### Re-affirming a whole action
+### Whole-action re-affirmation
 
 A version bump lapses every row of the claim it moved under, so re-making them
 is one act at the grain the claim was made at.

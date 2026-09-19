@@ -98,7 +98,7 @@ read.
 | `GRYPE_DB_CACHE_DIR` | Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
 | `GRYPE_DB_AUTO_UPDATE` | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
 
-### An install that cannot reach the network
+### An air-gapped install
 
 The scanner's vulnerability data is not shipped in the image: it changes daily
 and the image does not. A deployment that can reach the network downloads it
@@ -353,7 +353,7 @@ alone is caught.
 | `OPENPSIRT_GITHUB_CLIENT_SECRET` | Its secret | unset |
 | `OPENPSIRT_GITHUB_ORG` | Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want | unset |
 
-### A proxy that says who somebody is
+### The trusted header
 
 Both the header and the sources it is believed from are required together: a
 header named with nothing to trust it from is either a mistake or the first

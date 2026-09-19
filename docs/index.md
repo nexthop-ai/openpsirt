@@ -249,7 +249,7 @@ behind every line of it.
 | | |
 |---|---|
 | [Current state](built.md) | How far each area has actually got |
-| [Trying it](trying.md) | Standing one up to look at |
+| [Evaluation](trying.md) | Standing one up to look at |
 | [Build pipelines](pipeline.md) | A pipeline declares the target, mints a key and posts the inventory |
 | [Configuration](configuration.md) | Every setting, and what reads it |
 | [API reference](reference/api.md) | Every operation, generated from the server |
