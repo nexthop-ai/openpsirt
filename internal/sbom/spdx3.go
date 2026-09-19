@@ -71,7 +71,7 @@ var spdx3Ancestors = map[string]bool{"ancestorOf": true, "descendantOf": true}
 // counted as sitting under nothing, stored and scanned — which is what a
 // component the producer could not place gets too.
 //
-// **A scope is when a relationship matters, not whether the target ships**, and
+// A scope is when a relationship matters, not whether the target ships, and
 // the specification says nothing about the second. Reading `build` as "does not
 // ship" is the inference that looks obvious and is wrong for every compiled
 // language: a crate or a module linked into a binary is stated as a build-phase
@@ -88,7 +88,7 @@ const spdx3TestScope = "test"
 
 // spdx3Element is one entry of the graph, collected before its type is known.
 //
-// **The type may arrive after the fields it governs**, because the order of an
+// The type may arrive after the fields it governs, because the order of an
 // object's keys is the producer's business, so an element is read into one
 // neutral shape and interpreted when it closes. That is the same thing a
 // component read from the other formats does — every field is gathered before
@@ -102,16 +102,16 @@ type spdx3Element struct {
 	purl    string
 	cpe     string
 
-	// What a creation-information element states.
+	// A creation-information element's own fields.
 	created     string
 	specVersion string
 
-	// What a document or an inventory element points at, and which creation
-	// information it was made under.
+	// The elements a document or an inventory element points at, and the
+	// creation information it was made under.
 	rootElements []string
 	creationInfo string
 
-	// What a relationship states.
+	// A relationship's own fields.
 	from  string
 	to    []string
 	kinds string
@@ -451,7 +451,7 @@ func (c *reader) spdx3Roots() {
 // spdx3Settle fills in the build time from the creation information the
 // document pointed at.
 //
-// **The third version puts the header inside the contents**, so this cannot be
+// The third version puts the header inside the contents, so this cannot be
 // answered by the pass that skips them — a document's creation information is
 // one entry of the same array its packages are in, in no stated position. The
 // header read therefore walks the whole graph and builds nothing from it, which
@@ -459,8 +459,8 @@ func (c *reader) spdx3Roots() {
 //
 // A document carries more than one creation-information element, because
 // anything it imported brought its own. The one the document points at is the
-// document's, and where it points at nothing **the document has not said when
-// it was built**: an imported document's time is a value that does not move
+// document's, and where it points at nothing the document has not said when
+// it was built: an imported document's time is a value that does not move
 // between builds, so standing it in has the first scan taken and every later
 // one refused as not newer, for good. Saying nothing is refused at the door
 // instead, which is a message about this upload rather than a target that

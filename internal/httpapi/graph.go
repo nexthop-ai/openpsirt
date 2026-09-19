@@ -24,7 +24,7 @@ type NeighborBody struct {
 	// what somebody deciding where to descend is actually asking. The bands
 	// sum to `beneath`, because an issue has one rating.
 	BeneathBy map[string]int `json:"beneath_by_severity,omitempty" doc:"The same number by how the issues were rated, which is what says whether a branch is worth opening. 'unrated' is what nobody scored, and the bands sum to beneath"`
-	Children  int            `json:"children" doc:"How many components it pulls in. Zero means nothing to open"`
+	Children  int            `json:"children" doc:"The number of components it pulls in. Zero means nothing to open"`
 	// Ecosystem is what tells two components of one name and one version
 	// apart. The endpoint that answers about one refuses a name the build
 	// holds twice and says to send this; a list that did not carry it left
@@ -40,10 +40,10 @@ type RootsBody struct {
 	// before deciding whether to browse or to search. Two numbers rather than
 	// one because they answer different questions: how much was inventoried,
 	// and how much of it was placed.
-	Components int `json:"components" doc:"How many components this build holds"`
-	Edges      int `json:"edges" doc:"How many edges place them"`
-	// Searching is what somebody does when Items would be thousands long, so
-	// what they searched for comes back with the answer.
+	Components int `json:"components" doc:"The number of components this build holds"`
+	Edges      int `json:"edges" doc:"The number of edges placing them"`
+	// Searching is the term somebody typed when Items would be thousands
+	// long, and it comes back with the answer.
 	Term string `json:"term,omitempty" doc:"The search this answers, where one was asked"`
 }
 
@@ -53,8 +53,8 @@ type rootsOutput struct {
 
 // AroundBody is what sits above and below one component.
 type AroundBody struct {
-	Above []NeighborBody `json:"above" doc:"What pulls this in — usually short, and the direction people use"`
-	Below []NeighborBody `json:"below" doc:"What it pulls in"`
+	Above []NeighborBody `json:"above" doc:"The consumers that pull this in — usually short, and the direction people use"`
+	Below []NeighborBody `json:"below" doc:"The components it pulls in, downward"`
 }
 
 func registerGraph(api huma.API, in Ingest) {
@@ -81,7 +81,7 @@ func registerGraph(api huma.API, in Ingest) {
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
 		Term    string `query:"q" maxLength:"200" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many matches to return. Only read when searching"`
+		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of matches returned. Only read when searching"`
 	}) (*rootsOutput, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
@@ -91,7 +91,7 @@ func registerGraph(api huma.API, in Ingest) {
 
 		// A refusal from the store is the answer a build nobody declared
 		// gets, not a fault. Falling through to the fault answer, this route
-		// said 500 where a stranger got 404 — and the pair says which builds
+		// says 500 where a stranger gets 404 — and the pair says which builds
 		// exist, one name at a time. A case collaborator is the reach that
 		// meets it: they hold nothing on the product and may open exactly one
 		// finding.
@@ -106,8 +106,8 @@ func registerGraph(api huma.API, in Ingest) {
 		out.Body.Components = components
 		out.Body.Edges = edges
 
-		// A search answers with matches and no root. What is being asked for
-		// is a set of components rather than a position, and naming a root
+		// A search answers with matches and no root. The request is for a set
+		// of components rather than a position, and naming a root
 		// beside them would invite drawing them as though they hung off it.
 		if strings.TrimSpace(input.Term) != "" {
 			found, err := store.Search(ctx, subject, target, input.Term, input.Limit)
@@ -149,7 +149,7 @@ func registerGraph(api huma.API, in Ingest) {
 			"A component reached several ways appears once with several parents. It is a graph " +
 			"rather than a tree, so anything drawing it has to expect the same component under " +
 			"many places.\n\n" +
-			"**A component name is not unique within a build.** Where one ships at several " +
+			"A component name is not unique within a build. Where one ships at several " +
 			"versions, `version` says which — without it, a name that matches more than one is " +
 			"refused with 409, naming the choices, rather than guessed at.",
 		Tags: []string{"Findings"},
@@ -158,8 +158,8 @@ func registerGraph(api huma.API, in Ingest) {
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`
 		Component string `path:"component" doc:"The component's name, as the findings list gives it"`
-		Version   string `query:"version" doc:"Which version, where the build ships that name at more than one"`
-		Ecosystem string `query:"ecosystem" doc:"Which ecosystem, for the few names one build holds at one version as two components"`
+		Version   string `query:"version" doc:"The version, where the build ships that name at more than one"`
+		Ecosystem string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components"`
 	}) (*struct{ Body AroundBody }, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
@@ -194,9 +194,9 @@ func neighbors(rows []graph.Neighbor) []NeighborBody {
 // are real.
 //
 // A scanner's own "unknown", a producer's invented word and no rating at all
-// are the same state everywhere that ranks or filters — only what a reader saw
-// differed, and it differed by screen. Done here because the walk that counts
-// a subtree cannot reach that list without an import cycle, and a second copy
+// are the same state everywhere that ranks or filters — only what a reader
+// sees differs, and it differs by screen. Done here because the walk that
+// counts a subtree cannot reach that list without an import cycle, and a copy
 // of "which words are real" is exactly what one list exists to prevent.
 func banded(by map[string]int) map[string]int {
 	if len(by) == 0 {

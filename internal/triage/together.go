@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// Deciding about everything at one component at once.
+// One decision covering everything at one component.
 //
 // A distinct act with its own resolution: the places are worked out from a
 // component and a build rather than named, the bound is on how many places one
@@ -28,7 +28,7 @@ import (
 // too, and a finding cannot import a triage decision.
 const DefaultTogetherCap = setting.DefaultTogetherCap
 
-// allowed is what every proposal in a bulk **judgment** has to satisfy before
+// allowed is what every proposal in a bulk judgment has to satisfy before
 // any of them is written.
 //
 // Checked over the whole set first, because refusing halfway is the failure
@@ -49,7 +49,7 @@ func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Tim
 // permitted is everything except the bound: may this subject decide here, is
 // each proposal well formed, and is it recorded as made by whoever made it.
 //
-// **Split out because a bulk promise carries no bound.** What the cap is for is
+// Split out because a bulk promise carries no bound. What the cap is for is
 // reviewability — one sentence answering a thousand findings has to stay a size
 // a reviewer can follow, because nothing re-checks a dismissal afterwards. A
 // promise to upgrade is the one bulk write that verifies itself: the next scan
@@ -78,7 +78,7 @@ func permitted(subject access.Subject, proposals []Proposal, now time.Time) erro
 // before this ran — so they are resolved here, inside the transaction that
 // writes.
 //
-// **The component names a fold, not a package.** Naming any binary of a source
+// The component names a fold, not a package. Naming any binary of a source
 // package reaches all of them, which is the grain the list somebody picked from
 // already shows and the grain a bump is done at: one vim row on that list is
 // four packages at sixty-one places, and keyed on one binary it took four
@@ -110,7 +110,7 @@ type resolved struct {
 // which nobody does, or hiding them, which is refused.
 //
 // One outcome, one justification, one reasoning, one approval, and a separate
-// record per issue **and per place**. Each is keyed and expires on its own,
+// record per issue and per place. Each is keyed and expires on its own,
 // which is what makes one action across many findings defensible rather than a
 // blanket claim — and covering every place is what stops it reporting that it
 // answered a consumer it left open.
@@ -134,9 +134,10 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
-	// What the write was about, kept so a refusal can be read back after the
-	// transaction has unwound. Inside it the row that collided is the row this
-	// attempt cannot see, so the sentence naming it is built afterwards.
+	// attempted is what the write was about, kept so a refusal can be read
+	// back after the transaction has unwound. Inside it the row that
+	// collided is the row this attempt cannot see, so the sentence naming
+	// it is built afterwards.
 	var attempted []Proposal
 
 	err = s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
@@ -207,9 +208,9 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		// covering something already decided is a selection somebody should
 		// look at again rather than one to write around, and the sentinel is
 		// carried out whole so the refusal outside can name which decision
-		// stands — it used to be replaced here with "something in this
-		// selection is already decided", which tells a reader holding five
-		// hundred rows nothing they can act on.
+		// stands. Replaced here with "something in this selection is already
+		// decided", it tells a reader holding five hundred rows nothing they
+		// can act on.
 		made, err := within.proposeAll(ctx, claim, each)
 		if err != nil {
 			return err
@@ -257,7 +258,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		// What this product rates the issue, which is the rating in force
+		// This product's rating of the issue, which is the rating in force
 		// here. The read spans products, so each row reads its own stream's.
 		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`st.product_id AS "product_id"`).
@@ -274,7 +275,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
 		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed_severity"`).
 		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-		// Whether the release was built once, which decides what may be said
+		// A release built once, which decides what may be said
 		// about it. As an integer rather than a boolean: the four engines
 		// spell a boolean three ways.
 		ColumnExpr(`MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).

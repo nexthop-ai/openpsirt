@@ -12,23 +12,23 @@ import { Paged } from "../ui/Paged";
 import { Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 
-// What is approaching disclosure, and where an embargo is moved (a finding
-// saying whether it is disclosed, an extension needing agreement).
+// The findings approaching disclosure, and the place an embargo is moved (a
+// finding saying whether it is disclosed, an extension needing agreement).
 //
-// **Before the date, not on it.** The date arriving is the last moment to act
+// Before the date, not on it. The date arriving is the last moment to act
 // rather than the first useful warning, so this lists what is running out as
 // well as what has run out — and what has run out sits at the top.
 //
-// **The list is itself a disclosure.** Every row on it is undisclosed by
+// The list is itself a disclosure. Every row on it is undisclosed by
 // definition, so a product somebody may not read undisclosed work in
 // contributes nothing to it, not even a count. That narrowing is the server's.
-// How many rows one request carries. The server's own default, named here so
+// The rows one request carries. The server's own default, named here so
 // the pager and the request cannot disagree about where a page ends.
 const PAGE = 100;
 
 export function Disclosing() {
   const queries = useQueryClient();
-  // How far ahead to look. Empty is this deployment's own embargo length,
+  // The distance ahead to look. Empty is this deployment's own embargo length,
   // which the server supplies: a fixed thirty days against the ninety-day
   // policy that ships drew an empty screen while embargoes were running, and
   // an empty screen reads as "nothing is coming".
@@ -73,7 +73,9 @@ export function Disclosing() {
 
   if (rows.isPending) return <Loading />;
   if (rows.isError) {
-    return <Failed error={rows.error} what="What is approaching disclosure could not be read." />;
+    return (
+      <Failed error={rows.error} what="The findings approaching disclosure could not be read." />
+    );
   }
   const items = rows.data?.items ?? [];
   const total = rows.data?.total;
@@ -197,8 +199,8 @@ export function Disclosing() {
                             value={because}
                             onChange={setBecause}
                             rows={3}
-                            label="Why it is being extended"
-                            placeholder="Why the date is moving, and what has to happen before the new one."
+                            label="The reason for the extension"
+                            placeholder="The reason the date is moving, and what has to happen before the new one."
                           />
                           <div className="actions" style={{ marginTop: 8 }}>
                             <button

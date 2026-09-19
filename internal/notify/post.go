@@ -29,7 +29,7 @@ const sweepBatch = 200
 
 // heldFor is how long a sweep holds its lease.
 //
-// **Long enough to cover a cycle of the work rather than an instant of it**,
+// Long enough to cover a cycle of the work rather than an instant of it,
 // which is what the lease's own contract asks for: it is not renewed while
 // the work runs. Taken for the interval between cycles instead, a batch of
 // two hundred messages to a server answering slowly outlived it by an hour —

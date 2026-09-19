@@ -5,7 +5,7 @@ import (
 )
 
 func TestWhatOneSignInIsGivenIsUnguessableAndItsOwn(t *testing.T) {
-	// What this file can say about a sign-in's three values: that they are
+	// This file can say one thing about a sign-in's three values: that they are
 	// distinct, unguessable, and not shared with the next sign-in.
 	//
 	// It was named for the proof key being sent as a digest and kept as the

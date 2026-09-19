@@ -20,16 +20,17 @@ import (
 
 // A provider, standing where a real one would.
 //
-// Every method of both adapters was unexecuted: the nonce comparison that ties
-// a token to the sign-in that started here, the blank-subject refusal that
-// access.MatchProvider's own comment relies on these adapters to make, and the
-// endpoint-host check that stops a discovery document redirecting sign-ins
-// somewhere else. Each could be deleted with the suite green.
+// Without one, every method of both adapters goes unexecuted: the nonce
+// comparison that ties a token to the sign-in that started here, the
+// blank-subject refusal that access.MatchProvider's own comment relies on
+// these adapters to make, and the endpoint-host check that stops a discovery
+// document redirecting sign-ins somewhere else. Each could be deleted with the
+// suite green.
 //
-// Nothing about that was difficulty: where a boundary here has an in-process
+// Difficulty is not what decides it: where a boundary here has an in-process
 // stand-in the package behind it is at 65–96%, and where it has none the
-// boundary code is at 0.0% while the pure code in the same file is at 88.9–100%.
-// This is the stand-in.
+// boundary code is at 0.0% while the pure code in the same file is at
+// 88.9–100%.
 type provider struct {
 	*httptest.Server
 	key *rsa.PrivateKey
@@ -468,10 +469,10 @@ func TestTeamsAreReadPastTheFirstPage(t *testing.T) {
 }
 
 func TestBothAdaptersStartASignInTheSameWay(t *testing.T) {
-	// The proof key and its method were written out once per adapter, and the
-	// literals involved appeared exactly twice in the tree. A hardening change
-	// landing in one and not the other downgrades that provider alone, and
-	// nothing observed either.
+	// Written out once per adapter, the proof key and its method are two
+	// copies of the same literals. A hardening change landing in one and not
+	// the other downgrades that provider alone, with nothing observing
+	// either.
 	//
 	// So both are asked, and what differs is stated: OpenID Connect carries a
 	// nonce, because it has an identity token to tie to this sign-in, and

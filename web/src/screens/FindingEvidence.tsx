@@ -1,6 +1,6 @@
-// What is known about the flaw, as against what anybody has said about it.
+// The record of the flaw, as against what anybody has said about it.
 //
-// Where the component sits, what upstream has released, how the scanner
+// The component's place, upstream's releases, the route the scanner
 // matched it, what the published references say, and who reported it. None of
 // it is a judgment; all of it is what somebody reads before making one.
 
@@ -46,8 +46,8 @@ export function Places({
 }: {
   places: Sitting[];
   build: string;
-  // What ships here, for a way down the graph could not be walked: the chain
-  // carries a version at every step and a place without one carries none.
+  // The versions shipped here, for a way down the graph could not walk: the
+  // chain carries a version at every step and a place without one carries none.
   version?: string;
 }) {
   const [all, setAll] = useState(false);
@@ -82,7 +82,7 @@ export function Places({
                         "Build-time only" is the largest deferral class a
                         vendor has, and it is a person's to make. */}
                     {last && place.declared_as && (
-                      <span className="state" title="What the producer called this dependency">
+                      <span className="state" title="The producer's own name for this dependency">
                         producer said {place.declared_as}
                       </span>
                     )}
@@ -152,8 +152,8 @@ export function References({
   );
 }
 
-// How the scanner reached this, which is the first question anybody asks about
-// a distribution's package.
+// The route the scanner reached this by, which is the first thing anybody asks
+// about a distribution's package.
 //
 // An advisory for the package's own ecosystem counts the release number and
 // names the release that carries the fix. An identifier compared against an
@@ -165,7 +165,7 @@ export function References({
 // which is the wrong way round: the list is where they are noticed and this is
 // where the judgment is made. Nothing is said where the scanner said nothing,
 // because unknown is not unconfirmed.
-export function HowMatched({
+export function MatchMethod({
   matched,
   from,
   version,
@@ -208,7 +208,7 @@ export function HowMatched({
         </p>
       )}
       {from && (
-        <p className="hint" title="Where the match data came from">
+        <p className="hint" title="The source of the match data">
           Source <Away url={from} />
         </p>
       )}
@@ -216,8 +216,8 @@ export function HowMatched({
   );
 }
 
-// Where to read about this, worked out from the names held here rather than
-// handed over by a scanner.
+// The places to read about this, worked out from the names held here rather
+// than handed over by a scanner.
 //
 // A scanner points at whatever its data carried, which for a package matched
 // by identifier is often another distribution's write-up and need not include
@@ -240,17 +240,17 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
   );
 }
 
-// Who told us about a flaw, and what else it is called.
+// The reporter of a flaw, and the other names it goes by.
 //
-// **The reporter is the party the timeline is evidenced to.** Received,
+// The reporter is the party the timeline is evidenced to. Received,
 // acknowledged, triaged, fixed, disclosed — and the acknowledgment is the step
 // that costs nothing and is missed by being nobody's job, so it is a button
 // here rather than a field somebody remembers to fill in.
 //
-// **Acknowledging records that it happened rather than doing it.** What
+// Acknowledging records that it happened rather than doing it. What
 // reaches a researcher is a mail somebody sends from an address they already
 // have; recording it turns "somebody probably replied" into a date.
-export function WhoTold({ product, vulnerability }: { product: string; vulnerability: string }) {
+export function Reporter({ product, vulnerability }: { product: string; vulnerability: string }) {
   const queries = useQueryClient();
   const [alias, setAlias] = useState("");
   const told = useQuery({
@@ -299,7 +299,7 @@ export function WhoTold({ product, vulnerability }: { product: string; vulnerabi
         // for "you do not hold triage here" — so folding them told a case
         // collaborator the flaw was found in-house, which is a false claim
         // about a security record rather than a quiet card.
-        <Failed error={told.error} what="Who reported this could not be read." />
+        <Failed error={told.error} what="The reporter could not be read." />
       ) : !report ? (
         <p className="reading">No outside reporter recorded.</p>
       ) : (

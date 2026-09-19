@@ -78,7 +78,7 @@ func begin(w http.ResponseWriter, r *http.Request, in Ingest) {
 
 	encoded, err := json.Marshal(inProgress{
 		Pending: pending,
-		// Where to land afterwards, carried in our own cookie rather than
+		// The landing place afterwards, carried in our own cookie rather than
 		// through the provider. It never leaves this browser, so nothing a
 		// provider echoes back can decide where somebody ends up.
 		Return: aLocalPath(r.URL.Query().Get("return")),
@@ -96,7 +96,7 @@ func begin(w http.ResponseWriter, r *http.Request, in Ingest) {
 	cookie := browserCookie(pendingCookie, sealed, false, in.PlainHTTP,
 		int(pendingLife.Seconds()))
 	http.SetCookie(w, &cookie)
-	// Where this goes is the provider's authorization endpoint, and an adapter
+	// This goes to the provider's authorization endpoint, and an adapter
 	// refuses at startup to be built around one that is not on the configured
 	// provider's own host. That check is there rather than here because a
 	// provider that would misdirect people should stop the process, not
@@ -155,9 +155,8 @@ func complete(w http.ResponseWriter, r *http.Request, in Ingest) {
 	}
 	rights := access.NewStore(in.DB.DB)
 
-	// Authenticating is not being authorized, and which of the two
-	// questions gets asked here depends on where this deployment says
-	// roles come from.
+	// Authenticating is not being authorized. The question asked here follows
+	// from where this deployment says roles come from.
 	//
 	// Assigned: this looks somebody up and cannot bring them into being, so
 	// somebody who signs in perfectly well and was never granted anything is
@@ -266,13 +265,13 @@ func fillEmail(r *http.Request, in Ingest, rights *access.Store,
 
 // pendingFrom reads back what the sign-in remembered.
 //
-// **Named so a sibling host cannot write it.** Over TLS the cookie carries the
+// Named so a sibling host cannot write it. Over TLS the cookie carries the
 // `__Host-` prefix, which a browser refuses to set unless the cookie is
 // Secure, path-wide and bound to exactly the host that set it — so
 // `evil.internal.example` cannot plant one for `psirt.internal.example`, which
 // is the premise the attack rests on.
 //
-// **Signed as well, because the two answer different questions.** The
+// Signed as well, because the two answer different questions. The
 // signature says this deployment authored the value; the prefix says it
 // authored it for *this* browser. Signing alone is not the control: an
 // attacker who can write a cookie starts a sign-in of their own, takes the
@@ -379,10 +378,10 @@ func signingKey(ctx context.Context, in Ingest) ([]byte, error) {
 	minted := base64.RawURLEncoding.EncodeToString(fresh)
 	// Only where nothing holds one, and the answer is whatever is stored
 	// afterwards. Written as a plain set followed by a read, two replicas
-	// starting together both minted and the second overwrote the first: every
-	// session signed with the losing key stopped verifying, a sign-in already
-	// in flight included. The read-back closed the window between that write
-	// and itself, and not the one that mattered.
+	// starting together both mint and the second overwrites the first: every
+	// session signed with the losing key stops verifying, a sign-in already in
+	// flight included. The read-back closes the window between that write and
+	// itself, and not the one that matters.
 	stored, err := settings.SetIfAbsent(ctx, setting.SignInKey, minted)
 	if err != nil {
 		return nil, err
@@ -397,19 +396,18 @@ type inProgress struct {
 	Return  string         `json:"return,omitempty"`
 	// Minted is when this was sealed, checked when it is opened.
 	//
-	// The window was a MaxAge on the cookie and nothing else — a request to
-	// the browser, and the browser holding it may be the one that planted it.
-	// The payload carried no time, so the server could not tell a one-minute
-	// old value from a one-month old one, and the signing key is minted once
-	// and never rotated: a sealed sign-in stayed acceptable for the life of
-	// the deployment.
+	// A MaxAge on the cookie is a request to the browser, and the browser
+	// holding it may be the one that planted it. A payload carrying no time
+	// leaves the server unable to tell a one-minute old value from a one-month
+	// old one, and the signing key is minted once and never rotated: a sealed
+	// sign-in stays acceptable for the life of the deployment.
 	Minted time.Time `json:"minted"`
 }
 
 // aLocalPath keeps a return address that names somewhere on this deployment,
 // and nothing else.
 //
-// **The whole of the open-redirect defense.** A sign-in that will send a
+// The whole of the open-redirect defense. A sign-in that will send a
 // browser wherever a parameter says is a way to make this deployment's own
 // domain vouch for somebody else's page, and it is the classic bug in exactly
 // this flow. So the address is a path here or it is discarded:
@@ -419,9 +417,8 @@ type inProgress struct {
 //     protocol-relative and would send the browser to another host;
 //   - it parses, and carries no scheme or host of its own.
 //
-// Anything else becomes the home page, which is where a sign-in used to land
-// unconditionally. Refusing to sign somebody in over it would punish the
-// person for a link somebody else wrote.
+// Anything else becomes the home page. Refusing to sign somebody in over it
+// would punish the person for a link somebody else wrote.
 func aLocalPath(where string) string {
 	if where == "" || !strings.HasPrefix(where, "/") {
 		return ""

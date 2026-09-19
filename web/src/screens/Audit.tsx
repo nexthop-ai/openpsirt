@@ -15,7 +15,7 @@ import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
 import { coveringPeriod, stated } from "./reports/Window";
 
-// How much of the record one page holds. The server's own ceiling is five
+// The share of the record one page holds. The server's own ceiling is five
 // hundred; a page is what somebody reads, and the rest is a click away rather
 // than behind a narrower search.
 const PAGE = 100;
@@ -61,7 +61,7 @@ const STATES = [
 // happened. The findings list answers "what is open"; this answers "what did
 // you decide, and on whose say-so".
 //
-// **Built to be printed.** An auditor takes a copy away, so the page prints as
+// Built to be printed. An auditor takes a copy away, so the page prints as
 // the record rather than as a screenshot of an application: the shell, the
 // controls and the links go, a header states what was asked for and when it was
 // taken, and a judgment does not break across a page.
@@ -320,7 +320,7 @@ export function Audit() {
   );
 }
 
-// What somebody changed about how this deployment works.
+// The changes somebody made to how this deployment works.
 //
 // Beside the record rather than on a screen of its own, because it is the same
 // question one layer up: the deadline windows, the triage floor and a support
@@ -335,7 +335,7 @@ function Administered() {
   // to it.
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
-  // How many rows are shown, rather than an offset: the newest first is the
+  // The rows shown, rather than an offset: the newest first is the
   // order, and asking for the next page of a list that only grows at the top
   // is how a row is seen twice or not at all.
   const [showing, setShowing] = useState(50);
@@ -435,9 +435,9 @@ function Administered() {
   );
 }
 
-// Where the change history comes from as a file, built the way the record's
-// own link is: the screen's period straight from the address, so the file and
-// the section it was taken from cannot disagree about the stretch.
+// The address the change history comes from as a file, built the way the
+// record's own link is: the screen's period straight from the address, so the
+// file and the section it was taken from cannot disagree about the stretch.
 function changesAt(params: URLSearchParams, format: string): string {
   const asked = new URLSearchParams();
   for (const name of ["from", "to"]) {
@@ -592,7 +592,7 @@ function Judgment({ row }: { row: Judged }) {
   );
 }
 
-// Where the record comes from as a file. Built here rather than by the
+// The address the record comes from as a file. Built here rather than by the
 // generated client because it is a link somebody follows, not a request this
 // page makes: the browser fetches it with the session it already has.
 //

@@ -123,9 +123,9 @@ describe("the filters as the server takes them", () => {
   });
 
   it("leaves out what a promised upgrade answers, unless the address says otherwise", () => {
-    // Deciding covered work again one finding at a time is what the promise
-    // was made instead of. Written into the address rather than applied on the
-    // way to the server, so it is a chip like every other filter — and the
+    // A promise is made instead of deciding covered work again one finding at
+    // a time. Written into the address rather than applied on the way to the
+    // server, so it is a chip like every other filter — and the
     // by-component view, where the upgrade is managed, is untouched.
     expect(asAsked(new URLSearchParams(), "issues").get("planned")).toBe("unplanned");
     expect(asAsked(new URLSearchParams(), "components").get("planned")).toBe(null);

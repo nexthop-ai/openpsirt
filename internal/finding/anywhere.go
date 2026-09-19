@@ -15,7 +15,7 @@ import (
 
 // The findings list across every product somebody may see.
 //
-// **The work starts from an issue as often as from a product.** Findings were
+// The work starts from an issue as often as from a product. Findings were
 // answerable one product at a time, so "which of our products are carrying
 // this, and what is running out anywhere" was a question assembled by hand
 // once per product. At a dozen products that is the first thing anybody
@@ -23,18 +23,18 @@ import (
 // one issue, and the other half is the list — with filters, an order and
 // paging.
 //
-// **One row per product, issue and component.** The same library carrying the
+// One row per product, issue and component. The same library carrying the
 // same issue in two products is two pieces of work, decided separately by
 // different people; in three builds of one product it is one, with a count.
 // That is the grain the per-product list already groups at, one level out.
 //
-// **Every product's own line still applies.** A line is a claim about what is
+// Every product's own line still applies. A line is a claim about what is
 // worth an afternoon *here*, and a list that ignored the lines would hand
 // somebody back the thousands of rows their products deliberately set aside.
 // Applied per row from the product's own column rather than from one number
 // chosen for the page.
 //
-// **Nothing about it is a new visibility rule**, and that is exactly where it
+// Nothing about it is a new visibility rule, and that is exactly where it
 // has to be right: a page spanning products is where narrowing afterwards gets
 // forgotten, and the total leaks even when no row is shown. So the narrowing
 // is in the statement, and an issue that exists only in products somebody
@@ -100,10 +100,10 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		}
 	}
 
-	// Which releases are past their date, read once for the page. This list
-	// spans products and resolves no build identifiers, so the two questions
-	// are conditions here rather than a narrowing of a target list — the same
-	// rule, applied where this query can reach it.
+	// pastEOL is which releases are past their date, read once for the
+	// page. This list spans products and resolves no build identifiers, so
+	// the two questions are conditions here rather than a narrowing of a
+	// target list — the same rule, applied where this query can reach it.
 	var pastEOL []int64
 	if filter.Workable.asks() && len(filter.Workable.Support) == 1 {
 		var err error
@@ -209,11 +209,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		within = append(within, head.ProductID)
 	}
 
-	// What the page shows about each row, in one statement over the page's
-	// products, issues and folds as three lists. That admits combinations
-	// no row asked for, which are read and dropped on the way into the map;
-	// what it buys is the index, which is the same trade the per-product page
-	// makes.
+	// rows is what the page shows about each row, in one statement over
+	// the page's products, issues and folds as three lists. That admits
+	// combinations no row asked for, which are read and dropped on the way
+	// into the map; what it buys is the index, which is the same trade the
+	// per-product page makes.
 	var rows []struct {
 		ProductID       int64  `bun:"product_id"`
 		Product         string `bun:"product"`
@@ -261,7 +261,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(DISTINCT f.consumer_id) AS "consumers"`).
 		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
 		ColumnExpr(`0 AS "total"`)
-	// How far each of them has been decided, spelled once for every list
+	// The decision state of each, spelled once for every list
 	// that asks (see decided.go). Across products the row names its own.
 	body = decisionCounts(body, "st.product_id", nil,
 		claimWaiting, claimApproved, claimLapsed, claimSentBack).
@@ -285,7 +285,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, 0, err
 	}
-	// What each of the page's products rates each of its issues. Keyed on the
+	// Each product's own rating of each of its issues. Keyed on the
 	// pair, because this list spans products and one issue may be rated
 	// differently in two of them — which is the whole reason a rating belongs
 	// to a product.
@@ -298,7 +298,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		return nil, 0, err
 	}
 
-	// What people have marked these with, in their own product's words. The
+	// The marks people put on these, in their own product's words. The
 	// list is where a mark is for — the point of putting one on is finding the
 	// work again — so a mark this list did not draw was one nobody saw, on the
 	// screen somebody reaches before they have picked a product.

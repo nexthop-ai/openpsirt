@@ -8,7 +8,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
-// What the build already argued about its own findings.
+// The build's own argument about its findings.
 //
 // A claim in a scan file is the producer's judgment, applied here rather than
 // upstream: what it covers is marked and kept rather than dropped, and a claim

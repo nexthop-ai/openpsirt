@@ -11,9 +11,9 @@ import (
 
 // registerTags is the words people put on findings.
 //
-// **People tag work regardless.** With nowhere to put it they do it inside
-// the reasoning text, where nothing can filter on it and an approver reads it
-// as part of the argument.
+// People tag work regardless. With nowhere to put it they do it inside the
+// reasoning text, where nothing can filter on it and an approver reads it as
+// part of the argument.
 func registerTags(api huma.API, in Ingest) {
 	const at = "/v1/products/{product}/streams/{stream}/variants/{variant}" +
 		"/findings/{vulnerability}/components/{component}/tags/{tag}"
@@ -60,16 +60,16 @@ func registerTags(api huma.API, in Ingest) {
 		OperationID: "tag-finding", Method: http.MethodPut, Path: at,
 		Summary: "Tag a finding with a word",
 		Description: "Puts a free-text tag on one issue in one component of this product.\n\n" +
-			"**No fixed vocabulary**, because none has been earned yet. A tag that becomes " +
+			"No fixed vocabulary, because none has been earned yet. A tag that becomes " +
 			"universal is a signal that it should be promoted to a real concept — \"waiting on " +
 			"vendor\" is a state the tool would want to reason about rather than a string " +
 			"somebody typed.\n\n" +
-			"**One issue in one component of one product**, not one place and not one build: " +
+			"One issue in one component of one product, not one place and not one build: " +
 			"a kernel flaw at sixty places is one thing somebody is tagging, and a tag is " +
 			"about the work rather than about a release.\n\n" +
 			"Matched without regard to capitals and shown back as it was typed. Tagging what " +
 			"already carries the tag succeeds and keeps the first spelling.\n\n" +
-			"**Tagging is triage**, so it asks for the triage right: a tag changes what a " +
+			"Tagging is triage, so it asks for the triage right: a tag changes what a " +
 			"filtered list answers, and somebody who may only read should not move work into " +
 			"or out of a saved filter.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
@@ -90,7 +90,7 @@ func registerTags(api huma.API, in Ingest) {
 			"What a filter offers rather than a vocabulary: the list is what people have " +
 			"actually written, which is also the evidence for promoting one of them to a " +
 			"real concept.\n\n" +
-			"**Only the words on findings you may read.** A tag row carries no visibility of " +
+			"Only the words on findings you may read. A tag row carries no visibility of " +
 			"its own, so the list is narrowed by the findings it was written on — reading it " +
 			"is a read act, and writing one is the act that asks for triage.",
 		Tags: []string{"Findings"},

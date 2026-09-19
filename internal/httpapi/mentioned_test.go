@@ -133,7 +133,7 @@ func TestAMentionThatReachedNobodyIsReportedBack(t *testing.T) {
 	// way, and a comment rejected because one name in it was wrong loses
 	// the paragraph to fix a word.
 	//
-	// And reported **without saying why**. A name nobody holds and a name
+	// And reported without saying why. A name nobody holds and a name
 	// held by somebody who may not read this are one answer here, because
 	// telling them apart would answer "can this person see undisclosed
 	// work" one comment at a time.

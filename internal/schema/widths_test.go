@@ -61,12 +61,12 @@ func TestProducerSuppliedTextIsNotBoundedByAColumn(t *testing.T) {
 }
 
 func TestWhatAScannerCallsItselfIsNotBoundedByAColumn(t *testing.T) {
-	// The other half of the same class, and the one strictness turned from a
+	// The other half of the same class, and the one strictness turns from a
 	// truncation into a failure: what the scanner calls itself, its version
 	// and the version of the data it read are taken verbatim from its output
-	// and bounded by nothing on the way in. Left in the indexed-name slot,
-	// they were 191 characters on three engines — so one scan file would fail
-	// the whole run there and succeed on SQLite.
+	// and bounded by nothing on the way in. Left in the indexed-name slot they
+	// are 191 characters on three engines, so one scan file fails the whole
+	// run there and succeeds on SQLite.
 	//
 	// Long rather than enormous, because the point is that nothing bounds
 	// these rather than that they are ever large.

@@ -46,10 +46,10 @@ type Result struct {
 	Applied      graph.Applied
 	Components   int
 	Suppressions int
-	// What the document stated that we tolerated rather than refused. Each is
-	// a number that should be stable build to build, so a change in one says
-	// the producer changed — which is the thing that would otherwise be
-	// silent.
+	// Unrooted is what the document stated that we tolerated rather than
+	// refused. Each is a number that should be stable build to build, so a
+	// change in one says the producer changed — which is the thing that
+	// would otherwise be silent.
 	Unrooted       int
 	Unversioned    int
 	DanglingEdges  int
@@ -270,12 +270,12 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	stand := graph.Described{Name: target.Product}
 	snapshot := doc.Snapshot(stand)
 
-	// What the build argued is stored against the target, not against the
+	// The build's own argument is stored against the target, not against the
 	// scan, because it is what the next scan run has to apply.
 	//
-	// Where this scan could have made a claim is passed with it. A claim in a
-	// document of its own can always be restated, so not restating one is a
-	// withdrawal; a claim attached to a component can only be restated by a
+	// The places this scan could have made a claim are passed with it. A claim
+	// in a document of its own can always be restated, so not restating one is
+	// a withdrawal; a claim attached to a component can only be restated by a
 	// format that can attach one, and one of the two cannot. Without that, a
 	// product's first scan in the other format closes every carried patch it
 	// had and reopens every finding they suppressed.
@@ -283,13 +283,13 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		sbom.FromStatement: true,
 		sbom.FromPedigree:  doc.Format.StatesCarriedPatches(),
 	}
-	// What the inventory was made of, kept on the scan so a receipt can say
-	// it. The log line said it and nothing else did, which meant an operator
-	// could only learn that a document placed none of its components by going
-	// and finding the line — on the screen that exists to answer what became
-	// of an upload.
+	// The documents the inventory was made of, kept on the scan so a receipt
+	// can say it. The log line said it and nothing else did, which meant an
+	// operator could only learn that a document placed none of its components
+	// by going and finding the line — on the screen that exists to answer what
+	// became of an upload.
 	components, placed := len(doc.Components), len(doc.Components)-doc.Unrooted
-	// What the document called the thing it is about, which a published
+	// The document's own name for the thing it is about, which a published
 	// advisory offers a reader to match a release against.
 	//
 	// Read off the document rather than off the snapshot, and that is the
@@ -336,7 +336,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 		Retained:       !target.Moves,
 	}
 
-	// What was just stored has to be scanned: the inventory is new, and the
+	// The inventory just stored has to be scanned: it is new, and the
 	// vulnerability data has moved since whatever last looked at this target.
 	// The work is left behind rather than done here because it is a different
 	// job with a different rhythm — an inventory is read once and scanned

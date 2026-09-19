@@ -24,28 +24,28 @@ type EmbargoedBody struct {
 	Stream        string `json:"stream"`
 	Variant       string `json:"variant"`
 	Severity      string `json:"severity,omitempty"`
-	DiscloseAt    string `json:"disclose_at" doc:"When the embargo ends. Reaching it discloses nothing"`
+	DiscloseAt    string `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
 	// Passed says the date has arrived. It is a date to answer rather than a
 	// trigger, so this is a row somebody has to act on rather than a record of
 	// something that happened.
 	Passed bool `json:"passed" doc:"Whether the date has already arrived"`
-	Places int  `json:"places" doc:"How many findings this covers"`
+	Places int  `json:"places" doc:"The number of findings this covers"`
 }
 
-// EnteredBody is what came of recording a flaw.
+// EnteredBody is the record of a flaw entered.
 type EnteredBody struct {
-	// Identifier is what it is filed under here, minted because a flaw nobody
-	// has announced has no CVE to file it under.
-	Identifier string `json:"identifier" doc:"What this deployment filed it as, such as SONIC-2026-0001"`
-	Component  string `json:"component" doc:"What in the build carries it"`
+	// Identifier is the name it is filed under here, minted because a flaw
+	// nobody has announced has no CVE to file it under.
+	Identifier string `json:"identifier" doc:"The identifier this deployment filed it under, such as SONIC-2026-0001"`
+	Component  string `json:"component" doc:"The component in the build that carries it"`
 	Visibility string `json:"visibility" enum:"public,private" doc:"Whether it has been disclosed"`
-	DueAt      string `json:"due_at,omitempty" doc:"When it has to be answered by"`
-	Builds     int    `json:"builds" doc:"How many builds it was recorded against"`
+	DueAt      string `json:"due_at,omitempty" doc:"The date it has to be answered by"`
+	Builds     int    `json:"builds" doc:"The number of builds it was recorded against"`
 	// Places is how many findings that made. A component can sit in more than
 	// one place in a build, and a finding is a component at a place, so a
 	// flaw recorded against one build can open several — which is what a
 	// scanned finding of the same flaw at the same component would open.
-	Places int `json:"places" doc:"How many findings that opened. One per place the component sits in, in each build"`
+	Places int `json:"places" doc:"The number of findings that opened. One per place the component sits in, in each build"`
 }
 
 func registerEntry(api huma.API, in Ingest) {
@@ -55,10 +55,10 @@ func registerEntry(api huma.API, in Ingest) {
 		Summary: "Record a flaw in what this product ships",
 		Description: "Records a vulnerability in your own product — one no scanner reported, " +
 			"usually because nobody outside knows about it yet.\n\n" +
-			"**It starts undisclosed**, which needs the private triage role on the product. " +
+			"It starts undisclosed, which needs the private triage role on the product. " +
 			"Send `disclosed` for one that is already public, which needs the ordinary " +
 			"one.\n\n" +
-			"**It is filed under an identifier this deployment mints** — the product's name, " +
+			"It is filed under an identifier this deployment mints — the product's name, " +
 			"the year and a number. A CVE assigned later becomes another name for the same " +
 			"issue; nothing about the finding, the decisions or the approvals moves.\n\n" +
 			"`component` names what in the build carries it, as the build calls it. Leave it " +
@@ -67,36 +67,39 @@ func registerEntry(api huma.API, in Ingest) {
 			"choices rather than resolved to one; send `version`, and `ecosystem` where two " +
 			"share a version.\n\n" +
 			"From here it behaves like any other finding: triaged, assigned, decided, on the " +
-			"same clock and in the same reports. **No scan will close it**, so it is closed " +
+			"same clock and in the same reports. No scan will close it, so it is closed " +
 			"by a person through the resolve endpoint or it stays open.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, perProduct, "private-triage where the finding is undisclosed.", triageRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Body    struct {
-			// Which builds ship it, rather than one in the path. The same code
-			// goes out on several lines and as several variants at once, and
-			// the identifier is minted per product — so the product is the
-			// level this is recorded at and the builds are what it names.
+			// Builds is which builds ship it, rather than one in
+			// the path. The same code goes out on several lines
+			// and as several variants at once, and the identifier
+			// is minted per product — so the product is the level
+			// this is recorded at and the builds are what it
+			// names.
 			Builds []struct {
 				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
-				Variant string `json:"variant" minLength:"1" doc:"How that line is built"`
+				Variant string `json:"variant" minLength:"1" doc:"The way that line is built"`
 			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take"`
-			Summary  string `json:"summary" minLength:"1" doc:"What the flaw is, in your own words"`
-			Severity string `json:"severity,omitempty" enum:"critical,high,medium,low,negligible,none" doc:"How bad it is. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
+			Summary  string `json:"summary" minLength:"1" doc:"The flaw, in your own words"`
+			Severity string `json:"severity,omitempty" enum:"critical,high,medium,low,negligible,none" doc:"The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given"`
 			// The vector rather than a score. The number is derived from it
 			// here, so the two cannot say different things.
 			Vector     string   `json:"vector,omitempty" doc:"A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula"`
-			Weaknesses []string `json:"weaknesses,omitempty" doc:"What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which"`
-			Component  string   `json:"component,omitempty" doc:"What carries it. Omit for the build itself"`
-			Version    string   `json:"version,omitempty" doc:"Which one, where the build holds that name at several versions"`
-			Ecosystem  string   `json:"ecosystem,omitempty" doc:"Which one, where two share a name and a version"`
+			Weaknesses []string `json:"weaknesses,omitempty" doc:"The kind of flaw, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which"`
+			Component  string   `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
+			Version    string   `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
+			Ecosystem  string   `json:"ecosystem,omitempty" doc:"The ecosystem, where two share a name and a version"`
 			Disclosed  bool     `json:"disclosed,omitempty" doc:"Whether this is already public. Undisclosed by default"`
-			// Who told us, where somebody did. Every field is
-			// optional: a flaw found by whoever is typing has no reporter, and
-			// a form demanding one asks them to invent an answer.
-			ReportedBy string `json:"reported_by,omitempty" maxLength:"191" doc:"Who found it, as they gave their name"`
-			Contact    string `json:"contact,omitempty" maxLength:"191" doc:"How to reach them. A researcher has no account here, which is the shape of the thing"`
-			Credit     string `json:"credit,omitempty" maxLength:"191" doc:"How they wish to be credited in an advisory, where that is not the name they reported under. \"anonymous\" is a real answer"`
+			// ReportedBy is who told us, where somebody did. Every
+			// field is optional: a flaw found by whoever is typing
+			// has no reporter, and a form demanding one asks them
+			// to invent an answer.
+			ReportedBy string `json:"reported_by,omitempty" maxLength:"191" doc:"The finder, as they gave their name"`
+			Contact    string `json:"contact,omitempty" maxLength:"191" doc:"The address to reach them at. A researcher has no account here, which is the shape of the thing"`
+			Credit     string `json:"credit,omitempty" maxLength:"191" doc:"The credit they asked for in an advisory, where that is not the name they reported under. \"anonymous\" is a real answer"`
 			Received   string `json:"received,omitempty" format:"date" doc:"The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless"`
 		}
 	}) (*struct {
@@ -188,10 +191,10 @@ func registerEntry(api huma.API, in Ingest) {
 	})
 }
 
-// ResolvedBody is what came of saying a flaw is fixed.
+// ResolvedBody is the record of a flaw marked fixed.
 type ResolvedBody struct {
-	Closed int    `json:"closed" doc:"How many locations of the issue in this build were closed"`
-	At     string `json:"at" doc:"When it was closed"`
+	Closed int    `json:"closed" doc:"The number of locations of the issue in this build that closed"`
+	At     string `json:"at" doc:"The moment it closed"`
 }
 
 func registerResolution(api huma.API, in Ingest) {
@@ -202,14 +205,14 @@ func registerResolution(api huma.API, in Ingest) {
 		Summary: "Close a recorded flaw as fixed in this build",
 		Description: "Closes a flaw somebody recorded here, in one build, because it has been " +
 			"fixed there. Every location of the issue in that build is closed together.\n\n" +
-			"**Only a flaw somebody recorded.** Everywhere else, resolution is computed from " +
+			"Only a flaw somebody recorded. Everywhere else, resolution is computed from " +
 			"scans rather than declared, which is what stops a fix being reported that shipped " +
 			"in nobody's release. A flaw recorded by hand is the one case with no such " +
 			"evidence and no prospect of any — no scan reports it — so a person closes it or " +
 			"nothing does. An issue a scanner found is refused.\n\n" +
-			"**A reason is required.** A closure with no reason is a record saying somebody " +
+			"A reason is required. A closure with no reason is a record saying somebody " +
 			"closed it and nothing else.\n\n" +
-			"**Nothing reopens one.** Closing is a considered act, and this is the way it is " +
+			"Nothing reopens one. Closing is a considered act, and this is the way it is " +
 			"undone: it is not.",
 		Tags: []string{"Findings"},
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
@@ -218,7 +221,7 @@ func registerResolution(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability"`
 		Body          struct {
-			Because string `json:"because" minLength:"1" doc:"What fixed it"`
+			Because string `json:"because" minLength:"1" doc:"The fix"`
 		}
 	}) (*struct{ Body ResolvedBody }, error) {
 		subject, err := reading(ctx)
@@ -269,11 +272,11 @@ func registerDisclosure(api huma.API, in Ingest) {
 		Summary: "List what is approaching disclosure",
 		Description: "Returns findings nobody has announced whose embargo is running out, " +
 			"soonest first, and the ones whose date has already arrived.\n\n" +
-			"**Before the date, not on it.** The date arriving is the last moment to act on " +
+			"Before the date, not on it. The date arriving is the last moment to act on " +
 			"something rather than the first useful warning, and a list that only ever showed " +
 			"what was already past would be a list of decisions somebody has already failed to " +
 			"make.\n\n" +
-			"**Nothing here discloses anything.** Reaching the date escalates: the row appears " +
+			"Nothing here discloses anything. Reaching the date escalates: the row appears " +
 			"and the people who can act on it are told. Publishing embargoed detail because a " +
 			"timer expired is the wrong default — if the fix is not ready, disclosing anyway is " +
 			"a decision a person makes.\n\n" +
@@ -287,9 +290,9 @@ func registerDisclosure(api huma.API, in Ingest) {
 	}, perProduct, "A product you may not read undisclosed work in contributes "+
 		"nothing, not even a count.", privateRights()...), func(ctx context.Context, input *struct {
 		ScopeQuery
-		Within int `query:"within" minimum:"1" maximum:"365" doc:"How many days ahead to look. Left off, this deployment's own embargo length"`
+		Within int `query:"within" minimum:"1" maximum:"365" doc:"The number of days ahead to look. Left off, this deployment's own embargo length"`
 		Limit  int `query:"limit" default:"100" minimum:"1" maximum:"500"`
-		Offset int `query:"offset" minimum:"0" doc:"Where in the list to start"`
+		Offset int `query:"offset" minimum:"0" doc:"The offset into the list"`
 	}) (*listOutput[EmbargoedBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -303,10 +306,10 @@ func registerDisclosure(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		// How far ahead to look, where the caller has not said: the length
+		// The distance ahead to look, where the caller has not said: the length
 		// this deployment gives an embargo. A fixed thirty days against the
-		// ninety-day policy that ships drew an empty screen while embargoes
-		// were running, which reads as "nothing is coming".
+		// ninety-day policy that ships draws an empty screen while embargoes
+		// are running, which reads as "nothing is coming".
 		within := time.Duration(input.Within) * 24 * time.Hour
 		if input.Within == 0 {
 			within, err = setting.NewStore(in.DB.DB).Duration(ctx, setting.DiscloseAfter,
@@ -325,7 +328,7 @@ func registerDisclosure(api huma.API, in Ingest) {
 
 		now := time.Now().UTC()
 		out := &listOutput[EmbargoedBody]{}
-		// How many there are in all, so a caller holding a full page can tell
+		// The total, so a caller holding a full page can tell
 		// a clipped page from the whole list.
 		out.Body.Total = total
 		out.Body.Items = make([]EmbargoedBody, 0, len(rows))
@@ -345,8 +348,8 @@ func registerDisclosure(api huma.API, in Ingest) {
 // ExtensionBody is one time somebody moved the end of an embargo.
 type ExtensionBody struct {
 	ID            int64  `json:"id"`
-	Was           string `json:"was" doc:"Where the embargo ended before"`
-	Until         string `json:"until" doc:"Where it was asked to end"`
+	Was           string `json:"was" doc:"The embargo's previous end"`
+	Until         string `json:"until" doc:"The end that was asked for"`
 	Reason        string `json:"reason"`
 	AskedBy       string `json:"asked_by"`
 	AskedAt       string `json:"asked_at"`
@@ -364,10 +367,10 @@ type PendingExtensionBody struct {
 	ID            int64  `json:"id"`
 	Product       string `json:"product"`
 	Vulnerability string `json:"vulnerability"`
-	Was           string `json:"was" doc:"Where the embargo ends now"`
-	Until         string `json:"until" doc:"Where it is asked to end"`
-	Days          int    `json:"days" doc:"How much later that is, in days"`
-	By            string `json:"by" doc:"Who asked"`
+	Was           string `json:"was" doc:"The embargo's end now"`
+	Until         string `json:"until" doc:"The end being asked for"`
+	Days          int    `json:"days" doc:"The distance later, in days"`
+	By            string `json:"by" doc:"The person who asked"`
 	AskedAt       string `json:"asked_at"`
 	Reason        string `json:"reason"`
 	// Mine says you asked for this one, so you may not agree to it.
@@ -382,13 +385,13 @@ func registerExtensions(api huma.API, in Ingest) {
 		Summary: "Ask to move a disclosure date later",
 		Description: "Moves the end of an embargo, across every undisclosed finding of this " +
 			"issue in this product.\n\n" +
-			"**A reason is required, always**, however short the extension. One with no reason " +
+			"A reason is required, always, however short the extension. One with no reason " +
 			"is a record saying somebody moved it and nothing else.\n\n" +
-			"**Past a threshold it needs a second person**, and the threshold is measured " +
+			"Past a threshold it needs a second person, and the threshold is measured " +
 			"against everything this embargo has already been moved by rather than against " +
 			"this request alone — measured per request, the exception swallows the rule three " +
 			"weeks at a time. It is the same act a deferral is, and the same shape.\n\n" +
-			"**An extension that needs agreement moves nothing until it has it.** The request " +
+			"An extension that needs agreement moves nothing until it has it. The request " +
 			"is on record either way; `in_force` says whether the date follows it.\n\n" +
 			"A date only ever moves later. Bringing one forward is disclosing sooner, which is " +
 			"a different act.",
@@ -397,8 +400,8 @@ func registerExtensions(api huma.API, in Ingest) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 		Body          struct {
-			Until  string `json:"until" doc:"Where the embargo should end, as a date"`
-			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"Why it is being extended"`
+			Until  string `json:"until" doc:"The date the embargo should end"`
+			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"The reason it is being extended"`
 		}
 	}) (*struct {
 		Status int
@@ -467,19 +470,19 @@ func registerExtensions(api huma.API, in Ingest) {
 		Summary: "List extension requests waiting for a second person",
 		Description: "Every request to move a disclosure date that nobody has agreed to yet, " +
 			"across the products you may read undisclosed work in, newest first.\n\n" +
-			"**Until this there was nowhere to be that second person.** A request could be " +
+			"Until this there was nowhere to be that second person. A request could be " +
 			"read on the finding it belongs to and nowhere else, so the only way to find one " +
 			"was to already know it existed — which is the failure the review queue exists to " +
 			"prevent, in the one place where what is being agreed to is how long something " +
 			"stays hidden.\n\n" +
-			"**Your own requests are here too**, marked as yours. You cannot agree to one — " +
+			"Your own requests are here too, marked as yours. You cannot agree to one — " +
 			"the endpoint refuses it — but a proposer looking for what is holding a case up " +
 			"should not have their own request hidden from them.\n\n" +
 			"Agree with `POST /v1/disclosure-extensions/{id}/approval`.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Only where you may read undisclosed work."), func(ctx context.Context, input *struct {
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
-		Offset int `query:"offset" minimum:"0" doc:"Where in the list to start"`
+		Offset int `query:"offset" minimum:"0" doc:"The offset into the list"`
 	}) (*listOutput[PendingExtensionBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -494,8 +497,8 @@ func registerExtensions(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what is waiting could not be read", err)
 		}
 		out := &listOutput[PendingExtensionBody]{}
-		// How many are waiting in all, because the screen was printing the
-		// length of its own page as the number.
+		// The number waiting in all: without it a screen prints the length of
+		// its own page as the number.
 		out.Body.Total = total
 		out.Body.Items = make([]PendingExtensionBody, 0, len(rows))
 		for _, row := range rows {
@@ -608,7 +611,7 @@ func extensionBody(ctx context.Context, in Ingest, rows []finding.Extension) ([]
 	return out, nil
 }
 
-// AffectsBody is what setting the builds did.
+// AffectsBody is the record of setting the builds.
 type AffectsBody struct {
 	Added  int `json:"added" doc:"Builds it is now filed against that it was not"`
 	Closed int `json:"closed" doc:"Builds taken back out, closed as invalid because they were never affected"`
@@ -621,11 +624,11 @@ func registerAffects(api huma.API, in Ingest) {
 		Summary: "Set which builds a recorded flaw affects",
 		Description: "Makes the builds this flaw is filed against exactly the ones " +
 			"named.\n\n" +
-			"**Widening opens findings; narrowing closes them as `invalid`** — never " +
+			"Widening opens findings; narrowing closes them as `invalid` — never " +
 			"affected rather than no longer affected, so they count as no fix and appear in " +
 			"no release note. The record stays, with the reason.\n\n" +
-			"**A reason is required whenever anything is taken out.**\n\n" +
-			"**Only a flaw recorded here.** Which builds hold an issue a scanner reported is " +
+			"A reason is required whenever anything is taken out.\n\n" +
+			"Only a flaw recorded here. Which builds hold an issue a scanner reported is " +
 			"what the scans found, and this would overwrite it.\n\n" +
 			"`invalid` never means the finding exists but does not apply. That is a triage " +
 			"decision of `not-applicable` with the justification that fits.",
@@ -639,7 +642,7 @@ func registerAffects(api huma.API, in Ingest) {
 				Stream  string `json:"stream" minLength:"1"`
 				Variant string `json:"variant" minLength:"1"`
 			} `json:"builds" minItems:"1" maxItems:"200" doc:"Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding"`
-			Reason string `json:"reason,omitempty" doc:"Why any build is being taken out. Required whenever one is"`
+			Reason string `json:"reason,omitempty" doc:"The reason any build is being taken out. Required whenever one is"`
 		}
 	}) (*struct{ Body AffectsBody }, error) {
 		subject, err := reading(ctx)
@@ -651,7 +654,7 @@ func registerAffects(api huma.API, in Ingest) {
 		}
 		// The rule for a route about one named issue, which is what this is —
 		// and it is the rule the build lookup below applies. Gated on the
-		// narrower one, a single request gave both answers about the same
+		// narrower one, a single request gives both answers about the same
 		// subject and the same product: refused here as though the product did
 		// not exist, and admitted four lines later.
 		product, err := productForIssue(ctx, in, subject, input.Product)

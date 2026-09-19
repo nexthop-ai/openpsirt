@@ -31,9 +31,10 @@ func entries(rows []finding.Changed) map[string]finding.Changed {
 }
 
 func TestComparingTwoBuildsSaysWhatWentWhatCameAndWhatStayed(t *testing.T) {
-	// What a release note is drawn from. The three groups are the whole of the
-	// answer, and each fixed entry says why it went: "fixed by an upgrade" and
-	// "the component is gone" are different things to whoever reads the note.
+	// The source a release note is drawn from. The three groups are the whole
+	// of the answer, and each fixed entry says why it went: "fixed by an
+	// upgrade" and "the component is gone" are different things to whoever
+	// reads the note.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 
@@ -301,12 +302,12 @@ func TestAComparisonLeavesOutWhatIsNotDisclosed(t *testing.T) {
 		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), nil); err != nil {
 			t.Fatal(err)
 		}
-		// Why each of them closed, written directly: how a reason is derived
-		// from an inventory is the applying side's own subject and has its own
-		// tests. What is being pinned here is the counting rule — one of these
-		// was fixed, and one is a record taken back, which means the build was
-		// never affected and there is nothing to tell a customer about it. Not
-		// by name, and not as a number either.
+		// The reason each of them closed, written directly: how a reason is
+		// derived from an inventory is the applying side's own subject and has
+		// its own tests. What is being pinned here is the counting rule — one
+		// of these was fixed, and one is a record taken back, which means the
+		// build was never affected and there is nothing to tell a customer
+		// about it. Not by name, and not as a number either.
 		for _, each := range []struct {
 			issue  string
 			reason finding.Closure

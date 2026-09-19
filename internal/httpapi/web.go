@@ -30,7 +30,7 @@ type Interface struct {
 func reserved(path string) bool {
 	// Compared without regard to capitals, and against a path that has
 	// already been cleaned. Matched case-sensitively against the raw path, a
-	// request spelled with a dot segment or with different capitals was
+	// request spelled with a dot segment or with different capitals is
 	// answered with the page rather than reaching the API — a client parsing
 	// JSON then reports a parse failure rather than the 404 it is.
 	path = strings.ToLower(path)
@@ -64,9 +64,10 @@ func mountInterface(router interface {
 		// Serving a page here would answer a bad endpoint with HTML, which a
 		// client parsing JSON reports as a parse failure rather than as the
 		// 404 it is.
+		//
 		// Cleaned once, and the same cleaned value decides both questions.
 		// Tested on the raw path and resolved from the cleaned one, a path
-		// with a dot segment was answered with the page while naming
+		// with a dot segment is answered with the page while naming
 		// something the API owns.
 		asked := path.Clean(r.URL.Path)
 		if reserved(asked) {

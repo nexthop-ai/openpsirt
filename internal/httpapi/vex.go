@@ -21,9 +21,9 @@ func registerVEX(api huma.API, in Ingest) {
 			"components this build ships: every approved `not applicable` and `already fixed` " +
 			"claim, as `not_affected` and `fixed` statements with the justification and the " +
 			"reasoning somebody wrote.\n\n" +
-			"**Approved claims only**, and a deferral is absent rather than exported as " +
+			"Approved claims only, and a deferral is absent rather than exported as " +
 			"anything — silence already reads as affected in this format.\n\n" +
-			"**Public findings only.** `undisclosed=true` includes the rest for somebody who " +
+			"Public findings only. `undisclosed=true` includes the rest for somebody who " +
 			"may read them, which is a preview rather than a thing to publish.\n\n" +
 			"Requires a publisher configured for this deployment: a document naming none has " +
 			"nobody as its author.",
@@ -54,13 +54,12 @@ func registerVEX(api huma.API, in Ingest) {
 			case errors.Is(err, vex.ErrTooLarge):
 				// Something to narrow rather than something broken, and the
 				// sentence says which build and what the limit is. Answered
-				// as a fault it was a 500 reading "the document could not be
-				// generated", with the part a caller could act on in the log.
+				// as a fault it is a 500 reading "the document could not be
+				// generated", with the part a caller can act on in the log.
 				return nil, huma.Error422UnprocessableEntity(err.Error())
-			// Asked of the publisher directly. The same question had a
-			// wrapper of its own in the package that answers it, so one
-			// predicate was spelled two ways in one file — and the wrapper
-			// was the half nothing executed.
+			// Asked of the publisher directly. A wrapper of its own in the
+			// package that answers it spells one predicate two ways in one
+			// file, and the wrapper is the half nothing executes.
 			case err != nil && !in.Publisher.Stated():
 				// A configuration gap rather than a bad request, and named as
 				// one: whoever is asking cannot fix it from here, and an

@@ -7,7 +7,7 @@ import DOMPurify from "dompurify";
 // reference resolves to — still runs on the server before anything is stored,
 // because it needs data and authorization checks no browser holds.
 //
-// What is asserted about this is the *output*, not the configuration. Asking
+// The assertions are about the *output*, not the configuration. Asking
 // the allowlist whether it allows something proves only that it agrees with
 // itself.
 
@@ -155,14 +155,14 @@ const ATTACHMENT = /^attachment:([0-9a-f]{32})$/;
 // a broken reference rather than something to resolve.
 const ISSUE = /^issue:([A-Za-z][A-Za-z0-9._-]{2,63})$/;
 
-// Where an issue is read. A page of this deployment, so it keeps its href and
-// the router follows it without a reload.
+// The page an issue is read on. A page of this deployment, so it keeps its
+// href and the router follows it without a reload.
 function issuePath(identifier: string): string {
   return `/issues/${encodeURIComponent(identifier)}`;
 }
 
-// Where one is actually fetched from. Same origin, so the content security
-// policy permits it and the request carries who is asking.
+// The address one is actually fetched from. Same origin, so the content
+// security policy permits it and the request carries who is asking.
 function fetchPath(token: string): string {
   return `/v1/attachments/${token}`;
 }
@@ -206,8 +206,8 @@ function anchor(node: Element) {
   const href = node.getAttribute("href") ?? "";
   if (!SCHEMES.test(href)) {
     // A link to somewhere in this deployment keeps its href — a rewritten
-    // attachment reference among them, which is why the early return that
-    // stood above this answered nothing of its own: `/v1/attachments/x` has
+    // attachment reference among them, which is why an early return above
+    // this answers nothing of its own: `/v1/attachments/x` has
     // no scheme, so it arrives here and resolves against this page.
     //
     // One finding referring to another is ordinary, the submission check
@@ -233,7 +233,7 @@ function anchor(node: Element) {
 // Rewrites a reference to a file held here into the path it is fetched from,
 // and removes an image pointing anywhere else.
 //
-// **Before the sanitizer rather than after.** `attachment:` is a scheme
+// Before the sanitizer rather than after. `attachment:` is a scheme
 // nothing recognizes, so an attribute still carrying it when the sanitizer
 // runs is dropped as an unknown scheme — and then the rewrite would have
 // nothing to rewrite. By the time anything is judged, what is there is a
@@ -274,7 +274,7 @@ function resolve(node: Element) {
 
 // Turns bare identifiers in prose into links.
 //
-// **Text nodes only, and never inside a link or a code block.** An identifier
+// Text nodes only, and never inside a link or a code block. An identifier
 // inside somebody's own link would produce a link inside a link, which no
 // browser renders as anything sensible; inside a code span it is being shown
 // rather than referred to.

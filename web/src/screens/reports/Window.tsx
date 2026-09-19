@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 
-// How long a report sheet covers, and the words for it.
+// The window a report sheet covers, and the words for it.
 //
 // One control and one naming rule. Three sheets each had their own copy of
 // the segmented control and its own rule for what to call a number, so a
@@ -146,8 +146,8 @@ export function PeriodPicker({ period }: { period: Asked }) {
   );
 }
 
-// WindowPicker is the picker itself. It writes the choice into the address, so a
-// sheet somebody sends carries the window they were looking at.
+// WindowPicker is the picker itself. It writes the choice into the address, so
+// a sheet somebody sends carries the window they were looking at.
 export function WindowPicker({ offered, days }: { offered: readonly number[]; days: number }) {
   const [params, setParams] = useSearchParams();
   return (

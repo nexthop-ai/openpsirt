@@ -20,7 +20,7 @@ var bareAfter = regexp.MustCompile(`(?i)\b(TABLE|INDEX|CONSTRAINT|REFERENCES)\s+
 // excluded are the ones that open a table constraint, or continue the
 // declaration above, rather than naming a column.
 //
-// **Every name in the body, not only the one that opens a line.** Requiring a
+// Every name in the body, not only the one that opens a line. Requiring a
 // line start and trailing whitespace read a table declaration, where each
 // column is on its own line, and nothing else — an index body is
 // `("kind", "at")` on one line, so an unquoted column there was matched by
@@ -38,7 +38,7 @@ func TestEveryIdentifierInTheSchemaIsQuoted(t *testing.T) {
 	// built its own probe table, so it could not observe a single identifier
 	// in the schema.
 	//
-	// **Read from the database rather than from the migration source**, on the
+	// Read from the database rather than from the migration source, on the
 	// same principle as the index test beside this: what matters is the schema
 	// an operator ends up with. The source-reading gate is blind to a name
 	// built by concatenation, which is the safe direction for a check that

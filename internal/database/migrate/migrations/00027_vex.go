@@ -11,9 +11,9 @@ func init() {
 	goose.AddMigrationContext(upVex, downVex)
 }
 
-// What a VEX document says about a component we ship.
+// A VEX document's statement about a component we ship.
 //
-// **A third layer, never a decision**. A build's own claims are one
+// A third layer, never a decision. A build's own claims are one
 // layer, our decisions are another, and this is a third: what a distribution or
 // an upstream security team has said. It is shown as evidence and offered as a
 // prefill, and it is never applied to anything by itself — letting a third
@@ -21,11 +21,11 @@ func init() {
 // number we quote, which is exactly what keeping the layers apart exists to
 // prevent.
 //
-// **What it adds over the scan is the reasoning.** The status is in the fix
+// It adds the reasoning over the scan. The status is in the fix
 // state already; what a triager otherwise types from memory, and an approver
 // has no way to check, is *why* a distribution reached its answer.
 //
-// **Uploaded, not fetched**. The deployment is the thing with network
+// Uploaded, not fetched. The deployment is the thing with network
 // access to whoever publishes, not this application — the same answer the
 // scanner's vulnerability database got.
 //
@@ -86,8 +86,8 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vex_statement_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// What a finding looks one up by: the product, the issue's name and the
-		// component's. Only what still stands, which is the common read.
+		// The key a finding looks one up by: the product, the issue's name and
+		// the component's. Only what still stands, which is the common read.
 		`CREATE INDEX "vex_statement_about_idx"
 			ON "vex_statement" ("product_id", "vulnerability", "component", "superseded_at")`,
 	}

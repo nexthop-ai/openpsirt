@@ -22,17 +22,17 @@ import { Wide } from "../../ui/Wide";
 // planning meeting.
 const WINDOWS = [30, 90, 365] as const;
 
-// How many rows the sheet carries. What it is read for is the top of the list.
+// The rows the sheet carries. It is read for the top of the list.
 const SHOWN = 50;
 
-// Where the work went.
+// The work's destination.
 //
-// **Every other report here counts the backlog** — what is open, what is
+// Every other report here counts the backlog — what is open, what is
 // overdue, how long things wait. None of them says what the quarter actually
 // went into, which is the question a planning meeting asks and the one a
 // manager has to answer without any of the others.
 //
-// **Counted in claims rather than in the rows they wrote.** A claim is one
+// Counted in claims rather than in the rows they wrote. A claim is one
 // person's act; counting its rows measures how far a component fans out
 // through an image, and the component every image vendors would be the answer
 // every quarter. Both numbers are shown, because ten claims over ten places
@@ -78,7 +78,7 @@ export function Effort() {
   return (
     <Sheet
       settled={spent.isSuccess}
-      name="Where the effort went"
+      name="The destination of the effort"
       answers="what the judgments in this period were about."
       asked={coveringPeriod(period, days)}
     >
@@ -112,7 +112,7 @@ export function Effort() {
       {spent.isPending ? (
         <Loading />
       ) : spent.isError ? (
-        <Failed error={spent.error} what="Where the work went could not be read." />
+        <Failed error={spent.error} what="The destination of the work could not be read." />
       ) : rows.length === 0 ? (
         <section className="panel">
           <Empty

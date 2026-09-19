@@ -40,7 +40,7 @@ const said: Record<string, { label: string; color: string; means: string }> = {
   },
 };
 
-// What an outcome is called in a sentence, for the places that say it in
+// An outcome's name in a sentence, for the places that say it in
 // prose rather than as a chip. A word this does not know is shown as it
 // arrived: a server that grows an outcome before the interface does should
 // leave somebody reading something unfamiliar rather than a blank.
@@ -48,7 +48,7 @@ export function called(outcome?: string): string {
   return of(outcome)?.label.toLowerCase() ?? outcome ?? "";
 }
 
-// What this map says about a word, or nothing.
+// This map's entry for a word, or nothing.
 //
 // Asked through a guard rather than by indexing, because an object literal
 // inherits from the prototype: a server-supplied word that names a member of
@@ -74,9 +74,9 @@ export function labeled(outcome?: string): string {
 // The same word as a chip, with its color and its meaning.
 //
 // A word this does not know is shown as it arrived, the way the two renderers
-// above do it. Returning nothing instead drew an empty cell in five tables —
+// above do it. Returning nothing instead draws an empty cell in five tables —
 // and in those tables the outcome is the whole of the cell, so a vocabulary
-// the server grew before this did read as a judgment nobody made.
+// the server grew first reads as a judgment nobody made.
 export function Outcome({ outcome }: { outcome?: string }) {
   if (!outcome) return null;
   const it = of(outcome);

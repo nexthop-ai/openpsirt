@@ -1,7 +1,7 @@
 // Package vercmp orders two versions of one package, where the ecosystem it
 // came from defines an ordering, and refuses where it does not.
 //
-// **The refusal is the point.** A comparison that answers confidently for a
+// The refusal is the point. A comparison that answers confidently for a
 // pair it cannot actually order is worse than no comparison, because the answer
 // arrives as a recommendation somebody schedules a release around. So callers
 // get two results — the comparison, and whether it means anything — and what
@@ -136,7 +136,7 @@ func debianOrder(a, b string) (int, bool) {
 // The revision is whatever follows the *last* hyphen, because an upstream
 // version may contain one and a revision may not.
 //
-// What makes a string not a version is Debian policy's own rule: the upstream
+// A string fails to be a version by Debian policy's own rule: the upstream
 // part begins with a digit, and every part is drawn from a small set of
 // characters. A word an advisory wrote where a version belongs — "unfixed",
 // "TBD", a sentence — fails both.
@@ -329,7 +329,7 @@ func splitSemantic(v string) (release []string, pre string, ok bool) {
 	}
 	// An empty version needs no guard of its own: Split gives one empty part,
 	// which is not digits, and the loop below answers with the same nil, "",
-	// false. The branch that stood here was a second spelling of that.
+	// false. A branch here would be a second spelling of that.
 	release = strings.Split(v, ".")
 	for _, part := range release {
 		if !digits(part) {

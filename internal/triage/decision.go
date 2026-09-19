@@ -40,9 +40,10 @@ type Decision struct {
 	// itself — whose version changes every build and is excluded from expiry.
 	ComponentUpstreamVersion *string `bun:"component_upstream_version"`
 	ConsumerUpstreamVersion  *string `bun:"consumer_upstream_version"`
-	// What the claim says is on the claim: the outcome, the justification, the
-	// mitigation, the dates, the version an upgrade moves to. One act is one
-	// argument, and a copy per place is a copy that can be revised on its own.
+	// SeverityCenti is what the claim says is on the claim: the outcome,
+	// the justification, the mitigation, the dates, the version an upgrade
+	// moves to. One act is one argument, and a copy per place is a copy
+	// that can be revised on its own.
 	//
 	// SeverityCenti is how bad this was judged to be when the claim was made,
 	// in hundredths. Kept with the decision rather than read from the issue
@@ -130,11 +131,11 @@ type Approval struct {
 	// where it was carried rather than given.
 	//
 	// A re-affirmation states fresh reasoning and stands on the agreement its
-	// predecessor had. Recorded as an ordinary approval that read as the
+	// predecessor had. Recorded as an ordinary approval it reads as the
 	// earlier approver agreeing, today, to words they have never seen — which
 	// is what an approval naming one revision of the reasoning exists to make
-	// impossible. What is true is that they agreed to the earlier words, and
-	// this is what says so.
+	// impossible. What they agreed to is the earlier words, and this is the
+	// field that says so.
 	CarriedFrom *int64 `bun:"carried_from"`
 }
 
@@ -185,9 +186,9 @@ func NewStore(db bun.IDB) *Store {
 // ErrAlreadyInTransaction is returned when a write entry point is called on a
 // store that is already inside a transaction.
 //
-// One sentence rather than thirteen copies of it: every entry point here
-// asserted the handle and refused in its own words, and the copies had already
-// drifted — two of them said something else.
+// One sentence rather than thirteen copies of it: written out at every entry
+// point, the assertion refuses in its own words and the copies drift — two of
+// them say something else.
 var ErrAlreadyInTransaction = errors.New("this store is already inside a transaction")
 
 // pool is the handle a write opens its transaction on.
@@ -250,12 +251,12 @@ type Proposal struct {
 	UpgradeTo string
 	// Binding is the earliest deadline among the findings this act covers.
 	//
-	// What the commitment is gated against. Inside it, promising to act by a
-	// date is ordinary triage — the work is already allowed to stay open that
-	// long. Past it, the promise is a deferral of the worst thing the act
+	// The gate the commitment is measured against. Inside it, promising to act
+	// by a date is ordinary triage — the work is already allowed to stay open
+	// that long. Past it, the promise is a deferral of the worst thing the act
 	// covers, and a second person agrees. Computed over the whole set by the
-	// caller, because one act covering a critical and a medium is gated by
-	// the critical however many mediums are in it.
+	// caller, because one act covering a critical and a medium is gated by the
+	// critical however many mediums are in it.
 	Binding *time.Time
 	// BindingAcross is the builds the act covers, for a caller that cannot
 	// resolve the binding itself inside the transaction.
@@ -286,10 +287,10 @@ type Proposal struct {
 	FromStatement *int64
 	// NeedsApproval says a second person must agree before this takes effect.
 	//
-	// **Worked out by the store, inside the transaction that writes.** Not
+	// Worked out by the store, inside the transaction that writes. Not
 	// something whoever is proposing states: it turns on the deployment's
 	// threshold and on what this place has already been put off for, and read
-	// before the transaction opened it described a world that a retry — or a
+	// before the transaction opens it describes a world that a retry — or a
 	// policy somebody changed in between — has left behind. The acts that are
 	// gated by construction rather than by arithmetic set it themselves and
 	// say why.
@@ -350,11 +351,11 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 // connection because it has one writer — that is the whole process waiting
 // while somebody presses a button.
 //
-// Atomic for a better reason than speed. grouping as presentation only has one
-// action writing one record per place; half of them written and the rest
-// abandoned is not that, and it leaves a finding that is neither answered nor
-// open with nothing saying which places were which. The same holds across
-// builds, where one judgment covers a place in each of several.
+// Atomic for a better reason than speed. One action writes one record per
+// place; half of them written and the rest abandoned is not that, and it
+// leaves a finding that is neither answered nor open with nothing saying which
+// places were which. The same holds across builds, where one judgment covers a
+// place in each of several.
 func (s *Store) ProposeMany(ctx context.Context, subject access.Subject, proposals []Proposal,
 	cap int) ([]*Decision, error) {
 
@@ -472,8 +473,8 @@ func (s *Store) row(claim *Claim, p Proposal, now time.Time) Decision {
 // what varies per place — the versions it was made against, whether a second
 // person has to agree, how bad it was judged to be — has to come from the row
 // rather than from whoever pressed the button. What the claim *says* does not
-// vary, and nothing has ever produced a set where it did: in the measured
-// deployment every payload field was constant across every row of every claim.
+// vary, and nothing produces a set where it does: in the measured deployment
+// every payload field is constant across every row of every claim.
 //
 // Refused rather than quietly taking the first, because a set that disagrees is
 // two claims somebody meant to record as one, and recording it as one loses
@@ -529,7 +530,7 @@ func sameDay(a, b *time.Time) bool {
 // which refuses that one reason, correctly: there is nowhere for it to say
 // what stops it.
 //
-// **Two outcomes may carry one and they ask for it differently.** A claim that
+// Two outcomes may carry one and they ask for it differently. A claim that
 // mitigations already exist *is* the mitigation, so it is required there. A
 // claim that something will not be fixed is a standing property of a shipped
 // feature — a protocol that cannot change without breaking what it is
@@ -579,7 +580,7 @@ func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Valid() {
 		return fmt.Errorf("%q is not an outcome", p.Outcome)
 	}
-	// **A tag cannot be fixed.** It was built once and is what somebody
+	// A tag cannot be fixed. It was built once and is what somebody
 	// received, so an outcome that names a date is a statement about a thing
 	// that will not move: a deferral says somebody will look again when
 	// nothing will have changed, and a promise to act says work will land in a
@@ -590,7 +591,7 @@ func (p Proposal) valid(now time.Time) error {
 	// deferral's date is a review date rather than a commitment, and it is as
 	// meaningless here as the other two.
 	//
-	// What can still be said about a tag is what is true of it — affected, not
+	// A tag still takes what is true of it — affected, not
 	// applicable, will not fix, already fixed here — which is the whole point
 	// of triaging one.
 	if p.Place.OnTag && p.Outcome.Dated() {
@@ -647,7 +648,7 @@ func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Commits() && p.CommittedTo != nil {
 		return fmt.Errorf("%q promises no work, so there is no date for it to land on", p.Outcome)
 	}
-	// **A date already past is not a date.** Nothing here checked, and the two
+	// A date already past is not a date. Nothing here checked, and the two
 	// dates fail in opposite directions: a deferral until last year takes the
 	// place's live key so nobody else may decide there, suppresses nothing,
 	// and lands in the review queue already run out — a work item the tool
@@ -703,8 +704,8 @@ const versionLimit = 191
 // matched on.
 //
 // Refused here rather than left to the write, which would answer with a
-// driver's message about a column nobody reading it has heard of. **Refused
-// rather than truncated**, which is the important half: a decision keyed on a
+// driver's message about a column nobody reading it has heard of. Refused
+// rather than truncated, which is the important half: a decision keyed on a
 // shortened version would be compared against the finding's full one and match
 // nothing, so the claim would stand on the record, cover nothing, and say so
 // nowhere.
@@ -784,9 +785,9 @@ func placesOf(proposals []Proposal) []Place {
 // the read — the original refusal stands, because a message naming a decision
 // that is no longer there is worse than one naming none.
 //
-// Written four times, in three files, with the wording drifting by a word at
-// each: the same refusal read "here" from one path and "at one of these
-// places" from another for the same act on one place.
+// Written four times, in three files, the wording drifts by a word at each:
+// the same refusal reads "here" from one path and "at one of these places"
+// from another for the same act on one place.
 func (s *Store) alreadyDecided(ctx context.Context, err error, places []Place) error {
 	if !errors.Is(err, ErrAlreadyDecided) {
 		return err

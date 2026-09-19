@@ -12,17 +12,17 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
-// What became of an upload, and which run's numbers belong to it.
+// The fate of an upload, and the run whose numbers belong to it.
 //
 // None of this had a test. The runs query went from "the newest finished one"
 // to every finished one, a receipt gained the run that answered it, and both
 // design documents assert behavior that would regress with nothing saying so.
 func TestAFailedRunDoesNotPoisonTheUploadsBeforeIt(t *testing.T) {
-	// One bad night used to be permanent. The earliest run to finish after an
-	// upload was taken as the one that answered it whatever became of that
-	// run, so a scanner that fell over once made every receipt already waiting
-	// on it report that failure for ever — and the screen got steadily more
-	// wrong the longer a deployment ran.
+	// One bad night is otherwise permanent. Taking the earliest run to finish
+	// after an upload as the one that answered it, whatever became of that
+	// run, a scanner that falls over once makes every receipt already waiting
+	// on it report that failure for ever, and the screen gets steadily more
+	// wrong the longer a deployment runs.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()
 		target := quietTarget(t, s, ours)
@@ -266,10 +266,10 @@ func TestEachReceiptSaysWhatItsOwnRunWasMeasuredWith(t *testing.T) {
 }
 
 func TestARunIsAttributedToTheUploadThatArrivedLastBeforeIt(t *testing.T) {
-	// Which upload a run answers is decided by when the uploads arrived, and
+	// The upload a run answers is decided by when the uploads arrived, and
 	// identifiers are not arrival order: two uploads recorded at the same
 	// moment take their identifiers in whichever order they reach the table.
-	// Deciding it by identifier attributed a run's numbers to the older of the
+	// Decided by identifier, a run's numbers are attributed to the older of the
 	// two, and the receipt for the upload the run actually read said nothing.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()

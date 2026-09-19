@@ -15,11 +15,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// What to say when a name reaches nothing.
+// The words for a name that reaches nothing.
 //
-// One place, because there were several spellings of the same sentence and two
-// that described the wrong thing entirely — a missing person and a missing
-// credential both answered "not declared", which names neither and reads as
+// One place, because several spellings of the same sentence include two that
+// describe the wrong thing entirely — a missing person and a missing
+// credential both answering "not declared", which names neither and reads as
 // though the request were about a product.
 //
 // These are all 404, including for things somebody may not reach. A product
@@ -28,7 +28,7 @@ import (
 // somebody holding one product the name of every other, by guessing and
 // watching which guess answers differently.
 //
-// **A few refusals are 403, and they are not exceptions to that.** The rule is
+// A few refusals are 403, and they are not exceptions to that. The rule is
 // about existence: an answer that differs between "not there" and "not yours"
 // is what a guesser reads. Where a name has *already* been resolved visibly —
 // the catalog reads through VisibleProduct and answers 404 for a product
@@ -50,13 +50,13 @@ func noSuchPerson() error {
 	return huma.Error404NotFound("nobody here is called that")
 }
 
-// noSuchGrant is what withdrawing something nobody holds answers.
+// noSuchGrant is the answer to withdrawing something nobody holds.
 //
 // A 404 rather than a 200: "this grant does not exist" and "this grant has
 // been removed" are different answers, and only one of them means the caller
-// should go on to record what it did. Answered as success, the trail gained a
+// should go on to record what it did. Answered as success, the trail gains a
 // row saying a role was withdrawn that never existed, and every finding the
-// person was dealing with in that product was handed back.
+// person is dealing with in that product is handed back.
 func noSuchGrant() error {
 	return huma.Error404NotFound("they do not hold that")
 }
@@ -77,16 +77,15 @@ func noSuchIssue() error {
 	return huma.Error404NotFound("no issue is known by that name")
 }
 
-// noSuchNote is what a note that is not there answers, and what an issue this
-// product cannot reach answers, and what a name nobody has filed answers.
-// Three questions, one sentence: told apart, a note route becomes a way to
-// walk identifiers.
+// noSuchNote answers a note that is not there, an issue this product cannot
+// reach, and a name nobody has filed. Three questions, one sentence: told
+// apart, a note route becomes a way to walk identifiers.
 func noSuchNote() error {
 	return huma.Error404NotFound("no note is recorded there")
 }
 
-// noSuchRule is what a routing rule nobody declared answers, and what one
-// belonging to a product the caller cannot reach answers.
+// noSuchRule answers a routing rule nobody declared, and one belonging to a
+// product the caller cannot reach.
 func noSuchRule() error {
 	return huma.Error404NotFound("no routing rule is recorded there")
 }
@@ -146,7 +145,7 @@ func ambiguousOrMissing(err error) error {
 	// Each choice carries its ecosystem, because a version alone does not
 	// always resolve one: 13 names in a real image are held at one version by
 	// two components, a source repository and the package built from it. Left
-	// as versions alone, the refusal offered a choice that led straight back
+	// as versions alone, the refusal offers a choice that leads straight back
 	// to the same refusal.
 	var several *graph.Ambiguous
 	if errors.As(err, &several) {
@@ -158,9 +157,9 @@ func ambiguousOrMissing(err error) error {
 // severalComponents offers every way a name could be meant, and says how to
 // pick one.
 //
-// How to say which differs by where the name arrived — a query parameter for a
-// lookup, a body field for something being recorded — so the caller supplies
-// that sentence and the list is built once.
+// The way to say which one differs by where the name arrived — a query
+// parameter for a lookup, a body field for something being recorded — so the
+// caller supplies that sentence and the list is built once.
 func severalComponents(several *graph.Ambiguous, sayWith string) error {
 	detail := make([]error, 0, len(several.Choices))
 	for _, choice := range several.Choices {
@@ -180,11 +179,11 @@ func severalComponents(several *graph.Ambiguous, sayWith string) error {
 // absent turns a store error into the right answer: the caller's own 404 for a
 // row that is not there, and a fault for a read that could not be made.
 //
-// One place, because the split was being made by hand at every call site and
-// made correctly at a handful of them. Everywhere else a failed read was
-// answered as an authoritative negative — so a database nobody could reach told
-// every authenticated caller that their products, builds, issues and findings
-// did not exist, with the driver's own message in some of the bodies.
+// One place, because the split made by hand at every call site is made
+// correctly at a handful of them. Elsewhere a failed read answers as an
+// authoritative negative, so a database nobody can reach tells every
+// authenticated caller that their products, builds, issues and findings do not
+// exist, with the driver's own message in some of the bodies.
 //
 // missing is the sentence for a name that reaches nothing, passed as the
 // function rather than called, so a caller cannot build one from the error.
@@ -198,8 +197,8 @@ func absent(logger *slog.Logger, err error, reading string, missing func() error
 	// The absence sentinels, named one at a time rather than matched by
 	// shape. Each package words absence for itself, and a store that has not
 	// been given a sentinel yet must fall through to the fault arm rather than
-	// be guessed at — which is how a failed read became "that does not exist"
-	// in the first place.
+	// be guessed at — which is how a failed read turns into "that does not
+	// exist".
 	case errors.Is(err, catalog.ErrNotFound),
 		errors.Is(err, finding.ErrNoSuchIssue),
 		errors.Is(err, ingest.ErrNoScan),
@@ -218,7 +217,7 @@ func absent(logger *slog.Logger, err error, reading string, missing func() error
 // has to know what to declare, and "no product is declared by that name" does
 // not say whether the product, the branch or the variant was the problem.
 //
-// **The one place a 404 body is built from an error here.** It is reached only
+// The one place a 404 body is built from an error here. It is reached only
 // once the error is known to be the catalog's own ErrNotFound, whose message is
 // composed from the names the caller supplied and fixed words — nothing a
 // driver wrote can be in it. Everything else goes the ordinary way: a refusal
@@ -236,8 +235,8 @@ func undeclared(logger *slog.Logger, err error, reading string) error {
 // Paired with locatedVisibly rather than folded into it: catalog.VisibleProduct
 // asks whether the subject sees the product, and catalog.LocateVisible admits
 // somebody brought into a case here as well. Two deliberately different
-// contracts, and which one an endpoint wants is a security judgment — one that
-// was made by hand at every call site and invisible at all of them.
+// contracts, and which one an endpoint wants is a security judgment — made by
+// hand at every call site, it is invisible at all of them.
 func productNamedVisibly(ctx context.Context, in Ingest, subject access.Subject,
 	name string) (*catalog.Product, error) {
 
@@ -251,17 +250,16 @@ func productNamedVisibly(ctx context.Context, in Ingest, subject access.Subject,
 // productForIssue resolves a product for a route that is about one issue in
 // it.
 //
-// **The wider of the two rules here, and the pair is deliberate.** A route
-// about the product as a whole asks productNamedVisibly, which is what
-// somebody may see; a route about one named issue asks this, which admits
-// somebody brought into a case. Which of the two an endpoint wants is a
-// security judgment, and it was made by hand at every call site and visible at
-// none — including one handler that applied both in a single request, so one
-// answer about one subject and one product contradicted the other four lines
-// later.
+// The wider of the two rules here, and the pair is deliberate. A route about
+// the product as a whole asks productNamedVisibly, which is what somebody may
+// see; a route about one named issue asks this, which admits somebody brought
+// into a case. Which of the two an endpoint wants is a security judgment, and
+// made by hand at every call site it is visible at none — including one
+// handler that applies both in a single request, so one answer about one
+// subject and one product contradicts the other four lines later.
 //
-// Wider than productNamedVisibly by the case grants: somebody brought into one case
-// holds nothing on the product and may still act on the issue they were
+// Wider than productNamedVisibly by the case grants: somebody brought into one
+// case holds nothing on the product and may still act on the issue they were
 // brought in on, so refusing to resolve the product would refuse them the one
 // thing they were granted while telling them nothing they did not already
 // know. Every read past this still asks about the issue, which is where the
@@ -298,10 +296,10 @@ func locatedVisibly(ctx context.Context, in Ingest, subject access.Subject,
 // targetIDOf is the build a route is about, resolved and required to have been
 // scanned.
 //
-// The closure three report routes each carried a copy of. Kept as one function
-// so that "the names do not resolve" and "nothing has been filed here" stay
-// two answers: the first is a typo and the second is a build waiting for its
-// first scan, and a reader can act on only one of them.
+// One function rather than a closure copied into three report routes, so that
+// "the names do not resolve" and "nothing has been filed here" stay two
+// answers: the first is a typo and the second is a build waiting for its first
+// scan, and a reader can act on only one of them.
 func targetIDOf(ctx context.Context, in Ingest, subject access.Subject,
 	product, stream, variant string) (int64, error) {
 
@@ -321,7 +319,7 @@ func targetIDOf(ctx context.Context, in Ingest, subject access.Subject,
 //
 // "Nothing has been scanned there" is an answer about the build. A read that
 // could not be made does not support it, and this is the reader with the most
-// callers in the tree — nearly all of which answered 404.
+// callers in the tree — nearly all of which answer 404.
 func targetRow(ctx context.Context, in Ingest, streamID, variantID int64) (*catalog.Target, error) {
 	target, err := catalog.NewStore(in.DB.DB).ExistingTarget(ctx, streamID, variantID)
 	if err != nil {

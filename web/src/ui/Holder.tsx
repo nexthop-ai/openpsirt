@@ -6,7 +6,7 @@ import { unwrap } from "../api/queries";
 import { notACredential } from "./noautofill";
 import { useWho } from "../app/session";
 
-// Who work is being handed to: a person or a team, found by typing.
+// The party work is handed to: a person or a team, found by typing.
 //
 // Typed rather than chosen from everybody: a deployment with a hundred people
 // is a hundred options to scroll with no way to reach the one you want. The
@@ -34,15 +34,15 @@ export function Holder({
   none = "No one",
 }: {
   product: string;
-  // Which kind of work is being handed over, so the people offered are the
+  // The kind of work being handed over, so the people offered are the
   // ones who could open it.
   undisclosed?: boolean;
-  // What is held now, shown when the field is not being typed in.
+  // The present holder, shown when the field is not being typed in.
   value?: { identity: string; name?: string } | null;
   onPick: (held: Held | null) => void;
   disabled?: boolean;
   placeholder?: string;
-  // What choosing nobody is called here.
+  // The label for choosing nobody.
   none?: string;
 }) {
   const [typed, setTyped] = useState("");
@@ -50,11 +50,11 @@ export function Holder({
   const [at, setAt] = useState(-1);
   const box = useRef<HTMLDivElement>(null);
   const who = useWho();
-  // Who holds it now, which the field states rather than suggests. It was the
-  // placeholder: a held finding drew the holder's name in the grey a browser
-  // paints text nobody has typed, so work somebody had taken read as an empty
-  // box prompting for a name. While the list is open the field is a search
-  // box again, because that is what somebody is doing with it.
+  // The present holder, which the field states rather than suggests. Drawn as
+  // the placeholder, a held finding shows the holder's name in the grey a
+  // browser paints text nobody has typed, so work somebody has taken reads as
+  // an empty box prompting for a name. While the list is open the field is a
+  // search box again, because that is what somebody is doing with it.
   const holder = value?.identity ? (value.name ?? value.identity) : "";
 
   // Closing without a pick puts the field back to stating who holds it. A
@@ -131,7 +131,7 @@ export function Holder({
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
-        aria-label="Who holds this"
+        aria-label="The holder of this"
         disabled={disabled}
         placeholder={holder ? "" : placeholder}
         value={open || typed !== "" ? typed : holder}

@@ -35,7 +35,7 @@ func TestAPersonalTokenIsNarrowedWhenItIsMade(t *testing.T) {
 		if err := json.Unmarshal(listed.Body.Bytes(), &out); err != nil {
 			t.Fatalf("decode: %v (%s)", err, listed.Body.String())
 		}
-		// **The address, in the field minting resolves.** This asserted the
+		// The address, in the field minting resolves. This asserted the
 		// display name, with a comment saying an answer shows what a person
 		// reads — which is true of a field beside it and not of this one: a
 		// product declared "acme-router" and displayed "Acme Router" was

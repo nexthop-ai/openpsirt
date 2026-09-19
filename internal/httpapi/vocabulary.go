@@ -29,13 +29,13 @@ func words[T ~string](all []T) *huma.Schema {
 	return &huma.Schema{Type: huma.TypeString, Enum: offered}
 }
 
-// outcome is what somebody decided, any of them.
+// outcome is a decision's own word, any of them.
 type outcome string
 
 // Schema answers with every outcome the domain recognizes, in its order.
 func (outcome) Schema(huma.Registry) *huma.Schema { return words(triage.Outcomes()) }
 
-// outcomeOneAtATime is what one act may record against one finding.
+// outcomeOneAtATime is the outcomes one act may record against one finding.
 type outcomeOneAtATime string
 
 // Schema answers with the outcomes one act may record against one finding.
@@ -43,20 +43,20 @@ func (outcomeOneAtATime) Schema(huma.Registry) *huma.Schema {
 	return words(triage.OutcomesOneAtATime())
 }
 
-// outcomeInBulk is what one act may record against many issues.
+// outcomeInBulk is the outcomes one act may record against many issues.
 type outcomeInBulk string
 
 // Schema answers with the outcomes one act may record against many issues.
 func (outcomeInBulk) Schema(huma.Registry) *huma.Schema { return words(triage.OutcomesInBulk()) }
 
-// justification is why something does not apply.
+// justification is the reason something does not apply.
 type justification string
 
 // Schema answers with the reasons the exchange format defines.
 func (justification) Schema(huma.Registry) *huma.Schema { return words(triage.Justifications()) }
 
 // plainly is a repeatable query parameter's words as plain strings, which is
-// what the stores take.
+// the form the stores take.
 func plainly[T ~string](all []T) []string {
 	out := make([]string, 0, len(all))
 	for _, each := range all {
@@ -65,8 +65,8 @@ func plainly[T ~string](all []T) []string {
 	return out
 }
 
-// outcomeHidingRisk is what takes something out of the working queue, which is
-// what needing a second person turns on.
+// outcomeHidingRisk is the outcomes that take something out of the working
+// queue, which is what the need for a second person turns on.
 type outcomeHidingRisk string
 
 // Schema answers with the outcomes that hide risk.
@@ -74,8 +74,8 @@ func (outcomeHidingRisk) Schema(huma.Registry) *huma.Schema {
 	return words(triage.OutcomesThatHideRisk())
 }
 
-// outcomeOffered is what a publisher's statement prefills, where it prefills
-// one.
+// outcomeOffered is the outcome a publisher's statement prefills, where it
+// prefills one.
 type outcomeOffered string
 
 // Schema answers with the outcomes a statement can offer, derived from the
@@ -84,7 +84,7 @@ func (outcomeOffered) Schema(huma.Registry) *huma.Schema {
 	return words(finding.OutcomesOffered())
 }
 
-// vexStatus is what a publisher said, in the exchange format's own vocabulary.
+// vexStatus is a publisher's own word, in the exchange format's vocabulary.
 type vexStatus string
 
 // Schema answers with the statuses the format defines.
@@ -98,9 +98,9 @@ func (origin) Schema(huma.Registry) *huma.Schema { return words(finding.Origins(
 
 // role is a role somebody holds, as the access package lists them.
 //
-// Retyped beside the route it was a literal, which is the drift this file
-// exists to stop: `access.Roles` calls itself a floor rather than a ceiling, so
-// a role added there was accepted by the store and refused by the route.
+// Retyped beside the route as a literal, it is the drift this file exists to
+// stop: `access.Roles` calls itself a floor rather than a ceiling, so a role
+// added there is accepted by the store and refused by the route.
 type role string
 
 // Schema offers the roles the access package knows.

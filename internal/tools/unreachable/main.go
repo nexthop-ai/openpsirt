@@ -38,7 +38,7 @@ type decl struct {
 
 func main() {
 	var declared []decl
-	// How many times each name is written anywhere, declarations included.
+	// The number of times each name is written anywhere, declarations included.
 	// A symbol nothing reaches is written exactly once: where it is declared.
 	mentions := map[string]int{}
 	fset := token.NewFileSet()
@@ -108,7 +108,7 @@ func main() {
 
 // exportedIn is every exported name one declaration makes.
 //
-// **Types, values and constants as well as functions.** Only functions were
+// Types, values and constants as well as functions. Only functions were
 // read, so a request type registered on no operation sat fully specified and
 // unreachable — declared, documented, and in neither the OpenAPI document nor
 // the generated client, because nothing put it there. A type is exactly the

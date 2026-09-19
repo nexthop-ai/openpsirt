@@ -58,7 +58,7 @@ func TestARuleIsWrittenReadAndAppliedOnEveryEngine(t *testing.T) {
 			t.Fatalf("the rules read back as %+v", rules)
 		}
 
-		// What it would catch, before anything is placed.
+		// Its catch, before anything is placed.
 		caught, err := f.store.WouldMatch(ctx, who, f.productID, "", "libnl-3-*", 20)
 		if err != nil {
 			t.Fatal(err)

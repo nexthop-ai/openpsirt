@@ -25,7 +25,7 @@ func TestRawMarkupIsRefusedByTheParserAndNotOnlyTheSanitizer(t *testing.T) {
 		if err := parser.Convert([]byte(raw), &out); err != nil {
 			t.Fatal(err)
 		}
-		// What the parser does with it — dropping the block outright, or
+		// The parser's own handling — dropping the block outright, or
 		// escaping it inline — differs by where it appeared, and either is
 		// correct. What must not happen is it arriving as markup.
 		for _, live := range tagsIn(out.String()) {

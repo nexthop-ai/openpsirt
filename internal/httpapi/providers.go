@@ -10,8 +10,8 @@ import (
 
 // ProviderBody is one way in.
 type ProviderBody struct {
-	Name string `json:"name" doc:"What to put in the sign-in path"`
-	Path string `json:"path" doc:"Where to send the browser to start"`
+	Name string `json:"name" doc:"The segment in the sign-in path"`
+	Path string `json:"path" doc:"The address to send the browser to"`
 }
 
 func registerProviders(api huma.API, in Ingest) {
@@ -20,7 +20,7 @@ func registerProviders(api huma.API, in Ingest) {
 		Summary: "List sign-in providers",
 		Description: "Returns the sign-in providers this deployment has configured, so a " +
 			"sign-in page can offer them.\n\n" +
-			"**Answered without a credential**, because it is what somebody sees before they " +
+			"Answered without a credential, because it is what somebody sees before they " +
 			"have one. It is the only reading endpoint that is, and it reports names an " +
 			"operator configured and nothing else — no account exists or does not exist as far " +
 			"as this is concerned, which is the disclosure that would matter.",

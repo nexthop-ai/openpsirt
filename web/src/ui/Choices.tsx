@@ -4,13 +4,13 @@ import { useClickAway } from "./away";
 // Several answers to one question, as a list of checkboxes behind a control
 // that says what is ticked.
 //
-// **A dropdown holding one value could not ask what people ask.** "Undecided
+// A dropdown holding one value could not ask what people ask. "Undecided
 // or waiting" is one question — everything nobody has finished with — and a
 // select offered it as two lists to look at in turn. So is "nothing released
 // or upstream declined", which is the whole population that needs a judgment
 // rather than a version bump. Neither is expressible one word at a time.
 //
-// **What is ticked is on the control, not behind it.** A closed control that
+// The ticked values sit on the control, not behind it. A closed control that
 // says "Any" while three boxes are ticked inside it is how a narrowed list
 // comes to look like an unnarrowed one. One choice reads as itself, several
 // read as a count, and the chips above the list name each of them.
@@ -35,7 +35,7 @@ export function Choices({
   chosen: string[];
   onChange: (chosen: string[]) => void;
   disabled?: boolean;
-  // What nothing ticked is called, which differs by question.
+  // The label for nothing ticked, which differs by question.
   anything?: string;
   // Drawn without its own label, for a toolbar that names it alongside the
   // other controls rather than above them.

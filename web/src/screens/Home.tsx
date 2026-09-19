@@ -25,7 +25,7 @@ const OVERDUE_LIMIT = 200;
 // says so where the page was cut.
 const BACK_LIMIT = 200;
 
-// How far ahead "soon" looks. A fortnight is the window the deadline list
+// The distance ahead "soon" looks. A fortnight is the window the deadline list
 // itself defaults to, and it is about as far out as somebody can act on: a
 // quarter ahead is a plan rather than a week's work.
 const SOON_DAYS = 14;
@@ -47,8 +47,8 @@ function withOnly(path: string, only: string): string {
 // One home page, assembled from what this person holds. Five figures that
 // follow the scope, each with what it would say without one beside it, then the
 // work — what is pending, what is in progress, what lapsed — then the trends,
-// then the system's own state. Somebody opening this most days wants the size of
-// the day before its contents.
+// then the system's own state. Somebody opening this most days wants the size
+// of the day before its contents.
 export function Home({ who }: { who: Who }) {
   const at = useScope();
   const scope = scopeQuery(at);
@@ -167,7 +167,7 @@ export function Home({ who }: { who: Who }) {
 //
 // Drawn only where the question has an answer. It needs a whole build picked,
 // because a count across products is not a release; and it needs a branch,
-// because a tag is one frozen point and was not cut into anything. Where a
+// because a tag is one frozen point and is not cut into anything. Where a
 // branch has released nothing that has been scanned, the panel says so rather
 // than drawing zeroes — a release that shipped clean and a release nobody
 // scanned are not the same answer.
@@ -379,8 +379,8 @@ function Figures({
         }),
       ),
   });
-  // What this person is holding, and what has come back to them. **Home
-  // answered "how much is there" and never "what do I do next":** the largest
+  // This person's holdings, and what has come back to them. Home
+  // answered "how much is there" and never "what do I do next": the largest
   // number on the screen was the whole estate's open count, and the one panel
   // that could have carried her own work is deliberately everybody else's.
   // Both of these existed as endpoints and as screens one click away.
@@ -464,7 +464,7 @@ function Figures({
   const soonExploited = soon.filter((row) => row.exploited).length;
   const allRunning = allLate.data?.items ?? [];
   const allPoints = allOpen.data?.items ?? [];
-  // Whether the page in hand is the whole list. The two tiles below split one
+  // A page in hand that is the whole list. The two tiles below split one
   // read into overdue and due-soon, so neither half can be compared against
   // the cap on its own — a page that is entirely overdue would have to be a
   // full page before the test fired, and the due-soon half had no test at all.
@@ -472,7 +472,7 @@ function Figures({
   const cut = (late.data?.total ?? running.length) > running.length;
   const cutEverywhere = (allLate.data?.total ?? allRunning.length) > allRunning.length;
 
-  // What the same figure is without the scope. Nothing where no scope is
+  // The same figure without the scope. Nothing where no scope is
   // selected, because the two would be one number said twice.
   function everywhere(n: number | undefined): React.ReactNode {
     if (!widely || n === undefined) return null;
@@ -711,7 +711,7 @@ function Pending() {
   );
 }
 
-// What each person holds. Nothing lists what one person holds — only how much
+// Each person's holdings. Nothing lists one person's work — only how much
 // each person holds — so this is everybody rather than you.
 function InProgress({ me }: { me: string }) {
   const at = useScope();
@@ -932,7 +932,7 @@ function Status() {
         <h3>System status</h3>
       </header>
       {scanning.isError && (
-        <Failed error={scanning.error} what="What has been scanned could not be read." />
+        <Failed error={scanning.error} what="The scan coverage could not be read." />
       )}
       {quiet.slice(0, 3).map((build) => (
         <div className="alert" key={`${build.product}\u0000${build.stream}\u0000${build.variant}`}>

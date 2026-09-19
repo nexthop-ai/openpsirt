@@ -28,7 +28,7 @@ import { Exploited, Severity } from "../ui/Severity";
 import { PAGE, type Row } from "./list";
 import { Wide } from "../ui/Wide";
 
-// Where a component sits, as the two ends that differ between sibling rows —
+// A component's place, as the two ends that differ between sibling rows —
 // or, where the selection spans builds, which build the row is being read in.
 //
 // A chain belongs to one build's graph, so a row covering three builds is
@@ -54,7 +54,7 @@ export function Sits({ row }: { row: Row }) {
   if (!row.owner && !row.parent) {
     return <span className="hint">nothing records what pulls this in</span>;
   }
-  // Where the route up could not be walked the server sends what pulls this
+  // With no route up to walk, the server sends what pulls this
   // in and no owner above it. Rendering it as one hop rather than as an empty
   // first hop and an arrow to nowhere: what is unknown is the way up to the
   // build, and drawing that as a blank claims something worse than not knowing.
@@ -97,7 +97,7 @@ export function Sits({ row }: { row: Row }) {
   );
 }
 
-// Where the weight is, rather than what is wrong. Somebody opening a list of
+// The weight, rather than the faults. Somebody opening a list of
 // several thousand rows needs to know that one package is most of it before
 // they start reading.
 export function ByComponent({
@@ -115,12 +115,12 @@ export function ByComponent({
   offset: number;
   onHide: (component: string) => void;
   onOnly: (component: string) => void;
-  // Which order to page in. Weight by default, because where the volume is is
+  // The order to page in. Weight by default, because where the volume is is
   // the question this view answers; "which of these is worst" is the other
   // one somebody reads it for, and refusing to answer it sends them back to a
   // list of six thousand rows to find out.
   onSort: (key: string) => void;
-  // How many a page holds, so the by-component view pages the same way.
+  // The rows a page holds, so the by-component view pages the same way.
   size: number;
   onPage: (offset: number) => void;
 }) {
@@ -143,7 +143,9 @@ export function ByComponent({
 
   if (grouped.isPending) return <Loading />;
   if (grouped.isError) {
-    return <Failed error={grouped.error} what="What is open could not be read by component." />;
+    return (
+      <Failed error={grouped.error} what="The open findings could not be read by component." />
+    );
   }
 
   const rows = grouped.data?.items ?? [];
@@ -160,7 +162,7 @@ export function ByComponent({
   const most = rows[0]?.issues ?? 0;
   const asked = (query as { sort?: string }).sort ?? "";
   const worstFirst = asked === "severity";
-  // What this list is ordered by, which is not always its own default: the
+  // The order this list is in, which is not always its own default: the
   // findings list's controls carry across, and every key it offers is one
   // this view honors — read of the package rather than of one finding. Saying
   // "ordered by issue count" while the rows come back deadline-ordered is the
@@ -328,7 +330,7 @@ export function ByComponent({
   );
 }
 
-// What this view asks of the server, apart from the view that draws it.
+// The request this view makes of the server, apart from the view that draws it.
 //
 // A bump takes six of the list's filters. The rest ask about a place, a
 // deadline or an assignee, none of which a bump has. Written once because the
@@ -354,7 +356,7 @@ export function bumpQuery(
     ...(query.q ? { q: query.q } : {}),
     ...(first(query.ecosystem) ? { ecosystem: first(query.ecosystem) } : {}),
     ...(first(query.state) ? { state: first(query.state) } : {}),
-    // What each upgrade would close, which is what the line above this table
+    // The findings each upgrade closes, which is what the line above this table
     // says the order is and what somebody reads this view to decide. The
     // list's own default is worst-first, which is the findings list's
     // question asked again; the sort is not taken from the findings
@@ -371,7 +373,7 @@ export function bumpQuery(
 // reads a bump and the issues it closes. Keyed on the fold, so packages built
 // from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
 //
-// **No action column.** The view this replaces put the act in the last column,
+// No action column. The view this replaces put the act in the last column,
 // away from the thing it acts on, which is what it was deleted for. The
 // package name opens the component, where planning the upgrade lives.
 export function ByBump({
@@ -410,7 +412,7 @@ export function ByBump({
 
   if (bundles.isPending) return <Loading />;
   if (bundles.isError) {
-    return <Failed error={bundles.error} what="What is open could not be read by upgrade." />;
+    return <Failed error={bundles.error} what="The open findings could not be read by upgrade." />;
   }
   const rows = bundles.data?.items ?? [];
   const total = bundles.data?.total ?? 0;
@@ -519,11 +521,11 @@ export function ByBump({
 
 // Opening a row is where the judgment is made, not only where it is read.
 //
-// What the issue says, where it sits, and the decision form — the same form
+// The issue's own words, its place, and the decision form — the same form
 // the finding screen carries, in the same place a reader already is. Nothing
-// about what a claim requires changes: only where it is typed. A triager
-// answering a page of findings used to make two journeys per row, and the
-// list was read again on each return.
+// about what a claim requires changes: only where it is typed. Answered from
+// the finding's own screen, a page of findings is two journeys per row, with
+// the list read again on each return.
 export function Peek({
   at,
   vulnerability,
@@ -537,7 +539,7 @@ export function Peek({
   component: string;
   version: string;
   to: string;
-  // What the list does once something has been recorded here: read itself
+  // The list's own act once something has been recorded here: read itself
   // again, because the row's state has moved.
   onDecided: () => void;
 }) {
@@ -610,7 +612,7 @@ export function Pager({
   offset: number;
   total: number;
   onGo: (offset: number) => void;
-  // How many a page holds, where somebody has chosen. Fifty is 153 pages of
+  // The rows a page holds, where somebody has chosen. Fifty is 153 pages of
   // one product's findings.
   size?: number;
 }) {
@@ -637,7 +639,7 @@ export function Pager({
     </span>
   );
 }
-// Where the fix-bundle view comes from as a file.
+// The address the fix-bundle view comes from as a file.
 //
 // The same filters the table was read with, so the file and the table cannot
 // disagree about what was asked for — and a link somebody follows rather than
@@ -659,7 +661,7 @@ function bundlesFile(
   );
 }
 
-// Where the by-component view comes from as a file.
+// The address the by-component view comes from as a file.
 //
 // Built here rather than by the generated client because it is a link
 // somebody follows, not a request this page makes: the browser fetches it with

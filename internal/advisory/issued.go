@@ -28,7 +28,7 @@ type Went struct {
 // Published is what has gone out, newest first, across every flaw a reader may
 // see.
 //
-// **Answered per flaw until now**, which is the right shape for somebody
+// Answered per flaw until now, which is the right shape for somebody
 // deciding whether to publish a revision and the wrong one for the question a
 // period asks: what went out, and what went out twice.
 //

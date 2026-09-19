@@ -13,14 +13,14 @@ func init() {
 
 // A team: a named set of people that holds work.
 //
-// **A team holds work and grants nothing**: no role, no visibility, no
+// A team holds work and grants nothing: no role, no visibility, no
 // capability. That is what lets one carry mixed clearance, which is the
 // ordinary arrangement rather than a misconfiguration — a kernel team where two
 // members may read undisclosed work and four may not. A team that granted
 // anything would make routing work to it an access decision, and a queue could
 // then only be built out of people who all see the same things.
 //
-// **It is assignable as a party**, the name space it shares with a person, so
+// It is assignable as a party, the name space it shares with a person, so
 // that assignment points at either through the column it already has.
 // The party table is created with the person table, where the reasoning for it
 // is written down.
@@ -55,7 +55,7 @@ func upTeam(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "team_party_fk" FOREIGN KEY ("party_id") REFERENCES "party"("id")
 		)` + t.suffix,
 
-		// Who is on a team. Membership says nothing about what anybody may
+		// Team membership. It says nothing about what anybody may
 		// read: it says where their work arrives.
 		`CREATE TABLE "team_member" (
 			"team_id"   ` + t.ref + ` NOT NULL,
@@ -68,7 +68,7 @@ func upTeam(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "team_member_added_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// Which teams somebody is on, which is asked on every request that
+		// The teams somebody is on, asked on every request that
 		// resolves a subject and on every list narrowed to "mine".
 		`CREATE INDEX "team_member_person_idx" ON "team_member" ("person_id")`,
 	}

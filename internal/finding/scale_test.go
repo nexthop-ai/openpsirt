@@ -1,6 +1,6 @@
 //go:build measure
 
-// What a year of nightly scans does to this, measured rather than assumed.
+// A year of nightly scans against this, measured rather than assumed.
 //
 // `REQUIREMENTS.md` §4 records the gap: scan files are deleted once read and the
 // interval storage was shaped so that a rebuild changing nothing writes
@@ -98,7 +98,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		who := access.NewPerson(1, "a reader", false,
 			map[int64][]access.Role{product.ID: {access.PrivateRead}}, 0)
 
-		// What a night costs in *statements*, not only in seconds.
+		// A night's cost in statements, not only in seconds.
 		//
 		// The engine gap this measures — MySQL a night several times more
 		// expensive than PostgreSQL's, and barely moving when the churn was
@@ -175,9 +175,9 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 
 		// Then a year of them. A component whose version moves closes every
 		// finding at it and opens the same number again, which is the whole of
-		// what a quiet night costs.
-		// What each component is at, carried forward. A bump is permanent: a
-		// package that moved to 1.5 does not go back to 1.0 tomorrow.
+		// what a quiet night costs. Each component's version, carried forward.
+		// A bump is permanent: a package that moved to 1.5 does not go back to
+		// 1.0 tomorrow.
 		//
 		// The first version of this slid a window and left everything outside
 		// it at 1.0, so last night's components reverted — fourteen identities
@@ -337,11 +337,11 @@ func timed(t *testing.T, ctx context.Context, store *finding.Store,
 	}
 	out := time.Since(start)
 
-	// What one bump would close, which is the screen a person works down.
-	// Measured slow on a real deployment at 2.2 s, which is why it is here:
-	// the group is over every open fixable row of every build in scope, and
-	// what a page costs is a question about the whole set rather than about
-	// the fifty rows it answers with.
+	// The findings one bump would close, which is the screen a person works
+	// down. Measured slow on a real deployment at 2.2 s, which is why it is
+	// here: the group is over every open fixable row of every build in scope,
+	// and what a page costs is a question about the whole set rather than
+	// about the fifty rows it answers with.
 	start = time.Now()
 	bumps, bundles, err := store.Bundles(ctx, who, scope, 50, 0, finding.Filter{})
 	if err != nil {
@@ -501,7 +501,7 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 	})
 }
 
-// What the first scan after the deadline rule changed costs.
+// The cost of the first scan after the deadline rule changed.
 //
 // The rule moved the recount from "the ranking moved" to "the answer moved",
 // and a fix arriving upstream moves the answer without touching any ranking
@@ -609,8 +609,8 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 		// between the two is what the rule change costs once, rather than what
 		// a night costs for ever.
 		//
-		// **It is not zero on every engine, and that is not this rule's
-		// doing.** SQLite writes nothing; PostgreSQL and MySQL rewrite every
+		// It is not zero on every engine, and that is not this rule's
+		// doing. SQLite writes nothing; PostgreSQL and MySQL rewrite every
 		// fixable row again, and the same measurement taken before this rule
 		// existed says the same thing. What a re-scan of unchanged data writes
 		// is a question about how a timestamp survives a round trip on each

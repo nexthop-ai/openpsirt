@@ -305,7 +305,7 @@ func (a *Ambiguous) Is(target error) bool { return target == ErrAmbiguous }
 // ComponentVersionAt resolves a component by name and, where one is given,
 // version.
 //
-// **A name is not unique within a build**, and not rarely. This was written
+// A name is not unique within a build, and not rarely. This was written
 // assuming it nearly always was, resolving a collision by taking the lowest
 // identifier — stable between requests, which was the property being protected.
 // A real switch image then shipped three vendored versions of one library, and
@@ -422,11 +422,12 @@ type Neighbor struct {
 	// Purl is the package identifier, which is where the kind of package it is
 	// comes from.
 	//
-	// **What tells two components of one name and one version apart.** A build
-	// ships `opennsl-modules` twice at 15.2.0.0.0.0.0.0, and asking about
-	// either by name is refused — rightly, since they are two components — so
-	// a screen listing them without this could name neither. The refusal even
-	// says which field to send, and nothing offering the choice was saying it.
+	// The field that tells two components of one name and one version apart. A
+	// build ships `opennsl-modules` twice at 15.2.0.0.0.0.0.0, and asking
+	// about either by name is refused — rightly, since they are two components
+	// — so a screen listing them without this could name neither. The refusal
+	// even says which field to send, and nothing offering the choice was
+	// saying it.
 	//
 	// Carried as the identifier rather than as the word, and turned into the
 	// word by the one function that knows how, where every other reader of a
@@ -474,7 +475,7 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 	if err != nil {
 		return nil, nil, err
 	}
-	// What is beneath each neighbor, both directions in one statement.
+	// Everything beneath each neighbor, both directions in one statement.
 	if err := s.filled(ctx, productID, targetID, readable, above, below); err != nil {
 		return nil, nil, err
 	}
@@ -488,7 +489,7 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 // filled writes what is open beneath each of these rows, in one statement
 // for all of them however many lists they arrive in.
 //
-// What is in each of them, not only what is on it. A container holds no
+// The contents of each of them, not only what is on it. A container holds no
 // findings of its own, so without this every one of them reads zero while
 // the packages inside hold thousands — and a tree whose counts cannot tell a
 // full branch from an empty one is not something anybody can descend by.
@@ -642,12 +643,11 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
-		// What is open against it here, so descending follows the findings
-		// rather than being exploration.
-		// Narrowed like every other count. Without this a reader browsing the
-		// tree gets an accurate count of the undisclosed findings under each
-		// component and can bisect down to which one holds them — a leak that
-		// needs no row to be shown.
+		// Everything open against it here, so descending follows the findings
+		// rather than being exploration. Narrowed like every other count.
+		// Without this a reader browsing the tree gets an accurate count of
+		// the undisclosed findings under each component and can bisect down to
+		// which one holds them — a leak that needs no row to be shown.
 		//
 		// Counted once for the build and joined, like the children below,
 		// rather than asked per row. As a correlated subquery this had two
@@ -661,7 +661,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 			WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
 			GROUP BY f.component_id) AS "open" ON open.cid = c.id`, targetID, bun.List(readable)).
 		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`).
-		// Whether anything is under it, so a node that opens can be told from
+		// Anything under it, so a node that opens can be told from
 		// one that does not before somebody clicks it.
 		//
 		// Counted once for the whole build and joined, rather than asked per
@@ -682,8 +682,8 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		// the rule strictly will not take a column from a joined subquery on
 		// the strength of a primary key belonging to a different table.
 		GroupExpr("c.id, c.name, c.version, kids.n, open.n").
-		// What opens comes before what does not, and within each the most
-		// findings first.
+		// Anything that opens comes before anything that does not, and within
+		// each the most findings first.
 		//
 		// Ordering by findings alone buries the structure: a container holds
 		// no findings of its own, so on a real image the root's 5,270
@@ -705,13 +705,13 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 // ordered puts a list of neighbors in the order somebody reads it: what opens
 // first, and within each group the most findings first.
 //
-// **The number a row is ranked on is the number that describes it**: for a
+// The number a row is ranked on is the number that describes it: for a
 // branch, everything open beneath it, and for a leaf, its own count — which
 // for a leaf are the same number anyway. A container holds nothing of its own,
 // so ranking it on that put every container at zero and the list fell back to
 // alphabetical, which is what it looked like.
 //
-// **What opens still comes before what does not.** A container holds no
+// A node that opens still comes before one that does not. A container holds no
 // findings of its own, and on a real image the root's 5,270 children put the
 // first thing that opens at position 546 when structure was not held above
 // contents. A tree whose first screen contains no branches is a list, and the

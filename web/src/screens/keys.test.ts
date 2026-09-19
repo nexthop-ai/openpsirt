@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { activates, meansFor, moved, typingIn } from "./keys";
 
-// What a key means over a list of findings, and — the part worth pinning —
+// A key's meaning over a list of findings, and — the part worth pinning —
 // when it means nothing. A triager typing "j" into a justification does not
 // mean "next row", and a key that fired anyway would move the list out from
 // under the form they were filling in.

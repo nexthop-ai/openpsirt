@@ -15,10 +15,10 @@ import (
 
 // registerRetained reads back a document a build sent.
 //
-// **Retaining it was the point.** A tag's documents are kept precisely so a
-// release can be re-scanned later, and nothing returned one — so
-// "send me the SBOM you scanned for v2.4" was answered from the build system,
-// which is the copy that may have moved since.
+// Retaining it is the point. A tag's documents are kept precisely so a release
+// can be re-scanned later, and without a route that returns one the inventory
+// a release was scanned against is answered from the build system, which is
+// the copy that may have moved since.
 func registerRetained(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "fetch-scan-document", Method: http.MethodGet,
@@ -28,11 +28,11 @@ func registerRetained(api huma.API, in Ingest) {
 		Description: "Returns the bytes as they arrived, byte for byte: the hash on the receipt " +
 			"is over what comes back from here, so a copy can be checked against what was " +
 			"actually read.\n\n" +
-			"**A tagged release keeps its documents and a branch build does not.** A nightly " +
+			"A tagged release keeps its documents and a branch build does not. A nightly " +
 			"build's contents are let go once they have been read, because keeping them costs " +
 			"storage that grows with the calendar; a tag's are kept because re-scanning it " +
 			"years from now needs both what it contained and what the build had already argued " +
-			"about its own patches. One that was let go answers **410**, which says the bytes " +
+			"about its own patches. One that was let go answers 410, which says the bytes " +
 			"went on purpose — the record of what arrived is still on the receipt.\n\n" +
 			"Named through the scan it belongs to rather than on its own, so whoever may read " +
 			"the receipt may read what it describes and there is one rule rather than two.",
@@ -42,7 +42,7 @@ func registerRetained(api huma.API, in Ingest) {
 		Stream   string `path:"stream"`
 		Variant  string `path:"variant"`
 		Scan     int64  `path:"scan" doc:"The upload, as the receipt names it"`
-		Document int64  `path:"document" doc:"Which of its documents, as the receipt names it"`
+		Document int64  `path:"document" doc:"The document, as the receipt names it"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := requester(ctx)
 		if err != nil {

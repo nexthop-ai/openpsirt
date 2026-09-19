@@ -45,11 +45,11 @@ func upJob(ctx context.Context, tx *sql.Tx) error {
 		// belonging to another would lock and skip them on every poll.
 		`CREATE INDEX "job_runnable_idx" ON "job" ("kind", "state", "run_after", "id")`,
 
-		// What an operator opens because the queue has gone wrong. It filters
-		// on state and orders by when the row last moved, and the index above
-		// leads with the kind, which this query does not name — so without
-		// this it scans every job the deployment has ever run, and nothing
-		// deletes a finished one.
+		// The screen an operator opens because the queue has gone wrong. It
+		// filters on state and orders by when the row last moved, and the
+		// index above leads with the kind, which this query does not name — so
+		// without this it scans every job the deployment has ever run, and
+		// nothing deletes a finished one.
 		`CREATE INDEX "job_set_aside_idx" ON "job" ("state", "updated_at", "id")`,
 	}
 

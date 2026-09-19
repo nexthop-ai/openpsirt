@@ -2,7 +2,7 @@ package finding
 
 // Reading findings back, and the naming layer every other read here shares.
 //
-// What is left after the filter, the page and the component view moved to
+// The remainder, after the filter, the page and the component view moved to
 // files of their own: the whole-target read, which product a target belongs
 // to, and the two lookups that turn identifiers into names. The narrowing is
 // in narrow.go, the page in groups.go, and what is open at one component in
@@ -27,7 +27,7 @@ import (
 // and the thing being forgotten is not a blank screen — it is somebody seeing
 // an issue that has not been disclosed.
 //
-// Which product the target belongs to is read here too, rather than accepted
+// The product the target belongs to is read here too, rather than accepted
 // from the caller. A caller that could name the product could name a different
 // one, and then the check would be answering a question nobody asked.
 func (s *Store) Open(ctx context.Context, subject access.Subject, targetID int64) ([]Finding, error) {

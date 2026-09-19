@@ -1,21 +1,21 @@
 // Package vex writes what we have decided about the third-party components a
 // build ships, in the format a customer's own scanner reads.
 //
-// **This is the document third-party components belong in.** Advisories are
+// This is the document third-party components belong in. Advisories are
 // about flaws in our own product and are not issued for known CVEs in
 // dependencies — but a customer running a scanner against a shipped
 // image gets a list of those CVEs and asks what we say about them, which is
 // more often than they ask for an advisory. "We ship openssl 3.5.6, this CVE,
 // not affected, vulnerable code not present" is exactly a VEX statement.
 //
-// **It is mostly formatting over decisions already made and approved.** Every
-// "not applicable" claim already carries the VEX vocabulary, so the
-// justification needs no translation. What makes it safe to publish is the
-// approval that was already required: generating this puts our dismissals in
-// writing, machine-readable, in front of every customer, which is the feature
-// and the risk in one sentence.
+// It is mostly formatting over decisions already made and approved. Every
+// "not applicable" claim carries the VEX vocabulary, so the justification
+// needs no translation. What makes it safe to publish is the approval the
+// claim already required: generating this puts our dismissals in writing,
+// machine-readable, in front of every customer, which is the feature and the
+// risk in one sentence.
 //
-// **OpenVEX rather than CSAF-VEX**, because it is the format this deployment
+// OpenVEX rather than CSAF-VEX, because it is the format this deployment
 // already reads: a document we write and a document we read being the
 // same format is what lets one deployment's output be another's input, and
 // what keeps one shape to get right rather than two.
@@ -46,7 +46,7 @@ const namespace = "https://openvex.dev/ns/v0.2.0"
 //
 // Named rather than answered as a fault, because it is something the caller
 // can act on: narrow to a variant, or ask about a build that argues less. A
-// bare error reached the route as "the document could not be generated" with a
+// bare error reaches the route as "the document could not be generated" with a
 // 500, which reads as the tool being broken.
 var ErrTooLarge = errors.New("more dismissals than one document carries")
 
@@ -154,24 +154,23 @@ func (s *Store) carrying() int {
 
 // For writes the document for one build.
 //
-// **Approved claims only.** A proposal is one person's opinion and this
+// Approved claims only. A proposal is one person's opinion and this
 // document is the deployment's word to a customer — the two-person rule is
 // what makes publishing a dismissal safe, and a document carrying unapproved
 // ones would route around it.
 //
-// **Public findings only.** Every statement names an issue and a component in
+// Public findings only. Every statement names an issue and a component in
 // something we ship, so a document built from undisclosed work would announce
 // the undisclosed work. `undisclosed` includes them for somebody who may read
 // them, which is a preview rather than a thing to publish, and it is refused
 // for anybody who may not.
 //
-// **Two statuses, and silence for everything else.** `not_affected` and
-// `fixed` are what a generated VEX document names, and they are the two a
-// customer's scanner can act on. A deferral is deliberately absent rather than
-// exported as anything: a deferred item exports as affected and never as
-// not-affected, and silence already reads as
-// affected in this format, which is the honest answer for something we have
-// only postponed.
+// Two statuses, and silence for everything else. `not_affected` and `fixed`
+// are what a generated VEX document names, and they are the two a customer's
+// scanner can act on. A deferral is deliberately absent rather than exported
+// as anything: a deferred item exports as affected and never as not-affected,
+// and silence already reads as affected in this format, which is the honest
+// answer for something we have only postponed.
 func (s *Store) For(ctx context.Context, subject access.Subject, publisher publisher.Named,
 	product, stream, variant string, undisclosed bool) (*Statements, error) {
 
@@ -254,7 +253,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// Safe as an aggregate, because the grouping below refuses a component
 		// whose places disagree about the outcome.
 		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
-		// Which decision the words come from, rather than the words.
+		// The decision the words come from, rather than the words.
 		//
 		// The earliest of them, which is the claim that has stood longest
 		// about this component: where several places were decided separately
@@ -263,7 +262,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// identifier is assigned when it is written, so the lowest is the
 		// first written.
 		//
-		// **Read off one decision rather than taken column by column.** Three
+		// Read off one decision rather than taken column by column. Three
 		// independent minima are three answers from three claims: a category
 		// from one, the prose explaining a different reason from another, and
 		// a timestamp from a third — published, machine-readable, to every
@@ -287,10 +286,10 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		GroupExpr("v.id, v.identifier, c.name, c.purl").
 		// Every open place agreed, and agreed the same way. The join is left,
 		// so a place nobody has dismissed contributes a row with no decision:
-		// counting them is how "all of them" is asked. One dismissal at one
-		// place used to speak for a component open at forty-four others — a
-		// machine-readable "not affected" about something that is affected,
-		// published to every customer running a scanner.
+		// counting them is how "all of them" is asked. Without it, one
+		// dismissal at one place speaks for a component open at forty-four
+		// others — a machine-readable "not affected" about something that is
+		// affected, published to every customer running a scanner.
 		Having("COUNT(cl.id) = COUNT(*)").
 		Having("COUNT(DISTINCT cl.outcome) = 1").
 		// One more than the ceiling, so that reaching it is distinguishable
@@ -344,7 +343,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		Timestamp: moment, Version: 1,
 		Statements: make([]Statement, 0, len(rows)),
 	}
-	// What else each issue is called. The whole point of the field is that
+	// The other names each issue goes by. The whole point of the field is that
 	// a customer's scanner matched under the name *its* database uses,
 	// which is often not the one we filed under — a later CVE for a flaw
 	// first reported under a vendor identifier, or the reverse. A document
@@ -395,8 +394,8 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	}
 
 	// Ordered here rather than by the engine, so the document is byte-for-byte
-	// the same whatever it was generated against — which is what lets somebody
-	// diff two of them and see a real change rather than a reordering.
+	// the same whatever engine generated it, which is what lets somebody diff
+	// two of them and see a real change rather than a reordering.
 	sort.Slice(doc.Statements, func(i, j int) bool {
 		a, b := doc.Statements[i], doc.Statements[j]
 		if a.Vulnerability.Name != b.Vulnerability.Name {
@@ -484,7 +483,7 @@ type words struct {
 // moment have to come from the same claim, or the document says one thing in
 // the field a machine reads and another in the field a person does.
 //
-// **The reasoning is not read here at all.** It is written for a second person
+// The reasoning is not read here at all. It is written for a second person
 // inside this deployment, and the surest way for it not to be published is for
 // the query that builds the document never to fetch it.
 func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words, error) {

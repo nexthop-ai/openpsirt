@@ -25,9 +25,9 @@ import { useWho } from "../app/session";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 
-// How a product's two spellings are compared: a name people type is matched
-// without regard to capitals, which is the rule the server applies to the
-// identifier and the displayed name alike.
+// The comparison between a product's two spellings: a name people type is
+// matched without regard to capitals, which is the rule the server applies to
+// the identifier and the displayed name alike.
 function same(name?: string): string {
   return (name ?? "").toLowerCase();
 }
@@ -71,8 +71,8 @@ export function Claim({ who }: { who: Who }) {
   // label anybody can be given — which hid the Agree panel from somebody
   // entitled to approve and showed Hold back to somebody who did not propose.
   const mine = it.claim.proposed_by === who.identity;
-  // What a file is attached to. Both halves have to be known: the issue says
-  // which, and the product says whose, because the same identifier in two
+  // The thing a file is attached to. Both halves have to be known: the issue
+  // says which, and the product says whose, because the same identifier in two
   // products is two pieces of work with two sets of readers.
   const about = { product: it.place.product, vulnerability: it.place.vulnerability };
   const again = () => void queries.invalidateQueries({ queryKey: ["claim", id] });
@@ -124,13 +124,13 @@ export function Claim({ who }: { who: Who }) {
   );
 }
 
-// What the claim says, where it lands, and what it covers now.
+// The claim's argument, its landing place, and its present reach.
 function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChanged: () => void }) {
   const bulk = claim.issues > 1;
   return (
     <div className={`card standing ${stripe(claim.happened)}`}>
       <header className="dhead">
-        <h3>What was decided</h3>
+        <h3>The decision</h3>
         <Happened word={claim.happened} by={claim.by} />
       </header>
       {claim.happened === "sent-back" && (
@@ -184,7 +184,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
               the binaries that fold holds and the things that pull them in —
               never a place count, which is a unit nobody acts in and a reader
               cannot reconcile with anything else on the screen. */}
-          <span className="l">What it covers now</span>
+          <span className="l">Present reach</span>
           <span className="v" title={`${claim.places} written at, ${claim.findings} findings`}>
             {bulk ? (
               <>
@@ -310,7 +310,7 @@ function Reaffirm({
       <textarea
         rows={3}
         value={reasoning}
-        placeholder="Why it still holds, having checked again"
+        placeholder="The reason it still holds, having checked again"
         onChange={(event) => setReasoning(event.target.value)}
       />
       <div className="actions" style={{ marginTop: 10 }}>
@@ -335,7 +335,7 @@ function Reaffirm({
   );
 }
 
-// Where this is being argued about or worked on outside here.
+// The place this is being argued about or worked on outside here.
 //
 // Anybody who may argue about the claim may set it: a link is a note about
 // where the conversation is rather than a judgment, and needing a second
@@ -371,7 +371,7 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
         className="linkish"
         onClick={() => {
           const to = window.prompt(
-            "Where is this being worked on? A ticket, a thread, a change. Nothing is ever sent to it.",
+            "The place this is being worked on: a ticket, a thread, a change. Nothing is ever sent to it.",
             where,
           );
           if (to !== null) point.mutate(to.trim());
@@ -387,7 +387,7 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
 // The reasoning as it stands, and the two acts anybody who may argue about it
 // has.
 //
-// **Not the author's alone.** The server asks whether the subject may decide
+// Not the author's alone. The server asks whether the subject may decide
 // about each row of the claim and nothing about who wrote it, which is what
 // the act-and-needs table says: propose, revise and withdraw all ask for
 // triage on the product at the finding's visibility. Gated on authorship
@@ -425,7 +425,7 @@ function Reasoning({
   );
 }
 
-// What a second person may do about this claim.
+// The acts a second person may perform on this claim.
 //
 // Absent for the proposer, whatever they hold: the control this rests on is
 // that a second person agrees, and offering somebody a button that would
@@ -493,7 +493,7 @@ function Answer({
           <Editor
             value={because}
             onChange={setBecause}
-            placeholder="What you need before you would agree."
+            placeholder="The evidence you need before you would agree."
           />
           <div className="actions" style={{ marginTop: 8 }}>
             <button
@@ -593,7 +593,12 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
           {split.error != null && (
             <Failed error={split.error} what="Those rows could not be held back." />
           )}
-          <Editor value={because} onChange={setBecause} label="Why these are different" rows={2} />
+          <Editor
+            value={because}
+            onChange={setBecause}
+            label="The reason these are different"
+            rows={2}
+          />
           <div className="actions" style={{ marginTop: 8 }}>
             <button
               type="button"

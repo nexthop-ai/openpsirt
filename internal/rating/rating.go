@@ -62,7 +62,7 @@ var Here = For(onBound)
 // briefly two rules reading the same fact and they disagreed: the deadline
 // treats an unrated issue as a medium, on the grounds that unknown is not
 // harmless, while the line was treating it as below everything. On a real
-// image that was **91,040 findings rated "unknown"** dropping out of the
+// image that was 91,040 findings rated "unknown" dropping out of the
 // working list *and* off any clock, which is the opposite of what an unknown
 // rating should cause. Every bug in this project's identity and expiry rules
 // came from letting one fact into two rules; this is that lesson arriving in a

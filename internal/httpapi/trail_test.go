@@ -391,10 +391,10 @@ var outsideTheTrail = map[string]string{
 // TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot walks the document
 // the server builds and fails on a write that nobody has classified.
 //
-// This is the half that catches the next route rather than the last one. What
-// it replaced was a comment at internal/httpapi/trail.go claiming a test walks
-// the routes, beside a literal of twelve acts that walked nothing — and nine
-// administrative writes recording nothing, with the suite green.
+// This is the half that catches the next route rather than the last one. A
+// literal of twelve acts walks nothing, whatever the comment at
+// internal/httpapi/trail.go claims, and leaves nine administrative writes
+// recording nothing with the suite green.
 func TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		trailed := map[string]bool{}
@@ -512,7 +512,7 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 			}
 		}
 
-		// What it held before is kept, because "who raised the floor to
+		// The prior value is kept, because "who raised the floor to
 		// critical" is half the question and the other half is what it was.
 		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
 			`{"value":"critical"}`); got.Code >= 300 {
@@ -589,9 +589,9 @@ func TestTheTrailIsAnAdministratorsToRead(t *testing.T) {
 // TestAChangeThatCannotBeRecordedIsNotMade pins the act and its record as one
 // transaction.
 //
-// The record used to be written after the change and its failure logged, so a
-// setting could move with nothing saying who moved it — the state REQ-22 says
-// the record exists to prevent, reachable without anybody attacking anything.
+// Written after the change with its failure logged, the record lets a setting
+// move with nothing saying who moved it — the state REQ-22 says the record
+// exists to prevent, reachable without anybody attacking anything.
 //
 // The trail table is taken away for the length of the act, which is the one
 // way to make the record fail without making the change fail first.

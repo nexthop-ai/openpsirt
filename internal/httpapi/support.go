@@ -26,12 +26,12 @@ type RetiredBody struct {
 	// date and one that stated the same date are different: only the first
 	// moves when the product changes its mind.
 	Inherited bool `json:"inherited,omitempty" doc:"The date came from the product rather than from this release"`
-	// EndedDays is how long ago that was, which is what orders a pile nobody
-	// has looked at in two years below one that ended last month.
+	// EndedDays is the interval since, which orders a pile nobody has looked
+	// at in two years below one that ended last month.
 	//
 	// Negative on a release whose date has not arrived: the same figure read
 	// the other way, which is how long there is left.
-	EndedDays int `json:"ended_days" doc:"How many days ago support ended. Negative where the date has not arrived, which is how many days are left"`
+	EndedDays int `json:"ended_days" doc:"The days since support ended. Negative where the date has not arrived, which is how many days are left"`
 	Open      int `json:"open" doc:"Issues open against it, counted at components rather than at every place they sit"`
 	// Ended says the date has passed. The two populations are drawn apart
 	// rather than sorted together, because one is exposure nobody can work on
@@ -42,15 +42,15 @@ type RetiredBody struct {
 // registerOutOfSupport answers which releases have gone out of support and
 // what is still open on them.
 //
-// **This is the pile that dropped out of every deadline figure by design.**
-// Past end-of-life the deadline is stripped from every open finding, so none
+// This is the pile that drops out of every deadline figure by design. Past
+// end-of-life the deadline is stripped from every open finding, so none
 // of this is overdue, none of it is due soon, and none of it appears in any
 // count built on either. That is the right behavior — nothing will be fixed
 // there — and it means the only way to see the exposure is to ask for it.
 //
 // It is not a coverage question and not a compliance one. A release out of
-// support going quiet is expected, and work on it is not late; what somebody
-// is asking is what is still shipped and no longer maintained.
+// support going quiet is expected, and work on it is not late; the question is
+// what is still shipped and no longer maintained.
 func registerOutOfSupport(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-out-of-support", Method: http.MethodGet,
@@ -65,7 +65,7 @@ func registerOutOfSupport(api huma.API, in Ingest) {
 			"`inherited` means the date came from the product rather than from the release " +
 			"itself. `open` counts issues at components, not one per place — the same unit " +
 			"every release-level count here uses.\n\n" +
-			"**`within` asks what is about to go**, in days ahead. Those come back under " +
+			"`within` asks what is about to go, in days ahead. Those come back under " +
 			"`ending`, soonest first and never mixed into what has already gone: the day a " +
 			"release crosses, the deadline comes off every open finding on it and that work " +
 			"leaves every overdue count at once, so a warning and an exposure are two lists " +
@@ -166,16 +166,16 @@ func registerOutOfSupport(api huma.API, in Ingest) {
 type retiredOutput struct {
 	Body struct {
 		Items []RetiredBody `json:"items"`
-		Total int           `json:"total" doc:"How many releases are out of support"`
+		Total int           `json:"total" doc:"The number of releases out of support"`
 		Open  int           `json:"open" doc:"Issues open across all of them"`
-		// Ending is what has not gone yet, kept apart rather than mixed in.
-		// The day a release crosses, the deadline comes off every open
-		// finding on it and the work leaves every overdue count at once —
-		// so the two are a warning and an exposure, and reading them as one
-		// list is how the warning is missed.
+		// Ending is the releases that have not crossed yet, kept apart rather
+		// than mixed in. The day a release crosses, the deadline comes off
+		// every open finding on it and the work leaves every overdue count at
+		// once — so the two are a warning and an exposure, and reading them as
+		// one list is how the warning is missed.
 		Ending     []RetiredBody `json:"ending" doc:"Releases whose date has not arrived yet, soonest first. Empty unless within was asked for"`
 		EndingOpen int           `json:"ending_open" doc:"Issues open across those, which is what leaves every overdue count on the day they cross"`
-		Within     int           `json:"within" doc:"How many days ahead this looked"`
+		Within     int           `json:"within" doc:"The days ahead this looked"`
 	}
 }
 
@@ -196,16 +196,16 @@ func outOfSupport(ctx context.Context, in Ingest, asked ScopeQuery,
 		return nil, err
 	}
 	now := time.Now().UTC()
-	// How far ahead to look. Nothing by default, which is the past-only
-	// report this has always been: a second population appearing in it
-	// unasked would change what every figure on the screen counts.
+	// The distance ahead to look. Nothing by default, which is the past-only
+	// report: a second population appearing in it unasked would change what
+	// every figure on the screen counts.
 	ended, err := catalog.NewStore(in.DB.DB).OutOfSupport(ctx, subject, now,
 		now.AddDate(0, 0, within))
 	if err != nil {
 		return nil, wentWrong(in.Logger, "which releases are out of support could not be read", err)
 	}
-	// What is open on each: an issue at a component, not one per place it sits
-	// at. The same count every other release-level figure here uses, so a
+	// The count open on each: an issue at a component, not one per place it
+	// sits at. The same count every other release-level figure here uses, so a
 	// release reads the same on this report and on its product's own list.
 	// The findings list can show slightly fewer rows than this, because it
 	// folds sibling packages cut from one source together, and that is a
@@ -224,10 +224,10 @@ func outOfSupport(ctx context.Context, in Ingest, asked ScopeQuery,
 			continue
 		}
 		// Whole days from today, which is the day the store's own predicate
-		// is truncated to. Counted from the instant, a release ending
-		// tomorrow read as zero days left on the screen that exists to warn
-		// about it: the difference is a few hours, and truncation toward zero
-		// swallowed it.
+		// is truncated to. Counted from the instant, a release ending tomorrow
+		// reads as zero days left on the screen that exists to warn about it:
+		// the difference is a few hours, and truncation toward zero swallows
+		// it.
 		today := now.Truncate(24 * time.Hour)
 		since := int(today.Sub(release.EndedOn).Hours() / 24)
 		rows = append(rows, RetiredBody{
@@ -244,13 +244,13 @@ func outOfSupport(ctx context.Context, in Ingest, asked ScopeQuery,
 	sort.SliceStable(rows, func(i, j int) bool {
 		switch {
 		case rows[i].Ended != rows[j].Ended:
-			// What has ended is exposure now; what is about to is a date
-			// somebody can still act before.
+			// A release that has ended is exposure now; one about to is a
+			// date somebody can still act before.
 			return rows[i].Ended
 		case !rows[i].Ended && rows[i].EndedDays != rows[j].EndedDays:
 			// Soonest first among those, which is what the warning is for and
 			// what it says it is: ordered by what is open, the release with
-			// the most work outranked the one about to cross, and the one
+			// the most work outranks the one about to cross, and the one
 			// about to cross is the only one anybody can still act before.
 			return rows[i].EndedDays > rows[j].EndedDays
 		case rows[i].Open != rows[j].Open:

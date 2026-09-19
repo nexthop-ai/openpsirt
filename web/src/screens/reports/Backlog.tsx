@@ -14,10 +14,10 @@ import { Wide } from "../../ui/Wide";
 // build a spreadsheet against.
 import { BANDS } from "../../ui/severities";
 
-// Whether the backlog is growing, and what kind of thing is making it grow.
+// The direction of the backlog, and the kind of thing making it move.
 //
-// **The first question a manager asks, and it was a panel on the home screen
-// at a fixed twelve weeks** — no name, no window, no file, and no way to ask
+// The first question a manager asks, and it was a panel on the home screen
+// at a fixed twelve weeks — no name, no window, no file, and no way to ask
 // it of anything but the selection the shell happened to be on.
 //
 // The two flows are what a backlog is read for. Ten arriving and ten answered
@@ -123,13 +123,13 @@ export function Backlog() {
           </section>
 
           <section className="panel">
-            <h3>What is open, by severity</h3>
+            <h3>Open by severity</h3>
             <Mix points={points} />
             <p className="hint">The share matters as much as the total.</p>
           </section>
 
           <section className="panel">
-            <h3>What arrived, and what was answered</h3>
+            <h3>Arrivals and departures</h3>
             <p className="hint" style={{ marginTop: 0 }}>
               Both flows, split the same way.
             </p>

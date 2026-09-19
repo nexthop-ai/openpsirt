@@ -1,12 +1,12 @@
-# Sending a build's inventory
+# Build pipelines
 
 What a build pipeline does, end to end. Everything here is one HTTP request;
 there is no client to install and no agent to run.
 
-The short version: **declare what you ship once, mint a key once, and post the
-inventory on every build.**
+The short version: declare what you ship once, mint a key once, and post the
+inventory on every build.
 
-## What has to exist first
+## Prerequisites
 
 A scan is filed against a product, a stream and a variant, and an upload naming
 something undeclared is refused — the error says which part is missing. That is
@@ -23,7 +23,7 @@ Declaring is three requests, and you make them once rather than per build.
 Each is administration, so each needs an administrator — a pipeline's key
 cannot declare anything.
 
-**Scripting these needs an `Origin` header.** A write arriving with no session
+Scripting these needs an `Origin` header. A write arriving with no session
 of ours behind it is guarded against forgery by the origin it states, so a
 request made from a shell through a trusted-header proxy is refused as "not
 from a page this deployment served" until it says where it came from. Add
@@ -52,7 +52,7 @@ curl -X POST "$OPENPSIRT/v1/products/sonic/streams" \
   -d '{"name": "v2.4.1", "kind": "tag", "parent": "main"}'
 ```
 
-## Minting a key
+## The pipeline key
 
 A pipeline authenticates with an API key, which is a credential rather than a
 person: it may file scans and it holds none of a person's rights.
@@ -64,7 +64,7 @@ curl -X POST "$OPENPSIRT/v1/keys" \
   -d '{"name": "sonic-ci", "product": "sonic"}'
 ```
 
-**A key is scoped to one product**, which is required rather than optional, and
+A key is scoped to one product, which is required rather than optional, and
 may be narrowed further to one stream and one variant. So a deployment shipping
 three products has three keys, and a key that leaks reaches one of them.
 
@@ -81,7 +81,7 @@ against it is not, so a person holds nothing on a product until somebody grants
 it — but a key carries the product it was made for, so a pipeline needs no
 grant of its own.
 
-## Sending the inventory
+## The upload
 
 Your build already produces an SBOM. Send it.
 
@@ -97,12 +97,12 @@ curl -X POST \
 | `inventory` | The SBOM. CycloneDX 1.x, SPDX 2.x or SPDX 3.x — the format is read from the document, not declared |
 | `suppressions` | Optional, repeatable. OpenVEX documents stating what this build has already dealt with |
 
-**A 202 means accepted, not valid.** The documents are parsed afterwards, so the
+A 202 means accepted, not valid. The documents are parsed afterwards, so the
 response says the upload arrived and nothing about whether it could be read.
 That is the one thing to get right in a pipeline: a green step here is not a
 green scan.
 
-## Finding out what happened
+## The result
 
 Poll the scans for that build.
 
@@ -161,8 +161,8 @@ send-inventory:
         -F "inventory=@sbom.cdx.json"
 ```
 
-Naming the stream from `$CI_COMMIT_BRANCH` is the shape that bites: **the
-stream has to have been declared.** A pipeline running on a branch nobody
+Naming the stream from `$CI_COMMIT_BRANCH` is the shape that bites: the
+stream has to have been declared. A pipeline running on a branch nobody
 declared is refused, every build, until somebody declares it — and the refusal
 says which part is missing rather than making you guess:
 
@@ -170,7 +170,7 @@ says which part is missing rather than making you guess:
 404  product "sonic": stream "nobody-declared-this": not declared
 ```
 
-## What a pipeline is not asked to do
+## Out of a pipeline's scope
 
 | | |
 |---|---|

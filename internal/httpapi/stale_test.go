@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// What is wrong with each of these is that nothing has happened, which is the
+// Each of these is wrong because nothing has happened, which is the
 // one thing no message driven by an event can report — so each is derived by
 // the sweep and each clears by the thing finally happening.
 
@@ -114,7 +114,7 @@ func TestAClaimSentBackAndLeftIsSaidToItsAuthor(t *testing.T) {
 }
 
 func TestADeferralIsSaidBeforeItEndsRatherThanAfter(t *testing.T) {
-	// What follows the date is the finding arriving back as work that is now
+	// The date is followed by the finding arriving back as work that is now
 	// late, so the whole value of the warning is the time it leaves.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
@@ -214,7 +214,7 @@ func TestWorkSittingInATeamQueueIsSaidToTheTeam(t *testing.T) {
 			t.Errorf("somebody not on the team was told about its queue: %v", told)
 		}
 
-		// Deciding it is the work being done, and it leaves the queue's
+		// A decision is the work being done, and it leaves the queue's
 		// backlog whether or not anybody took it first.
 		r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
 		if told := r.alerts(t, "triager", "queue-untaken"); len(told) != 0 {

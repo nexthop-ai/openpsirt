@@ -10,7 +10,7 @@ import (
 
 // The report answers, says why of each, and carries what it matched against.
 //
-// **The three answers, because they are recorded identically.** A held-back
+// The three answers, because they are recorded identically. A held-back
 // name and one no index knows are both "asked, no version" in the database on
 // purpose — the pass must record both or starve its own window on them — so a
 // test with only one arm would pass against a reader that returned that word
@@ -48,7 +48,7 @@ func TestWhatUpstreamCouldNotAnswerIsReachableAndSaysWhy(t *testing.T) {
 			},
 		}, nil)
 
-		// What the document called itself. It lives on the scan rather than
+		// The document's own name for itself. It lives on the scan rather than
 		// on a component, because the component standing for the product is
 		// stored by its name alone so that a version on it does not give the
 		// product a new identity every night.
@@ -58,7 +58,7 @@ func TestWhatUpstreamCouldNotAnswerIsReachableAndSaysWhy(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// What a pass would have left behind. Written here rather than by
+		// The rows a pass leaves behind. Written here rather than by
 		// running one, because what the pass does is its own package's test
 		// and what this one asks is whether the answer can be read back.
 		asked := time.Now().UTC().Add(-time.Hour)
@@ -142,7 +142,7 @@ func TestWhatUpstreamCouldNotAnswerIsNarrowedToWhatMayBeRead(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// What the build declared itself to be, which is a product's own name.
+		// The build's own declaration, which is a product's own name.
 		if _, err := r.db.DB.NewUpdate().Table("scan").
 			Set("root_identifier = ?", "pkg:golang/github.com/unannounced-corp/product@v1").
 			Where("content_hash = ?", "upstream-narrowing").Exec(t.Context()); err != nil {
@@ -168,8 +168,8 @@ func TestWhatUpstreamCouldNotAnswerIsNarrowedToWhatMayBeRead(t *testing.T) {
 			t.Errorf("somebody holding nothing here was told about %q: %v",
 				"unannounced-corp", body.Ours)
 		}
-		// What the deployment configured is not product data and stays, so an
-		// empty list would pass this test for the wrong reason.
+		// The deployment's own configuration is not product data and stays, so
+		// an empty list would pass this test for the wrong reason.
 		if !slices.Contains(body.Ours, "example") {
 			t.Errorf("the deployment's own namespace is missing from %v", body.Ours)
 		}

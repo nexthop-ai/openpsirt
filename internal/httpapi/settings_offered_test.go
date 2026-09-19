@@ -117,7 +117,7 @@ func TestWhatTheDocumentSaysAFindingWithNoDeadlineCarries(t *testing.T) {
 		if len(declared) == 0 {
 			t.Fatal("no published body declares why a finding has no deadline")
 		}
-		// What the store emits, and nothing else. Named here rather than read
+		// The store's own words, and nothing else. Named here rather than read
 		// from internal/finding so that a word added there without being
 		// published fails this rather than passing it.
 		want := []string{"below-the-line", "nothing-to-take", "out-of-support"}

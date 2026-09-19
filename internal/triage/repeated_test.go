@@ -50,7 +50,7 @@ func (f *fixture) putOffAt(t *testing.T, product int64, place string, from, unti
 	t.Helper()
 	// Every decision belongs to a claim, even one covering a single place, so
 	// the report reads the same rows a real deferral produces.
-	// What it says is the claim's; where it lands is the row's.
+	// The words are the claim's; the landing place is the row's.
 	claim := &triage.Claim{
 		Kind: triage.FindingClaim, ProposedBy: f.proposer, ProposedAt: from,
 		Outcome: triage.Deferred, DeferredUntil: &until,
@@ -128,8 +128,8 @@ func TestSomethingPutOffOnceIsNotAPattern(t *testing.T) {
 
 func TestTimeTakenBackCountsForAsLongAsItHeld(t *testing.T) {
 	// A withdrawal shortens the time something was put off; it does not erase
-	// it. Erased, the pattern this list exists to show was invisible in it:
-	// withdraw and defer again, each span under the line, forever.
+	// it. Erased, the pattern this list exists to show is invisible in it:
+	// withdraw and defer again, each span under the line, for ever.
 	each(t, func(t *testing.T, f *fixture) {
 		now := time.Now().UTC()
 		f.putOff(t, "place-a", now.Add(-90*24*time.Hour), now.Add(-60*24*time.Hour), triage.Approved)

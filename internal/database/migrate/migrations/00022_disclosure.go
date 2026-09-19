@@ -13,7 +13,7 @@ func init() {
 
 // Every time somebody moved the end of an embargo, and why.
 //
-// **Kept in full, never overwritten.** The date itself lives on the finding
+// Kept in full, never overwritten. The date itself lives on the finding
 // and says only where the embargo ends now; the question an auditor asks is
 // how it got there. One extension is a judgment and six is a policy nobody
 // wrote down, and the difference is invisible if each one replaces the last.
@@ -21,8 +21,8 @@ func init() {
 // Keyed on the issue in the product, which is the unit a decision uses: an
 // embargo is about a vulnerability in one product's code, not about a row.
 //
-// **An extension that needs a second person does not move the date until it
-// has one.** The row is written either way — a request that was refused, or is
+// An extension that needs a second person does not move the date until it
+// has one. The row is written either way — a request that was refused, or is
 // still waiting, is part of the record of how long this stayed hidden — and
 // the finding's own date follows only an approved one.
 func upDisclosureExtension(ctx context.Context, tx *sql.Tx) error {
@@ -60,7 +60,7 @@ func upDisclosureExtension(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "disclosure_extension_approved_by_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// What this embargo has already been moved by, which is what the
+		// The distance this embargo has already been moved, which is what the
 		// threshold is measured against.
 		`CREATE INDEX "disclosure_extension_place_idx"
 			ON "disclosure_extension" ("vulnerability_id", "product_id")`,

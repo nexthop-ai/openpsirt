@@ -10,12 +10,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// CarriedClaimBody is one thing a build says it deals with itself, and for how long
-// it has been saying so.
+// CarriedClaimBody is one thing a build says it deals with itself, and how
+// long it has been saying so.
 type CarriedClaimBody struct {
 	Vulnerability string `json:"vulnerability" doc:"The identifier the build argued about, as it wrote it"`
-	Subject       string `json:"subject" doc:"What it said the claim was about — a package name, or its identifier where it named no name"`
-	Status        string `json:"status" doc:"What it claimed, in the exchange format's own vocabulary"`
+	Subject       string `json:"subject" doc:"The claim's subject — a package name, or its identifier where it named no name"`
+	Status        string `json:"status" doc:"The claim, in the exchange format's own vocabulary"`
 	Justification string `json:"justification,omitempty"`
 	Statement     string `json:"statement,omitempty" doc:"The build's own reasoning, shown as written and never rendered"`
 	// Pedigree is the one that matters here: a claim attached to a component
@@ -25,18 +25,17 @@ type CarriedClaimBody struct {
 	// Suppresses says the claim takes a finding off the list rather than
 	// merely recording what the build thinks.
 	Suppresses bool   `json:"suppresses" doc:"Whether it takes a finding off the list. 'affected' and 'under investigation' are information, not answers"`
-	Since      string `json:"since" doc:"When the build first said it, by the scan it arrived in"`
-	Until      string `json:"until,omitempty" doc:"When it stopped saying it. Absent while it is still being said"`
+	Since      string `json:"since" doc:"The date the build first said it, by the scan it arrived in"`
+	Until      string `json:"until,omitempty" doc:"The moment it stopped saying it. Absent while it is still being said"`
 }
 
-// registerCarried answers what a build has been declaring it deals with itself
-// .
+// registerCarried answers what a build declares it deals with itself.
 //
-// **The one thing a version comparison can never see.** A distribution carries
-// a fix into a package without moving its version, and the only evidence is the
-// build saying so in its own inventory. That was stored and read by nothing a
-// person could reach, so "when did we start carrying this, and are we still"
-// was a question with an answer only in the database.
+// The one thing a version comparison can never see. A distribution carries a
+// fix into a package without moving its version, and the only evidence is the
+// build saying so in its own inventory. Stored and read by nothing a person
+// can reach, the start and the persistence of a carried patch are facts held
+// only in the database.
 func registerCarried(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-carried-patches", Method: http.MethodGet,
@@ -45,11 +44,11 @@ func registerCarried(api huma.API, in Ingest) {
 		Summary: "List what a build says it deals with itself",
 		Description: "Everything this build has argued about in its own inventories: carried " +
 			"patches saying what they fix, and statements it sent alongside.\n\n" +
-			"**A history rather than a list of what is true tonight.** Each row says when the " +
+			"A history rather than a list of what is true tonight. Each row says when the " +
 			"build first said it and when it stopped, because a claim that stopped is the " +
 			"interesting one — somebody dropped a patch, and the finding it answered is " +
 			"back. A list of what is current would not have that row at all.\n\n" +
-			"**A carried patch is the only way a backport can be seen here.** No version " +
+			"A carried patch is the only way a backport can be seen here. No version " +
 			"comparison finds one: the fix is in the package and the version has not moved, " +
 			"so unless the build declares it, the finding sits open with nothing true to say " +
 			"about it.\n\n" +
@@ -69,7 +68,7 @@ func registerCarried(api huma.API, in Ingest) {
 	}) (*struct {
 		Body struct {
 			Items []CarriedClaimBody `json:"items"`
-			Total int                `json:"total" doc:"How many there are in all, so a page says what it is a page of"`
+			Total int                `json:"total" doc:"The total, so a page says what it is a page of"`
 		}
 	}, error) {
 		subject, err := reading(ctx)
@@ -95,7 +94,7 @@ func registerCarried(api huma.API, in Ingest) {
 		out := &struct {
 			Body struct {
 				Items []CarriedClaimBody `json:"items"`
-				Total int                `json:"total" doc:"How many there are in all, so a page says what it is a page of"`
+				Total int                `json:"total" doc:"The total, so a page says what it is a page of"`
 			}
 		}{}
 		out.Body.Total = total

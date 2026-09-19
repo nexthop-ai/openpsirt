@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// Who deals with something: giving work out, taking it back, and what each of
+// Dealing with something: giving work out, taking it back, and what each of
 // the three rights it takes may actually do.
 
 func TestWorkNobodyOwnsCanBeFoundAndGivenToSomebody(t *testing.T) {
@@ -107,8 +107,7 @@ func TestSomethingUndisclosedReachesOnlyWhoMayReadIt(t *testing.T) {
 		// The identity holding private triage and the assigner right,
 		// because giving work to somebody else asks for both and this
 		// test is about what the recipient is told rather than about
-		// who may hand it over. An administrator used to stand here
-		// and no longer holds either .
+		// who may hand it over. An administrator holds neither.
 		refused := asPerson(t, r, "private-dispatcher", http.MethodPut, at,
 			`{"person":"reader"}`)
 		if refused.Code != http.StatusUnprocessableEntity {

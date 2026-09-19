@@ -177,9 +177,9 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	}
 	findings := finding.NewStore(db)
 
-	// What became theirs without a message. Everything they hold, less the
-	// things a notification already told them about — which is the whole
-	// of "carries what nothing else told you".
+	// The work that became theirs without a message. Everything they hold,
+	// less the things a notification already told them about — which is the
+	// whole of "carries what nothing else told you".
 	//
 	// Theirs *and their teams'*: work routed to a team arrives without a
 	// message by design — a rule is not a human action, so it is digest
@@ -193,8 +193,8 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	// page and stopping. What is being answered is "the things nothing else
 	// told you about", and the things it told you about are exactly what the
 	// filter removes — so a holder with a page's worth of already-told work
-	// got an empty digest and was never told about anything behind it,
-	// however much there was. Routed work is the case that matters: it is
+	// gets an empty digest and is never told about anything behind it,
+	// however much there is. Routed work is the case that matters: it is
 	// deliberately silent, so the digest is the only place it is ever
 	// mentioned.
 	//
@@ -224,9 +224,9 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 		}
 	}
 
-	// What arrived since the last one and nobody has picked up, for whoever
-	// asked for it. A first digest has no "since", and reports nothing here
-	// rather than everything ever opened: arriving to a list of eight
+	// The work that arrived since the last one and nobody has picked up, for
+	// whoever asked for it. A first digest has no "since", and reports nothing
+	// here rather than everything ever opened: arriving to a list of eight
 	// thousand is the same as arriving to no channel at all.
 	if person.DigestUnassigned && person.DigestSentAt != nil {
 		unowned, total, err := findings.UnassignedSince(ctx, subject, finding.Scope{},
@@ -288,10 +288,10 @@ func itemOf(row finding.Owned) Item {
 //
 // Read once for the whole digest rather than asked per row: a person holding
 // two hundred things would otherwise be two hundred queries to answer one
-// message.
-// **Bounded**, on a table nothing prunes. Every other read in this package
-// carries one, and this had neither a window nor a ceiling: it returned every
-// notification a person had ever received, once per person per digest cycle.
+// message. Bounded, on a table nothing prunes. Every other read in this
+// package carries one, and this had neither a window nor a ceiling: it
+// returned every notification a person had ever received, once per person per
+// digest cycle.
 func ToldAbout(ctx context.Context, db *bun.DB, personID int64) (map[string]bool, error) {
 	var concerns []string
 	if err := db.NewSelect().Model((*Notification)(nil)).

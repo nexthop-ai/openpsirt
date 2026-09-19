@@ -278,13 +278,13 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 	})
 }
 
-// Whether a claim needs a second person is worked out where it is written.
+// A claim's need for a second person is worked out where it is written.
 //
-// It was a field on the proposal, answered before the transaction opened and
-// taken on trust — so a threshold an administrator lowered between the answer
-// and the write stored a claim as needing nobody under a policy that says it
-// does, and nothing reported it. A caller stating the flag at all is the same
-// shape the binding deadline had.
+// A field on the proposal, answered before the transaction opens and taken on
+// trust, stores a claim as needing nobody under a policy that says it does
+// wherever an administrator lowers the threshold between the answer and the
+// write — with nothing reporting it. A caller stating the flag at all is the
+// same shape as a binding deadline read outside the write.
 func TestTheGateIsWorkedOutAgainstThePolicyWhenTheClaimLands(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

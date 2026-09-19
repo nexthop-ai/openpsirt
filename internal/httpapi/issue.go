@@ -14,13 +14,13 @@ import (
 // SightingBody is one issue in one component of one build.
 type SightingBody struct {
 	Product     string `json:"product" doc:"The product's name, as an address takes it"`
-	ProductName string `json:"product_name" doc:"How it is spelled on screen"`
+	ProductName string `json:"product_name" doc:"Its spelling on screen"`
 	Stream      string `json:"stream"`
 	Variant     string `json:"variant"`
 	Component   string `json:"component"`
 	Version     string `json:"version"`
-	Places      int    `json:"places" doc:"How many times that component sits in that build carrying this issue"`
-	State       string `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"How far it has been decided here, by the definition the findings list uses"`
+	Places      int    `json:"places" doc:"The number of times that component sits in that build carrying this issue"`
+	State       string `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state here, by the definition the findings list uses"`
 	Undisclosed bool   `json:"undisclosed,omitempty"`
 	Due         string `json:"due,omitempty" doc:"The earliest deadline among its places"`
 	FixedIn     string `json:"fixed_in,omitempty"`
@@ -38,29 +38,29 @@ type IssueOutput struct {
 		Items         []SightingBody `json:"items"`
 		// Total counts build-and-component pairs, which is what a row is.
 		Total    int `json:"total"`
-		Products int `json:"products" doc:"How many of your products carry it"`
+		Products int `json:"products" doc:"The number of your products carrying it"`
 	}
 }
 
 // registerIssue answers for one issue across every product.
 //
-// **The work starts from an issue as often as from a product.** "A critical
-// just landed in openssl — which of our products ship an affected version" was
-// a question asked a dozen times and assembled by hand, because findings are
-// answered per product.
+// The work starts from an issue as often as from a product. A critical landing
+// in openssl raises the question of which products ship an affected version,
+// and answered per product that is a question assembled by hand a dozen
+// times.
 func registerIssue(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-issue", Method: http.MethodGet, Path: "/v1/issues/{vulnerability}",
 		Summary: "List findings for one issue across every product",
 		Description: "Every build that carries this issue, across every product you may see, " +
 			"with how far it has been decided in each.\n\n" +
-			"**One row per build and component**, not per place: the same component in two " +
+			"One row per build and component, not per place: the same component in two " +
 			"builds is two things somebody ships, and sixty places of it in one build is one " +
 			"piece of work with a count.\n\n" +
-			"**Narrowed the way every other read is**, per product and per visibility. A page " +
+			"Narrowed the way every other read is, per product and per visibility. A page " +
 			"that spans products is exactly where filtering afterwards gets forgotten, and " +
 			"the count is the leak even when no row is shown.\n\n" +
-			"**Nothing affected is an answer**, not a 404: `total` is zero and `items` is " +
+			"Nothing affected is an answer, not a 404: `total` is zero and `items` is " +
 			"empty, which is what a customer inquiry is asking for. An identifier nobody " +
 			"here has seen answers the same way as one that sits only in products you " +
 			"cannot read — told apart, the pair would say which issues this deployment " +
@@ -91,11 +91,11 @@ func registerIssue(api huma.API, in Ingest) {
 			if !errors.Is(err, finding.ErrNoSuchIssue) {
 				return nil, wentWrong(in.Logger, "what issue this is could not be read", err)
 			}
-			// **Not affected is an answer, and it is the one a customer
-			// inquiry asks for.** This refused with a 404, so the question
-			// "are you affected by this" could be answered "yes, here" and
-			// never "no" — and the case somebody is under time pressure to
-			// answer is the second one.
+			// Not affected is an answer, and it is the one a customer
+			// inquiry asks for. Refused with a 404, the question of whether
+			// we are affected can be answered yes-here and never no — and the
+			// case somebody is under time pressure to answer is the second
+			// one.
 			//
 			// An identifier nobody here has ever seen answers the same way as
 			// one that affects only products this reader cannot see. Told

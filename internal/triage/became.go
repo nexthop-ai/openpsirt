@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// What became of what somebody proposed.
+// The fate of what somebody proposed.
 //
 // Approval stays silent, and the reasoning for that survives: an approval is
 // the expected outcome and a message per approval is a channel people stop
@@ -67,9 +67,9 @@ type Became struct {
 	Decision  Decision
 	Reasoning string
 	Happened  WhatHappened
-	// When is when it became that, and By is who did it where a person did.
-	// Both are absent for a claim still waiting: nothing has happened to it,
-	// which is the whole of what it has to report.
+	// When is the moment it became that, and By is who did it where a
+	// person did. Both are absent for a claim still waiting: nothing has
+	// happened to it, which is the whole of what it has to report.
 	When *time.Time
 	By   int64
 	// Rows, Issues and Places are how big the claim is, in the three units a

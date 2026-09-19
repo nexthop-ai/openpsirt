@@ -139,7 +139,7 @@ func TestASavedFilterCanPrepareAClaimAndNeverProposesOne(t *testing.T) {
 			t.Errorf("it prepares %+v", kept[0].Prepares)
 		}
 
-		// **It proposes nothing by itself.** Keeping it left no claim behind:
+		// It proposes nothing by itself. Keeping it left no claim behind:
 		// a person submits it, which is the whole of why the narrow form was
 		// chosen over a rule that files its own.
 		var queue struct {

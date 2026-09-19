@@ -26,15 +26,15 @@ const depth = 64
 // membership test: what the findings list narrows by when asked for
 // everything the tree's number counts, so the two agree.
 //
-// One recursive statement rather than a walk in memory bound back as a list
-// of identifiers. The subtree under a build's root is every component in the
-// build, and binding six thousand identifiers into a statement was the cost
-// of asking for it; the engine walking its own edges is the same set with
-// nothing crossing the wire.
-// **Bounded on depth and not on rows**, and a caller that materializes it has
-// to say what it does past a size. The subtree under a build's root is every
-// component in the build, so scanning this into a slice is unbounded by
-// construction; the two callers that pass it into a subquery never hold it.
+// One recursive statement rather than a walk in memory bound back as a list of
+// identifiers. The subtree under a build's root is every component in the
+// build, and binding six thousand identifiers into a statement was the cost of
+// asking for it; the engine walking its own edges is the same set with nothing
+// crossing the wire. Bounded on depth and not on rows, and a caller that
+// materializes it has to say what it does past a size. The subtree under a
+// build's root is every component in the build, so scanning this into a slice
+// is unbounded by construction; the two callers that pass it into a subquery
+// never hold it.
 func Within(db *bun.DB, targetID, componentID int64) *bun.RawQuery {
 	return WithinAny(db, targetID, []int64{componentID})
 }
@@ -80,17 +80,17 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // scan ends and drifts from the screen beside it thereafter, which is a screen
 // quoting yesterday's answer with nothing saying so.
 //
-// **Distinct issues, not finding rows.** A finding is one issue at one place,
-// and a library at thirty-six places with two issues is seventy-two rows —
-// which is what every parent it sat beneath used to read, where somebody who
-// drilled down one path is looking at one place and expects two. The issues
-// open against a component are the same at every place it sits, so counting
-// them once per component answers per path without a walk per path. And
-// **counted over distinct components, not summed along edges**: a library
+// Distinct issues, not finding rows. A finding is one issue at one place, and
+// a library at thirty-six places with two issues is seventy-two rows — which
+// is what a parent reads if it counts findings, where somebody who drilled
+// down one path is looking at one place and expects two. The issues open
+// against a component are the same at every place it sits, so counting them
+// once per component answers per path without a walk per path. And counted
+// over distinct components, not summed along edges: a library
 // reached by twenty containers is one thing inside each of them. The
 // statement says exactly that: the subtree as a set of components, joined to
 // the distinct (component, issue) pairs open in the build, counted per start.
-// **And by severity, in the same statement.** A node saying five thousand
+// And by severity, in the same statement. A node saying five thousand
 // beneath it says nothing about whether any of it matters, which is what
 // somebody deciding where to descend is asking. An issue has one rating, so
 // the bands partition the distinct issues and their counts sum back to the
@@ -169,8 +169,8 @@ type step struct {
 // one statement: each row is a node on a route, with the node it was reached
 // from, so the routes can be unwound.
 //
-// **The recursive step does not repeat the build, and the two downward walks
-// do.** That asymmetry is the indexes rather than an omission: those walk on
+// The recursive step does not repeat the build, and the two downward walks
+// do. That asymmetry is the indexes rather than an omission: those walk on
 // `parent_id` and use the index leading on the build, so the build is its
 // leading column; this walks on `child_id` and uses the one leading on that,
 // which a build predicate cannot help and could push a planner off. The answer
@@ -218,7 +218,7 @@ func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64)
 // cheap direction: a component has few parents and the routes are a handful of
 // rows, so the statement returns what is on the way and nothing else.
 //
-// Where a component is reached several ways, the shortest way down is the one
+// With a component reached several ways, the shortest way down is the one
 // returned. A path is being shown to explain a position rather than to
 // enumerate the graph, and the shortest is the one somebody can hold in mind.
 // A component the inventory placed nowhere, or one whose every way up runs

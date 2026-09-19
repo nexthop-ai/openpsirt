@@ -54,7 +54,7 @@ func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 				}
 			} else {
 				statement++
-				// Saying it is affected is information rather than an answer,
+				// A claim of affected is information rather than an answer,
 				// and the row says which it is.
 				if row.Suppresses {
 					t.Errorf("a build saying it is affected suppressed something: %+v", row)

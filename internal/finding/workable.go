@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
-// Which sort of release a build sits in, and whether it is still in support.
+// The sort of release a build sits in, and whether it is still in support.
 const (
 	// OnBranch is a release that moves: work lands in it.
 	OnBranch = "branch"
@@ -29,7 +29,7 @@ const (
 // a branch can be past end-of-life, and a single control offering four
 // combinations as four words is a control nobody reads correctly.
 //
-// **The zero value narrows nothing.** What the working population is is a
+// The zero value narrows nothing. What the working population is is a
 // property of the question a screen asks rather than of the data, so a caller
 // that has not been asked answers about everything; the findings list applies
 // its defaults through Working.

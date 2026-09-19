@@ -4,16 +4,16 @@ import "strings"
 
 // LikeEscape is the escape character every LIKE predicate here states.
 //
-// **A backslash is what it must not be.** MySQL and MariaDB treat a backslash
+// A backslash is what it must not be. MySQL and MariaDB treat a backslash
 // as an escape inside a string literal, so `ESCAPE '\'` is an unterminated
 // string: a syntax error on two engines and parsed happily by the other two.
 // SQLite has no default escape character at all, so leaving the clause out
 // makes a backslash mean one thing on three engines and another on the fourth.
 //
 // Here rather than in each package that searches, because it is an engine
-// difference and this package is where those live. It was written out once per
-// package that had it — unexported in one and copied into another — while the
-// packages that had neither escaped nothing at all.
+// difference and this package is where those live. Written out per package it
+// is unexported in one and copied into the next, and the package after that
+// escapes nothing at all.
 const LikeEscape = "#"
 
 // LikeClause is the clause every predicate using these helpers carries.
@@ -29,7 +29,7 @@ const LikeClause = ` ESCAPE '` + LikeEscape + `'`
 // "50%", not every name containing "50" — and "a_b" means what it says rather
 // than "a, anything, b".
 //
-// What it cost where it was missing: the picker that decides who may be named
+// The cost of its absence: the picker that decides who may be named
 // on an embargoed case answered a term of "%" with every eligible person in
 // the deployment, in one request.
 func LikeEscaped(value string) string {

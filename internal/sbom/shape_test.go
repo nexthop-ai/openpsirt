@@ -22,10 +22,10 @@ import (
 // a document with thousands of components has very few shapes — and why the
 // ones that appear once are the interesting ones.
 //
-// What this pins is not that the reader is right. It is what the reader has
-// been shown. A path a producer emits that nothing here has decided about is
-// the gap that matters: a field we do not read because we chose not to and one
-// we do not read because we never knew it was there look identical in the
+// This pins something other than the reader being right. It is what the reader
+// has been shown. A path a producer emits that nothing here has decided about
+// is the gap that matters: a field we do not read because we chose not to and
+// one we do not read because we never knew it was there look identical in the
 // code.
 
 // pathsFile records every path the fixtures contain and what is done with it.
@@ -127,7 +127,7 @@ func TestAFullSizeDocumentIntroducesNoUndecidedPath(t *testing.T) {
 	paths, shapes, components := documentPaths(t, path, f)
 	t.Logf("%s: %d components, %d distinct shapes, %d paths", path, components, len(shapes), len(paths))
 
-	// What it examined, asserted rather than logged. A gate that iterates
+	// The fields it examined, asserted rather than logged. A gate that iterates
 	// counts what it examined: the make target selects this by name, and
 	// "go test -run" exits 0 when nothing matches, so renaming or splitting
 	// this function would retire the gate without a word — and a document
@@ -389,7 +389,7 @@ func TestEveryTopLevelKeyTheReaderClaimsIsRecordedAsRead(t *testing.T) {
 	// read into the component the reader builds, and all are easy to record
 	// the other way.
 	//
-	// **It is strict for a scalar key and weak for a container.** A key
+	// It is strict for a scalar key and weak for a container. A key
 	// holding a list appears in the record only through its members, so all
 	// this can ask of "components" is that something under it is read. The
 	// four above are fields of a component, so a record that calls one of them

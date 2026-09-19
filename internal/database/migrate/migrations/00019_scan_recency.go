@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upScanRecency, downScanRecency)
 }
 
-// When a build was last scanned, answerable without reading its whole history.
+// The last scan of a build, answerable without reading its whole history.
 //
 // "Has anything arrived for this lately" is asked for every declared build at
 // once — by the front page, by the scans screen, by the pass that decides

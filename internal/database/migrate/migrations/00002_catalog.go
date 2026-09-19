@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upCatalog, downCatalog)
 }
 
-// What a scan can be filed against: a product, one of its streams, and a
+// A scan is filed against a product, one of its streams, and a
 // variant it is built as. All three are declared before anything may target
 // them, so a mistyped name is rejected rather than quietly creating a stream
 // that looks real.
@@ -102,7 +102,7 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "variant_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
 		)` + t.suffix,
 
-		// Which of the product's variants a release was actually built as.
+		// The product variant a release was actually built as.
 		// This is what a scan is filed against and what everything downstream
 		// points at, so one identifier flows from a scan through to a finding.
 		//

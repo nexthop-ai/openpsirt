@@ -40,9 +40,9 @@ plugins:
 
 nav:
   - Home: index.md
-  - What is built: built.md
-  - Trying it: trying.md
-  - Sending a build: pipeline.md
+  - Current state: built.md
+  - Evaluation: trying.md
+  - Build pipelines: pipeline.md
   - Configuration: configuration.md
   - API reference: reference/api.md
   - Privileges: reference/privileges.md

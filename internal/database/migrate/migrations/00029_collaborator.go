@@ -13,19 +13,19 @@ func init() {
 
 // One person brought into one undisclosed case.
 //
-// **The grant is on the pair of product and issue**, not on the product: a
+// The grant is on the pair of product and issue, not on the product: a
 // collaborator sees that issue everywhere it sits in that product and nothing
 // else — not the rest of the embargo list, and not a count of it. The case it
 // exists for is the kernel engineer who normally sees only public findings and
 // is needed on one embargoed kernel flaw.
 //
-// **It grants reading and arguing, never approving.** Two collaborators could
+// It grants reading and arguing, never approving. Two collaborators could
 // otherwise satisfy the two people a dismissal on an embargoed finding asks for
 // with nobody accountable for the product involved, which is the rule met in
 // form and defeated in substance. Approval stays with the pool that already
 // held it, so nothing here records a capability.
 //
-// **Withdrawn rather than deleted**, like every other grant: who could see an
+// Withdrawn rather than deleted, like every other grant: who could see an
 // embargoed case, and when, is exactly the question asked afterwards. The open
 // row carries the pair again so that "one live grant per person per case" is
 // enforced by the database rather than by a check somebody remembers — nulls do
@@ -64,7 +64,7 @@ func upCollaborator(ctx context.Context, tx *sql.Tx) error {
 		`CREATE UNIQUE INDEX "case_collaborator_live_idx"
 			ON "case_collaborator" ("product_id", "vulnerability_id", "live_person_id")`,
 
-		// What a subject is resolved with: every case one person is on, read
+		// The key a subject is resolved with: every case one person is on, read
 		// at sign-in beside their roles.
 		`CREATE INDEX "case_collaborator_person_idx"
 			ON "case_collaborator" ("person_id", "live_person_id")`,

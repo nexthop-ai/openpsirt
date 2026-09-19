@@ -164,9 +164,9 @@ func TestAMentionResolvesANamePastTheFirstPage(t *testing.T) {
 // The gate is on the query, not on the two handlers that happen to call it.
 //
 // Both of them do authorize before a name is resolved, and the ordering is
-// right — but the gate was written out at each of them, so a third endpoint
-// over this query would have answered for everybody. What this asks is the
-// store directly, with a subject that may not read what is being asked about.
+// right. Written out at each of them, the gate leaves a third endpoint over
+// this query answering for everybody. This asks the store directly, with a
+// subject that may not read what is being asked about.
 func TestAskingWhoReadsSomethingIsAskedWithASubject(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

@@ -21,7 +21,7 @@ import (
 // arrived overnight against the same package was not covered until somebody
 // declared it too.
 //
-// **Coverage is a join, not a stamp.** A finding is covered when its component
+// Coverage is a join, not a stamp. A finding is covered when its component
 // folds to this key in this build; nothing is written onto findings. So one row
 // changes the version and everything covered follows, and a bump declared today
 // answers a vulnerability published tomorrow with nobody acting.
@@ -86,12 +86,12 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		return 0, fmt.Errorf("withdraw what is no longer committed: %w", err)
 	}
 
-	// What is already committed, read inside the transaction. A retry re-runs
-	// this closure against a database that has moved, so a set read before it
-	// began describes a world that is gone — and reading it here rather than
-	// upserting keeps the statement portable: "on conflict do nothing" is two
-	// different spellings across the four engines, and neither belongs in the
-	// core.
+	// already is what is already committed, read inside the transaction. A
+	// retry re-runs this closure against a database that has moved, so a
+	// set read before it began describes a world that is gone — and
+	// reading it here rather than upserting keeps the statement portable:
+	// "on conflict do nothing" is two different spellings across the four
+	// engines, and neither belongs in the core.
 	var already []int64
 	if err := db.NewSelect().
 		TableExpr(`"upgrade" AS "ug"`).
@@ -116,12 +116,12 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 				"declare a fix in build %d, which is out of support", id))
 		}
 		// Committing what is already committed keeps the first commitment.
-		// When somebody said they would do this is a fact about a moment, and
+		// The moment somebody said they would do this is a fact, and
 		// rewriting the set to add one release would move every date in it to
 		// today.
 		if have[id] {
 			// The version a release is moving to is what somebody agreed
-			// to.** Where a claim argued for it, changing it here would leave
+			// to. Where a claim argued for it, changing it here would leave
 			// the agreement standing over a promise nobody read, so it is
 			// refused and the claim named — revising that is the act that
 			// withdraws the agreement. Where nothing argued for it, the
@@ -165,7 +165,7 @@ const (
 	UpgradeLanded UpgradeState = "landed"
 	// UpgradeLapsed is the date past with work outstanding.
 	//
-	// **It returns the upgrade, not its findings.** The findings are still
+	// It returns the upgrade, not its findings. The findings are still
 	// covered — deciding them again one at a time is the thing the promise
 	// was made instead of — and what comes back is one item, to whoever holds
 	// it. Findings return on their own only when the component moved and they
@@ -222,7 +222,7 @@ type Planned struct {
 // PendingUpgrades is everything committed for one build, by the bump that would
 // deliver it, and how much of each is still open.
 //
-// **The fix-bundle query inverted.** The triager reads a bump and the issues it
+// The fix-bundle query inverted. The triager reads a bump and the issues it
 // closes; the coordinator reads a build and the bumps it is waiting on. One
 // query read from either end, which is why they are one piece rather than two
 // reports that will disagree.
@@ -259,11 +259,11 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 		folds = append(folds, row.FoldKey)
 	}
 
-	// What is still open under each of them, and which packages those are.
-	// Joined from the finding rather than from the commitment, because
-	// coverage is a match on the fold rather than a row somebody wrote: a
-	// vulnerability published tonight against the same package is covered by
-	// this morning's commitment with nobody acting.
+	// open is what is still open under each of them, and which packages
+	// those are. Joined from the finding rather than from the commitment,
+	// because coverage is a match on the fold rather than a row somebody
+	// wrote: a vulnerability published tonight against the same package is
+	// covered by this morning's commitment with nobody acting.
 	var open []struct {
 		Fold   string `bun:"fold"`
 		Issues int    `bun:"issues"`

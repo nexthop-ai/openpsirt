@@ -117,7 +117,7 @@ const (
 	//
 	// The decision stands: a third party's claim never becomes ours, and a
 	// publisher changing their mind does not withdraw somebody's judgment.
-	// What this says is that the ground moved under a dismissal approved
+	// It says the ground moved under a dismissal approved
 	// on the strength of it, which is a condition about evidence rather
 	// than an event about a person — the same shape as a build that
 	// stopped being scanned, and it clears the same way, when the decision
@@ -169,13 +169,13 @@ const (
 	//
 	// An event, and the one message that names an undisclosed issue on
 	// purpose: it goes to the person who has just been given that issue, in
-	// the area inside the application where no detail about an undisclosed finding allows one to be named, and
-	// a message saying "you were given access to something" without saying to
-	// what would be unactionable. What leaves this deployment about it still
-	// carries a link and nothing else.
+	// the area inside the application, where an undisclosed finding may be
+	// named, and a message saying "you were given access to something"
+	// without saying to what is unactionable. What leaves this deployment
+	// about it still carries a link and nothing else.
 	BroughtIn Kind = "brought-in"
 
-	// Unanswered is a report somebody sent us and nobody has replied to .
+	// Unanswered is a report somebody sent us and nobody has replied to.
 	//
 	// A condition, for the reason the others here are: what is wrong is
 	// that nothing has happened. Prompt acknowledgment is the part of
@@ -492,8 +492,8 @@ func attributable(kind Kind, private bool, productID *int64) error {
 // A cleared condition is not waiting on anybody: the thing it was about
 // stopped being true, which is the answer rather than a task.
 //
-// **Narrowed by what they may read now, not by what they could read when they
-// were told** (REQ-42 and REQ-43). Somebody whose private-triage on a product
+// Narrowed by what they may read now, not by what they could read when they
+// were told (REQ-42 and REQ-43). Somebody whose private-triage on a product
 // is withdrawn stops being served the lines naming its undisclosed findings,
 // and is served them again if it is granted back — because they were told, and
 // the record of having been told is what an auditor wants after a leak. So the
@@ -538,8 +538,8 @@ func (s *Store) Waiting(ctx context.Context, subject access.Subject,
 // narrowed by it and a rule spelled once per caller is a rule that is
 // eventually spelled wrong in one of them (REQ-42 and REQ-43).
 //
-// **The rule is that a notification stays readable while the reason it was
-// sent still holds**, which is not the same question as whether this person
+// The rule is that a notification stays readable while the reason it was
+// sent still holds, which is not the same question as whether this person
 // could read the finding it names. A notification is a message addressed to
 // somebody under a rule this deployment wrote down, and the audiences those
 // rules name are roles, cases and — for embargo notices alone — administrators
@@ -613,15 +613,15 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // somebody was told, and a line they have already acknowledged is still a line
 // they were sent.
 //
-// **For either thing held over the deployment**, and refused for anybody else.
+// For either thing held over the deployment, and refused for anybody else.
 // Every other read of this table is somebody reading their own; this one is a
 // person page asking after a leak, which is the one reason to read a list
 // addressed to somebody else. Enforced here rather than at the handler,
 // because that is where the rest of this table's rules live (REQ-42 and
 // REQ-43).
 //
-// **Narrowed by what the reader may see, and neither grant is a way to see
-// more.** Holding one decides who may ask this question; the rows that come
+// Narrowed by what the reader may see, and neither grant is a way to see
+// more. Holding one decides who may ask this question; the rows that come
 // back are the ones the asker could read on their own account, so somebody
 // holding nothing on a product reads the public half of a feed and not the
 // embargoed half — and an auditor, who holds no product, reads nothing.
@@ -680,7 +680,7 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject, id int6
 	// so zero here means it is not theirs or does not exist — which are
 	// the same answer on purpose.
 	//
-	// Which is only true because the update does not also require it to be
+	// That holds only because the update does not also require it to be
 	// unread. With that condition, acknowledging something twice reported
 	// zero and was refused — so a second click, or a click racing the
 	// button that clears everything, answered "no notification of yours by

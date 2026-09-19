@@ -3,35 +3,34 @@
 //
 // A cut at a byte offset lands inside a multi-byte character about two times
 // in three, and what is left is not valid UTF-8. PostgreSQL refuses such a
-// value outright and MySQL and MariaDB refuse it in strict mode, so the write
-// that was recording why something failed fails in turn — leaving no record
-// of either failure. SQLite stores it happily, which is the engine the quick
-// test loop uses, so nothing local sees it.
+// value outright and MySQL and MariaDB refuse it in strict mode, so a write
+// recording why something failed fails in turn, leaving no record of either
+// failure. SQLite stores it happily, and SQLite is the engine the quick test
+// loop uses, so nothing local sees it.
 //
-// It is one package because every bound in this tree was written by hand at
-// its call site, each spelling the same slice, and the ones that were written
-// correctly are the ones whose authors had already been bitten.
-// The direction is the part that differs and the part that is easy to get
-// wrong — a cut from the end leaves the partial character at the front — so
-// both directions are here and neither is open-coded again.
+// One package, because a bound written by hand at each call site is the same
+// slice spelled again by somebody who has not been bitten yet. The direction
+// is the part that differs and the part that is easy to get wrong — a cut from
+// the end leaves the partial character at the front — so both are here and
+// neither is open-coded again.
 package bound
 
 import "unicode/utf8"
 
 // Head keeps the first most bytes, cut on a character boundary.
 //
-// The partial character is at the end, so the trim goes backward — and only
-// as far as the last character can begin, which is three bytes. What is being
+// The partial character is at the end, so the trim goes backward, and only as
+// far as the last character can begin, which is three bytes. The text being
 // cut is often a program's own output, which nobody promised was text at all:
 // asked instead whether the whole kept prefix decodes, one bad byte anywhere
-// in it threw away everything after that byte, so the message quoting a
-// failed scan's standard error came back cut to whatever preceded its first
-// piece of binary. That question also re-read the whole prefix on every step,
-// which on a megabyte of output is a megabyte re-read per byte trimmed.
+// in it throws away everything after that byte, so a message quoting a failed
+// scan's standard error comes back cut to whatever preceded its first piece of
+// binary. That question also re-reads the whole prefix on every step, which on
+// a megabyte of output is a megabyte re-read per byte trimmed.
 //
-// Validity of the whole is not on offer and never was: a bad byte before the
-// bound is kept, and a string shorter than the bound is handed back as it
-// came. What is promised is the cut.
+// Validity of the whole is not on offer: a bad byte before the bound is kept,
+// and a string shorter than the bound is handed back as it came. What is
+// promised is the cut.
 func Head(s string, most int) string {
 	if most <= 0 {
 		return ""

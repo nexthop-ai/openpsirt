@@ -213,8 +213,8 @@ func TestAVEXStatementCarriesTheOtherNamesItsIssueAnswersTo(t *testing.T) {
 func TestAVEXStatementCoversEveryPlaceOrIsAbsent(t *testing.T) {
 	// The format says "this product, this component, not affected" and has no
 	// finer grain than that. A finding is an issue at a place, and a component
-	// commonly sits at many — so one dismissal agreed at one place used to
-	// speak for a component still open at all the others. That is a
+	// commonly sits at many, so one dismissal agreed at one place speaks for
+	// a component still open at all the others. That is a
 	// machine-readable claim of "not affected" about something that is
 	// affected, published to every customer running a scanner against the
 	// image, which is the most expensive wrong answer this tool can produce.
@@ -367,8 +367,8 @@ func TestACaseCollaboratorIsNotHandedTheBuildsWholeVEXDocument(t *testing.T) {
 	// nothing on the product, and the build lookup admits them only so that
 	// the names their own issue sits at resolve.
 	//
-	// The route stopped at that lookup, and the only authorization after it
-	// runs when the undisclosed preview is asked for. What went out was every
+	// A route stopping at that lookup, with the only authorization after it
+	// running when the undisclosed preview is asked for, hands out every
 	// approved statement about the build — unrelated issue identifiers, the
 	// components they sit in, the justification, and the free-text reasoning
 	// somebody wrote for a second person to check — about a product the reader

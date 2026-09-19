@@ -13,13 +13,13 @@ func init() {
 
 // That an advisory went out.
 //
-// **A fact about a moment rather than a derived value.** What was published on
+// A fact about a moment rather than a derived value. What was published on
 // a date cannot be worked out again once the record it was generated from has
 // moved on — a release is added, a decision is revised, a fix lands — so if it
 // is not written down when it happens it is gone.
 //
-// **Without it a second advisory for the same flaw cannot carry a revision
-// history or increment its version**, and both are things CSAF validators
+// Without it a second advisory for the same flaw cannot carry a revision
+// history or increment its version, and both are things CSAF validators
 // check. A document that fails validation is one a customer's tooling drops,
 // which is the failure that looks like nothing happening.
 //

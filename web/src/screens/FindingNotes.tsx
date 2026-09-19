@@ -5,7 +5,7 @@
 // a claim already exists — so the first person to say anything had to record a
 // judgment in order to say it.
 //
-// **It says what it is about, in words, above the thread.** It is read beside
+// It says what it is about, in words, above the thread. It is read beside
 // a row that may be one of eleven the same issue sits on, so "this issue in
 // this product" is the thing a reader has to be told: not this component, and
 // not every product.
@@ -29,7 +29,7 @@ export function Notes({
   product: string;
   vulnerability: string;
   mine: (who: string) => boolean;
-  // Whether the issue has been announced here, which is what decides who may
+  // The issue's disclosure here, which is what decides who may
   // be offered after an @: naming somebody who cannot read it calls them to
   // something they will be refused, and on an undisclosed issue the mention
   // itself says a finding exists.
@@ -157,7 +157,7 @@ function EditNote({
 
 // The same thread, on the screen that spans products.
 //
-// **A product at a time**, because a note belongs to one and this screen shows
+// A product at a time, because a note belongs to one and this screen shows
 // an issue wherever it sits. One thread merging what several teams wrote would
 // be the deployment-wide record a per-product note exists to avoid — and a
 // reader could not tell which product any line of it was about.

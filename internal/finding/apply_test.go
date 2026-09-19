@@ -492,7 +492,7 @@ func TestAFallingLikelihoodIsTakenRatherThanItsPeak(t *testing.T) {
 	// about the world — a CVE that spiked once read its peak for ever, and
 	// ordering by it answered "was ever risky" rather than "is risky".
 	//
-	// Which of two reports is newer is a question about the day the estimate
+	// The newer of two reports is a question about the day the estimate
 	// was computed for, not about which scan ran last: reports arrive in an
 	// order nobody controls.
 	each(t, func(t *testing.T, f *fixture) {

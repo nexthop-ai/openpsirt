@@ -130,13 +130,13 @@ func TestADigestNamesWhatIsDisclosedAndCountsWhatIsNot(t *testing.T) {
 	}
 	got := d.Message("https://psirt.example")
 
-	// What is public is named, because that is what makes it worth opening.
+	// The public part is named, because that is what makes it worth opening.
 	for _, wanted := range []string{"CVE-2025-60876", "busybox-binsh", "openpsirt"} {
 		if !strings.Contains(got.Text, wanted) {
 			t.Errorf("the digest does not name %q:\n%s", wanted, got.Text)
 		}
 	}
-	// What is not disclosed is counted, and the numbers say how urgent.
+	// The undisclosed part is counted, and the numbers say how urgent.
 	for _, wanted := range []string{"3 findings", "1 critical", "2 high", "1 known to be exploited", "2 that nobody owns"} {
 		if !strings.Contains(got.Text, wanted) {
 			t.Errorf("the digest does not say %q:\n%s", wanted, got.Text)

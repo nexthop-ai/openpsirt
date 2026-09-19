@@ -11,16 +11,17 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// SpentBody is what the work went into, for one component in one product.
+// SpentBody is the work spent on one component in one product.
 type SpentBody struct {
 	Product   string `json:"product"`
-	Component string `json:"component" doc:"What the judgments were about, by name. Empty where nothing in any build carries the place any more"`
+	Component string `json:"component" doc:"The subject of the judgments, by name. Empty where nothing in any build carries the place any more"`
 	// Claims is the unit somebody works in — one argument, however many rows
 	// it wrote — and Decisions how many places those reached.
 	Claims    int `json:"claims" doc:"Arguments made about it in the period"`
 	Decisions int `json:"decisions" doc:"Places those reached"`
-	People    int `json:"people" doc:"How many different people argued about it"`
-	// What came out of them, counted as claims for the same reason.
+	People    int `json:"people" doc:"The number of different people who argued about it"`
+	// Promised is the upgrades that came out of them, counted as claims for
+	// the same reason.
 	Promised  int `json:"promised" doc:"Claims that promised work: an upgrade or a backport"`
 	Dismissed int `json:"dismissed" doc:"Claims that argued it away"`
 	Deferred  int `json:"deferred" doc:"Claims that put it off"`
@@ -34,7 +35,7 @@ func registerEffort(api huma.API, in Ingest) {
 		Description: "What the judgments in a period were about, most argued first: which " +
 			"component in which product, how many arguments were made, how many places they " +
 			"reached, how many people made them, and what came out of them.\n\n" +
-			"**Counted in claims, not in the rows they wrote.** A claim is one person's act; " +
+			"Counted in claims, not in the rows they wrote. A claim is one person's act; " +
 			"counting its rows measures how far a component fans out through an image. Both " +
 			"numbers come back.\n\n" +
 			"Dated by when a judgment was proposed. Asked for neither a period nor a window, " +
@@ -84,8 +85,8 @@ func registerEffort(api huma.API, in Ingest) {
 
 // measuring resolves a product and a team into what the store narrows by.
 //
-// One spelling, because two reports take the same pair and a name resolved
-// two ways is two answers to "may this reader ask about it".
+// One spelling, because two reports take the same pair and a name resolved two
+// ways is two answers about one reader's reach.
 func measuring(ctx context.Context, in Ingest, subject access.Subject,
 	product, team string) (triage.Measuring, error) {
 

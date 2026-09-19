@@ -9,7 +9,7 @@ import (
 
 // The window a condition's link asks for is one the sheet it opens offers.
 //
-// **A link that asks for more is refused and falls back.** The address parser
+// A link that asks for more is refused and falls back. The address parser
 // bounds what it will take and a sheet that cannot read the number opens on
 // its own default — which for the report behind the unagreed-risk condition is
 // a quarter, while the count that raised it covers the whole record. An
@@ -39,7 +39,7 @@ func TestAConditionAsksForAWindowItsReportOffers(t *testing.T) {
 		values[found[1]] = found[2]
 	}
 
-	// Which sheet each report slug is, by the address the catalog gives it.
+	// The sheet each report slug names, by the address the catalog gives it.
 	sheets := map[string]string{"rubber-stamp": "../../web/src/screens/reports/Scrutiny.tsx"}
 	offers := regexp.MustCompile(`const WINDOWS = \[([0-9, ]+)\]`)
 

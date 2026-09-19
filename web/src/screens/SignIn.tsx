@@ -23,7 +23,7 @@ export function returningHere(): string {
   return "?return=" + encodeURIComponent(here);
 }
 
-// Whether a forward to the provider has already been tried in this tab.
+// A forward to the provider already tried in this tab.
 //
 // One provider means the button is the only thing on the screen, so the screen
 // is a stop on the way rather than a choice — but a forward that repeats is a
@@ -37,7 +37,8 @@ export function returningHere(): string {
 // screen with a button works, and a forward that cannot be remembered loops.
 const triedKey = "signin-forwarded";
 
-// Where signing out lands, and the marker the sign-in screen reads there.
+// The address signing out lands on, and the marker the sign-in screen reads
+// there.
 //
 // One value, exported, so that the screen and the sign-out button cannot drift
 // apart: a test asserting the address sign-out actually goes to is what catches
@@ -71,7 +72,7 @@ export function forgetForward() {
   }
 }
 
-// Whether this arrival is one to send straight on to the provider.
+// An arrival to send straight on to the provider.
 //
 // Deliberately narrow. It is a stop on the way only where there is nothing to
 // decide and nothing to read.

@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { Failed } from "./Failed";
 import { useReseed } from "./reseed";
 
-// Where a decision applies beyond this build, as a guided review.
+// A decision's reach beyond this build, as a guided review.
 //
 // Two kinds of other build, and only one of them is a choice: builds already
 // matching are covered by lookup and are named, not asked about; builds
-// holding the issue at **another version** are offered, because a tick there
+// holding the issue at another version are offered, because a tick there
 // is a claim about code nobody has looked at.
 //
 // A third kind was declared, rendered and never populated — a build already
@@ -16,14 +16,14 @@ import { useReseed } from "./reseed";
 // thing left over rather than the code, so it goes with it; if the endpoint
 // grows the bucket the card comes back with it.
 //
-// **What is offered is a version, not a variant**, and it says so. The same
+// The offer is a version, not a variant, and it says so. The same
 // product built two ways is one piece of work — a matching build is reached by
 // lookup and never asked about — so anything that reaches this list is here
 // because the code differs. Labeling those entries by their build read as
 // "approve this for mellanox", which is a question nobody should be asked and
 // which made a variant look like a decision somebody had to take twice.
 //
-// **One screen, not one per entry.** Walking them individually made a routine
+// One screen, not one per entry. Walking them individually made a routine
 // decision several sheets deep, and the thing being weighed is one line each:
 // does the reasoning hold at that version too. They are unticked to start,
 // because that is the whole control — a tick is the claim.
@@ -76,7 +76,7 @@ export function Review({
     setApplied(new Set());
   });
 
-  // What the sheet does to the page underneath it, which is the document's
+  // The sheet's effect on the page underneath it, which is the document's
   // rather than the sheet's and so belongs in an effect.
   useEffect(() => {
     if (!open) return;
@@ -130,7 +130,7 @@ export function Review({
 
   const progress = (
     <div className="revprog">
-      {["Where it applies", "Confirm"].map((label, i) => (
+      {["Its reach", "Confirm"].map((label, i) => (
         <span key={label} className={i === step ? "on" : i < step ? "done" : ""}>
           {label}
         </span>
@@ -143,7 +143,7 @@ export function Review({
   let foot: React.ReactNode;
 
   if (step === 0) {
-    title = "Where this decision applies";
+    title = "The reach of this decision";
     body = (
       <>
         {progress}

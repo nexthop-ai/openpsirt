@@ -27,8 +27,9 @@ func TestADocumentABuildSentReadsBackAsItArrived(t *testing.T) {
 			t.Fatalf("upload answered %d", code)
 		}
 
-		// What the receipt says arrived, which is where the identifiers come
-		// from: a document is named through the scan it belongs to.
+		// The receipt's own record of what arrived, which is where the
+		// identifiers come from: a document is named through the scan it
+		// belongs to.
 		rec := httptest.NewRecorder()
 		f.handler.ServeHTTP(rec, f.sending(httptest.NewRequest(http.MethodGet, f.path, nil)))
 		if rec.Code != http.StatusOK {

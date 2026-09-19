@@ -49,7 +49,7 @@ export function Work() {
   // Whose work is being looked at on the second tab. Empty is the roll-up of
   // everybody; a name is that holder's list.
   //
-  // **Which kind of holder, because a team is not a person.** Work goes to a
+  // The kind of holder, because a team is not a person. Work goes to a
   // team by standing rule and by an assignment naming one, and the totals list
   // says a team holds it — but the person's route resolves an identity, so a
   // team's name matched nobody and the screen answered "they are not holding
@@ -97,9 +97,9 @@ export function Work() {
 
   const peopleRows = holdings.data?.items ?? [];
   // Nobody's work appears on this screen. What is waiting for nobody is its
-  // own screen and its own question — mixing it in here made "assignments" a
-  // list of things that are not assigned, which is the one thing it should
-  // not be.
+  // own screen and its own question — mixed in here it makes "assignments" a
+  // list of things that are not assigned, which is the one thing it must not
+  // be.
   const others = peopleRows.filter((row) => row.person !== who.data?.identity);
   const myCount = peopleRows.find((row) => row.person === who.data?.identity)?.open ?? 0;
 
@@ -221,16 +221,16 @@ function ByPerson({
       ),
     onSuccess: () => {
       void queries.invalidateQueries({ queryKey: ["holdings"] });
-      // The badge for what nobody holds is counted from the findings list
-      // now, so the key this used to name registers nothing. Returning a whole
-      // queue is the single act that moves that number most.
+      // The badge for what nobody holds is counted from the findings list, so
+      // that is the key to invalidate. Returning a whole queue is the single
+      // act that moves the number most.
       void queries.invalidateQueries({ queryKey: ["findings"] });
     },
   });
 
   if (query.isPending) return <Loading />;
   if (query.isError) {
-    return <Failed error={query.error} what="What people are holding could not be read." />;
+    return <Failed error={query.error} what="The holdings could not be read." />;
   }
   if (rows.length === 0) {
     return (
@@ -323,7 +323,7 @@ function ByPerson({
   );
 }
 
-// What one person is dealing with, in the same units as what nobody is: one
+// One person's own work, in the same units as what nobody is dealing with: one
 // row per issue in a component in a product, not one per build. The same code
 // built several ways is one piece of work and was taken on as one.
 function Held({
@@ -345,7 +345,7 @@ function Held({
 }) {
   if (query.isPending) return <Loading />;
   if (query.isError) {
-    return <Failed error={query.error} what="What is assigned could not be read." />;
+    return <Failed error={query.error} what="The assigned work could not be read." />;
   }
   if (rows.length === 0) return <Empty title={empty} detail={detail} />;
 

@@ -51,7 +51,7 @@ const DefaultTimeout = 30 * time.Minute
 // prevent. The scanner shells out to container and registry tooling, so a
 // helper outliving it is the ordinary case rather than a contrived one.
 //
-// What it costs is that what the scanner said can be cut short at the delay,
+// The cost is that the scanner's own words can be cut short at the delay,
 // which is the trade the field exists for.
 const waitDelay = 10 * time.Second
 
@@ -113,7 +113,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	// What it said while succeeding, bounded the same way the failure is. A
+	// Its own words while succeeding, bounded the same way the failure is. A
 	// scanner writes progress to this stream as well, which it suppresses when
 	// nothing is watching — as nothing is here.
 	result.Caution = tail(strings.TrimSpace(errs.String()))
@@ -147,26 +147,30 @@ type grypeMatch struct {
 		ID          string `json:"id"`
 		Severity    string `json:"severity"`
 		Description string `json:"description"`
-		// Where the issue is written up. Every match carries one, and for
-		// the great majority it is the only route to a patch.
+		// DataSource is where the issue is written up. Every match
+		// carries one, and for the great majority it is the only route
+		// to a patch.
 		DataSource string `json:"dataSource"`
-		// Which body of data answered, as the scanner names it
-		// — "nvd:cpe" against "alpine:distro:alpine:3.24".
-		// Finer than the two words a finding records for how
-		// it was reached, and the difference between them is
-		// the whole of what recording the match is for.
+		// Namespace is which body of data answered, as the scanner
+		// names it — "nvd:cpe" against "alpine:distro:alpine:3.24".
+		// Finer than the two words a finding records for how it was
+		// reached, and the difference between them is the whole of
+		// what recording the match is for.
 		Namespace  string   `json:"namespace"`
 		URLs       []string `json:"urls"`
 		Advisories []struct {
 			Link string `json:"link"`
 		} `json:"advisories"`
-		// What the published estimates say about it being used.
+		// EPSS is what the published estimates say about it being
+		// used.
 		EPSS []struct {
 			EPSS float64 `json:"epss"`
-			// Where that estimate stands among all of them, and the day it
-			// was computed for. A reader cannot act on 0.00042 and can act on
-			// "higher than 91% of everything published", and the day is what
-			// says whether this estimate is newer than the stored one.
+			// Percentile is where that estimate stands among all
+			// of them, and the day it was computed for. A reader
+			// cannot act on 0.00042 and can act on "higher than
+			// 91% of everything published", and the day is what
+			// says whether this estimate is newer than the stored
+			// one.
 			Percentile float64 `json:"percentile"`
 			Date       string  `json:"date"`
 		} `json:"epss"`
@@ -177,21 +181,22 @@ type grypeMatch struct {
 		CVSS []struct {
 			Version string `json:"version"`
 			Vector  string `json:"vector"`
-			// Who published this rating and whether it is the primary one.
-			// Provenance is recorded for everything else a scan says — what
-			// found it, what it was matched from, what it was matched in —
-			// and the number a deadline is set from had none, so a reader
-			// asking "who says 5.9" had nowhere to go. Absent in some
-			// reports, which is itself an answer.
+			// Source is who published this rating and whether it
+			// is the primary one. Provenance is recorded for
+			// everything else a scan says — what found it, what it
+			// was matched from, what it was matched in — and the
+			// number a deadline is set from had none, so a reader
+			// asking "who says 5.9" had nowhere to go. Absent in
+			// some reports, which is itself an answer.
 			Source  string `json:"source"`
 			Type    string `json:"type"`
 			Metrics struct {
 				BaseScore float64 `json:"baseScore"`
 			} `json:"metrics"`
 		} `json:"cvss"`
-		// What kind of weakness this is. Several entries usually say the
-		// same thing from different sources, and the interesting part is
-		// the identifier rather than who said it.
+		// CWEs is what kind of weakness this is. Several entries
+		// usually say the same thing from different sources, and the
+		// interesting part is the identifier rather than who said it.
 		CWEs []struct {
 			CWE  string `json:"cwe"`
 			Type string `json:"type"`
@@ -225,11 +230,11 @@ type grypeMatch struct {
 		Version string `json:"version"`
 		Purl    string `json:"purl"`
 	} `json:"artifact"`
-	// How the match was made. A scanner tries the advisory data
-	// for the package's own ecosystem first and falls back to
-	// comparing a published identifier against an upstream version
-	// range, and those two answers mean very different things
-	// about a distribution's package.
+	// MatchDetails is how the match was made. A scanner tries the advisory
+	// data for the package's own ecosystem first and falls back to
+	// comparing a published identifier against an upstream version range,
+	// and those two answers mean very different things about a
+	// distribution's package.
 	MatchDetails []matchDetail `json:"matchDetails"`
 }
 
@@ -237,10 +242,10 @@ type grypeMatch struct {
 type grypeDescriptor struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
-	// Where the database describes itself moved between versions of the
-	// scanner: it used to sit directly under db and now sits under a
-	// status within it. Both are read, because an operator running an
-	// older build should not silently lose the record of what their
+	// DB is where the database describes itself. The place moved between
+	// versions of the scanner — directly under db in one, under a status
+	// within it in the next — and both are read, because an operator running
+	// an older build should not silently lose the record of what their
 	// findings were matched against.
 	DB struct {
 		Built  string `json:"built"`
@@ -356,7 +361,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	}
 	published := rating(match.Vulnerability.CVSS)
 	aliases := make([]string, 0, len(match.RelatedVulnerabilities))
-	// Where else this issue is written up, from every identifier it
+	// The other places this issue is written up, from every identifier it
 	// answers to. Deduplicated by `references`, which the matched
 	// record's own addresses go through as well.
 	related := make([]string, 0, len(match.RelatedVulnerabilities))
@@ -404,7 +409,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 		FixedIn:  strings.Join(match.Vulnerability.Fix.Versions, ", "),
 		FixedAt:  firstFixDate(match.Vulnerability.Fix.Available),
 		Matched:  matched(match.MatchDetails),
-		// Where *this* match came from, which is not always where the
+		// The source of *this* match, which is not always where the
 		// issue is written up. One issue reached through two ecosystems
 		// has two answers, and the issue can only hold one.
 		MatchedFrom:  strings.TrimSpace(match.Vulnerability.DataSource),
@@ -447,7 +452,7 @@ func matchedRange(details []matchDetail) string {
 // findings. Ordering it makes the stored value the same for the same report,
 // which is what keeps a re-scan from writing.
 //
-// **Which one the data calls the root cause is carried separately.** A
+// The root cause the data names is carried separately. A
 // published advisory states one weakness and a report commonly carries several,
 // so something has to say which — and taking whichever sorts first is an answer
 // with nothing behind it. The feeds say it, in the word beside each entry, and
@@ -457,7 +462,7 @@ func matchedRange(details []matchDetail) string {
 // a list cannot say "nobody said". A report that marks none is the ordinary
 // case and it has to stay distinguishable from one that marks the first.
 //
-// Where two entries are marked, the first stands: a report naming two root
+// With two entries marked, the first stands: a report naming two root
 // causes disagrees with itself, and one weakness is what gets stated.
 func weaknesses(cwes []struct {
 	CWE  string `json:"cwe"`
@@ -488,7 +493,7 @@ func weaknesses(cwes []struct {
 
 // databaseVersion says which vulnerability data a run matched against.
 //
-// When it was built identifies the data; the schema version only identifies
+// The build time identifies the data; the schema version only identifies
 // its shape, so it stands in only when there is nothing better. Without either,
 // a finding that appeared or vanished because the data moved is unexplainable.
 func databaseVersion(descriptor grypeDescriptor) string {

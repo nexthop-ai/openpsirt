@@ -64,7 +64,7 @@ type Match struct {
 // the decision does not reach it and somebody has to say whether the same
 // reasoning holds.
 //
-// **The build this is being decided in is searched too**, and that is the
+// The build this is being decided in is searched too, and that is the
 // point. A build commonly ships one name at several versions — the reference
 // image carries the Go standard library at four — so the same issue at the
 // same place sits at versions right beside the one being decided. Looking only
@@ -72,7 +72,7 @@ type Match struct {
 // nothing about this build's, which reads as a question about variants when
 // every question here is about a version.
 //
-// What is skipped is the decision itself: the rows in this build at the very
+// The decision itself is skipped: the rows in this build at the very
 // versions being decided are what `at.Places` already counts.
 //
 // One place, answered by the read that takes many. The two were the same
@@ -110,8 +110,8 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	// this finding and differing for another, and the two are different things
 	// to say about it.
 	seen := map[bool]map[string]int{true: {}, false: {}}
-	// What makes two rows the same entry, which is not the same question for
-	// the two lists.
+	// The test for two rows being the same entry, which is not the same
+	// question for the two lists.
 	//
 	// A build the judgment already reaches is one thing to be told about,
 	// however many places of this finding reach it: keyed on anything finer,
@@ -151,7 +151,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
 	}
 	identities := make([]string, 0, len(places))
-	// What each place is keyed on, which is what decides whether a build is
+	// The key of each place, which decides whether a build is
 	// reached by matching or has to be ticked. Two places of one finding can
 	// hold different versions, so the comparison is per place and cannot be
 	// asked of the statement.
@@ -210,7 +210,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 			Version:           row.Version,
 			ComponentUpstream: row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
 			Places: row.Places,
-			// Whether it is somewhere else or right here. A screen leads with
+			// Its place, elsewhere or right here. A screen leads with
 			// the version, because that is what differs, and says where as an
 			// aside — but it still has to be able to say "here".
 			Here: row.TargetID == hereTargetID,

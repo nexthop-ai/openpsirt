@@ -39,7 +39,7 @@ func TestWhatRanAndAgainstWhatIsRecorded(t *testing.T) {
 }
 
 func TestTheDatabaseVersionIsFoundWhereverItSits(t *testing.T) {
-	// Where the database describes itself moved between versions of the
+	// The place the database describes itself moved between versions of the
 	// scanner. An operator running an older build should not silently lose the
 	// record of what their findings were matched against.
 	older := `{"matches": [], "descriptor": {"name": "grype", "version": "0.90.0",
@@ -369,7 +369,7 @@ func TestPatchesOnTheRelatedRecordAreKept(t *testing.T) {
 		t.Fatal("no patch reference survived output whose related records carry six of them")
 	}
 
-	// Specifically one that exists **only** on the related record. The
+	// Specifically one that exists only on the related record. The
 	// matched record for this issue carries none of the OpenSSL commits; its
 	// related record carries four, which is the whole shape this is about.
 	var here []string
@@ -588,7 +588,7 @@ const twoWeaknesses = `{
 func TestWhichWeaknessTheDataCallsTheRootCauseIsRead(t *testing.T) {
 	// A published advisory states one weakness and a report commonly carries
 	// several, so something has to say which. The feeds say it, in a word
-	// beside each entry that was being read and dropped.
+	// beside each entry.
 	//
 	// Carried apart from the list rather than as its first entry, because a
 	// list cannot say "nobody said" — and the difference between "this is the

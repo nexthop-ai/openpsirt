@@ -14,7 +14,7 @@ import (
 )
 
 // Disposed is one known vulnerability in one build, and what was decided about
-// it — **including nothing**.
+// it — including nothing.
 //
 // The complement of the audit list rather than a variant of it. The audit list
 // says what was decided; an auditor's first question is what was *known*,
@@ -72,7 +72,7 @@ type Disposed struct {
 
 // Register is every known vulnerability in one build with its disposition .
 //
-// **Current state, and no `as_of`.** Reconstructing the view as of a past date
+// Current state, and no `as_of`. Reconstructing the view as of a past date
 // was asked for and refused: each row already carries the dates that evidence
 // what is being checked, and a reconstruction would be a second answer about
 // the past that has to be kept honest against the first.
@@ -149,7 +149,7 @@ func (s *Store) MayReadRegister(ctx context.Context, subject access.Subject, tar
 
 // RegisterPage is a page of the register and nothing else.
 //
-// **The count is not free and an export does not carry it.** Counting is a
+// The count is not free and an export does not carry it. Counting is a
 // scan of every finding in the build, and a file is written by asking for a
 // page a thousand times — so the whole register was answering "how many are
 // there altogether" a thousand times to fill in a number the file has no
@@ -180,15 +180,14 @@ func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, target
 
 // RegisterEach walks the whole register, handing over one row at a time.
 //
-// **An export does not page, and paging is what made it cost what it did.** A
-// file was written by asking for a page a thousand times, and every page
-// re-sorted the build's quarter of a million rows and then skipped past the
-// ones already written — so the deeper the file got, the more each page cost.
-// Measured on a real build: 52 minutes, and 0.69s for the first page against
-// 3.41s for the last.
+// An export does not page, because paging is what makes it cost. Written by
+// asking for a page a thousand times, every page re-sorts the build's quarter
+// of a million rows and then skips past the ones already written, so the
+// deeper the file gets the more each page costs. Measured on a real build: 52
+// minutes, and 0.69s for the first page against 3.41s for the last.
 //
 // One statement and one cursor instead. The sort happens once; nothing is
-// skipped; **1.9 seconds** for the same 249,288 rows, in the same order. The
+// skipped; 1.9 seconds for the same 249,288 rows, in the same order. The
 // reason the export paged in the first place — that no complete list ever
 // exists in memory — is what a cursor already gives: this holds one row.
 //
@@ -254,8 +253,8 @@ type registerRow struct {
 
 // Registering narrows the register.
 //
-// **An auditor's questions, and nothing that would make it a second findings
-// list.** What a register is asked is "show me what nobody decided", "show me
+// An auditor's questions, and nothing that would make it a second findings
+// list. What a register is asked is "show me what nobody decided", "show me
 // the dismissals", "show me this component" — each of them a way of reading
 // the same complete answer rather than a different question. What is left out
 // is deliberate: a triage line, because the register applies none.
@@ -349,7 +348,7 @@ func (s *Store) registerJoins(productID int64,
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.Here, productID).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		// What pulls the component in. Left, because a build holds some
+		// The component's consumer. Left, because a build holds some
 		// components directly and those have no consumer at all.
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		// Liveness is asked of the columns rather than of the join, for the
@@ -415,8 +414,8 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`f.due_at AS "due_at"`).
-		// Why it closed, in both the words the tool chose and the words a
-		// person typed. A closure with no reason was refused of whoever
+		// The reason it closed, in both the words the tool chose and the words
+		// a person typed. A closure with no reason was refused of whoever
 		// wrote it and then readable by nobody, so the refusal was a promise
 		// the tool did not keep.
 		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
@@ -456,9 +455,9 @@ func disposedFrom(row registerRow) Disposed {
 	default:
 		one.State = "waiting"
 	}
-	// Whether the deadline was met, which is answerable only for
-	// something that closed: an open row has not missed its deadline, it
-	// has not reached the end of the question.
+	// A deadline met, which is answerable only for something that closed: an
+	// open row has not missed its deadline, it has not reached the end of the
+	// question.
 	//
 	// Closed exactly at the deadline met it. The rate reads the boundary
 	// that way — something open at its deadline instant is not yet

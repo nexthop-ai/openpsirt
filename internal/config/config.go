@@ -84,7 +84,7 @@ type Config struct {
 	// without inverting that import. The consequence to accept is that
 	// changing one needs a restart.
 	//
-	// How deep the queue may get is the exception and is a stored setting: an
+	// The queue's depth is the exception and is a stored setting: an
 	// operator meeting a refused upload wants that remedy without one.
 	QueueMaxAttempts  int
 	QueueClaimTimeout time.Duration
@@ -114,9 +114,10 @@ type Config struct {
 	MailServer   string
 	MailUsername string
 	MailPassword string
-	// Where files hanging off an issue are kept, and absent is ordinary:
-	// with none of this set, attachments are off and everything else works
-	// . An operator who wants none should not have to run a bucket.
+	// AttachmentBucket is where files hanging off an issue are kept, and
+	// absent is ordinary: with none of this set, attachments are off and
+	// everything else works . An operator who wants none should not have
+	// to run a bucket.
 	//
 	// AttachmentBucket is what turns the object store on. Endpoint is what
 	// a self-hosted store needs and a cloud one does not; credentials are
@@ -243,7 +244,7 @@ const envPrefix = "OPENPSIRT_"
 // operator has no reason to look.
 func Load() (Config, error) {
 	var r reader
-	// What the queue is built with where nothing says otherwise, read from
+	// The queue's defaults where nothing says otherwise, read from
 	// the queue rather than restated: two spellings of one default disagree
 	// the first time either moves.
 	queueing := queue.DefaultOptions()
@@ -393,7 +394,7 @@ func Load() (Config, error) {
 
 // absoluteBase refuses a deployment address that is not one.
 //
-// **Checked here so that every consumer may assume it is absolute**, which
+// Checked here so that every consumer may assume it is absolute, which
 // four of them already did. It was the one string setting with a required
 // shape that nothing parsed, and the failure was silent where it mattered
 // most: `OPENPSIRT_BASE_URL=psirt.example.com` — the form the value takes in a

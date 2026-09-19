@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// What an operation asks of whoever calls it.
+// requiresExtension is the requirement an operation places on its caller.
 //
 // Structured on the document and rendered into the description from the same
 // value, so the two cannot disagree. The structure is what a client generator
@@ -17,7 +17,7 @@ import (
 // sees. Written twice by hand, one would be wrong within a month.
 const requiresExtension = "x-openpsirt-requires"
 
-// Scope says what a right is held against.
+// Scope is the thing a right is held against.
 const (
 	// perProduct is a role granted on the product the request names.
 	perProduct = "product"
@@ -31,7 +31,7 @@ const (
 	// difference is what may be done rather than what may be reached: every
 	// write over these records asks for the first, and these reads ask for
 	// either. Written as a note, an access review reading the published
-	// document would have counted them as administrator-only.
+	// document counts them as administrator-only.
 	deploymentRecords = "records"
 	// anySubject is any credential this deployment recognizes, a pipeline's
 	// key included. It still answers only what that subject may see.
@@ -43,17 +43,17 @@ const (
 	// anyPerson is any credential belonging to somebody who signed in. A
 	// pipeline's key is not somebody.
 	//
-	// Nearly every operation carrying anySubject then refused every credential
-	// that is not a person, so the generated reference, the extension a client
-	// generator reads, and an access review all stated a rule the code
-	// contradicted. The word could not simply be redefined, because two
-	// operations really do mean it.
+	// An operation carrying anySubject and then refusing every credential that
+	// is not a person leaves the generated reference, the extension a client
+	// generator reads and an access review all stating a rule the code
+	// contradicts. The word cannot simply be redefined, because two operations
+	// do mean it.
 	anyPerson = "person"
 	// ownSubject is whoever is asking, about themselves.
 	ownSubject = "self"
 	// noCredential is the handful of operations answered before anybody has
 	// one. Named rather than left as anySubject with a note contradicting it:
-	// the generated reference said "requires any recognized credential" and
+	// the generated reference says "requires any recognized credential" and
 	// then "answered without a credential" one line apart, which is a rule
 	// nobody can follow.
 	noCredential = "none"
@@ -61,20 +61,20 @@ const (
 
 // requires describes what an operation asks for.
 type requires struct {
-	// Scope is what the rights are held against.
+	// Scope is the thing the rights are held against.
 	Scope string `json:"scope"`
 	// AnyOf lists the roles that satisfy it. Any one is enough; empty means
 	// the scope alone is the requirement.
 	AnyOf []string `json:"any_of,omitempty"`
-	// Note is what a caller must know that the roles do not say — a narrowing
-	// that is not a role, or a control that refuses somebody holding every
-	// role listed.
+	// Note is the part a caller must know that the roles do not state — a
+	// narrowing that is not a role, or a control that refuses somebody holding
+	// every role listed.
 	Note string `json:"note,omitempty"`
 	// Narrowed says the roles decide what comes back rather than whether the
 	// operation answers at all.
 	//
-	// The distinction was implicit and it is the whole difference between two
-	// kinds of rule. A gate refuses somebody who holds none of the roles. A
+	// The distinction is the whole difference between two kinds of rule. A
+	// gate refuses somebody who holds none of the roles. A
 	// narrowed operation answers everybody and the roles decide what is in the
 	// answer — somebody holding none gets an empty list, or a count of zero,
 	// which is the correct answer rather than a leak. Read as if it were a
@@ -146,24 +146,24 @@ func declaring(op huma.Operation, asks requires, roles ...access.Role) huma.Oper
 		op.Extensions = map[string]any{}
 	}
 	op.Extensions[requiresExtension] = asks
-	op.Description = strings.TrimRight(op.Description, "\n ") + "\n\n**Requires:** " + asks.said()
+	op.Description = strings.TrimRight(op.Description, "\n ") + "\n\nRequires: " + asks.said()
 	return op
 }
 
 // enforceDeclarations refuses, before any handler runs, a caller the scope on
 // the operation's own declaration excludes.
 //
-// **The declaration wrote a document and nothing else.** What refused a caller
-// was a line inside each handler, so the published requirement and the code
-// were two statements of one rule that could differ — and did: an
-// administrator-only operation whose store check somebody deleted still
-// rendered "Requires: administrator", still carried the extension a client
-// generator reads, and answered anybody holding a credential.
+// A declaration that writes a document and nothing else leaves the refusal to
+// a line inside each handler, so the published requirement and the code are
+// two statements of one rule that can differ: an administrator-only operation
+// whose store check somebody deletes still renders "Requires: administrator",
+// still carries the extension a client generator reads, and answers anybody
+// holding a credential.
 //
 // Only the part of a requirement that is about the subject alone runs here. A
 // role on the product needs the product resolved, which is the handler's work
 // and stays there; the scope is the half that is mechanically checkable, and
-// it was the half checking nothing.
+// without this it is the half checking nothing.
 //
 // It reads the declaration off the operation rather than being written per
 // route, so an operation cannot be registered without it.
@@ -225,23 +225,23 @@ func triageRights() []access.Role {
 	return []access.Role{access.PublicTriage, access.PrivateTriage}
 }
 
-// approveRights is who may agree to a claim: the capability, or a triager on
-// somebody else's work. That the two are different people is checked
-// separately and has no override.
+// approveRights is the roles that may agree to a claim: the capability, or a
+// triager on somebody else's work. That the two are different people is
+// checked separately and has no override.
 func approveRights() []access.Role {
 	return []access.Role{access.Approver, access.PublicTriage, access.PrivateTriage}
 }
 
-// readRights is who may read findings on a product: the pair that reads, and
-// the pair that triages, because triage implies reading at the same
-// visibility. What Reads admits, said as a list for the operations that gate
-// on it.
+// readRights is the roles that may read findings on a product: the pair that
+// reads, and the pair that triages, because triage implies reading at the same
+// visibility. The set Reads admits, stated as a list for the operations that
+// gate on it.
 func readRights() []access.Role {
 	return []access.Role{access.PublicRead, access.PublicTriage,
 		access.PrivateRead, access.PrivateTriage}
 }
 
-// privateRights is who may read work nobody has announced.
+// privateRights is the roles that may read work nobody has announced.
 func privateRights() []access.Role {
 	return []access.Role{access.PrivateRead, access.PrivateTriage}
 }

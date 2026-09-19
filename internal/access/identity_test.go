@@ -267,7 +267,7 @@ func TestAnIdentifierWithNoIssuerNamesNobody(t *testing.T) {
 }
 
 func TestWhichProvidersHaveBoundAnIdentity(t *testing.T) {
-	// What the startup check reads. An authorization nobody has redeemed
+	// The startup check's input. An authorization nobody has redeemed
 	// binds nothing, so it names no provider and does not stop a deployment
 	// that has not yet been signed in to from changing provider.
 	each(t, func(t *testing.T, f *fixture) {

@@ -10,16 +10,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// What would make an approver disagree.
+// The case against agreeing.
 //
-// **An approver is shown the claim and the reasoning and nothing that argues
-// against them**, which is the rubber stamp the queue's whole shape was
+// An approver is shown the claim and the reasoning and nothing that argues
+// against them, which is the rubber stamp the queue's whole shape was
 // written against — so this is a weakness in a control rather than a card
 // layout. The material already exists: the finding's own detail carries the
 // decisions made elsewhere and what else sits at the place. What was missing
 // is putting it where the judgment is made rather than a page away from it.
 //
-// **Two counts and no argument.** It does not say a claim is wrong — nothing
+// Two counts and no argument. It does not say a claim is wrong — nothing
 // here can know that — it says what a careful reader would go and look up, so
 // that not looking is a choice rather than an omission.
 
@@ -59,10 +59,10 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		products = append(products, row.ProductID)
 	}
 
-	// What has been agreed about the same issue somewhere else. Approved
-	// only: a proposal is one person's opinion, and counting proposals here
-	// would let two people in a queue agree with each other by being counted
-	// at each other.
+	// agreed is what has been agreed about the same issue somewhere else.
+	// Approved only: a proposal is one person's opinion, and counting
+	// proposals here would let two people in a queue agree with each other
+	// by being counted at each other.
 	//
 	// The claim's own place is not excluded, and that is deliberate. A
 	// place identity is a pair of names with no product in it, so
@@ -97,9 +97,9 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		byIssue[row.VulnerabilityID][row.Outcome] += row.Places
 	}
 
-	// How much else at the same place nobody has answered, by the same test
-	// every screen uses for "undecided": no live claim covering it at the
-	// versions the code holds now.
+	// open is how much else at the same place nobody has answered, by the
+	// same test every screen uses for "undecided": no live claim covering
+	// it at the versions the code holds now.
 	var open []struct {
 		ProductID int64  `bun:"product_id"`
 		Place     string `bun:"place_identity"`

@@ -73,7 +73,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		// Which product this build belongs to, read before anything is
+		// The product this build belongs to, read before anything is
 		// ranked. A rating belongs to a product, so what ranks here is
 		// this product's rating and not a word somebody working on
 		// another one wrote.
@@ -81,7 +81,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		// What is on record about each issue: the rating in force —
+		// The record for each issue: the rating in force —
 		// this product's where somebody here has made one, the
 		// published one otherwise — and the signals that rank it. What
 		// a finding is ordered, admitted and clocked by has to be what
@@ -98,7 +98,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			return err
 		}
 
-		// Whether this build reaches customers, read once. A critical in
+		// This build's reach to customers, read once. A critical in
 		// something only the build system runs matters less than a medium in
 		// what people install, and that is a property of the build rather than
 		// of any finding in it.
@@ -115,7 +115,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		// What the build has already argued about what it ships. Applied here
+		// The build's own claims about what it ships. Applied here
 		// rather than upstream of us, so a suppressed finding is something
 		// that can be seen and accounted for instead of one that never
 		// arrived.
@@ -123,7 +123,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		// Which of them reached anything is worked out against what the target
+		// Those that reached anything are worked out against what the target
 		// contains, not against what was reported: a claim covering a
 		// component nothing was found in has still done its job, while one
 		// covering nothing the build ships has not.
@@ -147,12 +147,11 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			return fmt.Errorf("read when this run started: %w", err)
 		}
 
-		// What this product considers worth triaging. Below that line
-		// nothing carries a deadline: a line says "this is not work"
-		// and a deadline says "this is work, and it is late", and
-		// holding both means one of them is lying — within a year the
-		// overdue figure would be thousands of things nobody ever
-		// intended to look at.
+		// The product's triage line. Below that line nothing carries a
+		// deadline: a line says "this is not work" and a deadline says "this
+		// is work, and it is late", and holding both means one of them is
+		// lying — within a year the overdue figure would be thousands of
+		// things nobody ever intended to look at.
 		floor, err := FloorFor(ctx, tx, productID)
 		if err != nil {
 			return err
@@ -189,7 +188,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		onTheClock := moves && !supported.Past(s.now().UTC())
 
 		wanted := map[key]Finding{}
-		// How long each of them has, where it is on the clock at all. Carried
+		// The time each of them has, where it is on the clock at all. Carried
 		// beside the finding rather than on it: a deadline is worked out from
 		// the finding's own opening, and one already open opened before this
 		// run — so the window has to reach the loop below, where that is
@@ -215,7 +214,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				at := place{componentID: component.ID, consumerID: consumerID}
 				wanted[key{vulnerabilityID, at}] = Finding{
 					TargetID: targetID, Kind: Vulnerable,
-					// What a scanner found in a shipped component is public
+					// A scanner's finding in a shipped component is public
 					// knowledge by the time it reaches us: the advisory it
 					// matched is published. What is not disclosed is a finding
 					// somebody entered here.
@@ -258,12 +257,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 		}
 
-		// What is already open **that a scan governs**. A run is the authority
-		// on what it found, and everything it no longer reports is closed
-		// below — so without this narrowing, the first nightly scan after
-		// somebody records a finding by hand closes it, with a reason that
-		// reads like the issue went away. Nothing would report that: the row
-		// looks exactly like a component that stopped shipping.
+		// open is what is already open that a scan governs. A run
+		// is the authority on what it found, and everything it no
+		// longer reports is closed below — so without this narrowing,
+		// the first nightly scan after somebody records a finding by
+		// hand closes it, with a reason that reads like the issue went
+		// away. Nothing would report that: the row looks exactly like
+		// a component that stopped shipping.
 		var open []Finding
 		err = tx.NewSelect().Model(&open).
 			Where("target_id = ?", targetID).
@@ -283,7 +283,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			held[key{f.VulnerabilityID, place{f.ComponentID, value(f.ConsumerID)}}] = f
 			heldAt[at{f.VulnerabilityID, f.PlaceIdentity}] = f
 		}
-		// What those findings were about, so a version can be named rather
+		// The subject of those findings, so a version can be named rather
 		// than merely known to have changed.
 		before, err := componentsByID(ctx, tx, open)
 		if err != nil {
@@ -334,8 +334,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			// Asked of the answer rather than of what moved. A fix appearing
 			// upstream starts a clock that was not running, and one being
-			// withdrawn stops it — and a row written before this rule was
-			// what it is now carries an answer nothing else would correct.
+			// withdrawn stops it — and a row written under an earlier rule
+			// carries an answer nothing else corrects.
 			clockMoved := !sameDate(already.DueAt, f.DueAt)
 			if same(already, f) && !moved && !clockMoved {
 				continue
@@ -379,7 +379,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		}
 
 		var closing []Finding
-		// Where the same issue is still wanted at the same place, this row is
+		// With the same issue still wanted at the same place, this row is
 		// being superseded by one against a new version rather than resolved.
 		wantedAt := map[at]bool{}
 		for _, f := range wanted {
@@ -391,7 +391,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			closing = append(closing, f)
 		}
-		// What a closing finding was about is read from the component
+		// A closing finding's subject is read from the component
 		// catalog rather than from what the variant currently contains — the
 		// whole reason it is closing is usually that it is no longer there.
 		departed, err := componentsByID(ctx, tx, closing)
@@ -473,9 +473,9 @@ func same(held, found Finding) bool {
 	return held.FixState == found.FixState &&
 		held.FixedIn == found.FixedIn &&
 		sameDate(held.FixedAt, found.FixedAt) &&
-		// How it was matched moves for a real reason: a distribution
-		// recording an advisory for something previously reached only by
-		// upstream identifier changes the answer from "somebody has to look"
+		// The match method moves for a real reason: a distribution
+		// recording an advisory for something reached only by an upstream
+		// identifier changes the answer from "somebody has to look"
 		// to "the people who package this said so". A night where that is all
 		// that moved is a night worth recording.
 		held.Matched == found.Matched &&
@@ -500,7 +500,7 @@ func learnedExploitation(f Finding, startedAt time.Time) *time.Time {
 // ranking reports whether an open finding's place in the order has moved, and
 // whether exploitation is what moved it.
 //
-// The two are separate, and deliberately: **every** ranking signal moves the
+// The two are separate, and deliberately: every ranking signal moves the
 // order, and exploitation is the only one that starts a clock over. A score
 // somebody revised upward is worth reordering the list for and is not worth
 // resetting a deadline over — likelihood and score are not in the deadline at

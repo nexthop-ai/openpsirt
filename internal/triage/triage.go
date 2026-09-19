@@ -145,7 +145,7 @@ func (o Outcome) Valid() bool {
 // person, and putting it back does not. "Affected" is the only one that leaves
 // the issue visible as an issue.
 //
-// **The two commitments hide it as well**, and that is deliberate: work with a
+// The two commitments hide it as well, and that is deliberate: work with a
 // plan and a date on it should not come back round to somebody the next
 // morning. What keeps that from being an ungated deferral is where the gate
 // sits rather than whether there is one — a commitment inside the deadline

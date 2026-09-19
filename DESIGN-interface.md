@@ -30,21 +30,21 @@ end rather than left to be found by clicking.
 - [The finding screen](#the-finding-screen)
 - [The decision form](#the-decision-form)
 - [The reach sheet](#the-reach-sheet)
-- [Walking the list](#walking-the-list)
+- [List navigation](#list-navigation)
 - [The dependency tree](#the-dependency-tree)
 - [The review queue](#the-review-queue)
 - [The claim page](#the-claim-page)
 - [Assignments and routing rules](#assignments-and-routing-rules)
 - [Catalog and inventories](#catalog-and-inventories)
 - [Product and scan-run pages](#product-and-scan-run-pages)
-- [Recording a flaw](#recording-a-flaw)
+- [Flaw entry](#flaw-entry)
 - [Disclosure and advisories](#disclosure-and-advisories)
 - [The editor](#the-editor)
 - [Reachable from a keyboard](#reachable-from-a-keyboard)
 - [A read that failed](#a-read-that-failed)
 - [A render that threw](#a-render-that-threw)
 - [An expired session](#an-expired-session)
-- [Attaching a file](#attaching-a-file)
+- [File attachment](#file-attachment)
 - [Mentions and assignment pickers](#mentions-and-assignment-pickers)
 - [The search box](#the-search-box)
 - [A person's own page](#a-persons-own-page)
@@ -53,16 +53,16 @@ end rather than left to be found by clicking.
 - [Reports, settings, inheritance](#reports-settings-inheritance)
 - [The System screen](#the-system-screen)
 - [The administration screens](#the-administration-screens)
-- [Showing the ordering signals](#showing-the-ordering-signals)
+- [The ordering signals](#the-ordering-signals)
 - [Units, dates and copy](#units-dates-and-copy)
-- [What a screen says](#what-a-screen-says)
+- [Screen copy](#screen-copy)
 - [Interface-wide rules](#interface-wide-rules)
 - [The initial load](#the-initial-load)
-- [Running it locally](#running-it-locally)
+- [Local development](#local-development)
 - [Divergence from the mockup](#divergence-from-the-mockup)
 - [Test coverage](#test-coverage)
 - [Not built](#not-built)
-- [What the checks missed](#what-the-checks-missed)
+- [Gaps the checks left](#gaps-the-checks-left)
 - [File organization](#file-organization)
 - [Limits](#limits)
 
@@ -96,7 +96,7 @@ reload while working when navigated to.
 | The rule is "the router has no route for this", asked of the router | Not "the path is outside `/v1`". The framework registers routes of its own — the API document and the schemas it references — and a prefix rule hands those to anybody who asks |
 | Names the server owns are reserved even when nothing is routed there | The framework's documentation route is disabled by configuration, and unrouted is exactly what marks a path as the page's. Without a reserved list the interface would have claimed `/docs`. A test asserts that mounting the interface opens nothing |
 | The page loads without a credential and nothing else changes | The sign-in screen *is* the page. What is served is a compiled application and its assets, carrying no data |
-| An address the page does not know says so, and keeps the address | It used to redirect to the home screen, which threw away the one piece of evidence a link built wrong leaves behind. A component link composed with no product selected was reported as "it brings you back to the homepage" — the reporter could not say what address they had been on, because it was gone from the bar |
+| An address the page does not know says so, and keeps the address | A redirect to the home screen throws away the one piece of evidence a link built wrong leaves behind: a component link composed with no product selected is reported as "it brings you back to the homepage", and the reporter cannot say what address they were on, because it is gone from the bar |
 
 ## The generated client
 
@@ -110,7 +110,7 @@ The session is a cookie the browser holds and nothing in the application ever
 sees. The application holds the cross-site-request token, deliberately readable
 by script where the session cookie is not: echoing it distinguishes a request our
 page made from one somebody else's page caused. Every unsafe request carries it,
-**attached once as middleware rather than per call** — the one call somebody
+attached once as middleware rather than per call — the one call somebody
 forgets is the one that breaks in production and not in review.
 
 ## Capabilities before drawing
@@ -148,9 +148,8 @@ what every other application on the same screen calls them.
 | Kept in the browser, changing nothing anybody else sees | The same rule as saved filters |
 | Severity never borrows the accent | Each look has its own accent and the same five-band severity scale beside it, with exploited above critical. A page that paints "critical" in the brand color has nothing left that means "act on this" |
 
-A third look — an all-light hairline set — was dropped. Three looks named for
-their aesthetics asked somebody to guess which of "Dojo", "Ledger" and "Obsidian"
-was the light one.
+Two looks, not three. Named for their aesthetics they ask somebody to guess
+which of "Dojo", "Ledger" and "Obsidian" is the light one.
 
 ## The shell
 
@@ -171,17 +170,17 @@ selected, and the count beside it is of what the list it opens will show.
 
 Other bar rules:
 
-- **The search in the bar is the findings list's own search**, reached without
+- The search in the bar is the findings list's own search, reached without
   going there first. "/" focuses it, unless somebody is already typing.
-- **Upload is in the bar on every screen** (REQ-05), because the form picks its
-  own target; the inventories screen has it too, because that is where the result
+- Upload is in the bar on every screen (REQ-05), because the form picks its own
+  target; the inventories screen has it too, because that is where the result
   appears.
-- **On a narrow screen the rail goes and a tab bar of three arrives** — home,
-  findings, queue — which is what somebody reviews and responds from on a phone.
-  A menu control in the bar and a fourth tab open the whole rail as a panel over
-  the page.
+- On a narrow screen the rail goes and a tab bar of three arrives — home,
+  findings, queue — which is what somebody reviews and responds from on a
+  phone. A menu control in the bar and a fourth tab open the whole rail as a
+  panel over the page.
 
-### Folding the rail
+### The folded rail
 
 Twenty-four entries ask for about 935 pixels, taller than the window on most
 laptops. A scroll region of its own puts a second scrollbar down the middle of
@@ -191,8 +190,8 @@ want it.
 
 A group heading folds what is under it, and "Manage" starts folded. Granting a
 role or changing a setting is occasional rather than something done while
-working, and with it away the rail asks for under seven hundred. **A first visit
-needs nothing out of it**: somebody who has just arrived picks a product in the
+working, and with it away the rail asks for under seven hundred. A first visit
+needs nothing out of it: somebody who has just arrived picks a product in the
 bar above, which is what that control is for, rather than in the rail. The heading
 stays a heading to look at — a caret is the only thing marking it as a control,
 because three headings drawn as buttons read as three more places to go. What is
@@ -249,19 +248,19 @@ waiting for review, what is being worked on, what stopped applying, then the
 trends, and the operational state at the foot. The trends answer a question
 asked occasionally, and they are also the slowest part of the page.
 
-**The reader's own work leads, then the shape of the estate.** Assigned to
-them, and claims of theirs an approver sent back; then open at or above the
-floor, known exploited, pending their approval, and overdue. Home answered "how
-much is there" and never "what do I do next" — the largest number on the screen
-was the whole estate's open count, which is the least actionable thing on it,
-and the one panel that could have carried somebody's own work is deliberately
+The reader's own work leads, then the shape of the estate. Assigned to them,
+and claims of theirs an approver sent back; then open at or above the floor,
+known exploited, pending their approval, and overdue. Led by the estate, home
+answers "how much is there" and never "what do I do next": the largest number
+on the screen is the whole estate's open count, which is the least actionable
+thing on it, and the one panel that could carry somebody's own work is
 everybody else's.
 
 Open is the trend's latest point at every scope, which counts distinct issues —
 the findings list counts one row per issue and component, and a tile switching
 between the two as the picker moved would quote two figures for one word.
 
-**What became of a claim is derived rather than stored**, so there is no count
+What became of a claim is derived rather than stored, so there is no count
 to ask the server for: a page is read and what is on it is counted, and the
 tile says so where the page was cut. That is the treatment the deadline tiles
 beside it already get.
@@ -315,12 +314,12 @@ the product it belongs to, and what directly pulls it in. Those two are what
 differ between sibling rows; the steps between them rarely distinguish anything,
 so they are counted rather than named.
 
-Both ends cost **one recursive statement for the whole page**: the database climbs
+Both ends cost one recursive statement for the whole page: the database climbs
 from every consumer on the page to the root and returns the nodes on the way.
-Climbing is bounded by the depth of the graph rather than its size, and bounded at
-sixty-four steps so a document in a loop is answered rather than followed. The
-first version read every edge of the build into memory — 18,561 rows on a switch
-image — and walked them in Go, which was three to eighteen milliseconds and scaled
+Climbing is bounded by the depth of the graph rather than its size, and bounded
+at sixty-four steps so a document in a loop is answered rather than followed.
+Reading every edge of the build into memory instead — 18,561 rows on a switch
+image — and walking them in Go is three to eighteen milliseconds, and scales
 with the graph rather than with the page.
 
 Where a row's places are reached different ways, the row says the pair it shows is
@@ -353,11 +352,10 @@ further on, and that click is the point.
 ### The cross-product list
 
 The cross-product list is this screen with the product left out (REQ-64), not a
-screen of its own, and one entry on the rail rather than two. It was a second
-screen offering four of this one's filters, so "which of our products carry
-this, and what is running out anywhere" was answered by the weaker of the two
-lists. The server never had that split: both routes take the same filters from
-one definition.
+screen of its own, and one entry on the rail rather than two. A second screen
+offering four of this one's filters answers "which of our products carry this,
+and what is running out anywhere" with the weaker of the two lists. The server
+has no such split: both routes take the same filters from one definition.
 
 What is absent without a product is what has no meaning without one. A subtree
 is a walk over one build's edges and "differs between builds" is a statement
@@ -372,16 +370,15 @@ list.
 
 ## Filters
 
-Every filter the server offers is on the screen (REQ-60). That sentence was not
-true when it was written: the server narrowed by twenty-nine things and the
-screen could reach twenty-five, with the exploit-likelihood threshold and the
-three date bounds having no control at all.
+Every filter the server offers is on the screen (REQ-60). A filter the server
+takes and the screen cannot reach — an exploit-likelihood threshold, a date
+bound — is a narrowing only somebody editing the address can use.
 
 | Rule | |
 |---|---|
 | Every filter is labeled with the question it asks, grouped by what they are about | Severity and risk, what upstream did, where triage has got to, where the row came from, the component, and time. A value says what it is rather than completing a sentence begun by a label nobody can see |
-| What is narrowing the list is above the list | One chip per filter naming both the filter and its value, removable by clicking, whether or not the panel is open. The control used to carry a count and nothing else, and the count was a hand-maintained list of variables that had already fallen behind |
-| **The selection is a chip too, and the first of them** | It rides on the path rather than in the parameters, so it drew nothing — and a list scoped to one product sat under filters identical to the list across every product, counting fewer rows, with nothing on screen to explain the difference. The rail's own unassigned count is across every product a reader may see, so the two disagreed by exactly what the other products held. A chip per level, product first, because each is narrowing what the one before it chose |
+| The filters narrowing the list are above the list | One chip per filter naming both the filter and its value, removable by clicking, whether or not the panel is open. A control carrying a count and nothing else keeps that count as a hand-maintained list of variables, which falls behind the filters it counts |
+| **The selection is a chip too, and the first of them** | It rides on the path rather than in the parameters, so it draws nothing of its own — and a list scoped to one product then sits under filters identical to the list across every product, counting fewer rows, with nothing on screen to explain the difference. The rail's own unassigned count is across every product a reader may see, so the two disagree by exactly what the other products hold. A chip per level, product first, because each is narrowing what the one before it chose |
 | Removing a selection chip widens by a level and carries the filters | Widening is a move rather than a parameter change, and dropping what somebody actually narrowed by on the way would be a second surprise on top of the one the chip ends. The branch and the variant are the new address's to put back, so they are not carried |
 | **A filter cleared drops its key; it does not write out its own default** | The three narrowings the list applies when the address is silent are applied only where the key is absent. Two controls wrote both of their values to mean "not narrowed", which made the address say something, suppressed the default and widened the list — and left no way to express from the panel what the rail's address says |
 | The count is read from the address | The one place that knows what every filter is called |
@@ -424,7 +421,7 @@ Three filters need defining:
 A filter whose values are not exclusive takes several at once. Four do: the
 decision state, the decision outcome, what upstream did, and the kind of
 package. Each was one word, so "undecided or pending approval" had to be asked
-twice and read side by side. **Four more take a set**: who is dealing with it,
+twice and read side by side. Four more take a set: who is dealing with it,
 what a VEX document says, and, among the typed boxes, the component, the tag,
 the VEX publisher and the weakness. The typed ones are chip fields, because a
 box showing one value while narrowing by three is what the summary above the
@@ -437,11 +434,11 @@ list exists to prevent.
 | Drawn as checkboxes behind a control that says what is ticked | A closed control reading "Any" over three ticked boxes is how a narrowed list comes to look unnarrowed. The chips above name each separately, so removing one leaves the rest |
 | Carried in the address as the parameter repeated | A server reading only the first word narrows to less than was asked for, which looks like an answer rather than a mistake. Marked exploded on both sides, with a test at the HTTP layer that asks for two states and counts the rows |
 
-The decision state is above the list, beside the severity floor, where the
-exploited and fix-available chips used to sit. Neither earned the place: the
-list is ordered by urgency, so what is being exploited is already at the top,
-and a fix being available is a column on every row. What somebody reaches for
-first is what has not been answered yet.
+The decision state is above the list, beside the severity floor, in the place
+the exploited and fix-available chips would take. Neither earns it: the list is
+ordered by urgency, so what is being exploited is already at the top, and a fix
+being available is a column on every row. The first thing somebody reaches for
+is what has not been answered yet.
 
 | Rule | |
 |---|---|
@@ -455,8 +452,8 @@ first is what has not been answered yet.
 
 Sorting is by a column the server names, never by one a caller does (REQ-66).
 Four headers order the list — severity, EPSS, locations and the deadline — and
-clicking the one already sorted turns it around. **An order control above the
-list carries all six**, including the two with no column: the ranking the list
+clicking the one already sorted turns it around. An order control above the
+list carries all six, including the two with no column: the ranking the list
 is in when nothing is asked, and how long something has been open. What reaches
 the statement is
 an expression the server stores against each of its own keys: a placeholder
@@ -471,7 +468,7 @@ back in its own order rather than refusing.
 | **An empty list says what emptied it and offers the way back** | A narrowed list matching nothing is a dead end: the controls that produced it are scrolled off above, and what is left on screen says so and offers nothing. It names how many filters are in force and carries a control that takes all of them off — and says "nothing is open here at all" where none was in force, which is a different answer |
 | **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided lead now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the order control above the list |
 | **A row is decided where it sits** | Opening a row carries the same decision form the finding screen does, over the list rather than instead of it. What a claim requires and what it writes are unchanged — a second person still agrees — and what changes is the two journeys per row, each of which read the list again on the way back. Everything the form cannot show there is one link away |
-| **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. The whole screen used to unmount — the search box, the chips, the count and the controls with it — so changing one filter blanked the thing being narrowed and took the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
+| **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. Unmounting the whole screen — the search box, the chips, the count and the controls with it — blanks the thing being narrowed and takes the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
 | **Each view's button carries what that view would show** | The three answer one narrowing at three grains and the difference is the whole reason to switch: a by-issue list of 7,455 rows is 341 by component and 284 by upgrade. Without the numbers the list opened on its longest view and read as the only one. The by-upgrade figure is a fix-bundle aggregate, measured at 2.2 s against a backlog of 8,376, so it is held for five minutes rather than asked again as somebody pages |
 | **The list opens by issue, whatever the size** | No threshold, and the other two are a click away in the toggle and in the address as a chip that removes itself. A list that jumps to a different grain past a number nobody set is a list that answers a different question on two products |
 | The order in force is named on screen, and every order can be asked for | Four of the six sit under a column header, so the other two could be reached by typing an address and by nothing else — one of them being urgency, which is the order the list opens in and what REQ-32 is for. Sorting by a column and then wanting the ranking back was a dead end |
@@ -515,7 +512,7 @@ it prepares is kept as a number of days and turned into a date when somebody
 opens the form. Kept as a date and never read, the prefill opened the form with
 the outcome chosen and no date, which cannot be submitted.
 
-**What the list is narrowed by is what prepares a claim**, read off the address
+What the list is narrowed by is what prepares a claim, read off the address
 rather than remembered from the act of picking. Narrowing further asks a
 different question and drops it; coming back to the list finds it again. A rule
 that outlived the narrowing it was picked for would fill a form on a finding it
@@ -575,12 +572,12 @@ coordinator's. Keyed on the fold, so packages built from one source are one row.
 
 ## The component screen
 
-A component has **a row per version each build carries**, with what that build
+A component has a row per version each build carries, with what that build
 ships, what is open against it there, where it could go, the earliest deadline
 among what is open, and what has already been promised. The issue count is the
 way through to the findings list.
 
-**The screen is arranged on where the package sits**, because that is what
+The screen is arranged on where the package sits, because that is what
 decides what can be done about it. A leaf carries its own risk and is upgraded; a
 package vendored in pre-built carries everything beneath it and moves only when
 it does. So the graph leads — what pulls it in, the package, what it carries —
@@ -632,70 +629,70 @@ anything, which is why it is not gated on a claim. Nothing about writing one
 changes what ranks, a deadline, or what the product triages, and it says so
 beside the button.
 
-**The identifier in the heading opens the issue screen.** That screen answers
-"everywhere this issue sits", and the doors into it were an exact-match search,
-one report and one queue link — so the reader most likely to want it, somebody
-already looking at one place the issue sits, had none.
+The identifier in the heading opens the issue screen. That screen answers
+"everywhere this issue sits", and without this the doors into it are an
+exact-match search, one report and one queue link — none of them reachable by
+the reader most likely to want it, who is already looking at one place the
+issue sits.
 
-**The issue screen carries the same thread, a product at a time.** That screen
+The issue screen carries the same thread, a product at a time. That screen
 shows an issue wherever it sits, and a note belongs to one product — so one
 thread merging what several teams wrote would be the deployment-wide record a
 per-product note exists to avoid, and a reader could not tell which product any
 line of it was about. A product is picked where the issue sits in more than
 one.
 
-The description leads, at full width (REQ-60, as amended). The rule that put the
-action first is still the defect it fixes — the form had been three screens down
-— but the description went into the narrow column with it, where a paragraph
-runs four words to a line.
+The description leads, at full width (REQ-60, as amended). The rule putting the
+action first still holds against the defect it fixes, which is a form three
+screens down; what it must not take with it is the description, which in the
+narrow column runs four words to a line.
 
-Evidence full width, then the action full width beneath it — a reversal of
-evidence on one side and the action on the other. Both are still above the fold,
-which is what the side-by-side arrangement was for, and what it cost was
-measurable: rendered from the demo the narrow column held severity 7.8, EPSS
+Evidence full width, then the action full width beneath it, rather than
+evidence on one side and the action on the other. Both are still above the
+fold, which is what a side-by-side arrangement buys, and what it costs is
+measurable: rendered from the demo the narrow column holds severity 7.8, EPSS
 0.999, CWE-1288, "yes — exploited", the CVSS vector and eleven references, read
-at 380 pixels, while the widest thing on the screen was an empty text area.
+at 380 pixels, while the widest thing on the screen is an empty text area.
 Somebody weighs the evidence and then acts, and the page runs in that order.
 
 Triage is one pane and both questions: who is dealing with it, and what was
-decided. They were two panes with a screen between them. Where nothing is left
-to decide the form is not drawn and the assignee stands alone, because
+decided. Two panes with a screen between them is two visits. Where nothing is
+left to decide the form is not drawn and the assignee stands alone, because
 reassigning a decided finding is ordinary.
 
 The rating sits inside the severity block, under the words it disagrees with,
-so it is changed where it is read. It was a pane of its own further down, which
-asked somebody reading a severity to go and find the control for it.
+so it is changed where it is read. A pane of its own further down asks somebody
+reading a severity to go and find the control for it.
 
 The references sit above the VEX statements, at the head of what is read to
 decide. A write-up is what somebody triaging reads first, and a third party's
 claim about the finding is read against it rather than before it.
 
-They were below the form for a while, on the grounds that eleven links beside
-the action recreate the defect the side-by-side layout was built to fix. That
-holds for the whole block of them and not for the advisory somebody is about to
-judge from, which is consulted during the judgment rather than after it.
+Below the form they answer the objection that eleven links beside the action
+recreate the defect the side-by-side layout fixes. That holds for the whole
+block of them and not for the advisory somebody is about to judge from, which
+is consulted during the judgment rather than after it.
 
 What is neither evidence nor action — the timeline, the revisions, the
 comments, the holder, the assessment — stays below.
 
 Where a fix will land is not on this screen. It is settled by the judgment that
-promises the work, and the releases it is for are named there; a pane of its own
-offered the same set with no version, no date and no reasoning attached, which
-is a plan nothing could chase. What became of it is read from the release and
-from the build's list of what it is waiting on.
+promises the work, and the releases it is for are named there. A pane of its
+own offers the same set with no version, no date and no reasoning attached,
+which is a plan nothing can chase. What became of it is read from the release
+and from the build's list of what it is waiting on.
 
 A decision is made on the finding's own screen, and nowhere else (REQ-57,
-reversed). The list opened the decision form inside a row for a while, so a run
-of similar findings could be answered without leaving it. What that did not
-carry was everything else the finding puts beside a judgment — the references,
-the way down, what a VEX document said, the history, the comments. The saving
-was navigation and the cost was the evidence.
+reversed). A decision form inside a row answers a run of similar findings
+without leaving the list, and carries none of what the finding puts beside a
+judgment — the references, the way down, what a VEX document said, the history,
+the comments. The saving is navigation and the cost is the evidence.
 
 | Rule | |
 |---|---|
-| It says when it runs out and who has it | The list carried the deadline, the age and the owner, and the screen somebody decides on carried none of them |
+| It says when it runs out and who has it | The list carries the deadline, the age and the owner, and the screen somebody decides on is the wrong place for none of them |
 | It says how many of its places have been decided (REQ-57) | A finding half answered has to look different from one nobody has touched. The count of what the build argued away through its own VEX documents cannot stand in for this: reading it as ours would credit somebody else's reasoning to us |
-| It states how the match was made, and says where it came from | The list marks these and the screen somebody decides on did not, which is the wrong way round. Both answers are stated rather than only the weaker one, and nothing is said where the scanner said nothing — unknown is not unconfirmed |
+| It states how the match was made, and says where it came from | The list marks these, and the screen somebody decides on is where they matter more. Both answers are stated rather than only the weaker one, and nothing is said where the scanner said nothing — unknown is not unconfirmed |
 | Where to read about it is worked out from the identifiers, not only relayed (REQ-18) | The issue's own record, the record under each other name, the answer from the distribution that packages the component, and the package's own page. Derived at read time, kept apart from what the scanner supplied, and empty rather than approximate where a name resolves to no scheme this knows. The server derives them, so a machine client gets the same list; nothing is fetched |
 | Where it sits shows the chain, not the immediate parent | The same parent can be reached by several routes, and a screen naming only the nearest cannot tell them apart |
 | Where upstream currency is switched on, it says what upstream released and when (REQ-69) | Two facts rather than a judgment about anybody's project. Where an issue was named a clear year after the last release and is still unfixed, the screen says that is why there is no fix — never as a claim that a project is abandoned. It needs a full year of silence, because comparing two year-numbers makes a five-week gap look identical to a five-year one. Switched off, the panel is absent rather than empty |
@@ -709,9 +706,9 @@ Four situations for what pulls something in, and they are not one.
 | A named consumer nothing places | Two rows — the consumer, then the component under it — with "nothing recorded what pulls this in" on the consumer, which is the row it is true of |
 | The inventory placed it nowhere | The component, with "nothing recorded what pulls this in" |
 
-The middle two used to be drawn as the last, which said "nothing recorded what
-pulls this in" over records that named the consumer. The third also drew an
-empty name, read off the end of a chain that was not there.
+The three are distinct answers. Drawn alike, "nothing recorded what pulls this
+in" stands over records that name the consumer, and the third draws an empty
+name read off the end of a chain that is not there.
 
 One row per place, however many rows a finding holds there. `DESIGN-findings.md`
 owns that rule.
@@ -730,10 +727,10 @@ Nothing is chosen for you (REQ-59). The outcome opens unselected, the
 justification opens unselected, and submit is refused until each question being
 asked has an answer.
 
-It opened on "not applicable" with "vulnerable code not in execute path" already
-selected, so every finding was one click from a dismissal carrying a justification
-nobody had chosen — and a justification is a claim about our build that a reader
-is entitled to take literally. There is no neutral default to reach for instead:
+Opened on "not applicable" with "vulnerable code not in execute path" already
+selected, every finding is one click from a dismissal carrying a justification
+nobody chose — and a justification is a claim about our build that a reader is
+entitled to take literally. There is no neutral default to reach for instead:
 "affected" is a claim as well, and a form that pre-answers its own question
 collects the answer it suggested.
 
@@ -766,7 +763,7 @@ A guided review on submit (REQ-25), not a list of checkboxes. The sheet opens on
 a summary: this build, the builds covered automatically, the builds at other
 versions, and any not offered.
 
-The builds at other versions are **one list rather than one sheet each**, ticked
+The builds at other versions are one list rather than one sheet each, ticked
 where the reasoning holds at that version too and unticked to start, because a
 tick is the claim. Two steps — where it applies, then confirm — with Enter to
 advance, Escape to leave and the arrows to move. The last lists what will be
@@ -781,7 +778,7 @@ written, and only then is anything sent.
 | What counts as nothing is one thing: no build holds this issue at another version | Builds already matching are named on the sheet rather than asked about, so their absence from a skipped sheet costs nothing — the confirmation that follows names them |
 | An unread reach is not an empty one | A query still in flight, or one that failed, contributes no other versions, and treating that silence as "there are none" would submit past a question rather than skip one that was not there. The sheet is skipped only when every one of those reads succeeded |
 
-## Walking the list
+## List navigation
 
 The primary action is above the fold, and the next finding is reachable without
 going back (REQ-60). The decision form sat at about 1,550 pixels on a page
@@ -806,10 +803,10 @@ Both numbers are distinct issues, per path. A node's own count is the distinct
 issues open against that component; the cumulative count is the distinct issues
 across it and everything under it, each component counted once however many ways
 it is reached. A finding is one issue at one place, and a library at thirty-six
-places with two issues is seventy-two rows — which is what every parent used to
-read, where somebody who drilled down one path is looking at one place and
-expects two. **One recursive statement for the row's whole set of children**:
-0.08 s for the root's thirty children on the full-size image.
+places with two issues is seventy-two rows — which is what a parent reads if it
+counts findings, where somebody who drilled down one path is looking at one
+place and expects two. One recursive statement for the row's whole set of
+children: 0.08 s for the root's thirty children on the full-size image.
 
 | Rule | |
 |---|---|
@@ -825,13 +822,12 @@ expects two. **One recursive statement for the row's whole set of children**:
 | A component's name opens the component | The tree is where somebody asks about a component, and its own screen answers it. The node name is a button, because selecting is how the tree is walked, so the link is the row's own control and the names in the two lists beside the tree |
 | There is no pane over the tree | What sat in it — what pulls a component in, what it pulls in, its history, what is open against it — is the component's screen. Drawn over the tree it was a second copy of a page that already existed, and the page was the thinner of the two |
 
-Ordering on the cumulative count reverses an earlier decision worth keeping in
-view. Ordered on the row's own count the tree opened as an alphabetical list of
-containers saying nothing about which was worth opening; the correction before
-this one made branches alphabetical on purpose, because an edge means "contains
-*or* depends on" and the document does not distinguish them, so forty kernel-module
-packages each depending on the one kernel all report its total. That fault is
-back, deep in the tree, and it is the lesser of the two.
+Ordering on the cumulative count carries a fault worth naming. Ordered on the
+row's own count the tree opens as an alphabetical list of containers saying
+nothing about which is worth opening; ordered cumulatively, an edge means
+"contains or depends on" and the document does not distinguish them, so forty
+kernel-module packages each depending on the one kernel all report its total.
+That fault sits deep in the tree, and it is the lesser of the two.
 
 The list a tree number opens is `beneath`: every open finding at the component
 or anywhere under it, by the same walk. `under` stays the direct consumer. The
@@ -885,23 +881,23 @@ agree, send it back, hold rows back, and say where the work is happening.
 | **Reaffirming is not here** | It is a claim about one place in one build, and this screen is about an argument that may cover many. It happens on the finding, where the places are |
 
 Which acts are offered follows the act-and-needs table in `DESIGN-triage.md`,
-rather than being restated here: offering a button that would refuse somebody is
-worse than offering nothing, and a second copy of the rule is a copy that
-disagrees. It said revising and withdrawing were the author's, where the rule
-and the code both ask for triage on the product at the finding's visibility — so
-a triager reading a colleague's stale claim had no way to revise it on this
-screen and every way to do it from the finding.
+rather than being restated here: offering a button that would refuse somebody
+is worse than offering nothing, and a second copy of the rule is a copy that
+disagrees. A copy saying revising and withdrawing are the author's, where the
+rule and the code both ask for triage on the product at the finding's
+visibility, leaves a triager reading a colleague's stale claim no way to revise
+it on this screen and every way to do it from the finding.
 
 The one thing drawn narrower than the rule is holding rows back, which is
 offered only on a bulk claim that still has outliers, because it is the
 author's side of the choice an approver already has.
 
-A screen asks what it may do rather than working it out from roles. That is what
-the capability answer is for, and it is only usable as a gate while it means
-what the operation accepts: agreeing was reported from the approver capability
-alone while the operation accepts a triager too, so a two-person team where
-neither holds the capability — the ordinary shape of a small team — was shown a
-claim, its reasoning and its history with no way to answer it.
+A screen asks what it may do rather than working it out from roles. That is
+what the capability answer is for, and it is only usable as a gate while it
+means what the operation accepts: reported from the approver capability alone
+while the operation accepts a triager too, a two-person team where neither
+holds the capability — the ordinary shape of a small team — is shown a claim,
+its reasoning and its history with no way to answer it.
 
 ## Assignments and routing rules
 
@@ -909,7 +905,7 @@ Assignments is two tabs: what is due soon and undecided, and who holds what.
 A row nobody holds says "unassigned" in muted text rather than drawing nobody
 as a person with an avatar.
 
-**Work nobody holds is the findings list under two filters**, not a screen of
+Work nobody holds is the findings list under two filters, not a screen of
 its own: nobody assigned, and nothing decided. The rail entry keeps its label,
 its icon and its place, and its address carries those two filters. The badge
 beside it is counted from that same address, through the list's own query, so
@@ -966,10 +962,11 @@ is what the screen is about.
 ## Product and scan-run pages
 
 The product page names every declared build with what is open, overdue,
-exploited, undecided and agreed in each, and when each was last scanned. "How is
-SONiC doing" was five requests and a spreadsheet, and the products table is an
-administration surface — a triage line in a select, an end-of-support date in an
-input — which is a different job from reading how something is going.
+exploited, undecided and agreed in each, and when each was last scanned.
+Without it "how is SONiC doing" is five requests and a spreadsheet, because the
+products table is an administration surface — a triage line in a select, an
+end-of-support date in an input — which is a different job from reading how
+something is going.
 
 | Rule | |
 |---|---|
@@ -998,7 +995,7 @@ whether it is getting better or worse. Bars rather than a line, because these
 are separate builds and a line between two releases draws a trend through a gap
 where nothing happened.
 
-## Recording a flaw
+## Flaw entry
 
 A screen of its own, reached from the rail rather than from the findings list.
 What is being recorded is precisely what is **not** in that list, so opening it
@@ -1031,11 +1028,11 @@ scanner's text.
 A VEX publisher's own words are shown the same way, and for the same reason.
 What a distribution or an upstream security team publishes arrives in a document
 they wrote, so it is a third party's text reaching the people who hold the most
-access here. It was being rendered as markdown on the finding screen. Raw HTML
-is off at the parser and the page's own policy blocks scripts, so what that
-bought an author was not code: **it was headings, tables, bold assertions and
+access here. Rendered as markdown on the finding screen it is not code — raw
+markup is refused at submission and the page's own policy blocks scripts — but
+it is headings, tables, bold assertions and
 the text of arbitrary outbound links, laid out on the screen a triager is
-deciding from**, plus the ability to name one of this deployment's own
+deciding from, plus the ability to name one of this deployment's own
 attachments and have it drawn beside their argument. A judgment somebody else
 publishes may be evidence and may never be presentation.
 
@@ -1060,8 +1057,8 @@ is still reachable over HTTP and referenced nowhere in the interface.
 ### The advisory
 
 The advisory has a screen, on the issue. Both endpoints answered and nothing
-called them, so **the one output of this tool that leaves the company was the one
-output nobody here could make**.
+called them, so the one output of this tool that leaves the company was the one
+output nobody here could make.
 
 | Rule | |
 |---|---|
@@ -1104,23 +1101,23 @@ the part of a decision that matters most.
 | **A draft keeps the answer as well as the prose** | The outcome, the justification, the date, the fixed version. A draft that kept three paragraphs and lost what they argued for came back as text somebody had to read to find out what they had meant — and the prose is about the answer |
 | It is restored into the form it was typed in, and is not a default | The rule that the decision form opens on nothing chosen is about what somebody has *not* answered. This is their own answer to this exact finding, keyed on every part of it, and an explicit "start from this" beats it |
 
-### Where somebody was
+### Restored position
 
 A browser restores the scroll position on a real navigation and this
 application never makes one.
 
 | Rule | |
 |---|---|
-| **A list opened by pressing back opens where it was being read** | Going into a finding and coming back rebuilt the list at the top: eighteen rows above where somebody had been, on the screen whose whole use is working down a list one row at a time. The address and the filters survived because they are in the address; the place in the list is the one thing that cannot be re-derived from it |
+| **A list opened by pressing back opens where it was read** | Going into a finding and coming back otherwise rebuilds the list at the top: eighteen rows above where somebody was, on the screen whose whole use is working down a list one row at a time. The address and the filters survive because they are in the address; the place in the list is the one thing that cannot be re-derived from it |
 | A list opened fresh opens at the top | Which is what a fresh list is. The two are told apart by how the arrival happened, and restoring on both would drop somebody into the middle of a list they have not read |
 | Restored after the rows are drawn | Scrolling a page that is a few hundred pixels tall clamps to the bottom, so the restore lands somewhere arbitrary and reads as a fault in the list |
 | Written as somebody scrolls, not as they leave | A route change unmounts the screen, and an unmount is too late to read a position the browser has already moved |
 | A handful of pages, and anything that is not a position is the top | The store is the browser's and a person may edit it, and the value goes straight into a scroll call. An unbounded map in storage grows for as long as the tab is open |
 | Cleared with everything else the session holds | The next person on this browser does not land in the middle of somebody else's page |
 
-### Where an answer appears
+### Answer placement
 
-**A confirmation belongs where the button that produced it was pressed.** The
+A confirmation belongs where the button that produced it was pressed. The
 decision form's submit sits at the foot of a long form and the confirmation is
 drawn at the head of the screen, so somebody pressing it was left looking at
 the form they had just sent, with the answer a page and a half above them and
@@ -1187,7 +1184,7 @@ row they had open are not a draft.
 | Re-authenticating without leaving the page is not what this does | The requirement allows for that: where a redirect is unavoidable, the draft is saved first and the person returns to what they were writing. It is unavoidable here — a provider sign-in is a redirect to somebody else's host, which cannot be framed and increasingly cannot be done silently in a hidden frame either |
 | Where the address is checked is the server, not here | A sign-in that sends a browser wherever a parameter says makes this deployment's own domain vouch for somebody else's page; see `DESIGN-access.md` |
 
-## Attaching a file
+## File attachment
 
 The editor carries an attach control wherever an issue is in hand — writing a
 justification, writing a comment, editing one. It puts the file against that issue
@@ -1241,7 +1238,7 @@ chosen (REQ-64).
 | It matches issue names as well as component names | Labeled "Find a component or an issue", it searched component names only, so the question a PSIRT is asked first when an advisory lands — where is this in what we ship — returned an empty list, which reads as "we do not ship it" |
 | Aliases are matched | An issue is one thing under several names, so the name a reporter used has to reach the row filed under the name a scanner used, or the answer depends on which feed arrived first |
 | Both halves are one box rather than two fields | Somebody typing a name does not classify it first, and an identifier is not mistakable for a package name in practice |
-| It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. It used to return without navigating anywhere when no product was picked, so the box looked live and swallowed what was typed |
+| It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. Returning without navigating anywhere leaves the box looking live and swallowing what was typed |
 | A term that resolves to an issue goes to the issue instead | Decided by asking rather than by the shape of the text: a second copy of the server's name resolution is wrong about every identifier a deployment mints for itself |
 
 ## A person's own page
@@ -1270,15 +1267,15 @@ other, and two that could not be asked at all.
 
 | Section | What it answers |
 |---|---|
-| What they hold | The roles in force, and whether a role they hold grants nothing — which reads very differently from holding none |
+| Grants in force | The roles in force, and whether a role they hold grants nothing — which reads very differently from holding none |
 | Their part in the record | How many claims they argued, how many they agreed to that still stand, and how many agreements they took back. What the rubber-stamp report asks across a program, asked about one person |
 | Roles granted and withdrawn | Every change against them, newest first, with who made it. Absent before means nobody had set it; absent after means it was withdrawn, and a blank cannot tell the two apart |
-| What they were told | Everything sent to them, acknowledged and cleared included |
+| Notifications sent | Everything sent to them, acknowledged and cleared included |
 
 | Rule | |
 |---|---|
 | An agreement taken back is counted apart from one that stands | It is not somebody who agrees, and the record's own file already says so |
-| What they were told is not narrowed by what they may read now | The area somebody reads themselves is narrowed; this is a different question, asked by somebody who administers the deployment. A line about an undisclosed finding, sent while they held the role that reached it, is what the screen is for |
+| The record of what they were told is not narrowed by what they may read now | The area somebody reads themselves is narrowed; this is a different question, asked by somebody who administers the deployment. A line about an undisclosed finding, sent while they held the role that reached it, is what the screen is for |
 | A name nobody holds and a name the caller may not reach answer alike | Resolving first and refusing after makes the refusal informative, which turns a lookup into a directory |
 | Each list is a page, with its total beside it | Both only grow, and a screen that asks for all of either is one that stops answering |
 
@@ -1301,10 +1298,10 @@ goes out with the release, which sat in four places reached four ways.
 
 | Section | What it answers |
 |---|---|
-| What this is | The variants it was actually built as, each with what is open in it |
-| What is true of it now | Open across every variant, by severity |
-| What changed | The release before this one, and the comparison against it |
-| What we told customers | The release note, the advisories, and a VEX document per variant |
+| The variants | The variants it was actually built as, each with what is open in it |
+| Open now | Open across every variant, by severity |
+| Changes | The release before this one, and the comparison against it |
+| Customer documents | The release note, the advisories, and a VEX document per variant |
 | The record | The disposition register per variant |
 
 | Rule | |
@@ -1374,7 +1371,7 @@ What this deployment is doing, rather than what it has found.
 ## The administration screens
 
 Who may sign in, what they hold, and the credentials that carry it. Called
-**Access**, because all three are one subject and two of the three are not users
+Access, because all three are one subject and two of the three are not users
 or roles: a pipeline key belongs to no person, and a personal token is listed
 against the person whose reach it carries. Naming the screen after the first of
 the three left the credentials on a screen that did not mention them.
@@ -1392,11 +1389,11 @@ the three left the credentials on a screen that did not mention them.
 | The branch and the variant on a key are offered from what the product holds | A key names a build that exists: both are resolved through the catalog and refused unless declared. Offered rather than restricting, because the server is what refuses and a name declared between the two requests is not one this should decline. Choosing a product clears them, since a branch belongs to one |
 | The two things held over the deployment are checkboxes beside the grid, not roles in it | A role is held against a product and neither of these is. What each grants is written beside it, because one of them is a reader who changes nothing and that is not what "administrator" reads as |
 
-## Showing the ordering signals
+## The ordering signals
 
 The findings list is ordered by urgency: known-exploited, then whether the build
-reaches customers, then severity, then likelihood. **Every one of those is on the
-row.** An order that sorts on something it does not show reads as no order at all:
+reaches customers, then severity, then likelihood. Every one of those is on the
+row. An order that sorts on something it does not show reads as no order at all:
 the first version showed only the severity word, and the top of a real list came
 out "high, high, medium, medium, medium, high, high, critical" — correct, and
 indistinguishable from unsorted. The first five were known-exploited and nothing
@@ -1404,7 +1401,7 @@ said so.
 
 | Rule | |
 |---|---|
-| **What kind of flaw it is, all of it and named** | One identifier was shown and the rest dropped, as a bare number — "CWE-401" is not something a reader knows, and the four commonest in a kernel backlog are a memory leak, a race, improper locking and a double free, none of which was named. The common ones are named inline and every one links to where it is written up, built from the identifier rather than stored. The two words a feed uses to say it has no classification are said rather than drawn as one |
+| **The kind of flaw, all of it and named** | One identifier shown and the rest dropped, as a bare number, leaves a reader with "CWE-401" — and the four commonest in a kernel backlog are a memory leak, a race, improper locking and a double free, none of them named. The common ones are named inline and every one links to where it is written up, built from the identifier rather than stored. The two words a feed uses to say it has no classification are stated rather than drawn as one |
 | **The band a row is drawn in and the word it says are two answers** | They differ for exactly the two words a scanner reports below low. Both rank inside the low band everywhere that sorts and filters, so that is the color; what the row says is what was rated. Folded together, "rated negligible" read as "Unrated" — which tells a reader nobody has looked at a finding somebody looked at and dismissed |
 | Known-exploited is its own badge, not a replacement for the severity word | Replacing it answers one question by destroying another: an exploited medium is still a medium, and the reader needs both facts to see why it sits above an unexploited high |
 | The score sits beside the word | They come from different places and can tie while the words differ — a 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under v3. Two rows tied at 10.0 with different words look mis-sorted until the number is there. Genuine disagreement between word and number is rare, measured at 3 of 2,645; the vocabulary difference is not |
@@ -1427,8 +1424,8 @@ Home's open figure, the trend and the severity ring count issues and are labeled
 "issues". The findings list and the rail's counts are groups, so the same issue at
 three versions of one library is three rows there. "CVE" is not used as a label,
 because not every issue carries one. The list says "N places" on each row rather
-than calling the row a finding. **The rail has room for a number and not for a
-noun**, so a badge carries its unit on the title and on what a screen reader is
+than calling the row a finding. The rail has room for a number and not for a
+noun, so a badge carries its unit on the title and on what a screen reader is
 given.
 
 Dates take one absolute form and one relative form. Four were in use at once,
@@ -1462,7 +1459,7 @@ history before a direction is claimed, because three points is one change plus a
 confirmation. The panels still draw — the chart shows what there is and claims
 nothing; only the sentence is held back.
 
-## What a screen says
+## Screen copy
 
 Screen copy is labels and values. The reasoning behind a screen belongs in this
 document, not on it.
@@ -1486,13 +1483,14 @@ same fact is written one way in this document and another on a screen.
 | Planned fixes. Cleared by the next scan | A release clears when the next scan of it stops finding the issue, so nothing is marked done by hand |
 | Applies to every build with this component | The same code built several ways is one piece of work |
 
-Measured before the sweep that applied this: **262 standing strings, about
-6,700 words**, across 65 of the interface's files — 69 of them on the screens
+Measured before the sweep that applied this: 262 standing strings, about
+6,700 words, across 65 of the interface's files — 69 of them on the screens
 somebody opens every day. The copy had drifted into explaining the design to
 the reader, which is what a design document is for.
 
-**Contractions.** The rule against them covers the durable documents, which are
-read years later by somebody deciding whether a decision still holds. Screen
+Contractions are allowed here. The rule against them covers the durable
+documents, which are read years later by somebody deciding whether a decision
+still holds. Screen
 copy is not one of those and is written as spoken. In practice it rarely needs
 one: plain and short gets there without.
 
@@ -1527,7 +1525,7 @@ markdown renderer is only needed where somebody reads or writes a justification.
 Measured: one bundle of 820 KB became a 248 KB initial load, with the chart (369
 KB) and the renderer (146 KB) fetched only by the screens that use them.
 
-## Running it locally
+## Local development
 
     make demo                    # build the image, start it, seed it, say where to go
     make demo DEMO_HOST=yourbox  # if you browse by something but localhost
@@ -1581,8 +1579,8 @@ with the library.
 
 `make check` type-checks every screen against a client generated from the API
 document, so a screen cannot disagree with the shape the server sends and a
-drifted endpoint is a compile error rather than a blank panel. **That is real
-coverage and it is most of what the frontend needs.**
+drifted endpoint is a compile error rather than a blank panel. That is real
+coverage and it is most of what the frontend needs.
 
 What it is not is a test of what a screen *says*. Five pieces are pulled out and
 tested on their own — what a notification is called, the count on the control
@@ -1611,7 +1609,7 @@ Coverage of the interface is measured and reported by the gate.
 | **A deadline and an owner in the finding's header** | The row carries both; the header does not |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 
-## What the checks missed
+## Gaps the checks left
 
 | | |
 |---|---|

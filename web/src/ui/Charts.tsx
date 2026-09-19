@@ -31,12 +31,11 @@ export type Point = {
 // The four bands, folded the way the server folds them.
 //
 // The server ranks, filters and clocks on four bands and reports the trend in
-// the six words a feed uses. Something has to fold, and it was being done
-// twice with two different answers: here, "unknown" was counted as low, and
-// everywhere the server looks at it — the severity filter, the triage floor,
-// the order, the deadline — it is a medium. So Home said 1,415 low where the
-// list agreed on 38, and a thousand findings were one thing on one screen and
-// another thing on the next.
+// the six words a feed uses. Something has to fold, and done twice it has two
+// answers: "unknown" counted as low here, and a medium everywhere the server
+// looks at it — the severity filter, the triage floor, the order, the
+// deadline. Home then says 1,415 low where the list agrees on 38, and a
+// thousand findings are one thing on one screen and another on the next.
 //
 // Folded here to match, because a rating with no word is treated as a medium
 // rather than dismissed as a low, and the screen has no business disagreeing
@@ -247,7 +246,7 @@ export function Mix({ points }: { points: Point[] }) {
   );
 }
 
-// What is open right now. A ring on its own says what somebody already knows,
+// The open count right now. A ring on its own says what somebody already knows,
 // so the numbers are beside it rather than inside it.
 export function Ring({ point }: { point?: Point }) {
   const by = folded(point?.by_severity ?? {});
@@ -299,7 +298,7 @@ export function Ring({ point }: { point?: Point }) {
 // it was re-introduced in the same change that declared the class fixed.
 export type Release = Body<"ReleaseBody">;
 
-// What is open at each build, side by side.
+// The open count at each build, side by side.
 //
 // Bars rather than a line: these are separate builds, not one thing measured
 // over time, and a line between two releases draws a trend through a gap where
@@ -332,7 +331,7 @@ export function Across({ releases }: { releases: Release[] }) {
   );
 }
 
-// What each release shipped with.
+// The counts each release shipped with.
 //
 // Bars rather than a line, because a release is a frozen point and a line
 // between two of them draws a path nothing travelled. The gap between two

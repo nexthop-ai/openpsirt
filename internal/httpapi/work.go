@@ -14,9 +14,9 @@ import (
 
 // Work that stopped being retried, and putting it back.
 //
-// The queue sets a job aside once it has run out of attempts, and until there
-// was somewhere to see that, a deployment learned about it from a build that
-// had quietly stopped being scanned. The two routes here are the whole of the
+// The queue sets a job aside once it has run out of attempts. Without
+// somewhere to see that, a deployment learns about it from a build that has
+// quietly stopped being scanned. The two routes here are the whole of the
 // operator surface over the dead state: what stopped, and try it again.
 //
 // Deliberately not a general view of the queue. Work that is waiting or
@@ -27,22 +27,22 @@ import (
 // SetAsideBody is one piece of work that stopped being retried.
 type SetAsideBody struct {
 	ID int64 `json:"id" doc:"The job, for putting it back"`
-	// Kind and Reference are what the work was, in the queue's own words. No
+	// Kind and Reference are the work itself, in the queue's own words. No
 	// attempt is made to resolve the reference into whatever it points at:
 	// the thing may have been deleted since, and a list of set-aside work
 	// that fails to render because one row points at nothing is worse than
 	// one that says what the row says.
-	Kind      string `json:"kind" doc:"Which worker the job was for"`
-	Reference string `json:"reference" doc:"What the work was about"`
-	Attempts  int    `json:"attempts" doc:"How many times it was tried"`
-	// LastError is what a worker reported, which is not one of this
+	Kind      string `json:"kind" doc:"The worker the job was for"`
+	Reference string `json:"reference" doc:"The subject of the work"`
+	Attempts  int    `json:"attempts" doc:"The number of attempts"`
+	// LastError is the worker's own report, which is not one of this
 	// deployment's own records: a failed parse quotes the cause it was given,
 	// and that can carry a component name or a package address out of an
 	// SBOM. It is why this route asks for administration rather than for the
 	// grant that reads the records — that grant is declared, three times over,
 	// to reach no product's findings.
-	LastError string    `json:"last_error,omitempty" doc:"Why it stopped, where anything reported one. Worker output, which may quote what the job was about"`
-	StoppedAt time.Time `json:"stopped_at" doc:"When it was set aside"`
+	LastError string    `json:"last_error,omitempty" doc:"The reason it stopped, where anything reported one. Worker output, which may quote what the job was about"`
+	StoppedAt time.Time `json:"stopped_at" doc:"The moment it was set aside"`
 }
 
 // QueuedBody is how much of one kind of work is waiting, against the bound
@@ -52,19 +52,20 @@ type SetAsideBody struct {
 // runaway producer's own backlog is what hides behind everybody else's empty
 // queues, and the one number an operator has says the deployment is idle.
 type QueuedBody struct {
-	Kind    string `json:"kind" doc:"Which worker the work is for"`
-	Waiting int    `json:"waiting" doc:"How much is waiting, including work held by a worker that has stopped reporting"`
-	Limit   int    `json:"limit" doc:"How much of this kind may wait before more is refused"`
+	Kind    string `json:"kind" doc:"The worker the work is for"`
+	Waiting int    `json:"waiting" doc:"The depth waiting, including work held by a worker that has stopped reporting"`
+	Limit   int    `json:"limit" doc:"The depth of this kind allowed before more is refused"`
 }
 
-// VulnerabilityDataBody is what this deployment's scans are answering against.
+// VulnerabilityDataBody is the vulnerability data this deployment's scans
+// answer against.
 type VulnerabilityDataBody struct {
-	Version string `json:"version,omitempty" doc:"What the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said"`
+	Version string `json:"version,omitempty" doc:"The version the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said"`
 	// Since is when the data last moved, which is the most recent time any
 	// version was seen for the first time. A version that comes back was not a
 	// change the second time.
-	Since   *time.Time `json:"moved_at,omitempty" doc:"When the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"`
-	StaleAt string     `json:"stale_after" doc:"How long without moving counts as stopped, as this deployment has it set"`
+	Since   *time.Time `json:"moved_at,omitempty" doc:"The moment the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"`
+	StaleAt string     `json:"stale_after" doc:"The span without moving that counts as stopped, as this deployment has it set"`
 	Stale   bool       `json:"stale" doc:"Whether it has been that long. The same question the condition told to administrators asks"`
 }
 
@@ -75,7 +76,7 @@ func registerWork(api huma.API, in Ingest) {
 		Summary: "Show what the scans are answering against",
 		Description: "The vulnerability data version this deployment's scans are running " +
 			"against, and when it last moved.\n\n" +
-			"**Nothing here is a version anybody can order.** What a scanner reports is an " +
+			"Nothing here is a version anybody can order. What a scanner reports is an " +
 			"opaque string — a date for one, a schema revision and a build stamp for " +
 			"another — so the only question that can be asked of it is whether it changed. " +
 			"That is enough: what matters is that it moved, not which is newer.\n\n" +

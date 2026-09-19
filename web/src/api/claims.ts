@@ -8,7 +8,7 @@ import { unwrap } from "./queries";
 export type QueueRow = Body<"WaitingBody">;
 export type Outliers = Body<"OutliersBody">;
 export type FindingRef = Body<"FindingRefBody">;
-// What would argue against agreeing.
+// The case against agreeing.
 export type Counter = Body<"CounterBody">;
 
 export type Claim = {
@@ -38,11 +38,11 @@ export type Claim = {
   places: number;
   builds: string[];
   outliers: Outliers | null;
-  // What a careful reader would go and look up before agreeing: what was
+  // The things a careful reader looks up before agreeing: what was
   // decided about the same issue elsewhere, and how much else at the same
   // place nobody has answered.
   counter: Counter | null;
-  // What the claim is about, for the approver's card: the issue, the component
+  // The claim's subject, for the approver's card: the issue, the component
   // and version, how bad, where it sits, and where to open it.
   finding: FindingRef | null;
 };
@@ -79,7 +79,7 @@ export function claimOf(row: QueueRow): Claim {
 // Anything that changes a claim invalidates the same set: the queue it may
 // have left, the decisions it wrote, and the findings they hang off.
 //
-// **One list, because there were two.** A second copy listed four of these
+// One list, because there were two. A second copy listed four of these
 // keys and was used by revising and withdrawing, so a revision — which takes
 // back every standing approval — left the revision history and the approvals
 // beside the editor showing the old approval as standing. Somebody reading

@@ -13,8 +13,8 @@ import (
 // UnagreedBody is risk standing with nobody's agreement behind it.
 type UnagreedBody struct {
 	Outcome outcomeHidingRisk `json:"outcome"`
-	Claims  int               `json:"claims" doc:"How many acts"`
-	Rows    int               `json:"rows" doc:"How many decisions those acts wrote"`
+	Claims  int               `json:"claims" doc:"The number of acts"`
+	Rows    int               `json:"rows" doc:"The number of decisions those acts wrote"`
 }
 
 // BulkApprovalBody is one act of agreement covering many claims.
@@ -36,7 +36,7 @@ type PairingBody struct {
 	// these two, as a percentage. Concentration is the signal, and a count
 	// alone does not carry it: fifty out of fifty-two and fifty out of nine
 	// hundred are the same number.
-	Share int `json:"share" doc:"How much of everything agreed to here ran between these two, as a percentage of rows"`
+	Share int `json:"share" doc:"The share of everything agreed to here that ran between these two, as a percentage of rows"`
 }
 
 // LapsedApprovalBody is an agreement standing from somebody who has since lost
@@ -56,8 +56,8 @@ type GrownBody struct {
 	ApprovedBy string  `json:"approved_by"`
 	ApprovedAt string  `json:"approved_at"`
 	Outcome    outcome `json:"outcome"`
-	Covered    int     `json:"covered" doc:"What the claim covered when it was agreed to"`
-	CoversNow  int     `json:"covers_now" doc:"What it covers now, having reached it by matching rather than by anybody acting"`
+	Covered    int     `json:"covered" doc:"The claim's reach when it was agreed to"`
+	CoversNow  int     `json:"covers_now" doc:"Its reach now, arrived at by matching rather than by anybody acting"`
 }
 
 type scrutinyOutput struct {
@@ -85,8 +85,8 @@ type scrutinyOutput struct {
 
 // registerScrutiny answers how much a second pair of eyes actually did.
 //
-// **The control cannot be bypassed, so this is not a list of people who broke
-// it.** Approving refuses the proposer and refuses the author of the revision
+// The control cannot be bypassed, so this is not a list of people who broke
+// it. Approving refuses the proposer and refuses the author of the revision
 // being agreed to, and the write is conditional on that revision still being
 // current. What is worth reporting is where the rule did not apply, and where
 // it applied in form only.
@@ -113,7 +113,7 @@ func registerScrutiny(api huma.API, in Ingest) {
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name"`
 		Period
-		Limit int `query:"limit" default:"100" minimum:"1" maximum:"500" doc:"How many rows each section carries at most. capped says a section reached it"`
+		Limit int `query:"limit" default:"100" minimum:"1" maximum:"500" doc:"The number of rows each section carries at most. capped says a section reached it"`
 	}) (*scrutinyOutput, error) {
 		subject, err := reading(ctx)
 		if err != nil {

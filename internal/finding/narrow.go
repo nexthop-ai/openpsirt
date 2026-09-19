@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// What a list is narrowed to before it is paged.
+// The narrowing applied to a list before it is paged.
 //
 // Every filter the findings list offers, and the one expression each becomes.
 // Narrowing belongs here rather than in whatever displays the result: a filter
@@ -28,8 +28,8 @@ import (
 
 // SortKey is a column somebody may order the findings list by.
 //
-// **An allowlist, and the allowlist is the only thing that reaches the
-// statement**. A placeholder cannot bind a column name, so a sort
+// An allowlist, and the allowlist is the only thing that reaches the
+// statement. A placeholder cannot bind a column name, so a sort
 // column arriving from a query parameter is the one value that must reach the
 // SQL text — which makes it the live hole in a codebase that parameterizes
 // everything else. Nothing here is built from what a caller
@@ -187,13 +187,13 @@ type Filter struct {
 	// in the allowlist is not a sort and falls back to the same.
 	SortBy    SortKey
 	Ascending bool
-	// Search keeps rows whose component name **or issue name** contains
+	// Search keeps rows whose component name or issue name contains
 	// this, without regard to capitals. It is how somebody finds a package
 	// in a list of thousands, where Component above is the exact name and
 	// answers a different question: "show me openssl" against "show me
 	// anything ssl-ish".
 	//
-	// **The issue half is what an advisory landing actually asks for.** The
+	// The issue half is what an advisory landing actually asks for. The
 	// first question a PSIRT is asked is "where is CVE-2026-9079 in what we
 	// ship", and matching component names alone answered nothing at all for
 	// it — the box said it searched issues and returned an empty list, which
@@ -242,8 +242,8 @@ type Filter struct {
 	// an answer: nothing ranks by it, nothing prefills an outcome from it, and
 	// nothing is hidden by it unless somebody asks for it here.
 	//
-	// **Asked of the component's incoming edges in the build, not of the
-	// place.** A component reached from two consumers scoped differently
+	// Asked of the component's incoming edges in the build, not of the place.
+	// A component reached from two consumers scoped differently
 	// answers to both words, because the pair of columns a place is cannot be
 	// compared against a set the same way on four engines. What it costs is
 	// stated where the filter is: it is a question about a component in a
@@ -273,7 +273,7 @@ type Filter struct {
 	// of the same fact, and a fifth word would be a filter for a number
 	// people can read.
 	//
-	// **A set rather than one word.** "Undecided or waiting on approval" is
+	// A set rather than one word. "Undecided or waiting on approval" is
 	// the working list of a triager who wants everything not yet settled, and
 	// a single value could not ask it.
 	States []string
@@ -364,7 +364,7 @@ type Filter struct {
 	Origin Origin
 	// Planned keeps or drops what a promised upgrade covers.
 	//
-	// **Derived, never stored.** A finding is covered when a standing
+	// Derived, never stored. A finding is covered when a standing
 	// `upgrade-needed` decision reaches it, which the decision already
 	// records — so the mark is a join rather than a tag written across every
 	// row an upgrade touches. A tag would be per product and could not say
@@ -557,7 +557,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		})
 		q = q.Where("f.component_id IN (?)", where)
 	}
-	// What the producer called it. Correlated on the build rather than bound
+	// The producer's own name for it. Correlated on the build rather than bound
 	// to one, so the cross-product list can ask it too, and the leading column
 	// of the statement is the one the edge index leads with.
 	if words := trimmed(f.DeclaredAs); len(words) > 0 {
@@ -570,24 +570,25 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 				Where("ge.closed_scan_id IS NULL").
 				Where("ge.kind IN (?)", bun.List(words)))
 	}
-	// What holds it. A place records the component that pulls it in, so asking
-	// what is inside a container is asking for places whose consumer is that
-	// container — and what the build holds directly is the places with none.
+	// The component holding it. A place records the one that pulls it in, so
+	// asking what is inside a container is asking for places whose consumer is
+	// that container — and what the build holds directly is the places with
+	// none.
 	if f.UnderTheBuild {
 		q = q.Where("f.consumer_id IS NULL")
 	} else if under := strings.TrimSpace(f.Under); under != "" {
 		q = q.Where("f.consumer_id IN (?)", componentsWhere(q, "c.name = ?", under))
 	}
-	// Who is dealing with it. Set for the whole group at once, so a group is
-	// held when its places are — asked as MIN and MAX rather than as one row,
-	// because a group whose places disagree is not "mine" and saying so would
-	// hand somebody work that is half theirs.
-	// Several answers OR together, and each keeps its own meaning inside the
-	// OR — which is why they are assembled as one condition rather than
-	// applied one at a time. Applied one at a time they would AND, and "mine
-	// or nobody's" would be a list of nothing.
+	// The party dealing with it. Set for the whole group at once, so a group
+	// is held when its places are — asked as MIN and MAX rather than as one
+	// row, because a group whose places disagree is not "mine" and saying so
+	// would hand somebody work that is half theirs. Several answers OR
+	// together, and each keeps its own meaning inside the OR — which is why
+	// they are assembled as one condition rather than applied one at a time.
+	// Applied one at a time they would AND, and "mine or nobody's" would be a
+	// list of nothing.
 	q = f.heldBy(q)
-	// What this product said about the issue, as against what was published. A
+	// This product's own word on the issue, as against what was published. A
 	// rating of its own is the record of a priority somebody changed here —
 	// and a rating another product made is not, which is why the set is keyed
 	// on the product rather than on the issue alone.
@@ -601,12 +602,12 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 					Where("ir.product_id = ?", f.ProductID))
 		}
 	}
-	// What an uploaded VEX document says about this, matched the way a
+	// An uploaded VEX document's statement about this, matched the way a
 	// finding's own screen matches it: on the component's name and on every
 	// name the issue is known by, because which identifier a publisher chose
 	// is a preference of whichever database they consulted.
 	//
-	// **Resolved once and joined, never asked per row.** This was a correlated
+	// Resolved once and joined, never asked per row. This was a correlated
 	// EXISTS over three subqueries, evaluated for every candidate finding: on
 	// a demo image of 281,884 findings it did not return inside five minutes
 	// and it held a core for minutes after the request was abandoned, which
@@ -616,7 +617,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	// pairs the statements name, once, and join the list to that. The same
 	// answer arrives in 0.27s.
 	//
-	// **Distinct on the pair**, by UNION rather than UNION ALL, so joining
+	// Distinct on the pair, by UNION rather than UNION ALL, so joining
 	// cannot multiply a finding by the number of statements about it — a
 	// filter that changed the counts it narrows would be worse than a slow
 	// one.
@@ -686,14 +687,10 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			  AND ft.component_id = f.component_id
 			  AND ft.tag IN (?))`, append(args, bun.List(words))...)
 	}
-	// Something a person recorded here rather than a scanner reporting it
-	// . Its own question rather than a shade of another: a recorded
-	// flaw is the only kind a person may close by hand, and the screen that
-	// records one had no way to list what had been recorded before.
-	// What a promised upgrade covers, or what none does. A condition over the
-	// group rather than over a place, like every other decision predicate
-	// here: a group is planned when a promise reaches it, and unplanned when
-	// none reaches any of it.
+	// The places a promised upgrade covers, or the ones none does. A condition
+	// over the group rather than over a place, like every other decision
+	// predicate here: a group is planned when a promise reaches it, and
+	// unplanned when none reaches any of it.
 	if f.Planned != PlannedEither {
 		if f.Planned == PlannedOnly {
 			q = q.Having("SUM(COALESCE(dd.planned, 0)) > 0")
@@ -701,6 +698,10 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			q = q.Having("SUM(COALESCE(dd.planned, 0)) = 0")
 		}
 	}
+	// Something a person recorded here rather than a scanner reporting it. Its
+	// own question rather than a shade of another: a recorded flaw is the only
+	// kind a person may close by hand, and a screen that records one has no
+	// other way to list what has been recorded.
 	switch f.Origin {
 	case RecordedByHand:
 		q = q.Where("f.kind = ?", Entered)
@@ -739,7 +740,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // is: a state known at one place and not another would drop the places that
 // lack it and report a group smaller than it is.
 //
-// Which leaves the group whose places genuinely disagree, and it has its own
+// That leaves the group whose places genuinely disagree, and it has its own
 // word. Asked for one state, unanimity is the question; asked for "mixed",
 // the question is the opposite one — and a group that answered neither was a
 // row no value of this filter could list, which is what a filter presented as
@@ -824,7 +825,7 @@ func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
 func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 	publishers, saidIt := trimmed(f.Publishers), trimmed(f.VexStatus)
 	if len(publishers) > 0 || len(saidIt) > 0 {
-		// Which statements are being asked about, written once and used for
+		// The statements being asked about, written once and used for
 		// both arms of the union below.
 		asked := []string{"ss.superseded_at IS NULL"}
 		var about []any
@@ -889,7 +890,7 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 // did — a method rather than a bare field so that a caller who forgets cannot
 // get 1 January year one, which as a deadline reads as "everything is late".
 //
-// **Read through the store so a frozen clock reaches it.** Reading the wall
+// Read through the store so a frozen clock reaches it. Reading the wall
 // clock directly is what left the overdue filter untestable, and it meant one
 // request compared "is this overdue" against one moment and "is anything off
 // the clock" against another.
@@ -992,8 +993,8 @@ const upgradeNeeded = "upgrade-needed"
 //
 // A live claim covers a place at the versions it was keyed on and no other:
 // matched by place alone, a claim approved against libnl 3.7.0 in one build
-// answered for libnl 3.9.0 at the same place in the next, while everything
-// that asks whether a decision actually applies said it covered nothing there.
+// answers for libnl 3.9.0 at the same place in the next, while everything that
+// asks whether a decision actually applies says it covers nothing there.
 // A claim with no key has lapsed or been withdrawn, and by definition its
 // versions no longer match — what it says about the place is history, and it
 // is matched by place so that "lapsed" can be said at all.
@@ -1005,26 +1006,26 @@ const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 // so they are HAVING clauses: a group is undecided when none of its places has
 // a decision, not when one of them does not.
 //
-// **These read the decision table and nothing else.** The first version read
-// `suppressed_by`, which is not a decision of ours at all: it points at a
-// suppression, and a suppression is a claim the *build* made in its own scan
-// file (only internal/sbom ever writes one). So "agreed" meant "the vendor's
-// SBOM argued this away", a claim by a different author that nobody here
-// reviewed — and a decision actually approved by a second person matched none
-// of the four states. What the build argued away is a real number and the row
+// These read the decision table and nothing else. `suppressed_by` is not a
+// decision of ours at all: it points at a suppression, and a suppression is a
+// claim the *build* made in its own scan file (only internal/sbom ever writes
+// one), so reading it would make "agreed" mean "the vendor's SBOM argued this
+// away" — a claim by a different author that nobody here reviewed — and would
+// leave a decision actually approved by a second person matching none of the
+// four states. What the build argued away is a real number and the row
 // already carries it separately, as how many places are answered; it is not
 // how far *we* have decided.
 //
-// **Read from the decisions outward, not from the findings inward.** What is
+// Read from the decisions outward, not from the findings inward. What is
 // joined is the set of open finding rows that have a decision of ours in this
 // product, with what kind — built once from the decision table, which holds
 // hundreds of rows where finding holds hundreds of thousands, and joined to
-// the grouping by the finding's own identifier. The first version asked the
-// question the other way round, as a correlated lookup per finding row, and
-// that ran once for every open row in the build to say which groups had
-// nothing: 241,479 probes to answer "undecided" on a build with no decisions
-// at all. The counts are the same either way; a place with two decisions is
-// one place, which is what folding to one row per finding keeps true.
+// the grouping by the finding's own identifier. Asked the other way round, as
+// a correlated lookup per finding row, it runs once for every open row in the
+// build to say which groups have nothing: 241,479 probes to answer "undecided"
+// on a build with no decisions at all. The counts are the same either way; a
+// place with two decisions is one place, which is what folding to one row per
+// finding keeps true.
 //
 // A decision belongs to a product and the two keys linking one to a finding do
 // not: an issue is one row per identifier for the whole deployment, and a
@@ -1043,7 +1044,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	if len(states) == 0 && len(outcomes) == 0 && f.Planned == PlannedEither {
 		return q
 	}
-	// Whether one was asked for, kept before the list is padded: an empty IN
+	// A request for one, kept before the list is padded: an empty IN
 	// list is a syntax error on two of the engines, so the column binds a
 	// word no outcome equals — and reading the padded list as a request
 	// would narrow every group to those answered "" everywhere, which is
@@ -1096,16 +1097,15 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS "approved"`,
 			approved).
 		ColumnExpr(`MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS "lapsed"`, lapsed).
-		// Whether a promise to upgrade stands over this place. Counted
-		// only for the claim that currently stands, like "approved"
-		// above: a promise that was withdrawn is not one, and a
-		// finding it used to cover is unplanned again with nothing to
-		// clean up. That is the whole argument for deriving this
-		// rather than writing a tag.
+		// A promise to upgrade standing over this place. Counted only for the
+		// claim that currently stands, like "approved" above: a promise that
+		// was withdrawn is not one, and a finding it covered is unplanned
+		// again with nothing to clean up. That is the whole argument for
+		// deriving this rather than writing a tag.
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
 			` AND cl.outcome = ? THEN 1 ELSE 0 END) AS "planned"`,
 			append(append([]any{}, inForce...), string(upgradeNeeded))...).
-		// Which kind of judgment stands here, counted only for the claim that
+		// The kind of judgment standing here, counted only for the claim that
 		// currently stands: a dismissal withdrawn eighteen months ago must not
 		// answer for its place, which is the same rule "approved" above holds
 		// — and neither must one still waiting for a second person, or asking
@@ -1194,13 +1194,13 @@ func stateHaving(state string) string {
 // has no default escape character at all, so leaving it out makes a backslash
 // mean one thing on three engines and another on the fourth.
 //
-// **The escape character is `#`, and a backslash is what it must not be.**
+// The escape character is `#`, and a backslash is what it must not be.
 // MySQL and MariaDB treat a backslash as an escape inside a string literal, so
 // `ESCAPE '\'` is an unterminated string: a syntax error there, and parsed
 // happily by the other two. Caught by the four-engine run, which is the whole
 // reason that run exists.
 //
-// **Case is folded here and again by the engine**, which is a compromise worth
+// Case is folded here and again by the engine, which is a compromise worth
 // naming. Folding the term in Go is Unicode-aware; `LOWER()` on the column is
 // ASCII-only on SQLite — so a name carrying a non-ASCII capital is found on
 // three engines and missed on the fourth, wherever the comparison is against a
@@ -1229,9 +1229,9 @@ func (f Filter) fixStates() []FixState {
 }
 
 // foldedTags is a set of tags as they are stored, without the ones that fold
-// to nothing. Folded rather than trimmed, because a tag is matched on the folded
-// form everywhere else and a filter that skipped the folding would answer
-// nothing for a word somebody typed with a capital.
+// to nothing. Folded rather than trimmed, because a tag is matched on the
+// folded form everywhere else and a filter that skipped the folding would
+// answer nothing for a word somebody typed with a capital.
 func foldedTags(words []string) []string {
 	kept := make([]string, 0, len(words))
 	for _, word := range words {

@@ -20,12 +20,12 @@ import (
 // CountsQuery is the query parameter every catalog list takes, and the reason
 // it is a parameter.
 //
-// What is open against a row is counted over the findings, and that is the
-// whole cost of these reads: a list of two products answered in 0.39s against
-// 1ms for a liveness probe, and the time went with the findings rather than
-// with the rows — 0.39s for a product holding 8,839 and 0.24s for one holding
-// 28. The scope picker and the upload panel read all three of these lists and
-// draw none of the counts, so they were paying it for nothing on every open.
+// The count open against a row runs over the findings, and that is the whole
+// cost of these reads: a list of two products answers in 0.39s against 1ms for
+// a liveness probe, and the time goes with the findings rather than with the
+// rows — 0.39s for a product holding 8,839 and 0.24s for one holding 28. The
+// scope picker and the upload panel read all three of these lists and draw
+// none of the counts, so they pay it for nothing on every open.
 //
 // Off by default, because the callers that want it are the two screens whose
 // subject it is and a new caller should get the cheap answer until it asks.
@@ -72,7 +72,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 				return nil, wentWrong(d.Logger, "cannot count what is open", err)
 			}
 		}
-		// When each product was last scanned comes from the same answer the
+		// The last scan of each product comes from the same answer the
 		// home page reads, rather than a second query that could disagree
 		// with it about which build counts.
 		seen, err := lastScans(ctx, d.Scans(), subject)
@@ -145,10 +145,11 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		// The product's date, read once, so a release that has not stated one
 		// shows what actually applies to it rather than a blank that reads as
 		// "supported for ever".
-		// What each tag was cut from, by name. The rows carry the parent as an
-		// identifier and this list never resolved it, so the column reporting
-		// it was empty whatever the data said — which reads as "none of these
-		// was cut from anything" and is what release readiness depends on.
+		//
+		// And what each tag was cut from, by name. The rows carry the parent
+		// as an identifier, and unresolved the column reporting it is empty
+		// whatever the data says — which reads as "none of these was cut from
+		// anything" and is what release readiness depends on.
 		named := make(map[int64]string, len(rows))
 		for _, row := range rows {
 			named[row.ID] = row.Name
@@ -254,11 +255,10 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, refused(d.Logger, err, "cannot list what a release is built as")
 		}
-		// Counted within this stream rather than across the product. The list
-		// of what a release was built as carried no count at all, so every
-		// screen drawing the column drew zeroes — including for a variant
-		// holding twenty-five, which reads as a clean build rather than as a
-		// number nobody filled in.
+		// Counted within this stream rather than across the product. Without
+		// it every screen drawing the column draws zeroes — including for a
+		// variant holding twenty-five, which reads as a clean build rather
+		// than as a number nobody filled in.
 		productID := stream.ProductID
 		var open map[int64]int
 		if in.Counts {
@@ -276,8 +276,8 @@ func registerCatalogReading(api huma.API, d Declaring) {
 	})
 }
 
-// counted is what a row says about how much is open: the count where it was asked
-// for, and nothing where it was not.
+// counted is a row's open count: the number where it was asked for, and
+// nothing where it was not.
 //
 // A zero and an absence are different answers here. Reported as a plain zero,
 // a list nobody asked to count says every product is clean, which is the one

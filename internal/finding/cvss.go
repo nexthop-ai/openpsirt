@@ -17,7 +17,7 @@ var ErrNotAVector = errors.New("that is not a vector this can score")
 
 // A severity as a vector and the number derived from it.
 //
-// **The vector is what is recorded and the score is worked out from it**, so
+// The vector is what is recorded and the score is worked out from it, so
 // the two cannot disagree. Taking both from a caller would let somebody state
 // a vector saying one thing and a number saying another, and there would be no
 // way afterwards to know which they meant — the number is what sorts and the
@@ -56,7 +56,7 @@ var (
 
 // Score reads a CVSS base vector and works out what it says.
 //
-// **Version 3.0 and 3.1 only, and anything else is refused by name.** They
+// Version 3.0 and 3.1 only, and anything else is refused by name. They
 // share a base formula; version 4 does not, and version 2 is a different
 // scheme entirely. Scoring an unrecognized vector with whatever formula is to
 // hand produces a number that looks like every other number here.

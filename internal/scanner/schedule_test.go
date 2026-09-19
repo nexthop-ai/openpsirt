@@ -162,13 +162,12 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 	// the queue has not reached yet would otherwise collect one job per cycle,
 	// each of which does the same work when it finally runs.
 	//
-	// **Driven past the tenth build on purpose.** A job's reference is text
-	// and a build's identifier is a number, and the first version of this
-	// compared them by converting inside the query — which on PostgreSQL kept
-	// one character, so it was right for the first nine builds and wrong for
-	// every one after. Every SQLite test starts from a fresh file at one, so
-	// the whole class is invisible unless a test insists on a two-digit
-	// identifier.
+	// Driven past the tenth build on purpose. A job's reference is text and a
+	// build's identifier is a number, and comparing them by converting inside
+	// the query keeps one character on PostgreSQL — right for the first nine
+	// builds and wrong for every one after. Every SQLite test starts from a
+	// fresh file at one, so the whole class is invisible unless a test insists
+	// on a two-digit identifier.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
 		var tenth int64
@@ -182,7 +181,7 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 		if _, err := f.queue.Add(ctx, queue.Scan, strconv.FormatInt(tenth, 10)); err != nil {
 			t.Fatal(err)
 		}
-		// **Nothing else is queued**, deliberately. Converting inside the
+		// Nothing else is queued, deliberately. Converting inside the
 		// query does not merely miss: on PostgreSQL a two-digit identifier
 		// truncates to its first digit, which then matches whatever job holds
 		// *that* reference. A queue holding the single-digit build too would
@@ -314,7 +313,7 @@ func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
 }
 
 func TestAFullQueueStopsTheAskingRatherThanFailing(t *testing.T) {
-	// What is due stays due. Pressing on would push a producer's arriving
+	// Work due stays due. Pressing on would push a producer's arriving
 	// inventories behind a re-scan of something last measured yesterday, and
 	// failing would turn a full queue into an error nobody can act on.
 	eachRun(t, func(t *testing.T, f *runFixture) {

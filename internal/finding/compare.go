@@ -41,22 +41,22 @@ type Changed struct {
 	// given nowhere to look. Zero where a person closed it, which is the other
 	// way a finding closes.
 	ClosedRun int64 `bun:"closed_run"`
-	// What a reader of a release note acts on, beyond the identifier and the
-	// word: the number, whether somebody is known to be exploiting it, and
-	// where it is written up.
+	// ScoreCenti is what a reader of a release note acts on, beyond the
+	// identifier and the word: the number, whether somebody is known to be
+	// exploiting it, and where it is written up.
 	//
-	// **Not the description.** One upgrade closes hundreds of issues and the
+	// Not the description. One upgrade closes hundreds of issues and the
 	// note lists them under it, so a sentence apiece is a document nobody
 	// reads to the end — and the description is behind the link, which is
 	// what the link is for.
 	ScoreCenti int    `bun:"score_centi"`
 	Exploited  bool   `bun:"exploited"`
 	Advisory   string `bun:"advisory"`
-	// What stands about it in the later build, on a still-present entry and
-	// nowhere else. **This is the sign-off half**: shipping with a known
-	// issue is a decision somebody made, and a list of what is still there
-	// with no way to tell an approved not-applicable from something nobody
-	// has looked at is not a list anybody can sign.
+	// State is what stands about it in the later build, on a still-present
+	// entry and nowhere else. This is the sign-off half: shipping with
+	// a known issue is a decision somebody made, and a list of what is
+	// still there with no way to tell an approved not-applicable from
+	// something nobody has looked at is not a list anybody can sign.
 	//
 	// The outcome and its reason are stated only where every standing
 	// decision over the row's places says the same thing, which is the rule
@@ -74,7 +74,7 @@ type Changed struct {
 
 // Comparison is what changed between two builds.
 //
-// **What left the affected list is two sets, not one.** An upgrade, a carried
+// Two sets leave the affected list, not one. An upgrade, a carried
 // patch, a component no longer shipped and a flaw declared fixed are fixes. A
 // bump that carried the issue with it, a record taken back, and a closure
 // nothing explains are not — the last of those means the scanner stopped
@@ -95,7 +95,7 @@ type Comparison struct {
 // is usually about the last release a customer has, which is rarely the
 // previous one.
 //
-// Each fixed entry says **why** it went. "Fixed by upgrading to 2.4" and
+// Each fixed entry says why it went. "Fixed by upgrading to 2.4" and
 // "fixed by a carried patch" are different things to a reader, and a bump that
 // did not reach the fix is not a fix — it appears as superseded rather than as
 // something resolved.
@@ -115,7 +115,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	if err != nil {
 		return nil, err
 	}
-	// What may be read of the two, which is the narrower of the two answers.
+	// The readable part of the two, which is the narrower of the two answers.
 	if len(earlier) < len(visible) {
 		visible = earlier
 	}
@@ -182,7 +182,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 		comparison.Fixed = append(comparison.Fixed, c)
 	}
 
-	// Why each of them went, read from the rows that closed in the later
+	// The reason each of them went, read from the rows that closed in the later
 	// build — the earlier build's rows are still open in its own history.
 	//
 	// One read per batch rather than one per entry. A comparison against a
@@ -206,14 +206,14 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 		}
 	}
 	// Split once the reasons are in hand, through the one function that
-	// decides what counts as a fix. The screen used to make that judgment a
-	// second time, in a column heading, and it disagreed with this one.
+	// decides what counts as a fix. A screen making that judgment a second
+	// time, in a column heading, disagrees with this one.
 	comparison.Fixed, comparison.Closed = partition(comparison.Fixed)
 
-	// What stands over what is still there. Read only for the still-present
-	// entries, because that is the list somebody signs a release off against
-	// — what was fixed needs no justification and what is newly present has
-	// not been looked at yet.
+	// Judgments standing over what is still there. Read only for the
+	// still-present entries, because that is the list somebody signs a release
+	// off against — what was fixed needs no justification and what is newly
+	// present has not been looked at yet.
 	if len(comparison.Still) > 0 {
 		stands, err := s.whatStands(ctx, toProduct, toTarget, visible)
 		if err != nil {
@@ -344,7 +344,7 @@ func (s *Store) mayCompare(ctx context.Context, subject access.Subject, targetID
 // whyGone reads the explanations recorded when these findings closed in the
 // later build, by issue and component.
 //
-// **Narrowed by the two lists rather than by the pairs.** No engine here
+// Narrowed by the two lists rather than by the pairs. No engine here
 // spells a comparison against a pair of columns the same way, and building one
 // out of concatenated strings is a portability trap of its own — so the
 // statement asks for the issues and the components separately, which is a
@@ -468,7 +468,7 @@ type Stands struct {
 // whatStands reads how far the later build has decided each of the things it
 // still has, and what it decided.
 //
-// **Two statements over groups rather than one over places.** A real build
+// Two statements over groups rather than one over places. A real build
 // holds a quarter of a million places and a few hundred groups, and what is
 // wanted is one answer per group — so the counts are aggregated in the
 // database and the outcomes are folded here, which is also where the rule
@@ -524,7 +524,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	// group answered by two claims comes back as two — which is what says the
 	// row has no single judgment behind it.
 	//
-	// **Grouped on the claim rather than on its words.** MySQL and MariaDB
+	// Grouped on the claim rather than on its words. MySQL and MariaDB
 	// compare only the first `max_sort_length` bytes of a long text for
 	// GROUP BY, and a justification is bounded at sixty-four kilobytes — so
 	// two claims whose reasoning differs only past the first kilobyte counted
@@ -563,7 +563,7 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 	if err != nil {
 		return nil, fmt.Errorf("read what this build decided about what it still has: %w", err)
 	}
-	// **Only where they agree, and agreement is about the outcome.** A
+	// Only where they agree, and agreement is about the outcome. A
 	// component argued away at one place and deferred at another is two
 	// claims, and stating either over the row would be a claim nobody made —
 	// the rule the VEX document publishes under. Two claims reaching the same

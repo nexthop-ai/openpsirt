@@ -20,22 +20,22 @@ import { Wide } from "../ui/Wide";
 
 // One component, and the one piece of work it is.
 //
-// **Arranged on where it sits.** What can be done about a package is mostly a
+// Arranged on where it sits. What can be done about a package is mostly a
 // function of its position: a leaf carries its own risk and is upgraded, and
 // something vendored in pre-built carries everything beneath it and moves only
 // when it does. So the graph leads — what pulls it in, the package, what it
 // carries — and the act hangs off that.
 //
-// **A build is listed because it ships it**, not because something is open
+// A build is listed because it ships it, not because something is open
 // against it. A package whose risk is all inherited still has a version, a
 // position, and things pulling it in.
 //
-// **One entry per version.** A build shipping a name at two versions holds two
+// One entry per version. A build shipping a name at two versions holds two
 // components, and they are two pieces of code to decide about. The page is
 // about the one asked for and says what the others are.
 type Build = Body<"PerBuildBody">;
 
-// How many versions to offer before the rest are a count. A kernel names
+// The versions offered before the rest are a count. A kernel names
 // twenty, and the question is which to take rather than what the whole set is.
 const SHOWN = 5;
 
@@ -70,7 +70,7 @@ export function Component() {
   });
   const rows = useMemo(() => builds.data?.items ?? [], [builds.data]);
 
-  // Which of them the page is about. The address names it, so a link from the
+  // The one the page is about. The address names it, so a link from the
   // tree or from a findings list arrives on what somebody was reading.
   const stream = params.get("stream") ?? "";
   const variant = params.get("variant") ?? "";
@@ -123,9 +123,9 @@ export function Component() {
   }
 
   const sameVersion = rows.filter((row) => row.version === here.version);
-  // Where the package is published, as the server worked it out. This screen
-  // had a table of its own in a second language, with a different membership
-  // and different answers for the same identifier — it sent every
+  // The index the package is published on, as the server worked it out. This
+  // screen had a table of its own in a second language, with a different
+  // membership and different answers for the same identifier — it sent every
   // Debian-family package to Debian's tracker, so an Ubuntu package's link
   // landed on a record for different code with a different version history and
   // a different advisory status, while the server's own link for the same
@@ -218,7 +218,7 @@ export function Component() {
 
         <div>
           <div className="card">
-            <h3>What this package is</h3>
+            <h3>The package</h3>
             {here.summary && <p className="reading">{here.summary}</p>}
             <dl className="facts">
               <dt>Identifier</dt>
@@ -232,7 +232,7 @@ export function Component() {
                     {here.project_url.replace(/^https?:\/\//, "")}
                   </Outward>
                 ) : link ? (
-                  // What the record is, not what its address spells. Which
+                  // The record itself, not what its address spells. Which
                   // distribution's or which index's page this is decides
                   // whether it answers the question a reader has, and a
                   // hostname makes them work that out — the server names it
@@ -304,7 +304,7 @@ export function Component() {
   );
 }
 
-// Where the package sits, drawn as the chain it sits in.
+// The package's place, drawn as the chain it sits in.
 //
 // Per build, because an edge is a fact about one: the same library is pulled in
 // by different things in different builds. The build comes from the rows rather
@@ -358,7 +358,7 @@ function Sits({
           <label className="hint" style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
             <span>Build</span>
             <select
-              aria-label="Which build"
+              aria-label="The build"
               style={{ width: "auto" }}
               value={buildKey(here, here.version)}
               onChange={(event) => {
@@ -379,7 +379,7 @@ function Sits({
       </div>
 
       {around.isError ? (
-        <Failed error={around.error} what="Where it sits could not be read." />
+        <Failed error={around.error} what="Its place could not be read." />
       ) : (
         <ol className="sits">
           <li>
@@ -499,7 +499,8 @@ function Sits({
   );
 }
 
-// Where the fixes landed: each release the findings name, and what it fixed.
+// The releases the fixes landed in: each one the findings name, and what it
+// fixed.
 //
 // Two counts, because they answer different questions. What a release fixed is
 // how many name that exact version — its own security content. What reaching it
@@ -514,7 +515,7 @@ function Landed({ here }: { here: Build }) {
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
-        <h3>Where the fixes landed</h3>
+        <h3>Releases carrying fixes</h3>
         {landed.length > 0 && (
           <span className="eyebrow" style={{ marginLeft: "auto" }}>
             {landed.length} {landed.length === 1 ? "release" : "releases"}
@@ -531,7 +532,7 @@ function Landed({ here }: { here: Build }) {
               <thead>
                 <tr>
                   <th>Release</th>
-                  <th className="num" title="How many of what is open here that release fixed">
+                  <th className="num" title="The findings open here that release fixes">
                     Fixed here
                   </th>
                   {ordered && (
@@ -582,10 +583,10 @@ function Landed({ here }: { here: Build }) {
 // Promising an upgrade: the version, the releases it is for, the date, and who
 // carries it.
 //
-// **The releases are chosen here**, ticked to the ones shipping this version,
-// rather than in a column of the table below. The rest of the promise is written
-// here, and a control that summons a form from somewhere else is one nobody
-// finds.
+// The releases are chosen here, ticked to the ones shipping this version,
+// rather than in a column of the table below. The rest of the promise is
+// written here, and a control that summons a form from somewhere else is one
+// nobody finds.
 function Upgrade({
   product,
   component,
@@ -837,7 +838,11 @@ function Upgrade({
         </p>
       </div>
 
-      <Editor value={because} onChange={setBecause} placeholder="Why this is the answer here." />
+      <Editor
+        value={because}
+        onChange={setBecause}
+        placeholder="The reason this is the answer here."
+      />
 
       <div className="actions" style={{ marginTop: 10 }}>
         <button
@@ -853,7 +858,7 @@ function Upgrade({
   );
 }
 
-// What each release ships, and what is open against it there.
+// The version each release ships, and what is open against it there.
 function Ships({
   product,
   component,
@@ -868,7 +873,7 @@ function Ships({
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
-        <h3>Where it ships</h3>
+        <h3>Releases shipping it</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
           {rows.length} {rows.length === 1 ? "release" : "releases"}
         </span>

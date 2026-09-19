@@ -1,4 +1,4 @@
-// What tells a password manager that a field is not a credential.
+// The attributes that tell a password manager a field is not a credential.
 //
 // Settings, filters and declaration forms are full of short text and number
 // boxes, and a password manager offers to fill several of them: LastPass and

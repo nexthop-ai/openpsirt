@@ -206,7 +206,7 @@ func TestAPipelineKeyIsToldNothing(t *testing.T) {
 	// A key is not a person. It has no notification area, and asking for one
 	// answers empty rather than failing — there is nothing to refuse.
 	//
-	// **The key is given the same identifier as the person**, which is the
+	// The key is given the same identifier as the person, which is the
 	// case worth testing rather than the easy one: a key's identifier comes
 	// from one table and a person's from another, so the two collide as a
 	// matter of course. Without asking what kind of subject this is, a key
@@ -245,13 +245,13 @@ func TestTwoSweepsAtOnceStillSayOneThing(t *testing.T) {
 	// A deployment runs more than one of these — the chart ships two replicas
 	// and each sweeps — so two processes deriving the same true thing at the
 	// same moment is ordinary. The unique index is what makes it one row, and
-	// nothing exercised it: the in-memory check inside a single Reconcile
-	// satisfied every other test, so the index could have been absent.
+	// nothing else exercises it: the in-memory check inside a single Reconcile
+	// satisfies every other test, so the index could be absent.
 	//
 	// This runs the passes concurrently and asserts two things: one row, and
-	// no error. A duplicate is not retryable, so before this was handled the
-	// loser did not merely lose — it aborted the sweep, and every
-	// administrator after it in the list was told nothing that cycle.
+	// no error. A duplicate is not retryable, so unhandled the loser does not
+	// merely lose — it aborts the sweep, and every administrator after it in
+	// the list is told nothing that cycle.
 	each(t, func(t *testing.T, s *notify.Store, me, _ access.Subject) {
 		ctx := t.Context()
 		holding := []notify.Holds{{About: "sonic/master/broadcom", Body: "not scanned"}}

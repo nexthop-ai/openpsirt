@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-// When something goes out of support, and a way to say so.
+// The date something goes out of support, and a way to say so.
 //
 // A date rather than a switch: a date answers "what goes out of support next
 // quarter", which is a real planning question, and it takes effect on its own

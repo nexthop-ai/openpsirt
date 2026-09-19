@@ -12,9 +12,9 @@ import (
 //
 // It is the last role in every product at once, so somebody whose only role
 // came from it keeps every finding assigned to them: out of the shared queue
-// because it is assigned, and out of theirs because they can no longer open it.
-// The per-product withdrawal has released work for exactly this reason since it
-// was written; this one did not, and nothing said so either way.
+// because it is assigned, and out of theirs because they can no longer open
+// it. The per-product withdrawal releases work for exactly this reason, and an
+// estate withdrawal that does not leaves it held with nothing saying so.
 func TestWithdrawingAnEstateRoleHandsBackWhatItWasHolding(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		ctx := t.Context()
@@ -83,7 +83,7 @@ func TestWithdrawingAnEstateRoleHandsBackWhatItWasHolding(t *testing.T) {
 	})
 }
 
-// What it does not touch: a role held against a named product. Those are
+// It does not touch a role held against a named product. Those are
 // withdrawn one at a time through the path that names the product, and work in
 // a product where they still hold something stays with them.
 func TestWithdrawingAnEstateRoleLeavesNamedProductsAlone(t *testing.T) {

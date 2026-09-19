@@ -14,21 +14,21 @@ func init() {
 	goose.AddMigrationContext(upTrail, downTrail)
 }
 
-// What somebody changed about how this deployment works.
+// Changes somebody made to how this deployment works.
 //
-// **Who, what, before, after and when**. Three administrative levers
-// silently rewrite what this tool reports: changing the deadline policy
-// recomputes every open finding's deadline, raising the triage floor takes the
-// deadline off everything below it, and an end-of-life date takes it off
-// everything past it. None of them recorded who moved it — a setting carried
-// when it changed and not by whom, a role grant when it was withdrawn and not
-// who granted it.
+// The person, the subject, the values before and after, and the moment. Three
+// administrative levers silently rewrite what this tool reports: changing the
+// deadline policy recomputes every open finding's deadline, raising the triage
+// floor takes the deadline off everything below it, and an end-of-life date
+// takes it off everything past it. None of them recorded who moved it — a
+// setting carried when it changed and not by whom, a role grant when it was
+// withdrawn and not who granted it.
 //
 // For a tool whose entire output is evidence, that is the evidence being
 // movable with nothing recording that anybody moved it. It is the same gap the
 // triage history closes, one layer above it.
 //
-// **Both values are text, and both are kept.** What a setting held before is
+// Both values are text, and both are kept. What a setting held before is
 // not derivable afterwards, and "who raised the floor to critical" is only half
 // the question somebody asks — the other half is what it was. A value that was
 // unset is an absent before rather than an empty one, because "nobody had set
@@ -85,7 +85,7 @@ func upTrail(ctx context.Context, tx *sql.Tx) error {
 		// The same screen narrowed to one kind of change.
 		`CREATE INDEX "admin_change_kind_idx" ON "admin_change" ("kind", "at")`,
 
-		// What one person's own history is read by, which had no index at
+		// The key one person's own history is read by, which had no index at
 		// all — so opening anybody's page read every row ever written. The
 		// query asks for the exact name or for every name beginning with it
 		// followed by " on ", which is left-anchored and so a range this can

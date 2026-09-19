@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// When a second person has to agree.
+// The threshold a second person's agreement turns on.
 //
 // The deployment's separation-of-duties gate (REQ-24): what counts as a
 // deferral standing on its own, how long a place has been put off across every
@@ -218,10 +218,10 @@ func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Pr
 // gate works out whether each of these proposals needs a second person, and
 // records the answer on them.
 //
-// **Whether a claim is waiting is not something its author states.** It was a
-// field on the proposal, worked out by the caller before the transaction
-// opened and taken on trust — the same shape the binding deadline had, and
-// with the same consequence: a policy changing between the answer and the
+// A claim's wait is not something its author states. As a field on the
+// proposal, worked out by the caller before the transaction opens and taken on
+// trust, it has the same shape the binding deadline does and the same
+// consequence: a policy changing between the answer and the
 // write, or a deferral landing on the same place in between, stored a claim
 // as needing nobody under a rule that says it does. Nothing reported it.
 func (s *Store) gate(ctx context.Context, subject access.Subject, proposals []Proposal) error {
@@ -279,7 +279,7 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 		}
 	}
 
-	// What has already been asked for about this same place.
+	// The postponements already asked for about this same place.
 	already, err := s.DeferredSoFar(ctx, Decision{
 		ProductID: p.Place.ProductID, VulnerabilityID: p.Place.VulnerabilityID,
 		PlaceIdentity: p.Place.PlaceIdentity,

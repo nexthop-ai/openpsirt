@@ -18,58 +18,61 @@ import (
 type PerBuildBody struct {
 	Stream  string `json:"stream"`
 	Variant string `json:"variant"`
-	Version string `json:"version" doc:"What this build ships"`
-	// Purl is what an ecosystem and an upstream address are read out of.
+	Version string `json:"version" doc:"The version this build ships"`
+	// Purl is the identifier an ecosystem and an upstream address are read out
+	// of.
 	Purl      string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"Which ecosystem the identifier names, read out of it rather than stored"`
-	// Where the package is published, worked out from the identifier by the
-	// one table that does that. The interface had a second table of its own,
-	// with a different membership and different answers for the same
-	// identifier — an Ubuntu package was sent to Debian's tracker, which is a
+	Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem the identifier names, read out of it rather than stored"`
+	// PackagePageURL is where the package is published, worked out from
+	// the identifier by the one table that does that. A second table in the
+	// interface, with a different membership, answers differently for the same
+	// identifier — sending an Ubuntu package to Debian's tracker, which is a
 	// record for different code.
 	//
 	// Named for what it is rather than "upstream", which already means
 	// something else in this vocabulary: on a finding it is what a fork was
 	// made from, and on a component it is the source package a binary was
-	// built from. One word for two unrelated senses is the thing this change
-	// is against, and nothing is compatible with anything yet, so the rename
-	// is free now and impossible later.
-	PackagePageURL  string `json:"package_page_url,omitempty" doc:"Where this package is published, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like"`
-	PackagePageName string `json:"package_page_name,omitempty" doc:"What to call that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is"`
-	// What an ecosystem's index says the package is, where one was asked and
-	// answered. Absent is the ordinary case rather than a gap.
+	// built from. One word for two unrelated senses is what this name
+	// avoids.
+	PackagePageURL  string `json:"package_page_url,omitempty" doc:"The address this package is published at, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like"`
+	PackagePageName string `json:"package_page_name,omitempty" doc:"The name for that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is"`
+	// Summary is the ecosystem index's own description of the package, where
+	// one was asked and answered. Absent is the ordinary case rather than a
+	// gap.
 	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
-	ProjectURL string `json:"project_url,omitempty" doc:"Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier"`
+	ProjectURL string `json:"project_url,omitempty" doc:"The address the index gives for where the package is developed. Absent where it does not say, in which case an address can still be built from the identifier"`
 	// A count has a shape. Forty issues and three criticals are different
 	// work, and a number with nothing beside it says which is which.
-	BySeverity map[string]int `json:"by_severity,omitempty" doc:"What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
+	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Everything open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
 	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited, which outranks everything else about it"`
-	Fixable    int            `json:"fixable" doc:"How many of what is open here any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
-	Supplier   string         `json:"supplier,omitempty" doc:"Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
-	// What the ecosystem's index says is current, where one was asked.
+	Fixable    int            `json:"fixable" doc:"The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
+	Supplier   string         `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
+	// Newest is the current version according to the ecosystem's index, where
+	// one was asked.
 	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
-	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"When that version shipped, where the index said"`
-	FirstSeen time.Time  `json:"first_seen" doc:"When a scan of this deployment first reported the component"`
+	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
+	FirstSeen time.Time  `json:"first_seen" doc:"The moment a scan of this deployment first reported the component"`
 	Issues    int        `json:"issues" doc:"Distinct vulnerabilities open against it here"`
 	// Consumers is the unit somebody acts in: one judgment covers the whole
-	// fold, and what varies underneath it is what pulls the package in.
-	Consumers int `json:"consumers" doc:"How many things pull it in here"`
-	Places    int `json:"places" doc:"How many times those sit somewhere in this build. What the bulk cap is measured against"`
+	// fold, and what varies underneath it is the set of consumers pulling the
+	// package in.
+	Consumers int `json:"consumers" doc:"The number of things pulling it in here"`
+	Places    int `json:"places" doc:"The number of times those sit somewhere in this build. What the bulk cap is measured against"`
 	// Upgrades are the versions this build could move to.
 	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets"`
 	DueAt    *time.Time    `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees, because that defers the worst thing it covers"`
-	// What has already been promised for this build, read off the decisions.
-	CommittedTo *time.Time `json:"committed_to,omitempty" doc:"When the work promised here is due"`
+	// CommittedTo is the promise already made for this build, read off the
+	// decisions.
+	CommittedTo *time.Time `json:"committed_to,omitempty" doc:"The date the work promised here is due"`
 	UpgradeTo   string     `json:"upgrade_to,omitempty" doc:"The version somebody has committed to moving this build to"`
 }
 
 // registerComponent answers a component across the builds that carry it.
 //
-// **The screen that was missing.** The by-component view answers where the
-// weight is, and clicking a component opened a filtered list of its findings —
-// so a component could be read and never acted on. The act of upgrading one
-// ended up on a screen of its own, keyed on version pairs, which put the thing
-// somebody does on a different page from the thing it is done to.
+// The by-component view answers where the weight is. Clicking a component into
+// a filtered list of its findings leaves it read and never acted on, and the
+// act of upgrading one on a screen of its own, keyed on version pairs, puts
+// the thing somebody does on a different page from the thing it is done to.
 func registerComponent(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-component", Method: http.MethodGet,
@@ -77,11 +80,11 @@ func registerComponent(api huma.API, in Ingest) {
 		Summary: "Show a component across the builds that carry it",
 		Description: "What each build ships, what is open against it there, where it could " +
 			"go, and what has already been promised.\n\n" +
-			"**Answered per build, because the answer differs by build.** A stream staying " +
+			"Answered per build, because the answer differs by build. A stream staying " +
 			"on a maintained older line and a stream that has moved on are different work " +
 			"with different testing, and one target across both would be wrong for one of " +
 			"them.\n\n" +
-			"**Where it could go carries two counts.** `fixed_here` is how many of what is " +
+			"Where it could go carries two counts. `fixed_here` is how many of what is " +
 			"open name that exact version as their fix, which is the release's own security " +
 			"content; `reached` is how many the upgrade closes altogether, counting " +
 			"everything fixed at or before it. The second is the one somebody choosing a " +
@@ -89,11 +92,11 @@ func registerComponent(api huma.API, in Ingest) {
 			"not defined the two counts are equal, `ordered` is false, and the list is not " +
 			"ranked. Ranked on `fixed_here` a quiet release late on a maintained line sorts " +
 			"near the bottom while carrying every fix before it.\n\n" +
-			"**A build is listed because it ships the component**, not because something is " +
+			"A build is listed because it ships the component, not because something is " +
 			"open against it. A package carrying nothing of its own still answers with the " +
 			"version it ships and how many things pull it in, which is the ordinary case for " +
 			"anything vendored in pre-built.\n\n" +
-			"**One entry per version rather than per build.** A build shipping a name at two " +
+			"One entry per version rather than per build. A build shipping a name at two " +
 			"versions holds two components, and they are two different pieces of code to " +
 			"decide about.\n\n" +
 			"`due_at` is what a commitment about that build is gated against, and is absent " +
@@ -151,24 +154,26 @@ func registerComponent(api huma.API, in Ingest) {
 // PlanUpgradeBody is a promise to move a component in the builds named.
 type PlanUpgradeBody struct {
 	To string `json:"to" minLength:"1" maxLength:"191" doc:"The version this moves to, as whoever packages it writes it"`
-	By string `json:"by" doc:"When the work will be done, as 2026-03-31. What a missed target is measured against"`
-	// Which releases this is promised for. The same component can be promised
-	// a different version in another release, which is the ordinary case.
+	By string `json:"by" doc:"The date the work lands, as 2026-03-31. A missed target is measured against it"`
+	// Builds is which releases this is promised for. The same component
+	// can be promised a different version in another release, which is the
+	// ordinary case.
 	Builds    []BuildName `json:"builds" minItems:"1" doc:"The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version"`
-	Reasoning string      `json:"reasoning" minLength:"1" doc:"Why this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome"`
-	// Who carries it. A team as readily as a person: moving a package is
-	// work a queue tracks rather than a judgment one person makes.
-	Person string `json:"person,omitempty" doc:"Who is carrying it, by sign-in identity. Leave both out and it is held by nobody"`
+	Reasoning string      `json:"reasoning" minLength:"1" doc:"The reason this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome"`
+	// Person is who carries it. A team as readily as a person: moving a
+	// package is work a queue tracks rather than a judgment one person
+	// makes.
+	Person string `json:"person,omitempty" doc:"The party carrying it, by sign-in identity. Leave both out and it is held by nobody"`
 	Team   string `json:"team,omitempty" doc:"A team carrying it, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 }
 
-// PlannedUpgradeBody says what one act recorded.
+// PlannedUpgradeBody is the record of one act.
 type PlannedUpgradeBody struct {
 	ClaimID    int64 `json:"claim_id" doc:"The one claim the whole upgrade was recorded under"`
 	Decisions  int   `json:"decisions" doc:"Places answered"`
 	Issues     int   `json:"issues" doc:"Distinct vulnerabilities it covers"`
 	Targets    int   `json:"targets" doc:"Build-level intents recorded, which is what the pending upgrades screen reads"`
-	Components int   `json:"components" doc:"How many packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together"`
+	Components int   `json:"components" doc:"The number of packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together"`
 	// Waiting says a second person has to agree, which happens when the date
 	// is past the earliest deadline among what this covers.
 	Waiting bool `json:"waiting" doc:"Whether this needs a second person. True when the date is past the earliest deadline among what it covers, because that defers the worst thing in it"`
@@ -193,17 +198,17 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 		Description: "Answers everything open against a component in the releases named, in one " +
 			"act: each is recorded as `upgrade-needed`, carrying the version it moves to and " +
 			"the date the work will be done.\n\n" +
-			"**Coverage is the component, not a version pair.** Moving to 3.5.2 is a claim " +
+			"Coverage is the component, not a version pair. Moving to 3.5.2 is a claim " +
 			"that it answers what is open on the package — including findings recorded as " +
 			"fixed in 3.5.0 — and the next scan says which of that was true. Deciding it " +
 			"from the versions would need an ordering per ecosystem this does not have.\n\n" +
-			"**Whether a second person agrees depends on the date.** At or before the " +
+			"Whether a second person agrees depends on the date. At or before the " +
 			"earliest deadline among what this covers, it stands on its own: nothing is " +
 			"hidden for longer than the policy already allowed. Past it, the promise defers " +
 			"the worst thing it covers and it waits for approval. The response says which.\n\n" +
-			"**Not bounded**, unlike a bulk judgment: this one writes as many rows as the " +
+			"Not bounded, unlike a bulk judgment: this one writes as many rows as the " +
 			"component has open findings in the releases named.\n\n" +
-			"**Saying who carries it is part of the act**, not a second one: name a `person` " +
+			"Saying who carries it is part of the act, not a second one: name a `person` " +
 			"or a `team`, and every finding the promise covers is handed to them in the same " +
 			"transaction, so a promise nobody is carrying and a holder with no promise are " +
 			"both impossible. A team is a perfectly good holder — moving a package is work a " +
@@ -271,8 +276,8 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 // named.
 //
 // The same checks the per-finding assignment makes, asked once about the whole
-// set: a handover carries visibility of what was handed over, so what
-// matters is the strictest thing the promise covers rather than whichever row
+// set: a handover carries visibility of what was handed over, so the check is
+// against the strictest thing the promise covers rather than whichever row
 // somebody was looking at — one embargoed finding among fifty is enough to
 // make the handover the disclosure. And somebody has to be able to read a
 // team's queue, or it sits where none of them can see it.
@@ -330,16 +335,16 @@ func carrying(ctx context.Context, in Ingest, subject access.Subject, productID 
 // mayHandOver refuses a party nobody may be given work as, and a hand-off the
 // subject may not make.
 //
-// One helper because the rule is one rule and the two routes that state it
-// answered the same request differently otherwise: they had drifted over which
-// status a refused hand-off is, so the two paths to the same act contradicted
-// each other about what had happened.
+// One helper because the rule is one rule. Two routes stating it answer the
+// same request differently: they drift over which status a refused hand-off
+// is, so the two paths to the same act contradict each other about what
+// happened.
 //
 // Putting work into a team's queue is dispatching; taking it out again is not,
 // and that asymmetry is the whole of a team queue rather than a holding.
 // Matched without regard to capitals, because an identity is stored folded:
-// somebody typing their own name with the capitals they use was told they
-// needed the right to give work away, to themselves.
+// somebody typing their own name with the capitals they use is told they need
+// the right to give work away, to themselves.
 //
 // A 422 rather than a 404, which is this package's rule: a 404 answers a
 // *name*, and this answers an act on a finding already shown to them.

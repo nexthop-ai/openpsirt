@@ -1,6 +1,6 @@
-// What kind of flaw it is, by the classification the world uses.
+// The kind of flaw, by the classification the world uses.
 //
-// **Suggested, never restricted.** Anything may be recorded. A picker that
+// Suggested, never restricted. Anything may be recorded. A picker that
 // refused an identifier it had not heard of would refuse next year's, and the
 // point of recording these is to make a set of findings comparable to things
 // outside this deployment — which is served by recording what somebody meant,
@@ -82,15 +82,15 @@ export function unclassified(id: string): boolean {
   return UNCLASSIFIED.has(id.trim().toUpperCase());
 }
 
-// What this kind of flaw is called, where the list carries it.
+// The name of this kind of flaw, where the list carries it.
 export function nameOf(id: string): string {
   return NAMES.get(id.trim().toUpperCase()) ?? "";
 }
 
-// Where to read about it, built from the identifier rather than stored — the
-// same way an issue's own record and a package's page are. Nothing is fetched.
-// An identifier that is not a CWE number has nowhere to go, which includes the
-// two words above.
+// The place to read about it, built from the identifier rather than stored —
+// the same way an issue's own record and a package's page are. Nothing is
+// fetched. An identifier that is not a CWE number has nowhere to go, which
+// includes the two words above.
 export function readAbout(id: string): string | null {
   const number = /^CWE-(\d+)$/.exec(id.trim().toUpperCase());
   if (!number) return null;

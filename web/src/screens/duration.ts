@@ -60,7 +60,7 @@ export function humane(value: string): string {
   return "";
 }
 
-// Whether the composer takes a stored value. A duration it can read, or
+// A stored value the composer takes. A duration it can read, or
 // nothing at all: a setting nobody has set has no unit to show, and a plain
 // text box is the one control that cannot ask for one.
 export function composable(value: string): boolean {

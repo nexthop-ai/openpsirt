@@ -36,7 +36,7 @@ func TestProbesAnswerWithoutAuthentication(t *testing.T) {
 }
 
 func TestTheVersionIsNotToldToStrangers(t *testing.T) {
-	// Which build is running is small reconnaissance, but it is
+	// The running build is small reconnaissance, but it is
 	// reconnaissance: it says which published issues might apply here. Every
 	// documented route is authenticated, and this one is not an exception
 	// because it looks harmless.
@@ -151,7 +151,7 @@ func TestEveryOperationSaysWhatItAsksFor(t *testing.T) {
 				missing = append(missing, method+" "+path+" ("+op.OperationID+")")
 				continue
 			}
-			if !strings.Contains(op.Description, "**Requires:**") {
+			if !strings.Contains(op.Description, "Requires: ") {
 				missing = append(missing, op.OperationID+" states it in the document and not in the reference")
 			}
 		}

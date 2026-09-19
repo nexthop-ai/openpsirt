@@ -16,26 +16,26 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// PointBody is what was true at one moment.
+// PointBody is the state of the backlog at one moment.
 type PointBody struct {
 	At         string         `json:"at" doc:"The end of this step, as a date"`
 	Open       int            `json:"open"`
 	Opened     int            `json:"opened" doc:"Findings that appeared during this step"`
 	Resolved   int            `json:"resolved" doc:"Findings that went away during this step"`
 	BySeverity map[string]int `json:"by_severity"`
-	// The two flows, split the same way. What arrived and what was answered
-	// is the question a backlog is read for: ten in and ten out is a team
+	// The two flows, split the same way. Arrivals against departures is what
+	// a backlog is read for: ten in and ten out is a team
 	// keeping pace where both are low, and a team losing ground where what
 	// arrives is critical and what leaves is not.
-	OpenedBySeverity   map[string]int `json:"opened_by_severity" doc:"What appeared, split by severity"`
-	ResolvedBySeverity map[string]int `json:"resolved_by_severity" doc:"What went away, split by the severity it held while it was open"`
+	OpenedBySeverity   map[string]int `json:"opened_by_severity" doc:"Everything that appeared, split by severity"`
+	ResolvedBySeverity map[string]int `json:"resolved_by_severity" doc:"Everything that went away, split by the severity it held while it was open"`
 }
 
 // ComparisonBody is what changed between two builds.
 //
-// **What left the affected list is two lists, not one.** A bump that carried
-// the issue with it, a record taken back and a closure nothing explains are
-// not fixes, and a caller reading one list quotes scanner faults as work done.
+// Two lists leave the affected list, not one. A bump that carried the issue
+// with it, a record taken back and a closure nothing explains are not fixes,
+// and a caller reading one list quotes scanner faults as work done.
 type ComparisonBody struct {
 	Fixed  []ChangedBody `json:"fixed"`
 	Closed []ChangedBody `json:"closed_not_fixed" doc:"Left the affected list without being fixed"`
@@ -48,17 +48,18 @@ type ChangedBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Component     string `json:"component"`
 	Severity      string `json:"severity,omitempty"`
-	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,superseded,unexplained" doc:"Why it went. Only on fixed entries"`
+	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,superseded,unexplained" doc:"The reason it went. Only on fixed entries"`
 	ArrivedFrom   string `json:"arrived_from,omitempty" doc:"The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix"`
 	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
 	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
 	ClosedRun     int64  `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
-	// What stands about it, on a still-present entry and nowhere else. This
-	// is what turns a list of what is still there into something somebody
-	// can sign a release off against: an approved not-applicable and a row
-	// nobody has looked at are opposite answers and read alike without it.
-	State         string        `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"How far this build has decided it. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
-	Outcome       outcome       `json:"outcome,omitempty" doc:"What was decided, where every standing decision over its places says the same thing"`
+	// State is the decision standing on it, on a still-present entry and
+	// nowhere else. It turns a list of what is still there into something
+	// somebody can sign a release off against: an approved
+	// not-applicable and a row nobody has looked at are opposite answers
+	// and read alike without it.
+	State         string        `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
+	Outcome       outcome       `json:"outcome,omitempty" doc:"The decision, where every standing one over its places says the same thing"`
 	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, on a dismissal"`
 	Due           string        `json:"due,omitempty" doc:"The soonest deadline among the places still open, as a date"`
 }
@@ -69,7 +70,7 @@ func registerReports(api huma.API, in Ingest) {
 		Summary: "Show new, resolved and open over time",
 		Description: "Returns the three counts per step, with open split by severity, across " +
 			"every product you can see.\n\n" +
-			"**Narrowable to part of a tree.** `component` keeps one package at any version; " +
+			"Narrowable to part of a tree. `component` keeps one package at any version; " +
 			"`beneath` keeps a component and everything under it, which needs a branch and a " +
 			"variant naming exactly one build. A team that owns one area asks for its own " +
 			"three lines this way.\n\n" +
@@ -86,8 +87,8 @@ func registerReports(api huma.API, in Ingest) {
 		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
 		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
 		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build"`
-		Version   string `query:"beneath_version" doc:"Which one, where the build holds that name at several versions"`
-		Ecosystem string `query:"beneath_ecosystem" doc:"Which one, for the few names a build holds at one version as two components"`
+		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
+		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
 	}) (*listOutput[PointBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -108,9 +109,9 @@ func registerReports(api huma.API, in Ingest) {
 		if err != nil {
 			// A name meaning two components is the caller's question and not a
 			// fault here: every other endpoint that resolves one answers with
-			// the choices, and this one was answering 500 — so the panel that
-			// draws a subtree's history said the trend could not be worked
-			// out, about a component the reader could have picked.
+			// the choices, and a 500 here has the panel that draws a
+			// subtree's history say the trend cannot be worked out, about a
+			// component the reader could have picked.
 			var several *graph.Ambiguous
 			if errors.As(err, &several) {
 				return nil, severalComponents(several,
@@ -135,7 +136,7 @@ func registerReports(api huma.API, in Ingest) {
 		Path:    "/v1/products/{product}/releases",
 		Summary: "Report what is open in each build of a product",
 		Description: "One number per build, which is what a release-over-release chart is " +
-			"drawn from. The comparison endpoint says what changed between **two** builds; " +
+			"drawn from. The comparison endpoint says what changed between two builds; " +
 			"this says whether the estate is getting better or worse across all of them.\n\n" +
 			"Counted before any triage line is applied, so it agrees with the findings list " +
 			"rather than with whatever a product has decided is worth working on — a line is " +
@@ -153,10 +154,10 @@ func registerReports(api huma.API, in Ingest) {
 		}
 		// The visible lookup, so a product somebody may not see answers the
 		// same way as one that was never declared. Resolving the name first
-		// and authorizing afterwards is how the difference gets out: this
-		// answered 200 with an empty list for a product held by somebody else
-		// and 404 for a name nobody has, which hands anyone holding one
-		// product the name of every other by guessing.
+		// and authorizing afterwards is how the difference gets out: 200 with
+		// an empty list for a product held by somebody else and 404 for a name
+		// nobody has hands anyone holding one product the name of every other
+		// by guessing.
 		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
@@ -182,7 +183,7 @@ func registerReports(api huma.API, in Ingest) {
 		Summary: "Compare two builds",
 		Description: "Returns what was fixed, what is newly present, and what is still there " +
 			"between two builds of one product.\n\n" +
-			"Between **any** two, not only adjacent ones: what a release note has to answer is " +
+			"Between any two, not only adjacent ones: what a release note has to answer is " +
 			"usually about the last release a customer has, which is rarely the previous one.\n\n" +
 			"Each fixed entry says why it went, because \"fixed by upgrading\" and \"fixed by a " +
 			"carried patch\" are different sentences to a reader. `superseded` is the one to " +
@@ -191,7 +192,7 @@ func registerReports(api huma.API, in Ingest) {
 			"A still-present entry carrying `arrived_from` is the same failure seen from the " +
 			"other side: somebody moved that version since the earlier build and the issue came " +
 			"with it, so the upgrade did not reach the fix.\n\n" +
-			"**Public findings only unless you ask otherwise.** Its destination is usually a " +
+			"Public findings only unless you ask otherwise. Its destination is usually a " +
 			"public document, so including something undisclosed should be deliberate rather " +
 			"than something pasted in without noticing.",
 		Tags: []string{"Findings"},
@@ -241,10 +242,10 @@ func registerReports(api huma.API, in Ingest) {
 	})
 }
 
-// ReleasePointBody is what one release shipped with.
+// ReleasePointBody is the state one release shipped with.
 type ReleasePointBody struct {
 	Stream     string         `json:"stream"`
-	Cut        string         `json:"cut" doc:"When the release was declared. It orders them and labels them; the axis is the sequence"`
+	Cut        string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
 	Open       int            `json:"open" doc:"Distinct issues open against it now, against today's vulnerability data rather than the day it was cut"`
 	BySeverity map[string]int `json:"by_severity,omitempty"`
 }
@@ -256,21 +257,21 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		Summary: "Show what each release shipped with",
 		Description: "One point per tagged release of one product, oldest first, with what is " +
 			"open against it now.\n\n" +
-			"**The axis follows what is being viewed.** A branch is scanned nightly and has " +
+			"The axis follows what is being viewed. A branch is scanned nightly and has " +
 			"continuous data, so a calendar reads correctly on it. A tag never moves again, and " +
 			"releases months apart make a calendar count read as slow drift rather than the " +
 			"step change it was — the gaps are the chart's whole shape and they are gaps in " +
 			"nothing.\n\n" +
-			"**Answered against today's vulnerability data**, not as of the day each was cut. " +
+			"Answered against today's vulnerability data, not as of the day each was cut. " +
 			"That is what re-scanning a shipped release is for.\n\n" +
-			"**No rates here.** How many appeared and were resolved between two releases is an " +
+			"No rates here. How many appeared and were resolved between two releases is an " +
 			"artifact of how far apart somebody cut them; rates always plot on calendar. And a " +
 			"product must be named: two products' tags interleave by date and mean nothing side " +
 			"by side.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
-		Limit int `query:"limit" default:"12" minimum:"1" maximum:"50" doc:"How many releases, most recent kept"`
+		Limit int `query:"limit" default:"12" minimum:"1" maximum:"50" doc:"The number of releases, most recent kept"`
 	}) (*struct {
 		Body struct {
 			Items []ReleasePointBody `json:"items"`
@@ -290,10 +291,10 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		points, err := finding.NewStore(in.DB.DB).ReleaseTrend(ctx, subject, scope, input.Limit)
 		switch {
 		case errors.Is(err, finding.ErrNoProductNamed):
-			// The description says a product must be named and the route
-			// answered 200 with an empty list — which is what a product with
-			// no releases looks like, so a dashboard polling it without one
-			// read as a product that had never cut a release.
+			// The description says a product must be named, and answering 200
+			// with an empty list is what a product with no releases looks
+			// like, so a dashboard polling it without one reads as a product
+			// that has never cut a release.
 			return nil, huma.Error422UnprocessableEntity(
 				"a product must be named: two products' tags interleave by date and mean " +
 					"nothing side by side")
@@ -325,7 +326,7 @@ func registerNotes(api huma.API, in Ingest) {
 		Description: "The same comparison as markdown, in the form somebody pastes into a " +
 			"release note. Returned as `text/markdown` rather than as a string in a JSON " +
 			"field, because the point of it is that it goes straight in.\n\n" +
-			"**It carries what was fixed and nothing else.** Not what is still present, not " +
+			"It carries what was fixed and nothing else. Not what is still present, not " +
 			"what newly appeared, and not an upgrade that carried the issue with it — those are " +
 			"statements about what a build contains, and the document for them is a VEX, " +
 			"which a customer's own scanner reads. The comparison itself still answers all " +
@@ -333,7 +334,7 @@ func registerNotes(api huma.API, in Ingest) {
 			"Worst first and stably ordered, so two runs over the same pair of builds produce " +
 			"the same document. A lead line names both builds, the day, and the scanner and " +
 			"vulnerability-database versions the later build was last measured with.\n\n" +
-			"**Public findings only unless you ask otherwise**, as the comparison itself is. " +
+			"Public findings only unless you ask otherwise, as the comparison itself is. " +
 			"Where fixes are left out for not having been disclosed, the note says how many " +
 			"and never which.\n\n" +
 			"A release that fixed nothing answers with a sentence saying so, not with an " +
@@ -376,7 +377,7 @@ func registerNotes(api huma.API, in Ingest) {
 			From: describing(ctx, names, from, input.From, input.FromVariant),
 			To:   describing(ctx, names, to, input.To, input.ToVariant),
 		}
-		// What the later build was last measured with, and when. A note
+		// The tooling the later build was last measured with, and when. A note
 		// somebody kept for a year is re-checkable only if it says what
 		// produced it — a vulnerability database ships bad data and is
 		// corrected, and "which data said so" is then the question. A run that
@@ -448,12 +449,12 @@ type InheritedBody struct {
 	Component     string  `json:"component"`
 	Outcome       outcome `json:"outcome"`
 	Was           string  `json:"was" doc:"The version the claim was made against"`
-	Now           string  `json:"now" doc:"What the new line has"`
+	Now           string  `json:"now" doc:"The new line's contents"`
 	Reasoning     string  `json:"reasoning" doc:"The old words, to start from rather than start without"`
-	DeferredDays  int     `json:"deferred_days,omitempty" doc:"How long this has already been put off, across every line it has been carried through"`
+	DeferredDays  int     `json:"deferred_days,omitempty" doc:"The total this has already been put off for, across every line it has been carried through"`
 }
 
-// CarriedBody is what a new line would inherit.
+// CarriedBody is the set a new line inherits.
 type CarriedBody struct {
 	Applying  int             `json:"applying" doc:"Reach it by matching. Nothing to choose"`
 	Moved     []InheritedBody `json:"moved" doc:"The version differs, so each needs a fresh answer"`
@@ -472,7 +473,7 @@ func registerCarry(api huma.API, in Ingest) {
 			"Four groups, because they need four different things:\n\n" +
 			"`applying` reach this line by matching, and there is nothing to choose.\n\n" +
 			"`moved` held a claim at a version this line does not have. Each would come " +
-			"across as a **proposal carrying the old reasoning**, never as a decision.\n\n" +
+			"across as a proposal carrying the old reasoning, never as a decision.\n\n" +
 			"`postponed` were deferrals. Each says how long it has already been put off " +
 			"across every line it has come through, which is the total that carrying it " +
 			"again agrees to.\n\n" +
@@ -519,11 +520,11 @@ func registerCarrying(api huma.API, in Ingest) {
 		Summary: "Carry chosen triage onto a new line",
 		Description: "Takes the judgments named onto this build as claims waiting for " +
 			"agreement, each carrying the words from the line it came from.\n\n" +
-			"**Reasoning travels and conclusions do not.** Every one arrives needing approval, " +
+			"Reasoning travels and conclusions do not. Every one arrives needing approval, " +
 			"however confident whoever carried it was: a version moved, which is exactly what " +
 			"made the old judgment stop applying, so somebody has to look at the new code. " +
 			"What is inherited is the thinking rather than the answer.\n\n" +
-			"**Only what the preview offered.** A judgment that already applies here has " +
+			"Only what the preview offered. A judgment that already applies here has " +
 			"nothing to agree to, and one covering nothing here has nothing to apply to; " +
 			"naming either is refused rather than skipped, because a caller that got the set " +
 			"wrong should hear so.\n\n" +
@@ -540,11 +541,11 @@ func registerCarrying(api huma.API, in Ingest) {
 		// about which build is being carried from.
 		FromVariant string `query:"from_variant" required:"true" doc:"That line's variant"`
 		Body        struct {
-			Decisions []int64 `json:"decisions" minItems:"1" doc:"Which of the offered judgments to carry"`
+			Decisions []int64 `json:"decisions" minItems:"1" doc:"The offered judgments to carry"`
 		}
 	}) (*struct {
 		Body struct {
-			Carried int `json:"carried" doc:"How many claims were written, each waiting for a second person"`
+			Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
 		}
 	}, error) {
 		subject, err := reading(ctx)
@@ -583,7 +584,7 @@ func registerCarrying(api huma.API, in Ingest) {
 		}
 		out := &struct {
 			Body struct {
-				Carried int `json:"carried" doc:"How many claims were written, each waiting for a second person"`
+				Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
 			}
 		}{}
 		out.Body.Carried = carried
@@ -607,7 +608,7 @@ func inherited(rows []triage.Inherited) []InheritedBody {
 // ReleaseBody is one build and how much stands open against it.
 type ReleaseBody struct {
 	Stream     string         `json:"stream" doc:"The branch or tag"`
-	Kind       string         `json:"kind" doc:"Whether that is a branch or a tag"`
+	Kind       string         `json:"kind" doc:"The kind of stream: a branch or a tag"`
 	Variant    string         `json:"variant"`
 	Open       int            `json:"open" doc:"Every open finding at this build"`
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"That total split by the rating in force"`

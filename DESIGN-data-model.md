@@ -19,7 +19,7 @@ REQ-25, REQ-32, REQ-52, REQ-54.
 - [Component identity](#component-identity)
 - [Upstream name and version](#upstream-name-and-version)
 - [The fold](#the-fold)
-- [Merging duplicate descriptions](#merging-duplicate-descriptions)
+- [Duplicate descriptions](#duplicate-descriptions)
 - [History as intervals](#history-as-intervals)
 - [Place identity](#place-identity)
 - [Path traversal](#path-traversal)
@@ -40,11 +40,11 @@ before anything may target them.
 | Finding | One component at one place in one build. Twelve places is twelve findings (REQ-17) |
 | Group | One issue at one component across every place it sits at. The row the findings list returns, and the thing somebody decides about |
 
-Each word names one thing. The unit a scan is filed against had four names —
-target, build, release, and the pair itself — and two documents defined "release"
-a level apart. The finding-versus-group distinction is the difference between the
-twenty-five thousand rows a scan produced and the four hundred things somebody
-has to look at; every count in this system is one or the other.
+Each word names one thing, and the unit a scan is filed against is called a
+build wherever it is named. The finding-versus-group distinction is the
+difference between the twenty-five thousand rows a scan produces and the four
+hundred things somebody has to look at, and every count here is one or the
+other.
 
 | Term | Usage |
 |---|---|
@@ -82,9 +82,9 @@ can be filed against it, which happens before the release, months after, or whil
 backfilling a year of them.
 
 The release-over-release chart orders and labels its points by this date.
-Declaration time made it a chart of when somebody typed: a release recorded late
-sorted after ones that came out before it, and a year entered in an afternoon
-plotted as a single day.
+Ordered by declaration time it is a chart of when somebody typed: a release
+recorded late sorts after ones that came out before it, and a year entered in
+an afternoon plots as a single day.
 
 It falls back to the declaration date where nobody has stated one. It is the one
 of the two values that changes — the parent fills in and never moves, while the
@@ -140,12 +140,12 @@ ships.
 A scan naming something undeclared is refused, and the refusal names which part
 is missing — product, stream or variant.
 
-Creating whatever a scan names was the alternative. A pipeline with a typo in a
-stream name would then produce a stream that looks genuine, with its own
-findings, counts and place in every report, while the real stream appears to have
-stopped being scanned.
+Creating whatever a scan names is the alternative. A pipeline with a typo in a
+stream name then produces a stream that looks genuine, with its own findings,
+counts and place in every report, while the real stream appears to have stopped
+being scanned.
 
-**Declaring is idempotent, including against another writer.** Declaring what
+Declaring is idempotent, including against another writer. Declaring what
 is already there succeeds and changes nothing, because a pipeline that has to
 know whether it is the first one is not usable from CI — and nothing
 coordinates CI pipelines, so two arriving together is the ordinary case rather
@@ -175,9 +175,9 @@ What is stored for matching is the normalized form. The spelling somebody wrote 
 kept beside it and is what is shown back.
 
 Normalizing the value is what makes this behave identically on every engine: a
-lower-case value compares the same under any collation, and the unique constraint
-means one thing on all four. The first attempt treated it as an engine difference
-to be configured around.
+lower-case value compares the same under any collation, and the unique
+constraint means one thing on all four. Configuring a collation per engine is
+the alternative, and it makes the rule a property of the deployment.
 
 An identity a sign-in provider hands over is compared exactly. It is not typed
 here and not ours to reinterpret; deciding that two accounts are one person
@@ -221,20 +221,19 @@ identity and expiry (REQ-08). The flag is what lets everything walking upward
 stop there. A scan naming no root of its own is filed against the unit it was
 sent for.
 
-The flag is **reconciled like any other column**. A node kept from the previous
-scan had everything else refreshed and this left alone, so a build that promoted
-a component to its own root — or demoted the old one — carried the previous
-answer until that node happened to close. Everything walking upward stops at the
+The flag is reconciled like any other column. A node kept from the previous
+scan has everything refreshed, this included: left alone, a build that promotes
+a component to its own root — or demotes the old one — carries the previous
+answer until that node happens to close. Everything walking upward stops at the
 flag, so two flagged nodes or none is a tree that draws wrongly from the top.
 
-The root is also **not one of the build's components**. It is what the components
-are *in*, and the count beside the inventory said one more than the inventory
-lists.
+The root is also not one of the build's components. It is what the components
+are in, and a count including it says one more than the inventory lists.
 
 | Refused | Reason |
 |---|---|
 | A component with no name | It cannot be identified, so it cannot be tracked. A component with no *version* is kept: the format does not require one, nothing can match a vulnerability against a version nobody stated, and it ships regardless |
-| An edge naming a component the snapshot does not list | Inventing the component would report a dependency nobody declared. An edge naming something the *document* never described was already dropped and counted at read time, so one reaching here means the snapshot was built wrong |
+| An edge naming a component the snapshot does not list | Inventing the component reports a dependency nobody declared. An edge naming something the document never described is dropped and counted at read time, so one reaching here means the snapshot was built wrong |
 
 ## Component identity
 
@@ -249,9 +248,9 @@ A package identifier is read for what it says rather than byte for byte: escapes
 decoded, the ecosystem lowercased, and the qualifying parts — architecture,
 distribution, the source package a binary came from — excluded.
 
-Measured on a public switch operating-system image: **8,374 described components
+Measured on a public switch operating-system image: 8,374 described components
 named 7,858 packages, and every one of the 516 collisions was the same name at
-the same version.** A build that merges two sources emits the same package twice,
+the same version. A build that merges two sources emits the same package twice,
 once with those qualifiers and once without, sometimes escaping the version
 differently and sometimes disagreeing with itself about the architecture. Taking
 the identifier verbatim would count those packages twice, split their findings
@@ -263,7 +262,7 @@ already the variant. Including it states the dimension twice, and the same
 package then reads as two in a report that has already separated them by variant.
 
 The reduction is the one the identifier specification describes, applied the same
-way to every ecosystem. **Nothing here knows which producer wrote a document**,
+way to every ecosystem. Nothing here knows which producer wrote a document,
 because the inventories this will be given come from build systems nobody has
 seen.
 
@@ -275,8 +274,8 @@ upstream name is what a build's own suppressions use, since a patch is written
 against a source tree rather than the binaries cut from it.
 
 Producers state it two ways: the format has a place for it, and several hang it
-off the package identifier. Both are read. In the measured image **30 components
-state it the format's way and 537 hang it off the identifier**, 16 of them both,
+off the package identifier. Both are read. In the measured image 30 components
+state it the format's way and 537 hang it off the identifier, 16 of them both,
 so reading only the format's own mechanism captures a twentieth of what is there.
 
 A bare upstream name with no version is not a lesser answer. For a binary cut
@@ -288,7 +287,7 @@ it is the half that matching a claim needs.
 The binary packages one source package was built at one version are one thing to
 a person. curl, libcurl4t64 and libcurl3t64 are one bump; treating them as three
 is three acts that can disagree with each other. Every component carries a
-**fold key**, written as the scan is applied.
+fold key, written as the scan is applied.
 
 | Part of the key | Separates |
 |---|---|
@@ -298,8 +297,8 @@ is three acts that can disagree with each other. Every component carries a
 | Version it was built at | One source shipped twice in one build |
 
 The source package's name alone is not enough, and the fourth part is the one
-that looks optional. Measured on the demo: keyed on all four, **41 groups fold
-and none of them holds binaries that disagree** about which issues they carry or
+that looks optional. Measured on the demo: keyed on all four, 41 groups fold
+and none of them holds binaries that disagree about which issues they carry or
 which version fixes them. Keyed on the name alone, 72 fold and 14 disagree. The
 kernel is the clearest of them — an image at source version 6.12.41-1 carrying
 5,088 issues beside the perf and header packages at 6.12.107-1 carrying 607 and
@@ -315,20 +314,20 @@ none, one source at two versions in one build with one of them already fixed.
 | **Cut to a number of characters, not a number of bytes** | Every indexed name column here is declared in characters — PostgreSQL, MySQL and MariaDB all count a `VARCHAR`'s length that way — and the fold key hashes four cut names. Cut at the same number of *bytes*, a name in a script taking three bytes a character was cut to a third of the width the column holds, so two components whose names differ only past that third folded together and one judgment covered both. The cut could also land inside a character, which hashes mangled parts and stores invalid UTF-8 |
 | **It does not reach the two records that name what shipped** | The disposition register is one row per issue and place, and a VEX or CSAF statement is one per issue and component — the binary a customer's scanner matched on, not the source it was cut from. Folding either would publish a claim about a package nobody received |
 
-Not folded at ingest, which is a different proposal and was rejected on
-measurement. 82 of the 117 groups hold binaries pulled in by different parents,
-so a folded node answers "what pulls this in" wrongly for each of them —
+Folding at ingest is a different proposal, and the measurement refuses it. 82
+of the 117 groups hold binaries pulled in by different parents,
+so a folded node answers what pulls this in wrongly for each of them:
 `libcurl3t64-gnutls` has 30 distinct parents where `libcurl4t64` and `curl` have
 one each. And 54 live edges run between packages of one source package, so a
-folded node would depend on itself and the graph would acquire cycles the
-inventory does not have.
+folded node depends on itself and the graph acquires cycles the inventory does
+not have.
 
-## Merging duplicate descriptions
+## Duplicate descriptions
 
-A document describing the same package twice is describing one component, and the
-two descriptions are not always the same. In the measured image, keeping
-whichever arrived first discarded the vulnerability-database identifier for **204
-components**, depending only on which half the producer emitted first.
+A document describing the same package twice is describing one component, and
+the two descriptions are not always the same. In the measured image, keeping
+whichever arrives first discards the vulnerability-database identifier for 204
+components, on nothing but which half the producer emitted first.
 
 The first statement of anything stands, and anything it did not state is taken
 from the next description that does. Nothing is overwritten: two producers
@@ -362,8 +361,8 @@ thing that directly depends on it. Names only, no versions, hashed. Where the
 thing above is the root, the component's name stands alone, because the root's
 name differs per variant.
 
-The first form was the whole chain of names from the top down. Measured against a
-real switch image:
+A chain of names from the top down is the other form. Measured against a real
+switch image:
 
 | | Chain of names | Component and its consumer |
 |---|---:|---:|
@@ -372,8 +371,8 @@ real switch image:
 
 The worst case is one shared library: ten sub-packages built from its source,
 each depending on the others, and one package depending on all ten, so every
-route arriving at that family multiplies through it. A vulnerability there would
-have produced 49,170 findings for one issue.
+route arriving at that family multiplies through it. A vulnerability there
+produces 49,170 findings for one issue.
 
 The same component has 48 direct consumers: the containers that ship it, its own
 siblings, and the six packages that call it. Nothing is lost — which container
@@ -399,29 +398,17 @@ row of the tree's children for the distinct issues under each.
 
 The downward walks are spelled `CROSS JOIN ... WHERE`, which is an inner join
 everywhere and, on SQLite, the instruction to keep the recursion's queue on the
-outside of the join. Left to itself the planner put the edge table there and
-scanned every edge once per queued row: **6.6 s to list what sits under a build's
-root, against 0.018 s.**
+outside of the join. Left to itself the planner puts the edge table there and
+scans every edge once per queued row: 6.6 s to list what sits under a build's
+root, against 0.018 s.
 
 ## Limits
 
-- **The graph does not distinguish two builds of one version with different
-  feature flags** (REQ-16). Both report the same name and version. An edge means
-  the inventory said so, not that the code takes that path at run time. It matters
-  where a dismissal rests on reachability, which is why such a claim is keyed on
-  the versions in hand and asked again when they move.
-- **A finding of a kind with no dependency path gets no tree view** (REQ-14). For
-  something a scanner found in a source file the answer is the file. The finding
-  model carries a kind from the start, and the screens that assume a path check
-  for one rather than drawing an empty tree.
-- **Two artifacts distinguished only by a package qualifier read as one
-  component.** A component is tracked for which vulnerabilities apply to it, and a
-  qualifier does not change that.
-- **Which product a build belongs to is asked in one place.** It was two
-  byte-identical walks of the same three tables in two packages.
-- **A group's state is read from what its places say, never from the absence of a
-  decision.** Counting "no decision here" as undecided put a withdrawn claim in no
-  bucket at all, appearing in none of the four states and in the total.
-- **A place identity carries no build and no product.** That is what lets a
-  judgment travel between builds shipping the same versions, and it is why every
-  list correlating decisions requires a product to be named.
+| Limit | Detail |
+|---|---|
+| Two builds of one version with different feature flags are one thing to the graph (REQ-16) | Both report the same name and version. An edge means the inventory said so, not that the code takes that path at run time. It matters where a dismissal rests on reachability, which is why such a claim is keyed on the versions in hand and asked again when they move |
+| A finding of a kind with no dependency path gets no tree view (REQ-14) | For something a scanner found in a source file the answer is the file. The finding model carries a kind from the start, and the screens that assume a path check for one rather than drawing an empty tree |
+| Two artifacts distinguished only by a package qualifier are one component | A component is tracked for which vulnerabilities apply to it, and a qualifier does not change that |
+| Which product a build belongs to is asked in one place | Two walks of the same three tables cannot drift where there is one |
+| A group's state is read from what its places say, never from the absence of a decision | Counting "no decision here" as undecided puts a withdrawn claim in no bucket at all: in none of the four states, and in the total |
+| A place identity carries no build and no product | That is what lets a judgment travel between builds shipping the same versions, and why every list correlating decisions requires a product to be named |

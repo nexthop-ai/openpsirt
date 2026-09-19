@@ -18,7 +18,7 @@ import { Wide } from "../ui/Wide";
 // — so a rule could only route to a team somebody had created with a request
 // by hand. That is the gap this closes.
 //
-// **Belonging to a team grants nothing.** It says where work arrives and never
+// Belonging to a team grants nothing. It says where work arrives and never
 // what anybody may read, which is what lets one team carry mixed clearance —
 // and it is why this sits beside users and roles rather than inside it.
 export function Teams() {
@@ -88,7 +88,7 @@ export function Teams() {
       {rows.length === 0 ? (
         <Empty
           title="No teams are recorded."
-          detail="Where work goes when it belongs to a group rather than a person."
+          detail="The queues work goes to when it belongs to a group rather than a person."
         />
       ) : (
         <Wide>
@@ -193,7 +193,7 @@ export function Teams() {
           value={name}
           onChange={setName}
           placeholder="platform"
-          hint="What a rule names it by. Capitals do not matter."
+          hint="The name a rule uses for it. Capitals do not matter."
         />
         <Field
           label="Shown as"
@@ -214,7 +214,7 @@ export function Teams() {
 // hundreds of names in no order anybody chose. Typed against the same list, it
 // narrows as somebody types and says when nothing matches.
 //
-// **It still cannot invent anybody.** Add stays disabled until what is typed
+// It still cannot invent anybody. Add stays disabled until what is typed
 // resolves to one of the people offered, which is the guarantee the select
 // gave for free: a team cannot bring anybody into the deployment, and being
 // refused after typing is a worse way to learn that than not being offered it.
@@ -225,7 +225,7 @@ function Pick({
   onPick,
 }: {
   people: { identity: string; name: string }[];
-  // Whether the list of people could be read at all. An empty list and a list
+  // A readable list of people at all. An empty list and a list
   // nobody could fetch look alike, and only the first of them means the team
   // already holds everybody.
   unread: boolean;

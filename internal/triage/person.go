@@ -33,13 +33,13 @@ type Record struct {
 
 // RecordOf reads one person's part in the triage record.
 //
-// **For an administrator alone.** It counts across every product without
+// For an administrator alone. It counts across every product without
 // narrowing, which is the only way the question is answerable — a
 // concentration signal computed over the products the reader happens to hold
 // is not the signal. Enforced here, where the rest of this store's rules are
 // (REQ-42).
 //
-// Which is why the audit permission does not reach it, though it reads the
+// That is why the audit permission does not reach it, though it reads the
 // page this sits on: that grant is declared to reach no product's decisions,
 // and a count taken over every product's decisions is taken over decisions.
 // The page leaves the block out rather than refusing.

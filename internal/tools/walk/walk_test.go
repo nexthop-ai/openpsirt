@@ -9,7 +9,7 @@ import (
 
 // The reader all six gate programs route through, and it had no test.
 //
-// What that costs is specific: a gate whose walk reaches nothing prints the
+// The cost is specific: a gate whose walk reaches nothing prints the
 // same all-clear as one that read the whole tree and found nothing wrong, and
 // the refusal that tells those apart had never been seen to fire. AGENTS.md:
 // "A control whose test has never been seen to fail is a control nobody has

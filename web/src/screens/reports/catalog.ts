@@ -6,8 +6,8 @@ import { type Scoped } from "../../app/scope";
 // catalog is the list of those names; anything else is built on the findings
 // list and its filters, which is the entry at the foot of the catalog screen.
 //
-// **A report about the thing you are standing on lives on that screen and is
-// listed here. A report that spans things lives only here.** So a comparison
+// A report about the thing you are standing on lives on that screen and is
+// listed here. A report that spans things lives only here. So a comparison
 // of two releases keeps the address it has — it is the screen where the two
 // are picked — and appears in the catalog with the selection already made,
 // rather than being rebuilt as a second copy under a reports address.
@@ -17,13 +17,13 @@ export type Report = {
   // pointing at a screen of its own has none.
   slug?: string;
   name: string;
-  // What question it answers, in one line.
+  // The question it answers, in one line.
   answers: string;
-  // Where it is read. A report the catalog owns is at its slug; one that
-  // points elsewhere builds its address from the selection, so the scope
+  // The address it is read at. A report the catalog owns is at its slug; one
+  // that points elsewhere builds its address from the selection, so the scope
   // picker is not asked for twice.
   to?: (at: Scoped) => string;
-  // What has to be picked before it can answer anything, for a report that
+  // The picks it needs before it can answer anything, for a report that
   // cannot span.
   needs?: (at: Scoped) => string | null;
 };
@@ -72,7 +72,7 @@ export const CATALOG: Report[] = [
   },
   {
     slug: "where-the-effort-went",
-    name: "Where the effort went",
+    name: "The destination of the effort",
     answers:
       "What the judgments in a period were about, most argued first: which component, how many arguments, how far they reached, and what came out of them. Every other report counts the backlog; this one says what the quarter went into.",
   },
@@ -172,7 +172,7 @@ export const CATALOG: Report[] = [
   },
 ];
 
-// Where a whole build lives, for an entry that points at one of its screens.
+// The address of a whole build, for an entry that points at one of its screens.
 function buildAt(at: Scoped): string {
   return (
     `/products/${encodeURIComponent(at.product ?? "")}` +
@@ -181,7 +181,7 @@ function buildAt(at: Scoped): string {
   );
 }
 
-// What a build-scoped entry needs. Five screens exist for one build and no
+// The picks a build-scoped entry needs. Five screens exist for one build and no
 // other, and an entry into one of them without a build picked would open on a
 // scope that means nothing.
 function whole(at: Scoped): string | null {
@@ -194,7 +194,7 @@ export function reportAt(slug: string): Report | undefined {
   return CATALOG.find((report) => report.slug === slug);
 }
 
-// Where a catalog row leads, and what stands in the way.
+// The destination of a catalog row, and what stands in the way.
 //
 // Returned together because a row that cannot answer is still worth drawing:
 // a report missing from a list reads as a report that does not exist, and
@@ -206,7 +206,7 @@ export function leadsTo(report: Report, at: Scoped): { to: string | null; why: s
   return { to: report.to?.(at) ?? null, why: null };
 }
 
-// What a report is answering for, as words. Every report states it, because a
+// The subject a report answers for, as words. Every report states it, because a
 // figure narrowed to one variant and a figure spanning a program are the same
 // figure with very different meanings, and a printed sheet has nothing else to
 // say which of the two it holds.

@@ -5,7 +5,7 @@ import { humaneBytes, readBytes, writeBytes } from "./bytes";
 // upload against. Nobody reads 26214400 as twenty-five megabytes, and a field
 // that shows it is a field where a mistake is a factor of a thousand.
 //
-// Which is why this is tested rather than left to read correctly: a wrong
+// That is why this is tested rather than left to read correctly: a wrong
 // multiplier here is an upload bound off by 1024, and it looks right on the
 // screen either way. Its twin, the duration composer, has ten tests; this had
 // none.

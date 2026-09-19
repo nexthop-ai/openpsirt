@@ -115,8 +115,8 @@ func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
 // change somebody's words — an edit that could be made by another person is
 // not a correction, it is a forgery with a timestamp.
 //
-// **Whether the asker may reach the note is settled before anything about it
-// is said back.** The row is read first, because the issue and product it
+// The asker's reach to the note is settled before anything about it
+// is said back. The row is read first, because the issue and product it
 // hangs off are not knowable otherwise, but no answer turns on what was in it
 // until the asker has been let in: refusing on authorship first would tell
 // anybody with an account that a note with this identifier exists, one request
@@ -141,7 +141,7 @@ func (s *Store) RewordNote(ctx context.Context, subject access.Subject, noteID i
 	// value fetched before it began describes a world that is gone — and one
 	// of those values is whether the asker may be here at all.
 	//
-	// What it said before is kept in the same transaction for a second
+	// The earlier wording is kept in the same transaction for a second
 	// reason: written apart, an edit that succeeded beside a history write
 	// that did not would leave the record saying a note was changed and
 	// nothing saying from what, which is worse than keeping no history
@@ -293,7 +293,7 @@ func noteVisibility(ctx context.Context, db bun.IDB, productID,
 // noteReach is whether this subject may be told the issue is in this product
 // at all, and at what visibility a note about it is held.
 //
-// **Undisclosed if any place of the issue in this product is**, which is the
+// Undisclosed if any place of the issue in this product is, which is the
 // rule the finding screen already applies to what may be said: one undisclosed
 // place among fifty makes the whole of it undisclosed for anybody deciding
 // what to write. A note is one thread for the issue, so it cannot be public

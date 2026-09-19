@@ -14,7 +14,7 @@ import (
 type UpwardBody struct {
 	Component string `json:"component"`
 	Version   string `json:"version"`
-	Depth     int    `json:"depth" doc:"How far below the build's root it sits, so the tree is drawn by indenting"`
+	Depth     int    `json:"depth" doc:"The depth below the build's root, so the tree is drawn by indenting"`
 	Findings  int    `json:"findings" doc:"Your own open issues on this component itself"`
 	Beneath   int    `json:"beneath" doc:"Your own open issues at or under it along these chains. Never how much the build holds there"`
 	Placed    bool   `json:"placed" doc:"False for a component the inventory put nowhere. Those sit at the end with no chain"`
@@ -40,13 +40,13 @@ func registerUpward(api huma.API, in Ingest) {
 		Summary: "Show the chains your own findings sit on",
 		Description: "The build's dependency graph, seen upward from your own work: from each " +
 			"component you hold a finding on, up to the build's root.\n\n" +
-			"**This is what the tree is for somebody who holds no reading on the product.** " +
+			"This is what the tree is for somebody who holds no reading on the product. " +
 			"Descended from the root, that tree is the inventory of what the product " +
 			"contains — the breadth they were not granted — so it cannot be offered with rows " +
 			"hidden: a container's count would still say how much sits under it. The chain " +
 			"upward is the part that makes a finding judgeable, because it says what pulled " +
 			"the thing in, and every node on it sits above something already granted.\n\n" +
-			"**The counts are yours.** A node says how much of your own work hangs beneath it " +
+			"The counts are yours. A node says how much of your own work hangs beneath it " +
 			"along these chains, never how much the build holds there.\n\n" +
 			"Rows come back in the order they are drawn, parents before children, the fullest " +
 			"branch first. A component the inventory placed nowhere has no chain and sits at " +

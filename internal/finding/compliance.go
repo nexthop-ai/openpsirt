@@ -41,10 +41,10 @@ type Rate struct {
 
 // Compliance is what proportion of the work met its deadline, by severity.
 //
-// **Arithmetic rather than storage.** A closed row keeps the deadline it
+// Arithmetic rather than storage. A closed row keeps the deadline it
 // carried, and only *open* rows lose one at end-of-life or below the line — so
 // everything this needs is already there, and nothing is precomputed.
-// **The period bounds what closed in it; what is open is always now.** A rate
+// The period bounds what closed in it; what is open is always now. A rate
 // asked for last year says how much of the work finished then met its date.
 // The open half is a statement about the present whatever period was asked
 // for, because reconstructing what stood open on a date gone by is the
@@ -127,7 +127,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr(rating.BandExpr + ", f.vulnerability_id, f.component_id")
 
-	// What each of the four means about a group rather than about a row.
+	// Each of the four, read about a group rather than about a row.
 	// Closed when no place is still open and at least one of them carried a
 	// deadline to be judged against; met when none of those was late;
 	// deferred when every open place is covered by one, because a deferral

@@ -34,7 +34,7 @@ const MARKS: Mark[] = [
   { label: "", title: "Link", wrap: ["[", "](https://)"], icon: "link" },
 ];
 
-// Who may be offered after an @, as the editor takes it.
+// The people who may be offered after an @, as the editor takes them.
 //
 // The question is about what is being discussed rather than about who is
 // asking: the endpoint answers with the people who can already read findings
@@ -62,14 +62,14 @@ export function Editor({
 }: {
   value: string;
   onChange: (next: string) => void;
-  // Where an unsent draft is kept. Text somebody typed is theirs, and losing
-  // it to a failed request, an expired session or a closed tab is the thing
-  // that teaches people to write less.
+  // The place an unsent draft is kept. Text somebody typed is theirs, and
+  // losing it to a failed request, an expired session or a closed tab is the
+  // thing that teaches people to write less.
   draftKey?: string;
   rows?: number;
   placeholder?: string;
   label?: string;
-  // Where mentions may be offered from. Omitted where there is no product in
+  // The product mentions are offered from. Omitted where there is none in
   // hand, in which case nothing is offered rather than everybody.
   mentions?: { product: string; visibility?: "public" | "private" };
   // The issue a file would be attached to. Omitted where there is none in
@@ -107,7 +107,7 @@ export function Editor({
     typing ? (each.identity ?? "").toLowerCase().startsWith(typing.toLowerCase()) : true,
   );
 
-  // What is being typed after an @, if anything. Read from the text before the
+  // The text typed after an @, if any. Read from the text before the
   // cursor rather than tracked as state, so it stays right however somebody
   // edits — pasting, deleting, clicking elsewhere in the line.
   function partial(field: HTMLTextAreaElement): string | null {
@@ -146,7 +146,7 @@ export function Editor({
     if (kept) onChange(kept);
   }, [draftKey, value, onChange]);
 
-  // What is on screen is stored under the key it was typed under, never under
+  // The text on screen is stored under the key it was typed under, never under
   // a key that arrived after it. This effect runs on a change of either, so
   // the first run after the key moves carries the old text — which wrote one
   // thing's draft into another's.

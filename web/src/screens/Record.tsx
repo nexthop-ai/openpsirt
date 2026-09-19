@@ -17,7 +17,7 @@ import { Weaknesses } from "../ui/Weaknesses";
 // Recording a flaw in what we ship: a vulnerability no scanner reported,
 // usually because nobody outside knows about it yet.
 //
-// **A screen of its own rather than an action on a list.** What is being
+// A screen of its own rather than an action on a list. What is being
 // recorded is precisely what is *not* in the findings list, so opening it from
 // there asks somebody to start where the answer is absent. It also needs more
 // asked of it than a control beside a table has room for — which build, which
@@ -40,7 +40,7 @@ export function Record() {
   const queries = useQueryClient();
 
   const [product, setProduct] = useState(scope.product ?? "");
-  // Which lines and which ways they are built. Both are sets: the same code
+  // The lines, and the ways they are built. Both are sets: the same code
   // goes out on several lines and as several variants at once, and a flaw in
   // it is one issue in every build that ships it. The builds are the product
   // of the two, and the ones that do not exist are simply not offered.
@@ -54,7 +54,7 @@ export function Record() {
   // for a handful of names in a build.
   const [version, setVersion] = useState("");
   const [ecosystem, setEcosystem] = useState("");
-  // Which of the two somebody pressed, and nothing until they press one. The
+  // The button somebody pressed, and nothing until they press one. The
   // value that is read is worked out below, because what is on offer depends
   // on a right that is not known until the session is.
   const [chose, setChose] = useState<boolean | null>(null);
@@ -70,7 +70,7 @@ export function Record() {
   const [received, setReceived] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [refused, setRefused] = useState<string[]>([]);
-  // Where the finding that was just recorded lives, held while somebody reads
+  // The address of the finding just recorded, held while somebody reads
   // which of their files did not attach.
   const [onward, setOnward] = useState("");
   const [weaknesses, setWeaknesses] = useState<string[]>([]);
@@ -109,7 +109,7 @@ export function Record() {
     queryFn: async () =>
       unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
   });
-  // What the product is built as, rather than what one line was. A variant
+  // The variants the product is built as, rather than one line's own. A variant
   // belongs to the product, so with several lines chosen this is the set to
   // pick from — a per-line list would be an arbitrary one of them.
   const builtAs = useQuery({
@@ -119,9 +119,9 @@ export function Record() {
       unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
   });
 
-  // What the build holds, to offer back as they type. A name typed from memory
-  // is a name the server refuses, and a build holds thousands of components,
-  // so the list is searched rather than loaded.
+  // The components the build holds, to offer back as they type. A name typed
+  // from memory is a name the server refuses, and a build holds thousands of
+  // components, so the list is searched rather than loaded.
   const holding = useQuery({
     queryKey: ["components", product, streams[0], variants[0], component],
     enabled: whole && component.trim().length >= 2,
@@ -322,7 +322,7 @@ export function Record() {
 
         <div className="field">
           <label htmlFor="rec-summary">
-            What the flaw is{" "}
+            The flaw{" "}
             <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
               required
             </span>
@@ -336,11 +336,11 @@ export function Record() {
             onChange={setSummary}
             draftKey={`record:${product}`}
             rows={6}
-            label="What the flaw is"
+            label="The flaw"
             placeholder="The management socket answers a request before anyone has authenticated."
             mentions={mentioning(product, !disclosed)}
           />
-          <span className="hint">What a triager reads first.</span>
+          <span className="hint">The first line a triager reads.</span>
         </div>
 
         <div className="field">
@@ -377,7 +377,7 @@ export function Record() {
         </div>
 
         <div className="field">
-          <label htmlFor="rec-component">What carries it</label>
+          <label htmlFor="rec-component">The component carrying it</label>
           {/* Shown as a list rather than left to the browser's datalist, which
               has no affordance at all: no arrow, nothing until two characters,
               and nothing to say whether anything matched. This is the input in
@@ -417,7 +417,7 @@ export function Record() {
 
         {choices.length > 0 && (
           <div className="alert">
-            <strong>Which {component}?</strong>
+            <strong>Components named {component}</strong>
             <span>Shipped as more than one component here. Pick the one that carries it.</span>
             <ul className="refs" style={{ marginTop: 8 }}>
               {choices.map((choice) => (
@@ -446,7 +446,7 @@ export function Record() {
         <Scoring vector={vector} onChange={setVector} />
 
         <div className="field">
-          <label htmlFor="rec-files">What proves it</label>
+          <label htmlFor="rec-files">Evidence</label>
           <p className="hint" style={{ marginTop: 0 }}>
             Optional. Readable by whoever can read the issue, so an undisclosed flaw&rsquo;s
             evidence is undisclosed too.
@@ -515,7 +515,7 @@ export function Record() {
             the embargo runs from, and how they wish to be credited is what an
             advisory's acknowledgments say. */}
         <div className="field">
-          <span className="l">Who told us</span>
+          <span className="l">The reporter</span>
           <span className="hint" style={{ marginBottom: 6 }}>
             Optional. Only where somebody outside reported it.
           </span>
@@ -531,7 +531,7 @@ export function Record() {
               />
             </label>
             <label className="field" style={{ margin: 0 }}>
-              <span>How to reach them</span>
+              <span>Contact</span>
               <input
                 {...notACredential}
                 type="text"

@@ -1,16 +1,16 @@
 // Package advisory turns what is held about a flaw in our own product into a
 // document somebody can publish.
 //
-// **We own the triage record; whoever publishes owns the published advisory**
-// . The document is never sent anywhere and nothing here goes out over the
+// We own the triage record; whoever publishes owns the published advisory.
+// The document is never sent anywhere and nothing here goes out over the
 // network: it is assembled from what is held and handed over. What is kept is
 // the record that one went out and the digest of what was generated, which is
 // what makes "is what is published still what we would generate" answerable.
 // That is the question that decides whether an integration works or rots, and
 // keeping both ends as the source of truth is how it rots.
 //
-// **Only a flaw in what we ship**. A known issue in a third-party
-// component is dependency hygiene that a consumer can already read out of the
+// Only a flaw in what we ship. A known issue in a third-party component is
+// dependency hygiene that a consumer can already read out of the
 // inventory, and issuing a vendor advisory for every upstream CVE in a
 // dependency is not what an advisory is. So this refuses an issue this
 // deployment did not record, by name, rather than producing a document that
@@ -173,7 +173,7 @@ type Named struct {
 // IdentificationHelper is what a release called itself, in a spelling a machine
 // can compare.
 //
-// **The identifier the build declared, never one minted here.** An identifier
+// The identifier the build declared, never one minted here. An identifier
 // only helps if it appears on both sides of the comparison, and one invented
 // here appears on one: a reader holding our image has whatever our build wrote
 // into its inventory, which is this exact string if they ingested that
@@ -200,9 +200,9 @@ type Vulnerability struct {
 	Status Status `json:"product_status"`
 	// CWE is what kind of flaw this is, where the catalog knows the name.
 	CWE *Weakness `json:"cwe,omitempty"`
-	// What is held about the flaw beyond which releases carry it: what it
-	// scored, what a holder of an affected release can do, and whoever asked
-	// to be credited for telling us.
+	// Scores is what is held about the flaw beyond which releases carry
+	// it: what it scored, what a holder of an affected release can do, and
+	// whoever asked to be credited for telling us.
 	Scores          []Score          `json:"scores,omitempty"`
 	Remediations    []Remediation    `json:"remediations,omitempty"`
 	Acknowledgments []Acknowledgment `json:"acknowledgments,omitempty"`
@@ -213,7 +213,7 @@ type Vulnerability struct {
 
 // Weakness is the kind of flaw, as the standard carries it.
 //
-// **One, and both halves of it.** The standard states a weakness as the
+// One, and both halves of it. The standard states a weakness as the
 // identifier and the name the catalog gives it, and a consumer's validator
 // compares the pair — so an issue classified several ways states the one the
 // data calls the root cause, and one whose name the catalog does not know
@@ -237,7 +237,7 @@ type Issued struct {
 // never shipped the thing at all — and those are opposite answers, one of them
 // the one a reader is hoping for.
 //
-// What a person decided about a release — not affected, and the reason why —
+// A person's own decision about a release — not affected, and the reason why —
 // is the VEX half, and is not assembled here.
 type Status struct {
 	KnownAffected []string `json:"known_affected,omitempty"`
@@ -294,7 +294,7 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	// What has already gone out for this flaw. A second document for the
+	// Anything already published for this flaw. A second document for the
 	// same one has to carry a higher version and a revision history, and
 	// both are things a CSAF validator checks — a document that fails
 	// validation is one a customer's tooling drops.
@@ -343,13 +343,13 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 			ID: identifier, Status: statusOf(entered),
 			// The number of the last entry in the history below, rather than
 			// a second count of the same thing. Counted separately the two
-			// disagreed the moment an advisory had been issued once: the
-			// history numbered this document N+2 and the version said N+1,
+			// disagree the moment an advisory has been issued once: the
+			// history numbers this document N+2 and the version says N+1,
 			// and a validator compares them.
 			Version:            history[len(history)-1].Number,
 			InitialReleaseDate: entered.OpenedAt.UTC(),
 			CurrentReleaseDate: now,
-			// Which build wrote it, read from the binary rather than held in
+			// The build that wrote it, read from the binary rather than held in
 			// a variable something has to remember to set — one nobody set
 			// says the document was generated by a version that does not
 			// exist.
@@ -423,7 +423,7 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 		// producer's, taken from a scan file, and a scan file is hostile input
 		// (REQ-66): one that wrote something other than a package identifier
 		// into the field the root is declared in would fail a customer's
-		// validator on the **whole document** rather than on this field, which
+		// validator on the whole document rather than on this field, which
 		// is a worse outcome than the field being absent.
 		if isPackageIdentifier(release.Identifier) {
 			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
@@ -514,7 +514,7 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 		return nil, nil, fmt.Errorf("look up what we recorded about %q: %w", identifier, err)
 	}
 	if err != nil {
-		// Whether the issue is here at all and whether it is ours are told
+		// The issue's presence here and its ownership are told
 		// apart deliberately: the first is a typo and the second is a scope
 		// rule somebody has to understand.
 		held, here := s.here(ctx, subject, productID, issue.ID)
@@ -570,7 +570,7 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
-		// What this build's own inventory called itself, from the scan that
+		// This build's own name for itself, from the scan that
 		// inventory arrived on. Joined on the target's current scan, which is
 		// one row by key, so it cannot multiply the findings counted below.
 		Join(`LEFT JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
@@ -687,7 +687,7 @@ type Issuance struct {
 // Issued records that an advisory for this flaw went out, and returns what was
 // recorded.
 //
-// **The digest is taken from the document as it is now**, generated inside
+// The digest is taken from the document as it is now, generated inside
 // this call rather than supplied by the caller. A caller-supplied digest is a
 // digest of whatever they say — and the question this exists to answer is
 // whether what is published is still what we would generate, which only means
@@ -771,7 +771,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 
 // Issuances is what has gone out for one flaw in one product, newest first.
 //
-// **Readable without generating a document.** Every issuance is already in the
+// Readable without generating a document. Every issuance is already in the
 // document's own revision history, which is right for a reader of the document
 // — but it made "has an advisory gone out for this, and is what is published
 // still what we would generate" a question you had to build a CSAF document to
@@ -851,9 +851,9 @@ func revisions(opened time.Time, gone []Issuance, now time.Time) []Revision {
 	// published is not a revision of anything: its newest entry is the flaw
 	// being recorded, which is what it describes.
 	//
-	// That is also the one case where counting the version separately agreed
-	// with the history by accident, which is why the disagreement only showed
-	// once an advisory had been issued.
+	// It is also the one case where counting the version separately agrees
+	// with the history by accident, which is why the disagreement shows only
+	// once an advisory has been issued.
 	if len(gone) > 0 {
 		out = append(out, Revision{
 			Number: strconv.Itoa(len(gone) + 2), Date: now,

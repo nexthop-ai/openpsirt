@@ -191,7 +191,7 @@ func TestTheHeaderOfTheThirdVersionIsReadFromInsideTheContents(t *testing.T) {
 	// from it — which `!RootDeclared` does not show, since resolveRoot returns
 	// on any header read whatever the graph left behind.
 	//
-	// What shows it is a document the full read refuses. A nameless package is
+	// It is shown by a document the full read refuses. A nameless package is
 	// a fault in the contents, and the other two formats skip their contents
 	// on this pass, so the same document is answered 202 and fails later in
 	// the background reader. Reporting it here instead would have the same
@@ -269,8 +269,8 @@ func TestWhatTheThirdVersionSaysAboutABuildIsNotStructure(t *testing.T) {
 }
 
 func TestALifecycleScopeSaysWhenNotWhether(t *testing.T) {
-	// **The one judgment in this vocabulary that the specification does not
-	// make for us.** A scope says which phase a relationship matters in, and
+	// The one judgment in this vocabulary that the specification does not
+	// make for us. A scope says which phase a relationship matters in, and
 	// says nothing about whether the target ships. Reading `build` as "does not
 	// ship" is wrong for every compiled language — a crate linked into a binary
 	// is stated as a build-phase dependency and is inside what ships — and
@@ -278,7 +278,7 @@ func TestALifecycleScopeSaysWhenNotWhether(t *testing.T) {
 	// noise. A test dependency is the exception, and it is the same exception
 	// the second version's table makes.
 	//
-	// What the exception drops is the edge and not the component: the package
+	// The exception drops the edge and not the component: the package
 	// is in the document either way, so it is held and counted as sitting
 	// under nothing.
 	scoped := func(scope string) string {

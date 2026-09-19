@@ -1,4 +1,4 @@
-# Trying it
+# Evaluation
 
 Two ways, for two different questions. The published image answers "what does
 this thing do"; the checkout answers "what does my change do".
@@ -25,7 +25,7 @@ one port. The Helm chart is published beside the image, as
     Plain HTTP, and administration handed to whoever a header says they are.
     It is for looking at.
 
-### Something has to say who you are
+### Sign-in
 
 Nothing creates an account and no path admits an unknown arrival, so a
 deployment that cannot tell who is asking serves nobody. There are two ways to
@@ -36,7 +36,7 @@ tell it, and the command above uses the second.
 | A sign-in provider | One OpenID Connect provider, or GitHub. Configured at startup, and needed for anybody to sign in through a browser normally |
 | A trusted header | A reverse proxy authenticates and passes the username on. Honored only from addresses you name, because reaching the container directly bypasses the proxy |
 
-**A browser cannot set a header**, so the command above gives you an API to
+A browser cannot set a header, so the command above gives you an API to
 drive with `curl` rather than an interface to click:
 
 ```
@@ -68,11 +68,11 @@ It seeds two products: a real switch image, and OpenPSIRT itself, from the
 inventory the image carries of what it ships, so the screens that compare
 across products have something to compare.
 
-### One person cannot demonstrate this
+### The two-person control
 
 A judgment is proposed by one person and agreed to by another, and approving
-your own is refused. So the demo opens a door per person, and two browser
-windows are two people:
+your own is refused, so one person cannot demonstrate this. The demo opens a
+door per person, and two browser windows are two people:
 
 | Door | Arrives as | May |
 |---|---|---|
@@ -99,16 +99,15 @@ make demo DEMO_CAST="8091:ana:public-read,public-triage,approver \
 | `make demo-flaw` | One flaw in what this deployment ships, recorded by hand and undisclosed |
 | `make dev` | This machine's binary plus the interface's own dev server, for editing the interface and watching it reload |
 
-- **A demo where every figure reads zero demonstrates nothing.** Without
+- A demo where every figure reads zero demonstrates nothing. Without
   `demo-triage` the review queue, the record of judgments, how long triage is
   taking and what is planned are all empty, and the screens answering those
   questions look broken rather than idle. It records through the cast's own
   doors, because one person proposing and a second agreeing is the control the
   whole tool rests on.
-- **`demo-vex` is separate from the seed** because the scans run in the
-  background, and a document written before them would name issues this
-  deployment does not have.
-- **`make dev` needs Go, node and a scanner installed locally**, and it does
-  not exercise the interface the binary embeds. `make demo` does.
-- **Everything the demo writes stays in a git-ignored directory** in the
-  checkout.
+- `demo-vex` is separate from the seed because the scans run in the background,
+  and a document written before them would name issues this deployment does not
+  have.
+- `make dev` needs Go, node and a scanner installed locally, and it does not
+  exercise the interface the binary embeds. `make demo` does.
+- Everything the demo writes stays in a git-ignored directory in the checkout.

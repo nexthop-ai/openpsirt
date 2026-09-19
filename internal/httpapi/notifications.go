@@ -13,25 +13,25 @@ import (
 
 // NotificationBody is one thing somebody was told.
 type NotificationBody struct {
-	ID   int64  `json:"id" doc:"What to name this when acknowledging it"`
-	Kind string `json:"kind" doc:"What happened, as a word: assigned, sent-back, build-quiet"`
+	ID   int64  `json:"id" doc:"The name for this when acknowledging it"`
+	Kind string `json:"kind" doc:"The kind, as a word: assigned, sent-back, build-quiet"`
 	// Lifetime says whether acknowledging is the way this goes away. A
 	// condition clears itself when what it is about stops being true, so
 	// acknowledging one hides it rather than resolving anything.
 	Lifetime string `json:"lifetime" enum:"event,condition" doc:"An event happened once and is acknowledged; a condition holds until what it is about changes"`
-	About    string `json:"about,omitempty" doc:"What a condition is about. Absent for an event"`
-	Body     string `json:"body" doc:"What to say. Describes the moment it was written rather than the world now"`
-	Link     string `json:"link,omitempty" doc:"Where it points, where there is somewhere to go"`
-	At       string `json:"at" doc:"When it was recorded"`
+	About    string `json:"about,omitempty" doc:"A condition's subject. Absent for an event"`
+	Body     string `json:"body" doc:"The message. It describes the moment it was written rather than the world now"`
+	Link     string `json:"link,omitempty" doc:"The destination, where there is somewhere to go"`
+	At       string `json:"at" doc:"The moment it was recorded"`
 }
 
 type notificationsOutput struct {
 	Body struct {
 		Items []NotificationBody `json:"items"`
-		// Total is how many are waiting, which is the number the area draws.
+		// Total is the number waiting, which is what the area draws.
 		// Counted through the same conditions as the page, so a badge cannot
 		// disagree with the list under it.
-		Total int `json:"total" doc:"How many are waiting on you"`
+		Total int `json:"total" doc:"The number waiting on you"`
 	}
 }
 
@@ -45,14 +45,14 @@ func registerNotifications(api huma.API, in Ingest) {
 			"Everyone has one of these, and what appears in it differs by what you hold: work " +
 			"arriving, a dismissal sent back, an approval an edit withdrew, or — for an " +
 			"administrator — that the tool itself is unwell.\n\n" +
-			"Two lifetimes, and the difference matters to a caller. An **event** happened once " +
-			"and goes away when you acknowledge it. A **condition** is true while something is " +
+			"Two lifetimes, and the difference matters to a caller. An event happened once " +
+			"and goes away when you acknowledge it. A condition is true while something is " +
 			"true and clears itself when that stops, so a build that resumes being scanned " +
 			"leaves this list without anybody dismissing it.",
 		Tags: []string{"Notifications"},
 	}, ownSubject, ""), func(ctx context.Context, input *struct {
-		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many to return"`
-		Offset int `query:"offset" minimum:"0" doc:"How many to skip"`
+		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number returned"`
+		Offset int `query:"offset" minimum:"0" doc:"The number skipped"`
 	}) (*notificationsOutput, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -120,7 +120,7 @@ func registerNotifications(api huma.API, in Ingest) {
 		Tags: []string{"Notifications"},
 	}, ownSubject, ""), func(ctx context.Context, _ *struct{}) (*struct {
 		Body struct {
-			Acknowledged int `json:"acknowledged" doc:"How many were waiting"`
+			Acknowledged int `json:"acknowledged" doc:"The number that were waiting"`
 		}
 	}, error) {
 		subject, err := reading(ctx)
@@ -136,7 +136,7 @@ func registerNotifications(api huma.API, in Ingest) {
 		}
 		out := &struct {
 			Body struct {
-				Acknowledged int `json:"acknowledged" doc:"How many were waiting"`
+				Acknowledged int `json:"acknowledged" doc:"The number that were waiting"`
 			}
 		}{}
 		out.Body.Acknowledged = n

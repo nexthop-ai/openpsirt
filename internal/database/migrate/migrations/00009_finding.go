@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upFinding, downFinding)
 }
 
-// What a scan run found, and what it is about.
+// A scan run's findings, and their subject.
 //
 // A vulnerability is one issue however many names it goes by. The same issue
 // arrives as a national identifier from one database and an advisory
@@ -127,7 +127,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vulnerability_reference_unique" UNIQUE ("vulnerability_id", "url_identity")
 		)` + t.suffix,
 
-		// What kind of flaw this is, by the classification the data carries.
+		// The kind of flaw, by the classification the data carries.
 		//
 		// A row per weakness rather than one comma-joined column, which is the
 		// shape every other multi-valued attribute here has. Packed into one
@@ -170,7 +170,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vulnerability_weakness_unique" UNIQUE ("vulnerability_id", "cwe")
 		)` + t.suffix,
 
-		// What the class-of-flaw filter reads: every issue of one kind.
+		// The class-of-flaw filter's index: every issue of one kind.
 		`CREATE INDEX "vulnerability_weakness_cwe_idx" ON "vulnerability_weakness" ("cwe")`,
 
 		`CREATE TABLE "vulnerability_alias" (
@@ -212,7 +212,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "scan_run_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
 		)` + t.suffix,
 
-		// What a build has already argued does not apply to it.
+		// A build's own argument that something does not apply to it.
 		//
 		// Stored as data rather than left in the document it arrived in. A
 		// nightly scan's documents are discarded once read, the vulnerability
@@ -432,7 +432,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "finding_closed_run_id_fk" FOREIGN KEY ("closed_run_id") REFERENCES "scan_run"("id")
 		)` + t.suffix,
 
-		// What is open now, per variant, is the query behind every screen.
+		// Everything open now, per variant, is the query behind every screen.
 		// Matching an issue by a name somebody else wrote. Both the issue's
 		// own name and every name it goes by, because which of them a
 		// publisher chose is a preference of whichever database they
@@ -442,7 +442,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 
 		`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at")`,
 
-		// What is running out, off an index rather than a scan. It leads with
+		// Deadlines running out, off an index rather than a scan. It leads with
 		// the two columns always compared — a finding that is closed or
 		// already answered is not running out of anything — so the deadline
 		// itself is the range at the end of a narrow prefix.

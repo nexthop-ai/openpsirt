@@ -229,7 +229,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 			}
 		}
 
-		// What the page shows about a row comes from the second statement,
+		// The page's view of a row comes from the second statement,
 		// keyed on the group. The counts have to be the same group's.
 		got, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, finding.Filter{})
 		if err != nil {

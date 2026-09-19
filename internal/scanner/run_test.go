@@ -95,7 +95,7 @@ func eachRun(t *testing.T, fn func(t *testing.T, f *runFixture)) {
 			t.Fatal(err)
 		}
 
-		// What the build shipped, already read and stored.
+		// The inventory the build shipped, already read and stored.
 		scan, outcome, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
 			TargetID: target.ID, ContentHash: "hash-1",
 			BuiltAt: time.Now().UTC().Add(-time.Hour), ParserVersion: "test",

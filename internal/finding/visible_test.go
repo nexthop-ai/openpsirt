@@ -9,16 +9,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// Who may read what, asked of the store rather than of a handler.
+// Read access, asked of the store rather than of a handler.
 //
 // The rule is enforced in the data layer with a subject on the query, so these
 // ask the store directly: a check that only a handler makes is a check the
 // next handler forgets.
 
 func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
-	// What visibility on the query is actually about. The enforcement is
-	// on the query, so this tests the query rather than a handler that
-	// remembered to ask.
+	// Visibility on the query. The enforcement is on the query, so this tests
+	// the query rather than a handler that remembered to ask.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
@@ -51,9 +50,9 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 			{"private triager", f.holding(t, access.PrivateTriage), 2, false},
 			{"an approver alone", f.holding(t), 0, true},
 			// An administrator holds no role here, so they read
-			// nothing here . Administering the catalog is not
-			// reading what is open against it, and this is the row
-			// that used to say otherwise.
+			// nothing here. Administering the catalog is not reading
+			// what is open against it, and this is the row that
+			// says so.
 			{"an administrator granted nothing", access.NewPerson(1, "admin", true, nil, 0), 0, true},
 			{"an administrator granted private reading", f.admin(t, access.PrivateRead), 2, false},
 			{"a pipeline", access.NewPipeline(1, "nightly", access.Scope{ProductID: f.productID}), 0, true},

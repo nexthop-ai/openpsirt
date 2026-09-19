@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { revisable } from "./ReasonEditor";
 
-// Which claims still have something to revise or withdraw.
+// The claims that still have something to revise or withdraw.
 //
 // The two screens that draw the editor each had their own list of the open
 // words — one from what became of the claim, one from the decision's state —

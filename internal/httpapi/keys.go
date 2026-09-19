@@ -50,8 +50,8 @@ func registerKeys(api huma.API, a Administering) {
 					body.ProductDisplayName = product.DisplayName
 				}
 			}
-			// What the key is narrowed to, not only which product it names.
-			// "any branch, any variant" and "one release only" are different
+			// The whole narrowing, not only the product it names. "any
+			// branch, any variant" and "one release only" are different
 			// credentials, and a list that renders both the same way cannot be
 			// used to decide which one to withdraw.
 			if key.StreamID != nil {
@@ -78,7 +78,7 @@ func registerKeys(api huma.API, a Administering) {
 		Description: "Creates a credential a build may send scans with, and returns its secret. " +
 			"The secret is shown once and stored hashed: a credential store that can hand back " +
 			"what it holds gives up every pipeline's key with a copy of the database.\n\n" +
-			"**Requires a session.** A credential cannot create another, and a key created by " +
+			"Requires a session. A credential cannot create another, and a key created by " +
 			"one would outlive it.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
@@ -122,7 +122,7 @@ func registerKeys(api huma.API, a Administering) {
 				return wentWrong(a.Logger, "cannot issue a credential", err)
 			}
 			name, secret = key.Name, minted
-			// What it may send, never the secret or its digest: the trail is
+			// Its reach, never the secret or its digest: the trail is
 			// read by whoever may administer, and a credential store that
 			// hands back what it holds is what storing a digest exists to
 			// avoid.

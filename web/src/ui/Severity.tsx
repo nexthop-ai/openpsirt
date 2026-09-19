@@ -11,14 +11,15 @@ import { bandOf, ratedAs } from "./severities";
 export function Severity({ word }: { word?: string }) {
   // One word for one state. A scanner's own "unknown", a producer's invented
   // word and no rating at all rank alike everywhere that orders or filters —
-  // below every band, surviving no floor — and only what a reader saw
-  // differed: one row said "Unknown" and the row under it said "Unrated"
+  // below every band, surviving no floor — and only what a reader sees
+  // differs: one row saying "Unknown" and the row under it saying "Unrated"
   // about the same nothing.
+  //
   // Two answers about one row, and they are not the same question. The band
   // is where everything that sorts, filters and colors puts it; the word is
   // what somebody rated it. They differ only for the two words below low —
-  // "rated negligible" used to read as "Unrated", which says nobody looked at
-  // a finding somebody looked at and dismissed.
+  // "rated negligible" read as "Unrated" says nobody looked at a finding
+  // somebody looked at and dismissed.
   const band = bandOf(word);
   const said = ratedAs(word);
   // The class says what the band says. `unrated` is not one of the four, so

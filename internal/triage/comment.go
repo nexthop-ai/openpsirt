@@ -41,7 +41,7 @@ type Comment struct {
 //
 // The previous text, written when it is replaced, rather than every version
 // including the current one: the comment row holds what it says now, and this
-// holds what it stopped saying, which is the part that was being lost.
+// holds what it stopped saying, which is the part nothing else keeps.
 type WasSaid struct {
 	bun.BaseModel `bun:"table:claim_comment_revision,alias:dcr"`
 
@@ -93,8 +93,8 @@ func (s *Store) Say(ctx context.Context, subject access.Subject, claimID int64, 
 // change somebody's words — an edit that could be made by another person is
 // not a correction, it is a forgery with a timestamp.
 //
-// **Whether the asker may reach the claim is settled before anything about the
-// comment is said back**. The row is read first, because the claim it hangs off
+// The asker's reach to the claim is settled before anything about the
+// comment is said back. The row is read first, because the claim it hangs off
 // is not knowable otherwise, but no answer turns on what was in it until the
 // asker has been let in: refusing on authorship first told anybody holding
 // triage anywhere that a comment with this identifier exists, one request at a
@@ -129,7 +129,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 	}
 
 	edited := s.now().Truncate(time.Microsecond)
-	// What it said before, kept, and both writes together. Written apart,
+	// The earlier wording, kept, and both writes together. Written apart,
 	// an edit that succeeded and a history write that did not would leave
 	// the record saying a comment was changed and nothing saying from what
 	// — which is worse than the state this replaces, because it looks like
@@ -203,7 +203,7 @@ func (s *Store) Discussion(ctx context.Context, subject access.Subject, claimID 
 // once the words containing the reference are on record. Until then it is an
 // upload somebody may yet abandon, which is what the sweep collects.
 //
-// **Silent about references it cannot match.** The text has already been
+// Silent about references it cannot match. The text has already been
 // accepted, and a reference to nothing is a broken link in a document rather
 // than a reason to refuse somebody's justification after the fact.
 func noting(ctx context.Context, db bun.IDB, body string, now time.Time) error {

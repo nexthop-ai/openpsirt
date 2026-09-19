@@ -141,21 +141,20 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 		fixedVersion = *previous.Claim.FixedVersion
 	}
 
-	// Whether this needs a second person is decided before it is written, and
-	// recorded on the claim. Without it the claim was stored as needing
-	// nobody — so a re-affirmation sent back for full approval suppressed the
-	// finding the moment it was made and never appeared in the review queue,
-	// which is one person's action producing a live dismissal no second person
-	// ever sees.
-	// Whether there is an agreement to carry at all, asked of the approvals
-	// rather than inferred from the state. A claim lapses from Proposed as
-	// well as from Approved (the code moved out from under it either way), so
-	// "it lapsed" says nothing about whether anybody ever agreed to it.
+	// The need for a second person is decided before this is written, and
+	// recorded on the claim. Without it the claim was stored as needing nobody
+	// — so a re-affirmation sent back for full approval suppressed the finding
+	// the moment it was made and never appeared in the review queue, which is
+	// one person's action producing a live dismissal no second person ever
+	// sees. An agreement to carry at all, asked of the approvals rather than
+	// inferred from the state. A claim lapses from Proposed as well as from
+	// Approved (the code moved out from under it either way), so "it lapsed"
+	// says nothing about whether anybody ever agreed to it.
 	carryable, err := s.approvalToCarry(ctx, previous.ClaimID, subject.ID)
 	if err != nil {
 		return nil, err
 	}
-	// How bad it is judged to be **now**, read here with everything else this
+	// The severity judged now, read here with everything else this
 	// turns on. Passed in by the caller it was a number from before the
 	// transaction opened, so an advisory sweep raising the severity in
 	// between — or a retry running against a database that has moved — carried
@@ -310,7 +309,7 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 
 // carryApprovalTo is the same for every row of one act.
 //
-// **One approval row, however many decisions it stands over.** An agreement is
+// One approval row, however many decisions it stands over. An agreement is
 // an agreement to a claim's words, and the claim is what an approver reads —
 // written per decision, one person agreeing once would appear in the record
 // forty five times. The rows it takes effect on are updated together, because
@@ -403,7 +402,7 @@ type Lapsed struct {
 // image holds tens of thousands of places, and a sweep costing a write per
 // place is a sweep somebody turns off.
 //
-// **A decision covering nothing in the product is not lapsed.** A component
+// A decision covering nothing in the product is not lapsed. A component
 // that is gone altogether closed its findings and there is nothing to ask
 // anybody about, where a component still present at a different version is
 // exactly the question somebody has to answer again.
@@ -484,7 +483,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 		return Lapsed{}, err
 	}
 
-	// **Marked and read back as one act, a bounded batch at a time.** It was
+	// Marked and read back as one act, a bounded batch at a time. It was
 	// three statements on the pool with nothing around them: a crash between
 	// the update and the read left rows lapsed with nobody told, which is the
 	// outcome marking a lapse exists to prevent. And the rows were identified
@@ -533,8 +532,9 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 				return fmt.Errorf("mark what the code moved out from under: %w", err)
 			}
 			moved = n
-			// Who to tell, read back inside the same act. The identifiers
-			// are this pass's own, so nothing another sweep marked is in it.
+			// The people to tell, read back inside the same act. The
+			// identifiers are this pass's own, so nothing another sweep marked
+			// is in it.
 			if err := tx.NewSelect().Model((*Decision)(nil)).
 				ColumnExpr("de.id").
 				Where("de.id IN (?)", bun.List(ids)).
@@ -623,12 +623,12 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		return nil, ErrNotTheirs
 	}
 
-	// Which product this is about, read from the build rather than taken from
-	// the caller. The first version selected decisions by live key and a
-	// matching place alone — and a place is a hash of component names carrying
-	// no product, so a shared distribution package matched across products and
-	// the reasoning of undisclosed claims came back to anybody who could read
-	// one product.
+	// productID is which product this is about, read from the build rather
+	// than taken from the caller. The first version selected decisions by
+	// live key and a matching place alone — and a place is a hash of
+	// component names carrying no product, so a shared distribution
+	// package matched across products and the reasoning of undisclosed
+	// claims came back to anybody who could read one product.
 	var productID int64
 	if err := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).
@@ -675,7 +675,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "was"`).
 		ColumnExpr(`cl.outcome AS "outcome"`).
 		ColumnExpr(`COALESCE(dr.body, '') AS "reasoning"`).
-		// What the new line has at that place, if anything.
+		// The new line's contents at that place, if anything.
 		ColumnExpr(`COALESCE((SELECT MIN(c.name) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
@@ -702,7 +702,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL)
 			AS "still_there"`, toTarget).
-		// Whether the date it carries has already gone by, either date.
+		// A date it carries that has already gone by, either of them.
 		ColumnExpr(`(COALESCE(cl.deferred_until, cl.committed_to) IS NOT NULL
 			AND COALESCE(cl.deferred_until, cl.committed_to) <= ?) AS "ran_out"`, s.now()).
 		Where("de.live_key IS NOT NULL").
@@ -735,7 +735,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			Component: row.Component, Outcome: Outcome(row.Outcome),
 			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
 		}
-		// What the write would refuse is not offered. A carried judgment
+		// Anything the write would refuse is not offered. A carried judgment
 		// keeps its date rather than having it quietly moved forward, so a
 		// deferral that has already run out and a promise whose date has
 		// gone by cannot be carried at all — and offering one is offering
@@ -752,7 +752,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		carried.Moved = append(carried.Moved, one)
 	}
 
-	// How long each postponement has already run. Somebody agreeing to carry
+	// The length each postponement has already run. Somebody agreeing to carry
 	// a deferral into a new line is agreeing to however long it has been put
 	// off in total, not to the months the new one asks for — and four
 	// consecutive carries of "not this release" are a decision nobody made.
@@ -833,7 +833,7 @@ type ReaffirmingClaim struct {
 	// which is what makes it one thing a second person can read.
 	Reasoning string
 	By        int64
-	// Cap bounds a re-affirmed **judgment**, which this mostly is: the outcome
+	// Cap bounds a re-affirmed judgment, which this mostly is: the outcome
 	// comes from the claim being re-made, so re-affirming a bulk dismissal
 	// comes through here. A promise carries no bound, because the next scan
 	// re-checks it; nothing re-checks a dismissal, which is the reason the cap
@@ -857,16 +857,15 @@ type Reaffirmed struct {
 
 // ReaffirmClaim re-makes every lapsed row of one action, in one act.
 //
-// **Deciding is bulk-capable at three grains and re-deciding was capable at
-// none.** A team answering one kernel issue writes a decision at each of its 45
-// places in one action; when the kernel moves, those 45 lapse and restoring
-// them was 45 requests with 45 separately typed justifications. This is the one
-// path that is safe to make cheap — a version bump is a prompt to re-check
-// rather than a new claim, and the earlier agreement is already carried
-// forward — and it was the one path with no bulk form.
+// Bulk at the same three grains deciding has. A team answering one kernel
+// issue writes a decision at each of its 45 places in one action; when the
+// kernel moves, those 45 lapse, and restoring them one at a time is 45
+// requests with 45 separately typed justifications. This is the one path that
+// is safe to make cheap: a version bump is a prompt to re-check rather than a
+// new claim, and the earlier agreement is already carried forward.
 //
-// It also breaks nothing REQ-28 asks for: approval, send-back and undo already
-// operate on the claim, and re-affirmation operated on the row.
+// It also breaks nothing REQ-28 asks for: approval, send-back and undo operate
+// on the claim, and this brings re-affirmation to the same grain.
 //
 // Every escalation rule the single form applies is applied here, per row, and
 // any one of them puts the whole act through full approval. An act whose rows
@@ -917,7 +916,7 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 	// place and an undisclosed one is not one a public triager may re-make in
 	// part.
 	//
-	// **Before the proposer check, not after** (REQ-42). Refusing on the
+	// Before the proposer check, not after (REQ-42). Refusing on the
 	// proposer first answered a claim in a product the caller cannot see
 	// differently from one that does not exist — one sentence against a bare
 	// refusal — which turns walking claim identifiers into a directory of
@@ -943,7 +942,7 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 		return Reaffirmed{}, err
 	}
 
-	// Whether a second person has to agree, decided over the whole act before
+	// The need for a second person, decided over the whole act before
 	// any of it is written. Any row escalating carries the rest with it: an
 	// approver works at the unit the proposer acted at, and splitting the act
 	// would be agreeing to part of an argument they were shown whole.
@@ -1062,7 +1061,7 @@ func placeKey(productID, vulnerabilityID int64, placeIdentity string) string {
 // whereTheyAreNow is the versions each lapsed place sits at today, which is
 // what the re-made decisions expire on.
 //
-// **Narrowed by the two lists rather than by the pairs.** No engine here spells
+// Narrowed by the two lists rather than by the pairs. No engine here spells
 // a comparison against a pair of columns the same way, so the statement asks
 // for the issues and the places separately — a superset — and the pairing is
 // done on the way back.

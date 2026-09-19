@@ -85,7 +85,7 @@ func TestWhatIsOutOfSupportIsListedBecauseNothingElseCountsIt(t *testing.T) {
 }
 
 func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
-	// How long ago a release ended is only readable against a date, and a
+	// The interval since a release ended is only readable against a date, and a
 	// spreadsheet has nowhere else to carry the day it was taken.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)

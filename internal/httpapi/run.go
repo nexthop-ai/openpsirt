@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// RunChangeBody is what one run changed, by the rating in force.
+// RunChangeBody is the change one run made, by the rating in force.
 //
 // Named for the run rather than "Changed", because the schema registry keys
 // types by their bare name and a report already has one — two types called the
@@ -31,17 +31,17 @@ type RunBody struct {
 	RanHere         bool   `json:"ran_here,omitempty" doc:"We ran the scanner, rather than the build sending what its own found"`
 	StartedAt       string `json:"started_at"`
 	FinishedAt      string `json:"finished_at,omitempty" doc:"Absent while it is still going"`
-	Failure         string `json:"failure,omitempty" doc:"Why it produced nothing"`
-	Caution         string `json:"caution,omitempty" doc:"What the scanner said while succeeding — a qualification on what it found rather than a failure"`
+	Failure         string `json:"failure,omitempty" doc:"The reason it produced nothing"`
+	Caution         string `json:"caution,omitempty" doc:"The scanner's own words while succeeding — a qualification on what it found rather than a failure"`
 
 	Opened RunChangeBody `json:"opened"`
 	Closed RunChangeBody `json:"closed"`
 	// OpenedExploited is the one number that decides whether a jump of four
 	// thousand is an evening's work or a night's.
-	OpenedExploited int `json:"opened_exploited,omitempty" doc:"How many of what it opened somebody is known to be exploiting"`
+	OpenedExploited int `json:"opened_exploited,omitempty" doc:"The number it opened that somebody is known to be exploiting"`
 }
 
-// registerRun is what one run of the scanner did.
+// registerRun answers what one run of the scanner did.
 func registerRun(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-scan-run", Method: http.MethodGet,
@@ -50,7 +50,7 @@ func registerRun(api huma.API, in Ingest) {
 		Description: "One run, with what it was measured with and what it changed — broken " +
 			"down by the rating in force, and with how much of what it opened is known to be " +
 			"exploited.\n\n" +
-			"**A receipt says a run happened; this says what it did.** A row reading \"7,604 " +
+			"A receipt says a run happened; this says what it did. A row reading \"7,604 " +
 			"opened\" is a number with no shape, and somebody looking at a build that jumped " +
 			"overnight is asking which of them matter.\n\n" +
 			"Counted as issues at components, the unit every other count here uses: a " +
@@ -102,7 +102,7 @@ func registerRun(api huma.API, in Ingest) {
 	})
 }
 
-// runChangeBody turns a run's counts into what the screen reads.
+// runChangeBody turns a run's counts into the shape the screen reads.
 func runChangeBody(total int, by map[string]int) RunChangeBody {
 	return RunChangeBody{
 		Total:    total,

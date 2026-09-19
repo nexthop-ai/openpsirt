@@ -46,12 +46,12 @@ export function wayDown(place: Sitting, version?: string): WayDown {
   return { steps: [here], rootless: true };
 }
 
-// Where the dependency tree should open from a finding: the place the graph
+// The place the dependency tree opens from a finding: the place the graph
 // could be walked to, whichever of them that is, as the query the tree takes.
 //
 // The tree opens along a chain, expanding each step. Handed a place with no
-// route up it was given a name to land on and nothing to walk, so it opened at
-// the root with the component nowhere in sight. Where no place has one, the
+// route up, it has a name to land on and nothing to walk, so it opens at the
+// root with the component nowhere in sight. Where no place has one, the
 // component alone is the honest answer: the tree says what it can find.
 export function intoTheTree(places: Sitting[]): string {
   const walked = places.find((place) => (place.chain ?? []).length > 0);

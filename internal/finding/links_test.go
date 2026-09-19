@@ -218,10 +218,10 @@ func includes(all []string, want string) bool {
 	return false
 }
 
-// The interface used to answer this question itself, from a table of its own
-// in a second language with a different membership — so the same identifier
-// had two answers, and for an Ubuntu package they were records for different
-// code. There is one table now, and this is the door to it.
+// One table, and this is the door to it. Answered in the interface as well,
+// from a table of its own in a second language with a different membership,
+// the same identifier has two answers — and for an Ubuntu package they are
+// records for different code.
 func TestThePackagePageIsAnsweredForTheInterfaceToo(t *testing.T) {
 	for _, each := range []struct {
 		purl string

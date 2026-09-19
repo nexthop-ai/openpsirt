@@ -10,10 +10,10 @@ function tagsIn(rendered: string): string[] {
   return rendered.match(/<[^>]*>/g) ?? [];
 }
 
-// What must not survive rendering, whatever route it takes in. Deliberately
-// crude and deliberately broad: nothing executable, nothing that fetches, and
-// no attribute a browser will run. A subtle check here would be a second place
-// to get the rules wrong.
+// The things that must not survive rendering, whatever route they take in.
+// Deliberately crude and deliberately broad: nothing executable, nothing that
+// fetches, and no attribute a browser will run. A subtle check here would be a
+// second place to get the rules wrong.
 //
 // Checked against the output rather than against the configuration — asking
 // the allowlist whether it allows something proves only that it agrees with
@@ -43,7 +43,7 @@ const forbidden = [
 
 // The corpus, read from the one file the server's submission check reads.
 //
-// **One file, because it was two.** The Go list called itself "the same
+// One file, because it was two. The Go list called itself "the same
 // corpus" as this one and was 27 payloads shorter — two copies of a security
 // corpus diverge in the direction of the one nobody is adding to, and the
 // comment saying they were the same is what stopped anybody checking.

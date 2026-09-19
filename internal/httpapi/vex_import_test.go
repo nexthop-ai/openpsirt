@@ -122,7 +122,7 @@ func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
 		if one.Publisher != "debian" || one.Statement == "" {
 			t.Errorf("the statement reads %+v, and the reasoning is the point", one)
 		}
-		// **Never applied.** Nothing was decided by uploading it.
+		// Never applied. Nothing was decided by uploading it.
 		if len(detail.Standing) != 0 {
 			t.Errorf("a VEX statement became a decision: %d standing", len(detail.Standing))
 		}
@@ -240,7 +240,7 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
 		}
 
-		// Which statement to cite, as the finding offers it.
+		// detail is which statement to cite, as the finding offers it.
 		var detail struct {
 			Vex []struct {
 				ID int64 `json:"id"`
@@ -391,17 +391,17 @@ func TestAnUploadLeavesNothingBehindOnDisk(t *testing.T) {
 
 // The document is read as a stream, and the digest still covers all of it.
 //
-// It used to be held whole and then copied to parse from — about two and a
-// half times the byte limit, against a container that ships with less than
-// that, so importing a large vendor document killed the process instead of
-// answering. Streaming it puts the digest on the way past, and a digest over
+// Held whole and then copied to parse from, it costs about two and a half
+// times the byte limit against a container that ships with less than that, so
+// importing a large vendor document kills the process instead of answering.
+// Streaming it puts the digest on the way past, and a digest over
 // part of a document is worse than none: it is what says whether a publisher
 // has revised what they said, so two different documents hashing alike would
 // leave a decision citing evidence that has since changed.
 func TestTheDigestCoversTheWholeDocumentItStreamed(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
-		// The padding sits **outside** the top-level object, so the parser
+		// The padding sits outside the top-level object, so the parser
 		// stops at the closing brace and the drain past it actually runs.
 		// Inside the object it is a field the parser skips on its way to the
 		// end, which leaves the drain reading nothing and the test passing

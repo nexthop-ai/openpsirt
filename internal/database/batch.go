@@ -36,7 +36,7 @@ func InBatches[T any](ctx context.Context, db bun.IDB, rows []T) error {
 // InBatchesKeeping inserts rows a bounded number at a time, leaving alone any
 // row another writer got to first.
 //
-// **For a table whose rows are facts rather than somebody's state.** A
+// For a table whose rows are facts rather than somebody's state. A
 // component identified by its content is the same row whoever writes it, so
 // two writers describing the same library at the same version are agreeing
 // rather than colliding — and the loser of that race had its whole
@@ -45,7 +45,7 @@ func InBatches[T any](ctx context.Context, db bun.IDB, rows []T) error {
 // of them try to write it; one was told its upload could not be read, for a
 // component that is now present.
 //
-// **The caller reads the identifiers back rather than taking them from here.**
+// The caller reads the identifiers back rather than taking them from here.
 // A row somebody else wrote has their identifier and not one this statement
 // can report, and a row skipped reports nothing at all — so what the rows say
 // afterwards is what a read says, which is the only answer that is true for

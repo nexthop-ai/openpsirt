@@ -16,11 +16,11 @@ import { Wide } from "../ui/Wide";
 // told while holding a role that has since been withdrawn, and how much of the
 // record rests on this one person.
 //
-// **What they were told is not narrowed by what they may read now.** That is
-// the point of asking: a line about an undisclosed finding, sent while they
-// held the role that reached it, is exactly what an investigation is looking
-// for. The area they read themselves is narrowed; this is a different question
-// asked by somebody who administers the deployment.
+// The record of what they were told is not narrowed by what they may read now.
+// That is the point of asking: a line about an undisclosed finding, sent while
+// they held the role that reached it, is exactly what an investigation is
+// looking for. The area they read themselves is narrowed; this is a different
+// question asked by somebody who administers the deployment.
 export function Person() {
   const { identity = "" } = useParams();
   // The way back to the list of everybody is offered to somebody who may open
@@ -98,7 +98,7 @@ export function Person() {
       )}
 
       <section className="panel">
-        <h3>What they hold</h3>
+        <h3>Grants in force</h3>
         {/* "In force" is about the grant, not about them. Sitting under "they
             have left" it reads as a contradiction unless it says which. */}
         {who.deactivated_at && (
@@ -123,7 +123,7 @@ export function Person() {
                     <th>Product</th>
                     <th>Role</th>
                     <th>In force</th>
-                    <th>Where it came from</th>
+                    <th>Origin</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,7 +228,7 @@ export function Person() {
       </section>
 
       <section className="panel" style={{ marginTop: 14 }}>
-        <h3>What they were told</h3>
+        <h3>Notifications sent</h3>
         <p className="hint" style={{ marginTop: 0 }}>
           Everything sent, including what they have read and what has cleared. Not narrowed by what
           they may read now.
@@ -275,7 +275,7 @@ export function Person() {
 
       {!who.deactivated_at && (
         <section className="panel" style={{ marginTop: 14 }}>
-          <h3>When they leave</h3>
+          <h3>Departure</h3>
           <p className="hint" style={{ marginTop: 0 }}>
             Providers do not report disabled accounts, so mark departures here. Refuses them from
             the next request, ends their sessions, and unassigns their work.

@@ -91,7 +91,7 @@ func TestOneBumpIsOneRowHoweverManyPackagesItMoves(t *testing.T) {
 		if all.Total != 3 {
 			t.Fatalf("the fixture lists %d rows, want its three folds", all.Total)
 		}
-		// Which is the whole point: three rows to answer one at a time, or one
+		// The whole point: three rows to answer one at a time, or one
 		// bump to declare. The one with no fix is in neither the bundle nor
 		// its issue count.
 	})
@@ -232,7 +232,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		r.scannedSiblings(t)
 
 		const at = "/v1/products/mine/components/libcurl4t64/upgrade"
-		// Saying nothing about why is refused like every other judgment.
+		// A judgment with no reasoning is refused like every other.
 		if got := asPerson(t, r, "triager", http.MethodPost, at,
 			`{"to":"8.5.0-1","by":"`+aheadOfUs+`"}`); got.Code < 400 {
 			t.Errorf("a bump with no reasoning answered %d", got.Code)
@@ -489,7 +489,7 @@ func TestABuildHasOneCommitmentPerFold(t *testing.T) {
 		r.scannedSiblings(t)
 
 		// The two curl issues name different versions as their fix, which is
-		// what used to split the plan in two.
+		// what would split the plan in two if the version decided coverage.
 		if _, err := r.db.DB.NewUpdate().Table("finding").
 			Set("fixed_in = ?", "8.6.0-1").
 			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,
@@ -590,7 +590,7 @@ func TestAPromisedUpgradeSaysWhereItStandsAndLapsesAsOneItem(t *testing.T) {
 			t.Errorf("a promise for %s reads as %+v, want planned", ahead, one)
 		}
 
-		// Who is carrying it, which is what a lapsed one comes back
+		// The party carrying it, which is what a lapsed one comes back
 		// to. Held only where one party holds all of what is still
 		// open under it: a bump split between two people is nobody's,
 		// and naming one of them would hand somebody work that is half

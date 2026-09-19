@@ -47,9 +47,10 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Who hands the work out, and who holds it. The holder reads
-		// nothing on the product at all, which is the whole case: what
-		// gives their account content is what they were handed.
+		// party is who hands the work out, and who holds it. The
+		// holder reads nothing on the product at all, which is the
+		// whole case: what gives their account content is what they
+		// were handed.
 		const party = 77
 		boss := access.NewPerson(1, "boss", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PrivateTriage, access.Assigner}}, 1)

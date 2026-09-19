@@ -38,9 +38,9 @@ type AttachmentBody struct {
 	Token string `json:"token" doc:"Refer to this in text as attachment:<token>. It is the only identifier for a file, and never an address"`
 	// Reference is the same thing written out, because the thing somebody
 	// pastes is what they want back rather than a value to assemble.
-	Reference   string `json:"reference" doc:"What to paste into a justification or a comment"`
-	Filename    string `json:"filename" doc:"What it was called when it arrived"`
-	ContentType string `json:"content_type" doc:"What it is served as, which is decided here and is not what the uploader called it"`
+	Reference   string `json:"reference" doc:"The reference to paste into a justification or a comment"`
+	Filename    string `json:"filename" doc:"Its name when it arrived"`
+	ContentType string `json:"content_type" doc:"The type it is served as, which is decided here and is not what the uploader called it"`
 	Size        int64  `json:"size" doc:"Bytes"`
 	Inline      bool   `json:"inline,omitempty" doc:"Whether it is displayed in the page rather than downloaded. Only a small allowlist of raster image types is"`
 	UploadedAt  string `json:"uploaded_at"`
@@ -48,7 +48,7 @@ type AttachmentBody struct {
 	// the reference stay, so text that pointed at it says what happened
 	// rather than pointing at nothing.
 	Redacted       bool   `json:"redacted,omitempty" doc:"The file was removed on purpose. The record of it remains"`
-	RedactedReason string `json:"redacted_reason,omitempty" doc:"Why it was removed"`
+	RedactedReason string `json:"redacted_reason,omitempty" doc:"The reason it was removed"`
 }
 
 func attachmentBody(a *attach.Attachment) AttachmentBody {
@@ -74,8 +74,8 @@ type attachmentParts struct {
 	//
 	// Declared as a boolean so the framework parses it and refuses what is
 	// not one. Compared against the literal "true", every other spelling —
-	// "True", "1", "yes" — read as false and marked the file for deletion a
-	// day later, with the uploader told it had worked.
+	// "True", "1", "yes" — reads as false and marks the file for deletion a
+	// day later, with the uploader told it worked.
 	Evidence bool `form:"evidence"`
 }
 
@@ -210,7 +210,7 @@ func registerAttachments(api huma.API, in Ingest) {
 		Summary: "Fetch an attached file",
 		Description: "Authorized against the issue the file hangs off — whoever may read the " +
 			"text may read what it refers to — and only then served.\n\n" +
-			"**Two shapes, and a caller has to follow both.** An image displayed in the page is " +
+			"Two shapes, and a caller has to follow both. An image displayed in the page is " +
 			"sent from here; everything else answers 303 with a short-lived address at the " +
 			"store. Either way the content type and the disposition are the ones decided at " +
 			"upload, never the ones the file arrived with.\n\n" +
@@ -271,7 +271,7 @@ func registerAttachments(api huma.API, in Ingest) {
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Token string `path:"token"`
 		Body  struct {
-			Reason string `json:"reason" minLength:"1" maxLength:"1000" doc:"Why the file is being removed. Recorded and shown wherever the text referred to it"`
+			Reason string `json:"reason" minLength:"1" maxLength:"1000" doc:"The reason the file is being removed. Recorded and shown wherever the text referred to it"`
 		}
 	}) (*struct{}, error) {
 		subject, err := reading(ctx)

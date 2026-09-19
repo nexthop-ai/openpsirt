@@ -11,14 +11,14 @@ import { Sheet } from "./Sheet";
 import { PeriodPicker, asked, coveringPeriod, periodAsked, stated } from "./Window";
 import { Wide } from "../../ui/Wide";
 
-// Whether work met the dates policy set for it.
+// The work that met the dates policy set for it, and the work that did not.
 //
-// **The question a manager asks first**, and it was answered by one figure with
+// The question a manager asks first, and it was answered by one figure with
 // nothing behind it. A single percentage cannot be acted on: it does not say
 // which severity is slipping, how much of the shortfall was deliberate, or what
 // is late right now as against what was late once.
 //
-// **A deferral is its own number and never a failure.** A rate that counted an
+// A deferral is its own number and never a failure. A rate that counted an
 // approved deferral as one would punish the deliberate act the deferral
 // mechanism exists to make possible, and within a quarter people stop deferring
 // and start letting work run late quietly instead — which is the same risk with
@@ -75,7 +75,7 @@ export function Compliance() {
       ) : (
         <>
           <section className="panel">
-            <h3>What closed, and whether it closed in time</h3>
+            <h3>Closures, and their timeliness</h3>
             <div className="kpis" style={{ marginTop: 8 }}>
               <div className="kpi">
                 <span className="l">Met its deadline</span>
@@ -160,7 +160,7 @@ export function Compliance() {
               design, so none of them is in any figure above — and one of them
               has a report of its own. */}
           <section className="panel" style={{ marginTop: 14 }}>
-            <h3>What is not in these figures</h3>
+            <h3>Exclusions</h3>
             <p className="hint" style={{ marginTop: 0 }}>
               These carry no deadline, so nothing about them can be late.
             </p>

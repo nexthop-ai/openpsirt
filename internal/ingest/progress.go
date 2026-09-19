@@ -194,7 +194,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 		return nil, 0, err
 	}
 
-	// Which upload each run is attributed to, worked out over *every* scan
+	// The upload each run is attributed to, worked out over *every* scan
 	// rather than over this page.
 	//
 	// A page is a window on the same history, so deciding "the newest upload
@@ -213,8 +213,8 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 		state, failure, caution, run := progressOf(sc, read[strconv.FormatInt(sc.ID, 10)], runs)
 		receipt := Receipt{Scan: sc, State: state, Failure: failure, Caution: caution}
 		if run != nil {
-			// What it was measured with, on every receipt the run answers —
-			// and the counts only on the one it is attributed to.
+			// The tooling it was measured with, on every receipt the run
+			// answers — and the counts only on the one it is attributed to.
 			for i := range runs {
 				if runs[i].ID == *run {
 					receipt.Measured = &runs[i]
@@ -262,15 +262,14 @@ func progressOf(sc Scan, job queue.Job, runs []finding.Run) (Progress, string, s
 	// finish time, so the last assignment in each branch below is the earliest
 	// of its kind.
 	//
-	// **A run that failed only answers an upload while nothing has succeeded
-	// since.** A scan run covers a build rather than an upload, and this
-	// upload is the newest document the build holds, so a later run that
-	// finished cleanly did read this document — saying otherwise makes one bad
-	// night permanent. That was the first version of this: the earliest run
-	// after parsing was taken whatever became of it, so a scanner that fell
-	// over once poisoned every receipt already waiting on it, for ever,
-	// however many green runs came afterwards, and the scans screen got
-	// steadily more wrong the longer a deployment ran.
+	// A run that failed only answers an upload while nothing has succeeded
+	// since. A scan run covers a build rather than an upload, and this upload
+	// is the newest document the build holds, so a later run that finished
+	// cleanly did read this document, and saying otherwise makes one bad night
+	// permanent. Taking the earliest run after parsing whatever became of it,
+	// a scanner that falls over once poisons every receipt already waiting on
+	// it for ever, however many green runs come afterwards, and the scans
+	// screen gets steadily more wrong the longer a deployment runs.
 	//
 	// Still Refused while every run since has failed, which is the honest
 	// answer to "did anything come of my upload" at that point.

@@ -288,7 +288,7 @@ func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
 			t.Errorf("the listing does not say what to call them: %q", one.Name)
 		}
 		// Not the zero time. A person the grant reports and the rows do not
-		// used to come back dated 0001-01-01.
+		// is left out rather than dated 0001-01-01.
 		if strings.HasPrefix(one.AddedAt, "0001-") || one.AddedAt == "" {
 			t.Errorf("the listing dates the grant %q", one.AddedAt)
 		}
@@ -311,18 +311,17 @@ func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
 
 func TestACollaboratorHoldingNothingHereOpensTheFindingTheirGrantIsFor(t *testing.T) {
 	// "A grant that shows a row in a list and refuses it when opened is a
-	// grant with no content" — DESIGN-access.md says so, about the three reads
-	// by identifier that used to do exactly that. The finding detail was a
-	// fourth, through the graph.
+	// grant with no content" — DESIGN-access.md says so, about the reads by
+	// identifier. The finding detail is a fourth, through the graph.
 	//
 	// graph.visibleIn asks Sees and Reads product-wide with no case arm, and
-	// Detail calls Chains to build the way down to each place. So a
-	// collaborator holding no role on the product was refused the path to the
-	// component their own case sits in, and the route answered "no open
-	// finding is recorded there".
+	// Detail calls Chains to build the way down to each place. A collaborator
+	// holding no role on the product is then refused the path to the component
+	// their own case sits in, and the route answers "no open finding is
+	// recorded there".
 	//
-	// Every existing collaborator test passes because it uses an identity that
-	// also holds a product role, which carries it through.
+	// A collaborator test using an identity that also holds a product role
+	// passes either way, carried through by the role.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		embargoed := r.embargoed(t)
@@ -369,16 +368,16 @@ func TestOneRequestGivesOneAnswerAboutWhatACollaboratorMaySee(t *testing.T) {
 	// "May this subject see this product" has two rules here, and the pair is
 	// deliberate: a route about the product as a whole asks what somebody may
 	// see, and a route about one named issue admits somebody brought into a
-	// case. Which of the two an endpoint wants is a security judgment, and it
-	// was made by hand at every call site and visible at none.
+	// case. Which of the two an endpoint wants is a security judgment, and
+	// made by hand at every call site it is visible at none.
 	//
-	// Recording which builds an issue affects gated on the narrow rule and
-	// then resolved each named build with the wide one — so one request gave
+	// Recording which builds an issue affects gates on the narrow rule and
+	// then resolves each named build with the wide one, so one request gives
 	// both answers about the same subject and the same product, four lines
 	// apart.
 	//
-	// What is pinned is that the product question has one answer. What each
-	// route then allows is a separate question, answered by the act: a
+	// This pins the product question to one answer. What each route then
+	// allows is a separate question, answered by the act: a
 	// collaborator opens their case, and neither manages its list nor says
 	// which builds the issue affects, because both are product-level acts.
 	twoReach(t, func(t *testing.T, r *reach) {

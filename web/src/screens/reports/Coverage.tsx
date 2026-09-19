@@ -11,9 +11,9 @@ import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
 import { Wide } from "../../ui/Wide";
 
-// What is being scanned, and what has gone silent.
+// The builds being scanned, and the ones that have gone silent.
 //
-// **Every other number here is worthless if a build stopped being scanned**,
+// Every other number here is worthless if a build stopped being scanned,
 // and silence looks exactly like health: a build nothing arrives for reports
 // no new findings, fails nothing, and sits above one that is still being
 // scanned on every list ordered by what is open. It is the same failure shape
@@ -64,11 +64,11 @@ export function Coverage() {
       {coverage.isPending ? (
         <Loading />
       ) : coverage.isError ? (
-        <Failed error={coverage.error} what="What has been scanned could not be read." />
+        <Failed error={coverage.error} what="The scan coverage could not be read." />
       ) : (
         <>
           <section className="panel">
-            <h3>Where the estate stands</h3>
+            <h3>Estate coverage</h3>
             <div className="kpis" style={{ marginTop: 8 }}>
               <div className="kpi">
                 <span className="l">Being scanned</span>
@@ -179,8 +179,9 @@ export function Coverage() {
   );
 }
 
-// Where the file comes from. A link somebody follows rather than a request
-// this page makes, so the browser fetches it with the session it already has.
+// The address the file comes from. A link somebody follows rather than a
+// request this page makes, so the browser fetches it with the session it
+// already has.
 function fileAt(format: string, asked: string): string {
   return `/v1/scanning.${format}${asked ? `?${asked}` : ""}`;
 }

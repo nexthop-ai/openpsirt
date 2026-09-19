@@ -103,14 +103,14 @@ const (
 	DueHigh      = "remediation.due.high"
 	DueMedium    = "remediation.due.medium"
 	DueLow       = "remediation.due.low"
-	// TogetherCap is how many findings one bulk **judgment** may cover at
+	// TogetherCap is how many findings one bulk judgment may cover at
 	// once. A bound rather than none, because a single action writing an
 	// unbounded number of rows is a denial of service somebody triggers by
 	// accident. How generous it should be is a judgment about a product — a
 	// kernel's list is long — so it is tuned here rather than compiled in.
 	//
-	// **A promise to upgrade is not bounded by this, and by nothing else
-	// either.** The distinction is reversibility rather than size: nothing
+	// A promise to upgrade is not bounded by this, and by nothing else
+	// either. The distinction is reversibility rather than size: nothing
 	// re-checks a dismissal, so one sentence answering a thousand findings has
 	// to stay a size a reviewer can follow, while the next scan re-checks
 	// every row a promise names.
@@ -132,7 +132,7 @@ const (
 	// danger. Nothing fails, no scan is refused, and every finding on every
 	// screen is as old as the data behind it without saying so.
 	//
-	// How long is a judgment about how a deployment gets its data: one that
+	// The length is a judgment about how a deployment gets its data: one that
 	// downloads nightly expects it to move most days, and one that carries a
 	// bundle across an air gap on a schedule expects otherwise. So it is tuned
 	// here rather than compiled in.
@@ -159,7 +159,7 @@ const (
 	// index, and a deployment that cannot reach out loses this answer and
 	// nothing else.
 	//
-	// **What goes out is a component's name.** One request per component to
+	// A component's name goes out. One request per component to
 	// that ecosystem's public index, carrying the name and nothing else — no
 	// version, no build, no product, nothing about who is asking beyond the
 	// request itself. For an open-source dependency that is public knowledge.
@@ -430,7 +430,7 @@ func NewStore(db bun.IDB) *Store {
 // Unset is not an error. Every setting has a default, and a deployment that
 // has never been tuned is the ordinary case rather than a fault.
 //
-// **A failure to read is not "unset", though**, and treating the two as one
+// A failure to read is not "unset", though, and treating the two as one
 // was worse than it looks. Every caller falls back to a default when a setting
 // is unset, so a database that could not answer would silently swap the
 // deployment's configuration for the shipped one — including the threshold
@@ -550,7 +550,7 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 		before, had = "", false
 		now := s.now().Truncate(time.Microsecond)
 
-		// What it holds, in the same view as the write that replaces it.
+		// The stored value, in the same view as the write that replaces it.
 		held := new(Setting)
 		switch err := tx.NewSelect().Model(held).Where("name = ?", name).Scan(ctx); {
 		case database.IsNoRows(err):
@@ -590,7 +590,7 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
 
-		// How many rows the update matched, which is the question being asked
+		// The rows the update matched, which is the question being asked
 		// — whether the row still holds what the read answered with. This
 		// counted the rows in a second statement instead, on the ground that
 		// two of the four engines report nothing touched when an update writes
@@ -625,8 +625,8 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 // The answer is the stored value rather than a flag, because the caller wants
 // the key that won and does not care which process minted it.
 func (s *Store) SetIfAbsent(ctx context.Context, name, value string) (string, error) {
-	// **The retry is a fresh transaction, not a second read inside the failed
-	// one.** Reading again where the insert was refused does not work on any
+	// The retry is a fresh transaction, not a second read inside the failed
+	// one. Reading again where the insert was refused does not work on any
 	// server engine: MySQL and MariaDB fixed the transaction's snapshot at the
 	// opening select, before the winner committed, so the read sees nothing;
 	// PostgreSQL has already aborted the transaction and refuses every

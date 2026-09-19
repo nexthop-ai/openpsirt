@@ -75,8 +75,8 @@ func OutcomesOffered() []string {
 
 // Prefills is the outcome a statement offers, and whether it offers one.
 //
-// **A distribution saying it will not fix something is not the distribution
-// saying it is not affected**. Debian's `no-dsa`, Ubuntu's `ignored`
+// A distribution saying it will not fix something is not the distribution
+// saying it is not affected. Debian's `no-dsa`, Ubuntu's `ignored`
 // and Red Hat's will-not-fix all mean *affected, and judged minor* — so they
 // offer a will-not-fix, never a dismissal. Prefilling `not-applicable` from one
 // would record a claim the publisher never made, with their name on it, which
@@ -211,9 +211,9 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 // A claim against a source tree is kept however it was named: with no package
 // identifier at all, and with one of the generic type. The two are the same
 // claim and the matching rules match them the same way (DESIGN-ingest.md), so
-// narrowing the generic spelling away here hid the evidence for a suppression
-// that had already been applied — the finding was gone and what a publisher
-// said about it was not on the page.
+// narrowing the generic spelling away here hides the evidence for a
+// suppression already applied — the finding is gone and what a publisher said
+// about it is not on the page.
 func namingTheSamePackage(said []Statement, purl string) []Statement {
 	here := graph.PartsOfPurl(purl)
 	if here.Name == "" {

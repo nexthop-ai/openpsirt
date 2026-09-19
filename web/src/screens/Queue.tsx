@@ -48,7 +48,7 @@ export function Queue() {
   // for: undoing one named at some point in the past is a control nobody can
   // use without knowing what is in it.
   const [justDone, setJustDone] = useState("");
-  // How many of a batch were refused, so a partial result says so rather than
+  // The rows of a batch refused, so a partial result says so rather than
   // leaving somebody to compare counts.
   const [refused, setRefused] = useState(0);
   const approveClaim = useApproveClaim();
@@ -71,7 +71,7 @@ export function Queue() {
   // they were mixed in, which made the queue a list containing work the reader
   // cannot do, because approving your own is refused.
   const mine = params.get("mine") === "1";
-  // Which product, where the address names one. The figure on the home screen
+  // The product, where the address names one. The figure on the home screen
   // is narrowed by the scope picker and links here with it, so a queue that
   // ignored it answered a different question from the number that was clicked.
   const product = params.get("product") ?? "";
@@ -88,7 +88,7 @@ export function Queue() {
         }),
       ),
   });
-  // What became of what this person proposed. A different question from the
+  // The fate of what this person proposed. A different question from the
   // queue's, and a different statement: the queue lists what is pending, so
   // approved, withdrawn, lapsed and undone all present there as the row
   // disappearing, and the proposer finds out by reopening the finding.
@@ -157,8 +157,8 @@ export function Queue() {
     return <Failed error={queue.error} what="The review queue could not be read." />;
   }
 
-  // What the export links ask for, so a file matches the screen it was taken
-  // from rather than being the whole backlog under a narrowed heading.
+  // The request the export links make, so a file matches the screen it was
+  // taken from rather than being the whole backlog under a narrowed heading.
   const exporting = new URLSearchParams();
   if (mine) exporting.set("mine", "true");
   if (product) exporting.set("product", product);
@@ -185,7 +185,7 @@ export function Queue() {
         failed.push(key);
       }
     }
-    // What was refused, and nothing else.
+    // The refused rows, and nothing else.
     //
     // The selection spans pages and the loop above acts on all of it, so an
     // entry that is not on the page in front of somebody was approved like the
@@ -206,7 +206,7 @@ export function Queue() {
       return left;
     });
     setRefused(failed.length);
-    // What was just agreed to under one name, so it can be taken back
+    // The agreement just made under one name, so it can be taken back
     // without remembering the name. The control the queue already promised:
     // "approvals under one batch name can be undone together" said so and
     // there was nowhere to do it.
@@ -541,7 +541,7 @@ function Card({
   onPick,
 }: {
   claim: Claim;
-  // Whether somebody was sent to this claim in particular.
+  // An arrival sent to this claim in particular.
   marked: boolean;
   picked: boolean;
   onPick: (on: boolean) => void;
@@ -895,7 +895,7 @@ function Card({
             draftKey={draftKey}
             rows={4}
             label="Reason for rejection"
-            placeholder="What is missing or wrong."
+            placeholder="The part that is missing or wrong."
           />
           <div className="actions" style={{ marginTop: 8 }}>
             <button
@@ -937,7 +937,7 @@ function Card({
   );
 }
 
-// Where a claim's finding lives, with the version the build ships it at.
+// The address of a claim's finding, with the version the build ships it at.
 function findingPath(f: {
   product?: string;
   stream?: string;
@@ -956,7 +956,7 @@ function findingPath(f: {
   );
 }
 
-// What is being claimed, said as its own thing.
+// The claim itself, said as its own thing.
 //
 // The outcome is what an approver is agreeing to, and it was the fifth clause
 // of a line that led with the component, the version, the product, the branch

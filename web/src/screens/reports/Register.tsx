@@ -15,24 +15,24 @@ import { Sheet } from "./Sheet";
 import { STATES, type Stands, said } from "../../ui/states";
 import { Wide } from "../../ui/Wide";
 
-// How much of the register one page holds. The server's own ceiling is five
+// The share of the register one page holds. The server's own ceiling is five
 // hundred; this is what somebody reads before paging, and the file is what
 // they take away.
 const PAGE = 200;
 
 // Every known vulnerability in one build, and what became of it.
 //
-// **The complement of the record, not a variant of it.** The record says what
+// The complement of the record, not a variant of it. The record says what
 // was decided; an auditor's first question is what was *known*, decided or not.
 // So a row nobody has said anything about is in here, and so is a closed one —
 // a register of what is still open answers a different question from the one it
 // would appear to answer.
 //
-// **One row per issue and place**, unfolded. Every other list here groups,
-// because a person reading a list wants the judgment rather than the repetition;
-// a register is read against what shipped, and what shipped is places.
+// One row per issue and place, unfolded. Every other list here groups, because
+// a person reading a list wants the judgment rather than the repetition; a
+// register is read against what shipped, and what shipped is places.
 //
-// **It states no triage line because it applies none.** Everything in the build
+// It states no triage line because it applies none. Everything in the build
 // is here whatever the deployment considers worth triaging, which is the basis
 // on which somebody can rely on it.
 export function Register() {
@@ -49,7 +49,7 @@ export function Register() {
   // that are not there — and the empty answer draws as "nothing is known about
   // this build yet", with the footer inside the rows branch and so no way back.
   const [params, setParams] = useSearchParams();
-  // What the register was narrowed to. In the address, so a narrowed register
+  // The narrowing on the register. In the address, so a narrowed register
   // is something somebody sends rather than describes, and so the file beside
   // it carries the same narrowing.
   const states = params
@@ -114,7 +114,7 @@ export function Register() {
               open". The register applies no triage line whatever is picked
               here, which is what it is for. */}
           <div className="controls">
-            <div className="seg" role="group" aria-label="What stands">
+            <div className="seg" role="group" aria-label="The decision standing">
               {STATES.map((word) => (
                 <button
                   key={word}
@@ -307,7 +307,7 @@ export function Register() {
   );
 }
 
-// What the register was measured with.
+// The tooling the register was measured with.
 //
 // An auditor reads shipped artifact, inventory, run, scanner and database,
 // disposition. The rows are the last link, and without this the page states
@@ -359,7 +359,7 @@ function MeasuredWith({
   );
 }
 
-// What stands at one place, in the words the sheet uses.
+// The decision standing at one place, in the words the sheet uses.
 //
 // Four states, and a state this does not know shown as it arrived. A register
 // is read by somebody checking the record against what shipped, so a column of
@@ -379,8 +379,9 @@ function RegisterState({ state }: { state?: string }) {
   }
 }
 
-// Where the file comes from. A link somebody follows rather than a request
-// this page makes, so the browser fetches it with the session it already has.
+// The address the file comes from. A link somebody follows rather than a
+// request this page makes, so the browser fetches it with the session it
+// already has.
 function fileAt(
   at: { product: string; stream: string; variant: string },
   format: string,

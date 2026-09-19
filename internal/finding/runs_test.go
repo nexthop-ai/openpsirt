@@ -11,16 +11,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// What a run says about itself, and what it costs to read back.
+// A run's own account of itself, and the cost of reading it back.
 //
 // A receipt names the scanner and the vulnerability database it was measured
 // with, because a feed ships bad data for a week and is corrected afterwards.
 
 func TestNamingAPageOfFindingsDoesNotCostAQueryPerRow(t *testing.T) {
 	// This is the screen somebody opens first, against the largest product
-	// they have. Each row used to be named by two queries of its own, so a
-	// page of fifty was a hundred and one round trips and the cost grew with
-	// the page instead of staying flat.
+	// they have. Naming each row with two queries of its own makes a page of
+	// fifty a hundred and one round trips, with the cost growing with the
+	// page instead of staying flat.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
@@ -87,7 +87,7 @@ func TestNamingAPageOfFindingsDoesNotCostAQueryPerRow(t *testing.T) {
 // and not whether the estate was getting better or worse across all of them.
 func TestWhatIsOpenIsReportedPerBuild(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		// A **second** build, because "per build" tested against one build
+		// A second build, because "per build" tested against one build
 		// proves nothing: collapsing the grouping key to a constant passed.
 		second := f.anotherBuild(t, "202411")
 
@@ -128,8 +128,8 @@ func TestWhatIsOpenIsReportedPerBuild(t *testing.T) {
 			t.Errorf("202411 reports %d open, expected 1", got)
 		}
 		// The split has to name the band, not merely add up: incrementing both
-		// counters from the same value in the same loop is a tautology, and
-		// renaming the band to nonsense used to pass.
+		// counters from the same value in the same loop is a tautology that
+		// passes with the band renamed to nonsense.
 		if got := by["master"].BySeverity["high"]; got != 2 {
 			t.Errorf("master reports %d high, expected 2 (by_severity: %v)",
 				got, by["master"].BySeverity)
@@ -204,7 +204,7 @@ func TestTheLastRunSaysWhatItWasMeasuredWith(t *testing.T) {
 func TestOnlyTheVersionsCarryingTheIssueAreOffered(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		// Enough that every filter has something to exclude. With one finding
-		// and one component this test passed with **every** filter deleted —
+		// and one component this test passed with every filter deleted —
 		// the vulnerability, the closed check, the name and the visibility —
 		// because a join through `finding` could not return anything else
 		// whatever the query said. Absent data was doing the work the code was

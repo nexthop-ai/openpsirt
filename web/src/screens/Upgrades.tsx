@@ -8,7 +8,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
 
-// Where a promise stands, said in words rather than left to a color.
+// A promise's state, said in words rather than left to a color.
 const STANDING: Record<string, string> = {
   planned: "promised, with work outstanding and the date still ahead",
   landed: "every piece of it gone, which the scans say",
@@ -20,7 +20,7 @@ function rank(state?: string): number {
   return state === "lapsed" ? 0 : state === "landed" ? 2 : 1;
 }
 
-// What one build is waiting on, by the upgrade that would deliver it.
+// The work one build is waiting on, by the upgrade that would deliver it.
 //
 // Called "release plan" once, which read as the plan for the product's own
 // release. It is dependency hygiene: which packages this build is waiting to
@@ -166,7 +166,7 @@ export function Upgrades() {
   );
 }
 
-// Where the file comes from.
+// The address the file comes from.
 function fileAt(product: string, stream: string, variant: string, format: string): string {
   return (
     `/v1/products/${encodeURIComponent(product)}` +

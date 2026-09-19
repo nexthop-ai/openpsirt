@@ -154,14 +154,14 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// every identifier be quoted the same way everywhere, which makes the
 		// question stop arising.
 		//
-		// **Appended, not assigned.** Setting the mode outright replaces it,
+		// Appended, not assigned. Setting the mode outright replaces it,
 		// and what it replaces includes whatever else an operator has set.
 		// Assigning it cost a nine-character string stored in a
 		// four-character column its last five characters, with no error, on
 		// both of these engines and on neither of the other two — which is
 		// the shape of portability trap that only shows up in production.
 		//
-		// **Strictness is named rather than inherited.** Appending alone
+		// Strictness is named rather than inherited. Appending alone
 		// keeps whatever the server already held, and a server whose global
 		// sql_mode omits STRICT_TRANS_TABLES is the configuration that
 		// produces that truncation — routinely set that way for older
@@ -170,18 +170,18 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// deduplicated, so naming a mode the server already holds changes
 		// nothing.
 		//
-		// **How many rows an update touched has to mean the same thing on
-		// every engine.** By default these two report how many rows the update
+		// The rows an update touched have to mean the same thing on
+		// every engine. By default these two report how many rows the update
 		// *changed*, where the other two report how many it *matched*. Several
 		// writes here are conditional — set this state, but only if the row is
 		// still the one that was read — and they read the count back to find
 		// out whether the condition held. Under the default a write whose
 		// condition held but whose values happened to already be correct
 		// reports zero, and the caller reports a conflict that did not happen.
-		// Asking for matched rows makes the count answer the question that is
+		// A request for matched rows makes the count answer the question that is
 		// actually being asked, identically everywhere.
 		//
-		// **The transport is negotiated rather than left off.** This driver
+		// The transport is negotiated rather than left off. This driver
 		// leaves TLS disabled when nothing asks for it, where the PostgreSQL
 		// driver takes the same URL and negotiates opportunistically — one
 		// URL grammar with opposite defaults, and the rows here are

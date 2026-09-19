@@ -26,7 +26,7 @@ type Whole struct {
 	// Happened is what became of the claim, read from its rows the way the
 	// proposer's own list reads it, so the two cannot disagree.
 	Happened WhatHappened
-	// When it became that, and who did it where a person did.
+	// When is the moment it became that, and who did it where a person did.
 	When *time.Time
 	By   int64
 	// PreviouslyApproved says this was agreed to before and came back —

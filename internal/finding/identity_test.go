@@ -13,7 +13,7 @@ import (
 // property of whichever database matched it rather than of the flaw.
 
 func TestOneIssueUnderTwoNamesIsOneIssue(t *testing.T) {
-	// Which identifier a scanner calls primary is a preference of whichever
+	// The identifier a scanner calls primary is a preference of whichever
 	// database it consulted. A decision keyed on that choice would lapse the
 	// day the scanner changed its mind.
 	each(t, func(t *testing.T, f *fixture) {
@@ -83,7 +83,7 @@ func TestAnAliasSuppliedLaterFindsTheIssueAlreadyHeld(t *testing.T) {
 }
 
 func TestAnIssueIsFiledUnderItsMostRecognizedName(t *testing.T) {
-	// What somebody sees should be the name they will find in an advisory,
+	// A reader is shown the name they will find in an advisory,
 	// not whichever database the scanner happened to consult first.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
@@ -117,7 +117,7 @@ func TestAnIssueAgainstSomethingWeDoNotHaveIsReported(t *testing.T) {
 	})
 }
 
-// What kind of flaw an issue is, kept as rows rather than as a packed column.
+// The kind of flaw an issue is, kept as rows rather than as a packed column.
 //
 // It was one comma-joined string, which made the filter that asks "is this
 // issue a CWE-79" a substring match — and a substring match answers CWE-79 for
@@ -125,7 +125,7 @@ func TestAnIssueAgainstSomethingWeDoNotHaveIsReported(t *testing.T) {
 // commas, none of which an index can be used for. Every other list in this
 // schema is a table, and this is the one that was queried on.
 //
-// What the rows have to hold to: a second report adds what it knows, a report
+// The rule the rows hold to: a second report adds what it knows, a report
 // that carries no classification takes nothing away, and a re-scan of
 // unchanged data writes nothing.
 func TestWhatKindOfFlawAnIssueIsIsAddedToAndNeverTakenAway(t *testing.T) {

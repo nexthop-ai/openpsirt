@@ -29,15 +29,15 @@ export function People({ who: me }: { who: Who }) {
   // two of them stacked is a screen nobody can read a row out of.
   const [openFor, setOpenFor] = useState("");
   const [identity, setIdentity] = useState("");
-  // What to show instead of the identity, and where to reach them outside the
-  // application. Both are on the record and neither could be typed here: the
-  // whole mail path could never deliver to anybody recorded through this
-  // screen, and "an administrator has to record one" is what the person was
-  // told when they went looking.
+  // The label shown instead of the identity, and the address to reach them
+  // outside the application. Both are on the record and neither could be typed
+  // here: the whole mail path could never deliver to anybody recorded through
+  // this screen, and "an administrator has to record one" is what the person
+  // was told when they went looking.
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
 
-  // Who holds what, narrowed. "Who approves on this product" is what an
+  // The grants in force, narrowed. The approvers on one product are what an
   // access review asks, and reading it off a list of everybody is reading the
   // grid sideways — so the narrowing is a control rather than a scan.
   const [onProduct, setOnProduct] = useState("");
@@ -82,7 +82,7 @@ export function People({ who: me }: { who: Who }) {
     },
   });
 
-  // What to show instead of the identity, for somebody already recorded. An
+  // The label shown instead of the identity, for somebody already recorded. An
   // identity is what a provider hands over and a name is what people read, so
   // a deployment where every row is an address is one nobody scans.
   const rename = useMutation({
@@ -95,7 +95,7 @@ export function People({ who: me }: { who: Who }) {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["people"] }),
   });
 
-  // Where to reach somebody already recorded. Sent on its own so that an
+  // The address to reach somebody already recorded. Sent on its own so that an
   // address cleared here is cleared rather than left alone: the endpoint
   // distinguishes an empty address from an absent field, and the difference is
   // coming off mail without coming off the tool.
@@ -193,7 +193,7 @@ export function People({ who: me }: { who: Who }) {
     <>
       <div className="screen-head">
         <h2>Access</h2>
-        <p>Who can read and decide what</p>
+        <p>Access by product</p>
         {/* Offered only to somebody the server will take it from. A control
             that changes nothing is worse than a control that is not there,
             because pressing it looks like it worked. */}
@@ -245,7 +245,7 @@ export function People({ who: me }: { who: Who }) {
         <Failed error={endSessions.error} what="Their sessions could not be ended." />
       )}
       {reach.error != null && (
-        <Failed error={reach.error} what="Where to reach them could not be recorded." />
+        <Failed error={reach.error} what="The address to reach them could not be recorded." />
       )}
 
       {rows.length === 0 ? (
@@ -406,7 +406,7 @@ export function People({ who: me }: { who: Who }) {
                             : derived
                               ? "Roles come from provider groups and would be overwritten"
                               : unreadMode
-                                ? "Where roles come from could not be read"
+                                ? "The source of roles could not be read"
                                 : "Every product against every capability, as a grid"
                         }
                         onClick={() =>
@@ -541,7 +541,7 @@ export function People({ who: me }: { who: Who }) {
 
       {mode.isError && (
         <div className="alert" style={{ marginTop: 12 }}>
-          <strong>Where roles come from could not be read</strong>
+          <strong>The source of roles could not be read</strong>
           <span>
             Granting one here would be overwritten at the next sign-in if this deployment takes
             roles from provider groups, so the grids stay closed until it answers.
@@ -959,7 +959,7 @@ function Credentials({ me }: { me: Who }) {
   );
 }
 
-// What to show instead of somebody's identity, and the control that records
+// The label shown instead of somebody's identity, and the control that records
 // it. Cleared by saving it empty, which is what leaves the identity showing.
 function Named({
   person,
@@ -1022,8 +1022,8 @@ function Named({
   );
 }
 
-// Where somebody is reached outside the application, and the control that
-// records it.
+// The address somebody is reached at outside the application, and the control
+// that records it.
 //
 // An address is optional and the two states either side of it are different
 // acts: nobody having said, and somebody having cleared it. The source is

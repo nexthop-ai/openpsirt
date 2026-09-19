@@ -2,7 +2,7 @@ package finding
 
 import "github.com/uptrace/bun"
 
-// How far a group has been decided, counted per place.
+// The decision state of a group, counted per place.
 //
 // Four correlated counts over our decisions in one product, at each place and
 // at the versions that place holds now. Asked as an EXISTS per place rather
@@ -10,14 +10,13 @@ import "github.com/uptrace/bun"
 // place with two decisions counts twice — and the number of places is exactly
 // what the state words compare against.
 //
-// Written once because it was written four times, with each of the conditions
-// spelled again at every site. They had already drifted: the row required a
-// live key for "waiting" where the filter did not, so a claim proposed and
-// then withdrawn sat in the filter's waiting bucket and drew no state word on
-// the row that came back. The filter's own counts keep a different *shape* on
-// purpose — a joined derived table rather than a correlated subquery, because
-// asking per row was 241,479 probes to say "nothing has been decided here" —
-// and it is the conditions that have to agree, not the shape.
+// Written once, because spelled again at every site the conditions drift: a
+// row requiring a live key for "waiting" where the filter does not puts a
+// claim proposed and then withdrawn in the filter's waiting bucket, with no
+// state word on the row that comes back. The filter's own counts keep a
+// different shape on purpose — a joined derived table rather than a correlated
+// subquery, because asking per row was 241,479 probes to say "nothing has been
+// decided here" — and it is the conditions that have to agree, not the shape.
 
 // decisionState is one of those counts: the column it lands in, the condition
 // that recognizes it, and the words that condition binds.

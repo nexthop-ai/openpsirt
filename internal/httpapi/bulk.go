@@ -19,16 +19,16 @@ import (
 // select.
 type AtComponentBody struct {
 	Vulnerability string `json:"vulnerability"`
-	Severity      string `json:"severity,omitempty" doc:"How bad the report rates it"`
-	Places        int    `json:"places" doc:"How many places in this build it sits at"`
+	Severity      string `json:"severity,omitempty" doc:"The severity the report gives it"`
+	Places        int    `json:"places" doc:"The number of places in this build it sits at"`
 	FixedIn       string `json:"fixed_in,omitempty" doc:"The version the report says fixes it, where it names one"`
-	// What one judgment is being made on. Deciding in bulk on less than
-	// deciding singly is the wrong way round, and this list narrows by the
-	// description while showing none of it.
+	// Summary is the text one judgment is made on. Deciding in bulk on
+	// less than deciding singly is the wrong way round, and this list
+	// narrows by the description while showing none of it.
 	Summary    string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
 	Exploited  bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
-	Due        string  `json:"due,omitempty" doc:"When it runs out, as a date. The earliest among its places here, which is the one that makes it late"`
+	Due        string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its places here, which is the one that makes it late"`
 }
 
 func registerBulk(api huma.API, in Ingest) {
@@ -60,8 +60,8 @@ func registerBulk(api huma.API, in Ingest) {
 			Total int               `json:"total"`
 			// Findings is how many rows the whole narrowed set
 			// holds, and Cap how many one action may write. The
-			// two are what sizing a claim needs and what counting
-			// issues cannot say: a bound on rows written means a
+			// two are what sizing a claim needs and what a count of
+			// issues cannot state: a bound on rows written means a
 			// screen counting issues reports 44 where the answer
 			// is 2,000.
 			Findings int `json:"findings"`
@@ -81,8 +81,8 @@ func registerBulk(api huma.API, in Ingest) {
 			return nil, noSuchFinding()
 		}
 
-		// One call, which already counts both. It was two, and the second ran
-		// the whole narrowing again for a number the first had in hand.
+		// One call, which counts both. Two calls run the whole narrowing again
+		// for a number the first has in hand.
 		at, total, reaching, err := finding.NewStore(in.DB.DB).AtComponent(ctx, subject,
 			target, component, input.Contains, input.Limit, input.Offset)
 		if err != nil {
@@ -164,7 +164,7 @@ func registerBulk(api huma.API, in Ingest) {
 			"has an answer later — but it is never the claim. The reasoning has to hold for " +
 			"every issue in the list, since \"these matched a word\" is not a defense anybody " +
 			"would accept.\n\n" +
-			"**`contains` is the same question an approver can re-run.** Send the text you " +
+			"`contains` is the same question an approver can re-run. Send the text you " +
 			"narrowed the candidate list by; the claim records how many issues that narrowing " +
 			"reaches, read here, against how many you named. Equal, the claim is exactly what " +
 			"that narrowing returns; far apart, the sentence does not describe the set.\n\n" +
@@ -180,13 +180,13 @@ func registerBulk(api huma.API, in Ingest) {
 		Component string `path:"component"`
 		Body      struct {
 			Vulnerabilities []string      `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this claim covers, by name"`
-			SelectedBy      string        `json:"selected_by" minLength:"1" maxLength:"500" doc:"How you narrowed this set, in your own words. Recorded, and never part of the claim"`
+			SelectedBy      string        `json:"selected_by" minLength:"1" maxLength:"500" doc:"The narrowing, in your own words. Recorded, and never part of the claim"`
 			Contains        string        `json:"contains,omitempty" maxLength:"200" doc:"The text you narrowed the candidate list by, if any. Re-run here rather than believed: what is recorded beside your sentence is how many issues that narrowing reaches against how many you named, so an approver can check the two"`
 			Outcome         outcomeInBulk `json:"outcome"`
 			Justification   justification `json:"justification,omitempty" doc:"Required when it does not apply"`
 			DeferredUntil   string        `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 			FixedVersion    string        `json:"fixed_version,omitempty" doc:"Required when the outcome is already-fixed. The package version whoever packages this states the fix arrived in — which must be one release carrying the fix for every issue named, since the claim has to hold for all of them"`
-			Reasoning       string        `json:"reasoning" minLength:"1" doc:"Why this holds for every issue named"`
+			Reasoning       string        `json:"reasoning" minLength:"1" doc:"The reasoning, holding for every issue named"`
 		}
 	}) (*struct {
 		Body struct {
@@ -238,8 +238,8 @@ func registerBulk(api huma.API, in Ingest) {
 			issues = append(issues, id)
 		}
 		if len(unknown) > 0 {
-			// Which ones, because a person who pasted a list wants to fix the
-			// list rather than bisect it.
+			// Named individually, because a person who pasted a list wants to
+			// fix the list rather than bisect it.
 			return nil, huma.Error404NotFound(
 				"no issue is filed under " + strings.Join(clipped(unknown), ", "))
 		}
@@ -294,11 +294,10 @@ func registerBulk(api huma.API, in Ingest) {
 
 // deferredUntil reads the date a postponement runs to.
 //
-// Required when something is deferred, and refused otherwise. "Deferred" was
-// offered as an outcome here with nowhere to say until when, which recorded a
-// postponement with no end — the one thing a deferral has to have, since the
-// threshold that decides whether a second person must agree is measured
-// against it.
+// Required when something is deferred, and refused otherwise. Offered as an
+// outcome with nowhere to say until when, a deferral records a postponement
+// with no end — the one thing a deferral has to have, since the threshold that
+// decides whether a second person must agree is measured against it.
 func deferredUntil(outcome, stated string) (*time.Time, error) {
 	if outcome != string(triage.Deferred) {
 		if stated != "" {

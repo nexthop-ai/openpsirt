@@ -59,7 +59,7 @@ type unlock func(context.Context) error
 // driver's native form rather than the query builder's, because the lock must
 // be taken on a pinned connection rather than on the pool.
 //
-// **The connection is pinned deliberately.** These are session locks. Taking
+// The connection is pinned deliberately. These are session locks. Taking
 // one on the pool and releasing it on the pool means the release can land on a
 // different connection — and neither engine reports that as an error, it just
 // silently fails to release. The lock would then be held for the life of the
@@ -178,7 +178,7 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 // rights while running says the running application may hold read and write
 // rights only.
 //
-// **The catalog is asked, rather than the table.** Selecting from the table
+// The catalog is asked, rather than the table. Selecting from the table
 // answers three questions at once and cannot tell them apart: it is not there,
 // this credential may not read it, or the database is unreachable. All three
 // arrived as one error and read as the first, so "schema version 0" was
@@ -188,13 +188,13 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 // documented reason automatic migration can be turned off, so that credential
 // is the ordinary arrangement rather than an exotic one.
 //
-// **PostgreSQL is asked through pg_class rather than the information schema**,
+// PostgreSQL is asked through pg_class rather than the information schema,
 // because the information schema is filtered by privilege on all three
 // servers: a role with no rights on a table does not see the table there, so
 // it gives back the same conflation this exists to remove. `pg_class` is
 // readable by any role, so on that engine the two are genuinely told apart.
 //
-// **On MySQL and MariaDB they are not.** Every catalog those engines offer is
+// On MySQL and MariaDB they are not. Every catalog those engines offer is
 // privilege-filtered and there is no unfiltered one, so a credential that may
 // not read the table is indistinguishable from an absent table. What that
 // costs is bounded: the next thing to run is the version query or a migration,

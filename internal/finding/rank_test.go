@@ -153,10 +153,10 @@ func TestAWordStandsInWhereThereIsNoNumber(t *testing.T) {
 }
 
 func TestTheSeverityOrderingAndItsInverseAgree(t *testing.T) {
-	// The order was written out by hand four times — the list, two SQL CASE
+	// Written out by hand the order is four copies — the list, two SQL CASE
 	// expressions and the mapping back to words — and Bands' own doc records
-	// what that already cost once: a word added to one copy and missing from
-	// another sorts one way and filters another. All four read the one list
+	// what that costs: a word added to one copy and missing from another
+	// sorts one way and filters another. All four read the one list
 	// now, and this is what holds that.
 	bands := finding.Bands()
 	if len(bands) == 0 {

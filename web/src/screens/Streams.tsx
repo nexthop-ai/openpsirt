@@ -68,9 +68,9 @@ export function Streams() {
       ),
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["streams", product] }),
   });
-  // When a release went out, and what it was cut from. Both after the fact,
-  // because that is when they are usually known: a tag is declared here so
-  // scans can be filed against it, which happens whenever somebody gets to
+  // The day a release went out, and the branch it was cut from. Both after the
+  // fact, because that is when they are usually known: a tag is declared here
+  // so scans can be filed against it, which happens whenever somebody gets to
   // it — and fixed at declaration, the release-over-release chart is an
   // accident of administration.
   const setRelease = useMutation({
@@ -274,7 +274,7 @@ export function Streams() {
           value={name}
           onChange={setName}
           placeholder="202411"
-          hint="How scans name it"
+          hint="The name scans use for it"
         />
         <div className="field">
           <label htmlFor="declare-kind">Kind</label>

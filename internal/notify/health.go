@@ -14,7 +14,7 @@ import (
 // Two conditions about the deployment rather than about anybody's work: data
 // that has stopped moving, and a control that did not hold.
 //
-// **Both are questions a report already answers, asked as conditions.** A
+// Both are questions a report already answers, asked as conditions. A
 // report that must come back empty is one nobody opens — checked twice, seen
 // to be empty, stopped — so it is read after something has gone wrong rather
 // than before. Mailing it on a schedule fails either way round: sent only when
@@ -22,14 +22,14 @@ import (
 // run and nothing tells the two apart; sent always, fifty-one messages saying
 // nothing teach somebody to filter the fifty-second.
 //
-// **What goes out is the fact and a link, never the rows.** The same rule an
+// The fact and a link go out, never the rows. The same rule an
 // outbound notification already holds to, for a stronger reason here: one of
 // these is a list of places a security control failed, and a condition that
 // carried it would put that list wherever the channel goes.
 
 // dataStale is the condition that the vulnerability data has stopped moving.
 //
-// **The check is inequality, never ordering.** What a scanner reports as its
+// The check is inequality, never ordering. What a scanner reports as its
 // data version is an opaque string — a date for one, a schema revision and a
 // build stamp for another — so the only question that can be asked of it is
 // whether it is the same string as last time. That is enough: what matters is
@@ -40,21 +40,21 @@ import (
 // deployment that has never finished a scan has nothing to be stale — which is
 // the quiet-build condition's question rather than this one's.
 //
-// **Measured from the most recent time any version was seen for the first
-// time.** A version that comes back was not a change the second time, so the
+// Measured from the most recent time any version was seen for the first
+// time. A version that comes back was not a change the second time, so the
 // first sighting is when the data moved; taking the latest of those makes the
 // answer move forward only when something genuinely new arrives, and never
 // backward.
 //
-// Read as the first sighting of whichever version ran most recently, it did
-// both. A data bundle is a build stamp for the scanner this ships with, so
-// restoring last quarter's data reproduces a version string exactly, and the
-// age was then measured from the first time that string was ever seen — an
-// air-gapped deployment re-importing an old bundle was told the data had not
-// moved in seven months and sent somebody looking for a fetch that never
-// failed. Worse, the chart ships two replicas with a cache each, so two of
-// them can hold different versions and both keep scanning: whichever ran last
-// decided the answer, the condition held on one sweep and not the next, and a
+// Read as the first sighting of whichever version ran most recently, it moves
+// both ways. A data bundle is a build stamp for the scanner this ships with,
+// so restoring last quarter's data reproduces a version string exactly, and
+// the age is then measured from the first time that string was ever seen — an
+// air-gapped deployment re-importing an old bundle is told the data has not
+// moved in seven months and sent looking for a fetch that never failed.
+// Worse, the chart ships two replicas with a cache each, so two of them can
+// hold different versions and both keep scanning: whichever ran last decides
+// the answer, the condition holds on one sweep and not the next, and a
 // condition that clears and re-raises is a fresh unread alert for ever, which
 // is what REQ-49 is about.
 func (w *Watch) dataStale(ctx context.Context) ([]Holds, error) {
@@ -170,10 +170,10 @@ func (w *Watch) dataLastMoved(ctx context.Context) (*time.Time, error) {
 // dataInForce is the version the newest finished run stated.
 //
 // Read apart from when the data last moved, because they are answers to
-// different questions and one statement answering both is what made the age
-// wrong: what the newest run is carrying says nothing about when that string
-// first appeared, and on a deployment running two replicas with a cache each
-// it is whichever of them happened to finish last.
+// different questions and one statement answering both gets the age wrong:
+// what the newest run is carrying says nothing about when that string first
+// appeared, and on a deployment running two replicas with a cache each it is
+// whichever of them finished last.
 func (w *Watch) dataInForce(ctx context.Context) (string, error) {
 	var version string
 	err := w.db.NewSelect().
@@ -193,7 +193,7 @@ func (w *Watch) dataInForce(ctx context.Context) (string, error) {
 // riskUnagreed is the condition that something is hidden with nobody's
 // agreement behind it.
 //
-// **This query returning nothing is what the second-person rule means.** Every
+// This query returning nothing is what the second-person rule means. Every
 // outcome that hides risk needs a second person, so a row here is not a backlog
 // item: it is a control that did not hold, and it is the one thing the record
 // cannot discover on its own after the fact.

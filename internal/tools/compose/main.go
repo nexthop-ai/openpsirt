@@ -290,7 +290,7 @@ func run(name, version, out string, inputs []string) error {
 	// Readable only by whoever ran this, which is what the analysis gate
 	// allows a program to write and is the right default for one.
 	//
-	// **The mode travels with the file**, and that is the part worth knowing:
+	// The mode travels with the file, and that is the part worth knowing:
 	// a container build copying this into an image carries 0600 along, into an
 	// image whose process runs as somebody else — so the document describing
 	// what that image contains could not be read from inside it. Widening it
@@ -319,7 +319,7 @@ func compose(name, version string, docs []document) (*document, error) {
 	byIdentity := map[string]int{}
 	var components []component
 	edges := map[string]map[string]bool{}
-	// Which components something places, across every input rather than within
+	// The components something places, across every input rather than within
 	// one. A component described in the first document and placed by an edge
 	// in the second is placed; asking the question one document at a time
 	// answered no, and the image then claimed to contain directly what
@@ -327,7 +327,7 @@ func compose(name, version string, docs []document) (*document, error) {
 	placed := map[string]bool{}
 
 	for _, doc := range docs {
-		// What this document calls a thing, mapped to what the composed one
+		// This document's own name for a thing, mapped to what the composed one
 		// does. The root of an input is not carried over: it describes the
 		// part rather than the whole, and the whole is the root here.
 		local := map[string]string{}
@@ -359,7 +359,7 @@ func compose(name, version string, docs []document) (*document, error) {
 			local[id] = id
 		}
 
-		// What a component in this document places. Anything nothing places,
+		// The components one in this document places. Anything nothing places,
 		// in any input, is what the image contains directly — which for a
 		// cataloged binary is its main module, and for a cataloged filesystem
 		// is every package no other package pulls in.

@@ -385,7 +385,7 @@ func TestAGraphLargerThanOneStatementApplies(t *testing.T) {
 }
 
 func TestTheRootMovesWhenTheDocumentSaysItDid(t *testing.T) {
-	// Whether a node is the build's root was only ever written on an insert.
+	// A node's root flag is written on an insert and nowhere else.
 	// A component already in the graph that a later document puts at the top —
 	// a base-image component promoted, a restructured build — kept its old
 	// answer, and the build then reported no root of its own.

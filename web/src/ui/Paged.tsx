@@ -15,7 +15,7 @@ export function Paged({
   what = "shown",
 }: {
   shown: number;
-  // How many there are in all, where the server reports it.
+  // The total, where the server reports it.
   total?: number;
   offset?: number;
   // The most one request returns.

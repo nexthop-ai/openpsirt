@@ -35,10 +35,9 @@ type GitHub struct {
 	// api is where the account and the teams are read from.
 	//
 	// A field rather than a literal so that this adapter can be driven against
-	// a stand-in, which is the only way anything here runs at all: every
-	// method of this type was unexecuted. Unexported, so nothing outside this
-	// package can point it anywhere — the guarded client still refuses any
-	// host but GitHub's in a real deployment.
+	// a stand-in, which is the only way anything here runs at all. Unexported,
+	// so nothing outside this package can point it anywhere, and the guarded
+	// client still refuses any host but GitHub's in a real deployment.
 	api string
 }
 
@@ -65,7 +64,7 @@ func NewGitHub(cfg GitHubConfig) (*GitHub, error) {
 	}
 
 	// read:org is asked for only where teams are actually bound to roles.
-	// Asking for it otherwise puts a scope on the consent screen that this
+	// A request for it otherwise puts a scope on the consent screen that this
 	// deployment has no use for, which is how people learn to approve scopes
 	// without reading them.
 	scopes := []string{"read:user", "user:email"}
@@ -202,7 +201,7 @@ func (g *GitHub) teams(ctx context.Context, token *oauth2.Token) ([]string, erro
 		maxTeamPages)
 }
 
-// How much of GitHub's team listing is read. The page size is its maximum, and
+// The share of GitHub's team listing read. The page size is its maximum, and
 // the page limit is a bound on an answer that should never be near it.
 const (
 	teamPageSize = 100

@@ -155,7 +155,7 @@ type Store struct {
 // DerivingWithin returns a store where a grant a group derived stays in force
 // for the window the given function reports, asked each time it is needed.
 //
-// **What this bounds is staleness, not authentication.** Membership is read
+// It bounds staleness, not authentication. Membership is read
 // when somebody signs in, and every sign-in replaces their derived grants
 // whole, so a browser's are never older than its session. A personal token
 // never signs in — it resolves through its owner and reads whatever their last
@@ -416,7 +416,7 @@ func (s *Store) SetDigest(ctx context.Context, personID int64, wanted, unowned b
 	if personID == 0 {
 		return errors.New("a preference needs somebody to belong to")
 	}
-	// Asking for what nobody owns without asking for a digest at all is a
+	// A request for what nobody owns, without a digest at all, is a
 	// setting that changes nothing, which is worse than not offering it.
 	if unowned && !wanted {
 		return errors.New("a digest listing what nobody owns is still a digest: ask for one")
@@ -588,7 +588,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 			return Subject{}, fmt.Errorf("record that %q was seen: %w", identity, err)
 		}
 	}
-	// What counts as theirs: their own name in the assignable space, and
+	// Theirs is their own name in the assignable space, and
 	// the name of every team they are on. Read here because this is the
 	// one place a person becomes a subject, and "assigned to me" has to
 	// mean the same thing on the list, the counts, the digest and the
@@ -622,7 +622,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 // one part that genuinely differs: a grant asks whether it is in force, a
 // binding asks whether the row exists, and each says why beside itself.
 //
-// Where the row is there and the predicate says no, the caller hears what
+// With the row there and the predicate saying no, the caller hears what
 // happened rather than the driver's constraint message — which is what an
 // administrator was shown for an operation the endpoint documents as
 // idempotent.
@@ -716,14 +716,14 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 	}
 
 	// Matched on the whole digest, which is the comparison. A constant-time
-	// compare stood here afterwards, over the row the equality had just
-	// selected — so it could not fail, and the sentence above it said the
-	// lookup was "not by itself a statement that the secrets match" when a SQL
-	// equality on the whole digest is exactly that.
+	// compare afterwards, over the row the equality has just selected, cannot
+	// fail — and calling the lookup "not by itself a statement that the
+	// secrets match" is wrong, because a SQL equality on the whole digest is
+	// exactly that.
 	//
 	// The presented secret is never compared byte by byte: only its digest
-	// reaches the database. What decides the timing of this is the index
-	// lookup, which is not constant time and which nothing here controls —
+	// reaches the database. The timing of this is decided by the index lookup,
+	// which is not constant time and which nothing here controls —
 	// making that a property rather than decoration means replacing the lookup
 	// with a fetch by a non-secret key and a comparison in Go, which is a
 	// different design and would be stated as one.
@@ -768,8 +768,8 @@ func hashSecret(secret string) string {
 //
 // The rows are returned whole rather than filtered, because this is the view
 // an access review reads: a grant that has been set aside has to be visible as
-// set aside, not hidden and not counted. What must never happen is an inactive
-// row reading like a live one, which is what the caller renders.
+// set aside, not hidden and not counted. An inactive row must never read like
+// a live one, which is what the caller renders.
 func (s *Store) People(ctx context.Context) ([]Account, map[int64][]Grant, error) {
 	var people []Account
 	if err := s.db.NewSelect().Model(&people).Order("identity").Scan(ctx); err != nil {
@@ -846,9 +846,9 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 	// Any role at all, asked of the same union every other question uses. In
 	// force, like every question about what somebody holds: a row that grants
 	// nothing must never be counted as access — a grant left inactive by a
-	// switch to group-bound roles answered "they still hold something here",
-	// so their assigned findings stayed with somebody who could no longer open
-	// them and the response said nothing was released. And a role held across
+	// switch to group-bound roles answers "they still hold something here", so
+	// their assigned findings stay with somebody who can no longer open them
+	// and the response says nothing was released. And a role held across
 	// every product is a role held here, so withdrawing their last per-product
 	// grant does not leave their work unreachable.
 	held, err := holdingAny(s.db.NewSelect().
@@ -863,8 +863,8 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 // Keys lists the pipeline credentials, without their secrets.
 //
 // There is nothing to list them with: what is stored is a digest, and that is
-// the point. What an operator needs is which keys exist, what each reaches,
-// when it was last used, and whether it still works.
+// the point. An operator needs which keys exist, what each reaches, when it
+// was last used, and whether it still works.
 func (s *Store) Keys(ctx context.Context) ([]Key, error) {
 	var keys []Key
 	if err := s.db.NewSelect().Model(&keys).Order("name").Scan(ctx); err != nil {
@@ -880,7 +880,7 @@ func (s *Store) Keys(ctx context.Context) ([]Key, error) {
 // places this is needed — a review queue, a list of what was dismissed — are
 // exactly the ones that are long.
 //
-// **What this answers is never sent back to a lookup.** A display name is a
+// Its answer is never sent back to a lookup. A display name is a
 // label somebody chose and resolves to nobody; Handles is what a route naming
 // a person in its path matches.
 func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error) {
@@ -946,13 +946,13 @@ type Mentionable struct {
 // WhoCanRead lists the people who may read findings of this visibility in this
 // product, for offering as mentions.
 //
-// **Offering only people who can already see the thing** is the whole point.
+// Offering only people who can already see the thing is the whole point.
 // An autocomplete that lists everybody teaches somebody to mention a colleague
 // who then cannot open what they were called to, and on an undisclosed finding
 // the mention itself says that a finding exists — which is the disclosure the
 // visibility rule is there to prevent.
 //
-// **An administrator is not included for being one.** Administering the
+// An administrator is not included for being one. Administering the
 // catalog is not reading its findings, which is the split the roles were
 // separated to make possible — so an administrator holding nothing on the
 // product was offered as a mention target on an undisclosed finding there,
@@ -967,7 +967,7 @@ type Mentionable struct {
 func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64,
 	visibility Visibility, term string, limit int) ([]Mentionable, error) {
 
-	// Asking who may read something undisclosed is itself a question about
+	// A request for who may read something undisclosed is itself about
 	// undisclosed work, and the answer is the one every other read gives:
 	// nothing. Asked here rather than only at the two handlers that call it,
 	// because a third endpoint over this query would answer for everybody —
@@ -993,8 +993,8 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	// engines do not agree on what a case-insensitive comparison is, and
 	// one spelled the same way everywhere behaves the same way everywhere.
 	//
-	// **Folded here and again by the engine, and this is the caller where that
-	// still costs something.** Folding in Go is Unicode-aware and LOWER() on
+	// Folded here and again by the engine, and this is the caller where that
+	// still costs something. Folding in Go is Unicode-aware and LOWER() on
 	// SQLite is ASCII-only, so a display name carrying a non-ASCII capital is
 	// found on three engines and missed on the fourth. An identity is an
 	// address and ASCII; a display name is free human text and has no folded
@@ -1095,7 +1095,7 @@ func (s *Store) ReadersNamed(ctx context.Context, subject Subject, productID int
 // Nil where no role reaches that visibility at all, which is an answer rather
 // than an empty condition to be filled in.
 func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQuery {
-	// Which roles are enough to read at this visibility, asked of the rule
+	// The roles enough to read at this visibility, asked of the rule
 	// rather than of a list. It was the same four lines as rolesReading, in
 	// the same package, one of them named and one not — which is how "may
 	// read" comes to mean two things.
@@ -1114,12 +1114,12 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 // Deactivate records that somebody has left, and Reactivate that they are
 // back.
 //
-// **Never a deletion.** The record names them as the proposer of judgments and
-// the approver of others, and an assignment used to point at them; deleting the
-// row would either break those or rewrite what happened. So leaving is a date,
-// and every path in reads it (REQ-45).
+// Never a deletion. The record names them as the proposer of judgments and the
+// approver of others, and an assignment may point at them; deleting the row
+// would either break those or rewrite what happened. So leaving is a date, and
+// every path in reads it (REQ-45).
 //
-// **Their roles are left where they are.** What somebody held is part of why
+// Their roles are left where they are. What somebody held is part of why
 // the record reads as it does, and restoring an account should not mean
 // reconstructing its grants from memory. What stops them is the date, which is
 // read before anything else about them.

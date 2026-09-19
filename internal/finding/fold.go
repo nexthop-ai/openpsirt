@@ -7,7 +7,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// What a fold is, in SQL.
+// A fold, in SQL.
 //
 // The binary packages one source package was built at one version are one
 // thing to a person: curl, libcurl4t64 and libcurl3t64 are one bump, and
@@ -22,20 +22,18 @@ import (
 
 // FoldedOn is the grouping, over a component joined as "c".
 //
-// It replaces the source-package expression these queries used to group by.
-// That expression could not see three of the collisions a real image contains:
-// one source shipped at two versions in one build, and two ecosystems using
-// one word for different packages.
+// A source-package expression in its place cannot see three of the collisions
+// a real image contains: one source shipped at two versions in one build, and
+// two ecosystems using one word for different packages.
 const FoldedOn = "c.fold_key"
 
 // GroupedOn is the grain the findings list, its hidden count and its
 // cross-product form all group by: one issue at one fold.
 //
-// Spelled once because the empty-page fallback grouped one step finer than
-// the page it belongs to, and the figure above the list then changed
-// depending on which page was being looked at. The grain of a page and the
-// grain of the number above it are one fact, and it was written out at five
-// sites by hand.
+// Spelled once, because an empty-page fallback grouping one step finer than
+// the page it belongs to changes the figure above the list depending on which
+// page is being looked at. The grain of a page and the grain of the number
+// above it are one fact.
 const GroupedOn = "f.vulnerability_id, " + FoldedOn
 
 // GroupedAcross is the same grain across products, where a row is an issue at
@@ -85,7 +83,7 @@ func InTheFoldOf(q *bun.SelectQuery, componentID int64) *bun.SelectQuery {
 // InTheFold is every component of the fold the named one belongs to,
 // identifier first.
 //
-// **Read as identifiers and bound back in, rather than joined.** The queries
+// Read as identifiers and bound back in, rather than joined. The queries
 // that narrow by a component read their page off finding's covering index, and
 // reaching the fold key through a join puts a third join under the aggregate —
 // 0.35 s against 0.04 s on the kernel, which is 222,435 of 272,539 open rows on

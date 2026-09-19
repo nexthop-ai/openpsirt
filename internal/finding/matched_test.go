@@ -14,8 +14,8 @@ func TestHowAMatchWasMadeIsKeptAndCanBeAskedFor(t *testing.T) {
 	// ecosystem is the authority, and a comparison against a published
 	// identifier and an upstream range cannot see the difference.
 	//
-	// That is the question somebody asks about a distribution's packages, the
-	// scanner already answers it, and it was being thrown away.
+	// That is the question somebody asks about a distribution's packages, and
+	// the scanner answers it in every result.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 

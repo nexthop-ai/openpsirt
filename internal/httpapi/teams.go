@@ -15,8 +15,8 @@ import (
 
 // TeamBody is a team and who is on it.
 type TeamBody struct {
-	Name string `json:"name" doc:"What the team is called. Matched without regard to capitals"`
-	// DisplayName is the spelling somebody typed, which is what is shown back.
+	Name string `json:"name" doc:"The team's name. Matched without regard to capitals"`
+	// DisplayName is the spelling somebody typed, and the one shown back.
 	DisplayName string `json:"display_name,omitempty"`
 	// Members are the people on it, by sign-in identity. Membership says where
 	// work arrives, never what anybody may read.
@@ -25,9 +25,9 @@ type TeamBody struct {
 
 // TeamRecordBody declares a team, and optionally who is on it.
 type TeamRecordBody struct {
-	Name        string   `json:"name" minLength:"1" doc:"What to call the team"`
-	DisplayName string   `json:"display_name,omitempty" doc:"How to spell it when it is shown. Defaults to the name"`
-	Members     []string `json:"members,omitempty" doc:"Who is on it, by sign-in identity. Everybody named must already have been recorded"`
+	Name        string   `json:"name" minLength:"1" doc:"The team's name"`
+	DisplayName string   `json:"display_name,omitempty" doc:"The display spelling. Defaults to the name"`
+	Members     []string `json:"members,omitempty" doc:"The members, by sign-in identity. Everybody named must already have been recorded"`
 }
 
 func registerTeams(api huma.API, a Administering) {
@@ -38,7 +38,7 @@ func registerTeams(api huma.API, a Administering) {
 			"A team holds work and grants nothing: no role, no visibility, no capability. " +
 			"One team therefore carries mixed clearance as a matter of course, and what each " +
 			"member sees of the work routed to it is what they could see anyway.\n\n" +
-			"**Names to anybody, membership to an administrator.** Routing work to a team " +
+			"Names to anybody, membership to an administrator. Routing work to a team " +
 			"means naming one, so anybody who may hand work around has to be able to see the " +
 			"names; who is on it is the same question as who is here, and that is answered " +
 			"where the rest of the record is.",
@@ -66,8 +66,8 @@ func registerTeams(api huma.API, a Administering) {
 			if err != nil {
 				return nil, wentWrong(a.Logger, "cannot count the teams", err)
 			}
-			// Membership is who is here, which is answered where the rest of
-			// the record is: to an administrator.
+			// Membership is the people on it, answered where the rest of the
+			// record is: to an administrator.
 			members := administrating(ctx) == nil
 
 			out := &listOutput[TeamBody]{}
@@ -107,8 +107,8 @@ func registerTeams(api huma.API, a Administering) {
 
 		// Declaring a team and putting people on it is one act. Written as a
 		// declaration and then a statement per member, a name nobody holds
-		// left the team standing with whoever came before it on it, and the
-		// caller a 404 saying nothing had happened.
+		// leaves the team standing with whoever came before it on it, and the
+		// caller a 404 saying nothing happened.
 		var team *access.Team
 		var body TeamBody
 		var declared bool
@@ -117,8 +117,8 @@ func registerTeams(api huma.API, a Administering) {
 			if err != nil {
 				return err
 			}
-			// Read inside, because whether this declared the team is what the
-			// record at the foot of it says and what the status answers.
+			// Read inside, because the record at the foot of it states
+			// whether this declared the team, and so does the status.
 			_, missing := store.TeamByName(ctx, in.Body.Name)
 			declared = missing != nil
 

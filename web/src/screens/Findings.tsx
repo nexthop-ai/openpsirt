@@ -63,17 +63,16 @@ const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "
 // so a link carries what somebody is looking at; every filter is the server's,
 // so the total beside the list counts the same thing the list shows.
 //
-// Deciding is not done from here (deciding on the finding's own screen,
-// reversed). A row previews in place — the description and where the component
-// sits — and opens the finding, which is where a judgment is made with the
-// evidence beside it.
+// A judgment is not made from here. A row previews in place — the description
+// and where the component sits — and opens the finding, which is where a
+// judgment is made with the evidence beside it.
 export function Findings() {
   const { product = "", stream: named = "", variant: builtAs = "" } = useParams();
   // No product in the path means every product the reader may see. The server
   // has taken the same filters for both lists from the start — one struct,
   // embedded in each — so what differed was only ever the screen.
   const spanning = product === "";
-  // How many columns the header renders, so the preview row spans all of them.
+  // The columns the header renders, so the preview row spans all of them.
   // Written as a literal it was one short on the spanning list, which draws
   // the product as a column of its own.
   const COLUMNS = spanning ? 11 : 10;
@@ -85,7 +84,7 @@ export function Findings() {
   const stream = named || params.get("stream") || "";
   const variant = builtAs || params.get("variant") || "";
   const oneBuild = Boolean(stream && variant);
-  // What the server needs to know about the selection, beside the filters.
+  // The selection the server needs, beside the filters.
   //
   // Held rather than rebuilt each render, so the memo below it does not
   // recompute every time — and so the interface's own lint count stays the
@@ -107,20 +106,19 @@ export function Findings() {
   // so the tree's count and this list agree. Read here because the notice
   // above the list names it; the query it narrows is built elsewhere.
   const beneath = params.get("beneath") ?? "";
-  // Everything else the list narrows by is read where the panel draws it. It
-  // used to be pulled apart here, one variable per filter, and every one of
-  // them had to be threaded through to the control that set it — which is how
-  // the count of what was on came to be a hand-kept list that had already
-  // fallen behind the filters it counted. How many filters are on, counted
-  // where they are named. It was a list of variables kept in step by hand, and
-  // it was already out of step: the count omitted the component name, the
-  // subtree, the exclusions and the text search, so a list narrowed by those
-  // said it was narrowed by nothing. The address as the list actually reads
-  // it, which is not quite what the address says: the by-issue view leaves out
-  // what a promised upgrade already answers unless told otherwise. Everything
-  // downstream — the query, the chips, the panel, what a row hands the finding
-  // it opens — reads this rather than the raw parameters, so the default is
-  // visible, removable and travels with a link like any other filter.
+  // Everything else the list narrows by is read where the panel draws it.
+  // Pulled apart here, one variable per filter, each would have to be threaded
+  // through to the control that sets it, and the count of what is on would
+  // become a hand-kept list falling behind the filters it counts: a count
+  // omitting the component name, the subtree, the exclusions and the text
+  // search says a list narrowed by those is narrowed by nothing.
+  //
+  // The address as the list actually reads it, which is not quite what the
+  // address says: the by-issue view leaves out what a promised upgrade already
+  // answers unless told otherwise. Everything downstream — the query, the
+  // chips, the panel, what a row hands the finding it opens — reads this
+  // rather than the raw parameters, so the default is visible, removable and
+  // travels with a link like any other filter.
   const asked = useMemo(() => asAsked(params, view), [params, view]);
   const advanced = activeFilters(asked).length;
   // Closed until somebody opens it. The panel is most of a screen, and what is
@@ -129,12 +127,12 @@ export function Findings() {
   // somebody followed a link to read, to say what the chips say already.
   const [more, setMore] = useState(false);
   const [peeking, setPeeking] = useState<string | null>(null);
-  // Which row the keys are about. An index rather than a key, because "the
+  // The row the keys are about. An index rather than a key, because "the
   // next one" is a question about the page's order; it is put back to nothing
   // whenever the question changes, since a cursor pointing at row nine of a
   // list that has been re-read is pointing at a different finding.
   const [cursor, setCursor] = useState(-1);
-  // What is selected, by what a row *is* rather than by where it sits: the
+  // The selection, by what a row *is* rather than by where it sits: the
   // list is read again after every decision and after every page, and an index
   // would select a different row each time. Selection is a prerequisite rather
   // than a convenience — both bulk workflows start by picking a filtered set
@@ -220,8 +218,8 @@ export function Findings() {
     ? "/v1/findings"
     : `/v1/products/${encodeURIComponent(product)}/findings`;
 
-  // What a row hands the finding it opens: the list's own address, with the
-  // build it is looking at written in, so the finding can ask for the row
+  // The state a row hands the finding it opens: the list's own address, with
+  // the build it is looking at written in, so the finding can ask for the row
   // before and the row after under exactly these filters.
   const carrying = useMemo(() => {
     const now = new URLSearchParams(asked);
@@ -230,8 +228,8 @@ export function Findings() {
     return now.toString();
   }, [asked, stream, variant]);
 
-  // What a saved filter prepares, where this list is exactly one somebody kept
-  // and that one prepares anything. Read off the address rather than
+  // The claim a saved filter prepares, where this list is exactly one somebody
+  // kept and that one prepares anything. Read off the address rather than
   // remembered from the pick: a rule that outlived the narrowing it was picked
   // for would prefill rows it never drew, with somebody's name about to go on
   // the claim — and one remembered on the screen is lost coming back from a
@@ -248,14 +246,14 @@ export function Findings() {
   }, [kept.data, params, declined]);
 
   const queries = useQueryClient();
-  // What one action may write here, as the deployment sets it. A selection is
+  // The bound on one action here, as the deployment sets it. A selection is
   // handed over a row at a time, so this is the bound on how many round trips
   // one click makes. Read up here with the other hooks, because the screen
   // returns early for two of its views.
 
-  // What people have marked findings with here, for the filter to offer. Read
-  // only while the panel that uses it is open: it is a per-product list nobody
-  // needs unless they are narrowing by one.
+  // The tags people have marked findings with here, for the filter to offer.
+  // Read only while the panel that uses it is open: it is a per-product list
+  // nobody needs unless they are narrowing by one.
   const inUse = useQuery({
     enabled: more && !spanning,
     queryKey: ["tags", product],
@@ -304,7 +302,7 @@ export function Findings() {
     placeholderData: keepPreviousData,
   });
 
-  // What each view would show, on the button that switches to it.
+  // Each view's own count, on the button that switches to it.
   //
   // The three answer the same narrowing at three grains, and the difference
   // between them is the whole reason to switch: a product whose by-issue list
@@ -368,12 +366,12 @@ export function Findings() {
       ),
   });
 
-  // Where somebody was, restored when they come back. This is the screen the
-  // complaint is about: opening a finding and pressing back rebuilt the list
-  // at the top of it, eighteen rows above where they had been reading.
+  // The place somebody was, restored when they come back. This is the screen
+  // it matters on: opening a finding and pressing back rebuilds the list at
+  // the top of it, eighteen rows above where they were reading.
   useKeepPlace(findings.isSuccess);
 
-  // How many rows sit below what this product triages, and where that line is.
+  // The rows below what this product triages, and the line itself.
   // A product's own answer: across products each has its own line, so there is
   // no single count to give and no single value to name, and the notice is not
   // drawn. The cross-product response does not carry the two fields at all,
@@ -383,7 +381,7 @@ export function Findings() {
     ? { hidden: 0, floor: "" }
     : ((findings.data ?? {}) as { hidden?: number; floor?: string });
 
-  // Which build a row's actions and links are about. Where the selection is
+  // The build a row's actions and links are about. Where the selection is
   // one build that is the selection; across several the row names one of them
   // and says how many hold it, so the action lands somewhere real and the
   // decision reaches the rest by matching.
@@ -395,7 +393,7 @@ export function Findings() {
     };
   }
 
-  // What a write here makes stale.
+  // The reads a write here makes stale.
   //
   // Three keys rather than one: the view counts are held for five minutes, and
   // two of the three are not under the `findings` prefix — so a triager who
@@ -442,7 +440,7 @@ export function Findings() {
   // the effect that lands the cursor depend on something that always changed.
   const rows = useMemo(() => findings.data?.items ?? [], [findings.data]);
 
-  // How many other rows on this page are the same issue at another binary of
+  // The other rows on this page that are the same issue at another binary of
   // the same source package. Counted over the page rather than the list,
   // because a page is what somebody is reading and the server counts places —
   // saying otherwise would be a number that disagrees with the total beside
@@ -454,7 +452,7 @@ export function Findings() {
       const key = `${row.vulnerability} ${row.source}`;
       seen.set(key, (seen.get(key) ?? 0) + 1);
     }
-    // What is reported is the count of *others*, so a source package with one
+    // The count reported is of *others*, so a source package with one
     // binary on the page says nothing at all.
     for (const [key, count] of seen) {
       if (count <= 1) seen.delete(key);
@@ -690,11 +688,11 @@ export function Findings() {
         // and dropping the narrowing somebody did not touch would be a second
         // surprise on top of the one this chip exists to end.
         widen={(to) => {
-          // What ask() clears, cleared here too. This navigates rather than
-          // asking, and removing a chip usually stays on the same route
+          // The reads ask() clears, cleared here too. This navigates rather
+          // than asking, and removing a chip usually stays on the same route
           // element — so without these the keyboard cursor and the open peek
-          // row survive into a different answer, where row nine is a
-          // different finding.
+          // row survive into a different answer, where row nine is a different
+          // finding.
           setCursor(-1);
           setPeeking(null);
           navigate(widened(findingsPath(to), asked));
@@ -856,7 +854,7 @@ export function Findings() {
     return <Failed error={findings.error} what="The findings could not be read." />;
   }
 
-  // What is on this page, in the same key the selection uses.
+  // The rows on this page, in the same key the selection uses.
   const shownKeys = rows.map(
     (row) => `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`,
   );

@@ -10,8 +10,8 @@ import (
 
 // Every setting this reads is documented, and everything documented is read.
 //
-// **A setting nobody wrote down is one an operator finds by reading the
-// source**, which for a deployment they run in production is not an answer.
+// A setting nobody wrote down is one an operator finds by reading the
+// source, which for a deployment they run in production is not an answer.
 // The other direction is worse: a documented setting that nothing reads is a
 // line somebody follows, sets, restarts for, and gets no change from — and
 // there is nothing in the running system to tell them so.

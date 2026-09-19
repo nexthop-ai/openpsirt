@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// What is open at one component.
+// Everything open at one component.
 //
 // Not the findings list narrowed to one name: this answers per place rather
 // than per group, because somebody standing on a component in the dependency
@@ -96,7 +96,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		Places          int   `bun:"places"`
 		Total           int   `bun:"total"`
 	}
-	// How many findings the whole narrowed set holds, which is what a bulk
+	// The number of findings the whole narrowed set holds, which is what a bulk
 	// action is bounded against and what a screen counting issues
 	// cannot say. Counted over the same narrowing rather than summed from the
 	// page: a page is fifty of eight hundred.
@@ -153,7 +153,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 			ColumnExpr(`MIN(COALESCE(v.score_centi, 0)) AS "severity_centi"`).
 			ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`).
-			// What the issue says about itself, whether anybody is known to
+			// The issue's own account of itself, whether anybody is known to
 			// be using it, and the published estimate. One row per issue
 			// already, so the aggregate is over one value.
 			ColumnExpr(`MIN(COALESCE(v.description, '')) AS "description"`).
@@ -261,7 +261,7 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 // This is the fix-bundle grouping read per component rather than as a list of
 // its own: a package at a version, and where it could go.
 //
-// **Two counts, because they answer different questions.** `FixedHere` is how
+// Two counts, because they answer different questions. `FixedHere` is how
 // many of what is open name this exact version as their fix, which is that
 // release's own security content. `Reached` is how many the upgrade would close
 // altogether, counting everything fixed at or before it — which is what
@@ -326,7 +326,7 @@ type ComponentGroup struct {
 	// Upgrades are the versions upstream has released that would close
 	// some of what is open here, each with how many issues it would close.
 	//
-	// **Listed, never ordered.** Comparing two of these needs an ordering per
+	// Listed, never ordered. Comparing two of these needs an ordering per
 	// ecosystem that this does not have, so there is no "nearest"
 	// and no "latest" — what there is, is every version the scanner named as
 	// carrying a fix, and the count is what makes one of them obviously worth
@@ -342,7 +342,7 @@ type ComponentGroup struct {
 // it: the text the candidate list was narrowed by, how many issues that
 // narrowing reaches now, and how many the caller went on to name.
 //
-// **`selected_by` is prose and nothing can check it.** A claim reading
+// `selected_by` is prose and nothing can check it. A claim reading
 // "drivers this image does not build" over a set actually chosen by ticking
 // everything is indistinguishable in the record from an honest one, and the
 // decision that asks for how a set was chosen asks for something an approver

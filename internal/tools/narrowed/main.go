@@ -6,7 +6,7 @@
 // deliberately: what they were told already names the product, so refusing to
 // resolve it would refuse them the one thing they were granted while telling
 // them nothing they did not already know. What makes that safe is the sentence
-// beside it — **every read past this asks about the issue again**.
+// beside it — every read past this asks about the issue again.
 //
 // Nothing enforced that sentence. A collaborator on one embargoed issue
 // received every approved statement for the whole build, because the read that
@@ -21,7 +21,7 @@
 // subject, or to resolve an address further; it may not be handed to a read
 // that does not.
 //
-// **The names, and the address resolved from them.** A build resolved this way
+// The names, and the address resolved from them. A build resolved this way
 // is almost never read directly: it is handed to the call that turns a release
 // and a variant into a build, and the finding query is keyed on what that
 // returned. So what a resolver hands back is followed as another name, and
@@ -69,7 +69,7 @@ var resolving = map[string]string{
 	"append":             "collecting resolved builds to ask about together",
 }
 
-// What a resolver hands back stands for the same permissive resolution and is
+// A resolver's answer stands for the same permissive resolution and is
 // followed as another name, which is what makes this check reach the read: at
 // nearly every site the one visible use of the resolved names is the resolver
 // call, and the finding query is keyed on what it returned.
@@ -95,10 +95,11 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		// Where the closures are, so that a resolution inside one is checked
-		// against the closure that holds it rather than twice: a route's
-		// handler is a closure inside the function that registers it, and the
-		// refusal that covers it stands in the closure.
+		// closures is where the closures are, so that a resolution
+		// inside one is checked against the closure that holds it
+		// rather than twice: a route's handler is a closure inside the
+		// function that registers it, and the refusal that covers it
+		// stands in the closure.
 		var closures []*ast.FuncLit
 		ast.Inspect(file, func(node ast.Node) bool {
 			if lit, ok := node.(*ast.FuncLit); ok {
@@ -181,7 +182,7 @@ func main() {
 func looseIn(body *ast.BlockStmt, resolved map[string]token.Pos) (map[string][]token.Pos, int, int) {
 	held := len(resolved)
 	followed := 0
-	// What the address resolvers handed back, which is where nearly every
+	// The values the address resolvers handed back, which is where nearly every
 	// site does its reading.
 	for name, from := range derivedIn(body, resolved) {
 		if _, already := resolved[name]; !already {
@@ -245,7 +246,7 @@ func resolvedIn(body *ast.BlockStmt) map[string]token.Pos {
 // derivedIn returns what a call that resolves the rest of an address was bound
 // to, given the names already resolved.
 //
-// **The hop that consumed the check.** Almost every site hands the resolved
+// The hop that consumed the check. Almost every site hands the resolved
 // names straight to one of the address resolvers and then reads through what
 // that returned, so the one use this program could see was the exempt one and
 // there was nothing left to check. The build a resolver hands back stands for
@@ -306,12 +307,12 @@ func called(call *ast.CallExpr) string {
 // subject covers.
 func unguarded(body *ast.BlockStmt, name string) []token.Pos {
 	var loose []token.Pos
-	// Where the walk currently is. Every node is pushed on the way in and
-	// popped on the way out, which is the only way this stays a stack: the
-	// walk announces the end of a node by handing over nothing, whatever kind
-	// of node it was, so pushing one kind and popping on every ending empties
-	// it immediately — and an empty stack reads here as "used outside a
-	// call", which is the answer that passes.
+	// path is where the walk currently is. Every node is pushed on the way
+	// in and popped on the way out, which is the only way this stays a
+	// stack: the walk announces the end of a node by handing over nothing,
+	// whatever kind of node it was, so pushing one kind and popping on
+	// every ending empties it immediately — and an empty stack reads here
+	// as "used outside a call", which is the answer that passes.
 	var path []ast.Node
 	ast.Inspect(body, func(node ast.Node) bool {
 		if node == nil {

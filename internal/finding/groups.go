@@ -75,9 +75,9 @@ type Group struct {
 	// would invite a judgment made about one being applied to sixty unseen.
 	Packages  int
 	Consumers int
-	// Places is how many findings sit under it. What the bulk cap is measured
-	// against and what the disposition register expands to, rather than a
-	// number a reader is asked to reconcile with the two above.
+	// Places is the number of findings under it: the unit the bulk cap is
+	// measured in and the unit the disposition register expands to, rather
+	// than a number a reader is asked to reconcile with the two above.
 	Places int
 	// Answered counts the places the build has already argued about.
 	Answered int
@@ -154,7 +154,7 @@ type Group struct {
 	Middle int
 	Chains int
 	// Builds is how many builds in the selection hold this group, and Stream
-	// and Variant name **one** of them — not the only one. A screen needs
+	// and Variant name one of them — not the only one. A screen needs
 	// somewhere to link to and an action needs a build to name; what says
 	// there are others is the count, so a screen can show that instead of
 	// reading the named one as the whole answer. Both are empty where the
@@ -245,14 +245,14 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// product's decisions, and a caller free to state either would be choosing
 	// whose rating its findings are judged by.
 	filter.Floor.ProductID = productID
-	// Who "mine" means, from the subject rather than from the request, and
-	// their teams with them: the column holds a party.
+	// The person "mine" means, from the subject rather than from the request,
+	// and their teams with them: the column holds a party.
 	filter.HeldBy = subject.Mine()
 	// The store's clock, so the deadline filters compare against the same
 	// moment everything else here does — and so a frozen clock reaches them,
 	// which is what left the overdue filter with no test.
 	filter.now = s.now
-	// How many builds the selection holds, which is what "differs between
+	// The number of builds the selection holds, which is what "differs between
 	// builds" is measured against. The filter cannot see it.
 	filter.Builds = len(targets)
 	// A subtree is a walk over one build's edges, so it is answerable only
@@ -325,10 +325,9 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	// and this is the screen somebody opens first, against the largest product
 	// they have.
 	//
-	// The failures are reported rather than skipped. Each lookup used to be
-	// ignored when it failed, so a database in trouble produced a findings
-	// list with blank component names in it: a page that looks like data and
-	// is not.
+	// The failures are reported rather than skipped. Ignored, a database in
+	// trouble produces a findings list with blank component names in it: a
+	// page that looks like data and is not.
 	issues := make([]int64, 0, len(rows))
 	components := make([]int64, 0, len(rows))
 	for _, row := range rows {
@@ -344,7 +343,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	if err != nil {
 		return nil, 0, err
 	}
-	// What this product rates them, where it rates them anything. One
+	// This product's own ratings, where it rates them anything. One
 	// statement for the page, like the two lookups above: the rating belongs
 	// to the product and the page is inside one, so the pair is known here.
 	rated, err := RatingsIn(ctx, s.db, []int64{productID}, issues)
@@ -401,7 +400,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 		group := groupFrom(row, named, rated, shipped, filter.Floor)
 		group.Tags = marks[markKey{row.VulnerabilityID, row.ComponentID}]
 		if oneBuild {
-			// How many distinct ways down there are: the consumers this
+			// The number of distinct ways down: the consumers this
 			// component has here, plus one for the build pulling it in
 			// directly.
 			group.Chains = row.Consumers
@@ -448,12 +447,11 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 // force, so an issue reassessed here read one way on one list and another way
 // on the other — which is the whole point of reassessing it.
 //
-// What each list adds afterwards is what differs between them: the way down,
-// for a list of one build; the product and the build to link to, for a list
-// that spans them.
-// Which product's rating a row reads is the line's, because the two are one
-// product's: the word the line states and the word it is compared against are
-// both decisions that team made.
+// Each list's own additions are what differ between them: the way down, for a
+// list of one build; the product and the build to link to, for a list that
+// spans them. The rating a row reads is the line's product's, because the two
+// are one product's: the word the line states and the word it is compared
+// against are both decisions that team made.
 func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]string,
 	shipped map[int64]graph.Component, floor Floor) Group {
 
@@ -486,19 +484,19 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		if component.UpstreamVersion != "" {
 			group.Upstream = component.UpstreamName + " " + component.UpstreamVersion
 		}
-		// Which source package it was built from, where that is not the name
+		// The source package it was built from, where that is not the name
 		// itself. Two rows that are one bump say so on both lists.
 		if component.UpstreamName != "" && component.UpstreamName != component.Name {
 			group.Source = component.UpstreamName
 		}
 	}
-	// Why there is no deadline, said rather than left as a blank cell. The
-	// reasons are asked narrowest first and the last is what is left: the line
-	// is a statement about this issue's rating, upstream having nothing to
-	// take is one about this finding, and anything else without a deadline is
-	// in a release nothing is going to be fixed in.
+	// The reason there is no deadline, stated rather than left as a blank
+	// cell. The reasons are asked narrowest first and the last is what is
+	// left: the line is a statement about this issue's rating, upstream having
+	// nothing to take is one about this finding, and anything else without a
+	// deadline is in a release nothing is going to be fixed in.
 	//
-	// Which line that is belongs to the caller: per product it is the
+	// The line itself belongs to the caller: per product it is the
 	// product's own, and across products it is the deployment's, because one
 	// word chosen for a page that spans them would answer for none of them.
 	if group.DueAt == nil {
@@ -567,13 +565,13 @@ type groupHead struct {
 	// so that everything read per row has a component to hang off. Which one
 	// it is decides nothing a reader sees.
 	ComponentID int64 `bun:"component_id"`
-	// Places is how many findings sit under the row. What the cap is measured
-	// against and what the disposition register expands to.
+	// Places is the number of findings under the row: the unit the cap is
+	// measured in and the unit the disposition register expands to.
 	//
-	// How many packages and how many consumers — the numbers a reader is
+	// The packages and the consumers — the numbers a reader is
 	// shown — are counted in the second statement rather than here. They are
-	// COUNT(DISTINCT), and **MariaDB answers a query with no rows at all when
-	// a COUNT(DISTINCT) sits beside a window function**, silently: no error,
+	// COUNT(DISTINCT), and MariaDB answers a query with no rows at all when a
+	// COUNT(DISTINCT) sits beside a window function, silently: no error,
 	// an empty page, and a total from the other statement that says there was
 	// something. This one carries the window function that counts the whole
 	// filtered set, so the distinct counts go where there is none.
@@ -589,7 +587,7 @@ type groupHead struct {
 // everything else — so an empty cell would mean several intended things at
 // once, on the one screen whose purpose is noticing what is running out.
 //
-// **Narrowest first, where more than one holds.** The most useful sentence is
+// Narrowest first, where more than one holds. The most useful sentence is
 // the one about this finding rather than about its release, and a reader who
 // is told the release is retired learns nothing they could act on if the real
 // answer is that the rating puts it below the line.
@@ -658,16 +656,15 @@ type decorated struct {
 // finding's covering index and nothing else, and how many groups there are.
 //
 // The total rides on the page. It is counted through the same filter as the
-// page — a total that ignores the narrowing is worse than no total: it
-// reports how much there is to decide about, which is the figure people
-// quote, while the list beside it shows something else — and it used to be
-// a second statement making the same grouping over the same rows to count
-// what the first had just grouped. `COUNT(*) OVER ()` is the number of rows
-// the grouping produced after the HAVING clauses and before the limit,
-// which is exactly that, on all four engines (window functions are in each
-// of them), for the cost of nothing. Where the page comes back empty — an
-// offset past the end — there is no row to carry it and it is counted
-// separately.
+// page — a total that ignores the narrowing is worse than no total: it reports
+// how much there is to decide about, which is the figure people quote, while
+// the list beside it shows something else. A second statement makes the same
+// grouping over the same rows to count what the first has just grouped;
+// `COUNT(*) OVER ()` is the number of rows the grouping produced after the
+// HAVING clauses and before the limit, which is exactly that, on all four
+// engines (window functions are in each of them), for the cost of nothing.
+// Where the page comes back empty — an offset past the end — there is no row
+// to carry it and it is counted separately.
 func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Visibility,
 	limit, offset int, filter Filter) ([]groupHead, int, error) {
 
@@ -709,7 +706,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// hour needs at the top is what is being exploited.
 		//
 		// The expression comes from the allowlist and never from the
-		// request , and the tie-break is always the same pair so that
+		// request, and the tie-break is always the same pair so that
 		// paging is stable: two rows equal on the sorted column must
 		// not swap between pages, or a page boundary drops one and
 		// repeats another.
@@ -722,10 +719,10 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		return heads, heads[0].Total, nil
 	}
 	// Grouped the way the page groups, which is by the fold rather than by
-	// the component. Two binaries of one source are one row on a page and
-	// were two here, so the figure above the list changed depending on which
-	// page was being looked at — and this is the one somebody quotes, because
-	// it is what a deep link or the last page shows.
+	// the component. Two binaries of one source are one row on a page, so
+	// counting them as two here changes the figure above the list depending
+	// on which page is being looked at — and this is the one somebody quotes,
+	// because it is what a deep link or the last page shows.
 	counted := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
@@ -764,11 +761,11 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		folds = append(folds, head.Fold)
 	}
 
-	// How far each group has been decided, counted the way the state filter
-	// counts it, so the row and the filter cannot disagree. Four correlated
-	// counts over our decisions in this product at each place and at the
-	// versions the place holds, plus whether any live claim is with its
-	// author.
+	// rows is how far each group has been decided, counted the way the
+	// state filter counts it, so the row and the filter cannot disagree.
+	// Four correlated counts over our decisions in this product at each
+	// place and at the versions the place holds, plus whether any live
+	// claim is with its author.
 	var rows []decorated
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -787,17 +784,17 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
 		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
-		// Whether any of the issues folded here carries a score at all.
+		// Any of the issues folded here carrying a score at all.
 		// Written as a number rather than as a boolean, because the four
 		// engines do not agree about what a boolean out of an aggregate is.
 		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
 		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
-		// When the earliest of these places opened, and the earliest deadline
+		// The earliest opening among these places, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not
 		// the year in the identifier.
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
-		// Whether anything here is undisclosed, and when the earliest embargo
+		// Anything here undisclosed, and the earliest embargo
 		// ends. One undisclosed place among fifty makes the group
 		// undisclosed, which is what it is for anybody deciding what may be
 		// said about it.
@@ -837,12 +834,12 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// with a different word on it.
 		ColumnExpr(`COUNT(DISTINCT f.component_id) AS "packages"`).
 		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
-		// How many builds in the selection hold this group, and one of them to
-		// name. Both are one where the selection is a single build, which is
-		// why the row says nothing about either there.
+		// The number of builds in the selection holding this group, and one of
+		// them to name. Both are one where the selection is a single build,
+		// which is why the row says nothing about either there.
 		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
 		ColumnExpr(`MIN(f.target_id) AS "target_id"`)
-	// How far each group has been decided, counted the way the state filter
+	// The decision state of each group, counted the way the state filter
 	// counts it, so the row and the filter cannot disagree. One spelling of
 	// each state, in decided.go.
 	q = decisionCounts(q, "?", []any{productID},

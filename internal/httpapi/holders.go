@@ -13,11 +13,11 @@ import (
 // HolderBody is somebody or something work can be handed to.
 type HolderBody struct {
 	Kind     string `json:"kind" enum:"person,team" doc:"Whether this is a person or a team. Work is held by a party, and both are one"`
-	Identity string `json:"identity" doc:"What names it when handing work over"`
-	Name     string `json:"name" doc:"What to show, which is the spelling somebody typed where there is one"`
+	Identity string `json:"identity" doc:"The name used when handing work over"`
+	Name     string `json:"name" doc:"The label, which is the spelling somebody typed where there is one"`
 }
 
-// How much of the picker teams may take.
+// teamShare is how much of the picker teams may take.
 //
 // A few, because there are few of them and a team buried under twenty-five
 // names is one nobody finds — and no more, because the bound covers the merged
@@ -26,23 +26,23 @@ const teamShare = 5
 
 // registerHolders answers who may be given work here.
 //
-// **Assigning and mentioning are different questions**, and the interface was
-// asking the mentions endpoint both. That endpoint answers who can already
-// *read* a finding, which is right for offering a name inside text and wrong
-// here twice over: a team cannot be mentioned in prose but is a perfectly good
+// Assigning and mentioning are different questions. Asked of the mentions
+// endpoint, both get one answer: that endpoint answers who can already *read*
+// a finding, which is right for offering a name inside text and wrong here
+// twice over — a team cannot be mentioned in prose but is a perfectly good
 // holder of work, and being able to read something is not the same as being
-// somebody you may hand it to. The consequence was that no finding could be
-// assigned to a team from the interface at all, though the API has taken one
-// from the start.
+// somebody you may hand it to. Under one endpoint no finding can be assigned
+// to a team from the interface at all, though the API has taken one from the
+// start.
 //
-// **It inherits what the mentions endpoint was built to avoid**. Per
-// product, capped, an identity and a name and nothing else, narrowed on the
-// server so a picker at a hundred people does not fetch them all. It is not a
-// view over the people list, which is the administrator's directory: a lookup
-// answering "does this person have an account here" to anybody who may triage
-// is a staff directory for the price of one request.
+// It inherits what the mentions endpoint was built to avoid: per product,
+// capped, an identity and a name and nothing else, narrowed on the server so a
+// picker at a hundred people does not fetch them all. It is not a view over
+// the people list, which is the administrator's directory: a lookup answering
+// "does this person have an account here" to anybody who may triage is a staff
+// directory for the price of one request.
 //
-// **Teams are named to anybody**, which is already true of the teams list: a
+// Teams are named to anybody, which is already true of the teams list: a
 // team grants no role, no visibility and no capability, so its name discloses
 // nothing that its existence does not. Membership stays an administrator's.
 func registerHolders(api huma.API, in Ingest) {
@@ -51,11 +51,11 @@ func registerHolders(api huma.API, in Ingest) {
 		Path:    "/v1/products/{product}/holders",
 		Summary: "List who work here can be given to",
 		Description: "People and teams that can hold work in this product, for a picker.\n\n" +
-			"**People are those who can already read what they would be given**, at the " +
+			"People are those who can already read what they would be given, at the " +
 			"visibility asked for. Offering somebody who cannot open what they are handed " +
 			"is how work arrives with a person who cannot act on it — and on an undisclosed " +
 			"finding the offer itself would say a finding exists.\n\n" +
-			"**Teams are listed whole.** A team holds work and grants nothing, so one " +
+			"Teams are listed whole. A team holds work and grants nothing, so one " +
 			"carries mixed clearance as a matter of course and what each member sees of " +
 			"what is routed to it is what they could see anyway.\n\n" +
 			"Narrow with `q`, which matches the identity and the displayed name without " +
@@ -80,7 +80,7 @@ func registerHolders(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		// Asking who may hold undisclosed work is itself a question about
+		// A request for who may hold undisclosed work is itself about
 		// undisclosed work, and is answered the way every other path answers
 		// it: as though the product were not there.
 		wanted := access.AsVisibility(input.Visibility)
@@ -110,9 +110,9 @@ func registerHolders(api huma.API, in Ingest) {
 		// and a picker that buries three teams under twenty-five names is one
 		// where the team is never found — but one that spends the whole bound
 		// on teams is worse: with the bound applied to the merged answer, a
-		// deployment holding twenty-five teams opened this on twenty-five
-		// teams and no people at all, which is a harder failure than the
-		// unbounded list it replaced.
+		// deployment holding twenty-five teams opens this on twenty-five
+		// teams and no people at all, which is a harder failure than an
+		// unbounded list.
 		named := make([]HolderBody, 0, len(teams))
 		for _, team := range teams {
 			shown := team.DisplayName
@@ -131,7 +131,7 @@ func registerHolders(api huma.API, in Ingest) {
 				Kind: "person", Identity: person.Identity, Name: person.Name,
 			})
 		}
-		// How many there are to choose from, so a picker showing a page of
+		// The number to choose from, so a picker showing a page of
 		// them can say so rather than passing the page off as the whole.
 		// Counted rather than derived from the page for the reason every other
 		// capped listing here states: a figure taken off a page answers a

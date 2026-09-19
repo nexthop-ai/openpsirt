@@ -91,7 +91,7 @@ func TestARetriedTransactionLeavesNothingBehindFromTheAttemptThatFailed(t *testi
 				return err
 			}
 			if attempts == 1 {
-				// What a cluster reports at COMMIT, on a transaction whose
+				// A cluster's report at COMMIT, on a transaction whose
 				// every statement had already succeeded.
 				return &mysql.MySQLError{Number: 1213, Message: "Deadlock found"}
 			}

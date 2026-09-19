@@ -38,12 +38,13 @@ func refused(t *testing.T, err error) bool {
 }
 
 func TestAnOversizedValueIsRefusedRatherThanTruncated(t *testing.T) {
-	// Asking two of the engines for standard identifier quoting nearly cost
-	// this the strictness that makes an oversized value an error. Setting a
-	// mode replaces it rather than adding to it, and what it replaced included
-	// the rule that refuses a value too long for its column — so a nine
-	// character string went into a four character column and came back four
-	// characters long, with no error, on two engines and not on the other two.
+	// A request to two of the engines for standard identifier quoting nearly
+	// cost this the strictness that makes an oversized value an error. Setting
+	// a mode replaces it rather than adding to it, and what it replaced
+	// included the rule that refuses a value too long for its column — so a
+	// nine character string went into a four character column and came back
+	// four characters long, with no error, on two engines and not on the other
+	// two.
 	//
 	// Silent truncation is the worst shape a portability difference can take:
 	// nothing fails, and the data is wrong. This is here so that the quoting
@@ -82,7 +83,7 @@ func TestStandardQuotingSurvivesAlongsideStrictness(t *testing.T) {
 	// quoting is asked for by appending to the mode, and appending is only
 	// correct if what was already there is still in force.
 	//
-	// **The two have to meet on one column**, or this cannot fail for the
+	// The two have to meet on one column, or this cannot fail for the
 	// reason it is named. It declared a reserved word and an ordinary integer,
 	// wrote 1 and 2, and read 1 back — which passes with strictness entirely
 	// off, leaving the conjunction pinned by nothing. A reserved word carrying
@@ -129,7 +130,7 @@ func TestTheConnectionNamesBothModesItDependsOn(t *testing.T) {
 	// that names the mode rather than a value that came back a character
 	// short.
 	//
-	// **It cannot tell an asserted mode from an inherited one**, and nothing
+	// It cannot tell an asserted mode from an inherited one, and nothing
 	// asked of a connection can: what the session holds is the union. What
 	// catches a connection string that stops asking is the test over the
 	// string itself, in internal/database — against the server these run on,

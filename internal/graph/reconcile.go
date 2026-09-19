@@ -25,7 +25,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64, wan
 	}
 
 	nodeIDs := make(map[int64]int64, len(wanted))
-	// Whether each kept node is the build's root, which the scan just said and
+	// Each kept node's root flag, which the scan just said and
 	// the row may disagree with. Only ever written on an insert, a component
 	// promoted to the top of a graph it was already in kept its old answer —
 	// and the build then reported no root of its own.
@@ -61,7 +61,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64, wan
 		}
 	}
 
-	// What the scan says is the root, where the row disagrees. Two statements
+	// The scan's own root, where the row disagrees. Two statements
 	// at most, because a build has one root and at most one node loses it.
 	for _, isRoot := range []bool{true, false} {
 		var ids []int64
@@ -103,7 +103,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64, wan
 // edgeAt identifies one declared dependency: the pair and what the producer
 // said the dependency's scope is.
 //
-// **The scope is part of the key.** A producer that starts describing the same
+// The scope is part of the key. A producer that starts describing the same
 // pair differently has said something different, and an edge carrying the
 // earlier word while the document says another is a record of what nobody
 // sent. Closing the one and opening the other is what every other change to a

@@ -1,6 +1,6 @@
 // Command negatives reports a 404 built from an error's own text.
 //
-// **A 404 asserts that a name reaches nothing.** Building its body from an
+// A 404 asserts that a name reaches nothing. Building its body from an
 // error publishes whatever that error carried, and the two failures compound:
 // the handlers wrote the 404 from the error, and the readers under them
 // returned the driver's message unwrapped. A connection failure reached an
@@ -14,7 +14,7 @@
 // status it would flag every one of those deliberate lines and teach people to
 // ignore it.
 //
-// What it does not cover: an error arm that answers the fixed 404 without
+// It does not cover an error arm that answers the fixed 404 without
 // asking which error it is. That has the same wrong status with nothing
 // disclosed, and "did this arm test the sentinel" is a question about control
 // flow that reading the text cannot answer. A gate that pretended to answer it

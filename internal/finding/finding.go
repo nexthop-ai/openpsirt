@@ -102,14 +102,14 @@ const (
 	// an issue already tracked. The record is taken back rather than the world
 	// having changed.
 	//
-	// **It is the one closure on a different axis from the rest.** Every other
+	// It is the one closure on a different axis from the rest. Every other
 	// answers "why did this stop being present"; this one says it was never
 	// present, so it is neither a resolution nor a disappearance — it does not
 	// count toward how fast things are fixed and it appears in no release
 	// note, because there is nothing to tell a customer about a build that was
 	// never affected.
 	//
-	// **It never means the finding exists but does not apply here.** That is
+	// It never means the finding exists but does not apply here. That is
 	// sayable already and properly: a triage decision of `not-applicable` with
 	// the justification that fits, which a second person agrees to and which
 	// exports as VEX. Letting this absorb that case would route dismissals

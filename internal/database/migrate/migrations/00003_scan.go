@@ -90,7 +90,7 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 		// the deployment nothing to look at. The producer was told and
 		// nobody here was.
 		//
-		// What that cost is a coverage report that can say a build has gone
+		// The gain is a coverage report that can say a build has gone
 		// quiet and cannot say whether anybody is trying. Those want
 		// different people: one is a pipeline nobody wired up, the other is a
 		// pipeline failing nightly and reporting success to its own log.

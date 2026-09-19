@@ -104,7 +104,7 @@ func TestReadingAProductDoesNotCarryRatingAnIssueInIt(t *testing.T) {
 	// signed in, which is what stood here before there was a product to hold a
 	// role on at all.
 	//
-	// Which product the role has to be held on is pinned by
+	// The product the role has to be held on is pinned by
 	// TestRatingAProductAsksForTriageOnThatProduct; this pins that a role is
 	// needed at all.
 	each(t, func(t *testing.T, f *fixture) {
@@ -237,7 +237,7 @@ func TestAWithdrawnAssessmentDoesNotStandInTheWayOfAFreshOne(t *testing.T) {
 func TestTwoAssessmentsProposedAtOnceLeaveOneStanding(t *testing.T) {
 	// The shape a read-then-write check cannot hold: both proposals read
 	// "nothing stands here" before either writes, and both then write.
-	// What refuses the second is the unique constraint over the issue a
+	// The second is refused by the unique constraint over the issue a
 	// live claim is about, which no amount of checking beforehand can
 	// substitute for .
 	each(t, func(t *testing.T, f *fixture) {
@@ -663,10 +663,10 @@ func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
 }
 
 func TestRatingAProductAsksForTriageOnThatProduct(t *testing.T) {
-	// The hole this closed. A rating sets the deadline and can push a finding
-	// below the line a product triages at, and it used to ask for triage
-	// *anywhere* — so somebody holding one product moved both in a product
-	// they cannot see, and nothing in the request named the product at all.
+	// A rating sets the deadline and can push a finding below the line a
+	// product triages at. Asking for triage anywhere, somebody holding one
+	// product moves both in a product they cannot see, with nothing in the
+	// request naming the product at all.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())

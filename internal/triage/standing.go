@@ -203,7 +203,7 @@ type Earlier struct {
 // EarlierAt reads the decisions at a finding's places that stopped applying,
 // newest first.
 //
-// What was argued last time is offered back rather than thrown away. A claim
+// The earlier argument is offered back rather than thrown away. A claim
 // that lapsed on a version bump is usually still the right answer, and making
 // somebody start from a blank page is how a tool teaches people to stop
 // writing reasoning at all.
@@ -385,8 +385,8 @@ func (s *Store) SimilarAt(ctx context.Context, subject access.Subject, productID
 // Elsewhere is an approved claim about this same issue at this same place, in
 // another product.
 //
-// **A place identity carries no product, deliberately, so that a place is
-// recognized across variants.** The same key recognizes it across products: two
+// A place identity carries no product, deliberately, so that a place is
+// recognized across variants. The same key recognizes it across products: two
 // products shipping the same library under the same consumer are the same code
 // in the same position, and a judgment one team made about it is evidence the
 // other has no other way to reach.
@@ -404,14 +404,14 @@ type Elsewhere struct {
 // DecidedElsewhere reads approved claims about this issue at these places in
 // other products, newest first.
 //
-// **Evidence, and never an outcome.** It is offered the way a supplier's VEX
+// Evidence, and never an outcome. It is offered the way a supplier's VEX
 // statement is: as something to read and to quote, prefilling a reasoning where
 // somebody asks for it and deciding nothing. Another team's judgment about
 // their product is not a judgment about this one — what is shipped around the
 // component differs, which is the whole reason a place is a component at a
 // position rather than a component.
 //
-// **Narrowed by what the subject may read**, like every other query here, and
+// Narrowed by what the subject may read, like every other query here, and
 // for a sharper reason than most: the rows are in another product, so a join
 // that did not carry the subject would hand somebody the reasoning, the
 // approver and the existence of an embargoed judgment in a product they cannot

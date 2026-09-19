@@ -30,7 +30,7 @@ const (
 	ConsumerUpstreamExpr  = "COALESCE(NULLIF(uc.upstream_version, ''), uc.version, '')"
 )
 
-// Deciding is everything a decision needs to know about where it is being
+// Deciding carries everything a decision needs about where it is being
 // made, read from the findings rather than from whoever is making it.
 //
 // A caller naming a place freely would be choosing which decisions apply
@@ -173,10 +173,10 @@ type At struct {
 // DeadlineAt is the earliest deadline among the open findings at these places,
 // in these builds.
 //
-// What a promise already recorded is measured against, asked again rather than
-// remembered: the deadline moves when the policy or the rating moves, so a
-// promise being edited is gated against the deadline in force now and not the
-// one in force when it was first made.
+// The gate a promise already recorded is measured against, asked again rather
+// than remembered: the deadline moves when the policy or the rating moves, so
+// a promise being edited is gated against the deadline in force now and not
+// the one in force when it was first made.
 //
 // Narrowed by what the subject may see, like every other read here, and taking
 // a handle because the caller opens the transaction: resolved beforehand, a
@@ -357,7 +357,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// nothing here has and would leave out everything fixed in an
 		// earlier release of the same line.
 		//
-		// **Matched on the fold**, which is the reason the bundle view
+		// Matched on the fold, which is the reason the bundle view
 		// existed: curl, libcurl4t64 and libcurl3t64 are one source package
 		// bumping once, and keying on the binary name would make upgrading
 		// them three acts that can disagree. Naming any of the three reaches
@@ -554,7 +554,7 @@ func placeColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 		// the place, and a caller free to state it would be choosing whether
 		// their own commitment needed a second person.
 		ColumnExpr(`f.due_at AS "due_at"`).
-		// Whether the release was built once. A tag cannot change, so what may
+		// A release built once. A tag cannot change, so what may
 		// be said about a finding on one is narrower, and that is a fact about
 		// the build rather than about who is asking.
 		ColumnExpr(`CASE WHEN st.kind = ? THEN 1 ELSE 0 END AS "on_tag"`, catalog.Tag)

@@ -640,10 +640,10 @@ func (r *reach) scannedShared(t *testing.T) {
 }
 
 func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
-	// A library at two places with two issues used to read four under every
-	// parent, because a finding is one issue at one place. Somebody who
-	// drilled down one path is looking at one place and expects two — and
-	// the list the number opens has to show the same.
+	// A library at two places with two issues reads four under every parent
+	// where the count is per finding, because a finding is one issue at one
+	// place. Somebody who drilled down one path is looking at one place and
+	// expects two — and the list the number opens has to show the same.
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedShared(t)
 		const build = "/v1/products/mine/streams/master/variants/broadcom"
@@ -855,7 +855,7 @@ func TestAProposerHoldsPartOfTheirOwnClaimBack(t *testing.T) {
 }
 
 func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
-	// Deciding is bulk-capable at three grains and re-deciding was capable at
+	// A decision is bulk-capable at three grains and a re-decision at
 	// none. A team answering one kernel issue writes a decision at each of its
 	// places in one action; when the kernel moves those lapse, and restoring
 	// them was one request each with a separately typed justification — on a
@@ -990,7 +990,7 @@ func (r *reach) agreedThenLapsed(t *testing.T) int64 {
 }
 
 func TestOneRowEscalatingSendsTheWholeReAffirmationBack(t *testing.T) {
-	// What was agreed to was that this did not matter much, and that is not an
+	// The agreement was that this did not matter much, and that is not an
 	// agreement about what it has become. The single form already asks this
 	// per row; asked per row here, an act covering forty-five places could
 	// have written forty-four standing decisions and one waiting — an approver
@@ -1106,9 +1106,9 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 	// in it, deliberately, so that a place is recognized across variants. The
 	// same key recognizes it across products — two products shipping the same
 	// library under the same consumer are the same code in the same position —
-	// and nothing offered a team the judgment another team had already made
-	// about it. Deciding it again from scratch is the work the grouping exists
-	// to avoid.
+	// and without it no team is offered the judgment another team has already
+	// made about it. Deciding it again from scratch is the work the grouping
+	// exists to avoid.
 	eachReach(t, func(t *testing.T, r *reach) {
 		ctx := t.Context()
 		r.scanned(t)
@@ -1176,7 +1176,7 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 			t.Errorf("the judgment is offered with nothing to read: %+v", one)
 		}
 
-		// **And only to somebody who may read it.** A place identity spans
+		// And only to somebody who may read it. A place identity spans
 		// products, so a join that did not carry the subject would hand
 		// somebody the reasoning, the approver and the existence of a judgment
 		// in a product they cannot see at all.

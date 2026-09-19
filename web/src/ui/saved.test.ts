@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { here, ruleIn, type Kept } from "./Saved";
 
-// Which saved filter a list is narrowed by.
+// The saved filter a list is narrowed by.
 //
 // The answer decides two things: which name the dropdown shows as open, and —
 // where that one prepares a claim — which findings open with a decision form

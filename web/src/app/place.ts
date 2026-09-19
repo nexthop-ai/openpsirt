@@ -1,11 +1,11 @@
-// Where somebody was on a page, kept so that coming back is coming back.
+// The place somebody was on a page, kept so that coming back is coming back.
 //
-// **A browser restores scroll on a real navigation and an application like
-// this one never makes one.** Going into a finding and pressing back rebuilt
-// the list at the top of it: eighteen rows above where somebody had been, on
-// the screen whose whole use is working down a list one row at a time. The
-// address was restored, the filters were restored, and the place in the list
-// was not — which is the one thing that cannot be re-derived from the address.
+// A browser restores scroll on a real navigation and an application like this
+// one never makes one. Going into a finding and pressing back rebuilds the
+// list at the top of it: eighteen rows above where somebody was, on the screen
+// whose whole use is working down a list one row at a time. The address is
+// restored, the filters are restored, and the place in the list is the one
+// thing that cannot be re-derived from the address.
 //
 // Kept in the session store rather than in memory: a reload is the other way
 // somebody arrives back at a list they were reading, and a module variable
@@ -16,7 +16,7 @@
 // The namespace, beside the other two things kept per session.
 const PREFIX = "openpsirt.place.";
 
-// How many pages are remembered. A handful, because what is wanted is the list
+// The number of pages remembered. A handful, because what is wanted is the list
 // somebody came from rather than every list they have ever read — and an
 // unbounded map in storage is one that grows for as long as the tab is open.
 const KEEP = 12;

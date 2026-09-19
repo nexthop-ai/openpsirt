@@ -8,14 +8,14 @@ import (
 // Somebody who reads nothing can still read their own work in the build it is
 // in.
 //
-// a capability held without a read role reaches no product, and what gives it
-// content is what has been assigned. The store answers for exactly that — and
-// the endpoint refused first, because narrowing to a build asked whether the
-// caller may *read* the product. So the screen that shows an approver what
-// they are dealing with told them the product does not exist, while the tree
-// beside it, which had this right, drew their work.
+// A capability held without a read role reaches no product, and what gives it
+// content is what has been assigned. The store answers for exactly that. An
+// endpoint refusing first — because narrowing to a build asks whether the
+// caller may *read* the product — tells the approver's own screen that the
+// product does not exist, while the tree beside it, which has this right,
+// draws their work.
 //
-// What the refusal was protecting is kept: nothing of theirs in a product they
+// The refusal's own property is kept: nothing of theirs in a product they
 // cannot read still answers as a product that was never declared, so this
 // cannot be used to find out which products exist.
 func TestWhatSomebodyHoldsIsReadableInABuildTheyCannotRead(t *testing.T) {

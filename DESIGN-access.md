@@ -13,7 +13,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [The upward tree](#the-upward-tree)
 - [Refusals disclose nothing](#refusals-disclose-nothing)
 - [Assignment](#assignment)
-- [What a sign-in leaves behind](#what-a-sign-in-leaves-behind)
+- [Session state](#session-state)
 - [Departure](#departure)
 - [Statistics and the audit permission](#statistics-and-the-audit-permission)
 - [Somebody who has left](#somebody-who-has-left)
@@ -27,18 +27,18 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [Trusted-header sign-in](#trusted-header-sign-in)
 - [Name and identifier](#name-and-identifier)
 - [Sessions and request forgery](#sessions-and-request-forgery)
-- [How a group name is matched](#how-a-group-name-is-matched)
+- [Group name matching](#group-name-matching)
 - [Role assignment modes](#role-assignment-modes)
 - [The grant grid](#the-grant-grid)
 - [A role across every product](#a-role-across-every-product)
 - [Personal tokens](#personal-tokens)
-- [Where each check is made](#where-each-check-is-made)
+- [Enforcement sites](#enforcement-sites)
 - [Browser headers](#browser-headers)
 - [Sign-in return addresses](#sign-in-return-addresses)
 - [The administration trail](#the-administration-trail)
 - [Secrets and logs](#secrets-and-logs)
 - [Disclosure](#disclosure)
-- [Extending a disclosure date](#extending-a-disclosure-date)
+- [Disclosure extensions](#disclosure-extensions)
 - [Case collaborators](#case-collaborators)
 - [Values a deployment mints](#values-a-deployment-mints)
 - [Mail addresses](#mail-addresses)
@@ -71,13 +71,14 @@ should be here.
 |---|---|
 | Triage implies reading at the same visibility | Nobody decides about what they cannot see, and a deployment forced to grant both would eventually grant one and wonder why nothing worked |
 | A capability grants no visibility, and a capability has to grant something | What an approver reaches is bounded by what they may read. The converse held the other way too: approving asked for the triage role, which made the approver capability do nothing at all — somebody granted exactly the right to approve could approve nothing |
-| An administrator is not every role (REQ-42) | Administration is people, roles, credentials, settings and the catalog. Reading and triaging a product are granted per product like anybody else's, and an administrator who wants them grants them to themselves, so the grant sits in the same record as everybody else's. It read the other way and nothing said so, and the cost was separation of duties: one account proposed a decision and approved it, re-rated severities and read every embargo, so the second person a dismissal asks for was optional for whoever held admin. It also made a read-only auditor impossible to express |
+| An administrator is not every role (REQ-42) | Administration is people, roles, credentials, settings and the catalog. Reading and triaging a product are granted per product like anybody else's, and an administrator who wants them grants them to themselves, so the grant sits in the same record as everybody else's. Read the other way, it costs separation of duties: one account proposes a decision and approves it, re-rates severities and reads every embargo, so the second person a dismissal asks for is optional for whoever holds admin. It also makes a read-only auditor impossible to express |
 | Knowing a product exists is administration; what is open against it is not | An administrator holding no role sees the products they administer with nothing open against them, which is what a first sign-in looks like |
 
-Two things had been leaning on "an administrator sees everything": the background
-passes that report on the tool ask as **the deployment itself**, a subject
-nothing resolves a credential to and which holds no role; and the demo's
-administrator grants itself roles as part of seeding.
+Two things lean on "an administrator sees everything", and each is answered
+its own way: the background passes that report on the tool ask as **the
+deployment itself**, a subject nothing resolves a credential to and which holds
+no role; and the demo's administrator grants itself roles as part of
+seeding.
 
 | Rule | Reason |
 |---|---|
@@ -96,8 +97,8 @@ built.
 | A capability held without a read role | Only what that person, or a team they are on, is assigned. An assignment is itself a grant: it carries visibility of what was assigned |
 | A collaborator on a case | That one issue. Described under [case collaborators](#case-collaborators) |
 
-There is no "triage without reading": **a right to write implies the read it acts
-on.** What is expressible and meaningless is an approver or an assigner holding
+There is no "triage without reading": a right to write implies the read it acts
+on. What is expressible and meaningless is an approver or an assigner holding
 no read role, which an assignment gives content to.
 
 | Rule | Reason |
@@ -118,7 +119,7 @@ reading on the product, that structure is the inventory of what the product
 contains — the breadth they were not granted — so it cannot be drawn with rows
 hidden: a container's count would still say how much sits under it.
 
-What they get is **the chains their own findings sit on** (REQ-56): from each
+What they get is the chains their own findings sit on (REQ-56): from each
 finding's component up to the build root, with per-node counts narrowed to match.
 The chain upward is what makes a finding judgeable, and every node on it sits
 above something they were already given. Descending a node is the question they
@@ -152,7 +153,7 @@ earlier check to hide behind, so a name nobody holds answers exactly as a name
 somebody holds whose work the caller cannot see — an empty list.
 
 That shape was found in three places, so it is no longer checked one route at a
-time: **a test walks every route carrying an identity** and asserts that both
+time: a test walks every route carrying an identity and asserts that both
 spellings answer alike, for every kind of credential including one holding
 nothing.
 
@@ -160,7 +161,7 @@ Nobody learns which issues exist either. Every route shaped "this issue, at this
 place" resolved the name first and checked what it reached second. On two of
 them the second check was not a refusal at all: a fix target answered an empty
 list and an assignment answered "done" while writing nothing, so those two
-**disclosed by succeeding**.
+disclosed by succeeding.
 
 One resolver does both steps, and every such route goes through it: resolve the
 name, then ask whether this person may read a finding of it in this product, and
@@ -205,7 +206,7 @@ yourself is still doing it.
 | Nobody-assigned is a state to be asked about, not an absence | Work that nobody owns is what falls between people, so it is listed across every product somebody can see — that is exactly what hides when every screen shows one product |
 | Assigning covers what is there now | Findings arriving under the same component tomorrow start unassigned and appear in that list |
 
-## What a sign-in leaves behind
+## Session state
 
 What a sign-in has to remember while the browser is at the provider stays with
 the browser rather than in a table of half-finished sign-ins that has to be
@@ -260,15 +261,15 @@ The `reporting` role was retired for the same reason (REQ-42).
 
 ### The administrative half
 
-That held for findings, decisions and reports, and never for the administrative
-half. An auditor could read every decision and not the deadline policy those
-decisions were measured against, who held which role when they were made, or
-whether any of it changed — three of the four things an audit checks. The only
-grant that opened those was the administrator flag, which is not read-only: the
-record proving nobody moved the goalposts was readable by exactly the population
-able to move them.
+That holds for findings, decisions and reports, and not for the administrative
+half. Without a permission of its own, an auditor reads every decision and not
+the deadline policy those decisions were measured against, who held which role
+when they were made, or whether any of it changed — three of the four things an
+audit checks. The only grant that opens those is the administrator flag, which
+is not read-only, so the record proving nobody moved the goalposts is readable
+by exactly the population able to move them.
 
-### What the audit permission grants
+### The audit permission
 
 | | |
 |---|---|
@@ -277,19 +278,19 @@ able to move them.
 | Read, never write | Every write over the same records asks for administration. An administrator is not asked to hold this as well: they can grant themselves anything, so requiring it would be a checkbox rather than a control |
 | The records are shown whole | Not narrowed by which products the holder reaches |
 
-**Holding it means knowing which products exist.** The change log names them —
+Holding it means knowing which products exist. The change log names them —
 a role granted on one, a release whose support date moved — and the list of
 people names each person's products. That is a property of the grant rather
 than a leak, because granting it is a deliberate administrative act, and it is
 written down here so that granting it is an informed one. The alternative is an
 audit record with holes in it that nothing marks, which is worse than no record.
 
-**What somebody was told is narrowed, and this is not a way to see more.** The
+What somebody was told is narrowed, and this is not a way to see more. The
 rows come back as the asker could have read them on their own account, which is
 the rule the administrator flag already follows — so an auditor who reaches no
 product is answered with nothing.
 
-### Where it lives
+### Storage
 
 Its own column beside administration, not a role.
 
@@ -312,7 +313,7 @@ Recorded by an administrator, as a date on the person.
 | Rule | Reason |
 |---|---|
 | A date, not a flag | "When" is the whole of what an audit asks after a departure, and a boolean cannot answer it |
-| Never a deletion | The record names them as the proposer of judgments and the approver of others, and an assignment used to point at them. Deleting the row would either break those or rewrite what happened |
+| Never a deletion | The record names them as the proposer of judgments and the approver of others, and an assignment may point at them. Deleting the row would either break those or rewrite what happened |
 | Their roles are left where they are | What somebody held is part of why the record reads as it does, and bringing them back should not mean reconstructing it from memory. What stops them is the date |
 | Read once, where every way in already passes | A session, a personal token and a group-bound sign-in all resolve by identity. A second spelling of the check is a second rule to keep in step with the first |
 | **Every question of the form "may this person do this" excludes them** | The grants are left in place on purpose, so a query reading only grants answers that somebody who has left is still cleared. Three did: two of them decide whether an undisclosed finding may be handed to a person or a team, where the assignment itself is the disclosure, and the third decides whether their work is released |
@@ -379,7 +380,7 @@ precedence rule nobody would remember.
 
 ## Routing rules
 
-A rule matches on **component identity as well as a place in the tree**. The
+A rule matches on component identity as well as a place in the tree. The
 upstream name is the key that matters: one rule naming a source package catches
 every binary package built from it. A kernel is one source package appearing at
 many places under many consumers, so a subtree rule would need a line per place
@@ -442,23 +443,23 @@ subject is exactly what a leak looks like from the outside.
 3. A question whose answer does not vary by who is asking. Whether a finding is
    suppressed is the same fact for everybody.
 
-Anything else takes a subject. Two did not and should have: what a routing rule
-would catch, and which words are in use on a product. Both read findings, both
-answered for the whole product, and both were reached straight from a request.
+Anything else takes a subject. What a routing rule would catch and which words
+are in use on a product both read findings and both answer for the whole
+product, so a reader reached straight from a request is a product-wide read
+with nobody attached.
 
-The trail's two readers were a third. A row there names who was brought into
-which case, undisclosed ones among them, so the only thing between that and a
-caller was a line in the handler. Both now take a subject and refuse one that
-does not administer the deployment — a refusal rather than an empty page, since
-a deployment where nobody has ever changed anything is a different statement
-from one somebody may not read.
+The trail's readers are the same shape. A row there names who was brought into
+which case, undisclosed ones among them, so a line in the handler is the only
+thing between that and a caller. Each takes a subject and refuses one that does
+not administer the deployment — a refusal rather than an empty page, since a
+deployment where nobody has ever changed anything is a different statement from
+one somebody may not read.
 
 Whether somebody may read, and whether they may argue, are one question each,
-asked in one place. The reading rule lived on the subject from the start; the
-writing rule was written out byte for byte in two packages and open-coded at six
-more sites. They stay two questions rather than one: triage implies reading and
-reading does not imply triage, so a single answer would have to be qualified at
-every call site.
+asked in one place. Both live on the subject: a rule written out per package is
+a rule with a spelling per package. They stay two questions rather than one,
+because triage implies reading and reading does not imply triage, so a single
+answer would have to be qualified at every call site.
 
 ## Judgments about an issue
 
@@ -473,9 +474,9 @@ what a product's people work on.
 | Agreeing to a milder one | That, or the approver capability, on the product the rating belongs to |
 
 A rating sets the deadline and can push a finding below the line that product
-triages at. Asked anywhere, somebody holding one product moved both in a
-product they cannot see — and a second team was refused any rating of their
-own, because one live rating stood for the deployment.
+triages at. Asked anywhere, somebody holding one product moves both in a
+product they cannot see; held deployment-wide, one live rating stands for every
+product and a second team is refused any rating of their own.
 
 The role is not the whole of it: the issue has to be one the person may be told
 about **in that product**. A role answers which right is asked for, not which
@@ -553,7 +554,7 @@ being applied correctly to it.
 
 ## Provider sign-in
 
-Two adapters behind one interface, **one of them configured at a time**. One
+Two adapters behind one interface, one of them configured at a time. One
 speaks OpenID Connect, for an identity provider. The other speaks plain OAuth
 2.0, for a forge that issues no identity token and publishes no discovery
 document, so the account has to be asked about.
@@ -587,15 +588,15 @@ sign-ins, which has to be swept and which anybody can fill.
 ## Outbound provider fetches
 
 Discovery, the key fetches that follow it, the exchange of an authorization code,
-and the calls made to a forge go through a client that talks to **the configured
-host and nowhere else**, does not follow a redirect, and does not connect to an
+and the calls made to a forge go through a client that talks to the configured
+host and nowhere else, does not follow a redirect, and does not connect to an
 address inside this network.
 
-One client, in one place, for every fetch out of this process. It was written
-twice and forgotten a third time: the sign-in fetches had it, the
-upstream-currency asker had a bare client with a timeout and nothing else, and
-the token exchange — the one call carrying a client secret — fell back to the
-library's default client, which has no timeout and follows ten redirects.
+One client, in one place, for every fetch out of this process. Written per
+caller it is forgotten by one of them: a bare client with a timeout and nothing
+else, or the library's default, which has no timeout and follows ten redirects
+— and the call that falls back is as likely to be the token exchange, the one
+carrying a client secret, as any other.
 
 The exchange matters more than the rest: it carries the client secret and the
 authorization code, it happens on every sign-in rather than once at startup, and
@@ -627,12 +628,11 @@ and the separator are configured, because neither is standardized.
 ## Name and identifier
 
 An administrator grants access to a person they can name. A provider reports a
-username and its own identifier. **Only the second is stable.**
+username and its own identifier. Only the second is stable.
 
-- **The username is redeemed once.** The first successful sign-in pins the
+- The username is redeemed once. The first successful sign-in pins the
   provider's identifier to the authorization waiting under that name.
-- **From then on the identifier decides**, and the username is followed as a
-  label.
+- From then on the identifier decides, and the username is followed as a label.
 
 | Failure closed | How |
 |---|---|
@@ -660,7 +660,7 @@ same person as that username at the provider.
 | A username is folded, an identifier is not | The name is both halves of the rule at once now: an administrator types it to authorize somebody, and a provider reports it at every sign-in. The typed rule wins because the failure runs that way — "Alice" recorded against "alice" reported leaves an authorization nobody can redeem, and under group-bound admission a second account beside the first. Normalized as it is stored, so no engine's collation decides it (REQ-08) |
 | An identifier is unbound by an administrator, never by a sign-in | An identifier belongs to the provider that issued it, so changing provider leaves every account pinned to one that refuses its holder — the name matches and the identifier does not. Clearing it is an administrative act with the authorization left in place; doing it automatically would undo, at the moment it was working, the protection that stops a released name being redeemed by whoever took it |
 
-### Which provider issued an identifier
+### Provider attribution
 
 The issuer is recorded beside the identifier it minted, and written at the
 same moment.
@@ -695,7 +695,7 @@ is what a provider change goes through.
 | A deployment configured for a provider its bound identities do not name refuses to start, and says how to undo it | The refusal is the only place anybody learns that the bindings need withdrawing, so stating the condition without the remedy leaves an operator with a process that will not start and no next step |
 | The window an unredeemed authorization lapses in is charged on every path a name arrives by | The proxy path is the one where a name alone decides who gets the roles, so an authorization nobody redeemed matters most there. The deployment's own way back in is not what this closes: an administrator named in configuration is authorized again at every start, which restarts the window |
 
-### How long a name is redeemable
+### The redemption window
 
 An authorization nobody has redeemed is matched by name alone, because the
 identifier it will be pinned to is not knowable until somebody arrives holding
@@ -709,7 +709,7 @@ it. That window ends.
 | Thirty days where nobody has said | Long enough for somebody authorized ahead of a start date, a notice period or a holiday to arrive; short enough that a grant for a person who never came does not stand for the life of the deployment |
 | A redeemed authorization is not held to it | The identifier decides from then on, and the window was only ever about the name |
 
-### Which claim carries the username
+### The username claim
 
 An OpenID Connect provider is told which claim carries the username, and there
 is no default.
@@ -723,7 +723,7 @@ is no default.
 
 ## Sessions and request forgery
 
-A session is **stored, not held in a process**, so it works whichever replica
+A session is stored, not held in a process, so it works whichever replica
 answers and deleting the row cuts access off at once.
 
 A session holds no roles. It establishes who is asking; what they may reach is
@@ -745,7 +745,7 @@ echoed value has leaked. Requests carrying a key or a token are exempt: nothing
 sends those automatically. Safe methods are named as a list, so a method nobody
 thought of is guarded rather than exempt by having been forgotten.
 
-## How a group name is matched
+## Group name matching
 
 Exactly, with its capitals. A group name is an identity the provider hands over,
 and the rule for those is exact comparison — the same rule that makes a name
@@ -766,7 +766,7 @@ grant outlives somebody's removal from the team it was shadowing.
 A derived role is a statement about current membership. Membership is read at
 sign-in and never again: no provider reports a departure, and polling every
 active user against a rate-limited API is worse than the drift it would close.
-Every derived grant is **replaced wholesale at each sign-in** rather than
+Every derived grant is replaced wholesale at each sign-in rather than
 merged, so a group somebody left takes its roles with it.
 
 The window in which a withdrawn role still applies is therefore the session
@@ -794,23 +794,22 @@ database by hand.
 
 | Rule | Reason |
 |---|---|
-| Unbinding the last group granting administration is refused inside the write | The count has to see the delete, so both are one transaction and a refusal rolls it back. Written as a delete, a count and a compensating re-insert, a re-insert that failed left the binding gone and nobody able to administer — and a restored row carried a fresh timestamp, so it was not the row that had been there |
+| Unbinding the last group granting administration is refused inside the write | The count has to see the delete, so both are one transaction and a refusal rolls it back. Written as a delete, a count and a compensating re-insert, a re-insert that fails leaves the binding gone and nobody able to administer — and a restored row carries a fresh timestamp, so it is not the row that was there |
 | Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
 | A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
 
-**The session lifetime has a ceiling of thirty days.** It is the window in which
-a role a group withdrew can still be held, and it was whatever an administrator
-typed: a lifetime of a year made every browser sign-in last a year. Refused
+The session lifetime has a ceiling of thirty days. It is the window in which a
+role a group withdrew can still be held, so left to whatever an administrator
+types, a lifetime of a year makes every browser sign-in last a year. Refused
 rather than quietly shortened, at the settings write and at startup, so that
 somebody who asks for more hears the limit rather than discovering it later.
 
-**A grant a group derived grants through a token only while it is younger than
-this window.** Membership is read at sign-in and a sign-in replaces somebody's
-derived grants whole, so a browser's are never older than its session. A token never signs in: it resolves
-through its owner and reads whatever their last sign-in wrote. So a derived
-grant is in force for a token only while it is younger than this window, and a
-group somebody left stops granting them roles through a token even if they never
-sign in again. What an administrator assigned is untouched — that is a standing
+A grant a group derived grants through a token only while it is younger than
+this window. Membership is read at sign-in and a sign-in replaces somebody's
+derived grants whole, so a browser's are never older than its session. A token
+never signs in: it resolves through its owner and reads whatever their last
+sign-in wrote. So a group somebody left stops granting them roles through a
+token even if they never sign in again. What an administrator assigned is untouched — that is a standing
 decision rather than a reading of somebody's membership.
 
 Thirty is a judgment rather than a commitment. Nothing has been decided about
@@ -819,12 +818,11 @@ owner's to settle, and `TODO.md` carries it until they do.
 
 ## The grant grid
 
-Products down and capabilities across (REQ-42), one checkbox per pair. It
-replaced a run of chips shaped "product · role" beside a form of three controls,
-because two ordinary questions were unanswerable: "who can approve on this
-product" meant reading every chip on every person's row, and "what does this
-person hold" meant reading a list as long as products times capabilities, in no
-order.
+Products down and capabilities across (REQ-42), one checkbox per pair. Drawn as
+a run of chips shaped "product · role" beside a form of three controls, two
+ordinary questions are unanswerable: "who can approve on this product" means
+reading every chip on every person's row, and "what does this person hold"
+means reading a list as long as products times capabilities, in no order.
 
 | Feature | Reason |
 |---|---|
@@ -871,7 +869,7 @@ for work it was never scoped for.
 | A live reference to its owner, never a snapshot | What it reaches is read from what they hold at the moment it is used, so a role withdrawn cuts the token at the same instant — including one withdrawn because a group membership went away, which is the case with nothing else to notice it |
 | It may not mint or withdraw another | Minting resolves through the owner, so a token that could mint would ask for a wider one and be given it, making every limit exactly one request deep |
 | Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration is dropped by narrowing entirely, because a token narrowed to one product that still administered everything would not be narrowed |
-| A token narrows by what it may do as well as where | A credential a script reads with should not also be able to triage, and the only way to get one used to be to hold nothing else yourself. The roles it names intersect with its owner's the same way the product does, so naming one they do not hold reaches nothing. Naming none carries all of them. A case is untouched: being brought into one is a grant on a product and an issue rather than a role, so a read-only token still reads the case it was minted for |
+| A token narrows by what it may do as well as where | A credential a script reads with should not also be able to triage, and without this the only way to get one is to hold nothing else yourself. The roles it names intersect with its owner's the same way the product does, so naming one they do not hold reaches nothing. Naming none carries all of them. A case is untouched: being brought into one is a grant on a product and an issue rather than a role, so a read-only token still reads the case it was minted for |
 | Expiry is not optional, with a maximum an administrator sets | A credential that never runs out is one nobody ever revokes. Revoking marks rather than deletes, so what used it stays answerable |
 
 Every credential says which kind it is. Pipeline keys and personal tokens carry
@@ -880,7 +878,7 @@ trying each store in turn. A credential that ends up somewhere public is also
 recognizable as one: secret scanners match fixed prefixes, and a bare run of
 base64 matches nothing.
 
-## Where each check is made
+## Enforcement sites
 
 | Decided | Where | Reason |
 |---|---|---|
@@ -900,12 +898,11 @@ A pipeline is refused a read rather than shown an empty one, receipts for its
 own uploads excepted. "Here is nothing" and "you cannot ask" are different
 statements, and the first invites a caller to believe the list is empty.
 
-**Refused where the read is, not only at the edge.** Roughly twenty store reads
-answered a credential that is not a person with an empty result, so the
-invariant the design places in the data layer was in fact enforced by one
-function in a handler — and a check in a handler is the one somebody forgets.
-`Subject.Kind` is a string, so the zero subject took every one of those
-branches as well.
+Refused where the read is, not only at the edge. A store read answering a
+credential that is not a person with an empty result leaves the invariant the
+design places in the data layer enforced by one function in a handler, and a
+check in a handler is the one somebody forgets. `Subject.Kind` is a string, so
+the zero subject takes those branches as well.
 
 The two halves are separate questions and are answered separately. A credential
 that is not a person is refused. A *person* who holds nothing is answered with
@@ -919,15 +916,15 @@ were served to anybody who asked, including the running version the endpoint
 reporting it is authenticated to withhold.
 
 A read is narrowed twice: to the products somebody holds anything on, and within
-those to what has been disclosed to them. **Forgetting the first is silent** —
+those to what has been disclosed to them. Forgetting the first is silent —
 the visibility half alone admits every disclosed finding in the deployment, in
 products the asker holds nothing on, which reads as working because the numbers
 are plausible.
 
 The pair is one call. Where a product is already pinned — a build's readiness, one
 product's releases — a set membership would say less, so those have their own name
-for the pairing, which states that the first half was done. **Nothing calls the
-visibility half bare.**
+for the pairing, which states that the first half was done. Nothing calls the
+visibility half bare.
 
 ## Browser headers
 
@@ -978,13 +975,13 @@ record, because it is the same question one layer up.
 | A failure to record fails the change | Nothing was committed, so the retry a caller makes changes nothing twice. The refusal says the change was not made, because a caller told only that recording failed cannot tell which of the two stands |
 | What follows the change is outside it | Deactivating somebody also ends their sessions and hands their work back. The sessions end inside, because they are what deactivation means; the work is handed back afterwards, bounded by how much they held rather than by the request |
 | A grant and its withdrawal are recorded alike | A trail holding only removals cannot answer what an access review asks. Credentials were the case: withdrawing one was recorded and minting one was not |
-| A revocation that matched nothing leaves no row | The writes that take access away bound only the error from the statement and never read how many rows it matched, so withdrawing a role somebody does not hold answered as though it had been withdrawn. The caller then recorded the act and asked whether the person still held anything on that product: for a role they never had the answer was no, and everything they were dealing with there went back to the unassigned list. A grant, an estate grant, a group binding, a group's administration and a team membership all take access away, and all of them read what they matched |
+| A revocation that matched nothing leaves no row | A write binding only the error from the statement, and never reading how many rows it matched, answers the withdrawal of a role nobody holds as though it had been withdrawn. The caller then records the act and asks whether the person still holds anything on that product: for a role they never had the answer is no, and everything they are dealing with there goes back to the unassigned list. A grant, an estate grant, a group binding, a group's administration and a team membership all take access away, and all of them read what they matched |
 | Never the secret, and never the whole address | What a credential may send, and a destination's host. A record that is deliberately permanent is the wrong place for a bearer token, and for Slack and Teams the address is the credential |
 | **What a change is about is composed from the names it resolved to** | A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
 | The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |
 | **It is read over a period, and leaves as a file** | An access review asks what changed in the stretch a certificate covers. Capped at fifty rows, undated and unexportable, that question was answered a page at a time on a screen and could not leave it. Asked for no period it answers about everything it holds |
 
-### Which writes leave a row
+### Recorded writes
 
 Every write the server registers is one of two things, and the walk fails on one
 that is neither.
@@ -999,17 +996,17 @@ absorbing a route that should leave a row is the failure the walk exists to
 make visible — and the way that happens is somebody adding a line to the list
 instead of a call to the recorder.
 
-**The walk is what makes this true rather than intended.** It reads the
-operations the server registered, so a route in neither list fails it; the
-driving half then exercises each trailed route and reads the row back. What it
-replaced was a literal of twelve acts beside a comment claiming a route walk,
-and nine administrative writes recorded nothing with the suite green — a group
-bound to administration among them.
+The walk is what makes this true rather than intended. It reads the operations
+the server registered, so a route in neither list fails it, and the driving
+half exercises each trailed route and reads the row back. A literal list of
+acts beside a comment claiming a route walk leaves administrative writes
+recording nothing with the suite green — a group bound to administration among
+them.
 
 Three levers silently rewrite what this tool reports: changing the deadline policy
 recomputes every open finding's deadline, raising the triage floor removes
-deadlines below it, and an end-of-life date removes them past it. **For a tool
-whose entire output is evidence, that is the evidence itself being movable.**
+deadlines below it, and an end-of-life date removes them past it. For a tool
+whose entire output is evidence, that is the evidence itself being movable.
 
 ## Secrets and logs
 
@@ -1019,8 +1016,8 @@ is a token in whatever collects the logs, read by everybody who can read those
 and kept for longer than the token's own life.
 
 The case that actually happens is a database URL with a password in it, printed
-once at startup by something helpful. **It is redacted where it is formatted, not
-where it is logged**, so a second caller that logs the same value cannot
+once at startup by something helpful. It is redacted where it is formatted, not
+where it is logged, so a second caller that logs the same value cannot
 reintroduce it.
 
 The rule is written down rather than left as a habit because the failure is
@@ -1054,7 +1051,7 @@ The date arriving tells administrators, and whoever holds the finding where they
 may still read undisclosed work in that product. A condition rather than an
 event: it stands while the date is past and nothing has been decided.
 
-## Extending a disclosure date
+## Disclosure extensions
 
 Needs a reason, and past a threshold that is a setting — thirty days by default —
 a second person (REQ-38). The same shape as a deferral, because it is the same
@@ -1083,8 +1080,7 @@ of the case.
 
 ## Case collaborators
 
-Everybody holding private triage on a product used to see every embargoed finding
-in it, and there was no smaller unit than the product.
+The product is not the smallest unit access is granted in.
 
 A collaborator is granted one issue in one product (REQ-43). They see that issue
 everywhere it sits in that product and nothing else — not the rest of the
@@ -1102,11 +1098,11 @@ private access.
 | Asked once the row is in hand | It needs the issue, which a bare product-and-visibility rule cannot see. That is the opposite order from a name somebody typed, and safe for the same reason it is necessary: the row is already established as existing |
 | Adding somebody is an access change | It lands in the administration trail, tells them at once in the area inside the application, and the finding shows how many collaborators it has. It stops meaning anything at disclosure |
 | Whoever reads the product the case is in manages its list, rather than an administrator | Knowing who is needed on a case is knowing the case, and routing it through somebody who does not read it makes them the bottleneck on every embargo. A collaborator is not that reader: the grant is one issue, so it carries the finding and not the list of who else was brought in |
-| The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator was refused the path to the component their own case sits in and the finding answered as though it were not there |
-| Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faulted on the row the grant exists to open |
-| How far a decision would reach is asked about that issue | The reach reads are about one case and nothing else: the same issue at the same place, held at a version the decision would not already cover. Asked product-wide they refused the collaborator, and a refusal from the store with no arm in the handler answers as a fault — so the two screens that offer to carry a judgment across builds faulted on the one finding the grant exists to open |
+| The way down to a component is the build's shape, not what is open against it | So it asks whether somebody may know the build exists, which a case grant answers. Asked as the stronger question, a collaborator is refused the path to the component their own case sits in, and the finding answers as though it were not there |
+| Evidence narrowed to one issue is asked about that issue | What VEX publishers said about this issue at this component is evidence for the one finding. Asked product-wide, it faults on the row the grant exists to open |
+| How far a decision would reach is asked about that issue | The reach reads are about one case and nothing else: the same issue at the same place, held at a version the decision would not already cover. Asked product-wide they refuse the collaborator, and a refusal from the store with no arm in the handler answers as a fault — so the screens offering to carry a judgment across builds fault on the one finding the grant exists to open |
 | Resolving a build's names admits a collaborator; reading what that build holds does not | The names their own issue sits at have to resolve, or the grant refuses them the one thing it gave. So every read reached through that lookup puts the product-wide question for itself, and a document about the whole build is not a question about one named issue |
-| That every read past it does put the question is checked | The sentence beside the resolver was the whole of the safety and nothing enforced it: one read asked whether a single issue was undisclosed and never whether the subject could read the product, so a collaborator on one case received the approved statements for the whole build. A gate reads where a resolved build is used, and reports one handed to something that carries no subject where nothing refused first |
+| That every read past it does put the question is checked | A sentence beside the resolver is not enforcement: a read asking whether a single issue is undisclosed and never whether the subject may read the product hands a collaborator on one case the approved statements for the whole build. A gate reads where a resolved build is used, and reports one handed to something that carries no subject where nothing refused first |
 
 The product-wide question keeps answering no, and that is the whole of the
 safety. Every list, count, report and export narrows by whether somebody reads
@@ -1132,7 +1128,7 @@ between the two mints.
 | Minted only where nothing holds one, and the answer is what is stored | Two replicas starting together both find nothing and both mint. Written as a plain set, the second overwrites the first — and every sign-in already in flight, sealed with the losing key, is refused when the callback lands |
 | The caller takes whichever key won | It wants a key everybody agrees on, not the one it generated |
 
-**What a setting held is answered by the write that replaced it.** Read in a
+What a setting held is answered by the write that replaced it. Read in a
 statement of its own beforehand it is the value at some earlier moment: two
 administrators moving the same setting at once both read the original, and the
 second writes a prior value into the append-only trail that nothing ever held
@@ -1180,39 +1176,40 @@ notice the absence and say so.
 
 ## Limits
 
-- **A rule naming a component whose name carries a letter outside ASCII matches
-  on the three servers and not on SQLite**, whose fold is ASCII-only. SQLite is
+- A rule naming a component whose name carries a letter outside ASCII matches
+  on the three servers and not on SQLite, whose fold is ASCII-only. SQLite is
   for development and testing, so no deployment is affected, but a rule proved
-  locally can behave differently in production. Making it agree everywhere means
-  storing a folded name beside the spelling, which is a schema change.
-- **The batch-fullness rule is reasoned rather than pinned by a test.** The
+  locally can behave differently in production. Making it agree everywhere
+  means storing a folded name beside the spelling, which is a schema change.
+- The batch-fullness rule is reasoned rather than pinned by a test. The
   divergence needs a write landing between the read and the write of the same
-  batch, and a test here runs one thing at a time. What is pinned is that a sweep
-  spanning several batches routes everything it matches.
-- **Trusted-header sign-in has no stable identifier of its own.** It asserts a
+  batch, and a test here runs one thing at a time. What is pinned is that a
+  sweep spanning several batches routes everything it matches.
+- Trusted-header sign-in has no stable identifier of its own. It asserts a
   username on every request and there is nothing else to match on. The proxy is
   the authority there.
-- **Proxies that deliver identity in a signed token are not supported by that
-  path**, because reading a header cannot verify a signature. Such deployments
+- Proxies that deliver identity in a signed token are not supported by that
+  path, because reading a header cannot verify a signature. Such deployments
   configure a provider instead.
-- **A saved filter is not a permission.** It lived in this package because it
-  hangs off a person, which is the wrong reason. What it cost was that the triage
-  vocabulary a filter can prepare was defined a second time inside the package
-  about permissions, which is the last place somebody looks for it.
-- **A key is honored from anywhere.** It holds a credential rather than being
-  vouched for by position; where it connects from says nothing about whether it is
-  genuine.
-- **The stored key digest is compared again in constant time.** Finding a row by
-  digest is not by itself a statement that two secrets match.
-- **A person holding triage may send a scan.** Somebody re-uploading a build by
+- A saved filter is not a permission. Held in this package because it hangs off
+  a person — which is the wrong reason — it defines the triage vocabulary a
+  filter can prepare a second time inside the package about permissions, which
+  is the last place somebody looks for it.
+- A key is honored from anywhere. It holds a credential rather than being
+  vouched for by position; where it connects from says nothing about whether it
+  is genuine.
+- The stored key digest is matched by SQL equality on the whole digest, which
+  is the comparison. A constant-time compare over the row that equality has
+  already selected cannot fail, so there is none.
+- A person holding triage may send a scan. Somebody re-uploading a build by
   hand is doing triage work.
-- **A pipeline sees the product it may send to.** Pretending otherwise would make
-  an upload to its own product indistinguishable from one to a product that is not
-  there.
-- **A fault is logged rather than described.** The framework serializes an error
-  passed alongside the message, so handing it one hands the caller the query text
-  and, for a connection failure, the address and user it tried.
-- **Naming every address as a trusted source is refused.** It reaches the same
+- A pipeline sees the product it may send to. Pretending otherwise would make
+  an upload to its own product indistinguishable from one to a product that is
+  not there.
+- A fault is logged rather than described. The framework serializes an error
+  passed alongside the message, so handing it one hands the caller the query
+  text and, for a connection failure, the address and user it tried.
+- Naming every address as a trusted source is refused. It reaches the same
   place as naming none, through the setting that is supposed to be the guard.
-- **Granting a role somebody already holds succeeds.** An administrator scripting
+- Granting a role somebody already holds succeeds. An administrator scripting
   grants should not have to check first.

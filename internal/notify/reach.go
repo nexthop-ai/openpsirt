@@ -7,7 +7,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// Who a condition reaches.
+// The people a condition reaches.
 //
 // Shared by all three groups of conditions — the waits in stale.go, the
 // operational alerts in watch.go, and the embargo conditions in disclosure.go

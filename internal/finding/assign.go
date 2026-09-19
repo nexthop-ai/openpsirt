@@ -56,7 +56,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 	// colleague's assignment to land in, and a row that stopped qualifying is
 	// simply not matched.
 	if !dispatches {
-		// What nobody holds, what is already theirs, and what is
+		// Work nobody holds, work already theirs, and work
 		// sitting in a queue of a team they are on. That last is not
 		// taking work off a colleague, which is the act the dispatch
 		// right names: work routed to a team is unheld until somebody
@@ -86,7 +86,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 // HandOverWithin gives several pieces of work to one party inside a
 // transaction somebody else opened, under the rule Assign holds.
 //
-// What it exists for: planning an upgrade is one act that answers a whole
+// It exists for this: planning an upgrade is one act that answers a whole
 // component, and saying who is carrying it is part of that act rather than a
 // second one somebody might forget. Recorded in the same transaction, so a
 // promise nobody is carrying and a holder with no promise are both impossible.
@@ -128,8 +128,8 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 //
 // Set for the whole group at once rather than per place: assigning one place
 // of an issue and not another is not something anybody means to do, and the
-// places of a group are the same problem seen from several parents. **Across
-// builds for the same reason** — the same code built as several variants is
+// places of a group are the same problem seen from several parents. Across
+// builds for the same reason — the same code built as several variants is
 // one piece of work, and it is answered by one judgment.
 //
 // Assigning to nobody is how something is handed back, and is deliberately the
@@ -141,7 +141,7 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 // product and the first build both 1. Taking the build keeps every call site
 // saying what it is looking at and leaves one place that knows the grain.
 //
-// **The party work lands on is a person or a team**, in the column that already
+// The party work lands on is a person or a team, in the column that already
 // holds one. Nothing here asks which it is: the whole point of one
 // column is that every filter, count and handover asks "who holds this" once.
 func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
@@ -157,7 +157,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	// it stops somebody assigning what they cannot see, not somebody
 	// assigning.
 	//
-	// Which right depends on who it lands on. Taking work nobody owns, and
+	// The right needed depends on who it lands on. Taking work nobody owns, and
 	// handing back your own, are part of triaging: the constant stream of
 	// unowned findings assigning what is there now produces would
 	// otherwise need somebody's attention before anybody could start.
@@ -167,7 +167,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	if !triages {
 		return 0, false, access.Denied(fmt.Sprintf("decide who deals with findings in product %d", productID))
 	}
-	// Whether this caller may put work on somebody else, or take what
+	// This caller's right to put work on somebody else, or to take what
 	// somebody else holds. Where they may not, the rule is carried into the
 	// write below rather than checked before it: a check and a write that are
 	// two statements are two moments, and a colleague's assignment landing
@@ -217,7 +217,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 		return 0, false, nil
 	}
 
-	// Whether what was just handed over is a finding nobody has announced.
+	// The disclosure of what was just handed over.
 	//
 	// Answered here because the caller has to know it to decide what may
 	// be said about it outside the application and cannot see the rows
@@ -434,7 +434,7 @@ type Holding struct {
 // stuck behind somebody: an idle account holding nothing is harmless, and work
 // waiting on a person who is not here is the thing worth surfacing.
 //
-// **Counted in pieces of work, not in rows** — an issue in a component in a
+// Counted in pieces of work, not in rows — an issue in a component in a
 // product, the same unit Unassigned and AssignedTo list in. Counting
 // rows made this screen disagree with every screen it links to: measured
 // against a real image, one kernel flaw assigned to one person read as 48 held
@@ -528,16 +528,16 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		held[i].Places = places[held[i].PartyID]
 	}
 
-	// How much of it is late. One pass, against the deadline stored on the
-	// finding — it used to be a pass per urgency band, each with its own
-	// cutoff, because the deadline was derived. Overdue has to mean the
-	// same thing here as on the screen that lists what is running out, and
-	// the surest way to keep two answers equal is for there to be one of
-	// them: the deadline is the stored one, and what takes a finding off
-	// the clock is the one condition both read — a decision that applies,
-	// and nothing the build argued away. Counting every late finding
-	// regardless made a dismissed finding overdue against whoever held it
-	// while the list of what is running out, rightly, left it off.
+	// counted is how much of it is late. One pass, against the deadline stored
+	// on the finding. Derived instead it is a pass per urgency band, each with
+	// its own cutoff. Overdue has to mean the same thing here as on the screen
+	// that lists what is running out, and the surest way to keep two answers
+	// equal is for there to be one of them: the deadline is the stored one,
+	// and what takes a finding off the clock is the one condition both read —
+	// a decision that applies, and nothing the build argued away. Counting
+	// every late finding regardless made a dismissed finding overdue against
+	// whoever held it while the list of what is running out, rightly, left it
+	// off.
 	var counted []struct {
 		PersonID int64 `bun:"person_id"`
 		Overdue  int   `bun:"overdue"`
@@ -590,7 +590,7 @@ type Owned struct {
 	Severity      string `bun:"severity"`
 	Exploited     bool   `bun:"exploited"`
 	Product       string `bun:"product"`
-	// Stream and Variant name **a** build holding this, not the only one. A
+	// Stream and Variant name a build holding this, not the only one. A
 	// screen needs somewhere to link to and an action needs a finding to name,
 	// and where several builds hold the same code any of them will do. What
 	// says there are several is Builds, so a screen can show that instead of
@@ -620,7 +620,7 @@ type Owned struct {
 // per-product problem — it is exactly the thing that hides when every screen
 // is scoped to one product and nobody looks at the others.
 //
-// **One item per issue in a component in a product, not one per build**
+// One item per issue in a component in a product, not one per build
 // . Variants are mostly the same thing built twice: a decision is keyed
 // on the product, the place and the upstream versions and carries no variant,
 // so answering this on one build answers it on every build of that product
@@ -628,7 +628,7 @@ type Owned struct {
 // screen while doubling none of the work — which is how a queue stops being
 // read.
 //
-// **Genuine differences still break out, and they break out by themselves.** A
+// Genuine differences still break out, and they break out by themselves. A
 // component row is one name at one version, shared by every build that ships
 // it, so two variants at the same version group together and two at different
 // versions do not. Nothing here has to decide which case it is looking at.
@@ -752,9 +752,8 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	// The first groups and orders over finding and the two joins the
 	// scoping needs; the names of the issue, the component and the build
 	// come from a second statement over the page rather than from four
-	// more joins under the aggregate, which is what the first version did
-	// — a text column reduced with MIN once per row of the grouping to
-	// read fifty names.
+	// more joins under the aggregate — which reduces a text column with MIN
+	// once per row of the grouping to read fifty names.
 	var heads []struct {
 		VulnerabilityID int64     `bun:"vulnerability_id"`
 		ComponentID     int64     `bun:"component_id"`
@@ -915,13 +914,13 @@ func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build
 // onlyReadable narrows a query to what one person may read: the products they
 // hold anything on, and within those, what has been disclosed to them.
 //
-// **Both halves, together, because forgetting the first one is silent.** The
+// Both halves, together, because forgetting the first one is silent. The
 // visibility half alone admits every disclosed finding in the deployment,
 // including in products the asker holds nothing on — which reads as working,
 // because the numbers are plausible and nothing refuses.
 //
-// **The product half is not always this one, which is why the visibility half
-// is callable on its own.** A query that has already pinned a single product —
+// The product half is not always this one, which is why the visibility half
+// is callable on its own. A query that has already pinned a single product —
 // a build's readiness, one product's releases — has narrowed further than this
 // would, and applying a set membership over it would be a second clause saying
 // less. Those call inOneProduct, which is the same pairing stated for the case
@@ -952,12 +951,12 @@ func inOneProduct(q *bun.SelectQuery, subject access.Subject, productID int64,
 // Holding private read on one product does not make undisclosed findings on
 // another visible, so the clause is per product rather than a single flag.
 //
-// **An administrator is not narrowed at all**, and the first version of this
-// got that exactly backwards: Products() reports "everything" as an empty list
-// with a flag, the empty list rendered as IN (NULL) — which is never true —
-// and the clause collapsed to public-only for the one subject who is supposed
-// to see everything. Their dashboard, deadline list and trend all
-// under-reported, with nothing saying so.
+// An administrator is not narrowed at all, and the shape makes that easy to
+// get backwards: Products() reports "everything" as an empty list with a flag,
+// and an empty list rendered as IN (NULL) is never true — so the clause
+// collapses to public-only for the one subject who is supposed to see
+// everything, and their dashboard, deadline list and trend all under-report
+// with nothing saying so.
 func onlyVisible(q *bun.SelectQuery, subject access.Subject, products []int64, all bool) *bun.SelectQuery {
 	if all {
 		return q

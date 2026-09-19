@@ -54,9 +54,10 @@ type Evidence struct {
 	// different judgment from local-and-privileged at the same score.
 	ScoreCenti int
 	Vector     string
-	// Who published that score, which scoring system it is, and whether it is
-	// the primary rating or a secondary one. A reader asking "who says 5.9"
-	// had nowhere to go, on the one number a deadline is set from.
+	// ScoreVersion is who published that score, which scoring system it
+	// is, and whether it is the primary rating or a secondary one. A
+	// reader asking "who says 5.9" had nowhere to go, on the one number a
+	// deadline is set from.
 	ScoreVersion string
 	ScoreSource  string
 	ScoreKind    string
@@ -64,9 +65,10 @@ type Evidence struct {
 	// from the thousands that can wait.
 	Exploited     bool
 	LikelihoodPPM int
-	// Where that estimate stands among all of them, and the day it is about.
-	// The number alone is unreadable — 0.00042 is not something anybody acts
-	// on — and the day is what says whether it is current.
+	// LikelihoodPercentilePPM is where that estimate stands among all of
+	// them, and the day it is about. The number alone is unreadable —
+	// 0.00042 is not something anybody acts on — and the day is what says
+	// whether it is current.
 	LikelihoodPercentilePPM int
 	LikelihoodOn            *time.Time
 	Weaknesses              []string
@@ -137,7 +139,7 @@ type Evidence struct {
 	// and FoundBy what produced it: which scanner, at which version,
 	// against which vulnerability database.
 	//
-	// **The run that answered is not the run that answers now**, so this
+	// The run that answered is not the run that answers now, so this
 	// cannot be worked out again later — it is a fact about a moment, like the
 	// version a place held before it moved, which is what makes storing it the
 	// permitted kind of derivation. Without it, "which scanner and which
@@ -147,9 +149,9 @@ type Evidence struct {
 	OpenedAt time.Time
 	FoundBy  *Measured
 
-	// What the ecosystem's own index says is newest, and when it shipped .
-	// Empty where asking is turned off, where nothing has asked yet, and
-	// where the index has never heard of the component.
+	// LatestVersion is what the ecosystem's own index says is newest, and
+	// when it shipped . Empty where asking is turned off, where nothing
+	// has asked yet, and where the index has never heard of the component.
 	LatestVersion    string
 	LatestReleasedAt *time.Time
 	// NothingSince says upstream has shipped nothing since the year this issue
@@ -237,8 +239,9 @@ func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 			}
 			continue
 		}
-		// What the producer called the edge into here. A place under the
-		// build itself is pulled in by nothing, which is the zero key.
+		// puller is what the producer called the edge into here. A
+		// place under the build itself is pulled in by nothing, which
+		// is the zero key.
 		var puller int64
 		if row.ConsumerID != nil {
 			puller = *row.ConsumerID
@@ -276,7 +279,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		FixedAt:     rows[0].FixedAt,
 		ArrivedFrom: rows[0].ArrivedFrom,
 	}
-	// What upstream did, asked of every place rather than of the first. A
+	// Upstream's answer, asked of every place rather than of the first. A
 	// detail read is one issue at one component across its places, and places
 	// that disagree have no single answer — which is what the mixed state is
 	// for, and what the filter selects while the row claimed a definite one.
@@ -291,7 +294,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	}
 	evidence.FixState = agreedFixState(least, most)
 	evidence.FixedIn = agreedFixedIn(least, most, rows[0].FixedIn)
-	// Whether anything upstream would close any of these places. Asked of both
+	// An upstream release that closes any of these places. Asked of both
 	// ends here rather than of the word above, because that word is "mixed"
 	// wherever the places disagree — which is not a state upstream is ever in,
 	// and reading it as one says a supported release is past its end of life.
@@ -417,8 +420,8 @@ type Sitting struct {
 	// The direct consumer is what a decision is keyed on and it is not
 	// enough to *read*: where a component is reached several ways the
 	// consumer is often the same word twice, and two identical rows do not
-	// distinguish two places. the complete chain on a finding asks for the
-	// whole chain for that reason. It stays display-only — putting it back
+	// distinguish two places. The complete chain is carried on a finding for
+	// that reason. It stays display-only — putting it back
 	// into identity is what the place identity was measured against and
 	// rejected for, at 49,170 paths against 48 consumers.
 	//
@@ -484,7 +487,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`COALESCE(uc.name, '') AS "consumer"`).
 		ColumnExpr(`f.consumer_id AS "consumer_id"`).
-		// Which package of the fold this place is. A fold covers every binary
+		// The package of the fold this place is. A fold covers every binary
 		// one source package was built at one version, so a place named only
 		// by its consumer would leave a reader unable to tell curl's from
 		// libcurl4t64's.
@@ -492,10 +495,10 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`f.visibility AS "visibility"`).
 		ColumnExpr(`f.disclose_at AS "disclose_at"`).
-		// When it runs out, and why it does not where it has none. The
-		// list carries both and the finding's own screen carried
-		// neither, so somebody looking at the one row that matters had
-		// to go back to the list to find out when it was due.
+		// The moment it runs out, and the reason it does not where it has
+		// none. The list carries both and the finding's own screen carried
+		// neither, so somebody looking at the one row that matters had to go
+		// back to the list to find out when it was due.
 		ColumnExpr(`f.due_at AS "due_at"`).
 		// A live claim standing at this place, whatever its state. Proposed
 		// and waiting counts: it is answered as far as the person looking at
@@ -535,7 +538,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`COALESCE(f.matched_range, '') AS "matched_range"`).
 		ColumnExpr(`COALESCE(f.arrived_from, '') AS "arrived_from"`).
 		ColumnExpr(`f.kind AS "kind"`).
-		// When this place first appeared here and which run put it
+		// The first appearance of this place here, and the run that put it
 		// there . The run is the provenance of the finding, and it is
 		// the only thing that can answer which vulnerability database
 		// produced it.
@@ -564,7 +567,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	if err := s.db.NewSelect().Model(&issue).Where("id = ?", vulnerabilityID).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what this issue is: %w", err)
 	}
-	// What this product rates it, where somebody here has rated it. The screen
+	// This product's own rating, where somebody here has rated it. The screen
 	// is inside one product, so it shows that product's rating and not another
 	// team's.
 	rated, err := RatingIn(ctx, s.db, productID, vulnerabilityID)
@@ -605,9 +608,9 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 
 	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
 
-	// When this first appeared here and what produced it. The earliest
-	// place, because that is the age the deadline relates to, and the run
-	// that opened *that* place is the one that first said this.
+	// opened is when this first appeared here and what produced it. The
+	// earliest place, because that is the age the deadline relates to, and
+	// the run that opened *that* place is the one that first said this.
 	var opened *int64
 	for _, row := range rows {
 		if evidence.OpenedAt.IsZero() || row.OpenedAt.Before(evidence.OpenedAt) {
@@ -621,7 +624,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 			evidence.DueAt = row.DueAt
 		}
 	}
-	// Why there is none, where there is none — derived the way the list
+	// The reason there is none, where there is none — derived the way the list
 	// derives it, narrowest first: the line is a statement about this
 	// issue's rating, upstream having nothing to take is one about this
 	// finding, and anything else without a deadline is in a release nothing
@@ -669,7 +672,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		return nil, err
 	}
 
-	// What the producer said each of these dependencies is, where it said
+	// The producer's word for each of these dependencies, where it said
 	// anything. Read here rather than joined into the statement above: three
 	// more joins on a query already reaching five tables, for a word most
 	// inventories never state.
@@ -684,10 +687,10 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 
 	evidence.Places = placesOf(rows, chains, shipped, scopes)
 
-	// Who is dealing with it. Read here rather than left to a caller, so that
-	// the screen somebody reads a finding on is the screen they can hand it
-	// over from — being able to record a judgment about something and not to
-	// say who is dealing with it is a strange half of the same job.
+	// The party dealing with it. Read here rather than left to a caller, so
+	// that the screen somebody reads a finding on is the screen they can hand
+	// it over from — being able to record a judgment about something and not
+	// to say who is dealing with it is a strange half of the same job.
 	//
 	// One name for the whole finding, and empty where the places disagree: the
 	// assignment is set for a group at once, so a disagreement is a state

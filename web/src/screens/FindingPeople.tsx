@@ -1,4 +1,4 @@
-// Who is involved with this finding, and what hangs off it.
+// The people involved with this finding, and what hangs off it.
 //
 // Collaborators brought into an undisclosed case, whoever is holding the work,
 // closing a recorded flaw by hand, the files attached to it and the words
@@ -13,9 +13,9 @@ import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
 import { offeredAs, whoIs } from "../ui/whom";
 
-// Who has been brought into one undisclosed case.
+// The people brought into one undisclosed case.
 //
-// **Being on a case is not reading the product.** A collaborator sees this
+// Being on a case is not reading the product. A collaborator sees this
 // issue wherever it sits here and nothing else, may argue about it, and may
 // not agree to anybody's claim — which is said on the card rather than
 // discovered when a button refuses, because it is the reason the grant is
@@ -45,7 +45,7 @@ export function Collaborators({
     // an answer rather than a fault: the card stays quiet on their screen.
     retry: false,
   });
-  // Who can be offered. The people who already read this product at all —
+  // The people who can be offered: those who already read this product at all —
   // bringing somebody into a case grants access to somebody who has some, and
   // cannot bring anybody into the deployment.
   //
@@ -94,7 +94,7 @@ export function Collaborators({
     return notYours(on.error) ? null : (
       <div className="card">
         <h3>On this case</h3>
-        <Failed error={on.error} what="Who is on this case could not be read." />
+        <Failed error={on.error} what="The people on this case could not be read." />
       </div>
     );
   }
@@ -182,7 +182,7 @@ export function Assignee({
   };
   assigned: string;
   undisclosed: boolean;
-  // Which standing rule placed this, where one did. A placement nobody can
+  // The standing rule that placed this, where one did. A placement nobody can
   // explain is one nobody can correct.
   routedBy: string;
 }) {
@@ -291,7 +291,7 @@ export function Resolve({
         <>
           <div className="field">
             <label htmlFor="res-because">
-              What fixed it{" "}
+              The fix{" "}
               <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
                 required
               </span>
@@ -324,7 +324,7 @@ export function Resolve({
   );
 }
 
-// What text about this issue refers to.
+// The attachments text about this issue refers to.
 //
 // Listed as well as rendered inline, because a file referred to from a
 // revision nobody is reading now is still part of the record — and because
@@ -368,7 +368,7 @@ export function Attachments({
     return notYours(listed.error) ? null : (
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Attached files</h3>
-        <Failed error={listed.error} what="What is attached could not be read." />
+        <Failed error={listed.error} what="The attachments could not be read." />
       </section>
     );
   }
@@ -413,7 +413,7 @@ export function Attachments({
             )}
             {removing === file.token && (
               <div className="field" style={{ margin: "6px 0 0", maxWidth: "60ch" }}>
-                <label>Why it is being removed</label>
+                <label>Reason for removal</label>
                 <input
                   value={reason}
                   onChange={(event) => setReason(event.target.value)}
@@ -447,16 +447,16 @@ export function Attachments({
 
 // The words people put on a finding.
 //
-// **People mark work regardless.** With nowhere to put it they do it inside
+// People mark work regardless. With nowhere to put it they do it inside
 // the reasoning text, where nothing can filter on it and an approver reads it
 // as part of the argument.
 //
-// **What is offered is what people have written**, not a vocabulary this
+// The offer is what people have written, not a vocabulary this
 // screen invented: the list comes from the product, so the second person to
 // reach for "waiting on vendor" spells it the way the first one did, and the
 // two are one filter rather than two.
 //
-// **Marking is triage**, so somebody who may only read is shown the marks and
+// Marking is triage, so somebody who may only read is shown the marks and
 // not the control. A control that is offered and then refused teaches people
 // to distrust the ones that work.
 export function Marks({
@@ -517,7 +517,7 @@ export function Marks({
   });
 
   const busy = mark.isPending || unmark.isPending;
-  // What is already on this is not offered again — the request would succeed
+  // A tag already on this is not offered again — the request would succeed
   // and change nothing, which reads as the control not working.
   const already = new Set(tags.map((each) => each.trim().toLowerCase()));
   const offered = (inUse.data?.items ?? []).filter((each) => !already.has(each.toLowerCase()));

@@ -53,8 +53,8 @@ type OIDCConfig struct {
 	ClientID     string
 	ClientSecret string
 	Scopes       []string
-	// GroupsClaim names the claim carrying group membership. **Empty means
-	// groups are never read**, which is the right answer for a deployment
+	// GroupsClaim names the claim carrying group membership. Empty means
+	// groups are never read, which is the right answer for a deployment
 	// assigning roles directly and the wrong one for a deployment about to
 	// switch to group-bound roles: every claim set then reads as having no
 	// groups, and nobody derives anything.

@@ -77,7 +77,7 @@ type Outlier struct {
 	Exploited     bool
 	FixedIn       string
 	Description   string
-	// Why says which of the four things made it stand out.
+	// Why names which of the four things made it stand out.
 	Why []string
 }
 
@@ -125,7 +125,7 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 // part they may approve, a reader would agree to words whose other half stays
 // waiting on somebody else, and the count beside the card would be wrong.
 //
-// **And not their own.** Approving your own claim is refused, because a control
+// And not their own. Approving your own claim is refused, because a control
 // one person completes alone is not one — so a queue containing them
 // is a work list of things the reader cannot do, which teaches them to skip
 // rows. `mine` asks for exactly those instead: somebody wants to find what they
@@ -220,7 +220,7 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
 	if err != nil {
 		return nil, 0, err
 	}
-	// What would make an approver disagree. Read for the whole page in two
+	// The case against agreeing. Read for the whole page in two
 	// statements, because a card that costs two round trips is a card that
 	// ends up carrying less than it should.
 	against, err := s.counters(ctx, subject, representatives)
@@ -320,9 +320,10 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		ClaimID         int64 `bun:"claim_id"`
 		VulnerabilityID int64 `bun:"vulnerability_id"`
 		DecisionID      int64 `bun:"decision_id"`
-		// Which product the claim was made in. A rating belongs to a product,
-		// so an outlier is picked out against what *this* product rates these
-		// issues rather than against a word somebody in another one chose.
+		// ProductID is which product the claim was made in. A rating
+		// belongs to a product, so an outlier is picked out against
+		// what *this* product rates these issues rather than against a
+		// word somebody in another one chose.
 		ProductID int64 `bun:"product_id"`
 	}
 	if err := s.db.NewSelect().
@@ -367,12 +368,13 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		return nil, err
 	}
 
-	// Where a fix is known, from the open findings the claim's rows are
-	// about: the same match a row makes when a finding asks whether it
-	// applies — the product, the place and both versions — and only the
-	// findings the reader may see, since a fix version is read off the
-	// finding. A claim covers one component, so one answer per issue is the
-	// ordinary case and the smallest stated version stands in otherwise.
+	// fixes is where a fix is known, from the open findings the claim's
+	// rows are about: the same match a row makes when a finding asks
+	// whether it applies — the product, the place and both versions — and
+	// only the findings the reader may see, since a fix version is read
+	// off the finding. A claim covers one component, so one answer per
+	// issue is the ordinary case and the smallest stated version stands in
+	// otherwise.
 	var fixes []struct {
 		ClaimID         int64  `bun:"claim_id"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`
@@ -425,7 +427,7 @@ func outliersOf(claim Claim, productID int64, decisionOf map[int64]int64,
 	// The term the list was actually narrowed by, where the act recorded one,
 	// and the claimant's prose only where it did not.
 	//
-	// **The structured record is the one the check reads.** Reading the prose
+	// The structured record is the one the check reads. Reading the prose
 	// meant a claimant who narrowed by one word and wrote a sentence phrasing
 	// it differently got no "does not mention" flag at all — and the field
 	// they write is asked for in their own words, which invites exactly that.

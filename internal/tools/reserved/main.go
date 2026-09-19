@@ -8,7 +8,7 @@
 // PostgreSQL, and the day somebody writes `AS usage` the suite is green on
 // three engines and a production deployment on the fourth stops answering.
 //
-// **An invented name is reported for being bare, not for being reserved.**
+// An invented name is reported for being bare, not for being reserved.
 // This checked the word against a list of 321 the four engines reserve, which
 // is a strictly weaker property than the rule it was the enforcement of —
 // AGENTS.md says every identifier is quoted, including the names a query
@@ -21,7 +21,7 @@
 // It found 1,418 of them against 34 already quoted, so no reader could tell
 // which was the convention.
 //
-// **What it still cannot see is a name that is not in a literal.** An alias
+// A name that is not in a literal stays invisible to it. An alias
 // assembled from two pieces — `"… AS " + state.alias` — is invisible to
 // anything reading source as text, and there is no parser here for four
 // dialects. That is the safe direction for a check that fails a build, and it
@@ -33,7 +33,7 @@
 // are declared, and the question there is whether a declared name collides
 // with a reserved word — which is what the list is for.
 //
-// **Only the names this code invents.** A column that exists in the schema is
+// Only the names this code invents. A column that exists in the schema is
 // not an invented name: it was declared in a migration, which every engine has
 // already accepted, and quoting or renaming those is a different job. What
 // this reads is `AS <word>`, which is exactly the syntax for making one up.
@@ -69,7 +69,7 @@ var invented = regexp.MustCompile(`(?i)\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
 // Reading only the arguments of the builder's own methods missed every query
 // held in a const, returned by a helper, or handed to the raw-query
 // constructor — about thirty bare names, while the gate printed an all-clear.
-// Where a query lives is not what makes it a query.
+// A query's home is not what makes it a query.
 //
 // `FROM "` or `JOIN "` is the marker because every table in this schema is
 // quoted, so it appears in SQL and not in prose. Matching the bare keywords
@@ -83,7 +83,7 @@ var statement = regexp.MustCompile(`(?i)\b(?:FROM|JOIN)\s+"`)
 // IF EXISTS" declares nothing called "if", and reporting one is how a check
 // that reads text rather than parsing it goes wrong.
 //
-// **Only inside the migrations**, where every string is DDL by construction,
+// Only inside the migrations, where every string is DDL by construction,
 // so the false positives that keep this check narrow elsewhere cannot arise.
 // The alias pattern above cannot see these at all — a `DROP TABLE` names no
 // alias and contains no AS — so a table renamed to something one engine
@@ -185,8 +185,9 @@ func main() {
 		reserved[word] = true
 	}
 
-	// What the migrations made, read first, because the check below tells a
-	// table from a keyword by asking whether this schema has one of that name.
+	// The objects the migrations made, read first, because the check below
+	// tells a table from a keyword by asking whether this schema has one of
+	// that name.
 	schema := map[string]bool{}
 	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
 		if !strings.Contains(path, "database/migrate/migrations/") {
@@ -440,8 +441,8 @@ func assembledFrom(arg ast.Expr) string {
 // this function, which is a name somebody wrote bare either way — and reading
 // too little is what left three assembled clauses unread.
 //
-// What the statement pass has already read is left out, so a clause written
-// whole and then handed over as a variable is one defect and not two.
+// Everything the statement pass has already read is left out, so a clause
+// written whole and then handed over as a variable is one defect and not two.
 func assembled(fset *token.FileSet, fn *ast.FuncDecl, seen map[int]bool) map[string]string {
 	pieces := map[string]string{}
 	keep := func(name string, from ast.Expr) {

@@ -11,10 +11,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// Why says which of three things left a component without an upstream answer.
+// Why says which of three things left a component without an upstream
+// answer.
 //
 // One report rather than two, because the two questions are asked together.
-// What was held back says what the default is costing, and what no index knows
+// The held-back list says what the default costs, and the list no index knows
 // is the list an operator reads to decide what else should be held back — so a
 // name promoted from the second appears in the first afterwards, which is the
 // confirmation that the promotion worked.
@@ -71,7 +72,7 @@ type unanswered struct {
 
 // Unanswerable reads what has no upstream answer, and says why of each.
 //
-// **Derived rather than stored.** A held-back name and one no index knows are
+// Derived rather than stored. A held-back name and one no index knows are
 // recorded identically — asked at this time, no version — because the pass
 // must record both or starve its own window on them for ever. What tells them
 // apart is the same list applied again, here, which also means the report

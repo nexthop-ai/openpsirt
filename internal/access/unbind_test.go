@@ -64,7 +64,7 @@ func TestChangingProviderLocksEverybodyOutUntilTheIdentifierIsUnbound(t *testing
 	})
 }
 
-// What it does not do: grant anybody anything. Unbinding is about how somebody
+// It grants nobody anything. Unbinding is about how somebody
 // arrives, and a person nobody authorized is refused after it exactly as
 // before.
 func TestUnbindingAnIdentifierGrantsNothing(t *testing.T) {

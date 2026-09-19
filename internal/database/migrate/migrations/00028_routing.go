@@ -13,7 +13,7 @@ func init() {
 
 // A standing rule that hands work nobody holds to a team.
 //
-// **It matches on component identity as well as on a place in the tree.** The
+// It matches on component identity as well as on a place in the tree. The
 // upstream name is the key that matters: one rule naming a source package
 // catches every binary package built from it, wherever they sit. The earlier
 // framing had this as a subtree rule, and the case that motivates it is not a
@@ -21,7 +21,7 @@ func init() {
 // under many consumers, so a subtree rule would need a line per place and would
 // still miss tomorrow's.
 //
-// **Ordered, and the first match wins**. An unwritten precedence rule
+// Ordered, and the first match wins. An unwritten precedence rule
 // is forgettable, and the question it answers — where did this come from — is
 // asked months later by somebody who was not there. Which rule placed a finding
 // is written on the finding, the same choice already made for how a match was

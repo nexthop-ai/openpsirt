@@ -30,7 +30,7 @@ type Entering struct {
 	// than one, because the same code ships on several lines and as several
 	// variants at once.
 	//
-	// **One issue, and one finding per place it sits at in each build.** That
+	// One issue, and one finding per place it sits at in each build. That
 	// is the shape a scanner's findings already take, so a flaw somebody
 	// recorded lists, ranks, comes due, carries decisions and appears in a
 	// comparison exactly as one that was reported does — rather than in a
@@ -56,13 +56,13 @@ type Entering struct {
 	// Severity is how bad it is judged to be, in the same words a report uses,
 	// so that everything ranking and clocking findings treats it the same way.
 	//
-	// **It may be left unstated.** Somebody recording what they have just
+	// It may be left unstated. Somebody recording what they have just
 	// found, before anybody has worked out how bad it is, has not decided it
 	// is mild — and making them pick a word to get the record written is how
 	// a guess ends up stored as a judgment.
 	//
-	// An unrated finding is carried, listed, assignable and **on the same
-	// clock every other unrated finding is**: the deadline windows answer
+	// An unrated finding is carried, listed, assignable and on the same
+	// clock every other unrated finding is: the deadline windows answer
 	// "medium" for a severity they do not recognize, which is what a scanner
 	// that rated nothing already gets. That is a deliberate default rather
 	// than a gap — a finding with no deadline is one that is never late, and
@@ -77,7 +77,7 @@ type Entering struct {
 	// uses. Recorded because it is what makes a set of findings comparable to
 	// anything outside this deployment.
 	//
-	// **The root cause first.** A published advisory states one weakness, so
+	// The root cause first. A published advisory states one weakness, so
 	// something has to say which — and unlike a feed, which marks one or marks
 	// none, a person naming several has said which they meant by naming it
 	// first. That is a stated contract rather than an inference from the
@@ -135,19 +135,18 @@ var ErrNothingScanned = errors.New(
 // Enter records a flaw in what a build ships, and returns the finding and the
 // identifier it was filed under.
 //
-// **It is filed under an identifier this deployment mints**, because there is
+// It is filed under an identifier this deployment mints, because there is
 // nothing else to file it under: a flaw nobody has published has no CVE, and
 // waiting for one would mean the record of what we knew starts after the work
 // does. The identifier is the product's own name, the year, and a number —
 // `SONIC-2026-481907` — which is the shape a vendor advisory already takes.
 // The number is drawn rather than counted, so it is not a running total of
-// what this product has kept quiet.
-// When a CVE is assigned later it is recorded as another name for the same
-// issue, and the issue is then filed under the CVE; nothing about the finding,
-// the decisions or the approvals moves, because they are keyed on the issue
-// rather than on what it is called.
+// what this product has kept quiet. A CVE assigned later is recorded as
+// another name for the same issue, and the issue is then filed under the CVE;
+// nothing about the finding, the decisions or the approvals moves, because
+// they are keyed on the issue rather than on what it is called.
 //
-// **It opens with no run**, and everything that asks when a finding opened
+// It opens with no run, and everything that asks when a finding opened
 // reads the row rather than the run. A scan will not close it either: a run is
 // the authority on what it found, and it found none of this.
 func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) ([]Finding, string, error) {
@@ -233,7 +232,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		target    int64
 		component int64
 		name      string
-		// Where the component sits in that build, which is what a decision is
+		// The component's place in that build, which is what a decision is
 		// keyed on. One entry per place, because a component can sit in more
 		// than one at once.
 		consumerID int64
@@ -266,7 +265,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			if err != nil {
 				return err
 			}
-			// Where it sits, read from the same graph a scan reads. A flaw a
+			// Its place, read from the same graph a scan reads. A flaw a
 			// person records and the same flaw a scan finds are one thing, so
 			// they are keyed the same way — and a place recorded as "directly
 			// under the product" when the component is nested is a key no
@@ -413,7 +412,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if _, err := tx.NewInsert().Model(&rows).Exec(ctx); err != nil {
 			return fmt.Errorf("record the finding: %w", err)
 		}
-		// Who told us, in the same transaction as the flaw itself. A
+		// The reporter, in the same transaction as the flaw itself. A
 		// report written afterwards is one that can be lost while the
 		// finding stands, and the reporter is the party a coordinated
 		// timeline is evidenced to. Written through the transaction
@@ -536,8 +535,8 @@ func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (boo
 // mint issues an identifier for a flaw recorded against this product.
 //
 // Shaped like a vendor advisory identifier because that is what it becomes:
-// the product, the year, and a number. **The number is drawn rather than
-// counted**. Counting from one made the identifier a running total of what
+// the product, the year, and a number. The number is drawn rather than
+// counted. Counting from one made the identifier a running total of what
 // this product has kept quiet — anybody could ask for the first one, walk
 // upward until the answers changed, and read off both how many undisclosed
 // flaws exist and when the last one was recorded. That is a disclosure made by

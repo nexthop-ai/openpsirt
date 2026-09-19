@@ -4,7 +4,7 @@ import "strings"
 
 // rpmOrder compares two RPM versions: epoch, then version, then release.
 //
-// **Transcribed from rpmvercmp rather than derived.** The algorithm is not
+// Transcribed from rpmvercmp rather than derived. The algorithm is not
 // something to reason out from a description — the tilde and caret rules, a
 // numeric run outranking an alphabetic one, and separators being skipped
 // wholesale are each a decision somebody made, and the published test vectors
@@ -37,7 +37,7 @@ func rpmOrder(a, b string) (int, bool) {
 // a version may hold, so a string carrying a second one is refused either way
 // and where the cut is made changes no accepted answer.
 //
-// What makes a string not a version here is the same test the Debian
+// A string fails to be a version here by the same test the Debian
 // reader applies, for the same reason: the version part begins with a digit and
 // every part is drawn from the characters a version may hold. A word an
 // advisory wrote where a version belongs fails both.

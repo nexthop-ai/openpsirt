@@ -388,10 +388,9 @@ func TestTheSweepReachesWhatIsCreatedAfterABacklogOfEvents(t *testing.T) {
 func TestWhereThingsGoIsAnAdministratorsQuestionAndCarriesNoSecret(t *testing.T) {
 	// These three carried no subject at all, in a package that enforces its
 	// own authorization for this table in the same file with the reasoning
-	// written out. What kept the signing secret off the wire was one handler
-	// copying the fields it wanted by name — a second caller that marshalled
-	// what came back would have published a shared secret, and nothing would
-	// have said so.
+	// written out. The signing secret stays off the wire only because one
+	// handler copies the fields it wants by name — a second caller marshalling
+	// what comes back publishes a shared secret, with nothing saying so.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Reset(t, db)

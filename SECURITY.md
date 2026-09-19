@@ -1,4 +1,4 @@
-# Reporting a security issue
+# Security reports
 
 OpenPSIRT is in early development. Every version below 1.0 is alpha, there is
 no supported version yet, and no deployment we are aware of.
@@ -9,7 +9,7 @@ private until we have had a chance to look at it.
 
 Please do not open a public issue for a security problem.
 
-## What to expect
+## Response
 
 Because this is alpha, we cannot yet commit to response times or to a
 disclosure timeline. Once there is a 1.0, this file will state both.

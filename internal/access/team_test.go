@@ -49,7 +49,7 @@ func TestATeamHoldsPeopleAndGrantsNothing(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		// Saying it twice asserts the same thing.
+		// Said twice, it asserts the same thing.
 		if err := f.store.AddToTeam(ctx, team.ID, plain.ID, admin.ID); err != nil {
 			t.Errorf("adding somebody already on the team was refused: %v", err)
 		}

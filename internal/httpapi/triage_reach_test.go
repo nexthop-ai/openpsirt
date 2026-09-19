@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// How far a judgment reaches, asked of the two operations that answer it and
+// A judgment's reach, asked of the two operations that answer it and
 // of the one that writes across builds.
 
 func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
@@ -42,7 +42,7 @@ func TestReachSortsBuildsByTheVersionTheDecisionIsKeyedOn(t *testing.T) {
 			reached.Differing[0].Version != "3.8.0" {
 			t.Fatalf("the build at another version should be offered with that version: %+v", reached)
 		}
-		// What it named is what the route resolves a name by.
+		// The name it gave is what the route resolves by.
 		path := "/v1/products/mine/streams/master/variants/mellanox/findings/CVE-2026-9999" +
 			"/components/libnl-3-200/decision?version=" + reached.Differing[0].Version
 		got := asPerson(t, r, "triager", http.MethodPost, path,

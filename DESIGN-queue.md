@@ -14,8 +14,8 @@ Satisfies REQ-03, REQ-06, REQ-69.
 - [Passes on a timer](#passes-on-a-timer)
 - [Leases](#leases)
 - [Backlog refusal](#backlog-refusal)
-- [Bounds a deployment sizes](#bounds-a-deployment-sizes)
-- [What a failed job records](#what-a-failed-job-records)
+- [Configurable bounds](#configurable-bounds)
+- [Failure records](#failure-records)
 - [Transaction boundary](#transaction-boundary)
 - [Limits](#limits)
 
@@ -64,7 +64,7 @@ afterwards.
 | One replica buries | Every replica running the same range update is the same contention between processes that folding it into the claim caused between workers |
 | Work abandoned by its worker records that, in place of the reason nobody reported | Downstream it is the same failure. Somebody reading the row has to be able to tell "this failed" from "nothing was left alive to say" |
 
-### Work that stopped being retried
+### Set-aside work
 
 Set-aside work has an operator surface: a list of what stopped and why, and a
 way to put one back.
@@ -91,7 +91,7 @@ so several renewals may fail before the claim is at risk.
 | Renewal refused, another worker holds the job | The work is canceled and the worker is told the claim was lost, not that the work failed |
 | Renewal fails for any other reason | Reported and retried next interval. The claim is not lost until the timeout passes with nothing landing |
 | The job ends | Renewal stops first and the worker waits for it, so nothing else writes to the job while the ending is written |
-| Settling a job is one sequence, owned by the queue | Opening a context that outlives a cancellation, recording the ending against it, telling a stale claim apart from a write that failed, and noticing a takeover were written out in each worker down to the comment paragraph, and the copies had begun to disagree. A third worker would have been a third reading of the rule for a job finished by a worker that no longer holds it |
+| Settling a job is one sequence, owned by the queue | Opening a context that outlives a cancellation, recording the ending against it, telling a stale claim apart from a write that failed, and noticing a takeover. Written out in each worker down to the comment paragraph, the copies disagree, and a third worker is a third reading of the rule for a job finished by a worker that no longer holds it |
 | What a worker does about its own failure is passed in | It is the one respect the workers genuinely differ: the reader records the failure against the scan as well as the job, and must not on a cancellation or where the job went to another worker. Passed as a closure rather than a flag, so the difference is visible where it is made |
 | The claim went stale while the work ran | Only the claim holder finishes a job: the finishing statement carries the claim's condition. A refused finish is reported as "no longer held" and logged |
 | Shutdown mid-job | The job is handed back as a failed attempt. The writes recording an ending run under their own context, detached from the cancellation and bounded by a few seconds |
@@ -124,12 +124,11 @@ non-positive interval takes the pass's own default; the context ends the loop.
 | Reporting stays with each pass | They log different things — what was collected, what was sent and what failed, a line per unit of work. A helper that owned the logging would be the call site written out again with a worse vocabulary |
 | A failed pass is logged and the loop goes on | A pass that cannot run is not a reason to stop serving, and what it failed to do is still there next time |
 
-It was written out once per pass, and some of those copies had already diverged
-over whether the log line carries the trace context. Anything about how passes
-are scheduled — spreading goroutines that would otherwise wake together on a
-cold start, a measurement per pass, a first-run delay — was an edit per copy,
-and a missed one would have diverged in silence because nothing tested any of
-them.
+One implementation, not one per pass. Written out per pass, the copies diverge
+over what nothing tests: whether the log line carries the trace context, how
+goroutines that would otherwise wake together on a cold start are spread, and
+where a measurement or a first-run delay sits. Each is an edit per copy, and a
+missed one diverges in silence.
 
 ## Leases
 
@@ -165,7 +164,7 @@ administrator sets. The caller is told to retry.
 | A setting rather than a number in the binary | The producer a refusal lands on is a build server. An estate that pushes work in faster than the workers drain it has no remedy for a compiled-in number short of a new binary, and waiting is not one when the thing waiting is a build |
 | Read as the work is queued | A number an administrator changes takes effect on the next upload rather than on the next restart |
 
-## Bounds a deployment sizes
+## Configurable bounds
 
 Five bounds are read from the environment as the process starts. How deep the
 queue may get is the sixth and is a stored setting.
@@ -186,7 +185,7 @@ queue may get is the sixth and is a stored setting.
 | Two pairs are compared as the process starts | A heartbeat no shorter than the claim timeout hands running work to a second worker; a hold ceiling no larger than the claim timeout cancels work that is running normally. Both read as a fault in the work rather than in the configuration, so the process refuses to start and names the pair |
 | The defaults live where the queue is built | Every reader takes them from there rather than carrying its own, so two spellings cannot disagree. The configuration reference prints them in its Default column as it does for every other setting, which is the one restatement and the one an operator reads; the chart carries none, and a deployment that wants one sets the environment variable |
 
-## What a failed job records
+## Failure records
 
 A job that failed keeps the reason, bounded.
 
@@ -219,26 +218,9 @@ own.
 
 ## Limits
 
-- **Two workers can run one job.** The conditional update cannot prevent it:
-  from the database's point of view the second claim is legitimate, because the
-  row says the holder has not been heard from. The renewal interval bounds the
-  window.
-- **The claim timeout is not shortened to match the renewal interval.** On
-  SQLite the pool is one connection, so a renewal waits behind the job's own
-  statement and a long transaction can hold it for minutes. **On that engine
-  a renewal cannot succeed at all while the work holds the connection**, so
-  the claim timeout is not a safety margin there — it is the bound, and it has
-  to exceed the longest single unit of work a deployment runs. Past it the
-  claim goes stale, and once the work's own transaction commits a second
-  worker's claim succeeds and the job runs twice, which on an ingest looks
-  like real change. The renewal is kept because it is the whole of the
-  protection on the other three engines.
-- **No queue library is used.** The mature Go queues either tie to one database
-  engine or require a separate service — one would cut engine support from four
-  to one, the other adds a component to every deployment.
-- **Row locking is verified as non-load-bearing.** The exclusivity test runs
-  twice on every engine, once with the locking clause and once without it, and
-  the second arm is the one that fails when the conditional update stops
-  repeating the state it expects: with locking in place the same defect passes,
-  because locking hides it. The switch is reachable only from the package's
-  test surface, never from an option a deployment can set.
+| | |
+|---|---|
+| Two workers can run one job | The conditional update cannot prevent it: from the database's point of view the second claim is legitimate, because the row says the holder has not been heard from. The renewal interval bounds the window |
+| The claim timeout is not shortened to match the renewal interval | On SQLite the pool is one connection, so a renewal waits behind the job's own statement and a long transaction can hold it for minutes. On that engine a renewal cannot succeed at all while the work holds the connection, so the claim timeout is not a safety margin there — it is the bound, and it has to exceed the longest single unit of work a deployment runs. Past it the claim goes stale, and once the work's own transaction commits a second worker's claim succeeds and the job runs twice, which on an ingest looks like real change. The renewal is kept because it is the whole of the protection on the other three engines |
+| No queue library is used | The mature Go queues either tie to one database engine or require a separate service — one would cut engine support from four to one, the other adds a component to every deployment |
+| Row locking is verified as non-load-bearing | The exclusivity test runs twice on every engine, once with the locking clause and once without it, and the second arm is the one that fails when the conditional update stops repeating the state it expects: with locking in place the same defect passes, because locking hides it. The switch is reachable only from the package's test surface, never from an option a deployment can set |

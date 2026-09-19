@@ -94,7 +94,7 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 // Closable reports whether anything upstream would close a finding in this
 // state, which is what makes a deadline on it meetable.
 //
-// **A deadline nobody can meet is not a deadline.** Where upstream has released
+// A deadline nobody can meet is not a deadline. Where upstream has released
 // nothing, and where upstream has declined, there is no version to take: the
 // clock runs and the only thing that can stop it is a person recording a
 // judgment, which is the one act the deadline exists to ask for and cannot be
@@ -102,7 +102,7 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 // other directions — a tag that cannot change, a build past its end of life,
 // and an issue below the triage line all carry no deadline for the same reason.
 //
-// **A scanner that did not answer is not upstream saying no.** Reading silence
+// A scanner that did not answer is not upstream saying no. Reading silence
 // as "no fix exists" is a claim about the world made out of a gap in a report,
 // and it is the direction that loses a deadline somebody could have met. So an
 // unstated state stays on the clock.
@@ -118,7 +118,7 @@ func Closable(state FixState) bool {
 // Deadline is when a finding in this state has to be answered by, or nothing
 // where nothing upstream would close it.
 //
-// **Counted from the latest of the three moments that start the clock**, never
+// Counted from the latest of the three moments that start the clock, never
 // from the earliest and never from now:
 //
 //   - When we first saw it. A fix that already existed when the finding opened
@@ -230,12 +230,12 @@ func OffTheClock(product string, now time.Time) (string, []any) {
 // somebody whose claim needed no agreement. The decision is `de`, joined by
 // the caller, and the values it binds come back with it.
 //
-// **A claim waiting for a second person is not standing.** It suppresses
+// A claim waiting for a second person is not standing. It suppresses
 // nothing, answers for nothing and covers nothing in the meantime — otherwise
 // the review queue is decorative and one person dismisses a finding on their
 // own, which is the whole thing a second pair of eyes exists to prevent.
 //
-// **And not one that was sent back.** Only a claim needing nobody can be both
+// And not one that was sent back. Only a claim needing nobody can be both
 // sent back and standing, and it went on suppressing the finding while the
 // record said it had been returned — with the notice to its author saying, in
 // those words, that it applied to nothing until it was revised. Sending back
@@ -258,22 +258,21 @@ func InForce() (string, []any) {
 // RunningOut reports findings whose deadline is within this many days and
 // which nobody has decided about, most pressing first.
 //
-// **Undecided only.** A deadline that has been answered is not a deadline
+// Undecided only. A deadline that has been answered is not a deadline
 // running out: a dismissal takes a finding off the clock, because the claim is
 // that it will not be fixed, and a deferral replaces the deadline with its own
 // date. What is left is time passing with nothing said, which is the only part
 // worth interrupting somebody about.
 //
-// **One row per issue at a component**, not per place. A kernel flaw sitting
+// One row per issue at a component, not per place. A kernel flaw sitting
 // at sixty places is one thing somebody has to answer, and sixty rows of it is
 // a list with one entry in it.
 //
-// The deadline is read rather than derived. It used to be worked out per
-// request, which meant a pass over every open finding **per urgency band** —
-// each band allows a different number of days, and the window has to narrow
-// the rows before they are read rather than after. Measured at about eight
-// seconds over 441,108 findings. a deadline stored at ingest stores it
-// instead, so this is one range over an index.
+// The deadline is read rather than derived. Worked out per request it is a
+// pass over every open finding per urgency band — each band allows a different
+// number of days, and the window has to narrow the rows before they are read
+// rather than after — measured at about eight seconds over 441,108 findings.
+// Stored at ingest, this is one range over an index.
 //
 // A finding with no deadline is left out. That is a row recorded before the
 // deadline was stored, and it will have one the next time a scan reopens it —
@@ -365,9 +364,9 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`MIN(f.assigned_to) AS "assigned_to"`).
 		ColumnExpr(`MAX(f.assigned_to) AS "assigned_high"`).
 		ColumnExpr(`COUNT(f.assigned_to) AS "assigned_count"`).
-		// How many groups the question has, counted over the grouped result
-		// and before the limit. A screen that counted its own page said two
-		// hundred over a list of four hundred and sixty-two.
+		// The number of groups the question has, counted over the grouped
+		// result and before the limit. A screen that counted its own page said
+		// two hundred over a list of four hundred and sixty-two.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(grouping).
 		// The build is in the order as well as in the grouping. Without it two

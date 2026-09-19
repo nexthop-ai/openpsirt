@@ -10,9 +10,9 @@ import type { Who } from "../app/session";
 import { composable, humane, read, write, UNITS, type Unit } from "./duration";
 import { humaneBytes, readBytes, writeBytes, SIZES, type Size } from "./bytes";
 
-// What this deployment has decided for everybody in it, grouped the way the
-// mockup groups them. Every setting the server exposes renders; a setting no
-// group names lands under "Other", so nothing offered is hidden.
+// The decisions this deployment has made for everybody in it, grouped the way
+// the mockup groups them. Every setting the server exposes renders; a setting
+// no group names lands under "Other", so nothing offered is hidden.
 export function Settings({ who }: { who: Who }) {
   const queries = useQueryClient();
   // The audit permission reads this screen and writes none of it. A control
@@ -154,7 +154,7 @@ export function Settings({ who }: { who: Who }) {
   );
 }
 
-// What a setting is called. A noun phrase naming the thing, the way a settings
+// A setting's own name. A noun phrase naming the thing, the way a settings
 // screen anywhere else names one — not a description of the situation it
 // governs. What it does and why is the paragraph underneath, which is where a
 // reader looks second.
@@ -227,7 +227,7 @@ function label(name?: string): string {
   }
 }
 
-// What a value is, and what it may be, come from the server.
+// A value's type, and the values it may take, come from the server.
 //
 // They were three tables here keyed on setting names, beside the server's own
 // — five copies of one fact. A setting added to the server and not to these
@@ -259,9 +259,9 @@ function Field({
   // can only say whole hours must not offer to edit one of those.
   const composed = timed ? read(setting.value ?? "") : null;
   // A setting nobody has set is composed too. Nothing to read is not a value
-  // the composer refuses, and the text box it used to fall to is the one
-  // control that cannot say which unit a number is in — the embargo periods
-  // arrive unset, so that is the state they are first seen in.
+  // the composer refuses, and the text box it would otherwise fall to is the
+  // one control that cannot say which unit a number is in — the embargo
+  // periods arrive unset, so that is the state they are first seen in.
   const takes = timed && composable(setting.value ?? "");
   // The same composition for a size, and chosen the same way: on what the
   // setting *is* rather than on whether the value in hand happens to parse.
@@ -272,17 +272,17 @@ function Field({
   const measured = sized ? readBytes(setting.value ?? "") : null;
   const sizes = sized && (setting.value ?? "").trim() === "" ? true : measured !== null;
 
-  // **The number and the unit are held as typed, not re-derived.**
+  // The number and the unit are held as typed, not re-derived.
   //
-  // Both composers used to write the canonical value on every keystroke and
-  // read the control back out of it, which is three bugs in one gesture.
-  // Clearing the box made it empty, which is zero, which the writer floors at
-  // one — so the first character could not be deleted. Typing a number that
-  // divides differently flipped the unit underneath the cursor: 7 in days is
-  // 168 hours, and the largest unit that divides that is a week, so the box
-  // said 1 and the select said weeks while somebody was still typing. And a
-  // double-click to replace the number selected a value that changed as soon
-  // as the first digit landed.
+  // Writing the canonical value on every keystroke and reading the control
+  // back out of it is three bugs in one gesture. Clearing the box makes it
+  // empty, which is zero, which the writer floors at one — so the first
+  // character cannot be deleted. Typing a number that divides differently
+  // flips the unit underneath the cursor: 7 in days is 168 hours, and the
+  // largest unit that divides that is a week, so the box says 1 and the select
+  // says weeks while somebody is still typing. And a double-click to replace
+  // the number selects a value that changes as soon as the first digit
+  // lands.
   //
   // So the two controls hold what they were given, empty included, and the
   // canonical form is worked out once, when it is saved.
@@ -295,10 +295,10 @@ function Field({
   const [unit, setUnit] = useState<Unit>(composed ? composed.unit : "days");
   const [size, setSize] = useState<Size>(measured ? measured.unit : SIZES[0].unit);
 
-  // What would be stored, from whatever the controls are showing. A box left
-  // empty is not a value: saving is refused rather than a number invented for
-  // somebody.
-  // The control's id is opaque and generated, never the setting's key.
+  // The value that would be stored, from whatever the controls are showing. A
+  // box left empty is not a value: saving is refused rather than a number
+  // invented for somebody. The control's id is opaque and generated, never the
+  // setting's key.
   //
   // A password manager classifies a field by every word it can reach through
   // it, and the key is one of those: "signin.claim-window" rendered into `id`

@@ -48,7 +48,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	showVersion := fs.Bool("version", false, "print the build and exit")
 	dumpSpec := fs.Bool("openapi", false, "write the OpenAPI document to stdout and exit")
 	if err := fs.Parse(args); err != nil {
-		// Asking for help is not a failure.
+		// A request for help is not a failure.
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -95,10 +95,10 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Everything below this line is contacted before the server listens, and
 	// all of it under one deadline.
 	//
-	// **Unbounded, a hang here was silent and total.** An endpoint that
-	// accepts the connection and never answers held PingContext for ever: the
-	// process was up, no port was listening, and not one log line had been
-	// written — from outside, the same thing as a slow image pull. A crash
+	// Unbounded, a hang here is silent and total. An endpoint that accepts the
+	// connection and never answers holds PingContext for ever: the process is
+	// up, no port is listening, and not one log line has been written — from
+	// outside, the same thing as a slow image pull. A crash
 	// loop that names what it could not reach is the failure a supervisor can
 	// act on. Migrating is outside it — both the subcommand above and the
 	// auto-migration below — because a schema change on a large table
@@ -122,7 +122,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Migrating before serving means a request never arrives against a schema
 	// the code does not expect.
 	//
-	// **Outside the startup deadline**, and the deadline is why: a migration
+	// Outside the startup deadline, and the deadline is why: a migration
 	// adding an index to a large finding table takes longer than a deployment
 	// starts in, so bounded at 60s it gives up, restarts, and begins the
 	// migration again — for ever. A second replica waits on the advisory lock
@@ -200,7 +200,7 @@ func run(args []string, stdout, stderr *os.File) error {
 			"because a provider is configured")
 	}
 
-	// Where files hanging off an issue are kept. Nothing configured is the
+	// The store for files hanging off an issue. Nothing configured is the
 	// ordinary case: attachments are off and everything else works.
 	logger.Info("checking the attachment store")
 	files, err := attachmentStore(ctx, cfg, logger)
@@ -223,7 +223,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 
 	queueing := queue.DefaultOptions()
-	// What the deployment sizes. How deep the queue may get is not among
+	// The sizes the deployment sets. The queue's depth is not among
 	// these: it is a stored setting, so an operator meeting a refused upload
 	// has a remedy that does not need a restart.
 	queueing.MaxAttempts = cfg.QueueMaxAttempts
@@ -251,7 +251,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// work that must happen once — rewriting deadlines after a policy
 	// change — is held by one replica, and the name is what holds it.
 	name := workerName()
-	// What this deployment calls its own, and so never sends to a public
+	// The names this deployment calls its own, and so never sends to a public
 	// package index. Derived from the namespace it publishes under, which is
 	// the one place it has already said who it is, and unioned with whatever
 	// else the deployment stated. What a scan was about is folded in as the
@@ -283,10 +283,10 @@ func run(args []string, stdout, stderr *os.File) error {
 		},
 		Mode:  roleMode(settings),
 		Files: files,
-		// What never leaves, derived once here and read by the pass that
-		// asks and by the report saying what it held back. Two derivations
-		// of one boundary would be two boundaries the first time either
-		// moved.
+		// The names that never leave, derived once here and read by the pass
+		// that asks and by the report saying what it held back. Two
+		// derivations of one boundary would be two boundaries the first time
+		// either moved.
 		Ours: ours,
 	})
 
@@ -318,10 +318,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// sweeps thousands of findings, and saving a form must not hold a
 	// transaction open across the estate.
 	routing := finding.NewSweeper(db, work, logger, name)
-	// What the tool has to say about its own health. It needs nothing
-	// configured, which is the point: an operator who never set up mail is
-	// exactly the one who would otherwise never hear that a build stopped
-	// being scanned.
+	// The tool's own health. It needs nothing configured, which is the point:
+	// an operator who never set up mail is exactly the one who would otherwise
+	// never hear that a build stopped being scanned.
 	watch := notify.NewWatch(db.DB, logger)
 	// Asks for everything tracked to be scanned again against the day's
 	// vulnerability data. Started on every replica and asking on one, by
@@ -329,9 +328,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// two scans of one build on the queue and the second would find
 	// nothing to do.
 	schedule := scanner.NewSchedule(db, work, logger, name)
-	// What leaves the application, where an operator configured somewhere for
-	// it to go. Nil when they did not, which is ordinary rather than broken:
-	// the notification area is the channel that always exists.
+	// The messages that leave the application, where an operator configured
+	// somewhere for it to go. Nil when they did not, which is ordinary rather
+	// than broken: the notification area is the channel that always exists.
 	post := notify.NewPost(db.DB, mailChannel(cfg, logger), cfg.BaseURL, logger, name)
 	// One signed request per notification, to whatever destinations an
 	// administrator configured. Started whatever is configured and does
@@ -450,7 +449,7 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // schemaIsCurrent refuses to serve against a schema this build is ahead of.
 //
 // Applying migrations separately is supported and is why the setting exists.
-// What it leaves is a binary and a schema that move independently, and nothing
+// It leaves a binary and a schema that move independently, and nothing
 // compared them: a build carrying a new migration started, granted
 // administrators, answered the readiness probe, and failed every request that
 // touched the new table. In a rolling deployment the probe passing is what
@@ -459,12 +458,12 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // Refused at startup rather than through readiness, which is where every other
 // startup condition is refused and what keeps the previous replica alive.
 //
-// **Only when the database is behind.** A schema ahead of this build is a
+// Only when the database is behind. A schema ahead of this build is a
 // rollback, which has to keep working: the migrations a newer binary applied
 // are additive, and refusing here would leave a bad deployment with no way
 // back.
 //
-// **It compares version numbers, which is less than it sounds.** Before the
+// It compares version numbers, which is less than it sounds. Before the
 // first release a schema change edits the migration that created the thing
 // rather than adding one beside it, so two builds can carry the same highest
 // version and different schemas — and an existing database then matches on the
@@ -682,24 +681,24 @@ func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside 
 
 	// And give the workers the same bound, rather than none.
 	//
-	// This wait used to be unbounded, on the reasoning above — a worker
-	// mid-query should not have the database pulled from under it. That
-	// reasoning holds and the wait stays; what it lacked was an end. On SQLite
-	// the pool is one connection by design, so an HTTP handler running a slow
-	// statement blocks every worker behind it, and a worker that cannot get a
-	// connection cannot notice it has been asked to stop. Waiting for it then
-	// waits for the request, and shutting down takes as long as the slowest
-	// thing in the process.
+	// A worker mid-query should not have the database pulled from under it,
+	// which argues for waiting; an unbounded wait is that argument with no
+	// end. On SQLite the pool is one connection by design, so an HTTP handler
+	// running a slow statement blocks every worker behind it, and a worker
+	// that cannot get a connection cannot notice it has been asked to stop.
+	// Waiting for it then waits for the request, and shutting down takes as
+	// long as the slowest thing in the process.
 	//
-	// Observed: a query that should have taken milliseconds ran for over an
+	// Measured: a query that should have taken milliseconds ran for over an
 	// hour, SIGTERM did nothing, and the process had to be killed. A shutdown
 	// that cannot be completed by the signal meant for it is not a shutdown.
-	// Both halves of the grace answer the same way. An overrun request made
-	// Shutdown return an error and the process exit 1; an overrun worker
-	// logged a warning and returned nil, so the process exited 0 — and
-	// `docs/configuration.md` describes the two as one setting applied twice.
-	// A supervisor reading the exit code was told that half of a shutdown
-	// that did not finish had finished.
+	//
+	// Both halves of the grace answer the same way, which is why
+	// workersStopped returns an error rather than logging a warning: an
+	// overrun request makes Shutdown return an error and the process exit 1,
+	// and an overrun worker does the same. `docs/configuration.md` describes
+	// the two as one setting applied twice, and a supervisor reads the exit
+	// code.
 	workerErr := workersStopped(workers, cfg, logger)
 	if shutdownErr != nil {
 		shutdownErr = fmt.Errorf("shutdown: %w", shutdownErr)
@@ -867,7 +866,7 @@ func roleMode(settings *setting.Store) func(context.Context) access.Mode {
 // Returned as the interface rather than the concrete type, and deliberately
 // through a function that can answer nil: a typed nil pointer handed to an
 // interface is not nil, and the sweep asks whether it has a channel.
-// Which of the two it got is logged, the way the attachment store logs what it
+// The one it got is logged, the way the attachment store logs what it
 // chose. Half a configuration is refused where it is read, so what reaches
 // here is either a whole one or none — and "none" is ordinary rather than a
 // fault, which is exactly why it has to be said out loud.

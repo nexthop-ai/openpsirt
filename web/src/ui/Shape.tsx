@@ -1,11 +1,11 @@
 import { ROLLED } from "./severities";
 
-// What a count is made of, as one bar whose widths are the counts.
+// The parts of a count, as one bar whose widths are the counts.
 //
 // The shape is the answer: a bar that is mostly one color says where the weight
 // is before a number is read, which a chip per band at a fixed width does not.
 //
-// **The key carries the identity, not the color.** Two of the severity colors
+// The key carries the identity, not the color. Two of the severity colors
 // are close enough that a colorblind reader cannot separate them, so the labels
 // are what says which band is which and the color reinforces it. Where a row is
 // one line the key is dropped and the title carries it, because five legends

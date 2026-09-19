@@ -1,7 +1,7 @@
 // Package currency asks each ecosystem's index what the newest version of
 // something is, and when it shipped.
 //
-// **This is the one thing here that reaches the network.** Everything a scan
+// This is the one thing here that reaches the network. Everything a scan
 // needs arrives as a file somebody imports, deliberately, so that a scan
 // answers the same way twice and nothing it depends on is somebody else's
 // server being up (REQ-12). That rule is about the scan path, and this is not
@@ -9,7 +9,7 @@
 // off unless a deployment turns it on, and a deployment that cannot reach out
 // loses this answer and nothing else.
 //
-// **What leaves is a component's name.** One request per component, carrying
+// A component's name leaves. One request per component, carrying
 // the name and nothing else. For an open-source dependency that is public
 // knowledge; for something built here it is the name of a project, a team or a
 // product nobody has announced, so what this deployment calls its own is held
@@ -89,12 +89,11 @@ var ErrUnaskable = fmt.Errorf("this name cannot be asked about")
 // answer at all.
 //
 // The one class that is worth coming back to, and the reason the others are
-// told apart from it. Everything that is *not* one of these three is a
-// refusal the index will repeat every time — a package withdrawn, a region
-// blocked, a document nothing can read — and it used to take this arm: the
-// component was left unrecorded, and the window that takes the never-asked
-// first put it at the head of every pass afterwards, for ever, with the
-// components behind it never reached.
+// told apart from it. Everything that is not one of these three is a refusal
+// the index will repeat every time — a package withdrawn, a region blocked, a
+// document nothing can read — and taking this arm leaves the component
+// unrecorded, at the head of every pass afterwards for ever, because the
+// window takes the never-asked first.
 var ErrNotAnswering = fmt.Errorf("the index is not answering")
 
 // Client asks the public index for an ecosystem.
@@ -103,10 +102,10 @@ type Client struct {
 	// Agent identifies us to the indexes. crates.io refuses a request that
 	// does not say who is asking, and it is right to.
 	Agent string
-	// Where each index lives. Fields rather than constants so a test can point
-	// them at a local server: without this the only way to exercise any of
-	// this code is to call somebody else's service, whose answers change, so
-	// in practice it was not exercised at all.
+	// The address of each index. Fields rather than constants so a test can
+	// point them at a local server: without this the only way to exercise any
+	// of this code is to call somebody else's service, whose answers change,
+	// so in practice it was not exercised at all.
 	GoProxy, NPM, PyPI, Crates string
 }
 
@@ -125,13 +124,12 @@ const (
 // of packages, and an index that has stopped answering should cost one request
 // rather than the whole pass.
 //
-// Guarded, like every other fetch out of this process. one configured host names this feed
-// as the case it was written for and it was the one client that had none of
-// it: no host pin, no refusal to follow a redirect, and nothing stopping a
-// connection inside this network. A public index answering — or being made to
-// answer — with a redirect to an address on the deployment's own network was
-// followed silently, ten hops deep, downgrading to plain HTTP if it was told
-// to, by a background pass nobody is watching.
+// Guarded, like every other fetch out of this process: the host is pinned, a
+// redirect is refused, and a connection inside this network is stopped.
+// Without them a public index answering — or being made to answer — with a
+// redirect to an address on the deployment's own network is followed silently,
+// ten hops deep, downgrading to plain HTTP if it is told to, by a background
+// pass nobody is watching.
 func New() *Client {
 	return &Client{
 		HTTP: outward.Guarded(
@@ -274,10 +272,11 @@ func (g goProxy) Latest(ctx context.Context, name string) (Latest, error) {
 	var answer struct {
 		Version string    `json:"Version"`
 		Time    time.Time `json:"Time"`
-		// Where the module is developed, which the proxy states and nothing
-		// else here has to work out. There is no description anywhere in the
-		// protocol — not in this answer and not in a go.mod — so a Go module
-		// carries an address and no summary.
+		// Origin is where the module is developed, which the proxy
+		// states and nothing else here has to work out. There is no
+		// description anywhere in the protocol — not in this answer
+		// and not in a go.mod — so a Go module carries an address and
+		// no summary.
 		Origin struct {
 			URL string `json:"URL"`
 		} `json:"Origin"`

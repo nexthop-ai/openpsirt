@@ -17,19 +17,19 @@ type WentBody struct {
 	// Ordinal is which issuance this was, counting from one. Anything above
 	// one is a revision, which is what somebody reading a period is looking
 	// for.
-	Ordinal  int    `json:"ordinal" doc:"Which issuance this was, counting from one. Above one is a revision"`
+	Ordinal  int    `json:"ordinal" doc:"The issuance number, counting from one. Above one is a revision"`
 	Summary  string `json:"summary,omitempty"`
 	IssuedBy string `json:"issued_by"`
 	IssuedAt string `json:"issued_at"`
-	Digest   string `json:"digest" doc:"What the document hashed to when it went out. The published document belongs to whoever published it; this is what makes comparing it possible"`
+	Digest   string `json:"digest" doc:"The document's digest when it went out. The published document belongs to whoever published it; this is what makes comparing it possible"`
 }
 
 // registerPublished answers what advisories went out over a period.
 //
-// The per-flaw list answers "has one gone out for this, and is what is
-// published still what we would generate" — which is what somebody about to
-// publish a revision asks. A period asks something else: what went out at all,
-// and what went out more than once.
+// The per-flaw list answers whether one has gone out for this flaw and whether
+// what is published is still what we would generate, which is what somebody
+// about to publish a revision asks. A period asks something else: what went
+// out at all, and what went out more than once.
 func registerPublished(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-published-advisories", Method: http.MethodGet,
@@ -38,7 +38,7 @@ func registerPublished(api huma.API, in Ingest) {
 		Description: "Every advisory published from this deployment in a period, newest first, " +
 			"with which flaw it was about, which revision it was, who published it and what " +
 			"the document hashed to at the time.\n\n" +
-			"**Advisories are about flaws in our own product**, recorded here by hand. Known " +
+			"Advisories are about flaws in our own product, recorded here by hand. Known " +
 			"issues in third-party components are tracked and fixed rather than published " +
 			"about, and the document for those is a VEX statement per build.\n\n" +
 			"`ordinal` above one is a revision of an advisory already out, which is the entry " +

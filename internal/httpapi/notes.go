@@ -16,7 +16,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// What people write about an issue in a product, and what they wrote before.
+// The notes people write about an issue in a product, and their earlier
+// revisions.
 //
 // Apart from the claim comments beside them, because they hang off different
 // things: a comment is about one argument at one place, and a note is about
@@ -32,7 +33,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 			"when it was last changed.\n\n" +
 			"A note records no judgment and changes nothing: not what ranks, not a deadline, " +
 			"not a triage line. It is context for whoever decides.\n\n" +
-			"**It is about the issue in this product, not about one component.** A row in the " +
+			"It is about the issue in this product, not about one component. A row in the " +
 			"findings list is one issue at one source package, and one issue is often several " +
 			"rows — so a note kept against a row would be written on one of them and hidden " +
 			"from the rest. What is about a judgment at a place is a comment on that claim " +
@@ -66,7 +67,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		Description: "Adds a markdown note about this issue in this product. It records no " +
 			"judgment: nothing about what ranks, what a deadline is, or what the product " +
 			"triages changes because somebody wrote one.\n\n" +
-			"**This is the way to leave something for whoever decides without deciding.** A " +
+			"This is the way to leave something for whoever decides without deciding. A " +
 			"comment hangs off a claim; a note does not, so nothing has to be judged before " +
 			"anything can be said.\n\n" +
 			"It reaches every build of the product and does not lapse when a version moves. " +
@@ -81,7 +82,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Body          struct {
-			Body string `json:"body" minLength:"1" doc:"What to say, in markdown"`
+			Body string `json:"body" minLength:"1" doc:"The text, in markdown"`
 		}
 	}) (*struct{ Body NoteWritten }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -107,7 +108,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		Summary: "Edit a note on an issue",
 		Description: "Replaces the text of a note. Only its author may do this: an edit " +
 			"another person could make is not a correction.\n\n" +
-			"**What it said before is kept**, and read back with " +
+			"What it said before is kept, and read back with " +
 			"`GET /v1/notes/{id}/history`. A note is part of the record that goes public at " +
 			"disclosure, and a record whose earlier text is unrecoverable is readable rather " +
 			"than checkable.\n\n" +
@@ -118,7 +119,7 @@ func registerIssueNotes(api huma.API, in Ingest) {
 		"the path.", triageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			Body string `json:"body" minLength:"1" doc:"What it should say now, in markdown"`
+			Body string `json:"body" minLength:"1" doc:"The replacement text, in markdown"`
 		}
 	}) (*struct{ Body NoteWritten }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -181,13 +182,13 @@ func registerIssueNotes(api huma.API, in Ingest) {
 // NoteBody is one note on an issue in a product.
 type NoteBody struct {
 	ID        int64  `json:"id"`
-	Body      string `json:"body" doc:"What it says, in markdown"`
-	WrittenBy string `json:"written_by" doc:"Who wrote it"`
+	Body      string `json:"body" doc:"The text, in markdown"`
+	WrittenBy string `json:"written_by" doc:"The author"`
 	WrittenAt string `json:"written_at"`
-	EditedAt  string `json:"edited_at,omitempty" doc:"When the author last changed it, where they have"`
+	EditedAt  string `json:"edited_at,omitempty" doc:"The moment the author last changed it, where they have"`
 }
 
-// NoteWritten is what comes back from writing or changing a note.
+// NoteWritten is the answer to writing or changing a note.
 type NoteWritten struct {
 	ID          int64    `json:"id"`
 	NotNotified []string `json:"not_notified,omitempty" doc:"Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the note is about — deliberately not said which"`
@@ -201,11 +202,11 @@ type NoteWritten struct {
 // an account, which is what authorizing before resolving a name forbids
 // (REQ-42).
 //
-// **A name nobody has filed answers exactly as one this product cannot reach.**
-// Answered apart, anybody holding read on a single product could tell the two
-// apart and walk identifiers — including ones this deployment minted for a
-// flaw nobody has announced. It is the same collapse recording a rating makes,
-// and for the same reason.
+// A name nobody has filed answers exactly as one this product cannot reach.
+// Answered apart, anybody holding read on a single product tells the two apart
+// and walks identifiers — including ones this deployment minted for a flaw
+// nobody has announced. It is the same collapse recording a rating makes, and
+// for the same reason.
 //
 // The identifier comes back as the issue is filed under here rather than as it
 // was typed. A note may be reached through any name the issue answers to, and
@@ -299,7 +300,7 @@ func refusedNote(logger *slog.Logger, err error) error {
 	if errors.As(err, &faults) {
 		return refusedText(faults)
 	}
-	// What is left is a sentence the store wrote for a person to read: a note
+	// The remainder is a sentence the store wrote for a person to read: a note
 	// that says nothing, an edit by somebody who did not write it. Those are
 	// the caller's to fix, and the message is the answer.
 	return asked(logger, err)

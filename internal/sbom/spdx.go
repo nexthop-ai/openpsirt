@@ -45,7 +45,7 @@ const (
 // spdxEdges are the relationship types that say one thing is part of another,
 // and which way round each states it.
 //
-// **The test is whether the relationship describes what shipped.** A format
+// The test is whether the relationship describes what shipped. A format
 // with a hundred and forty relationship types states far more than a
 // dependency graph: what generated what, what documents what, what a file
 // amends. Only the ones below put one component inside another in the sense
@@ -79,13 +79,13 @@ var spdxEdges = map[string]spdxDirection{
 // the words the third version uses, because they are one fact under two
 // spellings and a filter cannot ask for the same thing twice.
 //
-// **Every relationship above that names a phase is here.** A runtime or
+// Every relationship above that names a phase is here. A runtime or
 // optional dependency is an edge either way, and recording the scope for two of
 // them and not the other two would be the same disagreement in a smaller place:
 // one producer emitting the third version and another emitting this one would
 // answer the filter differently about the same dependency.
 //
-// **`TEST_DEPENDENCY_OF` is not here and is not an edge either.** A test
+// `TEST_DEPENDENCY_OF` is not here and is not an edge either. A test
 // dependency is not part of what ships, which is what this relationship says
 // and what the other version's `test` scope says, and the edge is dropped in
 // both readers for that reason. The component is still held, stored and
@@ -213,7 +213,7 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 	var (
 		described graph.Described
 		ref       string
-		// Who supplied it, stated two ways. Resolved after the object rather
+		// The supplier, stated two ways. Resolved after the object rather
 		// than during it, because a producer chooses the order of its own
 		// keys and which field wins must not.
 		supplier   string
@@ -326,7 +326,7 @@ func (c *reader) spdxExternalRefs(described *graph.Described) error {
 // spdxFiles records the identifiers the document gave things that are not
 // packages.
 //
-// **The files themselves are not components.** A file is a path rather than a
+// The files themselves are not components. A file is a path rather than a
 // package: nothing matches a vulnerability against one, and a scan of a real
 // image describes five files for every package it found. Holding them would
 // grow the graph with nodes no finding can ever hang off.

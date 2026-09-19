@@ -50,8 +50,8 @@ type Point struct {
 	// its critical share rises is getting worse, and one line hides that.
 	BySeverity map[string]int
 	// OpenedBySeverity and ResolvedBySeverity are the same split over the two
-	// flows. **The question a backlog is read for is what kind of thing is
-	// arriving and what kind is being answered**: ten arriving and ten
+	// flows. The question a backlog is read for is what kind of thing is
+	// arriving and what kind is being answered: ten arriving and ten
 	// resolved is a team keeping pace where both are low, and a team losing
 	// ground where the ten arriving are critical and the ten resolved are
 	// not. Split only on the open count, that reads as a flat line.
@@ -139,9 +139,9 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		// — did not appear on the chart at all rather than appearing wrongly.
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		// And the closing off the row too, for the same reason and the same
-		// join. A finding a person closed has no run either, so reaching one
-		// for the moment dropped it from the chart exactly as the opening
-		// side used to — this is that lesson arriving on the other half.
+		// join. A finding a person closed has no run either, so reaching for
+		// one to get the moment drops it from the chart exactly as it does on
+		// the opening side.
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`COALESCE(f.closed_because, '') AS "closed_because"`).
 		// Only what can fall in the range. A finding opened after the last
@@ -207,7 +207,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	for i := range open {
 		open[i] = map[int64]string{}
 	}
-	// Where an issue stopped being present without explanation, per step.
+	// Issues that stopped being present without explanation, per step.
 	// The scanner going quiet is a fault to investigate rather than a fix,
 	// so it is held back from the resolved count even though the issue has
 	// left the set.
@@ -217,7 +217,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	}
 
 	for _, row := range rows {
-		// Which step an unexplained disappearance falls in, worked out once
+		// The step an unexplained disappearance falls in, worked out once
 		// from the moment rather than by walking the steps looking for it.
 		// Inside the loop below it did not depend on the step it sat in, so a
 		// row that went quiet re-walked every bucket once per step — steps

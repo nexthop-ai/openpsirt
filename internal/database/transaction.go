@@ -27,7 +27,7 @@ const Attempts = 5
 // InTransaction runs fn inside a transaction and retries the whole of it if
 // the database refuses the write for a reason that going again can fix.
 //
-// **Everything fn depends on must be read inside fn.** A retry re-runs the
+// Everything fn depends on must be read inside fn. A retry re-runs the
 // closure from the beginning against a database that has moved, so a value
 // read before the transaction started, or carried over from a previous
 // attempt, describes a world that no longer exists — and writing a decision
@@ -190,11 +190,11 @@ func IsNoRows(err error) bool {
 // the asking package's own sentinel, worded however that package words it.
 // reading names the act, for the line an operator reads: "look up product 12".
 //
-// One spelling, because the difference is a status code at every caller and it
-// was being made by hand wherever it was made at all. A reader that wraps every
-// failure alike answers "that does not exist" for a database it could not
-// reach, and every caller above it repeats that to whoever asked — so an outage
-// tells an authenticated reader their products, builds and findings are gone.
+// One spelling, because the difference is a status code at every caller and
+// made by hand it is made differently. A reader wrapping every failure alike
+// answers "that does not exist" for a database it could not reach, and every
+// caller above it repeats that to whoever asked — so an outage tells an
+// authenticated reader their products, builds and findings are gone.
 func FromRead(err error, absent error, reading string) error {
 	if IsNoRows(err) {
 		return absent
@@ -251,14 +251,13 @@ func IsDuplicate(err error) bool {
 // which is what it looks like and not what it is. Named, it says which of the
 // two it is doing.
 //
-// **The rule about reads is unchanged**, and it reaches further here: fn may
-// be re-run by a retry it cannot see, so everything it depends on is read
-// inside it.
-// **Each handle it may be given is named.** This package's own handle embeds
+// The rule about reads is unchanged, and it reaches further here: fn may be
+// re-run by a retry it cannot see, so everything it depends on is read inside
+// it. Each handle it may be given is named. This package's own handle embeds
 // `*bun.DB` rather than being one, so a type assertion for `*bun.DB` alone is
-// failed by the very handle Open returns — and the fallthrough that answered
-// it ran every statement as its own autocommit, with no transaction, no retry
-// and nothing said. The two spellings differ by four characters and both
+// failed by the very handle Open returns — and a fallthrough answering that by
+// running each statement as its own autocommit is no transaction, no retry and
+// nothing said, while the two spellings differ by four characters and both
 // compile. Anything this does not recognize is a fault rather than a fifth
 // silent path.
 func Within(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB) error) error {
@@ -353,7 +352,7 @@ func FromEngine(err error) bool {
 // 404 for a delete that committed. Discarding the error spells every one of
 // those as a confident sentence about rows nobody counted.
 //
-// What the count means is settled elsewhere and is the same on all four
+// The count's meaning is settled elsewhere and is the same on all four
 // engines: rows *matched*, not rows changed — see the connection settings in
 // this package, and `DESIGN-database.md`.
 //

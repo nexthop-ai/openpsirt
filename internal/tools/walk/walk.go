@@ -1,12 +1,12 @@
 // Package walk visits the files of this repository for the gate programs.
 //
-// What counts as "part of this repository" was decided six times, with five
+// "Part of this repository" is decided six times over, with five
 // different answers, and nothing recorded why they differed. `reserved` walked
 // the build output directory and the other Go gates did not, so a generated
 // file there would have failed one gate and been invisible to the rest;
 // `unreachable` walked the interface, the documentation site and the
-// distribution directory where they skipped all three. **An empty result means
-// both "nothing wrong" and "nothing looked at"**, so a gate reading less of the
+// distribution directory where they skipped all three. An empty result means
+// both "nothing wrong" and "nothing looked at", so a gate reading less of the
 // tree than its output implies reports the same "OK" either way.
 //
 // So the default skip set lives here and each caller names what it adds, with

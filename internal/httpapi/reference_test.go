@@ -4,10 +4,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/danielgtaylor/huma/v2"
 )
 
-// namesADecision matches a decision identifier, which belongs in REQUIREMENTS.md
-// and the design documents and nowhere a client reads.
+// namesADecision matches a decision identifier, which belongs in
+// REQUIREMENTS.md and the design documents and nowhere a client reads.
 //
 // Any three or four capitals and a number, rather than a list of prefixes.
 // The list named eighteen, not one of which appears anywhere in this
@@ -49,12 +51,12 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 	// obvious. The reasoning belongs in REQUIREMENTS.md — somebody reading this
 	// is trying to make a request work.
 	//
-	// **What this can check is the half that is mechanical.** Whether a
-	// paragraph is an explanation of the design or a thing a caller has to
-	// know is a person's judgment and stays one; two summaries reproduced
-	// AGENTS.md's own counter-examples verbatim, and one description cited a
-	// decision identifier into a document published to people who have no way
-	// to look it up. Those are checkable, and this checks them.
+	// The mechanical half is what this checks. Whether a paragraph is an
+	// explanation of the design or a thing a caller has to know is a person's
+	// judgment and stays one; a summary reproducing AGENTS.md's own
+	// counter-examples verbatim, and a description citing a decision
+	// identifier into a document published to people who have no way to look
+	// it up, are checkable.
 	twoReach(t, func(t *testing.T, r *reach) {
 		var checked int
 		for path, item := range r.api.OpenAPI().Paths {
@@ -85,7 +87,7 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 				// The requirement line is rendered from the declaration rather
 				// than written beside it, so its absence means an operation
 				// went around requiring() altogether.
-				if !strings.Contains(op.Description, "**Requires:**") {
+				if !strings.Contains(op.Description, "Requires: ") {
 					t.Errorf("%s does not say what it requires", where)
 				}
 			}
@@ -100,9 +102,9 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 //
 // A description lives in a struct tag, which has to be a literal, so a field
 // two bodies both carry is written out twice with nothing holding the two
-// equal. They had already drifted: the person screen's body and the
-// administration body described `sees_nothing` differently, and the published
-// reference carried the wrong one of the two for as long as it stood.
+// equal. Left to drift, the person screen's body and the administration body
+// describe `sees_nothing` differently, and the published reference carries
+// whichever of the two was registered first.
 //
 // Named fields rather than every repeated name: plenty of names mean different
 // things in different bodies — "places" is what a claim wrote in one and what
@@ -132,6 +134,77 @@ func TestAFactTwoBodiesCarryIsDescribedTheSameWay(t *testing.T) {
 		}
 		if len(said) == 0 {
 			t.Fatal("no field was found to check: this is not walking the schemas")
+		}
+	})
+}
+
+// No bold in the published document.
+//
+// A description is read by somebody working through a parameter list, and a
+// claim pressed at them there is noise in the one place a reader is most in a
+// hurry. It is a gate rather than a judgment because a span survives a rewrite
+// of the sentence around it: bold is added one field at a time, and one field
+// at a time is exactly what nobody reviews.
+//
+// Every string the document publishes, not the operations alone: a summary, a
+// description, a schema's own description and the description on each of its
+// properties. A rule over half the document is a rule that holds until
+// somebody writes in the other half.
+func TestThePublishedDocumentCarriesNoBold(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		var checked int
+		bold := func(where, what, text string) {
+			checked++
+			if strings.Contains(text, "**") {
+				t.Errorf("%s: the %s carries a bold span: %q", where, what, text)
+			}
+		}
+		// Walked rather than listed: a schema states its description on
+		// itself, on each property and on an array's items, and a request or
+		// response body declared inline — every multipart form here — never
+		// reaches components.schemas at all.
+		var walk func(where string, schema *huma.Schema, depth int)
+		walk = func(where string, schema *huma.Schema, depth int) {
+			if schema == nil || depth > 8 {
+				return
+			}
+			bold(where, "description", schema.Description)
+			for field, property := range schema.Properties {
+				walk(where+"."+field, property, depth+1)
+			}
+			walk(where+"[]", schema.Items, depth+1)
+		}
+		bodies := func(where string, content map[string]*huma.MediaType) {
+			for kind, media := range content {
+				walk(where+" "+kind, media.Schema, 0)
+			}
+		}
+
+		document := r.api.OpenAPI()
+		bold("info", "description", document.Info.Description)
+		for path, item := range document.Paths {
+			for method, op := range operations(item) {
+				where := method + " " + path
+				bold(where, "summary", op.Summary)
+				bold(where, "description", op.Description)
+				for _, parameter := range op.Parameters {
+					bold(where+" "+parameter.Name, "parameter", parameter.Description)
+				}
+				if op.RequestBody != nil {
+					bodies(where+" request", op.RequestBody.Content)
+				}
+				for code, response := range op.Responses {
+					if response != nil {
+						bodies(where+" "+code, response.Content)
+					}
+				}
+			}
+		}
+		for name, schema := range document.Components.Schemas.Map() {
+			walk(name, schema, 0)
+		}
+		if checked < 500 {
+			t.Fatalf("only %d strings checked: this is not walking the document", checked)
 		}
 	})
 }

@@ -6,12 +6,12 @@ import { useReseed } from "./reseed";
 
 // Composing a CVSS base vector, and showing what it scores.
 //
-// **The score is worked out on the server, not here.** The formula lives in
+// The score is worked out on the server, not here. The formula lives in
 // one place and what somebody sees while choosing is what gets stored — a
 // second copy in the browser is one that eventually disagrees with the number
 // in the database, and the disagreement is invisible.
 //
-// **Base metrics only.** Temporal and environmental scores describe a moment
+// Base metrics only. Temporal and environmental scores describe a moment
 // and a deployment, and the deployment reading this is not the one the finding
 // is about.
 
@@ -29,7 +29,7 @@ const METRICS: {
   {
     key: "AV",
     label: "Attack vector",
-    help: "Where the attacker has to be",
+    help: "The attacker's position",
     values: [
       { value: "N", label: "Network — reachable remotely" },
       { value: "A", label: "Adjacent — same broadcast or shared segment" },
@@ -40,7 +40,7 @@ const METRICS: {
   {
     key: "AC",
     label: "Attack complexity",
-    help: "Whether anything beyond the attacker's control has to line up",
+    help: "Conditions outside the attacker's control",
     values: [
       { value: "L", label: "Low — it works whenever they try" },
       { value: "H", label: "High — depends on conditions they cannot arrange" },
@@ -49,7 +49,7 @@ const METRICS: {
   {
     key: "PR",
     label: "Privileges required",
-    help: "What the attacker must already hold",
+    help: "Access the attacker must already hold",
     values: [
       { value: "N", label: "None" },
       { value: "L", label: "Low — an ordinary account" },
@@ -59,7 +59,7 @@ const METRICS: {
   {
     key: "UI",
     label: "User interaction",
-    help: "Whether somebody else has to do something",
+    help: "Action by somebody else",
     values: [
       { value: "N", label: "None" },
       { value: "R", label: "Required — a person has to act" },
@@ -68,7 +68,7 @@ const METRICS: {
   {
     key: "S",
     label: "Scope",
-    help: "Whether it reaches past the thing that is vulnerable",
+    help: "Reach past the vulnerable thing",
     values: [
       { value: "U", label: "Unchanged — only the vulnerable component" },
       { value: "C", label: "Changed — it reaches beyond it" },
@@ -77,7 +77,7 @@ const METRICS: {
   {
     key: "C",
     label: "Confidentiality",
-    help: "What can be read",
+    help: "Data that can be read",
     values: [
       { value: "H", label: "High — everything, or the part that matters" },
       { value: "L", label: "Low — something, but limited" },
@@ -87,7 +87,7 @@ const METRICS: {
   {
     key: "I",
     label: "Integrity",
-    help: "What can be changed",
+    help: "Data that can be changed",
     values: [
       { value: "H", label: "High" },
       { value: "L", label: "Low" },
@@ -97,7 +97,7 @@ const METRICS: {
   {
     key: "A",
     label: "Availability",
-    help: "What can be stopped",
+    help: "Service that can be stopped",
     values: [
       { value: "H", label: "High" },
       { value: "L", label: "Low" },

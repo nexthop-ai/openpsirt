@@ -68,11 +68,10 @@ func TestABulkClaimRecordsTheRatingInForceAsItsBaseline(t *testing.T) {
 
 func TestABulkClaimNamesTheDecisionThatBlockedIt(t *testing.T) {
 	// One live claim per combination of code holds here as it does anywhere,
-	// so a selection covering something already decided is refused whole. What
-	// it used to say was "something in this selection is already decided",
-	// which tells somebody holding five hundred rows nothing they can act on —
-	// while the single-finding path named the decision to go and revise. One
-	// spelling, and it names which.
+	// so a selection covering something already decided is refused whole.
+	// "Something in this selection is already decided" tells somebody holding
+	// five hundred rows nothing they can act on, while the single-finding path
+	// names the decision to go and revise. One spelling, and it names which.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		in := f.build(t, f.product, "2026.03")

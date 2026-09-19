@@ -193,9 +193,9 @@ func TestWhatCannotBeOrderedIsRefusedRatherThanGuessedAt(t *testing.T) {
 		// Nothing to compare.
 		{vercmp.Debian, "", "1.0"},
 		// A word an advisory wrote where a version belongs. The comparison
-		// answers for any pair of strings, so this read as an ordered scheme
-		// that never fails: a letter outranks a digit, so "unfixed" sorted
-		// above every real release and was recommended as the upgrade.
+		// answers for any pair of strings, which reads as a scheme that never
+		// fails: a letter outranks a digit, so "unfixed" sorts above every
+		// real release and is recommended as the upgrade.
 		{vercmp.Debian, "unfixed", "1.0-1"},
 		{vercmp.Debian, "TBD", "1.0-1"},
 		{vercmp.Debian, "see the advisory", "1.0-1"},
@@ -212,9 +212,9 @@ func TestWhatCannotBeOrderedIsRefusedRatherThanGuessedAt(t *testing.T) {
 }
 
 func TestReachingAVersionReachesEveryEarlierOne(t *testing.T) {
-	// What a picker asks. An issue fixed in an earlier release is closed by a
-	// later one, and the kernel is the case that makes it matter: the newest
-	// release names two of its own and carries every fix before it.
+	// A picker's own question. An issue fixed in an earlier release is closed
+	// by a later one, and the kernel is the case that makes it matter: the
+	// newest release names two of its own and carries every fix before it.
 	if !vercmp.Reaches(vercmp.Debian, "6.12.107-1", "6.12.100-1") {
 		t.Error("the newest release does not reach an earlier one")
 	}
@@ -254,7 +254,7 @@ func TestTheSchemeFollowsThePackageIdentifierARealScanCarries(t *testing.T) {
 }
 
 func TestADistributionUpgradeReachesWhatItLeavesBehind(t *testing.T) {
-	// What the planner asks, through the two new schemes: moving to this
+	// The planner's own question, through the two new schemes: moving to this
 	// version also closes what these earlier ones fixed.
 	for _, each := range []struct {
 		scheme            vercmp.Scheme
@@ -338,7 +338,7 @@ func TestAlpineOrdersTheTokensItsOwnSuiteNeverPairs(t *testing.T) {
 // knowledge: every rule each algorithm has is a case below, and the ones that
 // contradict what anybody would write from the format description say so.
 //
-// **The cost of writing our own is that nobody else chose the cases**, so a
+// The cost of writing our own is that nobody else chose the cases, so a
 // pair nobody here thought of is not covered. Against that, each case names
 // the rule it pins, which a borrowed suite does not.
 
@@ -358,7 +358,7 @@ func TestRPMVersionsOrderTheWayRpmvercmpOrdersThem(t *testing.T) {
 		{"a dot and an underscore are one separator", "1.2", "1_2", 0},
 		{"two separators are one", "1.2", "1..2", 0},
 
-		// **Leading zeros carry no value at all**, which is the one most
+		// Leading zeros carry no value at all, which is the one most
 		// likely to be written wrong: these are the same version, not
 		// neighbours.
 		{"a run of zeros is the number it spells", "10.0001", "10.1", 0},
@@ -369,9 +369,9 @@ func TestRPMVersionsOrderTheWayRpmvercmpOrdersThem(t *testing.T) {
 		{"ten is more than one", "5.5p10", "5.5p1", 1},
 		{"a letter run is compared as text", "10b2", "10a1", 1},
 
-		// **A numeric run outranks an alphabetic one at the same position.**
+		// A numeric run outranks an alphabetic one at the same position.
 		{"a number outranks a letter", "1.2", "1.a", 1},
-		// Which is why a release candidate spelled as a further segment is
+		// That is why a release candidate spelled as a further segment is
 		// *newer* than the release: the letters are extra, not a pre-release
 		// marker. rpm has a character for that and this is not it.
 		{"a trailing segment of letters is more, not less", "6.0.rc1", "6.0", 1},
@@ -387,7 +387,7 @@ func TestRPMVersionsOrderTheWayRpmvercmpOrdersThem(t *testing.T) {
 		{"a caret follows the release it came after", "1.0^", "1.0", 1},
 		{"a caret follows with content too", "1.0^git1", "1.0", 1},
 		{"and precedes the next version", "1.0^20160101", "1.0.1", -1},
-		// Which is not the same as preceding a longer number in the same
+		// That is not the same as preceding a longer number in the same
 		// segment: 0 against 01 is a number against a number.
 		{"a caret does not outrank a larger segment", "1.0^git1", "1.01", -1},
 
@@ -415,8 +415,8 @@ func TestAlpineVersionsOrderTheWayApkOrdersThem(t *testing.T) {
 		{"a further part", "1.0.1", "1.0", 1},
 		{"a letter after the numbers", "1.0a", "1.0", 1},
 
-		// **A part with a leading zero is compared as text, not as a
-		// number**, which is the rule nothing in the format description says
+		// A part with a leading zero is compared as text, not as a
+		// number, which is the rule nothing in the format description says
 		// and the one that reverses the obvious answer.
 		{"a leading zero makes a part a fraction", "8.2.0015", "8.2.002", -1},
 		{"and so orders 07 below 10", "1.02.07", "1.02.10", -1},

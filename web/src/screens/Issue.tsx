@@ -14,12 +14,12 @@ import { Wide } from "../ui/Wide";
 
 // One issue, everywhere it sits.
 //
-// **The work starts from an issue as often as from a product.** "A critical
+// The work starts from an issue as often as from a product. "A critical
 // just landed in openssl — which of our products ship an affected version" was
 // a question asked one product at a time, and at a dozen products that is the
 // first thing anybody complains about.
 //
-// **One row per build and component**, not per place: the same component in
+// One row per build and component, not per place: the same component in
 // two builds is two things somebody ships, and sixty places of it in one build
 // is one piece of work with a count.
 export function Issue() {
@@ -71,7 +71,7 @@ export function Issue() {
   // The products carrying it, once each and in the order they appear. The
   // advisory is a statement about one product, and this issue may sit in
   // several.
-  // Whether anything of it is still undisclosed there is folded in per
+  // Anything of it still undisclosed there is folded in per
   // product, because one undisclosed place makes the whole of it undisclosed
   // for anybody deciding what may be said about it.
   const products = Array.from(

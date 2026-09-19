@@ -18,7 +18,7 @@ import (
 
 // Find returns one attachment, if the asker may read the issue it hangs off.
 //
-// **Authorized before anything about the file is said back**. The row
+// Authorized before anything about the file is said back. The row
 // is read first because the issue it belongs to is not knowable otherwise, and
 // nothing about it — that it exists, what it is called, that it was redacted —
 // reaches the caller until they have been let in. A token nobody minted and a
@@ -37,7 +37,7 @@ func (s *Store) Find(ctx context.Context, subject access.Subject, token string) 
 	}
 	if err := mayReach(ctx, s.db, subject, row.ProductID, row.VulnerabilityID); err != nil {
 		if errors.Is(err, access.ErrDenied) {
-			// **The same words as a token nobody minted**, and deliberately
+			// The same words as a token nobody minted, and deliberately
 			// not the ones mayReach produces: those name the product, which a
 			// token does not. Told apart, the two answers turn a reference
 			// somebody guessed into a way to ask which products exist and
@@ -113,7 +113,7 @@ func (s *Store) ForIssue(ctx context.Context, subject access.Subject,
 // goes on existing in the revision that made it, and an attachment that has
 // ever been referred to is never a candidate for the sweep again.
 //
-// **Silent about tokens it does not recognize.** The text has already been
+// Silent about tokens it does not recognize. The text has already been
 // accepted by then, and a reference to nothing is a broken link in a document
 // rather than a reason to refuse somebody's justification.
 func Attached(ctx context.Context, db bun.IDB, tokens []string, now time.Time) error {
@@ -132,7 +132,7 @@ func Attached(ctx context.Context, db bun.IDB, tokens []string, now time.Time) e
 
 // Redact takes a file back out, leaving the record and the reference.
 //
-// **An administrator's act, and only theirs.** It is the answer to somebody
+// An administrator's act, and only theirs. It is the answer to somebody
 // having attached a credential, which is a thing that will happen — so it
 // exists, it is recorded, and it is not something whoever uploaded the file
 // can do quietly.

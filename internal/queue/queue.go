@@ -159,7 +159,7 @@ type Queue struct {
 	db   *database.DB
 	opts Options
 	now  func() time.Time
-	// Whether the claim holds the row it is about to take. Always true for a
+	// The claim's hold on the row it is about to take. Always true for a
 	// queue anything but a test builds, and a field rather than an option
 	// because the only thing that turns it off is the test that demonstrates
 	// exclusivity does not rest on it.
@@ -541,7 +541,7 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 			// one is due has already failed, and on SQLite it is waiting for
 			// the single connection the work itself is holding.
 			//
-			// **On that engine it cannot succeed while the work runs**, so
+			// On that engine it cannot succeed while the work runs, so
 			// the claim timeout is the whole of the protection there rather
 			// than a margin around this: it has to exceed the longest single
 			// unit of work, or the claim goes stale and the job is run again
@@ -620,7 +620,7 @@ func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
 // it is allowed to be, in which case it is set aside. Retrying for ever would
 // let one job that can never succeed crowd out work that could.
 func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) error {
-	// **The attempt count and the write that acts on it, in one act.** The
+	// The attempt count and the write that acts on it, in one act. The
 	// count was read with a bare select and compared in Go, so whether this
 	// was the last attempt rested on a value fetched separately from the
 	// statement that buries or re-queues the job. The claimed-by predicate
@@ -799,10 +799,9 @@ type Ending struct {
 //
 // Here rather than in each worker. The sequence — open a context that outlives
 // a cancellation, record the ending against it, tell a stale claim apart from
-// a write that failed, and notice a takeover — was written out in both workers
-// down to the comment paragraph, and they had begun to disagree. A third
-// worker would have been a third copy, and the rule for a job finished by a
-// worker that no longer holds it would then have three readings.
+// a write that failed, and notice a takeover — written out per worker is a
+// copy per worker, down to the comment paragraph, and the rule for a job
+// finished by a worker that no longer holds it acquires a reading per copy.
 //
 // noun is what the reference is called in a log line, because "scan" and
 // "target" are the same field to this package and not to an operator reading

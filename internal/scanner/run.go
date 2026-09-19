@@ -56,7 +56,7 @@ type Outcome struct {
 	Lapsed int64
 }
 
-// Telling says what to do with the claims a scan took out from under people.
+// Telling is the instruction for claims a scan took out from under people.
 //
 // Left unset a runner tells nobody, which is what every test and every
 // single-purpose invocation wants; the deployment wires it once.

@@ -112,7 +112,7 @@ func TestNarrowingByWhatHoldsIt(t *testing.T) {
 			t.Errorf("a consumer nothing sits under kept %d", absent)
 		}
 
-		// What the build holds directly is the other half. Together they are
+		// The build's direct holdings are the other half. Together they are
 		// every place, which is the assertion worth making: a filter that
 		// quietly kept nothing would satisfy either half alone.
 		_, direct, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
@@ -432,7 +432,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 				"proposed_at": time.Now().UTC(),
 			}
 			if live {
-				// What makes a claim the one standing here: a key, and the
+				// The test for a claim standing here: a key, and the
 				// version the claim was made against being the one shipping.
 				row["live_key"] = state + "-live-key"
 				row["component_upstream_version"] = swss.Version
@@ -469,10 +469,10 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		// A proposed row that holds no key covers nothing: a proposal is live
 		// until it is withdrawn or lapses, and both release the key. So the
 		// place stands undecided — and the row and the filter say the same
-		// thing about it, which is what they exist to do. The row used to
-		// draw no word at all while the filter put the group in the
-		// undecided bucket, so a reader found it in a list whose own state
-		// column was blank.
+		// thing about it, which is what they exist to do. A row drawing no
+		// word at all while the filter puts the group in the undecided
+		// bucket leaves a reader looking at a list whose own state column
+		// is blank.
 		record("proposed", false)
 		said("undecided")
 		if n := count("undecided"); n != 1 {
@@ -712,7 +712,7 @@ func TestARowNamesWhatPullsItInEvenWhereTheRouteUpIsUnknown(t *testing.T) {
 	})
 }
 
-// What a person recorded here, as against what a scanner reported.
+// A person's own record here, as against what a scanner reported.
 //
 // Its own question rather than a shade of another: a recorded flaw is the only
 // kind a person may close by hand, and the screen that records one had no way
@@ -810,7 +810,7 @@ func TestSeveralStatesAreAskedForTogether(t *testing.T) {
 		if undecided != 2 {
 			t.Fatalf("%d undecided, want both", undecided)
 		}
-		// Asking for a state nothing is in adds nothing, and asking for it
+		// A request for a state nothing is in adds nothing, and asking for it
 		// beside one that matches keeps what that one matched — an OR, not an
 		// AND.
 		if both := count(t, "undecided", "agreed"); both != undecided {
@@ -884,7 +884,7 @@ func TestTheBundleAndComponentListsFilterOnTheirOwnProductsRating(t *testing.T) 
 	// that lost the product would answer with the published word — silently,
 	// and only on that list. The findings list has its own check above.
 	//
-	// **Two products, rating it in opposite directions**, because a join that
+	// Two products, rating it in opposite directions, because a join that
 	// merely exists is not the thing at risk: the compiler catches a missing
 	// one on all four engines, and what it cannot catch is one bound to the
 	// wrong product. With only this product rating it, a swapped binding reads

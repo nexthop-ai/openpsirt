@@ -164,10 +164,9 @@ func (r *reach) decidedAt(t *testing.T, place string) (decision, claim int64) {
 }
 
 func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
-	// The gap this closes. A tool that lets somebody argue, agree and annotate
-	// and then offers no way to see what any of it produced sends every reader
-	// to the review queue — which by definition no longer holds what was
-	// agreed to.
+	// A tool that lets somebody argue, agree and annotate and then offers no
+	// way to read the result sends every reader to the review queue — which by
+	// definition no longer holds what was agreed to.
 	eachReach(t, func(t *testing.T, r *reach) {
 		place := r.scanned(t)
 		id, claim := r.decidedAt(t, place)
@@ -364,7 +363,7 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 			t.Errorf("what the claim wrote reads as %d rows, %d issues, %d places",
 				whole.Rows, whole.Issues, whole.Places)
 		}
-		// What it covers now, in the units somebody acts in. One judgment at
+		// Its present reach, in the units somebody acts in. One judgment at
 		// one fold, over the one package that fold holds here, under whatever
 		// pulls it in — never a place count, which is a unit nobody acted in.
 		if whole.Folds != 1 || whole.Packages != 1 || whole.Consumers != 1 ||
@@ -465,8 +464,8 @@ func TestTheRecordIsReadableAtTheFindingsVisibility(t *testing.T) {
 
 		// The finding's visibility is the whole of the rule, so an undisclosed
 		// one closes the record again to somebody who reads only what has been
-		// disclosed. This is the half that would leak if the widening had been
-		// written as "anybody on the product".
+		// disclosed. This is the half a widening written as "anybody on the
+		// product" leaks.
 		if _, err := r.db.DB.NewUpdate().Table("finding").
 			Set("visibility = ?", "private").
 			Where("1 = 1").Exec(t.Context()); err != nil {
@@ -1127,8 +1126,8 @@ func TestOnlyPeopleWhoCanAlreadySeeItAreOfferedAsMentions(t *testing.T) {
 			t.Error("nobody at all may be mentioned on an undisclosed finding")
 		}
 
-		// Asking who may be told about an undisclosed finding is itself a
-		// question about undisclosed findings, so somebody who cannot read
+		// A request for who may be told about an undisclosed finding is itself
+		// a question about undisclosed findings, so somebody who cannot read
 		// them is answered as though the product were not there.
 		if got := asPerson(t, r, "triager", http.MethodGet,
 			"/v1/products/mine/mentionable?visibility=private", ""); got.Code != http.StatusNotFound {
@@ -1248,11 +1247,11 @@ func TestBeingToldAboutWorkKeepsItOutOfTheDigest(t *testing.T) {
 
 // The bound is on what would be written, charged as each build resolves.
 //
-// It was consulted after every named build had been resolved and every place
-// accumulated, so the work one request did was bounded by the request array
-// rather than by the limit: REQ-27's "a limit checked against the request lets
-// a small request do a large amount of work", which is why the entry's own
-// note about each build costing a resolution was answered with a maxItems.
+// Consulted after every named build is resolved and every place accumulated,
+// the work one request does is bounded by the request array rather than by the
+// limit: REQ-27's "a limit checked against the request lets a small request do
+// a large amount of work", which is why each build costing a resolution is
+// answered with a maxItems.
 func TestTheBulkBoundIsChargedAsEachBuildResolves(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)

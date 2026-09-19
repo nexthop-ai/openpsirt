@@ -14,16 +14,16 @@ taken.
 
 ## Upgrading
 
-**`OPENPSIRT_BASE_URL` is checked at startup**, and a value with no scheme is
-now refused where it used to be accepted. `psirt.example.com` has to become
+`OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is now
+refused where it used to be accepted. `psirt.example.com` has to become
 `https://psirt.example.com`.
 
-It was accepted and did nothing useful: with no scheme there is no host to
-read, so the same-origin check on every state-changing browser request fell
-back to the address the request itself claimed — the guard ran and guarded
-nothing — and the address a sign-in provider is sent back to was not absolute,
-which the provider refuses. A deployment reaching this has not been protected
-by that check for as long as the value has been wrong.
+Accepting it bought nothing: with no scheme there is no host to read, so the
+same-origin check on every state-changing browser request falls back to the
+address the request itself claimed — the guard runs and guards nothing — and
+the address a sign-in provider is sent back to is not absolute, which the
+provider refuses. A deployment reaching this has not been protected by that
+check for as long as the value has been wrong.
 
 A path below the address is refused for the same reason:
 `https://psirt.example.com/psirt` makes every link this deployment writes point
@@ -42,7 +42,7 @@ is a thing to raise rather than to configure here.
 | `OPENPSIRT_LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` |
 | `OPENPSIRT_LOG_FORMAT` | `text` or `json` | `text` |
 
-The defaults above are the binary's. **The chart sets a log format of `json`**,
+The defaults above are the binary's. The chart sets a log format of `json`,
 because a cluster's collector parses the logs; run the binary yourself and it
 writes `text`.
 
@@ -58,7 +58,7 @@ writes `text`.
 | `OPENPSIRT_DB_CONN_LIFETIME` | How long a connection is used before it is replaced | `30m` |
 | `OPENPSIRT_DB_REQUIRE_ENCRYPTION` | Refuse to start where the connection to the database is not encrypted. See below | `false` |
 
-### Encrypting the database connection
+### Database connection encryption
 
 The connection carries undisclosed findings, and by default it is encrypted
 only where the server offers it. Opportunistic is not the same as certain: a
@@ -74,7 +74,7 @@ nobody checked. Ask for certainty in the URL.
 Anything the URL says about the transport is left alone, so `tls=skip-verify`
 or a `sslmode` of your own reaches the driver as written.
 
-**Say so where it is required.** With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set,
+Say so where it is required. With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set,
 the process asks the connection what it negotiated and refuses to start where
 that is cleartext — naming the URL, without its password, and what to put in
 it. Asking for encryption in the URL and being given none is a deployment that
@@ -98,7 +98,7 @@ read.
 | `GRYPE_DB_CACHE_DIR` | Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written | `/var/cache/openpsirt/grype` |
 | `GRYPE_DB_AUTO_UPDATE` | Whether the scanner fetches its own vulnerability data. Set it to `false` where the deployment cannot reach the network, and put the data there yourself — see below | `true` |
 
-### An install that cannot reach the network
+### An air-gapped install
 
 The scanner's vulnerability data is not shipped in the image: it changes daily
 and the image does not. A deployment that can reach the network downloads it
@@ -112,10 +112,10 @@ make scanner-db
 ```
 
 It produces `dist/openpsirt-scanner-db-<date>.tar.gz` and its checksum, using
-**the scanner the image carries** — the format is the scanner's, and a bundle
+the scanner the image carries — the format is the scanner's, and a bundle
 built by a different version is one that may not load. Before it says it
-succeeded it runs that same scanner against the bundle **with the network off
-and auto-update refused**, which is the configuration on the far side of the
+succeeded it runs that same scanner against the bundle with the network off
+and auto-update refused, which is the configuration on the far side of the
 gap: a bundle that merely exists is what the target refuses to produce.
 
 On the far side, check the bundle before trusting it, unpack it into
@@ -130,7 +130,7 @@ The verification is available there as well as here on purpose. "It built" and
 matters where the bundle is all there is — in the one situation where trying it
 out first is not available.
 
-## Telling people
+## Mail
 
 Mail is how anything leaves the application. A deployment that sets none of
 this tells nobody anything outside it, which is an ordinary way to run: the
@@ -156,7 +156,7 @@ and a link.
 On the Helm chart these are the `mail` values, and the password goes in a
 Secret the chart makes or one you name.
 
-## Publishing advisories
+## Advisory publication
 
 An advisory is a document about a flaw in your own product. It is generated
 from what this deployment already holds and handed to you; nothing is sent
@@ -176,14 +176,14 @@ validation after you have sent it.
 On the Helm chart these go through `extraEnv`, since a deployment that does not
 publish needs none of them.
 
-## Asking public indexes what is current
+## Upstream currency
 
 Off unless an administrator turns it on, under Settings. It is the only thing
 here that reaches the network: everything a scan needs arrives as a file
 somebody imported, and a deployment that cannot reach out loses this answer and
 nothing else.
 
-**What goes out is a component's name.** One request per component to that
+What goes out is a component's name. One request per component to that
 ecosystem's public index, carrying the name and nothing else — no version, no
 build, no product. For an open-source dependency that is public knowledge. For
 something built here it is the name of a project, a team, or a product nobody
@@ -214,32 +214,32 @@ deployment publishing under `example.test` holds back:
 
 `pkg:npm/exampler` is left alone. Case does not decide.
 
-**This is a better default, not a control.** A deployment that needs certainty
+This is a better default, not a control. A deployment that needs certainty
 about what leaves it leaves the whole feature off, which is where it ships. It
 is biased toward holding back: over-excluding loses an answer, which is visible
 on the screen that would have shown it, and under-excluding sends a name to
 somebody else's service, which is visible nowhere.
 
-**Turning it off again drops what was fetched.** On a deployment that had
+Turning it off again drops what was fetched. On a deployment that had
 asking on before a name was held back, the version an index gave for that name
 is removed the next time the pass reaches it, along with the summary and the
 project address. All of it came from sending the name. Nothing else is
 affected and no upgrade step is needed.
 
-**Read what it held back, and what no index knew.** The report is at
+Read what it held back, and what no index knew. The report is at
 `/v1/upstream/unanswered` and on the System screen. Held-back names say what
 the default is costing; names no public index has heard of are private modules
 and vendored forks, and they are the candidates to promote into
 `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
 
-## Who may sign in
+## Sign-in
 
 The process refuses to start until somebody can administer it, and naming
 somebody grants a role — it does not let anybody in without signing in.
 
 Configure at least one of the sign-in methods below, or nobody can reach it.
-**The Helm chart refuses to render an install with none; the binary does not
-check**, because a deployment being brought up in pieces is an ordinary state
+The Helm chart refuses to render an install with none; the binary does not
+check, because a deployment being brought up in pieces is an ordinary state
 for a process and not for an install.
 
 | Variable | Meaning | Default |
@@ -262,7 +262,7 @@ username, and two providers issuing them independently cannot be told apart.
 | `OPENPSIRT_OIDC_USERNAME_CLAIM` | Which claim carries the name an authorization is written for. **Required**, with no default — see below | none — the process refuses to start without it |
 | `OPENPSIRT_OIDC_GROUPS_CLAIM` | The claim carrying group membership, if the provider asserts it | unset |
 
-### Which claim carries the username
+### The username claim
 
 The claim is not the identity. The provider's subject is, and the first
 sign-in pins it; from then on the subject decides and a rename is followed as
@@ -273,8 +273,8 @@ somebody who has not arrived yet. That has to be a name a person can type, so
 the subject itself cannot serve — nobody knows it in advance. The property it
 needs is narrower than immutable:
 
-> **An end user must not be able to set it to a name an administrator might
-> have authorized.**
+> An end user must not be able to set it to a name an administrator might
+> have authorized.
 
 The exposure runs from the moment a grant is written until somebody redeems
 it, which `signin.claim-window` also bounds.
@@ -293,18 +293,18 @@ claim carried by any of the three is available.
 A claim the provider does not send, or sends as something other than a string,
 reads as absent. The sign-in then falls back to the address the provider says
 it verified, and failing that to the subject — which matches no authorization
-anybody typed, so the person is refused rather than admitted. **A claim name
-with a typo in it therefore reads as "this person was never granted access"**,
+anybody typed, so the person is refused rather than admitted. A claim name
+with a typo in it therefore reads as "this person was never granted access",
 not as a configuration error, so check the name against the provider's own
 token before deciding somebody's grant is missing.
 
-### Signing in when the provider is gone
+### Sign-in without a provider
 
 The trusted header below is the way in that does not depend on the provider,
 and it is what a provider change goes through. A pinned identifier does not
 refuse a proxy arrival, so everybody reaches what they already hold.
 
-**The provider is down and people must sign in.**
+The provider is down and people must sign in.
 
 1. Unset `OPENPSIRT_OIDC_ISSUER`. A provider that cannot be discovered stops
    the process at startup, so leaving it set means nothing starts at all.
@@ -312,7 +312,7 @@ refuse a proxy arrival, so everybody reaches what they already hold.
    needed; half a configuration stops the process.
 3. Restart. Sign-in is by the name the proxy asserts.
 
-**The provider publishes an endpoint on another host.** The process refuses to
+The provider publishes an endpoint on another host. The process refuses to
 start, naming the endpoint and the host. Pinning the fetch to the issuer does
 not stop the document naming somewhere else inside itself, and an issuer naming
 an authorization endpoint elsewhere turns every sign-in into a redirect of its
@@ -320,7 +320,7 @@ choosing. There is no way to allow it: the deployment reaches this provider
 through a proxy that serves the whole of it from one host, or it signs in
 through the trusted header instead.
 
-**The provider is changing.** An identifier belongs to the provider that
+The provider is changing. An identifier belongs to the provider that
 issued it, and the same string names somebody else at another one, so a
 deployment configured for a provider its bound identities do not name refuses
 to start.
@@ -353,7 +353,7 @@ alone is caught.
 | `OPENPSIRT_GITHUB_CLIENT_SECRET` | Its secret | unset |
 | `OPENPSIRT_GITHUB_ORG` | Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want | unset |
 
-### A proxy that says who somebody is
+### The trusted header
 
 Both the header and the sources it is believed from are required together: a
 header named with nothing to trust it from is either a mistake or the first
@@ -366,7 +366,7 @@ half of one, and the process stops rather than accept a header anybody can set.
 | `OPENPSIRT_TRUSTED_GROUPS_HEADER` | Where that proxy reports group membership, if it does | unset |
 | `OPENPSIRT_TRUSTED_GROUPS_DELIMITER` | What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed | `,` |
 
-## Where files hanging off a finding are kept
+## Attachment storage
 
 Absent is ordinary: with none of this set, attachments are off and everything
 else works. An operator who wants none should not have to run a bucket.
@@ -423,7 +423,7 @@ build server and waiting for a restart is not a remedy.
 | `OPENPSIRT_QUEUE_MAX_HOLD` | How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and `OPENPSIRT_SCANNER_TIMEOUT`, which the process checks at startup | `2h` |
 | `OPENPSIRT_QUEUE_BACKOFF` | How long a failed job waits before it is tried again, multiplied by the attempt | `30s` |
 
-## Reading a scan file
+## Scan file limits
 
 A scan file is somebody else's output arriving over a link this deployment does
 not control, so it is read within bounds. These are the ceilings; each is
@@ -451,7 +451,7 @@ the container's memory limit with them.
 | `OPENPSIRT_INGEST_MAX_DEPTH` | How deeply it may nest | 64 |
 | `OPENPSIRT_INGEST_MAX_DOCUMENTS` | How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document | 8 |
 
-## Reading what the scanner reported
+## Scanner output limits
 
 The scanner's report is read in the same process, and its size is components ×
 matches × references — the first of which a producer controls by uploading a

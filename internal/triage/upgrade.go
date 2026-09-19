@@ -42,18 +42,18 @@ type Upgrade struct {
 
 // PlanUpgrade records moving a component as the answer to what is open on it.
 //
-// **One act, one claim, one decision per issue** — the same shape a bulk
+// One act, one claim, one decision per issue — the same shape a bulk
 // judgment takes, because a bump answers many issues at once and
 // answering them one at a time is what the grouping exists to avoid.
 //
-// **Gated on where the date lands** rather than on the outcome alone. A
+// Gated on where the date lands rather than on the outcome alone. A
 // commitment at or before the earliest deadline among what it covers hides
 // nothing the policy did not already allow, so it stands on its own; past that
 // deadline it defers the worst thing it covers and a second person agrees.
 // Worked out here rather than by the caller, because the deadline is a fact
 // about the set this resolves and the caller does not have it.
 //
-// **It takes no bound.** A bulk judgment takes one and this does not, and the
+// It takes no bound. A bulk judgment takes one and this does not, and the
 // difference is reversibility rather than size: nothing re-checks a dismissal,
 // so one sentence answering a thousand findings has to stay a size a reviewer
 // can follow, while the next scan re-checks every row a promise names.
@@ -112,9 +112,10 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 				ErrNothingOpen)
 		}
 
-		// What the promise is measured against: the earliest deadline among
-		// what it covers. One act covering a critical and a medium is gated by
-		// the critical, however many mediums are in it.
+		// binding is what the promise is measured against: the
+		// earliest deadline among what it covers. One act covering a
+		// critical and a medium is gated by the critical, however many
+		// mediums are in it.
 		var binding *time.Time
 		for _, at := range reaching {
 			for _, place := range at.Places {
@@ -184,7 +185,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// raising a setting that guards the dismissal path this one has
 		// nothing to do with.
 		//
-		// What one of that size costs to commit is measured rather than
+		// The cost of committing one of that size is measured rather than
 		// assumed: 8.3 s on SQLite, 8.4 s on MariaDB, 10.9 s on MySQL and
 		// 23.9 s on PostgreSQL, under "make measure".
 		if err := permitted(subject, proposals, s.now()); err != nil {
@@ -225,10 +226,10 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 			}
 			out.Targets += n
 		}
-		// Who is carrying it, where somebody said. Part of the same act rather
-		// than a second one: a bump nobody is holding is a promise with no
-		// owner, and the screen that records it is the screen that knows who
-		// the owner is.
+		// The person carrying it, where somebody said. Part of the same act
+		// rather than a second one: a bump nobody is holding is a promise with
+		// no owner, and the screen that records it is the screen that knows
+		// who the owner is.
 		if up.HoldBy != nil {
 			held, err := findings.HandOverWithin(ctx, tx, subject, up.ProductID, work, up.HoldBy)
 			if err != nil {
@@ -246,14 +247,14 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 
 // Repromise changes what a release is moving to, or by when.
 //
-// **Editing a commitment is editing what somebody agreed to.** An approver
+// Editing a commitment is editing what somebody agreed to. An approver
 // agreed to "8.5.0 by 8 October"; a coordinator quietly rewriting either half
 // would leave the agreement standing over a promise nobody read, which is the
 // failure REQ-28 exists to prevent — so this goes through the same act revising
 // the words does: every agreement on the claim is withdrawn and every row of it
 // returns to the queue.
 //
-// **The reasoning is required, and it is the history.** Saying why a date moved
+// The reasoning is required, and it is the history. Saying why a date moved
 // is what a second person has to read, and the revisions are where "what we
 // said in October" survives being changed in November. A promise moved with no
 // sentence attached is a promise nobody can audit.

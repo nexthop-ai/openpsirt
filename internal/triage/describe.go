@@ -168,7 +168,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 	for _, issue := range issues {
 		byIssue[issue.ID] = issue
 	}
-	// What each decision's own product rates its issue. A rating belongs to a
+	// Each decision's own product's rating of its issue. A rating belongs to a
 	// product, and these rows span them — a queue of decisions is not one
 	// product's — so the word a card shows is the one the product the
 	// decision was made in holds.
@@ -181,7 +181,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		return nil, err
 	}
 
-	// How many places the issue sits at in that component in that build, and
+	// The places the issue sits at in that component in that build, and
 	// how many of those the decision's claim covers. One grouped statement
 	// each over the builds and components in hand; the triples that were not
 	// asked about fall out in Go.

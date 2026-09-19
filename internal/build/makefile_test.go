@@ -88,8 +88,8 @@ func TestEveryTargetIsDeclaredPhonyAndEveryDeclarationNamesOne(t *testing.T) {
 	t.Logf("%d targets across %d makefiles", examined, len(paths))
 }
 
-// What the join reports, asked of text that holds one of each drift and of
-// text that holds neither.
+// The join's report, asked of text holding one of each drift and of text
+// holding neither.
 func TestDriftIsReportedInBothDirectionsAndAgreementIsNot(t *testing.T) {
 	const drifted = `.PHONY: build gone
 GO := go

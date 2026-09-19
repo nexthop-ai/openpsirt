@@ -77,7 +77,7 @@ func TestWhoMayHoldWorkIsPeopleAndTeams(t *testing.T) {
 }
 
 func TestWhoMayHoldUndisclosedWorkIsNotAnswered(t *testing.T) {
-	// Asking who may hold undisclosed work is a question about undisclosed
+	// A request for who may hold undisclosed work is itself about undisclosed
 	// work. Somebody who cannot read it is answered as though the product
 	// were not there, which is what every other path does — and the
 	// request is refused before any name is resolved, so it cannot be used

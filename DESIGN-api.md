@@ -45,21 +45,20 @@ document is wrong the first time somebody is in a hurry — silently.
 
 | Rule | |
 |---|---|
-| A closed vocabulary is the domain's list, not a literal beside the route | Retyped at the route, a word added to the domain is accepted by the store and refused by every route that takes it — and it was retyped in eight struct tags carrying four different memberships. The list comes from the package that owns the vocabulary, so the document and the store cannot disagree about what a word is |
+| A closed vocabulary is the domain's list, not a literal beside the route | Retyped at the route, a word added to the domain is accepted by the store and refused by every route that takes it, and each retyping is free to carry a different membership. The list comes from the package that owns the vocabulary, so the document and the store cannot disagree about what a word is |
 | A subset is a named rule in the domain package | Some routes take fewer words than the vocabulary has: one decision at a time offers what a person may propose there, and a bulk claim offers less again. Shortening the list at the route makes what is left out an accident; naming the subset where the vocabulary lives makes it a statement, with the reason beside it |
 | Every word in the built document is checked against the list that owns it | A test walks the document the server builds from its own registrations and requires each enumerated word to be one the domain holds. Asked of a hand-kept list it would only check that two copies match; asked of the domain it checks that the document is true |
 
 ## Unauthenticated surfaces
 
-The application serves no documentation of its own, leaving **no unauthenticated
-route that reads domain data**: no product, finding, issue, person or credential
+The application serves no documentation of its own, leaving no unauthenticated
+route that reads domain data: no product, finding, issue, person or credential
 is readable without a credential.
 
-Sign-in is not nothing, and the absolute this used to state was false. It reads
-and writes the deployment's own sign-in key, the session it is creating and the
-account row a first arrival needs — its own machinery, and nothing beyond it. A
-route added under that prefix is checked against that; it is not harmless by
-construction.
+Sign-in is not nothing. It reads and writes the deployment's own sign-in key,
+the session it is creating and the account row a first arrival needs — its own
+machinery, and nothing beyond it. A route added under that prefix is checked
+against that rather than assumed harmless.
 
 Four surfaces answer without a credential. The list is written out rather than
 inferred from a rule, so adding a route never adds an exception.
@@ -76,7 +75,7 @@ inferred from a rule, so adding a route never adds an exception.
 | Rule | Detail |
 |---|---|
 | A summary is an imperative verb and the thing it acts on | In the words the domain uses. Somebody scanning thirty operations has to find theirs in a second |
-| The first sentence states what the operation does | A dozen opened with the argument instead and never said what the endpoint returns |
+| The first sentence states what the operation does | Opening with the argument leaves the endpoint's answer unsaid |
 | A description states what the operation takes, what comes back, and what is not obvious | An upload that answers before parsing, a field required only for one outcome, an approval a later edit withdraws |
 | Reasoning is excluded | It lives in this document and in `REQUIREMENTS.md`. Requirement identifiers name a file no caller has |
 | Every parameter carries its own description | A required query parameter documented as nothing is a parameter somebody guesses at |
@@ -100,15 +99,15 @@ decision identifier, a person and a credential.
 Anything else is an oracle: if "you may not see that" and "that does not exist"
 differ, somebody holding one product learns the name of every other by guessing.
 
-The sentences are kept in one place. There were six spellings, two of which
-described the wrong thing.
+The sentences are kept in one place, so spellings cannot multiply and describe
+the wrong thing.
 
-**A store's refusal that no handler has an arm for is an oracle too.** It falls
+A store's refusal that no handler has an arm for is an oracle too. It falls
 through to the fault answer, so the route says 500 where a stranger is told
-404, and the pair says the build is there — one name at a time, and the fault's
-own text named which of product, stream and variant was undeclared. Every store
-refusal is typed and every handler that can meet one answers it the way a name
-that reaches nothing is answered.
+404, and the pair says the build is there — one name at a time, with the
+fault's own text naming which of product, stream and variant is undeclared.
+Every store refusal is typed and every handler that can meet one answers it the
+way a name that reaches nothing is answered.
 
 The reach that meets them is a case collaborator: they hold nothing on the
 product and may open exactly one finding, so every product-wide read refuses
@@ -119,21 +118,21 @@ them, and each of those refusals has to look like a stranger's.
 | 404 | A name that reaches nothing, including one that reaches something they may not have |
 | 403 or 422 | An act they may not do on something already shown to them |
 
-The second is the one that was answered both ways: handing work to somebody
-else needs a right, and one route said 404 while the other said 422 about the
-identical condition.
+The second is the one two routes answer differently if nothing holds them
+together: handing work to somebody else needs a right, and 404 against 422
+about the identical condition is what that looks like.
 
-**A streamed answer is refused before its first byte.** Once the status has
-gone the only place left to say anything is the file, and what it said was that
-the export stopped early — behind a 200.
+A streamed answer is refused before its first byte. Once the status has gone,
+the only place left to say anything is the file, which then reports that the
+export stopped early behind a 200.
 
 ## Refusal shape
 
 `application/problem+json`, for everything, including the handlers in front of
 the router — the credential check and the sign-in callbacks, which are ordinary
 handlers rather than operations because a redirect arriving from a provider is
-not an API call. They answered `text/plain`, so a client parsing the documented
-error model read a refusal as a transport fault.
+not an API call. Answering `text/plain` there makes a client parsing the
+documented error model read a refusal as a transport fault.
 
 A refusal states where to look. Each fault travels as its own detail carrying
 the line and the offending text. This is an API shape decision rather than a
@@ -141,18 +140,18 @@ presentation one: an interface can only point at the problem if the answer says
 where it is.
 
 A store's own sentence and a failed query are distinguished by the engine's
-error types, asked in one place, rather than by the message text. Thirty
-handlers answered both as a 422 with the message in it, so a broken database
-reached the caller as a bad request carrying the statement text and, for a
-connection failure, the address and user it tried. Where the type cannot decide,
-the error is treated as a refusal.
+error types, asked in one place, rather than by the message text. Answered
+alike as a 422 with the message in it, a broken database reaches the caller as
+a bad request carrying the statement text and, for a connection failure, the
+address and user it tried. Where the type cannot decide, the error is treated
+as a refusal.
 
-**A 404 is never built from an error's own text.** It asserts that a name
-reaches nothing, and the body then publishes whatever the error carried — for a
-store read, the driver's message. Thirty handlers wrote one, over readers that
-returned the driver's error unwrapped, so a connection failure reached an
-authenticated caller as "that product does not exist" with the database host,
-port and driver in the detail. A gate checks it.
+A 404 is never built from an error's own text. It asserts that a name reaches
+nothing, and the body then publishes whatever the error carried — for a store
+read, the driver's message. Built that way over a reader returning the driver's
+error unwrapped, a connection failure reaches an authenticated caller as "that
+product does not exist" with the database host, port and driver in the detail.
+A gate checks it.
 
 The one exception is named in place: the catalog's own not-declared error is
 composed from the names the caller supplied and fixed words, and a pipeline
@@ -160,21 +159,21 @@ whose upload was refused has to be told which of the product, the branch and
 the variant it was. That arm is reached only once the sentinel has been tested.
 
 A read that could not be made is a fault rather than a 404. The split is one
-helper rather than a judgment made per route, because it was being made per
-route and made correctly at five sites of thirty-eight.
+helper rather than a judgment made per route: made per route, it is made
+differently per route.
 
 A process with no database answers with one sentence. Every handler guards
-against it, because a nil pointer inside one is worse than a refusal. Each guard
-had invented its own wording — twenty-one of them, reading as twenty-one
-conditions. It says nothing about what the caller asked for, because the caller
-did not cause it and cannot fix it.
+against it, because a nil pointer inside one is worse than a refusal, and each
+guard writing its own wording reads as that many different conditions. It says
+nothing about what the caller asked for, because the caller did not cause it
+and cannot fix it.
 
 ## Paging
 
 `limit` and `offset`, with a total, wherever a caller reads a second page. A
 list that takes a limit and no offset cannot be read past its ceiling at all
-through the API, and the screen showed the ceiling's worth and reported it as
-the list.
+through the API, and a screen shows the ceiling's worth and reports it as the
+list.
 
 Some lists take a limit and no offset on purpose, and the limit is there to
 refuse an absurd request rather than to cut a page.
@@ -185,12 +184,12 @@ refuse an absurd request rather than to cut a page.
 | What makes it correct | The ceiling is above anything the list can hold, so nobody is looking at a page |
 | What ends it | The list growing past the ceiling on a real deployment. It gains an offset then, and the screen gains the control to use it |
 
-Four of them had outgrown it and gained the offset: what is running out of
-time, what is approaching disclosure, the extensions waiting for a second
-person, and the deferrals that keep repeating. Each grows with the estate, and
-each now answers with a total as well — a caller holding a full page cannot
-otherwise tell a clipped page from the whole list, and two screens were
-printing the length of their own page as the figure.
+Four of them take an offset: what is running out of time, what is approaching
+disclosure, the extensions waiting for a second person, and the deferrals that
+keep repeating. Each grows with the estate, and each answers with a total as
+well — a caller holding a full page cannot otherwise tell a clipped page from
+the whole list, and a screen then prints the length of its own page as the
+figure.
 
 The three that keep a limit alone are the pickers: who holds something, who may
 be mentioned, and what sits at the top of one build's tree. Each is a list
@@ -212,26 +211,24 @@ Ceilings vary by list. Which list allows what is a judgment about each list.
 
 | Rule | |
 |---|---|
-| A capped listing carries the whole-answer count | A caller cannot tell a clipped page from a complete answer otherwise, and every reader that recounted its own page stated a figure about the page under a heading about the whole. What is running out of time reported none, so a tile said 200 over a list of 462 |
+| A capped listing carries the whole-answer count | A caller cannot tell a clipped page from a complete answer otherwise, and a reader recounting its own page states a figure about the page under a heading about the whole. Without the count a tile says 200 over a list of 462 |
 | A figure counted over the whole answer is returned beside the rows, not recomputed from them | Coverage reports how many builds there are, how many have gone quiet, how many have never been scanned and how many are out of support, each counted before the page is cut |
-| A bound declared for a listing bounds the whole listing | The holder picker declared twenty-five and applied it to the people alone, appending every team there is after them |
-| What a request asked for and could not be acted on comes back | A note naming more people than one act may tell reached some of them and said nothing about the rest, in the response or anywhere else |
+| A bound declared for a listing bounds the whole listing | Applied to the people alone, it appends every team there is after them |
+| What a request asked for and could not be acted on comes back | A note naming more people than one act may tell reaches some of them, and the rest go unmentioned in the response and anywhere else |
 
 ## Sorting and filtering
 
 Filters are named fields with fixed meanings, bound as parameters.
 
-**A filter over an open set says so.** The kind of package is read out of the
+A filter over an open set says so. The kind of package is read out of the
 identifier a producer wrote, so the set is whatever producers emit and the
-parameter carries any string: one nothing carries matches nothing. Two
-descriptions named eight kinds as though that were the vocabulary, and the
-interface offered exactly those eight — so on an image whose packages are
-`apk` or `rpm`, most of the inventory could not be narrowed to at all while the
-server would have answered either correctly.
+parameter carries any string: one nothing carries matches nothing. Named as
+eight kinds and offered as eight, most of an image whose packages are `apk` or
+`rpm` cannot be narrowed to at all, while the server answers either correctly.
 
-Sorting was refused outright and is now permitted (REQ-66). A value in a query
-can be bound as a parameter; a column name cannot, so a sort column arriving from
-a query string becomes part of the statement.
+Sorting is permitted (REQ-66). A value in a query can be bound as a parameter
+and a column name cannot, so a sort column arriving from a query string becomes
+part of the statement.
 
 | Rule | |
 |---|---|
@@ -241,9 +238,9 @@ a query string becomes part of the statement.
 | The direction is one of two words written here | Not a word that arrived |
 | A key that misses answers in the list's own order | An unknown sort is a mistake about a list, not a reason not to show it |
 | The issue table is joined only where the chosen order needs it | The ordinary page still reads one covering index |
-| A narrowing that cannot be applied answers nothing, never everything | "Assigned to me" from a credential that holds no party names nobody, and dropping the condition handed the caller every finding there is while the screen went on showing the filter as on. A filter asking for a set nothing is in answers with nothing |
-| A filter with three answers is a word, not a flag | Origin is one: the screen offered "Scanner" and could only send the absence of "entered by hand", so choosing it filtered nothing |
-| A repeated value is one value | A set of one word sent twice read as "both kinds, so no narrowing", which silently put tags back into a list somebody had asked to see branches of |
+| A narrowing that cannot be applied answers nothing, never everything | "Assigned to me" from a credential that holds no party names nobody. Dropping the condition hands the caller every finding there is while the screen goes on showing the filter as on, so a filter asking for a set nothing is in answers with nothing |
+| A filter with three answers is a word, not a flag | Origin is one: a screen offering "Scanner" as a flag can only send the absence of "entered by hand", so choosing it filters nothing |
+| A repeated value is one value | A set of one word sent twice otherwise reads as both kinds and no narrowing, which silently puts tags back into a list somebody asked to see branches of |
 
 This also prevents a sort exposing a column the caller was never meant to order
 by.
@@ -314,13 +311,13 @@ gated operation as somebody holding none of its roles; a 2xx fails it.
 A gate refuses an operation declaring neither scope nor roles. An endpoint added
 without one is not broken, it is undocumented.
 
-**"Any signed-in person" and "any recognized credential" are two scopes, because
-a pipeline's key is not somebody.** Seventy-four operations declared the second
-and then refused every credential that is not a person, so the reference, the
-extension a client generator reads, and an access review all stated a rule the
-code contradicted. The word could not be redefined instead: two operations
-really do mean any credential — a key reads back the scans it sent, and the
-receipts for them.
+"Any signed-in person" and "any recognized credential" are two scopes, because
+a pipeline's key is not somebody. An operation declaring the second and then
+refusing every credential that is not a person makes the reference, the
+extension a client generator reads and an access review all state a rule the
+code contradicts. The word cannot be redefined instead: two operations really
+do mean any credential — a key reads back the scans it sent, and the receipts
+for them.
 
 The part of a requirement that is about the subject alone is enforced before any
 handler runs, which is what makes the handler's own check the second statement
@@ -351,23 +348,19 @@ wherever a display name is more than a recapitalization.
 
 | Rule | Reason |
 |---|---|
-| A field a write resolves carries the address | It is what the lookup matches. A listing that published the label there could not be used to undo what it listed |
+| A field a write resolves carries the address | It is what the lookup matches. A listing publishing the label there cannot undo what it listed |
 | The label goes beside it, never in place of it | A screen still shows what a person reads. Two fields is the only arrangement where both are true |
 | The label is absent where it repeats the address | So that "no display name" and "the same again" do not read alike |
 | A name in a path is the address | Folding only lowercases and trims, so a label matches no row |
 
-What this cost. A collaborator on an embargoed case was listed under
-their display name in a field called `identity`, and the removal route resolves
-that field — so somebody who should no longer see the case could be listed and
-not taken off. And a role on a product declared `acme-router` and displayed
-`Acme Router` was listed as `Acme Router`, which the withdraw beside it sent
-back, and nothing matched.
+What publishing the label in the address's field costs. A collaborator on an
+embargoed case listed under their display name in a field called `identity`
+cannot be taken off, because the removal route resolves that field. A role on a
+product declared `acme-router` and displayed `Acme Router`, listed as the
+label, is sent back by the withdraw beside it and matches nothing.
 
-The collaborator list had the other field already declared and never filled.
-The role, credential, binding, token and routing-rule listings had only the one,
-and the label is a new field beside it — which is a shipped addition to those
-response schemas, and a change of value in the field that was already there: a
-key now reads `acme-router` where it read `Acme Router`.
+Every listing carries both fields: the collaborators, the roles, the
+credentials, the bindings, the tokens and the routing rules.
 
 ## File organization
 
@@ -383,7 +376,7 @@ The package's authorization primitives sit beside the declarations they
 enforce. A declaration in one file and the primitive enforcing it in another
 with nothing to do with it is what makes the privilege ladder hard to audit.
 
-### What stays as it is
+### Deliberate omissions
 
 Recorded because the conclusion is the deliverable.
 
@@ -394,36 +387,13 @@ Recorded because the conclusion is the deliverable.
 
 ## Limits
 
-- **Half the declaration is the check, and half is not.** The scope — an
-  administrator, the caller's own credential, any recognized one, none — is a
-  fact about the subject alone, so it is enforced from the declaration before
-  any handler runs. A role on a product needs the product resolved, so that
-  half stays a line in the handler, and where a narrower check was written than
-  the operation declares the two disagree and nothing fails. Enforcing the role
-  half centrally is refused for the reason it always was: a check running before
-  the handler would answer 403 and tell a guesser the thing exists. Enforcing
-  neither is what left every administrator gate resting on one line nobody
-  swept.
-- **The gate sweep is a floor, not a proof.** A refusal for the wrong reason
-  passes it, and it says nothing about what a narrowed operation puts in its
-  answer. It walks both gated scopes and counts them apart, because it walked
-  one of the two for a long time and the one it skipped was the administrator
-  gates.
-- **A note states something the scope does not, or is omitted.** Three said the
-  opposite of the value beside them, the worst being an operation answered
-  without a credential that declared it required one.
-- **Paging is `limit` and `offset`, with a total.** A cursor is better under
-  concurrent writes and worse for jumping to a page. The total is separate from
-  the page because somebody deciding whether to start work needs to know how much
-  there is.
-- **A list answers with an object, not an array.** An array at the top level has
-  nowhere to put the total.
-- **Names in paths, identifiers in bodies.** A product, stream and variant are
-  what somebody typing a request knows and what a pipeline has in its
-  configuration. A decision is numbered because it has no name.
-- **A place in a path is the identity the findings list gave out**, not something
-  a caller composes. A caller free to name a place would be choosing which
-  decisions apply where.
-- **Comment density in this layer is low by design.** It is a registration and a
-  mapping: the operation is declared, a store is called, its answer becomes a
-  body. What is worth explaining about a rule belongs where the rule is enforced.
+| Limit | Detail |
+|---|---|
+| Half the declaration is the check and half is not | The scope — an administrator, the caller's own credential, any recognized one, none — is a fact about the subject alone, so it is enforced from the declaration before any handler runs. A role on a product needs the product resolved and stays a line in the handler, where a check narrower than the operation declares disagrees with it and nothing fails. Enforcing the role half centrally would answer 403 before the handler and tell a guesser the thing exists; enforcing neither leaves every administrator gate resting on one line nobody sweeps |
+| The gate sweep is a floor, not a proof | A refusal for the wrong reason passes it, and it says nothing about what a narrowed operation puts in its answer. It walks both gated scopes and counts them apart, because a sweep over one of them skips the administrator gates |
+| A note states something the scope does not, or is omitted | A note saying the opposite of the value beside it is worse than none: an operation answered without a credential can declare that it requires one |
+| Paging is `limit` and `offset`, with a total | A cursor is better under concurrent writes and worse for jumping to a page. The total is separate from the page because somebody deciding whether to start work needs to know how much there is |
+| A list answers with an object, not an array | An array at the top level has nowhere to put the total |
+| Names in paths, identifiers in bodies | A product, stream and variant are what somebody typing a request knows and what a pipeline has in its configuration. A decision is numbered because it has no name |
+| A place in a path is the identity the findings list gave out | A caller free to compose one would be choosing which decisions apply where |
+| Comment density in this layer is low by design | It is a registration and a mapping: the operation is declared, a store is called, its answer becomes a body. What is worth explaining about a rule belongs where the rule is enforced |

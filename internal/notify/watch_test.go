@@ -22,9 +22,8 @@ import (
 func TestTheWatchTellsAdministratorsWhatHasGoneQuiet(t *testing.T) {
 	// The pass that makes a condition real. A build nothing has been filed
 	// against is something an administrator is told; when a scan arrives
-	// the alert goes without anybody dismissing it, which is the whole of
-	// conditions clearing, events acknowledged and the reason these are
-	// not events.
+	// the alert goes without anybody dismissing it, which is the whole of a
+	// condition clearing itself and the reason these are not events.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -128,9 +127,9 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 	// and nothing has been decided, and it clears when somebody moves the
 	// date or discloses, because both of those are answering it.
 	//
-	// Who hears about it is the careful part. Every one of these is a
-	// finding nobody has announced, so the alert is a disclosure in its
-	// own right.
+	// The people who hear about it are the careful part. Every one of these is
+	// a finding nobody has announced, so the alert is a disclosure in its own
+	// right.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -909,7 +908,7 @@ func hideSomething(t *testing.T, db *database.DB, productID int64) {
 // A version that comes back is not the data moving, and is not the data
 // standing still since the first time it was ever seen.
 //
-// **A data bundle is a build stamp**, so restoring an older one reproduces a
+// A data bundle is a build stamp, so restoring an older one reproduces a
 // version string exactly. Measured as the first sighting of whichever version
 // ran most recently, an air-gapped deployment re-importing last quarter's
 // bundle was told the data had not moved in seven months — about data that had

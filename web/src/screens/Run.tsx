@@ -15,9 +15,9 @@ type Changed = {
   low?: number;
 };
 
-// What one run of the scanner did.
+// One run of the scanner, and the change it made.
 //
-// **A receipt says a run happened; nothing said what it did.** A row reading
+// A receipt says a run happened; nothing said what it did. A row reading
 // "scanned · 7,604 opened" is a number with no shape: opened *what*, and is
 // any of it urgent. Somebody looking at a build that jumped by four thousand
 // overnight is asking which of them matter, and the answer was a findings list
@@ -124,12 +124,12 @@ export function Run() {
             problem this screen exists to fix, and "opened after a date" is the
             wrong question when two runs landed the same day. */}
         <Shape
-          title="What it opened"
+          title="The findings it opened"
           changed={it.opened}
           exploited={it.opened_exploited}
           to={`${build}/findings?opened_by_run=${encodeURIComponent(run)}`}
         />
-        <Shape title="What it closed" changed={it.closed} />
+        <Shape title="The findings it closed" changed={it.closed} />
       </div>
 
       <p className="hint" style={{ marginTop: 10 }}>
@@ -149,8 +149,8 @@ function Shape({
   title: string;
   changed: Changed | undefined;
   exploited?: number;
-  // Where the rows behind the count are, where they can be listed. What a run
-  // closed has no such list: those findings are closed, and the list is of
+  // The address of the rows behind the count, where they can be listed. What a
+  // run closed has no such list: those findings are closed, and the list is of
   // what is open.
   to?: string;
 }) {

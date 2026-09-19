@@ -972,7 +972,11 @@ docs-site:
 .PHONY: pins-check
 pins-check:
 	@fail=0; \
-	block() { sed -n '/^## What it does$$/,/^- Build or deploy fixes$$/p' "$$1"; }; \
+	block() { sed -n '/^## Scope$$/,/^- Build or deploy fixes$$/p' "$$1"; }; \
+	[ -n "$$(block README.md)" ] || { \
+	  echo "the shared block is empty in README.md, so this compared nothing."; fail=1; }; \
+	[ -n "$$(block docs/index.md)" ] || { \
+	  echo "the shared block is empty in docs/index.md, so this compared nothing."; fail=1; }; \
 	[ "$$(block README.md)" = "$$(block docs/index.md)" ] || { \
 	  echo "README.md and docs/index.md describe what this does in different words."; \
 	  echo "They are the same list maintained twice; make them the same words."; fail=1; }; \

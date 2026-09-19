@@ -20,20 +20,20 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// ClaimApprovalBody is what agreeing to a claim asks for.
+// ClaimApprovalBody is the body of an approval.
 type ClaimApprovalBody struct {
 	// Bounded to what the column holds. A name is compared for equality and
 	// never read back on its own, so it shares the width of a hash.
 	Batch string `json:"batch,omitempty" maxLength:"64" doc:"Name a batch to agree to several claims under one name, so they can be undone together. At most 64 characters"`
-	// Except sets rows aside. What is left is approved as one claim; these go
+	// Except sets rows aside. The remainder is approved as one claim; these go
 	// back to the proposer as a claim of their own, with the reason.
 	Except  []int64 `json:"except,omitempty" maxItems:"2000" doc:"Decisions in this claim to set aside rather than approve. They return to the proposer as a claim of their own, carrying the reason given in because"`
-	Because string  `json:"because,omitempty" doc:"Why the rows in except are set aside, in markdown. Required when any are"`
+	Because string  `json:"because,omitempty" doc:"The reason the rows in except are set aside, in markdown. Required when any are"`
 }
 
-// ClaimApprovedBody is what agreeing to a claim did.
+// ClaimApprovedBody is the record of an approval.
 type ClaimApprovedBody struct {
-	Approved      int   `json:"approved" doc:"How many decisions were agreed to"`
+	Approved      int   `json:"approved" doc:"The number of decisions agreed to"`
 	ReturnedClaim int64 `json:"returned_claim,omitempty" doc:"The claim the rows set aside went into, where any were"`
 }
 
@@ -76,7 +76,7 @@ func registerClaims(api huma.API, in Ingest) {
 		out.Body.Approved = done.Approved
 		if done.Returned != nil {
 			out.Body.ReturnedClaim = done.Returned.ID
-			// The rows went back to whoever proposed them, and
+			// The rows go back to whoever proposed them, and
 			// they should hear rather than find out. Logged on
 			// failure: the rows are returned either way.
 			tell(ctx, in, "could not say that rows were set aside", notify.Telling{
@@ -85,9 +85,9 @@ func registerClaims(api huma.API, in Ingest) {
 				Link: "/review-queue",
 				// A claim covers many findings and this path
 				// holds the claim rather than any of them, so
-				// whether one of them is undisclosed cannot be
+				// the disclosure of any one of them cannot be
 				// answered from here. Treated as though one
-				// is: the direction to be wrong in is a link
+				// is undisclosed: the direction to be wrong in is a link
 				// somebody has to follow, not an approver's
 				// words about an embargo landing in a mail
 				// server.
@@ -112,7 +112,7 @@ func registerClaims(api huma.API, in Ingest) {
 	}, perProduct, "The proposer may not approve their own.", approveRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			Because string `json:"because" minLength:"1" doc:"What needs to change, in markdown"`
+			Because string `json:"because" minLength:"1" doc:"The change being asked for, in markdown"`
 		}
 	}) (*struct{}, error) {
 		subject, store, err := triaging(ctx, in)
@@ -152,7 +152,7 @@ func registerClaims(api huma.API, in Ingest) {
 				// careful of them. Read off the claim rather
 				// than off its representative row: that row is
 				// chosen by identifier and a claim's rows need
-				// not agree .
+				// not agree.
 				Private: back.Undisclosed,
 				// Off the representative row, which is a row of
 				// this claim and so names its product and its
@@ -184,7 +184,7 @@ func registerClaimLink(api huma.API, in Ingest) {
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			Elsewhere string `json:"elsewhere" maxLength:"1000" doc:"Where the work is happening. Empty clears it"`
+			Elsewhere string `json:"elsewhere" maxLength:"1000" doc:"The place the work is happening. Empty clears it"`
 		}
 	}) (*struct{}, error) {
 		subject, store, err := triaging(ctx, in)
@@ -206,11 +206,11 @@ func noSuchClaim() error {
 	return huma.Error404NotFound("no such claim")
 }
 
-// ReaffirmedBody is what one bulk re-affirmation did.
+// ReaffirmedBody is the record of one bulk re-affirmation.
 type ReaffirmedBody struct {
 	ClaimID   int64   `json:"claim_id" doc:"The claim this action made, which is what a second person agrees to where one is needed"`
 	Decisions []int64 `json:"decisions"`
-	Places    int     `json:"places" doc:"How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
+	Places    int     `json:"places" doc:"The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
 	Waiting   bool    `json:"waiting" doc:"Whether a second person has to agree"`
 }
 
@@ -223,18 +223,18 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 		Description: "Re-makes every row of this claim that stopped applying because an " +
 			"upstream version moved, at the versions each place has now, as one act with one " +
 			"reasoning.\n\n" +
-			"**Deciding is bulk-capable and re-deciding was not.** A team answering one kernel " +
+			"Deciding is bulk-capable and re-deciding was not. A team answering one kernel " +
 			"issue writes a decision at each of its places in one action; when the kernel " +
 			"moves, those lapse, and restoring them was one request each with a separately " +
 			"typed justification.\n\n" +
 			"Only the person who made the original may do this. It normally needs no second " +
 			"approver, for the reason the single form does not: two people already agreed, and " +
 			"a version upgrade is a prompt to re-check rather than a new claim.\n\n" +
-			"**One act, one approval.** Where any row would need approval again — the " +
+			"One act, one approval. Where any row would need approval again — the " +
 			"severity has risen since it was agreed to, or nothing was ever agreed to — the " +
 			"whole act does. An approver works at the unit the proposer acted at, and agreeing " +
 			"to part of an argument they were shown whole is not review.\n\n" +
-			"**Bounded like the judgment it re-makes.** The outcome comes from the claim, so " +
+			"Bounded like the judgment it re-makes. The outcome comes from the claim, so " +
 			"re-affirming a bulk dismissal is a bulk judgment and is held to " +
 			"`triage.together-cap`; only a promise to upgrade goes through unbounded, because " +
 			"the next scan re-checks it.\n\n" +
@@ -244,7 +244,7 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 	}, anyPerson, "", triageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			Reasoning string `json:"reasoning" minLength:"1" doc:"Why every one of them still holds, in markdown"`
+			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason every one of them still holds, in markdown"`
 		}
 	}) (*struct{ Body ReaffirmedBody }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -325,21 +325,22 @@ type StandingClaimBody struct {
 	// State is the claim's as a whole, not a representative row's: approved
 	// only where every live row here is.
 	State string           `json:"state" enum:"proposed,approved" doc:"The claim's state as a whole: approved only when every live row here is approved, otherwise proposed"`
-	Rows  RowsStandingBody `json:"rows" doc:"How the claim's rows here stand"`
-	// What an approver asked for, where rows were sent back.
-	SentBackAt      string        `json:"sent_back_at,omitempty" doc:"When rows were last sent back to the author"`
+	Rows  RowsStandingBody `json:"rows" doc:"The state of the claim's rows here"`
+	// SentBackAt is the last time an approver asked for more, where rows were
+	// sent back.
+	SentBackAt      string        `json:"sent_back_at,omitempty" doc:"The last time rows were sent back to the author"`
 	SentBackBecause string        `json:"sent_back_because,omitempty" doc:"The reason given when they were, in markdown"`
 	Outcome         outcome       `json:"outcome"`
 	Justification   justification `json:"justification,omitempty"`
-	// FixedVersion is the evidence for a claim that the fix is already
-	// here, on the screen the claim is read from. The audit trail carried
-	// it and this did not, which puts the checkable part of the claim
-	// everywhere except where somebody looks at the claim.
+	// FixedVersion is the evidence for a claim that the fix is already here,
+	// on the screen the claim is read from. Carried by the audit trail alone,
+	// the checkable part of the claim is everywhere except where somebody
+	// reads the claim.
 	FixedVersion  string   `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
 	NeedsApproval bool     `json:"needs_approval,omitempty"`
 	ProposedBy    string   `json:"proposed_by"`
 	ProposedAt    string   `json:"proposed_at"`
-	Places        int      `json:"places" doc:"How many of this finding's places the claim covers"`
+	Places        int      `json:"places" doc:"The number of this finding's places the claim covers"`
 	Builds        []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
 	ApprovedBy    string   `json:"approved_by,omitempty"`
 	ApprovedAt    string   `json:"approved_at,omitempty"`
@@ -361,17 +362,17 @@ type EarlierBody struct {
 	Outcome       outcome       `json:"outcome"`
 	Justification justification `json:"justification,omitempty"`
 	DeferredUntil string        `json:"deferred_until,omitempty"`
-	// FixedVersion is what an approver checks the already-fixed claim
+	// FixedVersion is the evidence an approver checks the already-fixed claim
 	// against. Agreeing to a claim of fact without being shown the fact is
 	// the failure this outcome is most exposed to.
 	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
 	ProposedBy   string `json:"proposed_by"`
 	ProposedAt   string `json:"proposed_at"`
-	Ended        string `json:"ended" enum:"lapsed,withdrawn" doc:"Why it stopped applying"`
+	Ended        string `json:"ended" enum:"lapsed,withdrawn" doc:"The reason it stopped applying"`
 	EndedAt      string `json:"ended_at,omitempty"`
 	About        string `json:"about,omitempty" doc:"The component upstream version it was a claim about"`
 	Reasoning    string `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away"`
-	ApprovedBy   string `json:"approved_by,omitempty" doc:"Who last agreed to it, where anybody did"`
+	ApprovedBy   string `json:"approved_by,omitempty" doc:"The person who last agreed to it, where anybody did"`
 }
 
 // SimilarBody is an approved claim at the same places about another issue,
@@ -383,16 +384,16 @@ type SimilarBody struct {
 	Reasoning     string        `json:"reasoning"`
 	ApprovedBy    string        `json:"approved_by,omitempty"`
 	ApprovedAt    string        `json:"approved_at,omitempty"`
-	Issues        int           `json:"issues" doc:"How many distinct issues the claim covers"`
+	Issues        int           `json:"issues" doc:"The number of distinct issues the claim covers"`
 }
 
 // ElsewhereBody is an approved claim about this same issue at this same place,
 // in another product.
 //
-// **Evidence, never an outcome.** Offered the way a supplier's VEX statement
-// is: something to read and to quote, prefilling a reasoning where somebody
-// asks for it and deciding nothing. Another team's judgment about their product
-// is not a judgment about this one — what is shipped around the component
+// Evidence, never an outcome. Offered the way a supplier's VEX statement is:
+// something to read and to quote, prefilling a reasoning where somebody asks
+// for it and deciding nothing. Another team's judgment about their product is
+// not a judgment about this one — the software shipped around the component
 // differs, which is why a place is a component at a position rather than a
 // component.
 type ElsewhereBody struct {
@@ -414,12 +415,12 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	[]ElsewhereBody, error) {
 
 	store := triage.NewStore(in.DB.DB)
-	// What stands is matched by key — the place and the versions this build
-	// ships there — so a decision written against another version of the
-	// same place is not reported as standing here. What stood before and
-	// what might carry are asked by place: a lapsed decision no longer
-	// matches the versions by definition, and a similar claim is one about
-	// other issues at the same place.
+	// A standing claim is matched by key — the place and the versions this
+	// build ships there — so a decision written against another version of the
+	// same place is not reported as standing here. The lapsed and the
+	// carryable are asked by place: a lapsed decision no longer matches the
+	// versions by definition, and a similar claim is one about other issues at
+	// the same place.
 	places := make([]string, 0, len(at))
 	for _, place := range at {
 		places = append(places, place.PlaceIdentity)
@@ -495,7 +496,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	earlierOut := make([]EarlierBody, 0, len(earlier))
 	for _, one := range earlier {
 		d := one.Decision
-		// What it said is the claim's; where it landed is the row's.
+		// The words are the claim's; the landing place is the row's.
 		said := d.Claim
 		body := EarlierBody{
 			DecisionID: d.ID, ClaimID: d.ClaimID, Outcome: outcome(said.Outcome),
@@ -533,7 +534,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 		}
 		similarOut = append(similarOut, body)
 	}
-	products, err := decidedInWhat(ctx, in, elsewhere)
+	products, err := productsDecidedIn(ctx, in, elsewhere)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -557,14 +558,14 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	return standingOut, earlierOut, similarOut, elsewhereOut, nil
 }
 
-// decidedInWhat is what the products a set of judgments were made in are called,
-// by identifier.
+// productsDecidedIn is the names of the products a set of judgments were made
+// in, by identifier.
 //
 // Resolved here rather than carried on the judgment: a name is a fact about the
 // catalog, and the read that found the judgments is narrowed by what the
 // subject may see — so a name only ever reaches a reader who could already read
 // the judgment it belongs to.
-func decidedInWhat(ctx context.Context, in Ingest, rows []triage.Elsewhere) (map[int64]string, error) {
+func productsDecidedIn(ctx context.Context, in Ingest, rows []triage.Elsewhere) (map[int64]string, error) {
 	named := map[int64]string{}
 	if len(rows) == 0 {
 		return named, nil

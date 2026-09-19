@@ -417,13 +417,13 @@ func TestTheSecondFormatChargesTheSameBounds(t *testing.T) {
 }
 
 func TestFilesAreBoundedApartFromComponents(t *testing.T) {
-	// What a bound has to stop is the walk, and an unbounded array is an
-	// unbounded walk whatever it holds. The bound is its own rather than the
-	// component one because the two differ by a factor of fifty in a real
-	// document: 4,964 files against 89 packages on one image, 21,643 against
-	// 480 on another. Charged together, a switch operating system's inventory
-	// in a format that catalogs files is refused at a ceiling that is right
-	// for components.
+	// b is what a bound has to stop is the walk, and an unbounded array is
+	// an unbounded walk whatever it holds. The bound is its own rather
+	// than the component one because the two differ by a factor of fifty
+	// in a real document: 4,964 files against 89 packages on one image,
+	// 21,643 against 480 on another. Charged together, a switch operating
+	// system's inventory in a format that catalogs files is refused at a
+	// ceiling that is right for components.
 	var b strings.Builder
 	b.WriteString(`{"spdxVersion": "SPDX-2.3", "documentNamespace": "https://example.invalid/f", "files": [`)
 	for i := range 50 {
@@ -540,7 +540,7 @@ func TestReadsTheFormatsOwnExamples(t *testing.T) {
 			t.Errorf("%d components sit under nothing, want 1 (JUnit)", doc.Unrooted)
 		}
 		// A producer that states no package identifier at all is ordinary.
-		// What it costs is matching, and identity falls back to the name.
+		// The cost is matching, and identity falls back to the name.
 		if doc.Unversioned != 4 {
 			t.Errorf("%d components state no version, want 4", doc.Unversioned)
 		}
@@ -724,7 +724,7 @@ func TestAFileAndAComponentMayNotShareAnIdentifier(t *testing.T) {
 }
 
 func TestAStatedAncestorRefinesOneTakenFromAnIdentifier(t *testing.T) {
-	// Where no pedigree is stated the upstream name comes from the package
+	// With no pedigree stated the upstream name comes from the package
 	// identifier, which carries a name and no version in most cases — and the
 	// version is what expiry compares. A pointer naming a package the document
 	// fully describes knows the version, so it fills that in rather than

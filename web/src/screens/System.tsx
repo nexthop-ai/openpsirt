@@ -8,9 +8,9 @@ import { Wide } from "../ui/Wide";
 import { since } from "../ui/when";
 import { WebhookDelivery } from "./Webhooks";
 
-// What the deployment itself is doing, rather than what it has found.
+// The deployment's own state, rather than what it has found.
 //
-// **Three things were built and reachable from nothing.** Work the queue gave
+// Three things were built and reachable from nothing. Work the queue gave
 // up on had an endpoint and a retry route and no screen; what is waiting and
 // the bound that refuses more of it were settable and shown nowhere; and where
 // this deployment sends what it has to say was configurable only by calling
@@ -25,7 +25,7 @@ import { WebhookDelivery } from "./Webhooks";
 // looks exactly like a quiet one, and a webhook that has been refusing for a
 // week looks exactly like one nothing has been sent to.
 //
-// **Configuring a webhook is not here.** Adding one is administration and sits
+// Configuring a webhook is not here. Adding one is administration and sits
 // under Settings with the rest of what a deployment is set to; what is here is
 // whether the ones configured are arriving. The address is the credential, so
 // it stays on the screen that configures them.
@@ -34,23 +34,23 @@ export function System() {
     <>
       <div className="screen-head">
         <h2>System</h2>
-        <p>What this deployment is doing, and whether what it posts is arriving</p>
+        <p>The deployment&rsquo;s own state, and whether what it posts is arriving</p>
       </div>
       <VulnerabilityData />
       <TheQueue />
-      <WhatUpstreamCouldNotAnswer />
+      <UpstreamUnanswered />
       <WebhookDelivery />
     </>
   );
 }
 
-// How many rows to draw. Past this it is a list nobody reads through, and the
+// The rows drawn. Past this it is a list nobody reads through, and the
 // count beside it says how much there is.
 const MOST = 100;
 
-// What asking public indexes could not answer, and why of each.
+// The components public indexes could not answer for, and the reason for each.
 //
-// **Two questions that are one panel.** What was held back says what the
+// Two questions that are one panel. What was held back says what the
 // derived default is costing; what no index has heard of is the list an
 // operator reads to decide what else should be held back. A name promoted from
 // the second appears in the first afterwards, which is how somebody knows the
@@ -59,7 +59,7 @@ const MOST = 100;
 // Nothing here is a fault, which is why the empty state is the good news and
 // the table is not drawn in a failing color. A private module, a vendored
 // fork and a name this deployment publishes under all reach it.
-function WhatUpstreamCouldNotAnswer() {
+function UpstreamUnanswered() {
   const asked = useQuery({
     queryKey: ["upstream-unanswered"],
     queryFn: async () =>
@@ -68,7 +68,12 @@ function WhatUpstreamCouldNotAnswer() {
 
   if (asked.isPending) return <Loading />;
   if (asked.isError) {
-    return <Failed error={asked.error} what="What upstream could not answer could not be read." />;
+    return (
+      <Failed
+        error={asked.error}
+        what="The components upstream could not answer for could not be read."
+      />
+    );
   }
   const rows = asked.data?.items ?? [];
   const total = asked.data?.total ?? 0;
@@ -138,9 +143,9 @@ function WhatUpstreamCouldNotAnswer() {
   );
 }
 
-// What the scans are answering against, and when it last moved.
+// The vulnerability data the scans answer against, and when it last moved.
 //
-// **The half of "the fact and a link" that did not work.** Somebody told the
+// The half of "the fact and a link" that did not work. Somebody told the
 // vulnerability data has stopped moving arrived at this screen, which showed
 // the job queue and the webhooks and nothing about the data at all. The
 // version was in the database and on no screen anywhere.
@@ -157,7 +162,10 @@ function VulnerabilityData() {
   if (data.isPending) return <Loading />;
   if (data.isError) {
     return (
-      <Failed error={data.error} what="What the scans are answering against could not be read." />
+      <Failed
+        error={data.error}
+        what="The vulnerability data the scans answer against could not be read."
+      />
     );
   }
   const version = data.data?.version ?? "";
@@ -205,7 +213,7 @@ function VulnerabilityData() {
   );
 }
 
-// What each reason means, in words rather than in the vocabulary the API uses.
+// Each reason's meaning, in words rather than in the vocabulary the API uses.
 //
 // The three are different things and only one of them is anybody's to act on:
 // an unrecognized name is the candidate to hold back, a held-back name is the
@@ -222,7 +230,7 @@ function because(why?: string) {
   }
 }
 
-// What is waiting, and what stopped being retried.
+// The work waiting, and the work that stopped being retried.
 function TheQueue() {
   const queries = useQueryClient();
   const work = useQuery({
@@ -237,7 +245,7 @@ function TheQueue() {
 
   if (work.isPending) return <Loading />;
   if (work.isError) {
-    return <Failed error={work.error} what="What the queue is doing could not be read." />;
+    return <Failed error={work.error} what="The queue's own state could not be read." />;
   }
   const waiting = work.data?.waiting ?? [];
   const rows = work.data?.items ?? [];

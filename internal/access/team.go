@@ -437,13 +437,12 @@ func (s *Store) here(ctx context.Context, personID int64) (bool, error) {
 // holdingAny narrows a query to the rows whose person holds one of these roles
 // here: granted on the product, or granted across every product, both in force.
 //
-// One builder, because the union was written out at every question that asked
-// it inside this package — and this package was exactly where
-// `internal/tools/granted` could not reach, since that gate refused a query
-// naming one table and not the other *outside* here. DESIGN-access.md records
-// what the union costs when it is spelled by hand: predicates missed
-// role_grant_all the day it was added, "each answering no for somebody who held
-// the role — which compiles and passes".
+// One builder, because the union written out per question is a spelling per
+// question — and this package is where `internal/tools/granted` cannot reach,
+// since that gate refuses a query naming one table and not the other outside
+// here. Spelled by hand, a predicate misses role_grant_all the day it is
+// added, answering no for somebody who holds the role, which compiles and
+// passes.
 //
 // person names the column holding the person in the caller's own query, so the
 // same rule attaches to a query about one person, about a team's members, or

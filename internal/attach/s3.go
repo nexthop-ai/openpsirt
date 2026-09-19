@@ -27,7 +27,7 @@ type Bucket struct {
 	// that is written down. Kept because it is parsed here anyway, so nothing
 	// downstream has to parse it again to say where the store is.
 	endpoint string
-	// Whether what reaches this store, and the signed addresses handed out
+	// Whatever reaches this store, and the signed addresses handed out
 	// for it, cross the network in the clear. Worked out where the endpoint
 	// is checked, so that nothing has to decide it a second time.
 	clear bool
@@ -58,7 +58,7 @@ type BucketConfig struct {
 
 // NewBucket returns a store, or nil where the deployment configured none .
 //
-// **Credentials are taken from the environment when none are configured**,
+// Credentials are taken from the environment when none are configured,
 // which is the whole reason for the official client: a deployment on
 // a cloud provider gets a role that rotates rather than a long-lived key
 // somebody had to put in a variable and then keep.
@@ -110,7 +110,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 		// redirect is the part that leaves us. So plain HTTP is refused unless
 		// it reaches no further than this machine, or an operator has said
 		// that this network is one they accept it on (REQ-70).
-		// What is shown and what is used are the same string now, rather
+		// The string shown and the string used are one, rather
 		// than two that can drift: the password has already been taken out
 		// of the one the client gets.
 		shown = endpoint
@@ -130,7 +130,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	if err != nil {
 		return nil, fmt.Errorf("object store credentials: %w", err)
 	}
-	// **The address guard does not apply here, deliberately.** Everything the
+	// The address guard does not apply here, deliberately. Everything the
 	// guard exists for is an address that arrived from outside: a sign-in
 	// provider's endpoints come from a discovery document somebody else
 	// publishes, so they are pinned, refused a redirect and refused an
@@ -140,7 +140,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	// deployment rather than the attack. Routing it through the guard would
 	// refuse that and protect against nothing.
 	//
-	// What the exemption costs, which is less than it sounds: the endpoint is
+	// The cost of the exemption, which is less than it sounds: the endpoint is
 	// read from the environment once, at startup, and no administrator can
 	// change it from inside the application. So aiming these requests
 	// anywhere is something whoever deploys the process can already do by

@@ -14,15 +14,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// What one run of the scanner did.
+// One run of the scanner.
 //
-// **The receipt says a run happened; nothing said what it did.** A row reading
+// The receipt says a run happened; nothing said what it did. A row reading
 // "scanned · 7,604 opened" is a number with no shape: opened *what*, and was
 // any of it urgent. Somebody looking at a build that jumped by four thousand
 // overnight is asking which of them matter, and the answer was a findings list
 // with no way to narrow to that run.
 //
-// **Read per run rather than stored.** What a run opened is derived from the
+// Read per run rather than stored. What a run opened is derived from the
 // findings that still carry its identifier, so it moves as findings are closed
 // and reopened — which is correct, and a stored total would be right at the
 // moment the run ended and drift from the list beside it thereafter.

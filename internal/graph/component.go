@@ -64,10 +64,11 @@ type Component struct {
 	UpstreamName    string    `bun:"upstream_name"`
 	UpstreamVersion string    `bun:"upstream_version"`
 	FirstSeenAt     time.Time `bun:"first_seen_at,notnull"`
-	// What the ecosystem's own index says is newest, and when it shipped .
-	// Null where nothing has asked, where asking is turned off, and where
-	// the index has never heard of the component — a private module and a
-	// vendored fork both look like that, and none of the three is a fault.
+	// LatestVersion is what the ecosystem's own index says is newest, and
+	// when it shipped . Null where nothing has asked, where asking is
+	// turned off, and where the index has never heard of the component — a
+	// private module and a vendored fork both look like that, and none of
+	// the three is a fault.
 	//
 	// LatestCheckedAt is when we last asked, whatever came back, so that
 	// "we asked and there is nothing" is distinguishable from "we have not
@@ -135,7 +136,7 @@ func (d Described) Identity() string {
 //
 // Three reductions, each for something a real inventory does.
 //
-// **Qualifiers are dropped.** They qualify rather than identify — an
+// Qualifiers are dropped. They qualify rather than identify — an
 // architecture, a distribution, the source package a binary came from — and a
 // build that merges two sources emits one package with them and the same
 // package without. Measured on a public switch operating-system image: 8,373
@@ -149,10 +150,10 @@ func (d Described) Identity() string {
 // this image the two spellings even disagree about it: one source called a
 // package "all" and the other "amd64".
 //
-// **Escapes are decoded.** The same version arrives as `2.3.2-2%2Bb1` and
+// Escapes are decoded. The same version arrives as `2.3.2-2%2Bb1` and
 // `2.3.2-2+b1` from the two sources, which byte comparison calls two packages.
 //
-// **The type is lowercased**, which the specification requires and which
+// The type is lowercased, which the specification requires and which
 // nothing else here relies on.
 func canonicalPurl(purl string) string {
 	purl = strings.TrimSpace(purl)
@@ -243,7 +244,7 @@ func decoded(s string) string {
 // write thousands of rows, which is the one thing the interval shape exists to
 // prevent.
 //
-// Which build this was is not lost by dropping it. That is what the scan
+// The build this belongs to is not lost by dropping it. That is what the scan
 // record holds: when it was built, what it hashed to, and who sent it.
 func (d Described) AsRoot() Described { return Described{Name: d.Name} }
 
@@ -254,7 +255,7 @@ func (d Described) AsRoot() Described { return Described{Name: d.Name} }
 // a broken file, and refusing it would throw away every other component in the
 // document alongside it.
 //
-// What a component with no version costs is matching — nothing can say whether
+// A component with no version costs matching — nothing can say whether
 // a vulnerability applies to a version nobody stated. It still ships, so it is
 // better held and visible than dropped.
 func (d Described) Valid() error {
@@ -320,16 +321,16 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			FirstSeenAt:    now,
 		})
 	}
-	// What a later report knows and an earlier one did not. A component row is
-	// content-addressed and not edited, but a column nobody has filled in is
-	// not an edit: a producer stating a supplier where the producer that wrote
-	// the row stated none is the merge rule every other field here follows, and
-	// filling it in overwrites nothing.
+	// Anything a later report knows and an earlier one did not. A component
+	// row is content-addressed and not edited, but a column nobody has filled
+	// in is not an edit: a producer stating a supplier where the producer that
+	// wrote the row stated none is the merge rule every other field here
+	// follows, and filling it in overwrites nothing.
 	if err := c.fillSuppliers(ctx, byIdentity, known); err != nil {
 		return nil, err
 	}
 	if len(missing) > 0 {
-		// **Two writers describing the same component are agreeing.** The
+		// Two writers describing the same component are agreeing. The
 		// read above is inside the caller's transaction, which satisfies the
 		// rule about reading outside one — but it says nothing about another
 		// transaction, against another target, finding the same component
@@ -461,9 +462,9 @@ func PartsOfPurl(purl string) Parts {
 
 	// The scheme is fixed by the specification and is compared without regard
 	// to capitals, which is what the specification says of it — and what the
-	// canonical form beside this already did. Matched against two spellings,
-	// `Pkg:` got a real identity from one and an empty fold basis from the
-	// other, so the same component was two things depending on which asked.
+	// canonical form beside this does. Matched against two spellings, `Pkg:`
+	// takes a real identity from one and an empty fold basis from the other,
+	// and the same component is two things depending on which asked.
 	scheme, rest, found := strings.Cut(body, ":")
 	if !found || !strings.EqualFold(scheme, "pkg") {
 		return Parts{}
@@ -493,12 +494,13 @@ func PartsOfPurl(purl string) Parts {
 
 // FoldKey is the key the binary packages of one source package share.
 //
-// **What it groups.** A distribution cuts many binary packages from one source
-// package and they move together: curl, libcurl4t64 and libcurl3t64 are one
-// bump, and treating them as three is three acts that can disagree with each
-// other. The key is what makes them one row, one judgment and one upgrade.
+// The grouping it makes. A distribution cuts many binary packages from one
+// source package and they move together: curl, libcurl4t64 and libcurl3t64 are
+// one bump, and treating them as three is three acts that can disagree with
+// each other. The key is what makes them one row, one judgment and one
+// upgrade.
 //
-// **Four parts, because the source package name alone is not enough.** Measured
+// Four parts, because the source package name alone is not enough. Measured
 // on a public switch operating-system image: keyed on the name alone, 47 groups
 // fold and six of them hold binaries that disagree about which issues they
 // carry and which version fixes them. Keyed on all four, 41 groups fold and
@@ -520,14 +522,14 @@ func PartsOfPurl(purl string) Parts {
 // that use one word; the distribution separates two distributions that do; the
 // version separates one source shipped twice.
 //
-// **It groups, and it does not identify.** A component's identity stays derived
+// It groups, and it does not identify. A component's identity stays derived
 // from its own content, a finding stays keyed on its place, and a decision
 // stays keyed on that place and expires on its own version — so when a producer
 // starts stating a source package for something it did not, the grouping moves
 // and no record does. That is the whole reason this can be recomputed and
 // folding at ingest cannot.
 //
-// **Hashed rather than spelled out.** A readable composite would have to be
+// Hashed rather than spelled out. A readable composite would have to be
 // bounded to carry an index, and two keys agreeing to that bound would merge
 // two source packages into one row — which under one judgment for the whole
 // fold writes decisions across both. A name is not a candidate either: the

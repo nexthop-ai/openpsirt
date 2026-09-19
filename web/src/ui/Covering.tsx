@@ -2,11 +2,11 @@ import { notACredential } from "./noautofill";
 import { useEffect, useRef, useState } from "react";
 import type { Body } from "../api/client";
 
-// Which places a decision covers.
+// The places a decision covers.
 //
-// All of them by default, which is covering every place by default's rule.
-// What used to be a checkbox per place is a summary line, and excluding is a
-// deliberate second step that groups places by what pulls the component in —
+// All of them by default, which is the rule a decision is written under. A
+// summary line rather than a checkbox per place, and excluding is a deliberate
+// second step that groups places by what pulls the component in —
 // so leaving out a whole container is one click, leaving out one module is
 // still possible, and the result reads back as "59 of 62, three left open
 // under X".
@@ -142,7 +142,7 @@ export function Covering({
             />
           )}
           {groups.map((group) => {
-            // What is on screen under this consumer, which is what the
+            // The rows on screen under this consumer, which are what the
             // checkbox beside it acts on and what the count beside that says.
             // The three read the same rows, so the number names what the
             // click will do.

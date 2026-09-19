@@ -42,7 +42,7 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 			t.Errorf("a finding nobody has decided reads as %q", one.State)
 		}
 
-		// Deciding it moves the state on this page too: it is the same
+		// A decision moves the state on this page too: it is the same
 		// definition the findings list uses rather than a second one.
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
 		read(t, r, "triager", "/v1/issues/CVE-2026-9999", &out)
@@ -59,8 +59,8 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 		}
 
 		// Nothing affected is an answer, and it is the one a customer inquiry
-		// asks for: "are you affected by this" could be answered yes and
-		// never no.
+		// asks for: the question of whether we are affected can otherwise be
+		// answered yes and never no.
 		//
 		// And the two ways of not being affected answer identically. Somebody
 		// who reaches no product, and somebody asking about an identifier
@@ -144,7 +144,7 @@ func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
 // TestEverythingKnownAboutOneIssueIsADocument is the form a customer inquiry
 // is answered in.
 //
-// What the issue is, which of our builds carry it, what was decided about each
+// The issue itself, the builds of ours carrying it, the decision about each
 // and the argument behind it, were four screens and a copy-paste — so the
 // answer was assembled differently every time and the half somebody forgot was
 // the half that mattered.
@@ -184,7 +184,7 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 		}
 		for _, wanted := range []string{
 			"CVE-2026-9999",
-			// What it is, where it is, and what was decided.
+			// The issue, its places, and the decisions.
 			"read past the end of the buffer",
 			"libnl-3-200",
 			"not-applicable",
@@ -194,7 +194,7 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 			// And who agreed, because a dismissal standing on one person is
 			// the thing an inquiry is most likely to be about.
 			"reviewer",
-			// Where it is written up, from what the report carried.
+			// The write-up address, from what the report carried.
 			"https://nvd.nist.gov/vuln/detail/CVE-2026-9999",
 		} {
 			if !strings.Contains(written, wanted) {
@@ -236,7 +236,7 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 		// And says nothing about the issue itself, for the reason the issue's
 		// own route says nothing: the two ways of not being affected answer
 		// alike.
-		if strings.Contains(none.Body.String(), "## What it is") {
+		if strings.Contains(none.Body.String(), "## The issue") {
 			t.Errorf("an unaffected document describes the issue:\n%s", none.Body.String())
 		}
 	})

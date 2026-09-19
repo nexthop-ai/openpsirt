@@ -32,7 +32,7 @@ func TestTheIngestBoundsAreReachableFromTheEnvironment(t *testing.T) {
 	if bounds.MaxDepth != 8 {
 		t.Errorf("the depth ceiling is %d, want what was set", bounds.MaxDepth)
 	}
-	// What was not set keeps the reader's own default rather than becoming
+	// Anything not set keeps the reader's own default rather than becoming
 	// zero, which is what lets a deployment change one bound without restating
 	// the rest.
 	if bounds.MaxEdges != sbom.DefaultLimits().MaxEdges {

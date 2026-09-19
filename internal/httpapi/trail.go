@@ -18,11 +18,11 @@ import (
 // changing runs one administrative act and the record of it in one
 // transaction.
 //
-// **A failure to record fails the act.** Both are one change: a setting moved
-// with nobody recorded as having moved it is exactly the state REQ-22 says the
-// record exists to prevent, and it used to be reachable by a write that
-// succeeded beside a record that did not. Answering with an error invites a
-// retry, which is what the retry is for — nothing was committed.
+// A failure to record fails the act. Both are one change: a setting moved with
+// nobody recorded as having moved it is exactly the state REQ-22 says the
+// record exists to prevent, and it is reachable by a write that succeeds
+// beside a record that does not. Answering with an error invites a retry,
+// which is what the retry is for — nothing was committed.
 //
 // The act is written against the transaction rather than against the handle,
 // so everything it decides from is read inside it (REQ-71).
@@ -54,13 +54,13 @@ func noted(ctx context.Context, tx bun.IDB, kind trail.Kind, name string, was, b
 
 // recording answers a store write that is part of an act.
 //
-// **A lost race goes back untouched.** A store handed somebody else's
+// A lost race goes back untouched. A store handed somebody else's
 // transaction cannot go again itself — the failed statement has already
 // aborted it on one engine — so it says it lost, and the helper that opened
 // the transaction takes the whole act again. Reported as a fault instead, the
 // sentinel is destroyed: wentWrong builds a fresh refusal that wraps nothing,
 // so the retry helper never sees it and the loser of an ordinary race is
-// handed a 500 where the path this replaces went round and won.
+// handed a 500 where going round again would have won.
 //
 // One spelling rather than an arm at each site, because the way this stops
 // working again is a third write that forgets it.
@@ -102,19 +102,19 @@ func dayOf(at *time.Time) string {
 // ChangeBody is one administrative act, as an administrator reads it.
 type ChangeBody struct {
 	At   string `json:"at"`
-	By   string `json:"by" doc:"Who made the change, by sign-in identity"`
-	Kind string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"What sort of thing changed"`
-	// About is which one: the setting's name, the person and product a role
+	By   string `json:"by" doc:"The person who made the change, by sign-in identity"`
+	Kind string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"The kind of thing that changed"`
+	// About is the subject: the setting's name, the person and product a role
 	// was granted on, the release whose support date moved.
 	About string `json:"about"`
-	// Was and Became are what it held before and after. Absent before means
+	// Was and Became are the values before and after. Absent before means
 	// nobody had set it; absent after means it was cleared. The two are
 	// different acts and a blank cannot tell them apart.
 	Was    string `json:"was,omitempty"`
 	Became string `json:"became,omitempty"`
 	// Unset and Cleared say which of those an absent value is, because a
 	// value that is genuinely the empty string is also absent in JSON.
-	Unset   bool `json:"unset,omitempty" doc:"Nobody had set it before this"`
+	Unset   bool `json:"unset,omitempty" doc:"Whether nothing had been set before this, as distinct from a value stored empty"`
 	Cleared bool `json:"cleared,omitempty" doc:"This change cleared it"`
 }
 

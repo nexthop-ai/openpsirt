@@ -1,4 +1,4 @@
-// How a stored moment is written on screen.
+// The form a stored moment takes on screen.
 //
 // Two forms and no others. There were four in use at once, two of them
 // machine-shaped: a date cut out of the stored string, the whole stored string
@@ -109,7 +109,7 @@ const SCALE: [number, string][] = [
 ];
 
 // magnitude is how long an interval is, in words, with no sense of direction.
-// Which side of now it falls on is the caller's sentence to write.
+// The side of now it falls on is the caller's sentence to write.
 function magnitude(seconds: number): string {
   let size = 60;
   let unit = "minute";

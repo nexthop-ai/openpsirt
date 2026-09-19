@@ -10,7 +10,7 @@ import (
 
 // sqliteLock excludes another process migrating the same SQLite file.
 //
-// **The other three engines take a lock in the database and this one cannot.**
+// The other three engines take a lock in the database and this one cannot.
 // A SQLite handle is capped at one connection, because the file has one writer
 // and more connections add contention rather than concurrency — so a lock held
 // on a pinned connection would be holding the only connection the migration
@@ -23,12 +23,12 @@ import (
 // remove, and every start afterwards refuses for a reason that is no longer
 // true.
 //
-// **What this buys is not integrity.** Four processes migrating one file with
-// no lock were run: one applied the schema and three failed, with "no such
-// table: goose_db_version; table goose_db_version already exists". Nothing was
-// corrupted and the schema ended correct. What the lock changes is that the
-// three wait their turn and find the work already done, rather than crashing
-// on a message about the migration library's bookkeeping.
+// This buys ordering rather than integrity. Four processes migrating one file
+// with no lock were run: one applied the schema and three failed, with "no
+// such table: goose_db_version; table goose_db_version already exists".
+// Nothing was corrupted and the schema ended correct. What the lock changes is
+// that the three wait their turn and find the work already done, rather than
+// crashing on a message about the migration library's bookkeeping.
 func sqliteLock(ctx context.Context, db *database.DB) (unlock, error) {
 	path, err := sqliteFile(ctx, db)
 	if err != nil {

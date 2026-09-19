@@ -39,12 +39,12 @@ type Note struct {
 
 // Notes renders a comparison as prose somebody pastes into a release note .
 //
-// **Markdown, and generated here rather than in a browser**, so that what an
+// Markdown, and generated here rather than in a browser, so that what an
 // API caller gets and what the screen shows are the same words. A second
 // implementation of "how a release note reads" is one that drifts, and the
 // half that drifts is always the one nobody is looking at.
 //
-// **It carries what was fixed, and nothing else**. Not what is still
+// It carries what was fixed, and nothing else. Not what is still
 // present, not what newly appeared, and not a bump that fell short. Those are
 // dispositions and statements about what a build contains, and the document
 // for those is a VEX, which is machine-readable and is what a customer's own
@@ -55,7 +55,7 @@ type Note struct {
 //
 // The comparison keeps all three sets. This is the one that goes to somebody.
 //
-// **A release that fixed nothing says so.** It answered nothing at all, and a
+// A release that fixed nothing says so. It answered nothing at all, and a
 // caller cannot tell that from a truncated response, from the wrong pair of
 // builds, or from a request that went astray — every one of which is also
 // zero bytes. The reasoning that produced the empty answer still holds: a
@@ -188,7 +188,7 @@ func omitted(n int) string {
 
 // onlyFixes keeps what was actually fixed.
 //
-// **A bump that carried the issue with it is not a fix**, and neither is a
+// A bump that carried the issue with it is not a fix, and neither is a
 // record taken back. The first closed a row and is superseded; the second
 // means the build was never affected, so there is nothing to tell a customer
 // about it at all — it leaves the affected list rather than moving within it,
@@ -202,7 +202,7 @@ func onlyFixes(rows []Changed) []Changed {
 // partition splits what left the affected list into what was fixed and what
 // was not.
 //
-// **One spelling of the judgment, and both halves of it.** An allow-list
+// One spelling of the judgment, and both halves of it. An allow-list
 // rather than named exclusions, and the same list the remediation rate counts:
 // a closure added later is not a fix on any surface until somebody says it is,
 // rather than progress on one and churn on the other. Returning the other half
@@ -221,7 +221,7 @@ func partition(rows []Changed) (fixed, closed []Changed) {
 
 // section writes the lines, or nothing where there are none.
 //
-// **Grouped by the remediation, not by the issue.** One kernel upgrade closes
+// Grouped by the remediation, not by the issue. One kernel upgrade closes
 // 917 issues at once, and a bullet per issue repeats the same version pair 917
 // times in a document going to a customer. The upgrade is stated once and the
 // issues it closed are listed under it, which is the shape the reader is
@@ -242,7 +242,7 @@ func section(out *strings.Builder, rows []Changed) {
 
 // said is what is known about one issue, in the parenthesis after its name.
 //
-// **What a reader acts on, and not the description.** One upgrade closes
+// The part a reader acts on, and not the description. One upgrade closes
 // hundreds of issues and they are listed under it, so a sentence apiece is a
 // document nobody reads to the end — while the number, the word and whether
 // somebody is known to be exploiting it are what decides whether this upgrade

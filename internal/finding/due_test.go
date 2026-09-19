@@ -262,7 +262,7 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 }
 
 func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
-	// What takes a finding off the clock is a decision that applies — the
+	// A decision that applies takes a finding off the clock — the
 	// same condition that decides whether a decision suppresses the finding
 	// at all. What is running out of time excluded any live claim, so a
 	// proposal waiting for a second person took a finding off that list for
@@ -654,7 +654,7 @@ func (f *fixture) recorded(t *testing.T, id int64, identity string) {
 func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 	// A finding somebody recorded has no scan run. Three passes reached the
 	// run for one column — when it opened — and reached it with an inner join,
-	// so a finding without one was not mis-reported but **absent**: off the
+	// so a finding without one was not mis-reported but absent: off the
 	// trend, and never rewritten when the deadline policy changed.
 	//
 	// Absent is the worse failure. A wrong number invites somebody to check
@@ -790,8 +790,8 @@ func TestEachOpeningKeepsItsOwnDeadlineWhenThePolicyMoves(t *testing.T) {
 	// note promising a handful — and almost all of them matched nothing,
 	// because one opening lives in one slice.
 	//
-	// What that shape has to get right, and one opening cannot show, is that
-	// each row lands on *its own* opening plus its own window.
+	// The part that shape has to get right, and one opening cannot show, is
+	// that each row lands on *its own* opening plus its own window.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())

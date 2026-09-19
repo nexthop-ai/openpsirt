@@ -8,32 +8,32 @@ REQ-69.
 
 ## Contents
 
-- [What arrives](#what-arrives)
+- [The upload](#the-upload)
 - [Producer behavior](#producer-behavior)
 - [Request handling](#request-handling)
 - [The arrival decision](#the-arrival-decision)
 - [Document storage](#document-storage)
 - [Retention](#retention)
-- [Reading a scan](#reading-a-scan)
+- [Scan application](#scan-application)
 - [Concurrent scans of one target](#concurrent-scans-of-one-target)
 - [Parsing](#parsing)
 - [The formats read](#the-formats-read)
-- [What each format states](#what-each-format-states)
+- [Format spellings](#format-spellings)
 - [Tolerated and refused](#tolerated-and-refused)
 - [Unread fields](#unread-fields)
 - [Build-declared suppressions](#build-declared-suppressions)
 - [Scheduled rescanning](#scheduled-rescanning)
 - [Scanner warnings](#scanner-warnings)
-- [What a scan run may produce](#what-a-scan-run-may-produce)
+- [Scanner output](#scanner-output)
 - [Scan coverage](#scan-coverage)
 - [Receipts](#receipts)
-- [Reading back a document](#reading-back-a-document)
+- [Document retrieval](#document-retrieval)
 - [Administrator-supplied VEX](#administrator-supplied-vex)
 - [The offline scanner database](#the-offline-scanner-database)
 - [Analyzer findings](#analyzer-findings)
 - [Limits](#limits)
 
-## What arrives
+## The upload
 
 A build sends two things, in one request:
 
@@ -177,10 +177,10 @@ on trust. An upload whose contents are gone would otherwise read back as one
 that arrived with nothing.
 
 A document whose contents were released answers 410, not 404. On screen, one
-still held is a link and one released is not: a link that answered 410 is a
-control that looks like it works.
+still held is a link and one released is not: a link answering 410 is a control
+that looks like it works.
 
-## Reading a scan
+## Scan application
 
 A worker claims the scan, reads its documents, and applies what they describe.
 Every replica does both; a separate worker deployment would be a second thing to
@@ -190,7 +190,7 @@ The suppression documents are read here even though applying them waits on the
 scan itself. A document that cannot be read is a fault in what the build sent,
 and finding that out while the producer still has the build in front of them is
 worth more than finding out later. What the build argued is stored against the
-**target** rather than the scan, because it is what the next vulnerability scan
+target rather than the scan, because it is what the next vulnerability scan
 has to apply, and by then the documents may be gone.
 
 A failure is recorded against the scan, not only against the job. A job that
@@ -266,11 +266,11 @@ other's business (REQ-05).
 | **Half a declaration is not a declaration** | CycloneDX states its format and its version in two keys, and either alone leaves the other unstated. An unstated version is a version this was not written against, which is what the by-name refusal is for |
 | **A major version is read only where it has been written against** | Refused by name where it is read, so a file that was never going to be read is dropped before the rest of it is walked |
 
-**SPDX 2.2 and 2.3 are one vocabulary.** The later revision adds fields and
+SPDX 2.2 and 2.3 are one vocabulary. The later revision adds fields and
 adds nothing this reads, so one reader covers both and a document stating
 either is read.
 
-**SPDX 3.x is a third vocabulary rather than a branch in the second.** It
+SPDX 3.x is a third vocabulary rather than a branch in the second. It
 shares no key path with 2.x: a document is a context and one flat graph of
 typed elements — packages, files, relationships, people, tools, licenses and
 the document's own record in one array, in no stated order. Three vocabularies
@@ -285,16 +285,16 @@ and one reader is what the seam was for.
 | **An element does not say what it is until it has been read** | Every entry is charged against the component bound on the way in, because what a bound stops is the walk; the ones that turn out to be paths hand that charge back and take the file bound instead. So the walk is bounded throughout and the two are still sized the way they differ |
 | **Identifiers are absolute** | Nothing here depends on their shape. Every one but the document's own resolves the document to itself and is discarded, which is what the other formats' in-file identifiers are for too |
 
-**A path and a package may not share an identifier**, and this format states
+A path and a package may not share an identifier, and this format states
 both in one array — so the check runs where a package is bound and where a path
 is recorded, since which of the two a producer writes first is its business.
 
-**The version is stated in two places and either will do.** The context carries
+The version is stated in two places and either will do. The context carries
 it, and so does every creation record; a producer need not emit the first. Read
 from one place only, a document stating it in the other would be refused as
 saying nothing.
 
-## What each format states
+## Format spellings
 
 The internal shape is the same from either, because it is the shape the graph
 is stored in rather than either format's. What differs is where a producer put
@@ -314,28 +314,27 @@ each fact.
 | What a component was built from | a pedigree, describing the ancestor | a relationship pointing at another package | the same, spelled `ancestorOf` or `descendantOf` |
 | What a carried patch resolves | a patch in the pedigree, naming the vulnerability | **cannot be stated** | **cannot be stated** |
 
-**The scoped SPDX 2 relationships place their target.** `BUILD_DEPENDENCY_OF`,
+The scoped SPDX 2 relationships place their target. `BUILD_DEPENDENCY_OF`,
 `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF` are
 edges carrying what the producer called them; only `TEST_DEPENDENCY_OF` places
 nothing, which is the exception the third version's `test` scope gets too. What
 the word means, and what nothing may read into it, is in `DESIGN-findings.md`.
 
-**A component whose only incoming relationship was one of those four now has a
-consumer where it had none**, so its place identity moves and decisions written
-against the old one stop covering it. An instance that already ingested SPDX 2
-inventories has to be recreated for that reason and one other: the graph edge
-gained a column with no default, which an existing database never re-applies.
-Below 1.0 there is no schema compatibility (REQ-76), so recreation is the
+A component reached only by one of those four has a consumer, so its place
+identity is the one a consumer gives it and a decision keyed on the component
+alone does not cover it. A database that took SPDX 2 inventories under an
+earlier build is recreated rather than migrated, here as everywhere below 1.0
+(REQ-76), so recreation is the
 answer to both.
 
-**The root is resolved at the end rather than where it is named.** One format
+The root is resolved at the end rather than where it is named. One format
 states it inline with everything it says about it; the other points at a
 package that may not have been read yet. A document pointing at several things
 has no single root — the tracked unit stands in, as it does for a document
 naming none — because picking one of them states a hierarchy the producer did
 not.
 
-**What the document called that component is kept on the scan.** The root is
+What the document called that component is kept on the scan. The root is
 stored by name alone, because a package identifier carries the version, the
 root's version moves every build, and the root's identity moving takes every
 edge hanging off it with it. So the declared identifier is kept as a fact about
@@ -350,7 +349,7 @@ once — where the document named nothing, what stands in is the tracked unit,
 and that is ours. A declared root carrying no package identifier keeps nothing
 for the same reason.
 
-**What is counted is what the pointers resolve to, not how many there are.** A
+What is counted is what the pointers resolve to, not how many there are. A
 format offers more than one place to state the root — a list beside the
 contents, and a relationship saying the same thing — and a producer that fills
 in both has named one component twice rather than two components. Counting the
@@ -358,18 +357,18 @@ statements reads that as several roots and leaves the document with none, so a
 document that said the same thing twice would be read as though it had said
 nothing.
 
-**The first of each identifier stands.** A real producer emits eight spellings
+The first of each identifier stands. A real producer emits eight spellings
 of one database key, differing in where it put a hyphen, and nothing here can
 say which spelling an advisory used. Taking the first is the same answer
 everything downstream has already been given, rather than a preference invented
 here.
 
-**The words for nothing are nothing.** SPDX requires several fields to be
+The words for nothing are nothing. SPDX requires several fields to be
 present and offers `NOASSERTION` and `NONE` for a producer with no value for
 one. Taken literally a package carries the version `NOASSERTION`, which a
 person reads as a version and a scanner tries to match.
 
-### Which relationships are structure
+### Structural relationships
 
 SPDX states a hundred and forty kinds of relationship and most of them are not
 a dependency graph: what generated a file, what a document amends, what a
@@ -384,25 +383,25 @@ question a CycloneDX `dependsOn` answers.
 | What a component was derived from | `ANCESTOR_OF` and `DESCENDANT_OF` |
 | Nothing | Everything else |
 
-**A type stated either way round is the same edge.** A producer may say a
+A type stated either way round is the same edge. A producer may say a
 program contains a library or that the library is contained by the program, and
 the graph does not have two shapes.
 
-**What built something is not what shipped.** A build tool, a test dependency
+What built something is not what shipped. A build tool, a test dependency
 and a development dependency are statements about the build rather than about
 what is in the product, so none of them places a component under another. The
 component is still held and still counted as sitting under nothing, which is
 the same treatment CycloneDX build tooling gets by arriving under `formulation`
 rather than beside the contents.
 
-**A derivation is a pointer rather than a description**, which is what makes it
+A derivation is a pointer rather than a description, which is what makes it
 weaker than the other format's pedigree: it can only name something the
 document also describes. It fills in an upstream nothing else stated and never
 replaces one, and it is charged against the claim bound rather than the edge
 bound, because an unbounded array of them is the same hazard under a different
 name.
 
-**The third version drops the reversed spellings**, so a type is an edge or it
+The third version drops the reversed spellings, so a type is an edge or it
 is not and there is no direction to get wrong.
 
 | Read as | Types |
@@ -415,8 +414,8 @@ is not and there is no direction to get wrong.
 ### Lifecycle scopes
 
 The third version annotates a relationship with the phase it matters in —
-build, design, development, runtime, test or other. **The specification does not
-say that any of them means the target does not ship**, and inferring it is the
+build, design, development, runtime, test or other. The specification does not
+say that any of them means the target does not ship, and inferring it is the
 one judgment in this area the format leaves to a reader.
 
 | Scope | Read as |
@@ -424,7 +423,7 @@ one judgment in this area the format leaves to a reader.
 | `test` | Places nothing. The target is still held and still counted as sitting under nothing, which is the same treatment `TEST_DEPENDENCY_OF` gets in the second version |
 | Everything else | Places its target under the element the relationship is stated from |
 
-**Reading `build` as "does not ship" is wrong for every compiled language**: a
+Reading `build` as "does not ship" is wrong for every compiled language: a
 crate or a module linked into a binary is stated as a build-phase dependency
 and is inside what the product ships. The two errors are not equal, and
 `Limits` says what that costs.
@@ -442,7 +441,7 @@ without knowing, it reads as a graph with a hole in it, and a count meant to say
 the producer's derivation changed moves instead with how much file detail the
 producer was configured to emit. So the two are counted apart.
 
-**They are bounded apart from components**, and the ceiling was set by
+They are bounded apart from components, and the ceiling was set by
 measurement rather than by analogy. A real scan catalogs 4,964 files against 89
 packages on one image and 21,643 against 480 on another — forty-five to
 fifty-six files per package — so a switch operating system's 6,866 packages
@@ -508,18 +507,17 @@ exercises.
 This checks the recorded documents, not what is accepted. The reader itself
 ignores anything it does not recognize.
 
-A minor revision of the format is read, and is now shown to be. The reader
-checks the major version and refuses what it has not been written against;
-anything within that major version parses. That made every revision accepted
-**by construction rather than by evidence**, and the gap was live: the reference
-producer moved to 1.7 while every fixture stated 1.6, so the inventory this
-deployment's own image carries and the one the demo ingests were both revisions
-nothing had been tested against.
+A minor revision of the format is read, and a fixture shows it. The reader
+checks the major version and refuses what it has not been written against, so
+anything within that major version parses — which accepts every revision by
+construction rather than by evidence. A reference producer that moves while
+every fixture states the older revision leaves the inventory this deployment's
+own image carries untested against the reader that reads it.
 
-A fixture at the newer revision closed it — the document the image ships, read
-through the same reader, asserting the parts a revision could move: the root, the
-component count, the edges, and the package identifiers the graph is keyed on. It
-also brought eight key paths nothing had decided about.
+The fixture is the document the image ships, read through the same reader,
+asserting the parts a revision can move: the root, the component count, the
+edges, and the package identifiers the graph is keyed on. Each key path it
+brings is one more thing to decide about.
 
 ## Build-declared suppressions
 
@@ -530,14 +528,14 @@ A build's claims arrive two ways, and they are not equally precise.
 | On the component | A patch in a component's pedigree recording which vulnerability it fixes. It arrives attached to the thing it is about |
 | In a document of its own | Statements naming what they apply to by package identifier: one version, every version of a package, or a whole source tree |
 
-**Only one of the two formats can carry the first**. SPDX has a
+Only one of the two formats can carry the first. SPDX has a
 relationship saying a file is a patch for a package and no way to say which
 vulnerability that patch resolves, so an inventory in that format carries no
 claims and a build with carried patches states them in a document of its own.
 Deriving the link from the patch's filename would report a suppression nobody
 made.
 
-**So the format a scan arrived in is carried out of the reader**, because what
+So the format a scan arrived in is carried out of the reader, because what
 a claim is closed by is difference: a claim the build no longer argues is a
 claim the build withdrew. That reading only holds where the build had somewhere
 to argue it. A scan whose format cannot attach a claim to a component says
@@ -610,9 +608,9 @@ interval.
 
 ## Scanner warnings
 
-Warnings were read only when the scanner failed, which discarded the case that
-matters: a run that answers and states that its answer is coarse. They are
-recorded on the run, kept apart from the failure, and travel with the receipt.
+Read only when the scanner fails, warnings discard the case that matters: a run
+that answers and states that its answer is coarse. They are recorded on the
+run, kept apart from the failure, and travel with the receipt.
 
 Today it captures nothing. A scan runs over an inventory written here from the
 components held — name, version, package identifier and CPE — not over the
@@ -638,7 +636,7 @@ asks:
 Both are kept as the scanner wrote them and **never parsed**. Deciding whether a
 version falls inside a range needs an ordering per ecosystem.
 
-## What a scan run may produce
+## Scanner output
 
 The scanner runs as a subprocess of the process serving the API, and its report
 is read into that process. It is bounded the way a scan file is, from the same
@@ -658,7 +656,7 @@ anything this deployment chose unless it is bounded here.
 
 ## Scan coverage
 
-Every other failure here is loud. **Silence is the failure that is not**: a build
+Every other failure here is loud. Silence is the failure that is not: a build
 nothing files against reports no new findings, closes nothing, fails nothing, and
 every number about it holds still.
 
@@ -684,19 +682,19 @@ carry the answer, and a build that never checks again goes green on a file
 nothing could read.
 
 What was filed against a build can be asked for, newest first, each reporting how
-far it got: **taken and not yet read, read and awaiting a vulnerability scan,
-done, or refused with the reason.** A key sees the uploads it sent itself.
+far it got: taken and not yet read, read and awaiting a vulnerability scan,
+done, or refused with the reason. A key sees the uploads it sent itself.
 
 The four states are this deployment's, not the queue's. Reading and scanning are
 two jobs with different rhythms, and a producer has no business knowing which
 queue its work is sitting in.
 
 Which run answers an upload is a rule rather than a lookup, because a run covers
-a build rather than an upload: **the earliest successful run to finish after
-that upload was parsed.** A run that failed answers it only while nothing has
-succeeded since. The first version took the earliest run to finish after parsing
-whatever became of it, so a scanner that fell over once poisoned every receipt
-already waiting on it, permanently.
+a build rather than an upload: the earliest successful run to finish after
+that upload was parsed. A run that failed answers it only while nothing has
+succeeded since. Taking the earliest run to finish after parsing whatever
+became of it, a scanner that falls over once poisons every receipt already
+waiting on it, permanently.
 
 What each run changed is counted when asked for rather than stored, from the
 runs the findings already point at, as issues at components rather than places.
@@ -720,11 +718,11 @@ pair, not either alone — a component nothing places is ordinary, but a documen
 that places *none* is a list rather than a graph, whose every finding will be
 individually correct and unable to answer "why is this here".
 
-## Reading back a document
+## Document retrieval
 
-A tag's documents are retained so a release can be re-scanned later. Nothing
-returned one, so "send me the SBOM you scanned for v2.4" was answered from the
-build system, which is the copy that may have moved since.
+A tag's documents are retained so a release can be re-scanned later. With
+nothing to return one, "send me the SBOM you scanned for v2.4" is answered from
+the build system, which is the copy that may have moved since.
 
 | Rule | Reason |
 |---|---|
@@ -752,11 +750,10 @@ a prefill, never applied (REQ-31).
 
 ## The offline scanner database
 
-Produced by a build target rather than described in a document (REQ-12). What
-stood behind the offline requirement was one configuration variable and a
-paragraph, and a requirement whose only implementation is instructions somebody
-follows by hand is one that gets discovered broken by the operator who most needs
-it.
+Produced by a build target rather than described in a document (REQ-12). A
+requirement whose only implementation is a configuration variable and
+instructions somebody follows by hand is one the operator who most needs it
+discovers broken.
 
 `make scanner-db` writes a bundle and its checksum.
 
@@ -782,34 +779,17 @@ to retrofit were settled early.
 
 ## Limits
 
-- **The bounds are set from what reading costs, not from what a document looks
-  like.** They were round numbers several times the largest real producer:
-  measured, an edge holds about half a kilobyte of heap while being read and a
-  component about one and a third, so a ceiling of two million edges and a quarter
-  of a million components accepted a document taking about **1.3 GB against the
-  512 MiB the chart ships as a limit**. That file was guaranteed to kill the
-  process, in the background reader that runs *after* the upload was answered 202.
-  The budget is now about half the shipped limit for one document, and a test
-  measures the per-unit cost with a wide bound.
-- **The reader's bounds are configuration, not constants.** Five existed as a
-  defaults function every deployment ran unchanged.
-- **A component's name is folded on the way in, into a column of its own.** The
-  four engines do not fold alike outside ASCII: a VEX statement about a component
-  named with any letter outside it matched on three engines and not the fourth, so
-  which engine a deployment ran decided whether the publisher's judgment reached
-  the finding. Folding on write also leaves the index usable.
-- **So is an issue's identifier, and every name it goes by.** Comparing through
-  `LOWER` put a function on the indexed side, and the plan scanned the whole
-  vulnerability table and the whole alias table once per statement — thirty seconds
-  where the answer should take a fraction of one.
-- **Only the first ancestor supplies upstream identity.** Anything further back is
-  history, and a scanner matches against the fork point.
-- **Fixed-width character columns are not used.** They blank-pad on some engines,
-  so a hash read back carries trailing spaces that make an exact-match lookup fail.
-- **A component with no distribution context in its identifier is one nothing will
-  match**, and that is invisible rather than an error.
+| Limit | Detail |
+|---|---|
+| The bounds are set from what reading costs, not from what a document looks like | An edge holds about half a kilobyte of heap while being read and a component about one and a third, so round numbers several times the largest real producer — two million edges, a quarter of a million components — accept a document taking about 1.3 GB against the 512 MiB the chart ships as a limit. Such a file is guaranteed to kill the process, in the background reader that runs after the upload is answered 202. The budget is about half the shipped limit for one document, and a test measures the per-unit cost with a wide bound |
+| The reader's bounds are configuration, not constants | A defaults function every deployment runs unchanged is a constant with extra steps |
+| A component's name is folded on the way in, into a column of its own | The four engines do not fold alike outside ASCII: a VEX statement about a component named with any letter outside it matches on three engines and not the fourth, so which engine a deployment runs decides whether the publisher's judgment reaches the finding. Folding on write also leaves the index usable |
+| So is an issue's identifier, and every name it goes by | Comparing through `LOWER` puts a function on the indexed side, and the plan scans the whole vulnerability table and the whole alias table once per statement — thirty seconds where the answer should take a fraction of one |
+| Only the first ancestor supplies upstream identity | Anything further back is history, and a scanner matches against the fork point |
+| Fixed-width character columns are not used | They blank-pad on some engines, so a hash read back carries trailing spaces that make an exact-match lookup fail |
+| A component with no distribution context in its identifier is one nothing will match | And that is invisible rather than an error |
 
-**A lifecycle scope is read the way that keeps a component**, and the
+A lifecycle scope is read the way that keeps a component, and the
 two errors it sits between are not equal. Keeping too much adds something to
 triage, which somebody sees and acts on; dropping too much removes a finding
 nobody ever learns about. Measured against the format's own example 11: its
@@ -817,8 +797,8 @@ three dependencies are stated unscoped in the second version and scoped `build`
 in the third, which is one application described twice — so read as not
 shipping, that document loses every component it has.
 
-**The third version is read against the specification's documents and no
-producer's output.** Nothing this deployment ingests emits it; the scanner
-shipped here emits 2.3 and tag-value. The four fixtures are hand-written and
-small by construction, so which shapes a real producer actually uses is not yet
-evidence anything here has.
+The third version is read against the specification's documents and no
+producer's output. Nothing this deployment ingests emits it, and the scanner
+shipped here emits 2.3 and tag-value. The fixtures are hand-written and small
+by construction, so which shapes a real producer uses is not evidence anything
+here has.

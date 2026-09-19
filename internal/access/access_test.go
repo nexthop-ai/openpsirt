@@ -64,7 +64,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 }
 
 func TestSomebodyUnknownAndSomebodyUngrantedGetTheSameAnswer(t *testing.T) {
-	// Telling an outsider which of the two applies is free reconnaissance:
+	// Told apart, the two are free reconnaissance for an outsider:
 	// one answer says the name is wrong, the other says the name is right.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -511,7 +511,7 @@ func TestBeingOnACaseIsNotReadingTheProduct(t *testing.T) {
 	if on.Reads(access.Public, 5) || on.Sees(5) {
 		t.Error("being on a case made a product readable")
 	}
-	// Which is why the per-issue question exists beside it.
+	// The reason the per-issue question exists beside it.
 	if !access.SeesOn(on, 5, 92) {
 		t.Error("somebody on a case cannot reach the issue they are on")
 	}

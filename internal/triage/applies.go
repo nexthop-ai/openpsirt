@@ -17,7 +17,7 @@ import (
 //
 // Expiry happens here and is not a mechanism. A decision was stored under the
 // versions it was a claim about; a place asks under the versions it has now.
-// When a version moves the two keys stop matching and the decision simply does
+// With a version moved the two keys stop matching and the decision simply does
 // not come back — nothing sweeps, nothing expires on a timer, and there is no
 // second rule that could disagree with the first.
 //
@@ -255,7 +255,7 @@ type Filter struct {
 	Component string
 	// TargetID keeps judgments about places one build holds.
 	//
-	// **A decision names no build, deliberately** — it is keyed on the
+	// A decision names no build, deliberately — it is keyed on the
 	// product, the issue and the place, so that it carries across the
 	// releases that share the code. What a release sign-off asks is the other
 	// question: which of these judgments is about something this build
@@ -299,7 +299,7 @@ func (s *Store) List(ctx context.Context, subject access.Subject, f Filter,
 				`WHERE fc.id = de.claim_id AND fc.deferred_until IS NOT NULL `+
 				`AND fc.deferred_until <= ?))`, LapsedState, s.now())
 		}
-		// What the judgment was about, through the one spelling the record's
+		// The judgment's subject, through the one spelling the record's
 		// own page uses. Stated in the filter and applied by only one of the
 		// two readers, a caller that set any of the three got the whole
 		// unnarrowed list back with no complaint.

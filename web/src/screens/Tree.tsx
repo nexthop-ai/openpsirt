@@ -16,7 +16,7 @@ import { Icon } from "../ui/Icons";
 import { useWho } from "../app/session";
 import { useReseed } from "../ui/reseed";
 
-// What is beneath a node, worst first, as one bar whose widths are the counts.
+// The counts beneath a node, worst first, as one bar whose widths are them.
 //
 // The same control the component screen draws, for the same reason: a bar that
 // is mostly one color says where the weight is before a number is read. This
@@ -38,7 +38,7 @@ function Strip({ by }: { by?: Record<string, number> }) {
   );
 }
 
-// How many children of one node are drawn before it offers the rest.
+// The children of one node drawn before it offers the rest.
 //
 // A level is shown whole. An inventory that describes a build honestly has
 // tens of things at a level, not hundreds, and truncating those hid entries
@@ -92,8 +92,8 @@ const fetchAround =
 // beneath it, so descending follows the findings rather than being
 // exploration.
 //
-// Which component is selected lives in the URL, so a link carries it.
-// What sits under one node, in whichever of the three states the read is in:
+// The selected component lives in the URL, so a link carries it.
+// The rows under one node, in whichever of the three states the read is in:
 // nothing yet, refused, or the rows themselves. Two of them are not the same
 // answer, and drawing them alike is what left a node spinning for ever.
 type Under = { kids?: Node[]; error?: unknown };
@@ -108,11 +108,11 @@ export function Tree() {
   // say how much sits under it, and opening one is the question they may not
   // ask.
   if (who.isPending) return <Loading />;
-  // Which of the two trees somebody gets turns on what they may read, so a
+  // The tree somebody gets, of the two, turns on what they may read, so a
   // failed identity read is not an answer: falling through drew the whole
   // build's inventory for a subject nobody had established may see it.
   if (who.isError) {
-    return <Failed error={who.error} what="What you may see here could not be read." />;
+    return <Failed error={who.error} what="Your reach here could not be read." />;
   }
   if (who.data && !who.data.reach.some((each) => each.product === product)) return <Yours />;
   return <Whole />;
@@ -120,7 +120,7 @@ export function Tree() {
 
 // The chains somebody's own findings sit on.
 //
-// **The part that makes a finding judgeable.** The chain upward says what
+// The part that makes a finding judgeable. The chain upward says what
 // pulled the thing in, which is what somebody deciding needs, and every node
 // on it sits above something they were already given. The counts are theirs:
 // a node says how much of their own work hangs beneath it, never how much the
@@ -239,7 +239,7 @@ function Whole() {
   const { product = "", stream = "", variant = "" } = useParams();
   const at = useMemo(() => ({ product, stream, variant }), [product, stream, variant]);
   const [params, setParams] = useSearchParams();
-  // Which row is the one being looked at, as an identity rather than a name:
+  // The row being looked at, as an identity rather than a name:
   // where a build ships one name twice, the two rows are two components.
   const focus = params.get("at")
     ? keyOf({
@@ -320,7 +320,7 @@ function Whole() {
     }),
   });
 
-  // What sits under each opened node, and which of the three states that is
+  // The rows under each opened node, and which of the three states that is
   // in. A read that failed and a read still in flight both had no rows, and
   // both were drawn as the second — so a container whose children could not be
   // read spun for ever with nothing said.
@@ -361,7 +361,7 @@ function Whole() {
   // without it turned every such component into one nobody could look at.
   function select(name: string, children = 0, version = "", ecosystem = "") {
     const key = keyOf({ component: name, version, ecosystem });
-    // What was searched for survives the selection. Replaced wholesale, a hit
+    // The search term survives the selection. Replaced wholesale, a hit
     // cleared the search it was found through: the list went away, the tree
     // redrew from the root, and the component clicked was not on screen.
     const next = new URLSearchParams(params);
@@ -479,9 +479,9 @@ function Whole() {
 }
 
 // A search answers with a set of components rather than a position, so it is
-// drawn as a list and not as a tree with one branch. Selecting one positions the
-// tree on it; the control beside it opens the component's own screen, which is
-// the same pair of acts a row in the tree offers.
+// drawn as a list and not as a tree with one branch. Selecting one positions
+// the tree on it; the control beside it opens the component's own screen, which
+// is the same pair of acts a row in the tree offers.
 function Matches({
   at,
   found,
@@ -547,7 +547,7 @@ function onComponent(at: At, component: string | undefined): string {
 // where it could go, and the act that moves it. Reachable from a finding and
 // from the findings list, and from here, which is where somebody looking at
 // the graph asks about a component.
-// Which build the tree is drawn for, so the component's screen opens on the
+// The build the tree is drawn for, so the component's screen opens on the
 // graph of the build somebody was looking at rather than the first one.
 function buildQuery(at: At): string {
   return `?stream=${encodeURIComponent(at.stream)}` + `&variant=${encodeURIComponent(at.variant)}`;

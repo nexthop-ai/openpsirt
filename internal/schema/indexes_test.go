@@ -18,12 +18,12 @@ import (
 // narrower one is machinery nobody chose — it is maintained on every insert and
 // every update to those columns, and it earns nothing.
 //
-// **Read from the database rather than from the migration source**, because
+// Read from the database rather than from the migration source, because
 // what matters is the schema an operator ends up with, and constraints declare
 // indexes without ever saying the word.
 //
-// **Checked on SQLite alone, deliberately, and this is the exception that
-// proves the rule.** Every other schema test runs on four engines because the
+// Checked on SQLite alone, deliberately, and this is the exception that
+// proves the rule. Every other schema test runs on four engines because the
 // engines disagree — about reserved words, about types, about what an affected
 // row count means. They do not disagree about which columns an index is on:
 // the statements are one list, and what differs between engines is spelled in
@@ -138,11 +138,11 @@ func columnsOf(ctx context.Context, db *database.DB, index string) ([]string, er
 // leads reports whether one column list is answered by another: the same
 // columns in the same order, for as far as the first one goes.
 //
-// **Equal lengths count.** Skipped, the commonest accidental duplicate there
-// is — a hand-written index repeating a UNIQUE constraint — was the one shape
-// this could not see, and it was skipped twice: once by the caller's length
-// test and once here. An identical pair now reports in both directions, which
-// names both indexes and is what somebody has to read to decide which goes.
+// Equal lengths count. Skipped, the commonest accidental duplicate there is —
+// a hand-written index repeating a UNIQUE constraint — is the one shape this
+// cannot see, and it is skipped twice: once by the caller's length test and
+// once here. An identical pair reports in both directions, which names both
+// indexes and is what somebody reads to decide which goes.
 func leads(shorter, longer []string) bool {
 	if len(shorter) > len(longer) {
 		return false

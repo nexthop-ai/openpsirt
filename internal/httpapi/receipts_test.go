@@ -210,8 +210,8 @@ func TestAReceiptSaysWhatArrivedAfterTheContentsAreGone(t *testing.T) {
 	//
 	// The hash is the point. A re-parse means asking the build to send the
 	// file again, and without something to compare against the second copy
-	// is taken on trust — so a receipt that forgot what it had read left
-	// the producer no way to prove it was sending back the same file.
+	// is taken on trust — so a receipt that does not record what it read
+	// leaves the producer no way to prove they are sending the same file.
 	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
 		if code, _ := f.send(t, upload(t, f.path,
 			inventory(nowish(), "libc6"), suppression, suppression)); code != http.StatusAccepted {
@@ -404,7 +404,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 			if err := findings.Finish(ctx, run.ID, "0.112.0", "2026-08-28", "", nil); err != nil {
 				t.Fatal(err)
 			}
-			// When it ran, which is what decides the upload it answers and
+			// The moment it ran, which decides the upload it answers and
 			// the one its numbers are reported against.
 			if _, err := r.db.DB.NewUpdate().Model((*finding.Run)(nil)).
 				Set("started_at = ?", at.Add(-time.Minute)).Set("finished_at = ?", at).

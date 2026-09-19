@@ -566,7 +566,7 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 			recorded[row.PlaceIdentity] = true
 		}
 
-		// What a scan of the same build writes for the same component.
+		// A scan of the same build writes the same component again.
 		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
 			found("CVE-2026-1", libnl),
 		}); err != nil {

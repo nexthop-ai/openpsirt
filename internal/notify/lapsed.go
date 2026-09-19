@@ -41,7 +41,7 @@ func Lapses(db *bun.DB, logger *slog.Logger) func(context.Context, []triage.ForP
 				Link: "/decisions/" + strconv.FormatInt(one.DecisionID, 10),
 				// As careful as the most careful row.
 				Private: one.Undisclosed,
-				// What a later read narrows by, off the
+				// The fields a later read narrows by, off the
 				// representative row.
 				ProductID:       &one.ProductID,
 				VulnerabilityID: &one.VulnerabilityID,

@@ -21,32 +21,32 @@ import (
 // statementParts is a VEX document arriving.
 type statementParts struct {
 	// The declared content type is permissive for the reason an inventory's
-	// is: what a part is gets decided by reading it rather than by the label a
+	// is: a part's type is decided by reading it rather than by the label a
 	// client put on it.
 	Statements huma.FormFile `form:"statements" contentType:"application/json,application/octet-stream" required:"true"`
 }
 
-// StatementsTakenBody is what one VEX document changed.
+// StatementsTakenBody is the record of what one VEX document changed.
 type StatementsTakenBody struct {
-	Publisher  string `json:"publisher" doc:"Who the document says it is from"`
+	Publisher  string `json:"publisher" doc:"The publisher the document names"`
 	Recorded   int    `json:"recorded" doc:"Statements taken from it"`
-	Superseded int    `json:"superseded" doc:"What this publisher had said before, set aside rather than deleted"`
-	Digest     string `json:"digest" doc:"What the document hashed to, which is how a revision is noticed later"`
+	Superseded int    `json:"superseded" doc:"This publisher's previous statements, set aside rather than deleted"`
+	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 
 // VexSaidBody is one standing VEX statement, as a finding shows it.
 type VexSaidBody struct {
-	// ID is what a decision cites when somebody starts from this, so that
+	// ID is the citation a decision carries when somebody starts from this, so
 	// a revision to it can be noticed later.
 	ID            int64  `json:"id" doc:"Pass as from_statement when starting a decision from this, so a later revision can be noticed"`
 	Publisher     string `json:"publisher"`
-	Status        string `json:"status" doc:"What they said, in the format's own vocabulary"`
+	Status        string `json:"status" doc:"Their statement, in the format's own vocabulary"`
 	Justification string `json:"justification,omitempty" doc:"The term they gave for it, where the status is one that takes one"`
 	// Statement is the reasoning, which is the part worth having: the status
 	// is in the fix state already.
-	Statement string `json:"statement,omitempty" doc:"Why they reached that answer. What a triager otherwise types from memory"`
+	Statement string `json:"statement,omitempty" doc:"Their reasoning. What a triager otherwise types from memory"`
 	Document  string `json:"document" doc:"The document it came from"`
-	At        string `json:"at" doc:"When it was uploaded here"`
+	At        string `json:"at" doc:"The moment it was uploaded here"`
 	// Offers is the outcome this would prefill, where it offers one. A
 	// publisher saying they will not fix something is not the same as saying
 	// it does not apply, so that offers a will-not-fix and never a dismissal.
@@ -55,8 +55,8 @@ type VexSaidBody struct {
 
 // counting is a reader that says how much has gone past it.
 //
-// What a size refusal needs and what a stream does not otherwise carry: the
-// document is never held, so its length is only knowable by counting it on
+// The length a size refusal needs, which a stream does not otherwise carry:
+// the document is never held, so its length is only knowable by counting it on
 // the way through.
 type counting struct {
 	r io.Reader
@@ -76,15 +76,15 @@ func registerVexImport(api huma.API, in Ingest) {
 		Summary: "Upload a VEX document",
 		Description: "Takes one OpenVEX document of what a distribution or an upstream " +
 			"security team has published about components this product ships.\n\n" +
-			"**Nothing is applied.** What arrives is a third layer beside the build's own " +
+			"Nothing is applied. What arrives is a third layer beside the build's own " +
 			"claims and our decisions: shown as evidence, offered as a prefill, and never " +
 			"standing as our judgment by itself.\n\n" +
 			"What a document adds over what the scanner already reports is the " +
-			"**reasoning**. The status is in the fix state already.\n\n" +
+			"reasoning. The status is in the fix state already.\n\n" +
 			"Uploading again from the same publisher sets aside what they said before rather " +
 			"than deleting it, so what an approval was granted on the strength of stays " +
 			"readable.\n\n" +
-			"**OpenVEX and CSAF-VEX both read.** The two say the same thing in different " +
+			"OpenVEX and CSAF-VEX both read. The two say the same thing in different " +
 			"shapes — one puts the status on a statement, the other in which list a product " +
 			"identifier appears in — and both become the same claim here, because what a " +
 			"publisher is saying does not depend on which file they wrote it in. Which of the " +
@@ -98,13 +98,13 @@ func registerVexImport(api huma.API, in Ingest) {
 		// A published document is somebody else's output arriving over a link
 		// we do not control, exactly as a scan file is, and this is the first
 		// place it can be stopped. Without it huma's default does not apply —
-		// it is not consulted for multipart at all — so the whole body was
-		// spooled to disk before any of this endpoint's own checks ran.
+		// it is not consulted for multipart at all — so the whole body is
+		// spooled to disk before any of this endpoint's own checks run.
 		MaxBodyBytes: maxUpload(in.Limits),
 		Middlewares:  huma.Middlewares{boundedForm(api, maxUpload(in.Limits))},
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Publisher string `query:"publisher" maxLength:"191" doc:"Who published it, where the document does not name itself. At most 191 characters"`
+		Publisher string `query:"publisher" maxLength:"191" doc:"The publisher, where the document does not name itself. At most 191 characters"`
 		RawBody   huma.MultipartFormFiles[statementParts]
 	}) (*struct{ Body StatementsTakenBody }, error) {
 		if err := administrating(ctx); err != nil {
@@ -123,10 +123,10 @@ func registerVexImport(api huma.API, in Ingest) {
 		}
 
 		// Read as a stream, digested as it goes, and never held whole. Read
-		// into memory it was held twice — the growing buffer and then a copy
+		// into memory it is held twice — the growing buffer and then a copy
 		// of it to parse from — which is about two and a half times the
 		// limit, against a container that ships with less than that: an
-		// administrator importing a large vendor document got the process
+		// administrator importing a large vendor document gets the process
 		// killed rather than an answer. The scan upload streams a document of
 		// the same size past the same digest and holds none of it.
 		//
@@ -152,12 +152,12 @@ func registerVexImport(api huma.API, in Ingest) {
 		// digest is the whole document by definition, and a reader that
 		// answered early would otherwise record a hash of the part it read.
 		//
-		// Drained into nothing, because the reader above already tees into
-		// the digest: copying into it here hashed every drained byte a second
+		// Drained into nothing, because the reader above already tees into the
+		// digest: copying into it here hashes every drained byte a second
 		// time, so a document with anything after the closing brace — a
-		// trailing newline is enough — recorded a digest that is not the
-		// document's, which is what says whether a publisher has revised what
-		// an approval was granted against.
+		// trailing newline is enough — records a digest that is not the
+		// document's, and the digest is what says whether a publisher has
+		// revised what an approval was granted against.
 		if _, err := io.Copy(io.Discard, counted); err != nil {
 			return nil, huma.Error400BadRequest("that document could not be read")
 		}
@@ -166,7 +166,7 @@ func registerVexImport(api huma.API, in Ingest) {
 				"that document is larger than the %d bytes this deployment reads", most))
 		}
 
-		// Who published it is the key a later upload supersedes on, and it is
+		// The publisher is the key a later upload supersedes on, and it is
 		// an indexed column of a fixed width. Refused rather than shortened:
 		// two publishers agreeing for the width of the column would collapse
 		// into one, and the later upload would set aside statements it has
@@ -232,7 +232,7 @@ func cited(id int64) *int64 {
 	return &id
 }
 
-// componentNamed is what a statement's target points at, as a component name.
+// componentNamed is the component name a statement's target points at.
 //
 // A package identifier where it carries one, and the bare name otherwise: a
 // statement made against a source tree names something we cannot resolve to a

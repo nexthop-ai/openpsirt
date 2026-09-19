@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// SignOutOutput carries nothing. What matters is the cookie it clears.
+// SignOutOutput carries nothing but the cookie it clears.
 type SignOutOutput struct {
 	// SetCookie clears what the browser holds as well as what the database
 	// does. Clearing only the database leaves a browser holding a credential
@@ -72,8 +72,8 @@ func SessionCookie(token string, plainHTTP bool) http.Cookie {
 // it and no state-changing request able to be made at all.
 //
 // It is not a credential. It authenticates nothing by itself — the session
-// cookie does that — so what a script reading it gains is the ability to make
-// a request the browser could already have been made to make.
+// cookie does that — so a script reading it gains the ability to make a
+// request the browser could already have been made to make.
 func CSRFCookie(token string, plainHTTP bool) http.Cookie {
 	return browserCookie(csrfCookieName, token, true, plainHTTP, 0)
 }
@@ -81,7 +81,7 @@ func CSRFCookie(token string, plainHTTP bool) http.Cookie {
 // csrfCookieName is where a page reads the value it echoes back.
 const csrfCookieName = "openpsirt_csrf"
 
-// clearedCookie is what tells a browser to forget the session. Its attributes
+// clearedCookie tells a browser to forget the session. Its attributes
 // match the ones it was set with, because a browser matches on those before it
 // will replace a cookie.
 func clearedCookie(plainHTTP bool) http.Cookie {

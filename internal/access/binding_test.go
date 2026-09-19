@@ -391,7 +391,7 @@ func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// How they come through the door, recorded like anybody else's.
+		// The door they come through, recorded like anybody else's.
 		if err := f.store.Claim(ctx, person.ID, "bob"); err != nil {
 			t.Fatal(err)
 		}

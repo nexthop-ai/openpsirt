@@ -247,10 +247,10 @@ func TestAScannerGoingQuietIsNotCountedAsWorkDone(t *testing.T) {
 	// set without being counted as resolved, and the step it left in is the
 	// step it actually left in.
 	//
-	// Which step that is used to be found by walking every bucket looking for
-	// the one the moment fell in, once per step, for every row: the answer was
-	// right and it cost steps squared per row to get. The arithmetic that
-	// replaced it has to land in the same bucket, which is what this pins.
+	// Found by walking every bucket looking for the one the moment falls in,
+	// once per step and for every row, the answer is right and costs steps
+	// squared per row. The arithmetic in its place has to land in the same
+	// bucket, which is what this pins.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		now := time.Now().UTC()

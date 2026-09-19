@@ -27,15 +27,15 @@ func (bundleSort) Schema(huma.Registry) *huma.Schema {
 
 // BundleBody is one upstream bump and everything it would close.
 type BundleBody struct {
-	Upstream string `json:"upstream" doc:"What the upgrade is of: the source package where one is recorded, and the component's own name otherwise"`
+	Upstream string `json:"upstream" doc:"The upgrade's subject: the source package where one is recorded, and the component's own name otherwise"`
 	From     string `json:"from" doc:"The version in hand"`
 	To       string `json:"to" doc:"The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped"`
 	// Components are the names this bundle moves, which is what makes a
 	// bundle keyed on a source package readable.
 	Components []string `json:"components" doc:"The packages this one upgrade moves. More than one where a source package builds several"`
 	Issues     int      `json:"issues" doc:"Distinct vulnerabilities the upgrade closes"`
-	Places     int      `json:"places" doc:"How many findings those sit at"`
-	Builds     int      `json:"builds,omitempty" doc:"How many builds of the selection hold any of it. Absent where the selection is one build"`
+	Places     int      `json:"places" doc:"The number of findings those sit at"`
+	Builds     int      `json:"builds,omitempty" doc:"The number of builds of the selection holding any of it. Absent where the selection is one build"`
 	Severity   string   `json:"severity,omitempty" doc:"The worst of what it closes"`
 	Exploited  bool     `json:"exploited,omitempty" doc:"Some of what it closes is being exploited"`
 	// In names the builds that hold it, which is what a declaration is
@@ -44,7 +44,7 @@ type BundleBody struct {
 	In []BuildName `json:"in" doc:"The builds that hold this upgrade"`
 }
 
-// BundleQuery is what narrows the fix-bundle list.
+// BundleQuery is the narrowing the fix-bundle list takes.
 //
 // One struct for the screen and the file, because they are one question. An
 // export declaring its own parameters drifts from the list it came from, and
@@ -59,11 +59,11 @@ type BundleQuery struct {
 	Search    string     `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
 	Ecosystem string     `query:"ecosystem" doc:"Keep only components of one package kind"`
 	State     string     `query:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Keep only groups this far decided"`
-	Sort      bundleSort `query:"sort" doc:"Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for"`
+	Sort      bundleSort `query:"sort" doc:"The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for"`
 	Ascending bool       `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
 }
 
-// narrow is what the store reads by, from what was asked for.
+// narrow is the store's own filter, built from the request.
 func (q BundleQuery) narrow(floor finding.Floor) finding.Filter {
 	return finding.Filter{
 		MinSeverity: q.Severity, Exploited: q.Exploited,
@@ -81,7 +81,7 @@ func registerBundles(api huma.API, in Ingest) {
 		Summary: "List findings by upgrade",
 		Description: "One row per upstream upgrade, with the issues it closes.\n\n" +
 
-			"Keyed on the **source package** where one is recorded and on the component's " +
+			"Keyed on the source package where one is recorded and on the component's " +
 			"own name otherwise, so packages built from one source are one row — curl, " +
 			"libcurl4t64 and libcurl3t64 are upgraded once.\n\n" +
 			"Only what has a fix: a bundle is a version to move to, so a finding upstream has " +
@@ -232,19 +232,19 @@ type BuildName struct {
 // PlannedBody is one bump a release is waiting on.
 type PlannedBody struct {
 	Fold       string   `json:"fold" doc:"The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from"`
-	Upstream   string   `json:"upstream" doc:"What to call it: the source package"`
+	Upstream   string   `json:"upstream" doc:"The name: the source package"`
 	From       string   `json:"from"`
 	To         string   `json:"to" doc:"The version it moves to, as the commitment recorded it"`
 	Components []string `json:"components"`
 	Issues     int      `json:"issues" doc:"Distinct issues still open under this upgrade here, which is what it would close. Nothing is declared done by hand: a build is clear when it stops holding them"`
-	Places     int      `json:"places" doc:"How many findings those issues sit at"`
-	DeclaredAt string   `json:"declared_at" doc:"When the commitment was made, which is what this release has been waiting since"`
+	Places     int      `json:"places" doc:"The number of findings those issues sit at"`
+	DeclaredAt string   `json:"declared_at" doc:"The moment the commitment was made, which is what this release has been waiting since"`
 	// By, HeldBy and State are the promise, who is carrying it, and where
 	// it stands. The state is derived on every read from the scans and the
 	// date, and set by nobody.
 	By     string `json:"by,omitempty" doc:"The date the promise named, as a date. Absent where the commitment is intent rather than a promise"`
 	HeldBy string `json:"held_by,omitempty" doc:"The party carrying it, where one party holds all of what is still open under it. An upgrade split between two is nobody's"`
-	State  string `json:"state" enum:"planned,landed,lapsed" doc:"Where it stands. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
+	State  string `json:"state" enum:"planned,landed,lapsed" doc:"The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this"`
 	// ClaimID is the claim that argued for it, which is the way through to
 	// the reasoning, the approval and the conversation about the upgrade.
 	ClaimID int64 `json:"claim_id,omitempty" doc:"The claim that argued for it, where one did: its reasoning, its approval and its comments"`
@@ -258,18 +258,18 @@ func registerPendingUpgrades(api huma.API, in Ingest) {
 		Description: "Everything committed for this build, one row per upgrade — a source package " +
 			"at the version it was built at, moving to another version — with what it would " +
 			"still close here.\n\n" +
-			"**What it covers is a match, not a list.** A finding is covered when its " +
+			"What it covers is a match, not a list. A finding is covered when its " +
 			"component folds to the same key in this build, so changing the version a release " +
 			"is moving to is one row, and an issue published tonight against the same package " +
 			"is covered by this morning's commitment with nobody acting.\n\n" +
-			"**The fix-bundle query read from the other end.** A triager reads an upgrade and the " +
+			"The fix-bundle query read from the other end. A triager reads an upgrade and the " +
 			"issues it closes; a coordinator reads a build and the upgrades it is waiting on. One " +
 			"query rather than two reports that will eventually disagree.\n\n" +
-			"**Nothing here is declared done.** A piece of work has landed when the build " +
+			"Nothing here is declared done. A piece of work has landed when the build " +
 			"stops holding it, which the scans already say — a declared fix that is still " +
 			"open after a scan has run is a missed target, and the scan is independent " +
 			"evidence against the claim.\n\n" +
-			"**Each row says where it stands** — planned, landed, or lapsed — derived on every " +
+			"Each row says where it stands — planned, landed, or lapsed — derived on every " +
 			"read from the scans and the date the promise named, and set by nobody. A lapsed " +
 			"upgrade returns as one item to whoever holds it: the findings it covers stay " +
 			"covered, because deciding them again one at a time is the thing the promise was " +

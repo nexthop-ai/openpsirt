@@ -24,7 +24,7 @@ import (
 // engine. A property the whole design rests on is one somebody should be able
 // to watch hold without it.
 //
-// What locking adds is that workers do not queue behind one another on the
+// Locking adds that workers do not queue behind one another on the
 // same row. Without it, several workers all select the oldest job, one wins
 // and the rest did their round trip for nothing; with it, each takes a
 // different job. The query cannot be written portably, so each engine is

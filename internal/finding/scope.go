@@ -10,9 +10,9 @@ import (
 // Scope narrows a cross-product answer to what somebody has selected.
 //
 // The screens that span products — what is running out, what nobody owns, how
-// the estate is trending — used to answer for everything a reader may see and
-// nothing else. Once a product is chosen in the picker, a page counting the
-// others is answering a question nobody asked, so the picker narrows the whole
+// the estate is trending — otherwise answer for everything a reader may see
+// and nothing else. Once a product is chosen in the picker, a page counting
+// the others answers a question nobody asked, so the picker narrows the whole
 // interface and "all" is offered at each level rather than being the only
 // option.
 //
@@ -23,7 +23,7 @@ import (
 // The levels are independent. A variant belongs to the product rather than to
 // one branch of it, so "this product, every branch, this variant" is a real
 // question — what a product is built as, across everything still being built.
-// What cannot happen is a branch or variant without a product, which the
+// A branch or variant without a product cannot happen, which the
 // interface prevents by leaving those unselectable and the caller refuses
 // rather than guessing which product was meant.
 type Scope struct {
@@ -80,7 +80,7 @@ func (s *Store) BuildsWithin(ctx context.Context, db bun.IDB, scope Scope) ([]in
 // gives: the identifiers are resolved once and bound into the statements that
 // follow, and the catalog is not joined into any of them.
 //
-// **A selection that names one whole build is not narrowed by it.** The
+// A selection that names one whole build is not narrowed by it. The
 // question these two answer is which releases to consider, and a request that
 // has already named the release has answered it. Applied anyway, the defaults —
 // branches, in support — made a tag's own findings screen report "0 of 0"

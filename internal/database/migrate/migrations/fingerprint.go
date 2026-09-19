@@ -76,7 +76,7 @@ var (
 // cannot disagree without the file being misnamed, which nothing else would
 // accept either.
 //
-// What it is for: a deployment that applies migrations separately needs to
+// It exists for this: a deployment that applies migrations separately needs to
 // know whether the database is behind the binary, and "behind" needs a number
 // on both sides. Every other reading of the applied version had only one.
 func Expected() (int64, error) {

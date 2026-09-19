@@ -93,7 +93,7 @@ func TestRatingAnIssueAsksForTriageOnTheProductInThePath(t *testing.T) {
 			{"private", here, http.StatusForbidden},
 			// The capability with no triage right under it.
 			{"approver", here, http.StatusNotFound},
-			// Triage somewhere else, which used to be enough for anywhere.
+			// Triage somewhere else, which is not triage here.
 			{"triager", there, http.StatusNotFound},
 			{"", here, http.StatusUnauthorized},
 		} {

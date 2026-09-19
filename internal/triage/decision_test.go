@@ -50,7 +50,7 @@ func (f *fixture) claims(t *testing.T, at triage.Place) *triage.Decision {
 		Justification: triage.CodeNotInExecutePath,
 		Reasoning:     "The parser is never reached: we only call the encoder.",
 		By:            f.proposer,
-		// What a caller works out through NeedsApproval and passes in.
+		// The value a caller works out through NeedsApproval and passes in.
 		// Dismissing something as not applicable hides risk, so it waits.
 		NeedsApproval: true,
 	})
@@ -178,11 +178,10 @@ func TestAClaimThatNeedsNobodyTakesEffectAtOnce(t *testing.T) {
 }
 
 func TestAnAgreedClaimCannotBeShadowedByALaterOne(t *testing.T) {
-	// This used to check that a claim nobody had agreed to did not shadow an
-	// agreed one, because both could exist and what applied was chosen by
-	// agreed-beats-waiting and then newest-wins. The second claim can no
-	// longer be made at all, so the shadowing has nowhere to come from — and
-	// the refusal names the decision to go and revise instead.
+	// Two claims at one place cannot both exist, so the shadowing this asks
+	// about has nowhere to come from: the second is refused, and the refusal
+	// names the decision to go and revise. Allowed, what applies is chosen by
+	// agreed-beats-waiting and then newest-wins.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		agreed := f.agreed(t, f.at())
@@ -681,11 +680,11 @@ func TestAPlaceThatStatesNoVisibilityIsTreatedAsUndisclosed(t *testing.T) {
 }
 
 func TestAVersionIsReadTheSameWayItIsWritten(t *testing.T) {
-	// Surrounding space is not part of a version, and the two halves used to
-	// disagree about that: storing treated a whitespace-only version as absent
-	// while matching treated it as a version that happened to be spaces. A
-	// decision written against nothing then looked for something, and could
-	// never apply to the place it was made about — silently, since nothing
+	// Surrounding space is not part of a version, and the two halves must
+	// agree about that: storing treating a whitespace-only version as absent
+	// while matching treats it as a version that happens to be spaces writes a
+	// decision against nothing that then looks for something, and it can never
+	// apply to the place it was made about — silently, since nothing
 	// about it looks wrong from either side.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -926,7 +925,7 @@ func TestNobodySendsTheirOwnWordsBack(t *testing.T) {
 func TestAnApprovalKeepsWhatItCoveredAtTheTime(t *testing.T) {
 	// A decision reaches by matching, so it covers more as builds appear —
 	// with nobody acting, and nobody having agreed to the larger number.
-	// Asking later what it covers answers a different question from what
+	// Its reach asked later answers a different question from what
 	// somebody consented to, and only one of the two survives if it is not
 	// written down when it happens.
 	each(t, func(t *testing.T, f *fixture) {
@@ -1014,7 +1013,7 @@ func TestAVersionTooLongToKeyOnIsRefusedRatherThanShortened(t *testing.T) {
 	// columns they copy are not. Measured against the reference producer:
 	// 6,845 components, longest version 49 characters, nothing over 191.
 	//
-	// **Refused rather than shortened** is the part that matters. A decision
+	// Refused rather than shortened is the part that matters. A decision
 	// keyed on a truncated version would be compared against the finding's
 	// full one and match nothing, so the claim would stand on the record,
 	// cover nothing, and say so nowhere. Refused, somebody is told.

@@ -17,7 +17,7 @@ import (
 
 // ErrNotOursToSay is what an issue a scanner reported answers.
 //
-// Which builds hold one of those is a fact the scans establish, and editing it
+// The builds holding one of those is a fact the scans establish, and editing it
 // here would be overwriting what was found with what somebody thinks. A flaw
 // recorded by hand has no scan behind it, which is exactly why its build set
 // is ours to correct.
@@ -32,17 +32,17 @@ type Reset struct {
 
 // Affects makes the builds a recorded flaw is filed against exactly these.
 //
-// **Research narrows and widens what somebody first believed**, and the first
+// Research narrows and widens what somebody first believed, and the first
 // belief is written down before the analysis is finished — that is the point of
 // being able to record one early. So the set is editable, declaratively: this
 // is the list, work out what changed.
 //
-// **Widening opens findings; narrowing closes them as `invalid`** — because a
+// Widening opens findings; narrowing closes them as `invalid` — because a
 // build taken out of the set was never affected, rather than having stopped
 // being affected. The record of it stays, with the reason, so that the history
 // says what was believed and when it was corrected.
 //
-// **A reason is required whenever anything is closed.** Taking a build back out
+// A reason is required whenever anything is closed. Taking a build back out
 // of an advisory's affected list with no explanation is the state a history
 // exists to prevent.
 func (s *Store) Affects(ctx context.Context, subject access.Subject,
@@ -74,7 +74,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		wanted[target] = true
 	}
 
-	// What is filed now, and what the flaw is in. Read before the transaction
+	// Everything filed now, and the flaw's subject. Read before the transaction
 	// because resolving a component is a walk of a build's graph, and because
 	// a build that does not hold it has to be refused before anything is
 	// written — which is what recording already does for the same reason. The
@@ -112,14 +112,14 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		out.Added, out.Closed = 0, 0
 
-		// What is open now, read inside the transaction: a retry
-		// re-runs this against a database somebody else may have
-		// moved.
-		// Ordered, because the first row is what a filing against another
-		// build is copied from. Unordered, which row that is depends on the
-		// plan an engine happened to pick, so the same request could produce
-		// a different row on a different engine or after an index changed.
-		// The earliest filing is the one to copy: it is the record of what was
+		// rows is what is open now, read inside the transaction: a
+		// retry re-runs this against a database somebody else may have
+		// moved. Ordered, because the first row is what a filing
+		// against another build is copied from. Unordered, which row
+		// that is depends on the plan an engine happened to pick, so
+		// the same request could produce a different row on a
+		// different engine or after an index changed. The earliest
+		// filing is the one to copy: it is the record of what was
 		// first known about this issue here.
 		var rows []Finding
 		err := tx.NewSelect().Model(&rows).
@@ -139,9 +139,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 
 		here := map[int64]bool{}
 		var closing []int64
-		// How many rows this would open, counted as they are resolved.
+		// The number of rows this would open, counted as they are resolved.
 		opened := 0
-		// Which builds are being taken out, as against how many rows that
+		// The builds being taken out, as against the rows that
 		// is: a build holding the component in two places is one build.
 		out.Closed = 0
 		leaving := map[int64]bool{}

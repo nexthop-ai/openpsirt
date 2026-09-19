@@ -374,7 +374,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Who they are does not change because a credential was pinned.
+		// Identity does not change because a credential was pinned.
 		if narrowed.Party() != whole.Party() || narrowed.Party() == 0 {
 			t.Errorf("a narrowed token is party %d and the person is party %d",
 				narrowed.Party(), whole.Party())
@@ -420,7 +420,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 // already names as how long a role a group withdrew can still be held. It was
 // true of a browser and false of a token.
 //
-// What an administrator assigned is untouched. That is a standing decision
+// A grant an administrator assigned is untouched. That is a standing decision
 // rather than a reading of somebody's membership, and it does not go off.
 func TestATokenStopsCarryingARoleAGroupStoppedDeriving(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {

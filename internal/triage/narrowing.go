@@ -10,7 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// Who may read, argue about and agree to what.
+// The reach of each role: reading, arguing and agreeing.
 //
 // Every visibility rule this package enforces, in one file. They were spread
 // through the proposal writer, which is where the first caller of each was:

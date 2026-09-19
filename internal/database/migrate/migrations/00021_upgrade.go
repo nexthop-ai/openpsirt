@@ -17,25 +17,25 @@ func init() {
 // be recorded is which releases a bump is meant to reach; whether it arrived is
 // answered by the next scan of each of them rather than by anybody saying so.
 //
-// **The row is the commitment and nothing else.** There is no state column, no
+// The row is the commitment and nothing else. There is no state column, no
 // "done", no resolved-at. A build is clear when it stops holding the issues the
 // bump answers, which the findings already say — a second record of the same
 // fact would be one somebody has to keep true, and the way that fails is the
 // tool reporting a fix that shipped in nobody's release.
 //
-// **Keyed on the build and the fold**, which is the unit the work is actually
+// Keyed on the build and the fold, which is the unit the work is actually
 // done in: a source package at a version, moving to another version. It was
 // keyed per issue *and* per component *and* per target version, so changing
 // which version a release is moving to meant rewriting every row of it — and a
 // vulnerability that arrived last night against the same package was not
 // covered until somebody declared it too.
 //
-// **Coverage is a join, not a stamp.** A finding is covered when its component
+// Coverage is a join, not a stamp. A finding is covered when its component
 // folds to this key in this build. Nothing is written onto findings, so a bump
 // declared today answers a CVE published tomorrow without anybody acting, and
 // changing 2.41.6 to 2.41.7 is one row.
 //
-// **No version comparison is involved.** An upgrade covers everything open on
+// No version comparison is involved. An upgrade covers everything open on
 // the fold rather than only what records this version as its fix, which is the
 // rule the fix-bundle work already settled: deciding otherwise needs an
 // ordering per ecosystem that nothing here has.

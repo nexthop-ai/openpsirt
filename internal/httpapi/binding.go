@@ -25,10 +25,10 @@ type BindingBody struct {
 	// Product is absent where the binding carries administration, which is
 	// global rather than held against a product.
 	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it"`
-	// ProductDisplayName is what to show beside it, for the reason HeldBody
+	// ProductDisplayName is the label shown beside it, for the reason HeldBody
 	// carries one: unbind resolves the field above.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
-	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"What membership of this group grants"`
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
+	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"The role membership of this group grants"`
 }
 
 func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *setting.Store) {
@@ -109,10 +109,10 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			if err := rights.SwitchTo(ctx, wanted); err != nil {
 				return wentWrong(a.Logger, "cannot change where roles come from", err)
 			}
-			// Changed rather than set, because what it held is not derivable
-			// afterwards and is half of what the trail is asked: read in a
-			// statement of its own it would be the value at some earlier
-			// moment.
+			// Changed rather than set, because the prior value is not
+			// derivable afterwards and is half of what the trail is asked:
+			// read in a statement of its own it would be the value at some
+			// earlier moment.
 			before, had, err := store.Change(ctx, setting.RoleMode, string(wanted))
 			if err != nil {
 				return recording(a.Logger, "cannot record where roles come from", err)
@@ -185,7 +185,7 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 			"Every role names the product it applies to. Administration and the audit " +
 			"permission are bound without one, because they are held over the deployment " +
 			"rather than against a product.\n\n" +
-			"**The group is matched exactly, including its capitals.** It is an identity the " +
+			"The group is matched exactly, including its capitals. It is an identity the " +
 			"provider hands over rather than a name anybody here types, so it is stored as " +
 			"given and compared as given — `Security` and `security` are two bindings, and a " +
 			"binding whose capitals do not match what the provider sends grants nothing. The " +
@@ -278,8 +278,8 @@ func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *set
 						"that was the last thing granting administration: bind another group " +
 							"to admin, or name somebody in configuration, first")
 				case errors.Is(err, access.ErrNothingMatched):
-					// Nothing was bound, so nothing was withdrawn — and the
-					// check that would have refused this passed *because* the
+					// Nothing was bound, so nothing is withdrawn — and the
+					// check that would refuse this passes *because* the
 					// delete did nothing.
 					return noSuchGrant()
 				case err != nil:
@@ -359,19 +359,19 @@ func roleModeIn(settings func(bun.IDB) *setting.Store) func(context.Context, bun
 // display name is what the row says. Published as one pair rather than fetched
 // twice, so the two cannot come back from different reads.
 type named struct {
-	// Address is what ProductByName matches: lowercased and trimmed.
+	// Address is the form ProductByName matches: lowercased and trimmed.
 	Address string
-	// Display is what the operator declared, empty where it is the address
-	// again.
+	// Display is the operator's own declaration, empty where it repeats the
+	// address.
 	Display string
 }
 
 // productNames maps product rows to the names bindings state them by.
 //
 // The address is the one a binding states and the one every matching write
-// resolves. Publishing the display name there made the interface's Withdraw
-// send back a word that matched no row, so a role on a product whose display
-// name is not merely a recapitalization could be granted and not withdrawn.
+// resolves. Publishing the display name there has the interface's Withdraw
+// send back a word that matches no row, so a role on a product whose display
+// name is more than a recapitalization is granted and not withdrawn.
 func productNames(ctx context.Context, a Administering) (map[int64]named, error) {
 	names := a.Catalog(a.handle())
 	// Every product, because this is naming the ones bindings already refer

@@ -15,15 +15,15 @@ requires.
 - [Starting and stopping](#starting-and-stopping)
 - [Chart security context](#chart-security-context)
 - [Render-time refusals](#render-time-refusals)
-- [Where a secret comes from](#where-a-secret-comes-from)
+- [Secret sources](#secret-sources)
 - [Self-inventories](#self-inventories)
 - [Inventory composition](#inventory-composition)
 - [Release assets](#release-assets)
-- [Where a version comes from](#where-a-version-comes-from)
+- [Version sources](#version-sources)
 - [Image tags and labels](#image-tags-and-labels)
 - [Chart version stamping](#chart-version-stamping)
 - [Signing and provenance](#signing-and-provenance)
-- [Cutting a release](#cutting-a-release)
+- [The release procedure](#the-release-procedure)
 - [Not built](#not-built)
 - [Limits](#limits)
 
@@ -41,9 +41,10 @@ toolchain the module declares, the result run on Alpine.
 
 The interface is built inside the image rather than taken from the build
 context. The Go build embeds a git-ignored directory, so an image built from a
-clean checkout — which is what CI builds — carried no interface and nothing
-reported it: an API-only binary is a supported build, and the embed tolerates an
-empty directory. Building it here also limits the image's requirements to docker.
+clean checkout — which is what CI builds — carries no interface and nothing
+reports it: an API-only binary is a supported build, and the embed tolerates an
+empty directory. Building it here also limits the image's requirements to
+docker.
 
 The binary is fully static, with CGO off, which is part of why the pure-Go
 SQLite driver was chosen. `scratch` or distroless would work and carry no shell.
@@ -63,12 +64,12 @@ was published while the distribution continues publishing fixes for it, so
 pinning alone ships what was known-vulnerable on that date and keeps shipping
 it.
 
-Measured on this image the day the base moved from 3.21 to 3.24: **22 findings
+Measured on this image the day the base moved from 3.21 to 3.24: 22 findings
 against the distribution's own packages, 20 of them OpenSSL at `3.5.7-r0` with
-the fix published as `3.5.8-r0`**, two of them critical, every one matched
+the fix published as `3.5.8-r0`, two of them critical, every one matched
 through Alpine's own advisories rather than by comparing an identifier against an
-upstream range. Upgrading cleared them. The older base had the same shape and was
-less legible about it.
+upstream range. Upgrading clears them, and every older base has the same
+shape.
 
 ## Bundled scanner
 
@@ -97,7 +98,7 @@ These are the only places these claims are tested rather than asserted.
 | It serves the interface | An image built with no interface, which answers the page's path with a credential refusal rather than a page |
 | The archive's binary serves the interface | The same build with no interface in it, in the form somebody runs by hand |
 
-**They run against a release as well as against a change.** The image a
+They run against a release as well as against a change. The image a
 release publishes is built from a fresh checkout with its base upgraded as it
 builds, so it is a different set of bytes from the one a merge was gated on,
 and the scanner it bundles can stop working in between. A deployment that
@@ -127,12 +128,12 @@ the migration from the beginning.
 
 | Rule | Reason |
 |---|---|
-| Everything contacted before the server listens is under one deadline, and each step says what it is about to do | An endpoint that accepts the connection and never answers held the process for ever with no log line written and no port listening — from outside, the same thing as a slow image pull. A crash loop naming what it could not reach is the failure a supervisor can act on |
+| Everything contacted before the server listens is under one deadline, and each step says what it is about to do | An endpoint that accepts the connection and never answers holds the process for ever with no log line written and no port listening, which from outside is a slow image pull. A crash loop naming what it could not reach is the failure a supervisor can act on |
 | Migrating is outside that deadline | A schema change on a large table legitimately takes longer than a deployment starts in, which is what the ten-minute startup probe above is for |
-| A subcommand this does not know is refused | Ignored, a typo in a job meant to apply migrations started a server instead, against whatever schema was there |
+| A subcommand this does not know is refused | Ignored, a typo in a job meant to apply migrations starts a server instead, against whatever schema is there |
 | Ten background loops run beside the server; two of them may be absent | The mail sender where no channel is configured, and the attachment sweeper where no store is. Every other pass runs whatever a deployment has — a list rather than ten guarded starts, so what runs can be read without opening the package behind each one |
-| Every exit waits for the background work, including a failure to listen | Each pass begins with a timer that fires at once, so returning early left them mid-query while the deferred close took the database away — an orderly failure to listen became failed scans and jobs retried for no reason |
-| Both halves of the shutdown grace answer the same way | An overrun request made the process exit 1 and an overrun worker exit 0, while the setting that bounds them is one. A supervisor reading the exit code was told that half of an unfinished shutdown had finished |
+| Every exit waits for the background work, including a failure to listen | Each pass begins with a timer that fires at once, so returning early leaves them mid-query while the deferred close takes the database away, and an orderly failure to listen becomes failed scans and jobs retried for no reason |
+| Both halves of the shutdown grace answer the same way | One setting bounds them both, so an overrun request exiting 1 and an overrun worker exiting 0 tells a supervisor reading the exit code that half of an unfinished shutdown finished |
 
 ## Chart security context
 
@@ -182,7 +183,7 @@ produces is resolved against the Secrets that same install creates. A list
 written beside the check would give a fifth secret source no row, and stay
 green on the defect it exists for.
 
-## Where a secret comes from
+## Secret sources
 
 | Value | Where it is read from |
 |---|---|
@@ -197,9 +198,9 @@ Secret the chart created holds the value under the chart's key, and asking for
 the operator's key name there asks for a key that is not there — which renders
 perfectly and produces a pod that never starts.
 
-**A Secret is written only while the thing that reads it is configured.**
-Turning a provider off by clearing its issuer used to leave the Secret behind,
-holding a live credential nothing reads.
+A Secret is written only while the thing that reads it is configured.
+Clearing a provider's issuer removes its Secret. One left behind holds a live
+credential nothing reads.
 
 The same pair answers for the database URL, both client secrets and the mail
 password, because what differs between them is the name of the Secret and the
@@ -284,7 +285,7 @@ Both inventories are published rather than left as a workflow artifact that
 expires. We ingest these for other people's software; REQ-04 is the same
 promise kept about our own, and a promise kept where somebody can see it.
 
-## Where a version comes from
+## Version sources
 
 | Rule | Why |
 |---|---|
@@ -310,9 +311,9 @@ compares the two.
 
 The binary's inventory is told its version rather than asked for it. A binary
 built here comes from no module the proxy has seen, so its build information
-records the main module as `(devel)` — and the document went out describing a
-component with no version at all, which is the one field a scanner needs to
-decide whether a release is affected.
+records the main module as `(devel)`, and a document that asks describes a
+component with no version at all — the one field a scanner needs to decide
+whether a release is affected.
 
 ## Image tags and labels
 
@@ -322,10 +323,9 @@ decide whether a release is affected.
 | `<major>.<minor>` | To the newest patch on that line |
 | `latest` | To the newest release that is not a prerelease |
 
-The image carried no labels at all until releases were designed, so an image
-pulled by digest could not be traced back to what produced it — and the two
-inventories that do carry the version are inside a filesystem nobody has
-mounted at the moment the question is asked.
+Without them an image pulled by digest cannot be traced back to what produced
+it, and the two inventories that do carry the version are inside a filesystem
+nobody has mounted at the moment the question is asked.
 
 | Label | Holds |
 |---|---|
@@ -357,7 +357,7 @@ the inventories and `openpsirt -version` cannot disagree about one build.
 | Build provenance | An attestation naming the repository, the workflow file and the tag that produced the asset |
 | What it proves | That an asset came out of this repository at that tag. Not that what is inside it is correct — that is what the inventories and the scan are for |
 
-**Every signature is verified in the workflow that makes it**, with the
+Every signature is verified in the workflow that makes it, with the
 command and the identity a third party would use. A signature nobody has
 verified is a signature nobody has tested, and the first person to find out is
 otherwise somebody who downloaded it.
@@ -370,7 +370,7 @@ that check a download:
 | Issuer | `https://token.actions.githubusercontent.com` |
 | Identity | The release workflow in this repository, at a tag |
 
-## Cutting a release
+## The release procedure
 
 A release is a tag. Everything after it is the `Release` workflow, and there
 is no step anybody performs by hand:
@@ -428,35 +428,12 @@ should get.
 
 ## Limits
 
-- **Pinning the base means nothing moves it either.** The image carried 3.21 —
-  released December 2024, support ending 2026-11-01 — until somebody looked, by
-  which point it was three releases behind. Past a base's end-of-life its packages
-  receive no security backports, and all of the base, the scanner and the
-  inventory tool were found two or more releases behind in one week. Dependabot
-  now watches what a `FROM` line names, which is the base images and the Go
-  toolchain. **The scanner and the inventory tool are still watched by nobody**:
-  each is a version and a checksum in a build argument, which nothing reads as a
-  dependency.
-- **Two builds of one commit can differ**, because the packages inside the base
-  are upgraded at build time. Accepted because the image carries an inventory of
-  itself, so what shipped is recorded rather than assumed.
-- **The packaging gate has one implementation.** The image and chart checks were
-  seven checks written twice, once in the Makefile and once in the workflow,
-  neither a superset of the other. CI runs the target.
-- **Pinned pairs are compared rather than trusted.** The Go toolchain, the SBOM
-  generator and Node are each written in two files. The same check catches a build
-  argument given two different defaults, which made a binary report one version
-  and its SBOM another.
-- **The binary archives are a convenience, not the product.** REQ-02 says this
-  ships as an image and a chart, and a binary run bare has none of the chart's
-  render-time refusals in front of it. Linux amd64 and arm64 only: nothing in the
-  design targets another platform, and an archive nobody tests is a support
-  surface rather than a release.
-- **`make dist` reads one image inventory, for the architecture it runs on.**
-  Cataloging a foreign filesystem means running foreign binaries under emulation.
-  The workflow publishes one per architecture it pushes; a developer who wants
-  the other names it and waits.
-- **Nothing is fetched at run time from a source only this project controls**,
-  and nothing is gated on a key this project issues. An operator who mirrors the
-  image into their own registry has the whole thing, which is what Apache 2.0
-  (REQ-01) requires of delivery.
+| Limit | Detail |
+|---|---|
+| Pinning the base means nothing moves it either | Past a base's end-of-life its packages receive no security backports, and a base, a scanner and an inventory tool each fall behind unnoticed. Dependabot watches what a `FROM` line names, which is the base images and the Go toolchain. The scanner and the inventory tool are watched by nobody: each is a version and a checksum in a build argument, which nothing reads as a dependency |
+| Two builds of one commit can differ | The packages inside the base are upgraded at build time. Accepted because the image carries an inventory of itself, so what shipped is recorded rather than assumed |
+| The packaging gate has one implementation | Written twice, once in the Makefile and once in the workflow, neither copy is a superset of the other. CI runs the target |
+| Pinned pairs are compared rather than trusted | The Go toolchain, the inventory generator and Node are each written in two files. The same check catches a build argument given two different defaults, which makes a binary report one version and its inventory another |
+| The binary archives are a convenience, not the product | REQ-02 says this ships as an image and a chart, and a binary run bare has none of the chart's render-time refusals in front of it. Linux amd64 and arm64 only: nothing in the design targets another platform, and an archive nobody tests is a support surface rather than a release |
+| `make dist` reads one image inventory, for the architecture it runs on | Cataloging a foreign filesystem means running foreign binaries under emulation. The workflow publishes one per architecture it pushes; a developer who wants the other names it and waits |
+| Nothing is fetched at run time from a source only this project controls | And nothing is gated on a key this project issues. An operator who mirrors the image into their own registry has the whole thing, which is what Apache 2.0 (REQ-01) requires of delivery |

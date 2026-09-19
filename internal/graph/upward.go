@@ -13,19 +13,19 @@ import (
 
 // The tree, seen upward, for somebody narrowed to their own work.
 //
-// **The tree downward is the inventory.** Rooted at the build and descended, it
+// The tree downward is the inventory. Rooted at the build and descended, it
 // is what the product contains — which is the breadth a person holding no
 // reading on the product was deliberately not granted. So it cannot be offered
 // with rows hidden: a container's count would still say how much sits under it,
 // and opening one asks a question they may not ask.
 //
-// **What they get instead is the chains their own findings sit on**, from each
+// They get instead the chains their own findings sit on, from each
 // finding's component up to the build's root. The chain upward is what makes a
 // finding judgeable, because it says what pulled the thing in — and every node
 // on it sits above something they were already given, so nothing on it is new.
 // Descending a node is the question that stays closed.
 //
-// **The counts are narrowed to match.** A node says how much of *their* work
+// The counts are narrowed to match. A node says how much of *their* work
 // hangs beneath it along these chains, never how much the build holds there. A
 // number that counted the build would be the inventory leaking through a tree
 // drawn to avoid it.
@@ -55,7 +55,7 @@ const ours = 2000
 
 // Ours is the tree of what this subject holds in one build, seen upward.
 //
-// **No reading on the product is asked for.** An assignment is itself a grant
+// No reading on the product is asked for. An assignment is itself a grant
 // of visibility of what was assigned, which is what gives a
 // capability held without a read role any content at all — so the population
 // here is what they hold, at the visibility they may read it at and no

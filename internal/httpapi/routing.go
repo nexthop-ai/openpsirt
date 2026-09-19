@@ -19,16 +19,16 @@ import (
 // RuleBody is a standing rule that hands work nobody holds to a team.
 type RuleBody struct {
 	ID   int64  `json:"id"`
-	Name string `json:"name" doc:"What to call it, so a placement can be explained in words"`
-	Team string `json:"team" doc:"Where work lands, by the name that addresses the team"`
-	// TeamDisplayName is what to show beside it. The field above is what
+	Name string `json:"name" doc:"The name, so a placement can be explained in words"`
+	Team string `json:"team" doc:"The team work lands on, by the name that addresses it"`
+	// TeamDisplayName is the label shown beside it. The field above is the one
 	// add-routing-rule resolves through TeamByName, which matches the folded
 	// name column — so a team declared "platform-security" and displayed
-	// "Platform Security" listed as the label, and sending that back found no
+	// "Platform Security" lists as the label, and sending that back finds no
 	// team at all.
-	TeamDisplayName string `json:"team_display_name,omitempty" doc:"What to call that team, where it was declared with a display name"`
+	TeamDisplayName string `json:"team_display_name,omitempty" doc:"That team's display name, where it was declared with one"`
 	// Order is the whole of the precedence: first match wins.
-	Order int `json:"order" doc:"Where it sits among the others. The first rule that matches places the work"`
+	Order int `json:"order" doc:"Its position among the others. The first rule that matches places the work"`
 	// Upstream is the key that matters: one rule naming a source package
 	// catches every binary package built from it, wherever they sit.
 	Upstream string `json:"upstream,omitempty" doc:"A source package name. Catches every binary package built from it"`
@@ -39,9 +39,9 @@ type RuleBody struct {
 type CatchesOutput struct {
 	Body struct {
 		Components []string `json:"components" doc:"The components it names, at most twenty"`
-		Total      int      `json:"total" doc:"How many distinct components it matches. More than the list where the list was cut"`
+		Total      int      `json:"total" doc:"The number of distinct components it matches. More than the list where the list was cut"`
 		Work       int      `json:"work" doc:"Pieces of work at those components — one issue in one component, whatever it sits at"`
-		Unheld     int      `json:"unheld" doc:"How many of those nobody holds, which is what a rule may place"`
+		Unheld     int      `json:"unheld" doc:"The number of those nobody holds, which is what a rule may place"`
 	}
 }
 
@@ -52,7 +52,7 @@ func registerRouting(api huma.API, in Ingest) {
 		OperationID: "list-routing-rules", Method: http.MethodGet, Path: path,
 		Summary: "List the rules that route work to teams",
 		Description: "The standing rules for this product, in the order they are tried.\n\n" +
-			"**First match wins**, and which rule placed a finding is recorded on the finding: " +
+			"First match wins, and which rule placed a finding is recorded on the finding: " +
 			"an unwritten precedence is forgettable, and the question it answers — where did " +
 			"this come from — is asked months later by somebody who was not there.",
 		Tags: []string{"Administration"},
@@ -73,9 +73,9 @@ func registerRouting(api huma.API, in Ingest) {
 		// A rule is configuration rather than a finding, so there is nothing
 		// in it for the data layer to narrow: a reader either gets the whole
 		// precedence order or none of it. The declaration says triage and its
-		// three siblings enforce it, so this one does too — read against
-		// each other, they said different things, which is the whole failure
-		// mode this pair is kept in step to avoid.
+		// three siblings enforce it, so this one does too — read against each
+		// other they say different things, which is the whole failure mode
+		// this pair is kept in step to avoid.
 		if !subject.Triages(access.Public, product.ID) {
 			return nil, noSuchProduct()
 		}
@@ -105,11 +105,11 @@ func registerRouting(api huma.API, in Ingest) {
 		Description: "Answers what a rule with these keys matches, without recording " +
 			"anything: the components it names, how many pieces of work sit at them, and how " +
 			"many of those nobody holds.\n\n" +
-			"**A rule whose reach nobody can see before saving is a rule that sweeps the " +
-			"estate on a guess**, and one naming something nothing is called places nothing, " +
+			"A rule whose reach nobody can see before saving is a rule that sweeps the " +
+			"estate on a guess, and one naming something nothing is called places nothing, " +
 			"silently — which is the worst way for a rule to be wrong, because it still looks " +
 			"like a rule. `*` matches any run of characters in either key.\n\n" +
-			"**It does not account for the rules already there.** First match wins, so what " +
+			"It does not account for the rules already there. First match wins, so what " +
 			"this catches is what it would place only where no earlier rule claimed it first.",
 		Tags: []string{"Administration"},
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
@@ -166,14 +166,14 @@ func registerRouting(api huma.API, in Ingest) {
 		OperationID: "add-routing-rule", Method: http.MethodPost, Path: path,
 		Summary: "Add a rule that routes work to a team",
 		Description: "Records a standing rule and queues it against what is already open.\n\n" +
-			"**It matches on component identity as well as on a place in the tree.** The " +
+			"It matches on component identity as well as on a place in the tree. The " +
 			"source package is the key that matters: one rule naming it catches every binary " +
 			"package built from it, wherever they sit — a kernel is one source package " +
 			"appearing at many places under many consumers, and a subtree rule would need a " +
 			"line per place and would still miss tomorrow's.\n\n" +
-			"**It places only work nobody holds.** A human assignment always wins, and " +
+			"It places only work nobody holds. A human assignment always wins, and " +
 			"adding a rule never takes something out of somebody's hands.\n\n" +
-			"**Turning one on is a bulk write**, so it is queued rather than done here: one " +
+			"Turning one on is a bulk write, so it is queued rather than done here: one " +
 			"rule naming a source package sweeps thousands of existing findings, and saving " +
 			"a form must not hold a transaction open across the estate. The reply says the " +
 			"rule was recorded, not that the sweep has finished.",
@@ -183,7 +183,7 @@ func registerRouting(api huma.API, in Ingest) {
 		Product string `path:"product"`
 		Body    struct {
 			Name     string `json:"name" minLength:"1" maxLength:"120"`
-			Team     string `json:"team" minLength:"1" doc:"Where work lands, by team name"`
+			Team     string `json:"team" minLength:"1" doc:"The team work lands on, by name"`
 			Upstream string `json:"upstream,omitempty" doc:"A source package name"`
 			Beneath  string `json:"beneath,omitempty" doc:"A component name, matching it and everything under it"`
 		}
@@ -228,7 +228,7 @@ func registerRouting(api huma.API, in Ingest) {
 		OperationID: "retire-routing-rule", Method: http.MethodDelete,
 		Path:    path + "/{id}",
 		Summary: "Retire a routing rule",
-		Description: "Takes a rule out of use. **What it already placed stays placed**: " +
+		Description: "Takes a rule out of use. What it already placed stays placed: " +
 			"changing a rule never takes something out of somebody's hands, and that holds " +
 			"for a team's queue as much as for a person.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,

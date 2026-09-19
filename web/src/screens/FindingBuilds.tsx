@@ -7,12 +7,12 @@ import { buildKey, fromBuildKey } from "../ui/builds";
 
 // Correcting which builds a recorded flaw affects.
 //
-// **The endpoint answered and nothing called it.** The first belief about a
+// The endpoint answered and nothing called it. The first belief about a
 // flaw is written down before the analysis is finished — that is the point of
 // being able to record one early — so it has to be correctable, and it was
 // correctable only by somebody holding a shell.
 //
-// **The set is stated as a whole**, not edited a build at a time, because a
+// The set is stated as a whole, not edited a build at a time, because a
 // set somebody can read back and check is not the same thing as a stream of
 // additions and removals. Widening opens findings; narrowing closes them as
 // `invalid` — never affected, rather than no longer affected — which is why a
@@ -55,7 +55,7 @@ export function AffectedBuilds({
       unwrap(await api.GET("/v1/products/{product}/releases", { params: { path: { product } } })),
     retry: false,
   });
-  // Which of them hold it now. The same request the issue screen makes, under
+  // The builds holding it now. The same request the issue screen makes, under
   // the same key, so opening this after reading that page asks nothing.
   const holds = useQuery({
     enabled: open,
@@ -69,7 +69,7 @@ export function AffectedBuilds({
     retry: false,
   });
 
-  // Whether the page in hand is the whole answer.
+  // A page in hand that is the whole answer.
   //
   // This editor sends the *complete* list of builds, and the server closes
   // every build absent from it as never affected. So a set derived from a
@@ -139,7 +139,7 @@ export function AffectedBuilds({
       ) : builds.isError || holds.isError ? (
         <Failed
           error={builds.error ?? holds.error}
-          what="What this is filed against could not be read."
+          what="The builds this is filed against could not be read."
         />
       ) : partial ? (
         <div className="alert">
@@ -184,7 +184,7 @@ export function AffectedBuilds({
           {removing.length > 0 && (
             <div className="field">
               <label htmlFor="affects-because">
-                Why{" "}
+                The reason{" "}
                 {removing.length === 1 ? "that build was" : `those ${removing.length} builds were`}{" "}
                 never affected{" "}
                 <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>

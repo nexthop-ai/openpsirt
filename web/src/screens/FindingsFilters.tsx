@@ -5,7 +5,7 @@ import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
 // The findings list's filters, apart from the list itself.
 //
-// **Everything the server can narrow by is here, named for what it asks.**
+// Everything the server can narrow by is here, named for what it asks.
 // The panel this replaced offered a third of them behind a "more" control, in
 // a flat run of unlabeled boxes whose values read as phrases — "whatever it
 // did", "any deadline", "anyone or nobody". Two of the filters people asked
@@ -14,12 +14,12 @@ import { Words } from "../ui/Words";
 // dropdown and the other a chip that said "Recorded here". A filter nobody
 // can find is a filter that is not there.
 //
-// **A label says what it asks; a value says what it is.** "Upstream fix: will
+// A label says what it asks; a value says what it is. "Upstream fix: will
 // not fix" rather than "Upstream: declined to fix". The words are the ones the
 // domain uses, because somebody scanning for theirs has to find it in a
 // second and a paraphrase that avoids naming the thing reads as a riddle.
 //
-// **What is on is visible without opening anything.** Every active filter is a
+// The active filters are visible without opening anything. Each is a
 // chip above the list saying which filter and which value, and removing one is
 // clicking it — which is the other half of the discoverability problem: a
 // narrowed list that looks unnarrowed is how two people read the same screen
@@ -95,7 +95,7 @@ export const PLANNED = [
   ["planned", "Covered by a planned upgrade"],
 ] as const;
 
-// Which sort of release, and whether it is still in support. Two questions
+// The sort of release, and its support. Two questions
 // kept apart because they are two: a tag can be in support and a branch can be
 // past its date.
 export const RELEASES = [
@@ -140,7 +140,7 @@ export const DEADLINES = [
 // — Rust is cargo and Python is pypi, and somebody looking for one of those
 // searches for the language.
 //
-// **What the server takes is open, and this is what is offered.** The filter
+// The server takes an open set, and this is the offered part of it. The filter
 // carries whatever string arrives and matches the identifier against it, so
 // this list bounds the picker rather than the question — and a list short of
 // what an image actually holds is a capability that exists and cannot be
@@ -169,7 +169,7 @@ export const ECOSYSTEMS = [
   ["maven", "Maven"],
 ] as const;
 
-// What a producer may say a dependency's scope is, in the two formats' own
+// The scopes a producer may state for a dependency, in the two formats' own
 // words.
 //
 // Two vocabularies rather than one, and they are not folded together: a
@@ -206,16 +206,16 @@ export type Active = {
   label: string;
   value: string;
   clears: [string, string][];
-  // What to say instead of saying nothing. A filter the list applies unless
-  // told otherwise cannot be turned off by deleting it — deleting it is how
-  // the address asks for the default — so removing that chip writes the word
-  // that means "ask for everything".
+  // The words for a default, rather than silence. A filter the list applies
+  // unless told otherwise cannot be turned off by deleting it — deleting it is
+  // how the address asks for the default — so removing that chip writes the
+  // word that means "ask for everything".
   then?: [string, string[]][];
 };
 
-// What is narrowing the list right now. Read from the address rather than from
-// the controls, so a filter set by a link somebody was sent shows up exactly
-// like one set by clicking.
+// The filters narrowing the list right now. Read from the address rather than
+// from the controls, so a filter set by a link somebody was sent shows up
+// exactly like one set by clicking.
 export function activeFilters(params: URLSearchParams): Active[] {
   const out: Active[] = [];
   const at = (key: string) => params.get(key) ?? "";
@@ -518,7 +518,7 @@ export function Filters({
       <Group legend="Upstream fix">
         <Choices
           label="Fix status"
-          hint="What upstream has done"
+          hint="Upstream's own answer"
           chosen={all("fix_state")}
           options={FIX_STATES}
           onChange={(chosen) => setMany("fix_state", chosen)}
@@ -672,7 +672,7 @@ export function Filters({
         </Field>
         <Flag
           label="Held directly by the build"
-          hint="What has no container above it"
+          hint="Components with no container above them"
           on={at("under_build") === "yes"}
           onChange={(on) => set("under_build", on ? "yes" : "")}
         />
@@ -757,7 +757,7 @@ export function Filters({
   );
 }
 
-// What is narrowing the list, above the list, whether or not the panel is
+// The filters narrowing the list, above the list, whether or not the panel is
 // open. Each says which filter and what it is set to, and clicking one removes
 // it — so what is on can be read and undone without opening anything.
 export function Narrowed({
@@ -768,7 +768,7 @@ export function Narrowed({
   clearAll,
 }: {
   params: URLSearchParams;
-  // What the selection narrows this list to, which is a narrowing like any
+  // The narrowing the selection puts on this list, which is a filter like any
   // other and was the one that did not say so. It rides on the path rather
   // than in the parameters, so it drew no chip — and a list scoped to one
   // product sat under filters identical to the list across every product,

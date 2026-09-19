@@ -218,7 +218,7 @@ export function Products({ who }: { who: Who }) {
           value={name}
           onChange={setName}
           placeholder="sonic"
-          hint="How scans name it. Capitals do not matter."
+          hint="The name scans use for it. Capitals do not matter."
         />
         <Field
           label="Display name"
@@ -240,7 +240,7 @@ type Line = "" | (typeof THE_LINE)[number];
 
 const lines: Line[] = ["", ...THE_LINE];
 
-// What a product considers worth triaging, and a way to say something else.
+// The least severity a product triages, and a way to say something else.
 //
 // Below the line a finding is still recorded, still counted and still
 // reportable; it is out of the working list, not out of the system. Shown to

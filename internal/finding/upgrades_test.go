@@ -222,7 +222,7 @@ func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
 	// release fixed, the version that closes everything sorts near the bottom
 	// and the picker recommends against itself.
 	//
-	// What each release fixed and what reaching it closes are two counts. The
+	// Each release's own fixes and what reaching it closes are two counts. The
 	// second needs the ecosystem's ordering, which is why it is answered here
 	// rather than left for somebody to work out from a list.
 	each(t, func(t *testing.T, f *fixture) {
@@ -429,12 +429,12 @@ func TestTheByComponentViewOrdersByWhatWasAsked(t *testing.T) {
 			return groups[0].Component
 		}
 
-		// Where the weight is, which is what this view is for and what it
+		// The weight, which is what this view is for and what it
 		// answers when nothing is asked.
 		if got := leader(finding.Filter{}); got != swss.Name {
 			t.Errorf("unasked, the view leads with %q rather than the package holding the most issues", got)
 		}
-		// How far it reaches. Three issues at one place against two issues at
+		// Its reach. Three issues at one place against two issues at
 		// two places: a view that ignores the key answers the same as above.
 		if got := leader(finding.Filter{SortBy: finding.ByPlaces}); got != libnl.Name {
 			t.Errorf("sort=places leads with %q rather than the package sitting in the most places", got)
@@ -527,9 +527,9 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 func TestADistributionSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 	// Two things at once, because the second only means something if the first
 	// holds. An RPM component now has a scheme, so the per-version check in
-	// the planner runs for it where it used to stop at "this ecosystem has no
-	// ordering" — which makes the conservative rule newly reachable here, and
-	// a rule nothing reaches is a rule nobody has tested.
+	// the planner runs for it rather than stopping at "this ecosystem has no
+	// ordering", which is what makes the conservative rule reachable here —
+	// and a rule nothing reaches is a rule nobody has tested.
 	for _, one := range []struct {
 		what    string
 		fixedIn []string

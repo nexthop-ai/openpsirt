@@ -21,14 +21,14 @@ export type Who = {
   identity: string;
   name: string;
   admin: boolean;
-  // Whether they may read this deployment's own records and write none of
+  // Their reach over this deployment's own records, which grants no write to
   // them. A separate answer from admin: one of them changes things.
   audits?: boolean;
   kind: "person" | "key";
   reach: Can[];
-  // What they asked to be sent, and whether anything can be: a screen offering
-  // the switches has to know their state, and a switch that changes nothing is
-  // worse than no switch.
+  // The digest they asked for, and whether anything can be sent: a screen
+  // offering the switches has to know their state, and a switch that changes
+  // nothing is worse than no switch.
   digest?: boolean;
   digest_unassigned?: boolean;
   reachable?: boolean;
@@ -37,14 +37,14 @@ export type Who = {
   // decides whether a second person has to agree, and reading that off the
   // response is reading it after the fact.
   deferral_days?: number;
-  // How many rows one action may write here. A screen acting on a selection
+  // The rows one action may write here. A screen acting on a selection
   // bounds it by this and says so, rather than turning one click into as many
   // round trips as a filter matched — a page nobody can use and nothing can
   // cancel.
   bulk_cap?: number;
 };
 
-// Who is asking, and what they may do. Asked once and shared, because every
+// The caller, and their reach. Asked once and shared, because every
 // screen needs it to decide what to draw and asking per screen would put a
 // round trip in front of every navigation.
 //
@@ -81,19 +81,19 @@ export function mayOf(who: Who | null | undefined, product: string): Can | undef
 // it, and an anonymous async function on a button is not somewhere a test can
 // reach.
 //
-// **Drafts are cleared first, before anything is awaited and outside the try.**
+// Drafts are cleared first, before anything is awaited and outside the try.
 // They hold triage text, private findings included, and text that survived a
 // sign-out would be exposed in a way the application itself is not. A sign-out
 // that never reached the server is exactly the case where clearing matters
 // most, so it cannot sit inside the part that can fail.
 //
-// **The session's own state goes with them**, and for the same reason. This is
+// The session's own state goes with them, and for the same reason. This is
 // a same-tab navigation, so what the tab remembers survives it by
-// construction: the next person to sign in here was handed the previous
-// person's scope in the bar — a product name they may hold no grant on — and
-// their last outcome and reasoning in the decision form.
+// construction: without this the next person to sign in here is handed the
+// previous person's scope in the bar — a product name they may hold no grant
+// on — and their last outcome and reasoning in the decision form.
 //
-// **Forwarding is marked in this tab as well as in the address.** Where there
+// Forwarding is marked in this tab as well as in the address. Where there
 // is one provider the sign-in screen forwards straight to it, and the provider
 // still holds its own session — so an unmarked arrival would sign them back in
 // and make signing out impossible. The address alone is lost the moment
@@ -102,7 +102,7 @@ export function mayOf(who: Who | null | undefined, product: string): Can | undef
 // A full load rather than a route change, because signing out has to drop
 // every cached answer and starting again is the way to be sure.
 //
-// **It does not fail.** A server that never heard is not something a caller
+// It does not fail. A server that never heard is not something a caller
 // can act on — the drafts are gone, the forward is marked, and the page is
 // already being replaced — and the caller is a click handler, so a rejection
 // there is an unhandled one in the browser console rather than anything

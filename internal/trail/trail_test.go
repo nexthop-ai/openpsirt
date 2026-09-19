@@ -25,10 +25,9 @@ func each(t *testing.T, fn func(t *testing.T, s *trail.Store, by access.Subject)
 }
 
 func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
-	// This store had no test of its own at all — its only coverage was
-	// through handlers, which run on two engines, so neither its writes
-	// nor the ordering its reader depends on had ever executed on MySQL or
-	// MariaDB.
+	// Covered only through handlers, which run on two engines, neither this
+	// store's writes nor the ordering its reader depends on ever executes on
+	// MySQL or MariaDB.
 	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
 		ctx := t.Context()
 
@@ -201,7 +200,7 @@ func TestTheTrailRefusesAReaderWhoDoesNotAdminister(t *testing.T) {
 
 // TestARecordCannotOverflowItsOwnColumn pins the backstop under every caller.
 //
-// What is written here is composed by whoever is recording — a collaborator is
+// The rows here are composed by whoever is recording — a collaborator is
 // a product, an issue and a person — and the column is sized for three names
 // and their separators. Every caller composes from stored values, so this
 // never fires; it is here because "every caller does the right thing" is not a

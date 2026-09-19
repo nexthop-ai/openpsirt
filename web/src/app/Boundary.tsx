@@ -1,7 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Failed } from "../ui/Failed";
 
-// What a render-time throw reaches.
+// The boundary a render-time throw reaches.
 //
 // Without one, React unmounts the whole tree: a screen that threw takes the
 // rail, the scope bar and every other screen with it, and what is left is a
@@ -9,10 +9,11 @@ import { Failed } from "../ui/Failed";
 // arrive looks like, which is an ordinary thing on a flaky connection rather
 // than a defect anybody wrote.
 //
-// A class because this is the one thing hooks cannot do — `getDerivedStateFromError`
-// and `componentDidCatch` have no function equivalent.
+// A class because this is the one thing hooks cannot do —
+// `getDerivedStateFromError` and `componentDidCatch` have no function
+// equivalent.
 //
-// **It logs as well as renders.** A boundary that only renders swallows the
+// It logs as well as renders. A boundary that only renders swallows the
 // stack that was going to the console, which takes away the thing a developer
 // needs and leaves the sentence a reader cannot act on.
 export class Boundary extends Component<

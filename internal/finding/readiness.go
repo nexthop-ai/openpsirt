@@ -52,8 +52,8 @@ type Readiness struct {
 	// with none" and "we do not know what we shipped with" are answers a
 	// person acts on differently.
 	Shipped *Standing
-	// Why says what is missing when Shipped is nil, in words a screen can
-	// print. Empty where there is something to compare against.
+	// Why is the missing part where Shipped is nil, in words a
+	// screen can print. Empty where there is something to compare against.
 	Why string
 	// Floor is the line these counts are at or above, so a screen can say
 	// whose number it is showing.
@@ -63,11 +63,11 @@ type Readiness struct {
 // ReadyFor compares a branch's current state against the last release cut from
 // it, built the same way.
 //
-// **The same variant on both sides.** A branch built for one chip beside a
+// The same variant on both sides. A branch built for one chip beside a
 // release built for another compares two different pieces of software and
 // reads as a regression somebody then goes looking for.
 //
-// **The release is the latest one cut from this branch that we have scanned.**
+// The release is the latest one cut from this branch that we have scanned.
 // A tag declared and never built has no counts, and answering with zeroes
 // would report a clean release that does not exist.
 func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,

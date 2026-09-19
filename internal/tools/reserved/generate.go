@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// Asking the engines what they reserve, rather than trusting a list.
+// The engines are asked what they reserve, rather than a list being trusted.
 //
 // An engine upgrade adds reserved words — MySQL and MariaDB both do, across
 // minor releases — and a check against a committed list keeps passing while a
@@ -19,7 +19,7 @@ import (
 // deployment happens to run. Asking the engines is what stops the list drifting
 // from what they enforce.
 //
-// **Two of the four are asked and two are typed**, which is stated here and in
+// Two of the four are asked and two are typed, which is stated here and in
 // the generated file rather than glossed:
 //
 //   - PostgreSQL publishes pg_get_keywords(). Asked.
@@ -30,11 +30,11 @@ import (
 //     from here means the driver's own translation of libsqlite3 rather than
 //     anything reachable over SQL. Its words are typed, from its documentation.
 //
-// Asking SQLite indirectly does not work: it accepts most of its own keywords
-// as an alias, so putting each back as "SELECT 1 AS word" reports nearly all of
-// them as unreserved. The list here is wider than what any one engine rejects —
-// it is what is reserved on *any* of the four — so that probe answers a
-// different question.
+// An indirect question to SQLite does not work: it accepts most of its own
+// keywords as an alias, so putting each back as "SELECT 1 AS word" reports
+// nearly all of them as unreserved. The list here is wider than what any one
+// engine rejects — it is what is reserved on *any* of the four — so that probe
+// answers a different question.
 
 // generateURLEnv names where the generator finds each engine it asks. The same
 // variables the test harness reads, so "make engines-up" configures both.

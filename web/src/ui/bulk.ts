@@ -1,6 +1,6 @@
 import { useWho } from "../app/session";
 
-// What a screen acting on a selection is allowed to do at once.
+// The bound on what a screen acting on a selection may do at once.
 //
 // Every such screen sends one request per selected row, so an unbounded
 // selection is one click turning into as many round trips as the filter

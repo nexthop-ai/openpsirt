@@ -10,20 +10,20 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [Fan-out](#fan-out)
 - [The row a person reads](#the-row-a-person-reads)
 - [Issue identity](#issue-identity)
-- [What a report supplies](#what-a-report-supplies)
-- [Who supplied a component](#who-supplied-a-component)
-- [Merging later reports](#merging-later-reports)
+- [Report contents](#report-contents)
+- [Component suppliers](#component-suppliers)
+- [Report merging](#report-merging)
 - [Derived addresses](#derived-addresses)
-- [What an index says](#what-an-index-says)
-- [How a match was made](#how-a-match-was-made)
+- [Index responses](#index-responses)
+- [Match methods](#match-methods)
 - [Declared dependency scope](#declared-dependency-scope)
-- [Interning a component](#interning-a-component)
+- [Component interning](#component-interning)
 - [Recorded flaws](#recorded-flaws)
 - [Reporter details](#reporter-details)
 - [Scoring](#scoring)
 - [Affected build sets](#affected-build-sets)
 - [Closure by a person](#closure-by-a-person)
-- [What a scan governs](#what-a-scan-governs)
+- [The authority of a run](#the-authority-of-a-run)
 - [Interval storage](#interval-storage)
 - [Closure reasons](#closure-reasons)
 - [Build-declared claims](#build-declared-claims)
@@ -32,7 +32,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [Urgency](#urgency)
 - [Work across builds](#work-across-builds)
 - [Incomplete upgrades](#incomplete-upgrades)
-- [Scanning as separate work](#scanning-as-separate-work)
+- [Scans as separate work](#scans-as-separate-work)
 - [A year of nightly scans](#a-year-of-nightly-scans)
 - [The total above a list](#the-total-above-a-list)
 - [The severity ladder](#the-severity-ladder)
@@ -98,7 +98,7 @@ names**: every name resolves to one row, and a decision holds across all of them
 | The fold is what a screen reports about | The rows a finding screen shows are the whole fold, so who holds it, what rule placed it and everything else reported beside them is asked of the fold too. Asked of one component, a rule that placed a third of a fold reported as no rule under one name and as the whole thing under another — while the guarantee those reads state is "one name for the whole group, and empty where its places disagree" |
 | **Recording a name by hand asks for triage in every product the issue is open in** | Identity is deployment-wide, so from that moment a scan of any product reporting the name resolves to this issue and inherits its decisions and its approvals. Held at a role on the product in the path alone, somebody who reaches nothing in another product changed what a finding there means. Refused whole rather than partly done, and at the visibility each place carries |
 
-## What a report supplies
+## Report contents
 
 Everything a report says about an issue is kept. None of it is recoverable
 later, because a report is not kept once read.
@@ -127,7 +127,7 @@ being parsed and thrown away.
 | A group whose places disagree says so | A row is an issue at a component across the builds shipping it, and asking what upstream did is asking about the whole of that. The mixed state is read from both ends of the group rather than from a minimum, and the fix version is left empty there: a version taken from one of two disagreeing places is a fix attached to a group that does not have one |
 | Weakness classification | Kept where the data carries it, deduplicated and ordered, with the one the data calls the root cause first. It groups findings by the shape of the mistake rather than the package it landed in, and a published advisory states one of them — which is what the order says |
 
-## Who supplied a component
+## Component suppliers
 
 An inventory often says who supplied a component — a distribution, a vendor, a
 project — and that is kept, because a bare name is not enough for a dependency of
@@ -135,14 +135,14 @@ a dependency somebody has never heard of.
 
 | Rule | Reason |
 |---|---|
-| From the inventory, never from an index | It is what the producer of this build said, not what a registry says about a package in general. What an index says has its own section below and covers different fields |
+| From the inventory, never from an index | It is what the producer of this build said, not what a registry says about a package in general. Index responses have their own section below and carry different fields |
 | Absent for most of it, and said so rather than filled in | Measured on a switch image: 759 of 6,866 components carry one. A screen states that nobody said rather than showing a blank |
 | Two ways of saying it, resolved after the whole description is read | One format states an object and a plainer string beside it, and the object wins where a producer fills in both. Resolved while reading, whichever key the producer happened to write first won — and key order is the producer's choice |
 | A party's kind is dropped, its name kept | The other format prefixes it — "Organization: Debian" — and one of the two words is a label rather than a name. The word that format uses for "nobody stated one" is treated as nobody having stated one |
 | Never part of identity | Two producers describing one component name its supplier differently or not at all, and an identity that moved with it would take every triage decision attached along with it |
 | A later report fills it in where the row has none | The rule the section below states for everything else two reports can disagree about. Written only on the insert instead, a component first seen through a producer that stated none never got one, however many later scans said who it was |
 
-## Merging later reports
+## Report merging
 
 Reports disagree and arrive in an order nobody controls. A later one fills in
 what an earlier one did not know and **overwrites nothing**, or what is stored
@@ -157,13 +157,13 @@ would depend on which scan ran last.
 
 A test puts the same two reports through in both orders and asserts they agree.
 
-**The score carries where it came from.** Which scoring system it is on, who
+The score carries where it came from. Which scoring system it is on, who
 published it and whether it is the primary rating or a secondary one, filled
 where a report knows and never overwritten. Everything else a scan says is
 recorded with its provenance — what found it, what it was matched from, what it
 was matched in — and the one number a deadline is set from had none.
 
-**The estimate carries what it means and when.** Where it stands among all
+The estimate carries what it means and when. Where it stands among all
 published ones, and the day it was computed for. The probability alone is
 unreadable — nobody acts on 0.00042 — and the percentile is the same fact a
 reader can use.
@@ -183,7 +183,7 @@ Derived at read time and stored nowhere. An address worked out from two names
 cannot go stale while the names are right, and storing it would put a second copy
 of the templates somewhere to fall behind the first.
 
-**One table, and the interface reads its answer.** The component screen had a
+One table, and the interface reads its answer. The component screen had a
 second table of its own, in a second language, with a different membership —
 neither a superset of the other — and different answers for the same
 identifier: it sent every Debian-family package to Debian's tracker, so an
@@ -217,7 +217,7 @@ else, so a kernel CVE whose upstream record lists eight `git.kernel.org` commits
 showed one tracker link and no patches. References from every identifier an
 issue answers to are kept, deduplicated against the matched record's own.
 
-## What an index says
+## Index responses
 
 A bare name is not enough for a dependency of a dependency. Where an ecosystem
 publishes an index, what it says about a package is asked for alongside the
@@ -236,12 +236,12 @@ Asking is the same pass that asks for the newest version, so it costs no extra
 request: this is reading more of an answer already fetched. It is off unless a
 deployment turns it on, like everything else that reaches the network.
 
-**What no index gives is a distribution package's description.** Those live in a
+What no index gives is a distribution package's description. Those live in a
 distribution's own package index, which is one file per release rather than one
 request per package — a different shape from the per-package asks here, and not
 built.
 
-## How a match was made
+## Match methods
 
 A scanner reaches a finding one of two ways, and on a distribution's package they
 mean very different things (REQ-13).
@@ -252,9 +252,8 @@ mean very different things (REQ-13).
 | By identifier | A published identifier compared against an upstream version range. It knows nothing about packaging, and a distribution backports fixes without moving the upstream version, so the match fires whether or not the patch is in. Neither confirmed nor refuted |
 
 That distinction is the first question anybody asks about a distribution's
-packages, and the scanner answers it in every result. It was being discarded,
-which left a finding nobody had confirmed looking exactly like one the packagers
-had.
+packages, and the scanner answers it in every result. Discarded, it leaves a
+finding nobody has confirmed looking exactly like one the packagers have.
 
 The range and the source are kept with the finding, because "somebody has to
 look" is easier to act on with the thing to look at in hand. Neither is compared
@@ -270,7 +269,7 @@ against anything, which would need an ordering per ecosystem.
 ## Declared dependency scope
 
 What a producer said a dependency's scope is, stored on the graph edge, in the
-producer's own word. **Recorded, and read by nothing that decides anything.**
+producer's own word. Recorded, and read by nothing that decides anything.
 
 | Where it is stated | Words |
 |---|---|
@@ -279,9 +278,10 @@ producer's own word. **Recorded, and read by nothing that decides anything.**
 | An SPDX 2 relationship type | `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF`, recorded as `build`, `development`, `runtime` and `optional`. One fact under two spellings, and a filter cannot be made to ask for the same thing twice — so every relationship that names a phase is here, not a subset of them |
 
 "Not in the runtime path", "build-time only", "test-only" is the largest
-defensible deferral class a vendor has, and it was the one class this could not
-express: a component marked `excluded`, which the specification defines as not
-distributed, produced findings identical to one that ships.
+defensible deferral class a vendor has. Without the producer's declared scope
+it cannot be expressed at all: a component marked `excluded`, which the
+specification defines as not distributed, produces findings identical to one
+that ships.
 
 | Rule | Reason |
 |---|---|
@@ -292,30 +292,30 @@ distributed, produced findings identical to one that ships.
 | The scope is part of what identifies the edge | A producer that starts describing the same pair differently has said something different. The earlier edge closes and the new one opens, which is what every other change to a graph does here and what keeps a scan's reported counts true |
 | A pair declared twice takes the stated scope | A document naming a dependency plainly and again with a scope has said the scope. Where two differ, the first is kept: the producer said two things and one is recorded |
 
-**A test dependency places nothing, and carries no word.** Both readers drop
+A test dependency places nothing, and carries no word. Both readers drop
 that edge — SPDX 2's `TEST_DEPENDENCY_OF` and SPDX 3's `test` scope — because a
 test dependency is not part of what ships. The component is still held, stored
 and scanned, which is what a component the producer could not place gets too.
 So there is no edge for a word to sit on, and the one scope with the strongest
 case for deferral is the one not recorded.
 
-**Dropping that edge is not acting on a finding.** What it changes is where the
+Dropping that edge is not acting on a finding. What it changes is where the
 component sits, not whether it is tracked, which is why the rule above and this
 exception agree rather than contradict.
 
-### Where it is surfaced
+### Surfaces
 
 | Surface | What it does |
 |---|---|
 | A filter on the findings list | The only way to ask about the deferral class at all. Asked of the component's incoming edges in the build, so one reached from two consumers scoped differently answers to both words — a place is a pair of columns, and no engine here compares a pair against a set the same way |
 | An evidence line on the finding's dependency path | Beside the place it is about, in the producer's word, next to what the build's own VEX said. Which is where somebody deciding reads it |
 
-**Nowhere else.** Not in the urgency ranking, not as a prefilled outcome on a
-claim, and not as a default narrowing on any list. A person deciding that a
+It appears nowhere else: not in the urgency ranking, not as a prefilled
+outcome on a claim, and not as a default narrowing on any list. A person deciding that a
 build-time dependency does not ship is making a judgment, and the judgment stays
 theirs.
 
-## Interning a component
+## Component interning
 
 A component identified by its content is one row whoever writes it, so two
 scans describing the same library at the same version are agreeing rather than
@@ -426,9 +426,9 @@ somebody marking work done and the work being done. It needs evidence, and for a
 recorded flaw there is none: the one path that closes a finding is a scan
 applying what it found, and it passes over anything a person recorded.
 
-So the computation has no input, and what came of that was not "not yet resolved"
-but a finding that stayed open forever — a fix that shipped three releases ago
-still reading as present, invisibly.
+So the computation has no input, and what that produces is not "not yet
+resolved" but a finding that stays open for ever: a fix that shipped three
+releases ago still reading as present, invisibly.
 
 | Rule | Reason |
 |---|---|
@@ -442,12 +442,12 @@ still reading as present, invisibly.
 Each refusal is the caller's to fix and says so: a name that reaches nothing, a
 name that reaches several, a summary of nothing but whitespace, and a build with
 no contents. The third is worth naming — a minimum length passes whitespace, so
-it arrives from a request and used to be answered as a server fault.
+it arrives from a request and is refused rather than answered as a server fault.
 
-## What a scan governs
+## The authority of a run
 
-A run is the authority on what it reported. It opens what it found and **closes
-everything open that it no longer reports**, which is how a component leaving a
+A run is the authority on what it reported. It opens what it found and closes
+everything open that it no longer reports, which is how a component leaving a
 build stops being a finding without anybody saying so.
 
 The sweep is bounded by what a scan can have an opinion about. A finding carries
@@ -457,7 +457,7 @@ first run after it is written — silently, with a closure reason reading as
 though the issue went away, and nothing reporting it.
 
 The kind exists ahead of the second thing to put in it for that reason: a model
-assuming every finding came from a scan could not take one that did not without
+assuming every finding came from a scan cannot take one that did not without
 changing how closure works.
 
 ## Interval storage
@@ -471,16 +471,16 @@ run for a timestamp.
 
 Three passes did the reaching, all as inner joins: the trend, the deadline
 rewrite when the policy changes, and the urgency recount when a rating moves. A
-finding with no run did not appear in any of them — not wrongly, but **absent**,
-which is the worse failure. A number that is wrong invites somebody to check it;
-a row that is missing looks like there was nothing to say.
+finding with no run appears in none of them — not wrongly, but absent, which is
+the worse failure. A number that is wrong invites somebody to check it; a row
+that is missing looks like there was nothing to say.
 
 Closure carries one more reason. Spelled as "a run closed this", the column
-saying a finding is over could only be filled by something that never looks at it,
-so a finding a run will never close could not be closed at all. The row carries
-the moment, and what closed it sits beside as provenance: the run, or the person
-and their reason. Every index that carried the run to answer "is this open"
-carries the moment instead.
+saying a finding is over can only be filled by something that never looks at
+it, so a finding a run will never close cannot be closed at all. The row
+carries the moment, and what closed it sits beside as provenance: the run, or
+the person and their reason. Every index answering "is this open" carries the
+moment rather than the run.
 
 The run is still recorded where there is one, and it is what "what did this run
 change" is counted by.
@@ -509,8 +509,8 @@ fixed and newly present.
 
 Invalid is on a different axis. Every other reason answers "why did this stop
 being present"; this says it was never present, so it is neither a resolution
-nor a disappearance. **It never means the finding exists but does not apply
-here** — that is a triage decision of `not-applicable` with the justification
+nor a disappearance. It never means the finding exists but does not apply
+here — that is a triage decision of `not-applicable` with the justification
 that fits, agreed by a second person and exported as VEX. Letting the closure
 absorb that case would route dismissals around approval.
 
@@ -528,8 +528,8 @@ is usually that it is no longer there.
 
 ## Build-declared claims
 
-A build sends what it has already decided does not apply to it. **Those claims
-are kept as data when the scan is read**, not left in the document.
+A build sends what it has already decided does not apply to it. Those claims
+are kept as data when the scan is read, not left in the document.
 
 A nightly scan's documents are discarded once read, the vulnerability scan runs
 after that, and it runs again on a schedule. A claim that lived only in the file
@@ -573,10 +573,10 @@ reason about kernel-ABI risk — but which module is loaded does not change whet
 the kernel has a bug.
 
 The model is not wrong: a finding is a component at a place, and those are the
-places. What the number settles is that **grouping cannot be an afterthought in
-presentation.** What is read back is one row per issue in a component, carrying
+places. What the number settles is that grouping cannot be an afterthought in
+presentation. What is read back is one row per issue in a component, carrying
 how many places it occupies and how many the build has already argued about. The
-same image reads as **7,906 rows rather than 335,021**.
+same image reads as 7,906 rows rather than 335,021.
 
 The grouping is done by the database. A page of fifty grouped rows read out of a
 third of a million findings is not a page of fifty findings, and counting in the
@@ -600,21 +600,21 @@ Some places approved and the rest never decided, with nothing waiting or lapsed,
 is none of the four: the row carries no state, and the interface labels it partly
 decided.
 
-Undecided is nothing standing, not nothing ever said. Reading it as "no decision
-row covers this place" left a withdrawn claim in no state at all — the row it
-leaves behind covers the place, deliberately, so that "lapsed" can be said about
-a claim holding no key. A finding somebody claimed and took back was neither
-undecided nor any of the other three, disappeared from the count above the list
-as well as from the list, and was never offered as work again. The product's own
-totals counted it the same way and agreed.
+Undecided is nothing standing, not nothing ever said. Read as "no decision row
+covers this place" it leaves a withdrawn claim in no state at all: the row a
+withdrawal leaves behind covers the place, deliberately, so that "lapsed" can
+be said about a claim holding no key. A finding somebody claimed and took back
+is then neither undecided nor any of the other three, disappears from the count
+above the list as well as from the list, and is never offered as work again —
+with the product's own totals counting it the same way and agreeing.
 
-The word on the row and the filter's own buckets are one rule, not two spellings
-of it. They came apart twice: the filter counted a place as waiting without
-asking whether the claim still held its key, while the row required it, so a
-claim proposed and withdrawn put its group in the waiting list with a blank
-state column; and the row asked "was anything ever said" for undecided where the
-filter asked "does anything stand", so the same group was undecided to one and
-nothing to the other. Both now ask the filter's question.
+The word on the row and the filter's own buckets are one rule, not two
+spellings of it. Two spellings come apart: a filter counting a place as waiting
+without asking whether the claim still holds its key, against a row that
+requires it, puts a claim proposed and withdrawn in the waiting list with a
+blank state column; and a row asking "was anything ever said" for undecided
+against a filter asking "does anything stand" makes one group undecided to one
+and nothing to the other. Both ask the filter's question.
 
 A live decision covers a place at the versions it was keyed on and no other.
 These counts match a live decision by product, issue, place and both versions,
@@ -661,7 +661,7 @@ issue holds is the worst anybody has claimed for the two that are claims, and
 for the likelihood the newest anybody has published — see the table above for
 why those differ.
 
-**The fourth signal, the rating, belongs to a product** (REQ-29). Three of the
+The fourth signal, the rating, belongs to a product (REQ-29). Three of the
 four are properties of the issue and reach every product holding it; the rating
 is the product's own where somebody there has made one and the published word
 otherwise, so the same issue can sit at two different places in two products'
@@ -710,9 +710,8 @@ that turned a rank back into a list of reasons existed, exported and called by
 nothing but its own test. What makes a position explainable is that the rule is
 statable, and the interface says it from the signals a finding already carries.
 
-A signal reported out of range is clamped. A source sending something impossible
-would otherwise carry into the band above and rank as though it were being
-exploited.
+A signal reported out of range is clamped. A source sending something
+impossible otherwise carries into the band above and ranks as exploited.
 
 Where a report rates an issue only in words, the word stands in for a number, so
 a finding rated in words does not sort below everything rated at all. A group
@@ -732,8 +731,8 @@ A judgment carries no variant: it is keyed on the product, the place and the
 upstream versions, so answering it on one build answers it on every build of that
 product holding the same code.
 
-Screens asking "what is there to do" show **one item per issue in a component in
-a product**, not one per build (REQ-25). Listed per build, importing a second
+Screens asking "what is there to do" show one item per issue in a component in
+a product, not one per build (REQ-25). Listed per build, importing a second
 variant doubles the list while doubling none of the work — which is what happened
 the day a second variant was seeded, and the list went from 7,354 items to
 14,681 against the same estate.
@@ -748,8 +747,8 @@ the day a second variant was seeded, and the list went from 7,354 items to
 
 Measured on two variants of one switch image: 7,587 rows on one and 7,610 on the
 other, which is 15,197 rows read one build at a time. Across the product it is
-7,612 — so 7,585 of those rows were one piece of work seen twice, and **27 were
-the genuine differences.**
+7,612 — so 7,585 of those rows were one piece of work seen twice, and 27 were
+the genuine differences.
 
 What it gives up across builds is the way down. A dependency chain belongs to
 one build's graph, so the column naming the two ends of the chain is empty
@@ -770,11 +769,11 @@ names.
 | A claim standing on either row stands at the place, the lowest identifier first | A decision is keyed on the place and expires on the versions, and the two rows need not hold the same versions — a source package and the distribution's package of one name differ by a packaging revision, so a decision matches one row and not the other |
 
 A row names what pulls it in even where the route up is unknown. Where the walk
-up reaches nothing, both ends used to be blank and the row read "nothing records
-what pulls this in" — two different statements, and the second was false. The
-finding records its consumer whatever the graph managed; what was missing was
+up reaches nothing, the finding still records its consumer: what is missing is
 the route up, which happens where an inventory describes something under a
-component not itself reachable from the root. A row with no walkable chain names
+component not itself reachable from the root. Blank at both ends a row says
+nothing records what pulls this in, which is a different statement and a false
+one. A row with no walkable chain names
 its consumer and leaves the owner empty.
 
 A place names the claim standing on it, not only the decision. At most one live
@@ -807,7 +806,7 @@ Shown on the finding as the version it arrived from, and in the still-present
 column of a release comparison. Not in the review queue, which lists decisions
 rather than findings.
 
-## Scanning as separate work
+## Scans as separate work
 
 An inventory is read once, when it arrives. It is scanned again and again as the
 vulnerability data moves underneath it, so reading an inventory leaves a scan to
@@ -821,8 +820,8 @@ be done rather than doing it.
 
 ## A year of nightly scans
 
-The interval storage was shaped so a rebuild changing nothing writes nothing, and
-a test asserts that. What nobody had checked was the shape after a year.
+The interval storage is shaped so a rebuild changing nothing writes nothing,
+and a test asserts that. The shape after a year is a separate question.
 
 The model, stated because every number depends on it: a build of 700 components,
 each sitting in 34 containers, so 23,800 places; 260 issues open at the start;
@@ -834,8 +833,8 @@ The table grew 16.8 times over the year, from 8,840 rows to 148,614. The graph
 grew alongside: 23,834 edges to 110,466, and 736 nodes to 3,284, because a
 component whose version moves opens a new node and 34 new edges while the old
 ones stay as closed intervals. Neither is a leak — every row is an interval
-somebody can ask a question about — but **a deployment sizing a disk should know
-the shape is multiplicative in consumers, not additive in components.**
+somebody can ask a question about — but a deployment sizing a disk should know
+the shape is multiplicative in consumers, not additive in components.
 
 | | findings list | running out | trend | a night, average | a night, worst |
 |---|---:|---:|---:|---:|---:|
@@ -856,7 +855,7 @@ the run is for is the *growth*, which is stable across both samples.
 | MySQL writes seven times slower than PostgreSQL and fifteen times slower than MariaDB | A nightly scan taking thirteen seconds is not an operational problem; the same code being fifteen times more expensive on one supported engine than on its own sibling is a fact to have before somebody chooses one |
 | The cost is per statement, not per row | A night issues **1,699 statements on every engine**. What differs is what one costs: **203 µs on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL**. The lever for making MySQL faster is issuing fewer statements |
 
-**Rewriting every deadline walks the identifier range once.** The moments a
+Rewriting every deadline walks the identifier range once. The moments a
 product's findings opened at ride inside the statement as a case over a batch of
 them, rather than one statement per moment. The other way round the count was
 moments × bands × identifier slices: a product scanned nightly for a year holds
@@ -869,13 +868,12 @@ A quiet night issues **more** statements than the first — 1,699 against 1,077 
 because the first night is bulk inserts five hundred at a time and a quiet night
 is an update per finding that moved.
 
-The correction to the model says what that cost is made of. An earlier run
-applied twice the churn it documented and its figures were withdrawn rather than
-halved. Halving the churn halved MariaDB (0.64 s to 0.32 s) and cut PostgreSQL
-by a third (1.04 s to 0.67 s) — and moved MySQL by four percent, from 5.01 s to
-4.82 s. A cost that barely responds to how many rows changed is paid per
-statement, and the error did not scale the four engines alike, which is why the
-withdrawal was right.
+What that cost is made of is readable from how it responds to churn. Halving
+the churn halves MariaDB (0.64 s to 0.32 s) and cuts PostgreSQL by a third
+(1.04 s to 0.67 s), and moves MySQL by four percent, from 5.01 s to 4.82 s. A
+cost that barely responds to how many rows changed is paid per statement — and
+because churn does not scale the four engines alike, a run applying twice the
+churn it documents is withdrawn rather than halved.
 
 Two reads grow with the calendar rather than with a build:
 
@@ -898,9 +896,9 @@ identifiers in whichever order they reach the table, and "the newest upload this
 run covered" is a question about arrival. The runs are ordered by when they
 finished rather than by identifier, which is the order the page reads them in.
 
-What this does not measure: it was read as an administrator, who sees every
-product, so the queries ran with no narrowing by product — the cheapest plan
-available. One build, not the several a deployment tracks. And it assumes a
+Three things it does not measure. It is read as an administrator, who sees
+every product, so the queries run with no narrowing by product — the cheapest
+plan available. One build, not the several a deployment tracks. And it assumes a
 churn rate rather than observing one. `make measure` re-runs it, and the
 constants at the top of the harness are the model.
 
@@ -912,15 +910,15 @@ the list itself pages through.
 | Rule | |
 |---|---|
 | It rides on the page | Counted after the grouping and before the limit, in the statement that groups, so the number and the rows cannot describe different sets |
-| The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source counted as two where the page draws one, and the figure changed depending on which page was being looked at |
+| The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source count as two where the page draws one, and the figure changes with the page being read |
 | A separate count is grouped the same way | Where the total genuinely cannot ride on the page, the second statement's key is the page's key spelled again. Where this issue sits counted one row per component and drew one row per component *name*, so a build shipping a name at two versions — which is ordinary — listed nine and said ten. It is also the wrong row to draw: the row carries one version and one fix version, and two versions of a name are two different pieces of work |
 | Two overlapping lists are one question | The lapsed queue asked for lapsed decisions and for expired deferrals and added the totals. A deferral that ran out on code that then moved is both, so the figure was larger than the list beneath it and the list itself had to be deduplicated to draw at all. One filter answers both, and the number it comes back with is the number of rows |
 
 ## The severity ladder
 
-The severity words were written out ten times under seven names, with three
-different memberships. Three copies of an ordering is three chances for a word
-added to one to be missing from the others.
+The severity words are one list in one place. Written out per reader they
+acquire names and memberships of their own, and a copy of an ordering is a
+chance for a word added to one to be missing from the others.
 
 | List | Purpose |
 |---|---|
@@ -935,8 +933,8 @@ below every band, so that the sentinel for "no line" does.
 
 ## The rating in force
 
-What a finding's severity *is* has one rule: **this product's word where it has
-stated one, the published word otherwise.** Being able to say a published
+What a finding's severity *is* has one rule: this product's word where it has
+stated one, the published word otherwise. Being able to say a published
 rating is wrong is pointless if the surfaces that count and rank then ignore
 us.
 
@@ -968,10 +966,10 @@ The reads had grown into one file of two and a half thousand lines. They are
 three questions:
 
 1. **What is open here** — the list every screen pages through.
-2. **Everything known about one issue at one component** — what somebody looking
+2. Everything known about one issue at one component — what somebody looking
    at a single row needs. A different question from the list rather than a longer
    version of it.
-3. **What is open, gathered by the thing that would answer it** — by the upstream
+3. What is open, gathered by the thing that would answer it — by the upstream
    bump that would close it, or by the component it is against.
 
 The split turned up a doc comment describing the component grouping sitting two
@@ -981,7 +979,7 @@ The narrowing, the page and the component view each have their own test file
 already, which is what says the seam is real rather than a line count. What is
 left beside them is the naming layer they share.
 
-### What stays as it is
+### Deliberate omissions
 
 Recorded because the conclusion is the deliverable: a review that asks the same
 question next year should find the answer rather than the question.
@@ -996,32 +994,13 @@ question next year should find the answer rather than the question.
 
 ## Limits
 
-- **Incomplete upgrades are stated as inequality, not ordering.** Saying that a
-  version moved and is still not the one that fixes it needs no comparison, and
-  the fixed-in field is free text and is sometimes a list. An ordering exists
-  for four ecosystems and refuses the rest — `DESIGN-remediation.md` § Ordering
-  the versions a scanner named holds it — and it is used to rank a set of
-  candidates rather than to decide what a finding says.
-- **The inverse is not detected.** A component at or past the named fix while
-  the scanner still reports the issue would mean the scanner and the fix data
-  disagree. Deciding that needs an ordering for the ecosystem in hand, which
-  there is for four of them and not for the others, so it is not asked at all
-  rather than asked where it happens to be answerable.
-- **A component nothing leads to still has a place — itself.** It ships, and an
-  incomplete graph is normal.
-- **Severity is stored on the issue, fix state on the finding.** Severity is a
-  property of the vulnerability; whether a fix exists is a property of the version
-  in front of you.
-- **A place under the product records no consumer at all**, rather than recording
-  the root and excluding it later. The root's name differs per variant, and a key
-  that has to be remembered to ignore is one somebody will forget.
-- **A derived address refuses a name that is nothing but dots**, rather than
-  escaping it. A name and a version become path segments, and "." and ".." are
-  resolved by the browser before the request leaves it. Everything else,
-  separators included, is escaped into its segment (REQ-66).
-- **An identifier is matched against an anchored scheme before it resolves.** A
-  flaw this deployment recorded is filed under a name it minted, and a loose match
-  would send somebody to a public page about something else.
-- **A package kind nothing here knows produces no link.** A link that lands on the
-  wrong thing costs more than no link, because it is followed before it is
-  disbelieved.
+| Limit | Detail |
+|---|---|
+| Incomplete upgrades are stated as inequality, not ordering | Saying that a version moved and is still not the one that fixes it needs no comparison, and the fixed-in field is free text and is sometimes a list. An ordering exists for four ecosystems and refuses the rest — `DESIGN-remediation.md` § Version ordering holds it — and it ranks a set of candidates rather than deciding what a finding says |
+| The inverse is not detected | A component at or past the named fix while the scanner still reports the issue means the scanner and the fix data disagree. Deciding that needs an ordering for the ecosystem in hand, which exists for four of them, so it is not asked at all rather than asked where it happens to be answerable |
+| A component nothing leads to still has a place — itself | It ships, and an incomplete graph is normal |
+| Severity is stored on the issue, fix state on the finding | Severity is a property of the vulnerability; whether a fix exists is a property of the version in front of you |
+| A place under the product records no consumer at all | Rather than recording the root and excluding it later. The root's name differs per variant, and a key that has to be remembered to ignore is one somebody will forget |
+| A derived address refuses a name that is nothing but dots, rather than escaping it | A name and a version become path segments, and "." and ".." are resolved by the browser before the request leaves it. Everything else, separators included, is escaped into its segment (REQ-66) |
+| An identifier is matched against an anchored scheme before it resolves | A flaw this deployment recorded is filed under a name it minted, and a loose match sends somebody to a public page about something else |
+| A package kind nothing here knows produces no link | A link that lands on the wrong thing costs more than no link, because it is followed before it is disbelieved |

@@ -104,7 +104,7 @@ func (f *fixture) shippedAs(t *testing.T, target int64, declared string) {
 	}); err != nil {
 		t.Fatalf("apply graph: %v", err)
 	}
-	// What the document said it was about, which ingest records beside what
+	// The document's own subject, which ingest records beside what
 	// the inventory was made of.
 	if err := f.scans.Made(ctx, scan.ID, 1, 1, declared); err != nil {
 		t.Fatalf("record what the document declared: %v", err)
@@ -883,7 +883,8 @@ func TestAnIdentifierThatIsNotOneIsNotPublished(t *testing.T) {
 	}{
 		{"a package identifier", "pkg:generic/sonic-broadcom.bin@1.0", true},
 		{"one with a namespace", "pkg:deb/debian/linux@6.12", true},
-		// What a producer might reasonably put there and the standard refuses.
+		// Values a producer might reasonably put there and the standard
+		// refuses.
 		{"a path", "/build/out/sonic-broadcom.bin", false},
 		{"a bare name", "sonic-broadcom.bin", false},
 		{"a scheme with nothing after it", "pkg:generic", false},

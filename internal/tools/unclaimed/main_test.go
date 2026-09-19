@@ -42,7 +42,7 @@ func TestWhatADocumentNames(t *testing.T) {
 			[]string{"REQ-08", "REQ-17", "REQ-25"}, []string{"REQ-09", "REQ-18"},
 		},
 		{
-			// How the documents state a run. A hundred and thirty-two
+			// The form the documents state a run in. A hundred and thirty-two
 			// decisions are claimed by a range endpoint and nothing else,
 			// so what this expands to is the whole of their audit trail.
 			"a range, which names everything between",

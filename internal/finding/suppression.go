@@ -87,7 +87,7 @@ func (a ClaimsApplied) Unchanged() bool { return a.Opened == 0 && a.Closed == 0 
 // by the time anything needed it, and every carried patch would come back as
 // an outstanding vulnerability on the next re-scan.
 //
-// **stated is where the scan could have made a claim**, and a claim of any
+// stated is where the scan could have made a claim, and a claim of any
 // other origin is left alone rather than closed. Closing works by difference —
 // a claim the build no longer argues is a claim the build withdrew — and that
 // reading only holds where the build had somewhere to argue it. An inventory
@@ -229,13 +229,13 @@ type Carried struct {
 // CarriedPatches is what a build has been declaring it deals with itself, over
 // time.
 //
-// **The one thing a version comparison can never see.** A distribution carries
+// The one thing a version comparison can never see. A distribution carries
 // a fix into a package without moving its version, and the only evidence of it
 // is the build saying so in its own inventory — which is stored here and, until
 // now, read by nothing a person could reach. So the answer to "when did we
 // start carrying this, and are we still" was in the database and nowhere else.
 //
-// **Held over intervals against scans**, like the graph: a build argues the
+// Held over intervals against scans, like the graph: a build argues the
 // same things night after night, and the stretch is what makes this a history
 // rather than a list of what is true tonight. A claim that stopped is the
 // interesting row — somebody dropped a patch, and the finding it answered is
@@ -283,9 +283,9 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		Until         *time.Time `bun:"until"`
 	}
 	q := where(s.db.NewSelect().Model((*Claim)(nil))).
-		// When it was first said and when it stopped, read off the scans the
-		// interval is held against: the claim itself carries scan identifiers,
-		// and a screen needs moments.
+		// The moment it was first said and the moment it stopped, read off the
+		// scans the interval is held against: the claim itself carries scan
+		// identifiers, and a screen needs moments.
 		Join(`JOIN "scan" AS "opened" ON opened.id = sup.opened_scan_id`).
 		Join(`LEFT JOIN "scan" AS "closed" ON closed.id = sup.closed_scan_id`).
 		ColumnExpr(`sup.vulnerability AS "vulnerability"`).
@@ -296,7 +296,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		ColumnExpr(`sup.origin AS "origin"`).
 		ColumnExpr(`opened.built_at AS "since"`).
 		ColumnExpr(`closed.built_at AS "until"`).
-		// What it is still saying first, newest first within that: a claim
+		// Anything still being said first, newest first within that: a claim
 		// that stopped is history and a claim that stands is the estate.
 		OrderExpr("CASE WHEN sup.closed_scan_id IS NULL THEN 0 ELSE 1 END, " +
 			"opened.built_at DESC, sup.id DESC").

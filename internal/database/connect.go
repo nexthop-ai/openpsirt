@@ -24,12 +24,12 @@ import (
 // A floor is a release series: the oldest series whose behavior the queries
 // and schema here are written against.
 //
-// **It does not say upstream still publishes fixes for that series.** MySQL
+// It does not say upstream still publishes fixes for that series. MySQL
 // 8.0 and MariaDB 10.6 are both past upstream end of life and are admitted
 // anyway, because raising a floor refuses deployments that start today, which
 // is a decision rather than upkeep.
 //
-// **Nor that the server in front of it carries the fixes for its own series.**
+// Nor that the server in front of it carries the fixes for its own series.
 // Upstream publishes per patch release, and which patch release an operator
 // runs is a property of the deployment that no comparison made at startup can
 // act on — a floor that admits a series admits every unpatched release in it.

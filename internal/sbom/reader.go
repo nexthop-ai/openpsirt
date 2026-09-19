@@ -18,7 +18,7 @@ type refEdge struct{ parent, child, kind string }
 // declaredScopes are the words the two formats define for what a dependency's
 // scope is, and the whole of what is recorded.
 //
-// **The producer's own word, from whichever vocabulary it wrote in.** One
+// The producer's own word, from whichever vocabulary it wrote in. One
 // format states a scope on the component and the other on the relationship,
 // and the two do not use the same words for the same idea — "required" and
 // "run" both say the target is there when the product runs. Folding them onto
@@ -177,7 +177,7 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 // and the whole point of it is that the contents cost a walk rather than a
 // structure per component.
 //
-// What it costs is the duplicate-identifier refusal, which a header read no
+// The cost is the duplicate-identifier refusal, which a header read no
 // longer makes: a document carrying one is answered 202 and fails later in the
 // background reader. That is already how the other two formats behave, and a
 // fault reported at two different times depending on which format a build
@@ -237,15 +237,15 @@ func (c *reader) add(described graph.Described) error {
 // count charges one more thing the document describes against the component
 // bound.
 //
-// Charged on the way in, before anything is held. The bound used to be charged
-// where components are recorded, which returns at once on the header-only read
-// — so a document putting its components inside the root component's own array
-// was walked in full during a read that happens synchronously inside the
-// upload request, binding every one of them, with nothing but the byte limit
-// saying how many there could be. Ten million of them at twenty-six bytes each
-// is a quarter of a gigabyte of file and several gigabytes of process, which is
-// the failure this bound exists to prevent, arriving in the request rather than
-// in a background reader.
+// Charged on the way in, before anything is held. Charged where components are
+// recorded instead, the header-only read returns at once and a document
+// putting its components inside the root component's own array is walked in
+// full during a read that happens synchronously inside the upload request,
+// binding every one of them with nothing but the byte limit saying how many
+// there could be. Ten million of them at twenty-six bytes each is a quarter of
+// a gigabyte of file and several gigabytes of process — the failure this bound
+// exists to prevent, arriving in the request rather than in a background
+// reader.
 func (c *reader) count() error {
 	c.stated++
 	if c.stated > c.lim.MaxComponents {
@@ -507,8 +507,8 @@ func (c *reader) resolveUpstream() {
 		if !seen {
 			continue
 		}
-		// **What is already there may be a qualifier rather than a
-		// description.** Where no pedigree is stated the upstream name is
+		// The value already there may be a qualifier rather than a
+		// description. Where no pedigree is stated the upstream name is
 		// taken from the package identifier, which carries a name and no
 		// version in 459 of 535 cases — and the version is what expiry
 		// compares. A pointer naming a package the document fully describes

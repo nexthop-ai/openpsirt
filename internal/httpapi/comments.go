@@ -10,11 +10,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// The words people put on a claim, and what they said before.
+// The words people put on a claim, and the revisions before them.
 //
 // Their own subject: everything else in triage_read.go is about decisions and
-// claims, and this is about text and its revisions — which is why an edit, a
-// write, had ended up in a file named for reading.
+// claims, and this is about text and its revisions — which is how an edit, a
+// write, ends up in a file named for reading.
 func registerComments(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-claim-comments", Method: http.MethodGet,
@@ -65,7 +65,7 @@ func registerComments(api huma.API, in Ingest) {
 		OperationID: "edit-comment", Method: http.MethodPut, Path: "/v1/comments/{id}",
 		Summary: "Edit a comment",
 		Description: "Replaces the text of a comment. Only its author may do this.\n\n" +
-			"**What it said before is kept**, and read back with " +
+			"What it said before is kept, and read back with " +
 			"`GET /v1/comments/{id}/history`. A comment is part of the record that goes " +
 			"public at disclosure, and a record whose earlier text is unrecoverable is " +
 			"readable rather than checkable — which is the property the whole append-only " +
@@ -129,9 +129,9 @@ func registerComments(api huma.API, in Ingest) {
 
 // WasSaidBody is one version of a comment that has been replaced.
 type WasSaidBody struct {
-	Version    int    `json:"version" doc:"Which version this was, counting from one"`
-	Body       string `json:"body" doc:"What it said, in markdown"`
-	ReplacedAt string `json:"replaced_at" doc:"When it stopped saying that"`
+	Version    int    `json:"version" doc:"The version number, counting from one"`
+	Body       string `json:"body" doc:"Its text, in markdown"`
+	ReplacedAt string `json:"replaced_at" doc:"The moment it stopped saying that"`
 }
 
 // DecisionsOutput is a page of decisions, with how many there are behind it.

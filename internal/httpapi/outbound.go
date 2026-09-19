@@ -22,17 +22,18 @@ import (
 // showed it would put a shared secret on a page anybody with the settings
 // right can read.
 type OutboundBody struct {
-	Name string `json:"name" doc:"What it is called, so a log line and a screen can name it"`
-	Kind string `json:"kind" doc:"Which notifications go here, or * for all of them"`
+	Name string `json:"name" doc:"The name, so a log line and a screen can use it"`
+	Kind string `json:"kind" doc:"The notifications that go here, or * for all of them"`
 	URL  string `json:"url"`
 	// Sent and Failing say whether it is working, which is the question an
 	// operator has about a destination and one nothing else answers.
-	Sent    int    `json:"sent" doc:"How many things have gone there"`
-	Failing int    `json:"failing" doc:"How many are being retried or have been given up on"`
-	Because string `json:"because,omitempty" doc:"Why the last one failed, where one did"`
+	Sent    int    `json:"sent" doc:"The number of things delivered there"`
+	Failing int    `json:"failing" doc:"The number being retried or given up on"`
+	Because string `json:"because,omitempty" doc:"The reason the last one failed, where one did"`
 }
 
-// registerOutbound configures where this deployment sends what it has to say .
+// registerOutbound configures where this deployment sends what it has to
+// say.
 func registerOutbound(api huma.API, in Ingest, a Administering) {
 	const path = "/v1/outbound"
 
@@ -41,7 +42,7 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Summary: "List where this deployment sends things",
 		Description: "The destinations configured, which kinds go to each, and whether they " +
 			"are working.\n\n" +
-			"**The signing secret is never returned.** It signs our requests rather than " +
+			"The signing secret is never returned. It signs our requests rather than " +
 			"authenticating anybody to us, so it has to be stored recoverably — and showing " +
 			"it would put a shared secret on a page.",
 		Tags: []string{"Administration"},
@@ -73,18 +74,18 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Summary: "Send a kind of notification somewhere",
 		Description: "Records a destination: a URL, a shared secret to sign with, and which " +
 			"kinds go there — one kind by name, or `*` for all of them.\n\n" +
-			"**One signed request, not an adapter each.** Slack, Teams, a tracker driven by " +
+			"One signed request, not an adapter each. Slack, Teams, a tracker driven by " +
 			"automation and paging all take an HTTP request with a JSON body, so one shape " +
 			"reaches all of them.\n\n" +
-			"**What it carries is what the channel rules already allow.** A notification " +
+			"What it carries is what the channel rules already allow. A notification " +
 			"about a finding nobody has announced carries the fact that there is something " +
 			"and a link, and nothing else — the same body a mail would carry, composed by the " +
 			"same code.\n\n" +
-			"**Every request is signed.** `X-OpenPSIRT-Timestamp` and " +
+			"Every request is signed. `X-OpenPSIRT-Timestamp` and " +
 			"`X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the " +
 			"body — so a receiver can tell one of ours from one anybody could make, and " +
 			"cannot replay yesterday's.\n\n" +
-			"**https only, and a redirect is refused rather than followed.** The body is " +
+			"https only, and a redirect is refused rather than followed. The body is " +
 			"signed and not encrypted, and a redirect asks us to send a signed request " +
 			"somewhere else, which is what the restriction exists to prevent.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
@@ -92,8 +93,8 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Body struct {
 			Name   string `json:"name" minLength:"1" maxLength:"191"`
 			Kind   string `json:"kind" minLength:"1" maxLength:"191" doc:"One notification kind, or * for all of them"`
-			URL    string `json:"url" minLength:"1" maxLength:"1000" doc:"Where to send it. https only"`
-			Secret string `json:"secret" minLength:"16" maxLength:"400" doc:"What requests are signed with. Never returned by any endpoint"`
+			URL    string `json:"url" minLength:"1" maxLength:"1000" doc:"The address to send to. https only"`
+			Secret string `json:"secret" minLength:"16" maxLength:"400" doc:"The signing secret. Never returned by any endpoint"`
 		}
 	}) (*struct {
 		Status int
@@ -103,8 +104,8 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		if err != nil {
 			return nil, err
 		}
-		// Normalized here so what is stored is the address as it parses. What
-		// may be stored is decided by the store, where the rest of this
+		// Normalized here so the stored value is the address as it parses. The
+		// rule for what may be stored is the store's, where the rest of this
 		// table's rules live.
 		parsed, err := url.Parse(strings.TrimSpace(input.Body.URL))
 		address := strings.TrimSpace(input.Body.URL)

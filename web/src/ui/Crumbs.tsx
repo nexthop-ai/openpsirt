@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
-// Where you are, and the way back up. The findings list is bound to one build
+// The place you are in, and the way back up. The findings list is bound to one
+// build
 // , so which build that is has to be on the screen rather than only in the
 // address bar.
 export function Crumbs({

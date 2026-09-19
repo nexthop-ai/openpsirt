@@ -165,7 +165,7 @@ func callback(t *testing.T, r *signInReach, state, code string, pending bool) *h
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub/callback?state="+state+"&code="+code, nil)
 	if pending {
-		// What begin would have left behind.
+		// The value begin leaves behind.
 		start := httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil)
 		rec := httptest.NewRecorder()
 		r.handler.ServeHTTP(rec, start)
@@ -190,8 +190,8 @@ func TestSigningInSendsTheBrowserToTheProvider(t *testing.T) {
 		if where := rec.Header().Get("Location"); !strings.HasPrefix(where, "https://provider.example/") {
 			t.Errorf("sent the browser to %q", where)
 		}
-		// What has to survive the round trip is left with the browser, and
-		// left where a script cannot read it.
+		// held is what has to survive the round trip is left with the
+		// browser, and left where a script cannot read it.
 		var held *http.Cookie
 		for _, cookie := range rec.Result().Cookies() {
 			if cookie.Name == "openpsirt_pending" {
@@ -321,7 +321,7 @@ func TestSigningInGrantsTheSessionSomebodyWasAlreadyOwed(t *testing.T) {
 }
 
 func TestAProviderThatFailedSaysNothingAboutWhy(t *testing.T) {
-	// What went wrong between us and a provider is an operator's problem.
+	// A fault between us and a provider is an operator's problem.
 	// Describing it to whoever is at the browser describes our configuration.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		r.provider.fail = errClientSecretRejected
@@ -541,7 +541,7 @@ func TestATamperedReturnAddressIsStillRefused(t *testing.T) {
 	// left here is an address this deployment sent, which is what an open
 	// redirect is.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
-		// What begin would have left behind, with the address replaced —
+		// The value begin leaves behind, with the address replaced —
 		// signed with this deployment's own key, because an unsigned one is
 		// refused before the address is looked at.
 		forged, err := json.Marshal(map[string]any{
@@ -604,7 +604,7 @@ func (r *signInReach) sealed(t *testing.T, payload []byte) string {
 // that browser a session for the attacker's account. Every earlier test here
 // presented an unsigned forgery, which the signature alone already refused.
 //
-// What denies a sibling host the write is the `__Host-` cookie prefix, which
+// The `__Host-` cookie prefix is what denies a sibling host the write, which
 // this harness runs without because it serves plain HTTP. So what is asserted
 // here is the half a name cannot carry: the session that comes back is the one
 // the pending value was minted for, and never the victim's.
@@ -632,9 +632,10 @@ func TestASignedPendingCookieFromAnotherSignInIsNotYours(t *testing.T) {
 
 		r.provider.says = &signin.Identity{Subject: "2", Username: "other"}
 
-		// Who the provider will say signed in: the attacker, because this is
-		// the attacker's sign-in. The victim is somebody else entirely, and
-		// the point is that the session that comes back is never theirs.
+		// The person the provider names as signed in: the attacker, because
+		// this is the attacker's sign-in. The victim is somebody else
+		// entirely, and the point is that the session that comes back is never
+		// theirs.
 
 		// Planted in the victim's browser, which then completes it.
 		req := httptest.NewRequest(http.MethodGet,

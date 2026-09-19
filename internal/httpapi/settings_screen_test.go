@@ -14,17 +14,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// What a value is, said once.
+// A value's type, stated once.
 //
-// It was five tables keyed on setting names — the server's own, and three in
-// `Settings.tsx` — and a setting added to one and not the others rendered as a
-// raw text field somebody typed a refused value into: 26214400 by hand, where
-// the mistake available is a factor of a thousand, which is the reason the
-// composing exists. The pairing test that stood here checked the copies
-// against each other, which is the shape a rule takes when it has two homes.
+// Five tables keyed on setting names — the server's own, and three in
+// `Settings.tsx` — render a setting added to one and not the others as a raw
+// text field somebody types a refused value into: 26214400 by hand, where the
+// mistake available is a factor of a thousand. A test pairing the copies
+// against each other is the shape a rule takes when it has two homes.
 //
-// The kind is served now, so the screen has nothing to key on a name. What is
-// left to hold is that it stays that way.
+// The kind is served, so the screen has nothing to key on a name. What is left
+// to hold is that it stays that way.
 func TestTheScreenTakesWhatAValueIsFromTheServer(t *testing.T) {
 	screen, err := os.ReadFile(filepath.Join("..", "..", "web", "src", "screens", "Settings.tsx"))
 	if err != nil {
@@ -38,7 +37,7 @@ func TestTheScreenTakesWhatAValueIsFromTheServer(t *testing.T) {
 	}
 
 	// And it holds no collection keyed on setting names, which is the shape
-	// the three tables took. **Naming a setting is not the same thing**: the
+	// the three tables took. Naming a setting is not the same thing: the
 	// screen groups settings into cards and gives them labels, and which card
 	// a setting is drawn in is a judgment about the screen. What must not come
 	// back is a *lookup* that answers what a value is.

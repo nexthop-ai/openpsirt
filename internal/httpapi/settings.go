@@ -27,27 +27,27 @@ type SettingBody struct {
 	Name    string `json:"name"`
 	Value   string `json:"value"`
 	Default bool   `json:"default,omitempty" doc:"Nobody has set this; the shipped value is in use"`
-	Means   string `json:"means" doc:"What it decides"`
-	// Kind is what the value is, so a client offers the control the value
+	Means   string `json:"means" doc:"The thing it decides"`
+	// Kind is the type of the value, so a client offers the control the value
 	// takes rather than a text field somebody types a refused value into.
 	//
-	// Served rather than kept client-side: it was three tables in the
-	// interface keyed on setting names, beside the server's own — five copies
-	// of one fact, and a setting added to any of them was a control that
-	// offered the wrong thing or none.
-	Kind string `json:"kind" enum:"duration,count,size,word,switch" doc:"What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off"`
-	// Words is what a word setting may be set to, in the order to offer them.
+	// Served rather than kept client-side: three tables in the interface keyed
+	// on setting names, beside the server's own, are five copies of one fact,
+	// and a setting added to any of them is a control that offers the wrong
+	// thing or none.
+	Kind string `json:"kind" enum:"duration,count,size,word,switch" doc:"The kind of value: a length of time, a count of things, a count of bytes, one of a few words, or on and off"`
+	// Words is the values a word setting may take, in the order to offer them.
 	// Empty for every other kind.
 	Words []string `json:"words,omitempty" doc:"For a word setting, the values it takes, in the order to offer them"`
 }
 
-// settingKind is what a value of a setting is.
+// settingKind is the type of a setting's value.
 //
 // Named because the four are checked differently, and a value checked as the
 // wrong kind is stored and then silently ignored. Carried on the row rather
-// than answered by four functions that each knew about some of the names: a
-// name missing from all four fell through to "a length of time", and a name
-// missing from the shipped switch fell through to the empty string.
+// than answered by four functions that each know about some of the names: a
+// name missing from all four falls through to "a length of time", and a name
+// missing from the shipped switch falls through to the empty string.
 type settingKind string
 
 const (
@@ -64,15 +64,14 @@ const (
 )
 
 // windows is the shipped deadline policy, read from the package that applies
-// it. Five of these were respelled as string literals here, and a shipped
-// number written twice is one that disagrees with itself the first time
-// anybody moves it.
+// it rather than respelled here as string literals: a shipped number written
+// twice is one that disagrees with itself the first time anybody moves it.
 var windows = finding.DefaultWindows()
 
 // sessionLifetime is the one shipped value that is not a constant.
 //
 // A sign-in's length falls back to the environment before the built-in, so
-// reporting the built-in said twelve hours on a deployment that had set
+// reporting the built-in says twelve hours on a deployment that has set
 // something else — the screen contradicting the deployment about its own
 // configuration.
 func sessionLifetime(in Ingest) string {
@@ -87,29 +86,28 @@ func sessionLifetime(in Ingest) string {
 //
 // A list rather than anything the store will accept, so that adding a setting
 // is a deliberate act and a typo in a name is refused instead of quietly
-// creating a setting nothing reads. **One row per setting**, because it was
-// five tables keyed on the same name and three of the names were in some of
-// them: the three disclosure settings reported as blank on the screen while
-// 90d, 30d and 14d were what the deployment enforced.
+// creating a setting nothing reads. One row per setting, because five tables
+// keyed on the same name hold three of the names between them: the three
+// disclosure settings report as blank on the screen while 90d, 30d and 14d are
+// what the deployment enforces.
 var settable = []struct {
 	name  string
 	means string
-	// kind is what a value of this setting is, which decides how it is
+	// kind is the type of this setting's value, which decides how it is
 	// checked at the write and how the screen offers it.
 	kind settingKind
-	// words is what this setting may be set to, in the order to offer them,
-	// and is the list the write path checks against. Nil for every kind but a
+	// words is the values this setting may take, in the order to offer them,
+	// and the list the write path checks against. Nil for every kind but a
 	// word or a switch.
 	//
 	// On the row rather than in a second table keyed on the name: keyed that
 	// way, the next word setting anybody adds is offered nothing and then
-	// checked against the triage floor's list, which is the shape the rest of
-	// this commit removes.
+	// checked against the triage floor's list.
 	words []string
 	// shipped is the value in force where nobody has set one, read from the
-	// package that reads it rather than respelled here — five of them were
-	// respelled, and a shipped number written twice is one that disagrees with
-	// itself the first time anybody moves it.
+	// package that reads it rather than respelled here: a shipped number
+	// written twice is one that disagrees with itself the first time anybody
+	// moves it.
 	//
 	// A function rather than a constant for the one setting whose shipped
 	// value is not one: a sign-in's length falls back to the environment
@@ -179,7 +177,7 @@ var settable = []struct {
 		aDuration, nil, func(Ingest) string { return setting.DefaultDisclosureLead.String() }, false},
 }
 
-// theSwitch is what an on-or-off setting may be set to.
+// theSwitch is the two values an on-or-off setting may take.
 var theSwitch = []string{setting.On, setting.Off}
 
 // theFloor is the words the triage line may be set to, from the package that
@@ -205,9 +203,9 @@ func registerSettings(api huma.API, in Ingest) {
 			return nil, err
 		}
 		// From the accessor, which answers nothing where there is no
-		// database. Built from `in.DB.DB` directly this panicked into the
-		// recovery middleware and answered 500, where the route already has
-		// words for a process that has no database.
+		// database. Built from `in.DB.DB` directly it panics into the recovery
+		// middleware and answers 500, where the route already has words for a
+		// process that has no database.
 		settings := in.settings(in.handle())
 		if settings == nil {
 			return nil, noDatabase(in.logger())
@@ -298,12 +296,13 @@ func registerSettings(api huma.API, in Ingest) {
 						"withdrew can still be held", access.MaxSessionLifetime))
 			}
 		}
-		// What it held, answered by the write that replaced it: it is not
-		// derivable afterwards, and "who raised the floor to critical" is half
-		// the question somebody asks. Read in a statement of its own it was
-		// the value at some earlier moment — two administrators moving the
-		// same setting at once both read the original, and the second wrote a
-		// prior value into an append-only trail that nothing ever held.
+		// The prior value, answered by the write that replaced it: it is not
+		// derivable afterwards, and the person who raised the floor to
+		// critical is half of what somebody asks. Read in a statement of its
+		// own it is the value at some earlier moment — two administrators
+		// moving the same setting at once both read the original, and the
+		// second writes a prior value into an append-only trail that nothing
+		// ever held.
 		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
 			settings := in.settings(tx)
 			if settings == nil {
@@ -368,7 +367,7 @@ func deadlinesRewritten(in Ingest) func(context.Context, string, string) {
 // rewriteDeadlines applies a changed policy to every open finding, one replica
 // at a time.
 //
-// **The policy is read after the lease is taken, not before.** Two replicas
+// The policy is read after the lease is taken, not before. Two replicas
 // each handling a change would otherwise rewrite the same rows from whatever
 // each read when it started, and whichever finished last would win — so the
 // stored deadlines could end up describing a policy that had already been

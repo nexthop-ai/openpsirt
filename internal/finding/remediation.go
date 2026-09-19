@@ -14,7 +14,7 @@ import (
 
 // Remediation is how fast things are being fixed, and what is aging.
 //
-// **Counted in issues, not in places.** One kernel flaw across sixty modules is
+// Counted in issues, not in places. One kernel flaw across sixty modules is
 // one thing that was fixed, and a mean time to remediate weighted by how far a
 // component fans out through an image is a measurement of the dependency graph
 // rather than of anybody's work.
@@ -68,15 +68,15 @@ var agingBuckets = []struct {
 
 // resolved keeps only what counts as an issue actually going away.
 //
-// **A closure is not a fix unless the issue went with it.** A bump that
+// A closure is not a fix unless the issue went with it. A bump that
 // carried the issue into the next version closed one row and opened another
 // with the same issue in it, and a scanner that silently stopped reporting
 // something closed a row and explained nothing. Counting either as a fix
 // measures churn and reports it as progress, which is worse than reporting
 // nothing: the number moves in the right direction while nothing improves.
 //
-// **`invalid` is not here either, and for a different reason from the other
-// two.** A record taken back was never a finding, so it is not churn being
+// `invalid` is not here either, and for a different reason from the other
+// two. A record taken back was never a finding, so it is not churn being
 // counted as progress — it is nothing at all, and counting it would make the
 // fix rate improve every time somebody corrected a filing mistake.
 // Bound rather than spliced, and built from Resolving rather than retyped
@@ -115,9 +115,10 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 
 	out := &Remediation{TimeToFix: map[string]time.Duration{}}
 
-	// How long each issue took, averaged per severity band. Averaged over the
-	// issue rather than over its rows: an issue is closed when the last of its
-	// places is, and the places are what fans out.
+	// spans is how long each issue took, averaged per severity band.
+	// Averaged over the issue rather than over its rows: an issue is
+	// closed when the last of its places is, and the places are what fans
+	// out.
 	var spans []struct {
 		Band    string  `bun:"band"`
 		Seconds float64 `bun:"seconds"`
@@ -161,8 +162,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		}
 	}
 
-	// What opened in the same window, as distinct issues, so the two figures
-	// are in the same unit and can be read against each other.
+	// Everything opened in the same window, as distinct issues, so the two
+	// figures are in the same unit and can be read against each other.
 	opened := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
@@ -182,7 +183,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	}
 	out.Opened = count
 
-	// What is open now, by how long it has been. One statement per bucket
+	// Everything open now, by how long it has been. One statement per bucket
 	// rather than a case expression, because the boundaries are moments
 	// computed here and a database that does its own date arithmetic does it
 	// four different ways.

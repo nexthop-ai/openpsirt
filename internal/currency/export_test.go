@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Asking is how long a lease is taken for inside a pass, for a test that has
+// The lease length taken inside a pass, for a test that has
 // to make one lapse part way through.
 //
 // Set by Run in production, where the caller states the interval. A test that

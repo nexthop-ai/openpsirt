@@ -18,7 +18,7 @@ const suppressionNamespace = "openvex.dev/ns"
 // that can be seen and accounted for rather than one that simply never
 // appeared.
 //
-// **Two shapes, one reading**. OpenVEX and CSAF-VEX say the same
+// Two shapes, one reading. OpenVEX and CSAF-VEX say the same
 // thing differently — one puts the status on a statement, the other puts it in
 // which list a product identifier appears in — and both become the same claim
 // here, because what a build is telling us does not depend on which file it

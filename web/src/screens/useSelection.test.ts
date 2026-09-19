@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { questionIn } from "./useSelection";
 
-// What counts as a change of question decides when the selection is emptied,
+// The definition of a change of question decides when the selection is emptied,
 // and the selection is what a bulk act writes against. Both directions matter:
 // too narrow and rows chosen under one question are written under another; too
 // wide and turning the page throws away what somebody ticked.

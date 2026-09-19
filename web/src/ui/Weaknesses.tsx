@@ -24,7 +24,7 @@ export function Weaknesses({
 
   return (
     <div className="field">
-      <label htmlFor="cwe-typed">What kind of flaw</label>
+      <label htmlFor="cwe-typed">Kind of flaw</label>
       <p className="hint" style={{ marginTop: 0 }}>
         Optional. More than one is fine.
       </p>

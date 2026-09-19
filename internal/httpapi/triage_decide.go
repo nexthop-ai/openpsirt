@@ -29,25 +29,25 @@ import (
 // it covers.
 type FindingDecisionBody struct {
 	Outcome       outcomeOneAtATime `json:"outcome"`
-	Justification justification     `json:"justification,omitempty" doc:"Why it does not apply. Required when it does not"`
-	Mitigation    string            `json:"mitigation,omitempty" maxLength:"65536" doc:"What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
+	Justification justification     `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
+	Mitigation    string            `json:"mitigation,omitempty" maxLength:"65536" doc:"The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
 	DeferredUntil string            `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 	// CommittedTo is when a promised backport lands. An upgrade is not
 	// recorded here at all: it answers a component rather than one
 	// finding, so it is recorded from the component.
-	CommittedTo string `json:"committed_to,omitempty" doc:"When a promised backport lands, as a date. Required for patch-needed and refused with any other"`
+	CommittedTo string `json:"committed_to,omitempty" doc:"The date a promised backport lands. Required for patch-needed and refused with any other"`
 	// FixedVersion is what makes the already-fixed claim checkable against
 	// whoever packages the component. Offered here because the outcome is
 	// offered here: an enum listing an outcome whose evidence the body
 	// cannot carry refuses every request that picks it.
 	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other"`
-	Reasoning    string `json:"reasoning" minLength:"1" doc:"Why this holds"`
+	Reasoning    string `json:"reasoning" minLength:"1" doc:"The reasoning"`
 	// Places is the deliberate narrowing. Absent means every place, which
 	// is the default naming the places covered asks for.
 	// Bounded like every other array a write path takes. Each entry costs a
 	// map insert and a scan of the finding's places before anything is
 	// refused, so an unbounded one is work a caller chooses the size of.
-	Places []string `json:"places,omitempty" maxItems:"2000" maxLength:"191" doc:"Which places this covers, as the finding names them. Omit for all of them"`
+	Places []string `json:"places,omitempty" maxItems:"2000" maxLength:"191" doc:"The places this covers, as the finding names them. Omit for all of them"`
 	// Extends names an approved claim this one carries to a new issue. The
 	// outcome and justification have to be the source's, and the places have
 	// to be ones the source sits at.
@@ -57,9 +57,9 @@ type FindingDecisionBody struct {
 	// are already reached by lookup and a second claim about them would be
 	// refused.
 	Remaining bool `json:"remaining,omitempty" doc:"Decide only the places nothing currently stands at, and leave the rest as they are. For applying a decision to another build, where some of its places are already reached by lookup"`
-	// FromStatement cites a VEX statement this was started
-	// from. A citation and never an application: what they said is not this
-	// claim, and recording it is what lets a later revision be noticed.
+	// FromStatement cites a VEX statement this was started from. A citation
+	// and never an application: their statement is not this claim, and the
+	// citation is what lets a later revision be noticed.
 	FromStatement int64 `json:"from_statement,omitempty" doc:"A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the claim rests on"`
 	// Also carries the same judgment to other builds of this product, in
 	// the same transaction as the build in the path.
@@ -82,23 +82,23 @@ type AlsoBuild struct {
 // DecidedBody is what one judgment about a finding recorded.
 type DecidedBody struct {
 	ClaimID  int64 `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
-	Recorded int   `json:"recorded" doc:"How many places it was written against"`
-	Covered  int   `json:"covered" doc:"How many findings those places hold"`
+	Recorded int   `json:"recorded" doc:"The number of places it was written against"`
+	Covered  int   `json:"covered" doc:"The number of findings those places hold"`
 	// Every place this judgment did not reach, whatever kept it from
-	// reaching. "Because they were not named" described one of the two:
-	// with `remaining` it also counts places a decision reached through
-	// lookup already suppressed, which is deliberate — a caller deciding
+	// reaching. Not being named describes one of the two: with `remaining`
+	// it also counts places a decision reached through lookup already
+	// suppressed, which is deliberate — a caller deciding
 	// what is left to do wants the number that is left to do, not the
 	// number they could have named.
 	Left          int     `json:"left" doc:"Places of this finding this judgment did not reach: ones it did not name, and ones a decision already standing there covers"`
 	NeedsApproval bool    `json:"needs_approval" doc:"Whether a second person has to agree"`
 	IDs           []int64 `json:"ids"`
-	// Also is what the same judgment wrote in each other build named, in the
+	// Also is the same judgment's record in each other build named, in the
 	// order they were named. Absent where none were.
-	Also []CoveredBuild `json:"also,omitempty" doc:"What this judgment wrote in each other build it was applied to"`
+	Also []CoveredBuild `json:"also,omitempty" doc:"The rows this judgment wrote in each other build it reached"`
 }
 
-// CoveredBuild is what one judgment wrote in one other build.
+// CoveredBuild is one judgment's record in one other build.
 //
 // There is no per-build outcome to report, because there is no per-build
 // outcome to have: the whole judgment is written or none of it is.
@@ -106,8 +106,8 @@ type CoveredBuild struct {
 	Stream   string `json:"stream"`
 	Variant  string `json:"variant"`
 	Version  string `json:"version,omitempty"`
-	Recorded int    `json:"recorded" doc:"How many places it was written against there"`
-	Covered  int    `json:"covered" doc:"How many findings those places hold"`
+	Recorded int    `json:"recorded" doc:"The number of places it was written against there"`
+	Covered  int    `json:"covered" doc:"The number of findings those places hold"`
 }
 
 func registerFindingDecision(api huma.API, in Ingest) {
@@ -118,7 +118,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		Summary: "Record one judgment about a finding, covering its places",
 		Description: "Records the same claim against every place this issue occupies in this " +
 			"component. Naming `places` narrows it; leaving it out covers all of them.\n\n" +
-			"**A place left out stays open.** Nothing is recorded against it and nothing is " +
+			"A place left out stays open. Nothing is recorded against it and nothing is " +
 			"asked about it.\n\n" +
 			"One record is written per place, each keyed and expiring on its own, so this " +
 			"reads later as the several decisions it is rather than as one.\n\n" +
@@ -135,7 +135,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 			"justification must match it. The new claim is recorded as an extension of it and " +
 			"still waits for a second person. `similar` on `GET .../findings/{vulnerability}/" +
 			"components/{component}` lists the claims that qualify.\n\n" +
-			"**`patch-needed` is the backport case**: a fix is being carried into this build " +
+			"`patch-needed` is the backport case: a fix is being carried into this build " +
 			"and the version does not move, so it requires `committed_to`, the date the work " +
 			"lands. `upgrade-needed` is not recorded here — an upgrade answers a component and " +
 			"everything open on it, so it is recorded from the component.",
@@ -146,7 +146,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component, as the findings list gives it"`
-		Version       string `query:"version" doc:"Which version, where the build ships more than one under that name"`
+		Version       string `query:"version" doc:"The version, where the build ships more than one under that name"`
 		Body          FindingDecisionBody
 	}) (*struct{ Body DecidedBody }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -196,17 +196,17 @@ func registerFindingDecision(api huma.API, in Ingest) {
 
 		out := &struct{ Body DecidedBody }{}
 		var proposals []triage.Proposal
-		// What each build contributes, so that the judgment can report per
-		// build once the whole of it has been written.
+		// Each build's contribution, so the judgment can report per build
+		// once the whole of it has been written.
 		writes := make([]int, len(asked))
 		holds := make([]int, len(asked))
 		sits := 0
-		// How many places the act has reached so far, charged as each build
+		// The places the act has reached so far, charged as each build
 		// resolves.
 		seen := 0
 		reached := make([][]finding.Deciding, len(asked))
-		// The builds a promise made here is gated across. What it is gated
-		// against — the earliest deadline among them — is a stored value that
+		// The builds a promise made here is gated across. The gate itself —
+		// the earliest deadline among them — is a stored value that
 		// a re-rating or an arriving scan moves, so it is resolved inside the
 		// transaction rather than here: read now, a promise would be gated
 		// against a deadline that may be gone by the time it is written, and a
@@ -300,8 +300,8 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		if out.Body.IDs == nil {
 			out.Body.IDs = []int64{}
 		}
-		// The counts on the body itself are about the build in the path, which
-		// is what they have always been about; the others report themselves.
+		// The counts on the body itself are about the build in the path; the
+		// others report themselves.
 		out.Body.Recorded = writes[0]
 		out.Body.Covered = holds[0]
 		out.Body.Left = sits - out.Body.Recorded
@@ -318,9 +318,9 @@ func registerFindingDecision(api huma.API, in Ingest) {
 // placesToDecide resolves one build's places for a finding, narrowed the way
 // the caller asked for.
 //
-// Returns what to write against and how many places the finding sits at there.
-// The two differ whenever something was left out, and the difference is what
-// says how much of the finding is still open.
+// Returns the places to write against and the number the finding sits at
+// there. The two differ whenever something was left out, and the difference
+// states how much of the finding is still open.
 func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, store *triage.Store,
 	product, stream, variant, vulnerability, component, version string,
 	wanted []string, remaining bool) ([]finding.Deciding, int, int64, error) {

@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-// Where this deployment answers, as a browser would name it — which is the
+// The address this deployment answers on, as a browser would name it, and the
 // input to the same-origin check on every state-changing browser request.
 //
-// A configured address that yields no host fell through to origins derived
-// from the request's own Host header, so the guard echoed what the request
+// A configured address that yields no host falls through to origins derived
+// from the request's own Host header, so the guard echoes what the request
 // said: it still ran, still passed, and guarded nothing, while the operator
 // believed the origin was pinned. `psirt.example.com` is the form that
 // produces it, and the form the value takes in a DNS record.

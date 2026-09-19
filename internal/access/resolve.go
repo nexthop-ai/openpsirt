@@ -108,7 +108,7 @@ type Resolver struct {
 	store *Store
 	trust Trust
 	// logger records a refusal an operator would otherwise have to guess at.
-	// What the caller is told never changes.
+	// The caller's answer never changes.
 	logger *slog.Logger
 	// mode says where roles come from. It is read per request rather than
 	// held, because an administrator can change it without a restart and a

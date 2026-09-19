@@ -32,7 +32,7 @@ import (
 var asking = regexp.MustCompile(
 	`(database\.Postgres|database\.MySQL|database\.MariaDB|database\.SQLite|` +
 		`mysql\.MySQLError|pgconn\.PgError|` +
-		// Asking the handle which engine it is, which is how a branch is
+		// The handle is asked which engine it is, which is how a branch is
 		// written without naming a constant. It was not looked for at all, so
 		// the one live branch in the tree that spells it this way —
 		// InBatchesKeeping — was invisible, and those three lines pasted into

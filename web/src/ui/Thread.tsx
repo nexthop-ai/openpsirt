@@ -11,12 +11,11 @@ import { initials } from "./initials";
 // The comments on a claim and the notes on an issue are the same thread: the
 // avatar and the author line, the timestamp, the edited mark, the earlier
 // versions behind it, the editor in place, the draft, and the note about a
-// name that reached nobody. They were written out twice, one tab apart, and
-// the two had already started to diverge — the timestamp was formatted in four
-// places, so a fix to it would have landed in whichever file the author had
-// open.
+// name that reached nobody. Written out twice, one tab apart, the two would
+// diverge, and a fix to the timestamp would land in whichever file the author
+// had open.
 //
-// What genuinely differs is the endpoint, and that stays with each caller: the
+// The endpoint is what genuinely differs, and it stays with each caller: the
 // query, the two mutations and the history read arrive as props rather than
 // being built here from a word.
 
@@ -52,12 +51,12 @@ export function Thread({
   history,
 }: {
   items: Said[];
-  // Whether a piece was written by whoever is reading. The identity alone: a
+  // A piece written by whoever is reading. The identity alone: a
   // display name anybody can be given would make ownership turn on a label.
   mine: (writtenBy: string) => boolean;
   about: { product: string; vulnerability: string };
   undisclosed?: boolean;
-  // What one piece is called, and what adding one does not do. The two words
+  // The name for one piece, and what adding one does not do. The two words
   // that are genuinely a caller's, so the wording stays deliberate rather than
   // drifting together by accident.
   word: "Comment" | "Note";
@@ -95,7 +94,7 @@ export function Thread({
                     <button
                       type="button"
                       className="edited"
-                      title="What it said before"
+                      title="Its earlier wording"
                       aria-expanded={showing === each.id}
                       onClick={() => setShowing(showing === each.id ? null : (each.id ?? null))}
                     >
@@ -177,7 +176,7 @@ export function Thread({
 
 export type Version = { version?: number; body?: string; replaced_at?: string };
 
-// What a piece said before it was changed.
+// A piece's earlier wording, before it was changed.
 //
 // A thread goes public at disclosure with the rest of the record, so one whose
 // earlier text is unrecoverable is one somebody can read and nobody can check.
@@ -188,7 +187,7 @@ function Earlier({ history }: { history: UseQueryResult<{ items?: Version[] | nu
   const rows = history.data?.items ?? [];
   if (history.isPending) return <Loading />;
   if (history.isError) {
-    return <Failed error={history.error} what="What it said before could not be read." />;
+    return <Failed error={history.error} what="The earlier wording could not be read." />;
   }
   if (rows.length === 0) return null;
   return (

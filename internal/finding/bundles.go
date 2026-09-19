@@ -72,7 +72,7 @@ type Bundle struct {
 
 // Bundles groups what is fixable by the bump that would fix it.
 //
-// **Presentation, like every other grouping here.** One act still writes one
+// Presentation, like every other grouping here. One act still writes one
 // decision per component and per place; this only says which rows a
 // person is answering at once.
 //
@@ -486,8 +486,8 @@ func componentOrder(filter Filter) string {
 
 // bandsFor is how the issues open against each component were rated.
 //
-// **Ranking by count alone is the wrong answer to the question this view
-// asks.** A package with forty-four issues outranks one with three criticals,
+// Ranking by count alone is the wrong answer to the question this view
+// asks. A package with forty-four issues outranks one with three criticals,
 // and somebody reading it to decide what to look at next is told the opposite
 // of what they need. The count is still the order — where the weight is is the
 // question — but the row says what the weight is made of.
@@ -545,7 +545,7 @@ func (s *Store) bandsFor(ctx context.Context, ids []int64, targets []int64,
 // One read for the page rather than one per row: a page of fifty components on
 // a real image is fifty round trips otherwise, for a column.
 //
-// **Ordered by how much it closes, never by version.** Comparing two versions
+// Ordered by how much it closes, never by version. Comparing two versions
 // needs an ordering per ecosystem this does not have, so the question
 // "which of these is nearest" is one this cannot answer and does not pretend
 // to. What it answers is which one closes the most, which is the question
@@ -664,27 +664,27 @@ type PerBuild struct {
 // AcrossBuilds is one component seen in every build of a product that carries
 // it.
 //
-// **The screen that was missing.** The by-component view answers where the
+// The screen that was missing. The by-component view answers where the
 // weight is, and clicking a component took somebody to a filtered list of its
 // findings — so a component could be read and never acted on, and the act of
 // upgrading it ended up on a screen of its own keyed on version pairs. This is
 // the component as the thing it is: what each stream ships, where each could
 // go, and what has been promised for each.
 //
-// **Per build rather than per product**, because the answer differs by build
+// Per build rather than per product, because the answer differs by build
 // and that is the whole difficulty: a stream staying on 3.0.x and a stream on
 // 3.5.x are different work with different testing, and one target across both
 // would be wrong for one of them.
 //
-// **A build is listed because it ships the component, not because something is
-// open against it.** The presence comes from the graph and the counts are
+// A build is listed because it ships the component, not because something is
+// open against it. The presence comes from the graph and the counts are
 // joined onto it, so a package carrying nothing of its own still answers with
 // the version it ships and where it sits. Driven off the findings instead, a
 // vendored binary whose whole risk sits underneath it — nothing on the package,
 // everything in what it pulls in — answered with no builds at all, which reads
 // as a name the product does not ship.
 //
-// **One row per version, not per build.** A build shipping a name at two
+// One row per version, not per build. A build shipping a name at two
 // versions holds two components, and they are two different pieces of code to
 // decide about; collapsing them to the lowest version reported one of them and
 // silently hid the other.
@@ -720,7 +720,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		DueAt       *time.Time `bun:"due_at"`
 		ComponentID int64      `bun:"component_id"`
 	}
-	// What is open against it, per build and component. A left join rather
+	// Everything open against it, per build and component. A left join rather
 	// than the driving table: no findings is an answer, and it is the answer
 	// for every package that carries its risk underneath it rather than on
 	// itself. Narrowed by visibility here, where the counts are, because the
@@ -741,7 +741,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr("f.target_id, f.component_id")
 
-	// How many things pull it in, from the graph rather than from the
+	// The number of things pulling it in, from the graph rather than from the
 	// findings: it is a fact about the build, true whether or not anything is
 	// open. A component nothing pulls in is contained by the build itself,
 	// which counts as the one thing pulling it in.
@@ -799,8 +799,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	for _, row := range rows {
 		ids = append(ids, row.ComponentID)
 	}
-	// Where each could go, per build: the same read the by-component view
-	// takes, narrowed to these builds so a stream's answer is its own.
+	// The versions each could go to, per build: the same read the by-component
+	// view takes, narrowed to these builds so a stream's answer is its own.
 	upgrades, err := s.upgradesPerBuild(ctx, ids, targets, visible, name)
 	if err != nil {
 		return nil, err
@@ -838,13 +838,13 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 
 // upgradesPerBuild is where a component could go, answered per build.
 //
-// **Grouped per version, not per string.** What a scanner records as the fix is
+// Grouped per version, not per string. What a scanner records as the fix is
 // one field, and some ecosystems put several versions in it — "1.25.13, 1.26.6,
 // 1.27.0-rc.3" is one string naming three releases, any of which closes the
 // issue. Grouped on the string, one version lands in several groups and its own
 // coverage is reported nowhere.
 //
-// **And counted twice.** What a release fixed is what names it; what an upgrade
+// And counted twice. What a release fixed is what names it; what an upgrade
 // to it closes is that plus everything fixed before it. The second needs the
 // ecosystem's ordering and is the question somebody choosing a version asks, so
 // where the ordering is unavailable the candidates carry equal counts and say
@@ -884,8 +884,8 @@ func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
 		return nil, fmt.Errorf("read where a component could go in each build: %w", err)
 	}
 
-	// What each build's findings name, one entry per issue so an issue counts
-	// once however many versions its fix names.
+	// The versions each build's findings name, one entry per issue so an issue
+	// counts once however many versions its fix names.
 	per := map[[2]int64][]namedFix{}
 	scheme := map[[2]int64]vercmp.Scheme{}
 	for _, row := range rows {

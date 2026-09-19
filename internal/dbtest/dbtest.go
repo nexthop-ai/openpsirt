@@ -86,7 +86,7 @@ func candidates() []candidate {
 
 // Each runs fn once against every database available, as a subtest.
 //
-// **The database arrives migrated and empty of the previous test's rows.**
+// The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
 // was migrated once per binary, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
@@ -103,13 +103,13 @@ func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Alone is Each for a test that cannot run beside another in its package.
 //
-// **The database arrives migrated and empty of the previous test's rows.**
+// The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
 // was migrated once per binary, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
-// What qualifies is a test that changes something the whole process shares —
+// A test qualifies where it changes something the whole process shares —
 // an environment variable, the working directory — rather than one that is
 // merely delicate. Everything else uses Each: the databases are already
 // separate, and a test that needs the rest of the package held still usually
@@ -121,7 +121,7 @@ func Alone(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Two runs fn against SQLite and PostgreSQL only.
 //
-// **The database arrives migrated and empty of the previous test's rows.**
+// The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
 // was migrated once per binary, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
@@ -142,7 +142,7 @@ func Two(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Servers runs fn against the three server engines and not SQLite.
 //
-// **For a test that needs two transactions open at once**, which SQLite cannot
+// For a test that needs two transactions open at once, which SQLite cannot
 // give it: its pool is one connection, so a second writer waits for a
 // connection the first is holding and the test deadlocks rather than racing.
 //
@@ -164,7 +164,7 @@ func Servers(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Only runs fn against one engine.
 //
-// **The database arrives migrated and empty of the previous test's rows.**
+// The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
 // was migrated once per binary, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
@@ -185,7 +185,7 @@ func Only(t *testing.T, engine database.Engine, fn func(t *testing.T, db *databa
 	run(t, fn, map[database.Engine]bool{engine: true}, beside)
 }
 
-// Whether a test may run beside the others in its package.
+// company is whether a test may run beside the others in its package.
 type company bool
 
 const (
@@ -363,10 +363,10 @@ func sqliteTemplate() ([]byte, error) {
 // packages never share tables, and for the checkout so that two worktrees do
 // not either.
 //
-// **The database is kept between runs and reused.** Applying the migrations is
+// The database is kept between runs and reused. Applying the migrations is
 // nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
-// MariaDB, once per package per engine, which was 475 s of server work in a
-// run that spent 43 s of processor time — and none of it tests anything the
+// MariaDB, once per package per engine, which is 475 s of server work in a run
+// that spends 43 s of processor time — and none of it tests anything the
 // migration tests do not. What makes reuse safe is that the name carries a
 // fingerprint of the migration sources: a schema change edits the migration
 // that created the thing rather than adding one beside it, so the applied
@@ -593,7 +593,7 @@ func Tables() []string { return slices.Clone(tables) }
 // tables lists every table, in an order safe to delete from: children before
 // the rows they reference.
 //
-// **Add new tables at the top.** A table missing from this list leaves rows
+// Add new tables at the top. A table missing from this list leaves rows
 // behind between tests, and one in the wrong position fails on the engines
 // that enforce foreign keys during a bulk delete — which is not all of them,
 // so it will look engine-specific rather than like the ordering mistake it is.
@@ -727,8 +727,8 @@ func TablesIn(t *testing.T, ctx context.Context, db *database.DB) []string {
 // Reset empties every table, leaving the schema in place.
 //
 // It lives here rather than in each test package so that adding a table is one
-// change instead of one per package. Before this, a new table with a foreign
-// key silently broke the cleanup of every package that predated it.
+// change instead of one per package. A new table with a foreign key otherwise
+// breaks the cleanup of every package that predates it, silently.
 func Reset(t *testing.T, db *database.DB) {
 	t.Helper()
 	if err := clear(context.Background(), db); err != nil {
@@ -739,15 +739,15 @@ func Reset(t *testing.T, db *database.DB) {
 // clear is Reset without a test to fail: the harness empties a database it
 // kept from an earlier run before any test sees it.
 func clear(ctx context.Context, db *database.DB) error {
-	// One transaction, not thirty statements. SQLite in its default mode
-	// syncs the file at every commit, and thirty commits of that between
-	// every pair of tests was a large part of what a test on SQLite cost.
+	// One transaction, not thirty statements. SQLite in its default mode syncs
+	// the file at every commit, and thirty commits of that between every pair
+	// of tests is a large part of what a test on SQLite costs.
 	//
 	// And one statement per table that holds something, rather than one per
 	// table. A statement costs a round trip whether or not it changes a row —
 	// 203 µs on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL — and a test
-	// touches a handful of the fifty-odd tables, so most of the work was
-	// emptying tables that were already empty. Which ones hold anything is one
+	// touches a handful of the fifty-odd tables, so most of the work is
+	// emptying tables that are already empty. Which ones hold anything is one
 	// more statement, asked before the deletes and inside the same transaction.
 	return database.InTransaction(ctx, db.DB, func(ctx context.Context, tx bun.Tx) error {
 		occupied, err := occupied(ctx, tx)

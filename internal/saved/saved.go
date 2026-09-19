@@ -1,12 +1,12 @@
 // Package saved is a narrowing of a list that somebody kept, and the claim it
 // prepares.
 //
-// **Not access.** It lived there because a saved filter hangs off a person,
-// which is the wrong reason: `access` decides who may do what, and a personal
-// narrowing is neither a grant nor a check. What it cost was that the triage
-// vocabulary — an outcome, a justification, reasoning, how long a deferral —
-// was defined a second time inside the package about permissions, which is the
-// last place somebody looks for it.
+// Not access. A saved filter hangs off a person, which is the wrong reason to
+// keep it there: `access` decides who may do what, and a personal narrowing is
+// neither a grant nor a check. Held there, the triage vocabulary — an outcome,
+// a justification, reasoning, how long a deferral — is defined a second time
+// inside the package about permissions, which is the last place somebody looks
+// for it.
 package saved
 
 import (
@@ -51,21 +51,20 @@ type Filter struct {
 
 	// Outcome, Justification, Reasoning and DeferDays are what this filter
 	// prepares, all absent on an ordinary saved filter — which is most of
-	// them. **A rule prepares a claim; a person proposes it**: what is
-	// kept here is offered prefilled, and a named person submits it as
-	// their own for a second person to approve.
+	// them. A rule prepares a claim and a person proposes it: what is kept
+	// here is offered prefilled, and a named person submits it as their own
+	// for a second person to approve.
 	//
-	// The wider form — a rule proposing its own pending claim — was argued
-	// for and refused: it leaves the approver as the only human judgment
-	// on the claim, which is what making the claim the approver's unit was
-	// meant to prevent, and it puts a configuration file where a name
-	// belongs in the record.
+	// The wider form — a rule proposing its own pending claim — leaves the
+	// approver as the only human judgment on the claim, which is what making
+	// the claim the approver's unit prevents, and it puts a configuration
+	// file where a name belongs in the record.
 	Outcome       string `bun:"outcome"`
 	Justification string `bun:"justification"`
 	Reasoning     string `bun:"reasoning"`
-	// DeferDays is how long a deferral it prepares, from whenever somebody
-	// submits it. A date would be wrong the week after it was saved: what a
-	// rule means is "put this off for a quarter", not "until 3 March".
+	// DeferDays is the deferral it prepares, from whenever somebody submits
+	// it. A date is wrong the week after it is saved: a rule means "put this
+	// off for a quarter", not "until 3 March".
 	DeferDays int `bun:"defer_days"`
 }
 
@@ -107,12 +106,12 @@ var ErrNoSuchFilter = errors.New("you have kept no filter by that name")
 // overdue kernel", and answering "you already have one of those" makes
 // somebody delete before they can correct.
 //
-// **The reasoning is required where an outcome is.** What is being saved is
-// what somebody will put their name to, and a prefill with an empty argument
-// is a button that proposes a dismissal saying nothing. The person who submits
-// it owns it, which is the whole of why the narrow form was chosen.
+// The reasoning is required where an outcome is. What is saved is what
+// somebody will put their name to, and a prefill with an empty argument is a
+// button that proposes a dismissal saying nothing. The person who submits it
+// owns it, which is the whole of the narrow form.
 //
-// **A deferral carries how long it defers for, never a date.** The date is
+// A deferral carries the length it defers for, never a date. The date is
 // worked out from the length whenever somebody submits it, so a rule saved in
 // March means "put this off for a quarter" rather than "until 3 March".
 func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int64,
@@ -130,8 +129,8 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 	prepares.Reasoning = strings.TrimSpace(prepares.Reasoning)
 	// The same policy every other typed field goes through, run before the
 	// text is stored rather than when it is read back. What is saved here
-	// prefills a claim, so text the decision store refuses saved cleanly and
-	// was refused when somebody pressed the button it filled in.
+	// prefills a claim, so text the decision store refuses would save cleanly
+	// and be refused when somebody pressed the button it filled in.
 	if err := markdown.Check(prepares.Reasoning); err != nil {
 		return nil, err
 	}
@@ -190,10 +189,10 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID, productID int
 		res, err := db.NewUpdate().Model((*Filter)(nil)).
 			Set("query = ?", kept.Query).
 			Set("display_name = ?", kept.DisplayName).
-			// What it prepares is replaced too, including with nothing: saving
-			// over a name is deciding what that name means now, and a prefill
-			// that survived being taken off would fire on a filter somebody
-			// thought they had made ordinary.
+			// The claim it prepares is replaced too, including with nothing:
+			// saving over a name is deciding what that name means now, and a
+			// prefill that survived being taken off would fire on a filter
+			// somebody thought they had made ordinary.
 			Set("outcome = ?", kept.Outcome).
 			Set("justification = ?", kept.Justification).
 			Set("reasoning = ?", kept.Reasoning).

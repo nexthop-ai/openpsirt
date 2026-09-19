@@ -22,7 +22,7 @@ import (
 // are one list of statements, so a second engine would answer the same
 // question again in a different dialect.
 //
-// **Membership is what this checks; the order stays hand-kept**, because
+// Membership is what this checks; the order stays hand-kept, because
 // putting children before the rows they reference means reading the foreign
 // keys, and where a position needed that reasoning the comment beside the name
 // is the record of it.

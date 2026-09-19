@@ -273,7 +273,7 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			return asked, nil
 		}
 
-		// **A name of ours never leaves, and is still answered.** Recorded
+		// A name of ours never leaves, and is still answered. Recorded
 		// exactly as an unanswerable one below is, and for the same reason:
 		// left unrecorded it would stay due for ever, and the window takes
 		// the never-asked first, so it would hold the head of every pass
@@ -281,7 +281,7 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		// the two apart afterwards is the same list applied again, which is
 		// what the report of what was held back is.
 		//
-		// **Anything an index said is dropped.** It was obtained by sending
+		// Anything an index said is dropped. It was obtained by sending
 		// this name, which is the thing that stops here. Kept, the version
 		// stays on the screen with nothing that will ever refresh it, the
 		// component never reaches the report of what was held back, and the
@@ -294,13 +294,13 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			continue
 		}
 
-		// **A question with nowhere to send it is still answered.** Not
-		// recording here is what made this feature do nothing: a component
-		// whose ecosystem has no index stayed due forever, and `due` takes the
-		// oldest 200 with never-asked first — so on a real image, where 3,929
-		// components are `generic`, `oci`, `github` or `maven` against 3,010
-		// that are askable, the window filled with rows nothing ever wrote and
-		// the pass asked upstream about nothing at all, every cycle, forever.
+		// A question with nowhere to send it is still answered. Unrecorded, a
+		// component whose ecosystem has no index stays due for ever, and `due`
+		// takes the oldest 200 with never-asked first — so on a real image,
+		// where 3,929 components are `generic`, `oci`, `github` or `maven`
+		// against 3,010 that are askable, the window filled with rows nothing
+		// ever wrote and the pass asked upstream about nothing at all, every
+		// cycle, forever.
 		ecosystem, name, ok := Asked(component.Purl)
 		if !ok || r.Index(ecosystem) == nil {
 			if err := r.record(ctx, component.ID, Latest{}); err != nil {
@@ -453,9 +453,9 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 		return nil
 	}
 	q = q.Set("latest_version = ?", latest.Version)
-	// What the index says the package is, and where it is developed. Both are
-	// somebody else's text arriving over the network and rendered to staff who
-	// hold the most access, so both are bounded and the address is judged
+	// The index's description of the package, and where it is developed. Both
+	// are somebody else's text arriving over the network and rendered to staff
+	// who hold the most access, so both are bounded and the address is judged
 	// before it is stored rather than only before it is drawn.
 	//
 	// Absent is normal and overwrites nothing: three of the four indexes serve

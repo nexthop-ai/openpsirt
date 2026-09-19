@@ -7,7 +7,7 @@ import (
 
 // parser is configured once, and is a parser only.
 //
-// **Raw HTML is refused at submission, not turned off here.** goldmark's
+// Raw HTML is refused at submission, not turned off here. goldmark's
 // parser produces RawHTML and HTMLBlock nodes whatever this is configured
 // with; what read as "off at the parser" was a *renderer* option on an object
 // whose renderer is never obtained. So the sentence described a mechanism that

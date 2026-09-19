@@ -16,7 +16,7 @@ import (
 // a property of the tables rather than of anything a reader can check at run
 // time.
 //
-// **By vocabulary, not by format**, which is the one collision first-match
+// By vocabulary, not by format, which is the one collision first-match
 // routing cannot survive: a key claimed by both SPDX tables is claimed twice
 // and counted once if the question is asked per format. The reader routes a
 // key to the first vocabulary holding it and keys what it has already read by

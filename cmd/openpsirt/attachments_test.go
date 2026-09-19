@@ -19,7 +19,7 @@ const password = "hunter2"
 
 var withPassword = "http://minio:" + password + "@minio.internal:9000"
 
-// What a plaintext store costs is said at every start.
+// The cost of a plaintext store is stated at every start.
 //
 // The refusal that governs which endpoints may exist is pinned where it is
 // made. This pins the other half: a deployment that lifted the refusal is told
@@ -104,7 +104,7 @@ func TestTheRefusalNamesTheWayThrough(t *testing.T) {
 // over as credentials instead makes the two one string, and is also what makes
 // the signing well-defined.
 //
-// **Measured, not assumed:** the leak this was filed for does not happen. A
+// Measured, not assumed: the leak this was filed for does not happen. A
 // reachability failure against a credentialed endpoint reports the operation
 // and the status and never the address, so the password did not reach standard
 // error by that route. What stands is that the endpoint the client is given

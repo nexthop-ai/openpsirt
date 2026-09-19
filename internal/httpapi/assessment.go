@@ -12,12 +12,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// AssessmentBody is what one product thinks of an issue, as against what was
-// published.
+// AssessmentBody is one product's rating of an issue, against the published
+// one.
 type AssessmentBody struct {
 	ID            int64  `json:"id,omitempty"`
 	Vulnerability string `json:"vulnerability,omitempty" doc:"The issue this is about"`
-	// Product is whose rating it is. Carried on every row because two
+	// Product is the owner of the rating. Carried on every row because two
 	// products may rate one issue differently, so a rating shown without one
 	// is a word nobody can act on.
 	//
@@ -25,16 +25,17 @@ type AssessmentBody struct {
 	// same field on both operations has to mean the same thing, and this is
 	// the one a client feeds back to the filter beside it.
 	Product       string `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
-	ProductName   string `json:"product_name,omitempty" doc:"How that product is spelled on screen"`
-	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"What this product rates it"`
-	Published     string `json:"published,omitempty" doc:"What was published when this was made, kept so a reader can see what we disagreed with"`
-	Reasoning     string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"Why. It outlives the version it was made about, so the next person needs the argument"`
+	ProductName   string `json:"product_name,omitempty" doc:"That product's spelling on screen"`
+	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"This product's own rating"`
+	Published     string `json:"published,omitempty" doc:"The published rating when this was made, kept so a reader can see what we disagreed with"`
+	Reasoning     string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"The reasoning. It outlives the version it was made about, so the next person needs the argument"`
 	State         string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
 	NeedsApproval bool   `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
-	// What agreeing would do beyond moving things down a list, on the claims
-	// that are waiting for somebody to agree. Absent on the rest: it is a
-	// question about a decision nobody has taken yet, and answering it for
-	// every historical claim would cost a query each to say nothing.
+	// Open is the effect of agreeing beyond moving things down a list, on
+	// the claims waiting for somebody to agree. Absent on the
+	// rest: it is a question about a decision nobody has taken yet, and
+	// answering it for every historical claim would cost a query each to
+	// say nothing.
 	//
 	// Counted inside the rating's own product, because that is everywhere the
 	// rating reaches.
@@ -42,7 +43,7 @@ type AssessmentBody struct {
 	// OffTheList is the number an approver is really being asked about: these
 	// stop being work rather than becoming later work, and lose their deadline
 	// with it.
-	OffTheList int `json:"off_the_list,omitempty" doc:"How many of them this rating would put below the product's triage line, where they stop being work and carry no deadline"`
+	OffTheList int `json:"off_the_list,omitempty" doc:"The number this rating would put below the product's triage line, where they stop being work and carry no deadline"`
 	// Mine says you made this one, so you may not be the second person. The
 	// server refuses it either way; carried so a screen can say why rather
 	// than offering a button that answers 422 — which is what the embargo
@@ -55,8 +56,8 @@ func registerAssessment(api huma.API, in Ingest) {
 		OperationID: "assess-issue", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/issues/{vulnerability}/assessment",
 		Summary: "Record what a product thinks of an issue, as against what was published",
-		Description: "Recorded against the **issue**, not against a place, and against **one " +
-			"product**. A published rating being wrong, or a report being disputed, is one " +
+		Description: "Recorded against the issue, not against a place, and against one " +
+			"product. A published rating being wrong, or a report being disputed, is one " +
 			"statement about the vulnerability in this product — true in every build of it, " +
 			"including builds it has not reached yet, and it does not stop being true " +
 			"because somebody rebuilt something.\n\n" +
@@ -66,9 +67,9 @@ func registerAssessment(api huma.API, in Ingest) {
 			"different ratings of the same issue, and neither reaches the other. A product " +
 			"nobody has rated the issue in reads the published rating.\n\n" +
 			"It changes the order, which is what makes it worth having rather than a note " +
-			"nobody acts on. Rating something **worse** than published takes effect at " +
+			"nobody acts on. Rating something worse than published takes effect at " +
 			"once: nobody needs protecting from being told something is worse than the " +
-			"world says. Rating it **milder** waits for a second person, because that is " +
+			"world says. Rating it milder waits for a second person, because that is " +
 			"the direction that hides things — and it hides more than a position in a " +
 			"list. Severity sets the deadline, so calling a high a low pushes its deadline " +
 			"out by months, and where a product has said what is worth triaging at all, a " +
@@ -128,7 +129,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		Description: "Only a milder rating waits for this. Somebody other than whoever " +
 			"proposed it, for the same reason every other second person here is somebody " +
 			"else: a control one person can complete alone is not a control.\n\n" +
-			"The second person holds their role **on the product the rating belongs to**. " +
+			"The second person holds their role on the product the rating belongs to. " +
 			"Agreeing is what puts a milder rating into force, so it moves that product's " +
 			"deadlines and its triage line; a rating in a product you hold nothing on " +
 			"answers as one that is not there.",
@@ -162,7 +163,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			"everything that reads it — where a finding sits in the list, how long it has, " +
 			"whether it is above the line the product triages — follows it back. No other " +
 			"product is touched.\n\n" +
-			"Asked of triage **on the product the rating belongs to**: taking a rating back " +
+			"Asked of triage on the product the rating belongs to: taking a rating back " +
 			"is making one.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusNoContent,
 	}, perProduct, "The product is the rating's own, not one in the path.",
@@ -230,7 +231,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			}
 			return nil, wentWrong(in.Logger, "what we have said could not be read", err)
 		}
-		// What each rating's product is called, read once for the page rather
+		// The name of each rating's product, read once for the page rather
 		// than per row.
 		products, shown, err := productsNamed(ctx, in, claims)
 		if err != nil {

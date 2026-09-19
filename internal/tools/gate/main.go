@@ -14,7 +14,7 @@
 // running are kept apart so that what was chosen can be seen before it runs,
 // and so that this can be asked what it would do without doing it.
 //
-// **It never narrows below what the change can break, and errs the other way.**
+// It never narrows below what the change can break, and errs the other way.
 // A path it does not recognize takes the whole gate. That is the direction a
 // check that gates a commit should be wrong in.
 package main
@@ -56,8 +56,8 @@ const (
 	everything
 )
 
-// What each tier runs, in the order a person wants to see a failure: the fast
-// and specific before the slow and broad.
+// runs is what each tier runs, in the order a person wants to see a failure:
+// the fast and specific before the slow and broad.
 var runs = map[tier][]string{
 	documents: {"docs-check", "unclaimed"},
 	web:       {"web-check"},
@@ -172,8 +172,9 @@ func name(t tier) string {
 	return [...]string{"documents", "web", "code", "api", "engines", "everything"}[t]
 }
 
-// Where the queries, the schema and the harness the tests share live. A change
-// under any of these is portability work whatever it looks like.
+// storage is where the queries, the schema and the harness the tests share
+// live. A change under any of these is portability work whatever it looks
+// like.
 var storage = []string{
 	"internal/database/",
 	"internal/dbtest/",

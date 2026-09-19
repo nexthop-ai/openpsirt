@@ -408,8 +408,8 @@ func TestANameTheBuildHoldsTwiceIsRefusedWithTheChoicesToPickFrom(t *testing.T) 
 
 func TestASummaryOfNothingButSpacesIsTheCallersToFix(t *testing.T) {
 	// Whitespace passes a minimum length, so this reaches the store, and the
-	// store refusing it used to arrive as a 500 saying something went wrong
-	// here. Nothing went wrong here.
+	// store's refusal is the caller's to fix rather than a 500 saying
+	// something went wrong here. Nothing went wrong here.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		got := asPerson(t, r, "private-triage", http.MethodPost,
