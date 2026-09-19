@@ -51,8 +51,8 @@ document is wrong the first time somebody is in a hurry — silently.
 
 ## Unauthenticated surfaces
 
-The application serves no documentation of its own, leaving **no unauthenticated
-route that reads domain data**: no product, finding, issue, person or credential
+The application serves no documentation of its own, leaving no unauthenticated
+route that reads domain data: no product, finding, issue, person or credential
 is readable without a credential.
 
 Sign-in is not nothing, and the absolute this used to state was false. It reads
@@ -394,36 +394,36 @@ Recorded because the conclusion is the deliverable.
 
 ## Limits
 
-- **Half the declaration is the check, and half is not.** The scope — an
+- Half the declaration is the check, and half is not. The scope — an
   administrator, the caller's own credential, any recognized one, none — is a
   fact about the subject alone, so it is enforced from the declaration before
   any handler runs. A role on a product needs the product resolved, so that
   half stays a line in the handler, and where a narrower check was written than
   the operation declares the two disagree and nothing fails. Enforcing the role
-  half centrally is refused for the reason it always was: a check running before
-  the handler would answer 403 and tell a guesser the thing exists. Enforcing
-  neither is what left every administrator gate resting on one line nobody
-  swept.
-- **The gate sweep is a floor, not a proof.** A refusal for the wrong reason
-  passes it, and it says nothing about what a narrowed operation puts in its
-  answer. It walks both gated scopes and counts them apart, because it walked
-  one of the two for a long time and the one it skipped was the administrator
-  gates.
-- **A note states something the scope does not, or is omitted.** Three said the
+  half centrally is refused for the reason it always was: a check running
+  before the handler would answer 403 and tell a guesser the thing exists.
+  Enforcing neither is what left every administrator gate resting on one line
+  nobody swept.
+- The gate sweep is a floor, not a proof. A refusal for the wrong reason passes
+  it, and it says nothing about what a narrowed operation puts in its answer.
+  It walks both gated scopes and counts them apart, because it walked one of
+  the two for a long time and the one it skipped was the administrator gates.
+- A note states something the scope does not, or is omitted. Three said the
   opposite of the value beside them, the worst being an operation answered
   without a credential that declared it required one.
-- **Paging is `limit` and `offset`, with a total.** A cursor is better under
+- Paging is `limit` and `offset`, with a total. A cursor is better under
   concurrent writes and worse for jumping to a page. The total is separate from
-  the page because somebody deciding whether to start work needs to know how much
-  there is.
-- **A list answers with an object, not an array.** An array at the top level has
+  the page because somebody deciding whether to start work needs to know how
+  much there is.
+- A list answers with an object, not an array. An array at the top level has
   nowhere to put the total.
-- **Names in paths, identifiers in bodies.** A product, stream and variant are
-  what somebody typing a request knows and what a pipeline has in its
-  configuration. A decision is numbered because it has no name.
-- **A place in a path is the identity the findings list gave out**, not something
-  a caller composes. A caller free to name a place would be choosing which
+- Names in paths, identifiers in bodies. A product, stream and variant are what
+  somebody typing a request knows and what a pipeline has in its configuration.
+  A decision is numbered because it has no name.
+- A place in a path is the identity the findings list gave out, not something a
+  caller composes. A caller free to name a place would be choosing which
   decisions apply where.
-- **Comment density in this layer is low by design.** It is a registration and a
+- Comment density in this layer is low by design. It is a registration and a
   mapping: the operation is declared, a store is called, its answer becomes a
-  body. What is worth explaining about a rule belongs where the rule is enforced.
+  body. What is worth explaining about a rule belongs where the rule is
+  enforced.

@@ -286,7 +286,7 @@ count and the figures that say how urgent they are: how many at each severity,
 how many known to be exploited, how many nobody owns.
 
 A bare count is not enough — "three undisclosed" does not say whether to open the
-tool now or after coffee. **The figures name nothing, including the product.**
+tool now or after coffee. The figures name nothing, including the product.
 What the aggregate protects is not the recipients, who already hold the right to
 read these, but the path the message takes to reach them.
 
@@ -461,8 +461,7 @@ finding it names may since have been decided, closed or reopened.
 
 ## Limits
 
-- **Events are not collapsed.** Being assigned the same finding twice is two
-  things that happened, and the second is the one they have not seen.
-- **The badge count is counted through the same conditions as the list.** A badge
-  that disagrees with the list under it is the same class of mistake as a total
-  that ignores a filter.
+| | |
+|---|---|
+| Events are not collapsed | Being assigned the same finding twice is two things that happened, and the second is the one they have not seen |
+| The badge count is counted through the same conditions as the list | A badge that disagrees with the list under it is the same class of mistake as a total that ignores a filter |

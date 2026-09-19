@@ -75,7 +75,7 @@ offering one this deployment's operator has better grounds to reach.
 
 ## Windows
 
-A deployment configures its own, and **none ships as a default**. A shipped
+A deployment configures its own, and none ships as a default. A shipped
 window is an interpretation, and the one thing this area refuses to encode.
 
 An obligation's clock runs from when something became known. It is not the
@@ -88,8 +88,8 @@ why that rule is right where it is.
 ## Not built
 
 The obligation surface itself: where the windows are watched, warned in advance,
-and kept out of reach of anything bulk. **This document describes a decision
-that is recorded and not yet implemented**, which is the difference between a
+and kept out of reach of anything bulk. This document describes a decision
+that is recorded and not yet implemented, which is the difference between a
 plan somebody can read and a gap somebody rediscovers by clicking.
 
 What it will not be is a filter over the overdue list. A remediation deadline

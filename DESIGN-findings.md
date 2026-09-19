@@ -270,7 +270,7 @@ against anything, which would need an ordering per ecosystem.
 ## Declared dependency scope
 
 What a producer said a dependency's scope is, stored on the graph edge, in the
-producer's own word. **Recorded, and read by nothing that decides anything.**
+producer's own word. Recorded, and read by nothing that decides anything.
 
 | Where it is stated | Words |
 |---|---|
@@ -446,8 +446,8 @@ it arrives from a request and used to be answered as a server fault.
 
 ## The authority of a run
 
-A run is the authority on what it reported. It opens what it found and **closes
-everything open that it no longer reports**, which is how a component leaving a
+A run is the authority on what it reported. It opens what it found and closes
+everything open that it no longer reports, which is how a component leaving a
 build stops being a finding without anybody saying so.
 
 The sweep is bounded by what a scan can have an opinion about. A finding carries
@@ -509,8 +509,8 @@ fixed and newly present.
 
 Invalid is on a different axis. Every other reason answers "why did this stop
 being present"; this says it was never present, so it is neither a resolution
-nor a disappearance. **It never means the finding exists but does not apply
-here** — that is a triage decision of `not-applicable` with the justification
+nor a disappearance. It never means the finding exists but does not apply
+here — that is a triage decision of `not-applicable` with the justification
 that fits, agreed by a second person and exported as VEX. Letting the closure
 absorb that case would route dismissals around approval.
 
@@ -528,8 +528,8 @@ is usually that it is no longer there.
 
 ## Build-declared claims
 
-A build sends what it has already decided does not apply to it. **Those claims
-are kept as data when the scan is read**, not left in the document.
+A build sends what it has already decided does not apply to it. Those claims
+are kept as data when the scan is read, not left in the document.
 
 A nightly scan's documents are discarded once read, the vulnerability scan runs
 after that, and it runs again on a schedule. A claim that lived only in the file
@@ -573,10 +573,10 @@ reason about kernel-ABI risk — but which module is loaded does not change whet
 the kernel has a bug.
 
 The model is not wrong: a finding is a component at a place, and those are the
-places. What the number settles is that **grouping cannot be an afterthought in
-presentation.** What is read back is one row per issue in a component, carrying
+places. What the number settles is that grouping cannot be an afterthought in
+presentation. What is read back is one row per issue in a component, carrying
 how many places it occupies and how many the build has already argued about. The
-same image reads as **7,906 rows rather than 335,021**.
+same image reads as 7,906 rows rather than 335,021.
 
 The grouping is done by the database. A page of fifty grouped rows read out of a
 third of a million findings is not a page of fifty findings, and counting in the
@@ -732,8 +732,8 @@ A judgment carries no variant: it is keyed on the product, the place and the
 upstream versions, so answering it on one build answers it on every build of that
 product holding the same code.
 
-Screens asking "what is there to do" show **one item per issue in a component in
-a product**, not one per build (REQ-25). Listed per build, importing a second
+Screens asking "what is there to do" show one item per issue in a component in
+a product, not one per build (REQ-25). Listed per build, importing a second
 variant doubles the list while doubling none of the work — which is what happened
 the day a second variant was seeded, and the list went from 7,354 items to
 14,681 against the same estate.
@@ -748,8 +748,8 @@ the day a second variant was seeded, and the list went from 7,354 items to
 
 Measured on two variants of one switch image: 7,587 rows on one and 7,610 on the
 other, which is 15,197 rows read one build at a time. Across the product it is
-7,612 — so 7,585 of those rows were one piece of work seen twice, and **27 were
-the genuine differences.**
+7,612 — so 7,585 of those rows were one piece of work seen twice, and 27 were
+the genuine differences.
 
 What it gives up across builds is the way down. A dependency chain belongs to
 one build's graph, so the column naming the two ends of the chain is empty
@@ -834,8 +834,8 @@ The table grew 16.8 times over the year, from 8,840 rows to 148,614. The graph
 grew alongside: 23,834 edges to 110,466, and 736 nodes to 3,284, because a
 component whose version moves opens a new node and 34 new edges while the old
 ones stay as closed intervals. Neither is a leak — every row is an interval
-somebody can ask a question about — but **a deployment sizing a disk should know
-the shape is multiplicative in consumers, not additive in components.**
+somebody can ask a question about — but a deployment sizing a disk should know
+the shape is multiplicative in consumers, not additive in components.
 
 | | findings list | running out | trend | a night, average | a night, worst |
 |---|---:|---:|---:|---:|---:|
@@ -935,8 +935,8 @@ below every band, so that the sentinel for "no line" does.
 
 ## The rating in force
 
-What a finding's severity *is* has one rule: **this product's word where it has
-stated one, the published word otherwise.** Being able to say a published
+What a finding's severity *is* has one rule: this product's word where it has
+stated one, the published word otherwise. Being able to say a published
 rating is wrong is pointless if the surfaces that count and rank then ignore
 us.
 
@@ -968,10 +968,10 @@ The reads had grown into one file of two and a half thousand lines. They are
 three questions:
 
 1. **What is open here** — the list every screen pages through.
-2. **Everything known about one issue at one component** — what somebody looking
+2. Everything known about one issue at one component — what somebody looking
    at a single row needs. A different question from the list rather than a longer
    version of it.
-3. **What is open, gathered by the thing that would answer it** — by the upstream
+3. What is open, gathered by the thing that would answer it — by the upstream
    bump that would close it, or by the component it is against.
 
 The split turned up a doc comment describing the component grouping sitting two
@@ -996,32 +996,32 @@ question next year should find the answer rather than the question.
 
 ## Limits
 
-- **Incomplete upgrades are stated as inequality, not ordering.** Saying that a
+- Incomplete upgrades are stated as inequality, not ordering. Saying that a
   version moved and is still not the one that fixes it needs no comparison, and
   the fixed-in field is free text and is sometimes a list. An ordering exists
   for four ecosystems and refuses the rest — `DESIGN-remediation.md` § Ordering
   the versions a scanner named holds it — and it is used to rank a set of
   candidates rather than to decide what a finding says.
-- **The inverse is not detected.** A component at or past the named fix while
-  the scanner still reports the issue would mean the scanner and the fix data
+- The inverse is not detected. A component at or past the named fix while the
+  scanner still reports the issue would mean the scanner and the fix data
   disagree. Deciding that needs an ordering for the ecosystem in hand, which
   there is for four of them and not for the others, so it is not asked at all
   rather than asked where it happens to be answerable.
-- **A component nothing leads to still has a place — itself.** It ships, and an
+- A component nothing leads to still has a place — itself. It ships, and an
   incomplete graph is normal.
-- **Severity is stored on the issue, fix state on the finding.** Severity is a
-  property of the vulnerability; whether a fix exists is a property of the version
-  in front of you.
-- **A place under the product records no consumer at all**, rather than recording
-  the root and excluding it later. The root's name differs per variant, and a key
-  that has to be remembered to ignore is one somebody will forget.
-- **A derived address refuses a name that is nothing but dots**, rather than
+- Severity is stored on the issue, fix state on the finding. Severity is a
+  property of the vulnerability; whether a fix exists is a property of the
+  version in front of you.
+- A place under the product records no consumer at all, rather than recording
+  the root and excluding it later. The root's name differs per variant, and a
+  key that has to be remembered to ignore is one somebody will forget.
+- A derived address refuses a name that is nothing but dots, rather than
   escaping it. A name and a version become path segments, and "." and ".." are
   resolved by the browser before the request leaves it. Everything else,
   separators included, is escaped into its segment (REQ-66).
-- **An identifier is matched against an anchored scheme before it resolves.** A
-  flaw this deployment recorded is filed under a name it minted, and a loose match
-  would send somebody to a public page about something else.
-- **A package kind nothing here knows produces no link.** A link that lands on the
+- An identifier is matched against an anchored scheme before it resolves. A
+  flaw this deployment recorded is filed under a name it minted, and a loose
+  match would send somebody to a public page about something else.
+- A package kind nothing here knows produces no link. A link that lands on the
   wrong thing costs more than no link, because it is followed before it is
   disbelieved.

@@ -34,7 +34,7 @@ This is the one scheme added to what a link may use beside `http`, `https` and
 
 ## Attachment subjects
 
-An attachment hangs off **the issue in the product** — the unit a decision, an
+An attachment hangs off the issue in the product — the unit a decision, an
 embargo and a comment already use. Not the finding row: text is written against
 a decision, a decision covers every place an issue sits at, and binding a file to
 one of forty-eight rows would make it unreachable the day that row closed while
@@ -183,12 +183,8 @@ that cannot be escaped, rather than a path comparison this package performs.
 
 ## Limits
 
-- **Uploads are not scanned for malware.** An operator handling files from
-  outside their organization should know this does nothing about it. Scanning
-  belongs in front of the bucket, where an operator can choose it.
-- **A refusal states that the issue is not there, never that the file is not
-  yours.** Telling somebody a file exists but is not theirs tells them the issue
-  exists.
-- **Only an identifier this deployment minted resolves.** Matching loosely would
-  let text name rows by pattern. Submission refuses anything else, and the
-  renderer keeps only the references that pass.
+| | |
+|---|---|
+| Uploads are not scanned for malware | An operator handling files from outside their organization should know this does nothing about it. Scanning belongs in front of the bucket, where an operator can choose it |
+| A refusal states that the issue is not there, never that the file is not yours | Telling somebody a file exists but is not theirs tells them the issue exists |
+| Only an identifier this deployment minted resolves | Matching loosely would let text name rows by pattern. Submission refuses anything else, and the renderer keeps only the references that pass |

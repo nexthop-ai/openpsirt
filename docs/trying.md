@@ -99,16 +99,15 @@ make demo DEMO_CAST="8091:ana:public-read,public-triage,approver \
 | `make demo-flaw` | One flaw in what this deployment ships, recorded by hand and undisclosed |
 | `make dev` | This machine's binary plus the interface's own dev server, for editing the interface and watching it reload |
 
-- **A demo where every figure reads zero demonstrates nothing.** Without
+- A demo where every figure reads zero demonstrates nothing. Without
   `demo-triage` the review queue, the record of judgments, how long triage is
   taking and what is planned are all empty, and the screens answering those
   questions look broken rather than idle. It records through the cast's own
   doors, because one person proposing and a second agreeing is the control the
   whole tool rests on.
-- **`demo-vex` is separate from the seed** because the scans run in the
-  background, and a document written before them would name issues this
-  deployment does not have.
-- **`make dev` needs Go, node and a scanner installed locally**, and it does
-  not exercise the interface the binary embeds. `make demo` does.
-- **Everything the demo writes stays in a git-ignored directory** in the
-  checkout.
+- `demo-vex` is separate from the seed because the scans run in the background,
+  and a document written before them would name issues this deployment does not
+  have.
+- `make dev` needs Go, node and a scanner installed locally, and it does not
+  exercise the interface the binary embeds. `make demo` does.
+- Everything the demo writes stays in a git-ignored directory in the checkout.

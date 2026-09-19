@@ -3,8 +3,8 @@
 What a build pipeline does, end to end. Everything here is one HTTP request;
 there is no client to install and no agent to run.
 
-The short version: **declare what you ship once, mint a key once, and post the
-inventory on every build.**
+The short version: declare what you ship once, mint a key once, and post the
+inventory on every build.
 
 ## Prerequisites
 
@@ -161,8 +161,8 @@ send-inventory:
         -F "inventory=@sbom.cdx.json"
 ```
 
-Naming the stream from `$CI_COMMIT_BRANCH` is the shape that bites: **the
-stream has to have been declared.** A pipeline running on a branch nobody
+Naming the stream from `$CI_COMMIT_BRANCH` is the shape that bites: the
+stream has to have been declared. A pipeline running on a branch nobody
 declared is refused, every build, until somebody declares it — and the refusal
 says which part is missing rather than making you guess:
 

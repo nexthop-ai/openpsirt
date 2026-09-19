@@ -29,8 +29,8 @@ Two controls, kept apart, and they run in two different places.
 | Sanitizing | Wherever the text is rendered, which is not here | Text stored before a rule existed |
 
 Policy needs data and authorization checks no client holds, so it is the
-server's. Sanitizing travels with rendering, and **nothing on the server
-renders**: the API returns the source as its only representation, and mail is
+server's. Sanitizing travels with rendering, and nothing on the server
+renders: the API returns the source as its only representation, and mail is
 sent as plain text. The interface sanitizes what it renders, and an integrator
 rendering this markdown sanitizes what they render.
 
@@ -207,13 +207,13 @@ the request answers and releases its resources while the work runs on.
 
 ## Limits
 
-- **A bare `scheme://` is treated as an address; a bare `word:` is not.** The
+- A bare `scheme://` is treated as an address; a bare `word:` is not. The
   second matches `parser.go:112` in a stack trace and `TODO: check this` in a
   sentence. Schemes that act rather than navigate are matched separately, since
   they carry no `//`.
-- **A tag in the text is reported rather than silently dropped.** Raw markup is
+- A tag in the text is reported rather than silently dropped. Raw markup is
   already off at the parser, so this changes nothing about safety; it tells the
   author why their tag will not appear.
-- **An allowlist of permitted tags was rejected** in favor of refusing raw markup
-  outright. Such a list is a thing that can be wrong, and the gap between what it
-  permits and what a browser does is where the attacks live.
+- An allowlist of permitted tags was rejected in favor of refusing raw markup
+  outright. Such a list is a thing that can be wrong, and the gap between what
+  it permits and what a browser does is where the attacks live.

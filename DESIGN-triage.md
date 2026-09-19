@@ -67,7 +67,7 @@ made in is not part of the key.
 
 The match is an index lookup on every screen that asks whether anything stands
 here, so the two version columns are bounded where the component columns they
-copy are not. **A version that will not fit is refused, not shortened**;
+copy are not. A version that will not fit is refused, not shortened;
 shortening would key the decision on something the finding does not hold.
 
 Measured before settling the bound: the reference producer's real output is
@@ -271,7 +271,7 @@ This was on the row. A judgment reaching forty-four places was forty-four copies
 of one sentence, each revisable on its own — so revising one returned that row
 to the queue and left the other forty-three saying the old thing under a claim
 that read as agreed. Measured on the demo before the move: 11 claims, 155
-decisions, 155 revisions, and **five distinct pieces of reasoning**; one claim
+decisions, 155 revisions, and five distinct pieces of reasoning; one claim
 carried forty-four identical copies of its own words. Every payload field was
 constant across every row of every claim.
 
@@ -324,12 +324,12 @@ an identifier before.
 Approving a claim approves every waiting row in it, in one transaction, under the
 rules each row is approved under: by somebody other than whoever wrote the words,
 against the revision that stands now, with what it covered counted and kept. A
-row already approved, withdrawn or lapsed is left alone. **A row already sent
-back is not approved with the rest** — it is with the author.
+row already approved, withdrawn or lapsed is left alone. A row already sent
+back is not approved with the rest — it is with the author.
 
 It is a set operation, not a loop. A claim over a kernel is two thousand rows;
-one row at a time, **1,760 rows took 15.6 s on the demo, and 500 rows were 2,500
-statements**.
+one row at a time, 1,760 rows took 15.6 s on the demo, and 500 rows were 2,500
+statements.
 
 As a set it is a bounded number of statements whatever the size:
 
@@ -436,12 +436,12 @@ carry agreed claims, and each arrives as a blank decision.
 Three things hold, read inside the transaction that writes:
 
 1. **The source is approved** — every row of it, none withdrawn or lapsed.
-2. **The new rows sit at places the source sits at, in the same product, and
-   name an issue the source does not already cover.** A place is the component
+2. The new rows sit at places the source sits at, in the same product, and
+   name an issue the source does not already cover. A place is the component
    and its consumer, and "the same argument" is about the same code. Each is
    asked of every row of the source rather than of its first: a claim covers as
    many issues as the act that wrote it.
-3. **The outcome and justification are the source's.** A different conclusion is
+3. The outcome and justification are the source's. A different conclusion is
    a different claim.
 
 It needs a second person like any other dismissal. The queue marks it as an
@@ -537,8 +537,8 @@ how a queue stops being read.
 
 Short is measured against everything the finding has already been put off for,
 not against the deferral being asked for. Otherwise four twenty-nine-day
-deferrals are a year nobody approved. **The time counted is what each deferral
-asked for**, not what it has spent.
+deferrals are a year nobody approved. The time counted is what each deferral
+asked for, not what it has spent.
 
 Every deferral counts for as long as it actually held: from when it was asked
 for to the date it returns on, cut short where it was taken back before that
@@ -587,8 +587,8 @@ stayed on the record as agreed.
 
 ## The triage line
 
-A deployment says what it considers worth triaging. **Below that line a finding
-is still recorded, still counted and still reportable** — out of the working
+A deployment says what it considers worth triaging. Below that line a finding
+is still recorded, still counted and still reportable — out of the working
 list, not out of the system. Five thousand findings is a list nobody reads, and
 the ones that drown it are the ones nobody was ever going to act on.
 
@@ -663,8 +663,8 @@ would take off a working list.
 
 ## Coverage count
 
-The answer to making a decision says **how many findings it covers**, and **how
-many distinct versions sit there**. A kernel issue reaches dozens of modules and
+The answer to making a decision says how many findings it covers, and how
+many distinct versions sit there. A kernel issue reaches dozens of modules and
 the answer is almost always the same for all of them, so without the count
 somebody discovers afterwards that they answered for sixty-two things.
 
@@ -744,8 +744,8 @@ narrowing holds, how many findings those sit at, and how many one action may
 write. The second is counted over the whole narrowed set rather than summed from
 a page. The screen counted in issues while the cap counted in findings, so a
 kernel issue sitting at 45 places made a cap of two thousand mean about
-forty-four issues, discovered after typing the reasoning. **Measured on a real
-image, 805 candidates narrowed by hand became eighteen separate claims**, each
+forty-four issues, discovered after typing the reasoning. Measured on a real
+image, 805 candidates narrowed by hand became eighteen separate claims, each
 with its own outlier table.
 
 Whatever is offered to narrow the set — a weakness class, a subsystem named in
@@ -795,8 +795,8 @@ feature.
 
 Proposing per row instead wrote the same key twice, and the second collided with
 the index that keeps one claim standing per place, taking the whole transaction
-with it: **every product with more than one build refused every bundle it was
-ever asked to declare**, with a message naming a decision it had just written
+with it: every product with more than one build refused every bundle it was
+ever asked to declare, with a message naming a decision it had just written
 itself.
 
 It is safe at that size because of what it carries. The outcome hides nothing and
@@ -892,7 +892,7 @@ it from the queue.
 ## Deadlines
 
 A finding gets a deadline from how urgent it is, counted from when it was first
-seen. **Being known-exploited has its own, and it is the shortest**, whatever the
+seen. Being known-exploited has its own, and it is the shortest, whatever the
 severity says.
 
 The clock runs on what nobody has answered. A dismissal takes a finding off it; a
@@ -1068,8 +1068,8 @@ they are an afternoon; unfound, they are retyped one claim at a time.
 | A claim against a source tree is shown however it was named | A bare name and a package identifier of the generic type are the same claim, and the matching rules treat them as one. Compared as a package, the second spelling was narrowed away — so a statement that had already suppressed the finding was missing from the evidence for it |
 
 As a correlated `EXISTS` over three subqueries evaluated per candidate finding,
-the filter **did not return inside five minutes on a demo image of 281,884
-findings and 1,854 statements**, and held a core for minutes after the request
+the filter did not return inside five minutes on a demo image of 281,884
+findings and 1,854 statements, and held a core for minutes after the request
 was abandoned.
 
 *This does not contradict rejecting abandonment as a triage signal.* That
@@ -1098,8 +1098,8 @@ it — the rule, the setting, the service that is not exposed.
 
 Every other recognized reason for something not applying is a claim about code,
 and code is what makes a decision lapse. This one is a claim about
-configuration, which can be removed with no version moving at all. **Nothing
-here watches configuration, and nothing expires this claim.**
+configuration, which can be removed with no version moving at all. Nothing
+here watches configuration, and nothing expires this claim.
 
 Naming the control does not close that gap. It is the difference between a claim
 somebody can go and check and one nobody can, and it is the justification an
@@ -1127,8 +1127,8 @@ publishing — which is why only a claim that fills it is published at all.
 
 ## Outcomes on a tag
 
-A tag never moves. **An outcome may state a fact about it; it may not carry a
-date.**
+A tag never moves. An outcome may state a fact about it; it may not carry a
+date.
 
 | Allowed | Refused |
 |---|---|

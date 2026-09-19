@@ -289,7 +289,7 @@ something it cannot see.
 ## Database engines
 
 The suite runs against SQLite alone unless pointed at real servers, and **a
-skipped engine passes**. A green run does not mean four engines agreed; it means
+skipped engine passes. A green run does not mean four engines agreed; it means
 nothing failed, which is also what running almost nothing looks like.
 
 `make engines-up` starts them, waits until each answers, and writes their URLs to
@@ -427,7 +427,7 @@ answered by regenerating the lock in a commit somebody reviews.
 
 ## Static analysis
 
-Rule selection lives in `.golangci.yml` and nowhere else. **Two scopes only**: a
+Rule selection lives in `.golangci.yml` and nowhere else. Two scopes only: a
 rule gates, or it is advisory. There is no third scope for grandfathering a
 backlog (REQ-75).
 
@@ -452,7 +452,7 @@ byte that makes a text tool skip a file is not a Go question.
 
 | Rule | |
 |---|---|
-| **A walk that reaches nothing refuses** | An empty result is what "nothing is wrong" looks like and what "I read nothing" looks like. No caller can tell those apart from a count of zero, so the reader answers an error rather than a silence |
+| A walk that reaches nothing refuses** | An empty result is what "nothing is wrong" looks like and what "I read nothing" looks like. No caller can tell those apart from a count of zero, so the reader answers an error rather than a silence |
 | **What is counted is what the caller kept**, not what it was shown | A count of visits is held above zero by any file at all, so the refusal above could never fire for a gate that reads one kind of file |
 | **Every gate says how much it read** | The count is beside the all-clear, so a run that quietly stopped reading part of the tree does not look like a run that read all of it |
 | **A directory is matched by name at any depth**, not by path prefix | Which is what a caller adding one means, and it is how nested dependency directories are covered |
@@ -580,21 +580,11 @@ generated address rather than at the organization's.
 
 ## Limits
 
-- **Branch protection is not enforced.** The gate runs on every pull request but
-  nothing blocks a merge, which is the state REQ-75 warns about. Deliberate for
-  early development, and it needs revisiting before outside contributions.
-- **The documentation workflow publishes one set, `main`, as the default.**
-  Publishing a tag under its version and moving a `latest` alias belongs with a
-  release process that does not exist. The versioning machinery is in place.
-- **The install and operate guides are not written.** Both are about a release —
-  how to get a version, how to move between them, what to back up before an
-  upgrade — and there is no release process, so a guide written now would describe
-  the demo target and the development database.
-- **The gate and CI run the same commands.** The packaging checks existed twice,
-  neither a superset of the other, so a reviewer running the gate and a merge being
-  blocked were checking different things.
-- **A check needing a running server refuses rather than skips.** A skipped test
-  passes, and "the suite is green" and "the suite ran" are two different facts
-  behind one command.
-- **`README.md` and `docs/index.md` are compared.** Neither can include the other,
-  and they drifted in five of ten lines.
+| | |
+|---|---|
+| Branch protection is not enforced | The gate runs on every pull request but nothing blocks a merge, which is the state REQ-75 warns about. Deliberate for early development, and it needs revisiting before outside contributions |
+| The documentation workflow publishes one set, `main`, as the default | Publishing a tag under its version and moving a `latest` alias belongs with a release process that does not exist. The versioning machinery is in place |
+| The install and operate guides are not written | Both are about a release — how to get a version, how to move between them, what to back up before an upgrade — and there is no release process, so a guide written now would describe the demo target and the development database |
+| The gate and CI run the same commands | The packaging checks existed twice, neither a superset of the other, so a reviewer running the gate and a merge being blocked were checking different things |
+| A check needing a running server refuses rather than skips | A skipped test passes, and "the suite is green" and "the suite ran" are two different facts behind one command |
+| `README.md` and `docs/index.md` are compared | Neither can include the other, and they drifted in five of ten lines |

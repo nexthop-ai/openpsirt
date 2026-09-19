@@ -74,7 +74,7 @@ the work that finding is part of.
 ### Coverage by matching
 
 A finding is covered when its component folds to the commitment's key in the
-commitment's build. **Nothing is written onto findings.**
+commitment's build. Nothing is written onto findings.
 
 | Consequence | |
 |---|---|
@@ -125,7 +125,7 @@ from the findings list, which has a row per build.
 There are no per-item due dates. A deadline comes from how urgent the finding is
 (REQ-33). Moving one is a deferral, which carries a reason and an approval
 threshold, and the deferral date becomes the effective target. Deferred items are
-reported apart from plainly overdue ones. **A plan says where, not when.**
+reported apart from plainly overdue ones. A plan says where, not when.
 
 The clock starts at the latest of three moments, never the earliest and never
 now: when the finding was first seen here, when exploitation was learned, and
@@ -386,8 +386,8 @@ evidence.
 
 ## External links
 
-A claim carries a link to work happening elsewhere, and **nothing is sent to
-it** (REQ-36): the link is stored and read by people. One link per claim rather
+A claim carries a link to work happening elsewhere, and nothing is sent to
+it (REQ-36): the link is stored and read by people. One link per claim rather
 than one per release, because the conversation about a promise is one
 conversation. What is not built is the tracker hand-off — opening or updating an
 item in whatever system that link points at.
@@ -580,16 +580,8 @@ no adapter and no route to one exists.
 
 ## Limits
 
-- **A bump is keyed on where it is going as well as where it comes from.**
-  Pending upgrades grouped on the first two fields and took the third from
-  whichever row made the bucket, so two bundles at 5.9.0 and 5.9.2 rendered as one
-  row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs
-  carry more than one target version.
-- **A fix declared for a product covers its builds without being written per
-  build.** A decision's live key names the place and not the build, so a product
-  shipping the same component in two builds produced two identical proposals and
-  the second collided with the unique index, rolling back the whole declaration.
-  The proposals are made distinct before they are written.
-- **A statement about a group speaks for the group.** The outbound format has no
-  place granularity, so a dismissal covering some of a group is not published as
-  covering all of it.
+| | |
+|---|---|
+| A bump is keyed on where it is going as well as where it comes from | Pending upgrades grouped on the first two fields and took the third from whichever row made the bucket, so two bundles at 5.9.0 and 5.9.2 rendered as one row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs carry more than one target version |
+| A fix declared for a product covers its builds without being written per build | A decision's live key names the place and not the build, so a product shipping the same component in two builds produced two identical proposals and the second collided with the unique index, rolling back the whole declaration. The proposals are made distinct before they are written |
+| A statement about a group speaks for the group | The outbound format has no place granularity, so a dismissal covering some of a group is not published as covering all of it |

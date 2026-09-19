@@ -171,15 +171,15 @@ selected, and the count beside it is of what the list it opens will show.
 
 Other bar rules:
 
-- **The search in the bar is the findings list's own search**, reached without
+- The search in the bar is the findings list's own search, reached without
   going there first. "/" focuses it, unless somebody is already typing.
-- **Upload is in the bar on every screen** (REQ-05), because the form picks its
-  own target; the inventories screen has it too, because that is where the result
+- Upload is in the bar on every screen (REQ-05), because the form picks its own
+  target; the inventories screen has it too, because that is where the result
   appears.
-- **On a narrow screen the rail goes and a tab bar of three arrives** — home,
-  findings, queue — which is what somebody reviews and responds from on a phone.
-  A menu control in the bar and a fourth tab open the whole rail as a panel over
-  the page.
+- On a narrow screen the rail goes and a tab bar of three arrives — home,
+  findings, queue — which is what somebody reviews and responds from on a
+  phone. A menu control in the bar and a fourth tab open the whole rail as a
+  panel over the page.
 
 ### The folded rail
 
@@ -191,8 +191,8 @@ want it.
 
 A group heading folds what is under it, and "Manage" starts folded. Granting a
 role or changing a setting is occasional rather than something done while
-working, and with it away the rail asks for under seven hundred. **A first visit
-needs nothing out of it**: somebody who has just arrived picks a product in the
+working, and with it away the rail asks for under seven hundred. A first visit
+needs nothing out of it: somebody who has just arrived picks a product in the
 bar above, which is what that control is for, rather than in the rail. The heading
 stays a heading to look at — a caret is the only thing marking it as a control,
 because three headings drawn as buttons read as three more places to go. What is
@@ -315,7 +315,7 @@ the product it belongs to, and what directly pulls it in. Those two are what
 differ between sibling rows; the steps between them rarely distinguish anything,
 so they are counted rather than named.
 
-Both ends cost **one recursive statement for the whole page**: the database climbs
+Both ends cost one recursive statement for the whole page: the database climbs
 from every consumer on the page to the root and returns the nodes on the way.
 Climbing is bounded by the depth of the graph rather than its size, and bounded at
 sixty-four steps so a document in a loop is answered rather than followed. The
@@ -424,7 +424,7 @@ Three filters need defining:
 A filter whose values are not exclusive takes several at once. Four do: the
 decision state, the decision outcome, what upstream did, and the kind of
 package. Each was one word, so "undecided or pending approval" had to be asked
-twice and read side by side. **Four more take a set**: who is dealing with it,
+twice and read side by side. Four more take a set: who is dealing with it,
 what a VEX document says, and, among the typed boxes, the component, the tag,
 the VEX publisher and the weakness. The typed ones are chip fields, because a
 box showing one value while narrowing by three is what the summary above the
@@ -455,8 +455,8 @@ first is what has not been answered yet.
 
 Sorting is by a column the server names, never by one a caller does (REQ-66).
 Four headers order the list — severity, EPSS, locations and the deadline — and
-clicking the one already sorted turns it around. **An order control above the
-list carries all six**, including the two with no column: the ranking the list
+clicking the one already sorted turns it around. An order control above the
+list carries all six, including the two with no column: the ranking the list
 is in when nothing is asked, and how long something has been open. What reaches
 the statement is
 an expression the server stores against each of its own keys: a placeholder
@@ -575,7 +575,7 @@ coordinator's. Keyed on the fold, so packages built from one source are one row.
 
 ## The component screen
 
-A component has **a row per version each build carries**, with what that build
+A component has a row per version each build carries, with what that build
 ships, what is open against it there, where it could go, the earliest deadline
 among what is open, and what has already been promised. The issue count is the
 way through to the findings list.
@@ -766,7 +766,7 @@ A guided review on submit (REQ-25), not a list of checkboxes. The sheet opens on
 a summary: this build, the builds covered automatically, the builds at other
 versions, and any not offered.
 
-The builds at other versions are **one list rather than one sheet each**, ticked
+The builds at other versions are one list rather than one sheet each, ticked
 where the reasoning holds at that version too and unticked to start, because a
 tick is the claim. Two steps — where it applies, then confirm — with Enter to
 advance, Escape to leave and the arrows to move. The last lists what will be
@@ -808,7 +808,7 @@ across it and everything under it, each component counted once however many ways
 it is reached. A finding is one issue at one place, and a library at thirty-six
 places with two issues is seventy-two rows — which is what every parent used to
 read, where somebody who drilled down one path is looking at one place and
-expects two. **One recursive statement for the row's whole set of children**:
+expects two. One recursive statement for the row's whole set of children:
 0.08 s for the root's thirty children on the full-size image.
 
 | Rule | |
@@ -1033,9 +1033,9 @@ What a distribution or an upstream security team publishes arrives in a document
 they wrote, so it is a third party's text reaching the people who hold the most
 access here. It was being rendered as markdown on the finding screen. Raw HTML
 is off at the parser and the page's own policy blocks scripts, so what that
-bought an author was not code: **it was headings, tables, bold assertions and
+bought an author was not code: it was headings, tables, bold assertions and
 the text of arbitrary outbound links, laid out on the screen a triager is
-deciding from**, plus the ability to name one of this deployment's own
+deciding from, plus the ability to name one of this deployment's own
 attachments and have it drawn beside their argument. A judgment somebody else
 publishes may be evidence and may never be presentation.
 
@@ -1060,8 +1060,8 @@ is still reachable over HTTP and referenced nowhere in the interface.
 ### The advisory
 
 The advisory has a screen, on the issue. Both endpoints answered and nothing
-called them, so **the one output of this tool that leaves the company was the one
-output nobody here could make**.
+called them, so the one output of this tool that leaves the company was the one
+output nobody here could make.
 
 | Rule | |
 |---|---|
@@ -1395,8 +1395,8 @@ the three left the credentials on a screen that did not mention them.
 ## The ordering signals
 
 The findings list is ordered by urgency: known-exploited, then whether the build
-reaches customers, then severity, then likelihood. **Every one of those is on the
-row.** An order that sorts on something it does not show reads as no order at all:
+reaches customers, then severity, then likelihood. Every one of those is on the
+row. An order that sorts on something it does not show reads as no order at all:
 the first version showed only the severity word, and the top of a real list came
 out "high, high, medium, medium, medium, high, high, critical" — correct, and
 indistinguishable from unsorted. The first five were known-exploited and nothing
@@ -1427,8 +1427,8 @@ Home's open figure, the trend and the severity ring count issues and are labeled
 "issues". The findings list and the rail's counts are groups, so the same issue at
 three versions of one library is three rows there. "CVE" is not used as a label,
 because not every issue carries one. The list says "N places" on each row rather
-than calling the row a finding. **The rail has room for a number and not for a
-noun**, so a badge carries its unit on the title and on what a screen reader is
+than calling the row a finding. The rail has room for a number and not for a
+noun, so a badge carries its unit on the title and on what a screen reader is
 given.
 
 Dates take one absolute form and one relative form. Four were in use at once,
@@ -1486,8 +1486,8 @@ same fact is written one way in this document and another on a screen.
 | Planned fixes. Cleared by the next scan | A release clears when the next scan of it stops finding the issue, so nothing is marked done by hand |
 | Applies to every build with this component | The same code built several ways is one piece of work |
 
-Measured before the sweep that applied this: **262 standing strings, about
-6,700 words**, across 65 of the interface's files — 69 of them on the screens
+Measured before the sweep that applied this: 262 standing strings, about
+6,700 words, across 65 of the interface's files — 69 of them on the screens
 somebody opens every day. The copy had drifted into explaining the design to
 the reader, which is what a design document is for.
 
@@ -1581,8 +1581,8 @@ with the library.
 
 `make check` type-checks every screen against a client generated from the API
 document, so a screen cannot disagree with the shape the server sends and a
-drifted endpoint is a compile error rather than a blank panel. **That is real
-coverage and it is most of what the frontend needs.**
+drifted endpoint is a compile error rather than a blank panel. That is real
+coverage and it is most of what the frontend needs.
 
 What it is not is a test of what a screen *says*. Five pieces are pulled out and
 tested on their own — what a notification is called, the count on the control

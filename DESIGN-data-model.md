@@ -221,13 +221,13 @@ identity and expiry (REQ-08). The flag is what lets everything walking upward
 stop there. A scan naming no root of its own is filed against the unit it was
 sent for.
 
-The flag is **reconciled like any other column**. A node kept from the previous
+The flag is reconciled like any other column. A node kept from the previous
 scan had everything else refreshed and this left alone, so a build that promoted
 a component to its own root — or demoted the old one — carried the previous
 answer until that node happened to close. Everything walking upward stops at the
 flag, so two flagged nodes or none is a tree that draws wrongly from the top.
 
-The root is also **not one of the build's components**. It is what the components
+The root is also not one of the build's components. It is what the components
 are *in*, and the count beside the inventory said one more than the inventory
 lists.
 
@@ -249,9 +249,9 @@ A package identifier is read for what it says rather than byte for byte: escapes
 decoded, the ecosystem lowercased, and the qualifying parts — architecture,
 distribution, the source package a binary came from — excluded.
 
-Measured on a public switch operating-system image: **8,374 described components
+Measured on a public switch operating-system image: 8,374 described components
 named 7,858 packages, and every one of the 516 collisions was the same name at
-the same version.** A build that merges two sources emits the same package twice,
+the same version. A build that merges two sources emits the same package twice,
 once with those qualifiers and once without, sometimes escaping the version
 differently and sometimes disagreeing with itself about the architecture. Taking
 the identifier verbatim would count those packages twice, split their findings
@@ -263,7 +263,7 @@ already the variant. Including it states the dimension twice, and the same
 package then reads as two in a report that has already separated them by variant.
 
 The reduction is the one the identifier specification describes, applied the same
-way to every ecosystem. **Nothing here knows which producer wrote a document**,
+way to every ecosystem. Nothing here knows which producer wrote a document,
 because the inventories this will be given come from build systems nobody has
 seen.
 
@@ -275,8 +275,8 @@ upstream name is what a build's own suppressions use, since a patch is written
 against a source tree rather than the binaries cut from it.
 
 Producers state it two ways: the format has a place for it, and several hang it
-off the package identifier. Both are read. In the measured image **30 components
-state it the format's way and 537 hang it off the identifier**, 16 of them both,
+off the package identifier. Both are read. In the measured image 30 components
+state it the format's way and 537 hang it off the identifier, 16 of them both,
 so reading only the format's own mechanism captures a twentieth of what is there.
 
 A bare upstream name with no version is not a lesser answer. For a binary cut
@@ -298,8 +298,8 @@ fold key, written as the scan is applied.
 | Version it was built at | One source shipped twice in one build |
 
 The source package's name alone is not enough, and the fourth part is the one
-that looks optional. Measured on the demo: keyed on all four, **41 groups fold
-and none of them holds binaries that disagree** about which issues they carry or
+that looks optional. Measured on the demo: keyed on all four, 41 groups fold
+and none of them holds binaries that disagree about which issues they carry or
 which version fixes them. Keyed on the name alone, 72 fold and 14 disagree. The
 kernel is the clearest of them — an image at source version 6.12.41-1 carrying
 5,088 issues beside the perf and header packages at 6.12.107-1 carrying 607 and
@@ -400,28 +400,28 @@ row of the tree's children for the distinct issues under each.
 The downward walks are spelled `CROSS JOIN ... WHERE`, which is an inner join
 everywhere and, on SQLite, the instruction to keep the recursion's queue on the
 outside of the join. Left to itself the planner put the edge table there and
-scanned every edge once per queued row: **6.6 s to list what sits under a build's
-root, against 0.018 s.**
+scanned every edge once per queued row: 6.6 s to list what sits under a build's
+root, against 0.018 s.
 
 ## Limits
 
-- **The graph does not distinguish two builds of one version with different
-  feature flags** (REQ-16). Both report the same name and version. An edge means
-  the inventory said so, not that the code takes that path at run time. It matters
-  where a dismissal rests on reachability, which is why such a claim is keyed on
-  the versions in hand and asked again when they move.
-- **A finding of a kind with no dependency path gets no tree view** (REQ-14). For
-  something a scanner found in a source file the answer is the file. The finding
-  model carries a kind from the start, and the screens that assume a path check
-  for one rather than drawing an empty tree.
-- **Two artifacts distinguished only by a package qualifier read as one
-  component.** A component is tracked for which vulnerabilities apply to it, and a
-  qualifier does not change that.
-- **Which product a build belongs to is asked in one place.** It was two
+- The graph does not distinguish two builds of one version with different
+  feature flags (REQ-16). Both report the same name and version. An edge means
+  the inventory said so, not that the code takes that path at run time. It
+  matters where a dismissal rests on reachability, which is why such a claim is
+  keyed on the versions in hand and asked again when they move.
+- A finding of a kind with no dependency path gets no tree view (REQ-14). For
+  something a scanner found in a source file the answer is the file. The
+  finding model carries a kind from the start, and the screens that assume a
+  path check for one rather than drawing an empty tree.
+- Two artifacts distinguished only by a package qualifier read as one
+  component. A component is tracked for which vulnerabilities apply to it, and
+  a qualifier does not change that.
+- Which product a build belongs to is asked in one place. It was two
   byte-identical walks of the same three tables in two packages.
-- **A group's state is read from what its places say, never from the absence of a
-  decision.** Counting "no decision here" as undecided put a withdrawn claim in no
-  bucket at all, appearing in none of the four states and in the total.
-- **A place identity carries no build and no product.** That is what lets a
-  judgment travel between builds shipping the same versions, and it is why every
-  list correlating decisions requires a product to be named.
+- A group's state is read from what its places say, never from the absence of a
+  decision. Counting "no decision here" as undecided put a withdrawn claim in
+  no bucket at all, appearing in none of the four states and in the total.
+- A place identity carries no build and no product. That is what lets a
+  judgment travel between builds shipping the same versions, and it is why
+  every list correlating decisions requires a product to be named.

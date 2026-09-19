@@ -96,8 +96,8 @@ built.
 | A capability held without a read role | Only what that person, or a team they are on, is assigned. An assignment is itself a grant: it carries visibility of what was assigned |
 | A collaborator on a case | That one issue. Described under [case collaborators](#case-collaborators) |
 
-There is no "triage without reading": **a right to write implies the read it acts
-on.** What is expressible and meaningless is an approver or an assigner holding
+There is no "triage without reading": a right to write implies the read it acts
+on. What is expressible and meaningless is an approver or an assigner holding
 no read role, which an assignment gives content to.
 
 | Rule | Reason |
@@ -118,7 +118,7 @@ reading on the product, that structure is the inventory of what the product
 contains — the breadth they were not granted — so it cannot be drawn with rows
 hidden: a container's count would still say how much sits under it.
 
-What they get is **the chains their own findings sit on** (REQ-56): from each
+What they get is the chains their own findings sit on (REQ-56): from each
 finding's component up to the build root, with per-node counts narrowed to match.
 The chain upward is what makes a finding judgeable, and every node on it sits
 above something they were already given. Descending a node is the question they
@@ -152,7 +152,7 @@ earlier check to hide behind, so a name nobody holds answers exactly as a name
 somebody holds whose work the caller cannot see — an empty list.
 
 That shape was found in three places, so it is no longer checked one route at a
-time: **a test walks every route carrying an identity** and asserts that both
+time: a test walks every route carrying an identity and asserts that both
 spellings answer alike, for every kind of credential including one holding
 nothing.
 
@@ -379,7 +379,7 @@ precedence rule nobody would remember.
 
 ## Routing rules
 
-A rule matches on **component identity as well as a place in the tree**. The
+A rule matches on component identity as well as a place in the tree. The
 upstream name is the key that matters: one rule naming a source package catches
 every binary package built from it. A kernel is one source package appearing at
 many places under many consumers, so a subtree rule would need a line per place
@@ -553,7 +553,7 @@ being applied correctly to it.
 
 ## Provider sign-in
 
-Two adapters behind one interface, **one of them configured at a time**. One
+Two adapters behind one interface, one of them configured at a time. One
 speaks OpenID Connect, for an identity provider. The other speaks plain OAuth
 2.0, for a forge that issues no identity token and publishes no discovery
 document, so the account has to be asked about.
@@ -587,8 +587,8 @@ sign-ins, which has to be swept and which anybody can fill.
 ## Outbound provider fetches
 
 Discovery, the key fetches that follow it, the exchange of an authorization code,
-and the calls made to a forge go through a client that talks to **the configured
-host and nowhere else**, does not follow a redirect, and does not connect to an
+and the calls made to a forge go through a client that talks to the configured
+host and nowhere else, does not follow a redirect, and does not connect to an
 address inside this network.
 
 One client, in one place, for every fetch out of this process. It was written
@@ -627,12 +627,11 @@ and the separator are configured, because neither is standardized.
 ## Name and identifier
 
 An administrator grants access to a person they can name. A provider reports a
-username and its own identifier. **Only the second is stable.**
+username and its own identifier. Only the second is stable.
 
-- **The username is redeemed once.** The first successful sign-in pins the
+- The username is redeemed once. The first successful sign-in pins the
   provider's identifier to the authorization waiting under that name.
-- **From then on the identifier decides**, and the username is followed as a
-  label.
+- From then on the identifier decides, and the username is followed as a label.
 
 | Failure closed | How |
 |---|---|
@@ -723,7 +722,7 @@ is no default.
 
 ## Sessions and request forgery
 
-A session is **stored, not held in a process**, so it works whichever replica
+A session is stored, not held in a process, so it works whichever replica
 answers and deleting the row cuts access off at once.
 
 A session holds no roles. It establishes who is asking; what they may reach is
@@ -766,7 +765,7 @@ grant outlives somebody's removal from the team it was shadowing.
 A derived role is a statement about current membership. Membership is read at
 sign-in and never again: no provider reports a departure, and polling every
 active user against a rate-limited API is worse than the drift it would close.
-Every derived grant is **replaced wholesale at each sign-in** rather than
+Every derived grant is replaced wholesale at each sign-in rather than
 merged, so a group somebody left takes its roles with it.
 
 The window in which a withdrawn role still applies is therefore the session
@@ -919,15 +918,15 @@ were served to anybody who asked, including the running version the endpoint
 reporting it is authenticated to withhold.
 
 A read is narrowed twice: to the products somebody holds anything on, and within
-those to what has been disclosed to them. **Forgetting the first is silent** —
+those to what has been disclosed to them. Forgetting the first is silent —
 the visibility half alone admits every disclosed finding in the deployment, in
 products the asker holds nothing on, which reads as working because the numbers
 are plausible.
 
 The pair is one call. Where a product is already pinned — a build's readiness, one
 product's releases — a set membership would say less, so those have their own name
-for the pairing, which states that the first half was done. **Nothing calls the
-visibility half bare.**
+for the pairing, which states that the first half was done. Nothing calls the
+visibility half bare.
 
 ## Browser headers
 
@@ -1008,8 +1007,8 @@ bound to administration among them.
 
 Three levers silently rewrite what this tool reports: changing the deadline policy
 recomputes every open finding's deadline, raising the triage floor removes
-deadlines below it, and an end-of-life date removes them past it. **For a tool
-whose entire output is evidence, that is the evidence itself being movable.**
+deadlines below it, and an end-of-life date removes them past it. For a tool
+whose entire output is evidence, that is the evidence itself being movable.
 
 ## Secrets and logs
 
@@ -1019,8 +1018,8 @@ is a token in whatever collects the logs, read by everybody who can read those
 and kept for longer than the token's own life.
 
 The case that actually happens is a database URL with a password in it, printed
-once at startup by something helpful. **It is redacted where it is formatted, not
-where it is logged**, so a second caller that logs the same value cannot
+once at startup by something helpful. It is redacted where it is formatted, not
+where it is logged, so a second caller that logs the same value cannot
 reintroduce it.
 
 The rule is written down rather than left as a habit because the failure is
@@ -1180,39 +1179,39 @@ notice the absence and say so.
 
 ## Limits
 
-- **A rule naming a component whose name carries a letter outside ASCII matches
-  on the three servers and not on SQLite**, whose fold is ASCII-only. SQLite is
+- A rule naming a component whose name carries a letter outside ASCII matches
+  on the three servers and not on SQLite, whose fold is ASCII-only. SQLite is
   for development and testing, so no deployment is affected, but a rule proved
-  locally can behave differently in production. Making it agree everywhere means
-  storing a folded name beside the spelling, which is a schema change.
-- **The batch-fullness rule is reasoned rather than pinned by a test.** The
+  locally can behave differently in production. Making it agree everywhere
+  means storing a folded name beside the spelling, which is a schema change.
+- The batch-fullness rule is reasoned rather than pinned by a test. The
   divergence needs a write landing between the read and the write of the same
-  batch, and a test here runs one thing at a time. What is pinned is that a sweep
-  spanning several batches routes everything it matches.
-- **Trusted-header sign-in has no stable identifier of its own.** It asserts a
+  batch, and a test here runs one thing at a time. What is pinned is that a
+  sweep spanning several batches routes everything it matches.
+- Trusted-header sign-in has no stable identifier of its own. It asserts a
   username on every request and there is nothing else to match on. The proxy is
   the authority there.
-- **Proxies that deliver identity in a signed token are not supported by that
-  path**, because reading a header cannot verify a signature. Such deployments
+- Proxies that deliver identity in a signed token are not supported by that
+  path, because reading a header cannot verify a signature. Such deployments
   configure a provider instead.
-- **A saved filter is not a permission.** It lived in this package because it
-  hangs off a person, which is the wrong reason. What it cost was that the triage
+- A saved filter is not a permission. It lived in this package because it hangs
+  off a person, which is the wrong reason. What it cost was that the triage
   vocabulary a filter can prepare was defined a second time inside the package
   about permissions, which is the last place somebody looks for it.
-- **A key is honored from anywhere.** It holds a credential rather than being
-  vouched for by position; where it connects from says nothing about whether it is
-  genuine.
-- **The stored key digest is compared again in constant time.** Finding a row by
+- A key is honored from anywhere. It holds a credential rather than being
+  vouched for by position; where it connects from says nothing about whether it
+  is genuine.
+- The stored key digest is compared again in constant time. Finding a row by
   digest is not by itself a statement that two secrets match.
-- **A person holding triage may send a scan.** Somebody re-uploading a build by
+- A person holding triage may send a scan. Somebody re-uploading a build by
   hand is doing triage work.
-- **A pipeline sees the product it may send to.** Pretending otherwise would make
-  an upload to its own product indistinguishable from one to a product that is not
-  there.
-- **A fault is logged rather than described.** The framework serializes an error
-  passed alongside the message, so handing it one hands the caller the query text
-  and, for a connection failure, the address and user it tried.
-- **Naming every address as a trusted source is refused.** It reaches the same
+- A pipeline sees the product it may send to. Pretending otherwise would make
+  an upload to its own product indistinguishable from one to a product that is
+  not there.
+- A fault is logged rather than described. The framework serializes an error
+  passed alongside the message, so handing it one hands the caller the query
+  text and, for a connection failure, the address and user it tried.
+- Naming every address as a trusted source is refused. It reaches the same
   place as naming none, through the setting that is supposed to be the guard.
-- **Granting a role somebody already holds succeeds.** An administrator scripting
+- Granting a role somebody already holds succeeds. An administrator scripting
   grants should not have to check first.

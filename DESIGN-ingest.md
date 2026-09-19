@@ -414,8 +414,8 @@ is not and there is no direction to get wrong.
 ### Lifecycle scopes
 
 The third version annotates a relationship with the phase it matters in —
-build, design, development, runtime, test or other. **The specification does not
-say that any of them means the target does not ship**, and inferring it is the
+build, design, development, runtime, test or other. The specification does not
+say that any of them means the target does not ship, and inferring it is the
 one judgment in this area the format leaves to a reader.
 
 | Scope | Read as |
@@ -657,7 +657,7 @@ anything this deployment chose unless it is bounded here.
 
 ## Scan coverage
 
-Every other failure here is loud. **Silence is the failure that is not**: a build
+Every other failure here is loud. Silence is the failure that is not: a build
 nothing files against reports no new findings, closes nothing, fails nothing, and
 every number about it holds still.
 
@@ -683,16 +683,16 @@ carry the answer, and a build that never checks again goes green on a file
 nothing could read.
 
 What was filed against a build can be asked for, newest first, each reporting how
-far it got: **taken and not yet read, read and awaiting a vulnerability scan,
-done, or refused with the reason.** A key sees the uploads it sent itself.
+far it got: taken and not yet read, read and awaiting a vulnerability scan,
+done, or refused with the reason. A key sees the uploads it sent itself.
 
 The four states are this deployment's, not the queue's. Reading and scanning are
 two jobs with different rhythms, and a producer has no business knowing which
 queue its work is sitting in.
 
 Which run answers an upload is a rule rather than a lookup, because a run covers
-a build rather than an upload: **the earliest successful run to finish after
-that upload was parsed.** A run that failed answers it only while nothing has
+a build rather than an upload: the earliest successful run to finish after
+that upload was parsed. A run that failed answers it only while nothing has
 succeeded since. The first version took the earliest run to finish after parsing
 whatever became of it, so a scanner that fell over once poisoned every receipt
 already waiting on it, permanently.
@@ -781,32 +781,33 @@ to retrofit were settled early.
 
 ## Limits
 
-- **The bounds are set from what reading costs, not from what a document looks
-  like.** They were round numbers several times the largest real producer:
+- The bounds are set from what reading costs, not from what a document looks
+  like. They were round numbers several times the largest real producer:
   measured, an edge holds about half a kilobyte of heap while being read and a
-  component about one and a third, so a ceiling of two million edges and a quarter
-  of a million components accepted a document taking about **1.3 GB against the
-  512 MiB the chart ships as a limit**. That file was guaranteed to kill the
-  process, in the background reader that runs *after* the upload was answered 202.
-  The budget is now about half the shipped limit for one document, and a test
-  measures the per-unit cost with a wide bound.
-- **The reader's bounds are configuration, not constants.** Five existed as a
+  component about one and a third, so a ceiling of two million edges and a
+  quarter of a million components accepted a document taking about 1.3 GB
+  against the 512 MiB the chart ships as a limit. That file was guaranteed to
+  kill the process, in the background reader that runs *after* the upload was
+  answered 202. The budget is now about half the shipped limit for one
+  document, and a test measures the per-unit cost with a wide bound.
+- The reader's bounds are configuration, not constants. Five existed as a
   defaults function every deployment ran unchanged.
-- **A component's name is folded on the way in, into a column of its own.** The
-  four engines do not fold alike outside ASCII: a VEX statement about a component
-  named with any letter outside it matched on three engines and not the fourth, so
-  which engine a deployment ran decided whether the publisher's judgment reached
-  the finding. Folding on write also leaves the index usable.
-- **So is an issue's identifier, and every name it goes by.** Comparing through
+- A component's name is folded on the way in, into a column of its own. The
+  four engines do not fold alike outside ASCII: a VEX statement about a
+  component named with any letter outside it matched on three engines and not
+  the fourth, so which engine a deployment ran decided whether the publisher's
+  judgment reached the finding. Folding on write also leaves the index usable.
+- So is an issue's identifier, and every name it goes by. Comparing through
   `LOWER` put a function on the indexed side, and the plan scanned the whole
-  vulnerability table and the whole alias table once per statement — thirty seconds
-  where the answer should take a fraction of one.
-- **Only the first ancestor supplies upstream identity.** Anything further back is
+  vulnerability table and the whole alias table once per statement — thirty
+  seconds where the answer should take a fraction of one.
+- Only the first ancestor supplies upstream identity. Anything further back is
   history, and a scanner matches against the fork point.
-- **Fixed-width character columns are not used.** They blank-pad on some engines,
-  so a hash read back carries trailing spaces that make an exact-match lookup fail.
-- **A component with no distribution context in its identifier is one nothing will
-  match**, and that is invisible rather than an error.
+- Fixed-width character columns are not used. They blank-pad on some engines,
+  so a hash read back carries trailing spaces that make an exact-match lookup
+  fail.
+- A component with no distribution context in its identifier is one nothing
+  will match, and that is invisible rather than an error.
 
 A lifecycle scope is read the way that keeps a component, and the
 two errors it sits between are not equal. Keeping too much adds something to

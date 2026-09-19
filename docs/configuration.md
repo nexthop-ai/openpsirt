@@ -42,7 +42,7 @@ is a thing to raise rather than to configure here.
 | `OPENPSIRT_LOG_LEVEL` | `debug`, `info`, `warn` or `error` | `info` |
 | `OPENPSIRT_LOG_FORMAT` | `text` or `json` | `text` |
 
-The defaults above are the binary's. **The chart sets a log format of `json`**,
+The defaults above are the binary's. The chart sets a log format of `json`,
 because a cluster's collector parses the logs; run the binary yourself and it
 writes `text`.
 
@@ -114,8 +114,8 @@ make scanner-db
 It produces `dist/openpsirt-scanner-db-<date>.tar.gz` and its checksum, using
 the scanner the image carries — the format is the scanner's, and a bundle
 built by a different version is one that may not load. Before it says it
-succeeded it runs that same scanner against the bundle **with the network off
-and auto-update refused**, which is the configuration on the far side of the
+succeeded it runs that same scanner against the bundle with the network off
+and auto-update refused, which is the configuration on the far side of the
 gap: a bundle that merely exists is what the target refuses to produce.
 
 On the far side, check the bundle before trusting it, unpack it into
@@ -273,8 +273,8 @@ somebody who has not arrived yet. That has to be a name a person can type, so
 the subject itself cannot serve — nobody knows it in advance. The property it
 needs is narrower than immutable:
 
-> **An end user must not be able to set it to a name an administrator might
-> have authorized.**
+> An end user must not be able to set it to a name an administrator might
+> have authorized.
 
 The exposure runs from the moment a grant is written until somebody redeems
 it, which `signin.claim-window` also bounds.
@@ -293,8 +293,8 @@ claim carried by any of the three is available.
 A claim the provider does not send, or sends as something other than a string,
 reads as absent. The sign-in then falls back to the address the provider says
 it verified, and failing that to the subject — which matches no authorization
-anybody typed, so the person is refused rather than admitted. **A claim name
-with a typo in it therefore reads as "this person was never granted access"**,
+anybody typed, so the person is refused rather than admitted. A claim name
+with a typo in it therefore reads as "this person was never granted access",
 not as a configuration error, so check the name against the provider's own
 token before deciding somebody's grant is missing.
 

@@ -219,26 +219,9 @@ own.
 
 ## Limits
 
-- **Two workers can run one job.** The conditional update cannot prevent it:
-  from the database's point of view the second claim is legitimate, because the
-  row says the holder has not been heard from. The renewal interval bounds the
-  window.
-- **The claim timeout is not shortened to match the renewal interval.** On
-  SQLite the pool is one connection, so a renewal waits behind the job's own
-  statement and a long transaction can hold it for minutes. **On that engine
-  a renewal cannot succeed at all while the work holds the connection**, so
-  the claim timeout is not a safety margin there — it is the bound, and it has
-  to exceed the longest single unit of work a deployment runs. Past it the
-  claim goes stale, and once the work's own transaction commits a second
-  worker's claim succeeds and the job runs twice, which on an ingest looks
-  like real change. The renewal is kept because it is the whole of the
-  protection on the other three engines.
-- **No queue library is used.** The mature Go queues either tie to one database
-  engine or require a separate service — one would cut engine support from four
-  to one, the other adds a component to every deployment.
-- **Row locking is verified as non-load-bearing.** The exclusivity test runs
-  twice on every engine, once with the locking clause and once without it, and
-  the second arm is the one that fails when the conditional update stops
-  repeating the state it expects: with locking in place the same defect passes,
-  because locking hides it. The switch is reachable only from the package's
-  test surface, never from an option a deployment can set.
+| | |
+|---|---|
+| Two workers can run one job | The conditional update cannot prevent it: from the database's point of view the second claim is legitimate, because the row says the holder has not been heard from. The renewal interval bounds the window |
+| The claim timeout is not shortened to match the renewal interval | On SQLite the pool is one connection, so a renewal waits behind the job's own statement and a long transaction can hold it for minutes. **On that engine a renewal cannot succeed at all while the work holds the connection**, so the claim timeout is not a safety margin there — it is the bound, and it has to exceed the longest single unit of work a deployment runs. Past it the claim goes stale, and once the work's own transaction commits a second worker's claim succeeds and the job runs twice, which on an ingest looks like real change. The renewal is kept because it is the whole of the protection on the other three engines |
+| No queue library is used | The mature Go queues either tie to one database engine or require a separate service — one would cut engine support from four to one, the other adds a component to every deployment |
+| Row locking is verified as non-load-bearing | The exclusivity test runs twice on every engine, once with the locking clause and once without it, and the second arm is the one that fails when the conditional update stops repeating the state it expects: with locking in place the same defect passes, because locking hides it. The switch is reachable only from the package's test surface, never from an option a deployment can set |

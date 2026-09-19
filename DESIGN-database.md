@@ -41,8 +41,8 @@ Satisfies REQ-03, REQ-06, REQ-71, REQ-72, REQ-73.
 | SQLite | Development and testing only | 3.35 |
 
 A floor is a release series: the oldest series this application's queries and
-schema are written against. **It is not a statement that upstream still
-publishes fixes for that series** — MySQL 8.0 and MariaDB 10.6 are both past
+schema are written against. It is not a statement that upstream still
+publishes fixes for that series — MySQL 8.0 and MariaDB 10.6 are both past
 upstream end of life and are still admitted, because raising a floor refuses
 deployments that start today and that is a decision rather than upkeep.
 
@@ -825,24 +825,24 @@ and the granularity are open questions.
 
 ## Limits
 
-- **The concurrency test does not cover the advisory lock.** Every caller
-  serializes on the in-process mutex first, so a test driving goroutines through
-  the normal path passes with the advisory lock deleted entirely. It pins the
-  mutex and nothing else.
-- **Queries are not bounded.** No statement timeout, no blanket driver read
-  timeout. Any such bound eventually kills legitimate slow work — a large report,
-  an ingest transaction over tens of thousands of components — and the usual
-  result is per-query exceptions until the bound means nothing. It would also cut
-  off a migration part way through.
-- **Connections are not validated on checkout**, because there is no hook for it.
-  A validation helper with a short deadline exists for callers that would
+- The concurrency test does not cover the advisory lock. Every caller
+  serializes on the in-process mutex first, so a test driving goroutines
+  through the normal path passes with the advisory lock deleted entirely. It
+  pins the mutex and nothing else.
+- Queries are not bounded. No statement timeout, no blanket driver read
+  timeout. Any such bound eventually kills legitimate slow work — a large
+  report, an ingest transaction over tens of thousands of components — and the
+  usual result is per-query exceptions until the bound means nothing. It would
+  also cut off a migration part way through.
+- Connections are not validated on checkout, because there is no hook for it. A
+  validation helper with a short deadline exists for callers that would
   otherwise block on a dead connection, and readiness uses it. It costs a round
   trip per use and can only say a connection was alive a moment ago.
-- **A page size is clamped in one place.** Every list takes a limit, and each had
+- A page size is clamped in one place. Every list takes a limit, and each had
   its own clamp written beside it — twenty-one of them, six different pairs of
-  numbers. One helper takes what was asked, the most this list will give, and what
-  it gives when nobody says.
-- **Index key length is tightest on MySQL**, and package identifiers get long.
+  numbers. One helper takes what was asked, the most this list will give, and
+  what it gives when nobody says.
+- Index key length is tightest on MySQL, and package identifiers get long.
   Index a hash, not the raw string.
-- **Timestamp semantics differ between engines.** Store UTC and be explicit about
+- Timestamp semantics differ between engines. Store UTC and be explicit about
   types.

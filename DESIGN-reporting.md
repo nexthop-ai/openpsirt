@@ -39,7 +39,7 @@ this document is its own.
 
 ## The counting unit
 
-Every rate and count is **one issue at one component**, never one place. The
+Every rate and count is one issue at one component, never one place. The
 deadline is stored per place, but a place is not a piece of work: one flaw in one
 library that forty-five packages pull in is one decision. Counted per place it
 was forty-five late things beside one late thing on the findings list, both
@@ -264,8 +264,8 @@ separates somebody keeping up with a large list from somebody sitting on one.
 Counted as pieces of work — an issue in a component in a product — rather than
 as the findings they cover, so the figure agrees with the list behind it.
 
-It carries the same narrowing every other query does. **A count is as much a
-disclosure as a row.**
+It carries the same narrowing every other query does. A count is as much a
+disclosure as a row.
 
 It is bounded, worst first, like every other list. It was the one name-yielding
 projection with no ceiling at all — no limit parameter, no default, one row per
@@ -716,12 +716,12 @@ severity word for the triage floor; on or off for upstream currency.
 
 ## Limits
 
-- **An export answers the question the list beside it answers**, embedding the
-  same filters rather than re-declaring them. A filter the list applied and the
+- An export answers the question the list beside it answers, embedding the same
+  filters rather than re-declaring them. A filter the list applied and the
   export dropped produced eight rows on screen and seven thousand in the file,
   under the same heading.
-- **A cell a spreadsheet reads as a formula is neutralized.** Component names
+- A cell a spreadsheet reads as a formula is neutralized. Component names
   arrive in somebody else's inventory, and these files are opened by the people
   holding the most access in the deployment.
-- **The disclosure periods were read and wired into behavior with no way to set
-  them**, while two other documents described each as a setting.
+- The disclosure periods were read and wired into behavior with no way to set
+  them, while two other documents described each as a setting.

@@ -63,9 +63,9 @@ was published while the distribution continues publishing fixes for it, so
 pinning alone ships what was known-vulnerable on that date and keeps shipping
 it.
 
-Measured on this image the day the base moved from 3.21 to 3.24: **22 findings
+Measured on this image the day the base moved from 3.21 to 3.24: 22 findings
 against the distribution's own packages, 20 of them OpenSSL at `3.5.7-r0` with
-the fix published as `3.5.8-r0`**, two of them critical, every one matched
+the fix published as `3.5.8-r0`, two of them critical, every one matched
 through Alpine's own advisories rather than by comparing an identifier against an
 upstream range. Upgrading cleared them. The older base had the same shape and was
 less legible about it.
@@ -428,35 +428,35 @@ should get.
 
 ## Limits
 
-- **Pinning the base means nothing moves it either.** The image carried 3.21 —
+- Pinning the base means nothing moves it either. The image carried 3.21 —
   released December 2024, support ending 2026-11-01 — until somebody looked, by
-  which point it was three releases behind. Past a base's end-of-life its packages
-  receive no security backports, and all of the base, the scanner and the
-  inventory tool were found two or more releases behind in one week. Dependabot
-  now watches what a `FROM` line names, which is the base images and the Go
-  toolchain. **The scanner and the inventory tool are still watched by nobody**:
-  each is a version and a checksum in a build argument, which nothing reads as a
-  dependency.
-- **Two builds of one commit can differ**, because the packages inside the base
-  are upgraded at build time. Accepted because the image carries an inventory of
+  which point it was three releases behind. Past a base's end-of-life its
+  packages receive no security backports, and all of the base, the scanner and
+  the inventory tool were found two or more releases behind in one week.
+  Dependabot now watches what a `FROM` line names, which is the base images and
+  the Go toolchain. The scanner and the inventory tool are still watched by
+  nobody: each is a version and a checksum in a build argument, which nothing
+  reads as a dependency.
+- Two builds of one commit can differ, because the packages inside the base are
+  upgraded at build time. Accepted because the image carries an inventory of
   itself, so what shipped is recorded rather than assumed.
-- **The packaging gate has one implementation.** The image and chart checks were
+- The packaging gate has one implementation. The image and chart checks were
   seven checks written twice, once in the Makefile and once in the workflow,
   neither a superset of the other. CI runs the target.
-- **Pinned pairs are compared rather than trusted.** The Go toolchain, the SBOM
-  generator and Node are each written in two files. The same check catches a build
-  argument given two different defaults, which made a binary report one version
-  and its SBOM another.
-- **The binary archives are a convenience, not the product.** REQ-02 says this
+- Pinned pairs are compared rather than trusted. The Go toolchain, the SBOM
+  generator and Node are each written in two files. The same check catches a
+  build argument given two different defaults, which made a binary report one
+  version and its SBOM another.
+- The binary archives are a convenience, not the product. REQ-02 says this
   ships as an image and a chart, and a binary run bare has none of the chart's
-  render-time refusals in front of it. Linux amd64 and arm64 only: nothing in the
-  design targets another platform, and an archive nobody tests is a support
+  render-time refusals in front of it. Linux amd64 and arm64 only: nothing in
+  the design targets another platform, and an archive nobody tests is a support
   surface rather than a release.
-- **`make dist` reads one image inventory, for the architecture it runs on.**
-  Cataloging a foreign filesystem means running foreign binaries under emulation.
-  The workflow publishes one per architecture it pushes; a developer who wants
-  the other names it and waits.
-- **Nothing is fetched at run time from a source only this project controls**,
-  and nothing is gated on a key this project issues. An operator who mirrors the
+- `make dist` reads one image inventory, for the architecture it runs on.
+  Cataloging a foreign filesystem means running foreign binaries under
+  emulation. The workflow publishes one per architecture it pushes; a developer
+  who wants the other names it and waits.
+- Nothing is fetched at run time from a source only this project controls, and
+  nothing is gated on a key this project issues. An operator who mirrors the
   image into their own registry has the whole thing, which is what Apache 2.0
   (REQ-01) requires of delivery.
