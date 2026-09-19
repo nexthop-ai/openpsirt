@@ -33,8 +33,11 @@ func rpmOrder(a, b string) (int, bool) {
 // splitRPM pulls a version into epoch, version and release, and says whether
 // what it was given is a version at all.
 //
-// The release is whatever follows the *last* hyphen, as the version may hold
-// one. What makes a string not a version here is the same test the Debian
+// The release is whatever follows the last hyphen. A hyphen is not a character
+// a version may hold, so a string carrying a second one is refused either way
+// and where the cut is made changes no accepted answer.
+//
+// What makes a string not a version here is the same test the Debian
 // reader applies, for the same reason: the version part begins with a digit and
 // every part is drawn from the characters a version may hold. A word an
 // advisory wrote where a version belongs fails both.
