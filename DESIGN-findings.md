@@ -996,14 +996,17 @@ question next year should find the answer rather than the question.
 
 ## Limits
 
-- **Incomplete upgrades are stated as inequality, not ordering.** Nothing here
-  can compare 3.0.12 against 3.0.14: there is no version comparison in this
-  codebase, the fixed-in field is free text and is sometimes a list, and doing it
-  properly means per-ecosystem ordering for Debian epochs, RPM release segments,
-  semantic versions, and ecosystems following none of them.
-- **The inverse is not detected**, and cannot be: a component at or past the named
-  fix while the scanner still reports the issue would mean the scanner and the fix
-  data disagree, and deciding that needs the ordering above.
+- **Incomplete upgrades are stated as inequality, not ordering.** Saying that a
+  version moved and is still not the one that fixes it needs no comparison, and
+  the fixed-in field is free text and is sometimes a list. An ordering exists
+  for four ecosystems and refuses the rest — `DESIGN-remediation.md` § Ordering
+  the versions a scanner named holds it — and it is used to rank a set of
+  candidates rather than to decide what a finding says.
+- **The inverse is not detected.** A component at or past the named fix while
+  the scanner still reports the issue would mean the scanner and the fix data
+  disagree. Deciding that needs an ordering for the ecosystem in hand, which
+  there is for four of them and not for the others, so it is not asked at all
+  rather than asked where it happens to be answerable.
 - **A component nothing leads to still has a place — itself.** It ships, and an
   incomplete graph is normal.
 - **Severity is stored on the issue, fix state on the finding.** Severity is a

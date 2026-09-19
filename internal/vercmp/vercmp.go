@@ -31,6 +31,15 @@ const (
 	// Semantic is dotted numeric parts with an optional pre-release suffix,
 	// which is what the language ecosystems publish.
 	Semantic
+	// RPM is the algorithm rpmvercmp uses: an optional epoch, a version and
+	// an optional release, each compared in runs of digits and letters with
+	// everything else read as a separator.
+	RPM
+	// APK is Alpine's, where a version is numbers, an optional letter, any
+	// number of named suffixes, an optional commit hash and an optional
+	// revision — and the suffix decides whether it leads to a release or
+	// follows one.
+	APK
 )
 
 // SchemeOf says how an ecosystem spells versions, given the type read out of a
@@ -46,6 +55,10 @@ func SchemeOf(ecosystem string) Scheme {
 		return Debian
 	case "golang", "npm", "cargo":
 		return Semantic
+	case "rpm":
+		return RPM
+	case "apk":
+		return APK
 	default:
 		// Every other ecosystem, including ones that plainly do have an
 		// ordering. Adding one is adding its algorithm and the tests that show
@@ -71,6 +84,10 @@ func Order(scheme Scheme, a, b string) (int, bool) {
 		return debianOrder(a, b)
 	case Semantic:
 		return semanticOrder(a, b)
+	case RPM:
+		return rpmOrder(a, b)
+	case APK:
+		return apkOrder(a, b)
 	default:
 		return 0, false
 	}

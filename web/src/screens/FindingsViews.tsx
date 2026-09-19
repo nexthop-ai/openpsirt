@@ -258,10 +258,11 @@ export function ByComponent({
                     </span>
                   </td>
                   {/* Where it could go, on the package it is a bump of.
-                      Listed rather than ordered: comparing two versions needs
-                      a per-ecosystem ordering this does not have, so the one
-                      that closes the most is offered first and "nearest" is
-                      not a question this can answer. */}
+                      Listed rather than ordered: an ordering exists for some
+                      ecosystems and not others, and a list ordered for some
+                      packages and not the rest reads as one ordering somebody
+                      can trust. So the one that closes the most is offered
+                      first and "nearest" is not a question this answers. */}
                   <td>
                     {(row.upgrades ?? []).length === 0 ? (
                       <span className="hint">—</span>
@@ -432,9 +433,9 @@ export function ByBump({
         <a href={bundlesFile(at, narrowed, "json")}>JSON</a>.
       </p>
       <p className="hint" style={{ margin: "0 0 8px" }}>
-        Ordered by what each upgrade would close. <b>Listed rather than ordered</b> — comparing two
-        versions needs a per-ecosystem ordering this does not have, so one package appears once per
-        version upstream released and there is no nearest and no latest.
+        Ordered by what each upgrade would close. <b>Listed rather than ordered</b> — versions can
+        be compared in some ecosystems and not others, so one package appears once per version
+        upstream released and there is no nearest and no latest.
         {cannot.length > 0 && (
           <>
             {" "}
