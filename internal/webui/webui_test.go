@@ -7,16 +7,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/webui"
 )
 
-// Whether this binary carries an interface, said rather than inferred.
+// An interface in the binary is said rather than inferred.
 //
 // Two different failures, and a caller that passes the result straight into
-// the server. Answering both with nothing would make a build whose interface
-// cannot be read indistinguishable from an API-only build, and both silent.
+// the server: answering both with nothing makes a build whose interface cannot
+// be read indistinguishable from an API-only build, and both silent.
 //
 // Which of the two this binary is depends on whether the frontend was built
 // before the tests ran, so the test asserts the pair rather than one of them:
-// either there is a filesystem and no error, or there is an error saying
-// which state it is and no filesystem.
+// either there is a filesystem and no error, or there is an error naming the
+// state and no filesystem.
 func TestTheInterfaceIsEitherThereOrSaysWhyNot(t *testing.T) {
 	pages, err := webui.Files()
 	switch {

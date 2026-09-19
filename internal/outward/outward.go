@@ -1,17 +1,16 @@
 // Package outward is the one HTTP client this process reaches the internet
 // with.
 //
-// Every fetch out of here goes to somewhere named in configuration or in a
-// document somebody else published, which is to say from outside — so all of
-// it is pinned to the hosts it was told about, refuses redirects, refuses to
+// Every fetch out of here goes somewhere named in configuration or in a
+// document somebody else published, which is to say from outside, so all of it
+// is pinned to the hosts it was told about, refuses redirects, refuses to
 // connect inside this network, and is bounded in time.
 //
-// It lives in one package because it was written twice and forgotten a third
-// time: the sign-in fetches were guarded, the upstream-currency client was a
-// bare one with a timeout and nothing else, and the token exchange that
-// carries a client secret fell back to the default client entirely. A control
-// that has to be remembered at each new call site is one that will be missed
-// at the next.
+// One package, because a control remembered at each call site is missed at the
+// next: a bare client with a timeout and nothing else, or the library's
+// default, which has no timeout and follows ten redirects. The call that falls
+// back is as likely to be the token exchange, the one carrying a client
+// secret, as any other.
 package outward
 
 import (
