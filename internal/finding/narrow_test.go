@@ -469,10 +469,10 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 		// A proposed row that holds no key covers nothing: a proposal is live
 		// until it is withdrawn or lapses, and both release the key. So the
 		// place stands undecided — and the row and the filter say the same
-		// thing about it, which is what they exist to do. The row used to
-		// draw no word at all while the filter put the group in the
-		// undecided bucket, so a reader found it in a list whose own state
-		// column was blank.
+		// thing about it, which is what they exist to do. A row drawing no
+		// word at all while the filter puts the group in the undecided
+		// bucket leaves a reader looking at a list whose own state column
+		// is blank.
 		record("proposed", false)
 		said("undecided")
 		if n := count("undecided"); n != 1 {

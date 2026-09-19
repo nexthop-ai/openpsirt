@@ -527,9 +527,9 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 func TestADistributionSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 	// Two things at once, because the second only means something if the first
 	// holds. An RPM component now has a scheme, so the per-version check in
-	// the planner runs for it where it used to stop at "this ecosystem has no
-	// ordering" — which makes the conservative rule newly reachable here, and
-	// a rule nothing reaches is a rule nobody has tested.
+	// the planner runs for it rather than stopping at "this ecosystem has no
+	// ordering", which is what makes the conservative rule reachable here —
+	// and a rule nothing reaches is a rule nobody has tested.
 	for _, one := range []struct {
 		what    string
 		fixedIn []string

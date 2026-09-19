@@ -10,10 +10,10 @@ import (
 
 func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 	// Whether a publisher's judgment reaches a finding is an equality test
-	// on three columns, and it used to be a LOWER() the engine performed —
-	// which the four do not agree about: SQLite folds ASCII and nothing
-	// else, so a component named with any letter outside it matched on
-	// three engines and not on the fourth, and which one a deployment ran
+	// on three columns. Spelled as a LOWER() the engine performs, the four do
+	// not agree: SQLite folds ASCII and nothing else, so a component named
+	// with any letter outside it matches on three engines and not on the
+	// fourth, and which one a deployment runs
 	// decided whether the statement was seen. Folded on write instead, the
 	// comparison is the same everywhere and the index over the three
 	// columns is usable.
@@ -153,10 +153,10 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 	//
 	// A source tree is named either way it can be named: as a bare name, and
 	// as a package identifier of the generic type. The matching rules treat
-	// the two as one claim, and narrowing the second away here compared a
-	// source tree's type against the component's own — so a statement that
-	// had already suppressed the finding was missing from the evidence for
-	// it, and the page said nobody had spoken.
+	// the two as one claim. Narrowing the second away here compares a source
+	// tree's type against the component's own, so a statement that already
+	// suppressed the finding is missing from the evidence for it and the page
+	// says nobody has spoken.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PrivateTriage)

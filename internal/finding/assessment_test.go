@@ -663,10 +663,10 @@ func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
 }
 
 func TestRatingAProductAsksForTriageOnThatProduct(t *testing.T) {
-	// The hole this closed. A rating sets the deadline and can push a finding
-	// below the line a product triages at, and it used to ask for triage
-	// *anywhere* — so somebody holding one product moved both in a product
-	// they cannot see, and nothing in the request named the product at all.
+	// A rating sets the deadline and can push a finding below the line a
+	// product triages at. Asking for triage anywhere, somebody holding one
+	// product moves both in a product they cannot see, with nothing in the
+	// request naming the product at all.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())

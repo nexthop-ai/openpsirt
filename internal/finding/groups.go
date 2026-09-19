@@ -325,10 +325,9 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	// and this is the screen somebody opens first, against the largest product
 	// they have.
 	//
-	// The failures are reported rather than skipped. Each lookup used to be
-	// ignored when it failed, so a database in trouble produced a findings
-	// list with blank component names in it: a page that looks like data and
-	// is not.
+	// The failures are reported rather than skipped. Ignored, a database in
+	// trouble produces a findings list with blank component names in it: a
+	// page that looks like data and is not.
 	issues := make([]int64, 0, len(rows))
 	components := make([]int64, 0, len(rows))
 	for _, row := range rows {
@@ -660,9 +659,9 @@ type decorated struct {
 // The total rides on the page. It is counted through the same filter as the
 // page — a total that ignores the narrowing is worse than no total: it
 // reports how much there is to decide about, which is the figure people
-// quote, while the list beside it shows something else — and it used to be
-// a second statement making the same grouping over the same rows to count
-// what the first had just grouped. `COUNT(*) OVER ()` is the number of rows
+// quote, while the list beside it shows something else. A second statement
+// makes the same grouping over the same rows to count what the first has just
+// grouped; `COUNT(*) OVER ()` is the number of rows
 // the grouping produced after the HAVING clauses and before the limit,
 // which is exactly that, on all four engines (window functions are in each
 // of them), for the cost of nothing. Where the page comes back empty — an
@@ -722,10 +721,10 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		return heads, heads[0].Total, nil
 	}
 	// Grouped the way the page groups, which is by the fold rather than by
-	// the component. Two binaries of one source are one row on a page and
-	// were two here, so the figure above the list changed depending on which
-	// page was being looked at — and this is the one somebody quotes, because
-	// it is what a deep link or the last page shows.
+	// the component. Two binaries of one source are one row on a page, so
+	// counting them as two here changes the figure above the list depending
+	// on which page is being looked at — and this is the one somebody quotes,
+	// because it is what a deep link or the last page shows.
 	counted := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).

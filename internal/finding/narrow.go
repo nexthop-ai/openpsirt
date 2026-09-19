@@ -1098,9 +1098,9 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		ColumnExpr(`MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS "lapsed"`, lapsed).
 		// Whether a promise to upgrade stands over this place. Counted
 		// only for the claim that currently stands, like "approved"
-		// above: a promise that was withdrawn is not one, and a
-		// finding it used to cover is unplanned again with nothing to
-		// clean up. That is the whole argument for deriving this
+		// above: a promise that was withdrawn is not one, and a finding
+		// it covered is unplanned again with nothing to clean up. That
+		// is the whole argument for deriving this
 		// rather than writing a tag.
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
 			` AND cl.outcome = ? THEN 1 ELSE 0 END) AS "planned"`,

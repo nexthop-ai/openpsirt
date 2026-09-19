@@ -268,12 +268,11 @@ func InForce() (string, []any) {
 // at sixty places is one thing somebody has to answer, and sixty rows of it is
 // a list with one entry in it.
 //
-// The deadline is read rather than derived. It used to be worked out per
-// request, which meant a pass over every open finding **per urgency band** —
-// each band allows a different number of days, and the window has to narrow
-// the rows before they are read rather than after. Measured at about eight
-// seconds over 441,108 findings. a deadline stored at ingest stores it
-// instead, so this is one range over an index.
+// The deadline is read rather than derived. Worked out per request it is a
+// pass over every open finding per urgency band — each band allows a different
+// number of days, and the window has to narrow the rows before they are read
+// rather than after — measured at about eight seconds over 441,108 findings.
+// Stored at ingest, this is one range over an index.
 //
 // A finding with no deadline is left out. That is a row recorded before the
 // deadline was stored, and it will have one the next time a scan reopens it —

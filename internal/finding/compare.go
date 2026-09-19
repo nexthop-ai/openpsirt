@@ -206,8 +206,8 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 		}
 	}
 	// Split once the reasons are in hand, through the one function that
-	// decides what counts as a fix. The screen used to make that judgment a
-	// second time, in a column heading, and it disagreed with this one.
+	// decides what counts as a fix. A screen making that judgment a second
+	// time, in a column heading, disagrees with this one.
 	comparison.Fixed, comparison.Closed = partition(comparison.Fixed)
 
 	// Judgments standing over what is still there. Read only for the still-present

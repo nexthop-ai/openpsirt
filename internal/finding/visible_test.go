@@ -51,9 +51,9 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 			{"private triager", f.holding(t, access.PrivateTriage), 2, false},
 			{"an approver alone", f.holding(t), 0, true},
 			// An administrator holds no role here, so they read
-			// nothing here . Administering the catalog is not
-			// reading what is open against it, and this is the row
-			// that used to say otherwise.
+			// nothing here. Administering the catalog is not reading
+			// what is open against it, and this is the row that
+			// says so.
 			{"an administrator granted nothing", access.NewPerson(1, "admin", true, nil, 0), 0, true},
 			{"an administrator granted private reading", f.admin(t, access.PrivateRead), 2, false},
 			{"a pipeline", access.NewPipeline(1, "nightly", access.Scope{ProductID: f.productID}), 0, true},

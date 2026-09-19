@@ -529,8 +529,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	}
 
 	// counted is how much of it is late. One pass, against the deadline
-	// stored on the finding — it used to be a pass per urgency band, each
-	// with its own cutoff, because the deadline was derived. Overdue has
+	// stored on the finding. Derived instead it is a pass per urgency band,
+	// each with its own cutoff. Overdue has
 	// to mean the same thing here as on the screen that lists what is
 	// running out, and the surest way to keep two answers equal is for
 	// there to be one of them: the deadline is the stored one, and what
@@ -753,9 +753,8 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 	// The first groups and orders over finding and the two joins the
 	// scoping needs; the names of the issue, the component and the build
 	// come from a second statement over the page rather than from four
-	// more joins under the aggregate, which is what the first version did
-	// — a text column reduced with MIN once per row of the grouping to
-	// read fifty names.
+	// more joins under the aggregate — which reduces a text column with MIN
+	// once per row of the grouping to read fifty names.
 	var heads []struct {
 		VulnerabilityID int64     `bun:"vulnerability_id"`
 		ComponentID     int64     `bun:"component_id"`
@@ -953,12 +952,12 @@ func inOneProduct(q *bun.SelectQuery, subject access.Subject, productID int64,
 // Holding private read on one product does not make undisclosed findings on
 // another visible, so the clause is per product rather than a single flag.
 //
-// **An administrator is not narrowed at all**, and the first version of this
-// got that exactly backwards: Products() reports "everything" as an empty list
-// with a flag, the empty list rendered as IN (NULL) — which is never true —
-// and the clause collapsed to public-only for the one subject who is supposed
-// to see everything. Their dashboard, deadline list and trend all
-// under-reported, with nothing saying so.
+// An administrator is not narrowed at all, and the shape makes that easy to
+// get backwards: Products() reports "everything" as an empty list with a flag,
+// and an empty list rendered as IN (NULL) is never true — so the clause
+// collapses to public-only for the one subject who is supposed to see
+// everything, and their dashboard, deadline list and trend all under-report
+// with nothing saying so.
 func onlyVisible(q *bun.SelectQuery, subject access.Subject, products []int64, all bool) *bun.SelectQuery {
 	if all {
 		return q

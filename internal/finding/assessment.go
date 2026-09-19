@@ -623,10 +623,10 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		return err
 	}
 
-	// Grouped on when each finding opened, which the row carries. It used to
-	// group on the run and join it for the timestamp — one join to read one
-	// column, and an inner one, so a finding a person opened was left out of
-	// its own recount.
+	// Grouped on when each finding opened, which the row carries. Grouped on
+	// the run and joined for the timestamp it is one join to read one column,
+	// and an inner one, so a finding a person opened is left out of its own
+	// recount.
 	var groups []struct {
 		Exploited bool       `bun:"exploited"`
 		OpenedAt  time.Time  `bun:"opened_at"`
