@@ -36,9 +36,77 @@ export function System() {
         <h2>System</h2>
         <p>What this deployment is doing, and whether what it posts is arriving</p>
       </div>
+      <VulnerabilityData />
       <TheQueue />
       <WebhookDelivery />
     </>
+  );
+}
+
+// What the scans are answering against, and when it last moved.
+//
+// **The half of "the fact and a link" that did not work.** Somebody told the
+// vulnerability data has stopped moving arrived at this screen, which showed
+// the job queue and the webhooks and nothing about the data at all. The
+// version was in the database and on no screen anywhere.
+//
+// It fails silently like everything else here, which is why it belongs on this
+// screen rather than beside a build: every scan since the data stopped goes on
+// answering as confidently as ever, and nothing reports a fault.
+function VulnerabilityData() {
+  const data = useQuery({
+    queryKey: ["vulnerability-data"],
+    queryFn: async () => unwrap(await api.GET("/v1/vulnerability-data", {})),
+  });
+
+  if (data.isPending) return <Loading />;
+  if (data.isError) {
+    return (
+      <Failed error={data.error} what="What the scans are answering against could not be read." />
+    );
+  }
+  const version = data.data?.version ?? "";
+  const moved = data.data?.moved_at;
+
+  return (
+    <section className="panel">
+      <h3>Vulnerability data</h3>
+      <p className="hint" style={{ marginTop: 0 }}>
+        What every scan is answering against. The version is the scanner&rsquo;s own spelling and
+        nothing orders it — what matters is that it moves, not which is newer.
+      </p>
+      {version === "" ? (
+        <Empty
+          title="No scan has finished and stated a version."
+          detail="Nothing has been pointed at this deployment yet, which is a different thing from data that has stopped moving."
+        />
+      ) : (
+        <table>
+          <tbody>
+            <tr>
+              <th scope="row">In force</th>
+              <td className="id">{version}</td>
+            </tr>
+            <tr>
+              <th scope="row">Last moved</th>
+              <td>
+                {moved ? since(moved) : <span className="hint">—</span>}
+                {data.data?.stale === true && (
+                  <>
+                    {" "}
+                    <span className="state closed">stopped</span>
+                  </>
+                )}
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">Counts as stopped after</th>
+              <td className="hint">{data.data?.stale_after}</td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }
 

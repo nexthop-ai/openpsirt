@@ -18,6 +18,14 @@ export function label(kind?: string): string {
       return "not being scanned";
     case "critical-on-release":
       return "critical on a release";
+    // The two conditions about the deployment rather than about anybody's
+    // work. Both go to administrators, and both said their own slug here —
+    // which is the one place the fallthrough below reads as a tool that was
+    // not finished rather than as one the server has grown past.
+    case "vulnerability-data-stale":
+      return "vulnerability data not moving";
+    case "risk-unagreed":
+      return "hidden with nobody agreeing";
     // The four things that are wrong because nothing has happened. Each says
     // what has stopped rather than what took place, which is what makes a row
     // of them read as a list of things to pick up.

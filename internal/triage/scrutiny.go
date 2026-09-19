@@ -432,17 +432,28 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 // the write path having been got around, and it is the one failure the record
 // cannot find on its own afterwards.
 //
-// **The three, and not everything that hides risk.** A deferral and a promise
-// to act hide risk too and are approved conditionally, on where the date sits
-// against the deadline already set — so one of those standing alone is the rule
-// working rather than failing, and counting it here would report a control as
-// broken on the ordinary case.
+// **A deferral and a promise to act are here too, but only where the gate
+// caught them.** Both hide risk and both are approved conditionally, on where
+// the date sits against the deadline already set — so a short deferral
+// standing alone is the rule working rather than failing. What tells the two
+// apart is the gate's own verdict, written onto the decision as it was
+// proposed: a deferral past the threshold needed a second person as surely as
+// a dismissal did, and left standing with nobody agreeing it is the same write
+// path got around. Asked as the outcome alone this saw none of them, and said
+// so in a design document.
 //
-// **Asked of the record rather than of a stored flag**, the same way the report
-// that shows these rows asks it: no approval from anybody other than the
-// proposer, and none taken back. A flag would be the row's own account of
-// itself, and the test that matters writes a self-approval straight to the
-// table.
+// **Whether somebody agreed is asked of the record, never of a flag.** No
+// approval from anybody other than the proposer, and none taken back, which is
+// the same question the report that shows these rows asks — the test that
+// matters writes a self-approval straight to the table, and a flag would be
+// the row's own account of itself.
+//
+// The gate's verdict is a flag, and it is read for the opposite half on
+// purpose. Nothing a caller passes reaches it: a proposal's own answer is
+// re-worked against the policy in force when the write lands. And the three
+// that dismiss are counted whatever it says, so a write path that got around
+// the gate by clearing it is still caught — the flag only ever widens the
+// question and never narrows it.
 //
 // Counted rather than listed, and unnarrowed. What it feeds is a condition told
 // to administrators, which carries the fact and a link and never the rows —
@@ -460,7 +471,10 @@ func (s *Store) HiddenWithNobodyAgreeing(ctx context.Context) (claims, rows int,
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
 		ColumnExpr(`COUNT(*) AS "written"`).
-		Where("cl.outcome IN (?)", bun.List([]Outcome{NotApplicable, WontFix, AlreadyFixed})).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.WhereOr("cl.outcome IN (?)", bun.List(OutcomesDismissing())).
+				WhereOr("de.needs_approval = ?", true)
+		}).
 		Where(standing, held...).
 		Where(standingAlone).
 		Scan(ctx, &counted)

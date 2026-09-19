@@ -8355,6 +8355,33 @@ components:
       required:
         - product_status
       type: object
+    VulnerabilityDataBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/VulnerabilityDataBody.json
+          format: uri
+          readOnly: true
+          type: string
+        moved_at:
+          description: "When the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"
+          format: date-time
+          type: string
+        stale:
+          description: Whether it has been that long. The same question the condition told to administrators asks
+          type: boolean
+        stale_after:
+          description: How long without moving counts as stopped, as this deployment has it set
+          type: string
+        version:
+          description: What the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said
+          type: string
+      required:
+        - stale_after
+        - stale
+      type: object
     WaitingBody:
       additionalProperties: false
       properties:
@@ -20678,6 +20705,37 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: "A person rather than a pipeline: a build server has no business asking what version is running."
+  /v1/vulnerability-data:
+    get:
+      description: |-
+        The vulnerability data version this deployment's scans are running against, and when it last moved.
+
+        **Nothing here is a version anybody can order.** What a scanner reports is an opaque string — a date for one, a schema revision and a build stamp for another — so the only question that can be asked of it is whether it changed. That is enough: what matters is that it moved, not which is newer.
+
+        `moved_at` is the most recent time any version was seen for the first time. A version that comes back was not a change the second time, which is what an air-gapped deployment re-importing an older bundle looks like.
+
+        Absent everywhere means nothing has finished a scan and stated a version, which is a deployment nobody has pointed at anything yet rather than data that has gone stale.
+
+        **Requires:** administrator
+      operationId: get-vulnerability-data
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VulnerabilityDataBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Show what the scans are answering against
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
   /v1/work/set-aside:
     get:
       description: |-

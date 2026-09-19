@@ -4412,6 +4412,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/vulnerability-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show what the scans are answering against
+         * @description The vulnerability data version this deployment's scans are running against, and when it last moved.
+         *
+         *     **Nothing here is a version anybody can order.** What a scanner reports is an opaque string — a date for one, a schema revision and a build stamp for another — so the only question that can be asked of it is whether it changed. That is enough: what matters is that it moved, not which is newer.
+         *
+         *     `moved_at` is the most recent time any version was seen for the first time. A version that comes back was not a change the second time, which is what an air-gapped deployment re-importing an older bundle looks like.
+         *
+         *     Absent everywhere means nothing has finished a scan and stated a version, which is a deployment nobody has pointed at anything yet rather than data that has gone stale.
+         *
+         *     **Requires:** administrator
+         */
+        get: operations["get-vulnerability-data"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/work/set-aside": {
         parameters: {
             query?: never;
@@ -9182,6 +9210,25 @@ export interface components {
             remediations?: components["schemas"]["Remediation"][] | null;
             scores?: components["schemas"]["Score"][] | null;
             title?: string;
+        };
+        VulnerabilityDataBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/VulnerabilityDataBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: date-time
+             * @description When the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change
+             */
+            moved_at?: string;
+            /** @description Whether it has been that long. The same question the condition told to administrators asks */
+            stale: boolean;
+            /** @description How long without moving counts as stopped, as this deployment has it set */
+            stale_after: string;
+            /** @description What the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said */
+            version?: string;
         };
         WaitingBody: {
             /**
@@ -16208,6 +16255,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Info"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-vulnerability-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VulnerabilityDataBody"];
                 };
             };
             /** @description Error */

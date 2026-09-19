@@ -150,56 +150,53 @@ filtered for what one person decided should return nothing, because every
 outcome that hides risk needs a second person; and the vulnerability data
 should never have stopped moving.
 
-**A report that is empty every time is one nobody opens.** Checked twice, seen
-to be empty, stopped — so it is read after something has gone wrong rather than
-before, which is the opposite of what it is for.
+Neither is a report anybody opens, and neither is mailed on a schedule.
 
-**Mailing it on a schedule fails whichever way it is sent.**
-
-| Sent | What silence means |
+| Shape | Why it fails |
 |---|---|
-| Only when it has something to say | Either the control held or the job did not run, and nothing tells the two apart |
-| Always | Fifty-one messages saying nothing teach somebody to filter the fifty-second |
+| A report to go and read | One that is empty every time is checked twice, seen to be empty, and stopped — so it is read after something has gone wrong rather than before, which is the opposite of what it is for |
+| Mailed only when it has something to say | Silence means either the control held or the job did not run, and nothing tells the two apart |
+| Mailed always | Fifty-one messages saying nothing teach somebody to filter the fifty-second |
 
-So they are conditions rather than reports that arrive. Nothing is sent while
-the control holds, and what is sent when it does not reaches somebody who was
-not looking.
+So they are conditions. Nothing is sent while the control holds, and what is
+sent when it does not reaches somebody who was not looking.
 
 | Condition | What is wrong |
 |---|---|
 | The vulnerability data has stopped moving | Nothing failed. Every scan since answers as confidently as ever against what was known a month ago, and a finding newer data would have opened has not |
-| Something is hidden with nobody's agreement | The three outcomes claiming no further work is needed each require a second person, so one standing alone means the write path was got around |
+| Something is hidden with nobody's agreement | Anything that hides risk needs a second person, so one standing with none means the write path was got around |
 
 Both go to administrators, like the other conditions about the deployment rather
-than about anybody's work, and both are asked as the deployment rather than as a
-person: administering grants no reading, so an administrator's own subject would
-answer about whichever products they happen to hold.
+than about anybody's work.
 
-**The fact and a link, never the rows.** One of these is a list of places a
-security control failed, and a condition carrying it would put that list wherever
-the channel goes. The count is what the message holds, which is also why the
-question underneath it returns counts rather than rows — the rule holds by
-construction rather than by a check on the way out.
+| Rule | Reason |
+|---|---|
+| The fact and a link, never the rows | One of these is a list of places a security control failed, and a condition carrying it would put that list wherever the channel goes |
+| The question underneath returns counts, not rows | So the rule above holds by construction rather than by a check on the way out |
+| Asked as the deployment, never as a person | Administering grants no reading, so an administrator's own subject would answer about whichever products they happen to hold |
 
-**Only the three outcomes that claim no further work is needed.** A deferral and
-a promise to act hide risk too, and are approved conditionally on where their
-date sits against the deadline already set — so one of those standing alone is
-the rule working, and counting it would report a broken control on the case it
-was built for. A claim still waiting for its second person is not this either: it
-suppresses nothing while it waits.
+### Hidden with nobody agreeing
 
-**The staleness check is inequality, never ordering.** What a scanner reports as
-its data version is opaque — a date for one, a schema revision and a build stamp
-for another — so the only question that can be asked is whether it is the same
-string as last time. That is enough: what matters is that it moved.
+| Rule | Reason |
+|---|---|
+| The three that claim no further work is needed are counted whatever else is recorded about them | It does not apply, it will not be fixed, the fix is already here. Each closes the question and nothing re-opens it, so each needs a second person — and counting them unconditionally means a write path that got around the gate by clearing its own flag is still caught |
+| A deferral or a promise to act counts where the gate asked for a second person | Both hide risk and both are approved conditionally, on where the date sits against the deadline already set. A short deferral standing alone is the rule working; one past the threshold needed agreement as surely as a dismissal did, and asking which outcome it was saw none of them |
+| The gate's verdict is read, never a caller's | A proposal's own answer is re-worked against the policy in force when the write lands, so nothing a caller asserts reaches the record |
+| Whether somebody agreed is asked of the record | No approval from anybody other than the proposer, and none taken back. A flag there would be the row's own account of itself, and the failure this exists to find is a row the write path should never have produced |
+| A claim still waiting for its second person is not this | It suppresses nothing and hides nothing while it waits, and somebody is looking at it |
+| Counted across every product and the whole record | The condition is about the deployment. What the report behind the link shows is narrowed to what its reader holds, so an administrator granted no product reads the count and an empty page — the same answer their dashboard gives, and the reason the link asks for everything rather than the quarter the sheet opens on |
 
-Measured from the first run carrying the version in force rather than the last,
-because the question is when the data changed. The condition holds under one key
-however the data moves: a deployment that fetched once and stalled again never
-stopped being stale, and a condition keyed on the version would clear and
-re-open while nothing had changed about it. What it says is rewritten as it
-changes, so the sentence names the data in force rather than the data the alert
-was first raised for.
+### Data that stopped moving
+
+| Rule | Reason |
+|---|---|
+| The check is inequality, never ordering | What a scanner reports as its data version is opaque — a date for one, a schema revision and a build stamp for another. Whether it is the same string as last time is the only question there is, and it is enough |
+| Only a finished run that stated a version counts | A run that failed says nothing about the data and one still going has not reported yet. A deployment that has never finished a scan has nothing to be stale, which is the quiet-build condition's question |
+| Measured from the most recent time any version was seen for the first time | A version that comes back was not a change the second time. Read instead as the first sighting of whichever version ran last, an air-gapped deployment re-importing an older bundle was told the data had not moved in seven months, and two replicas holding different versions made the condition hold on one sweep and not the next — a fresh unread alert for ever, which is what REQ-49 is about |
+| How long counts as stopped is a setting, shipping at a week | Long enough that a publisher having a slow few days is not an alert, short enough that a feed nobody fetches any more is noticed in the week it stopped |
+| One key however the data moves | A deployment that fetched once and stalled again never stopped being stale, and a key carrying the version would clear and re-open while nothing about it had changed. What the condition says is rewritten as it changes, so the sentence names the data in force rather than the data the alert was first raised for |
+| The version in force is read apart from when it last moved | They are answers to different questions, and one statement answering both is what made the age wrong |
+| The screen it links to shows both | Otherwise the link is the half that does not work: somebody told the data has stopped moving arrives at the job queue |
 
 ## Absent holders
 

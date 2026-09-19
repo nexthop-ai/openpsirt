@@ -404,11 +404,15 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 		}
 		where := row.Product + " " + row.Stream + " " + row.Variant
 		days := int(row.Since.Hours() / 24)
-		body := fmt.Sprintf("%s has not been scanned for %d days. Nothing has failed — "+
-			"nothing has arrived.", where, days)
+		// Put into words rather than printed, because "0 days" is what
+		// arithmetic gives for a threshold measured in hours and is not
+		// something anybody says. The quiet window is a setting and nothing
+		// stops a deployment scanning hourly from setting one.
+		body := fmt.Sprintf("%s has not been scanned for %s. Nothing has failed — "+
+			"nothing has arrived.", where, plainly(days))
 		if row.LastReceivedAt == nil {
-			body = fmt.Sprintf("%s was declared %d days ago and nothing has ever been "+
-				"filed against it.", where, days)
+			body = fmt.Sprintf("%s was declared %s ago and nothing has ever been "+
+				"filed against it.", where, plainly(days))
 		}
 		// Something did arrive and was turned away, which is the opposite of
 		// nothing having failed. This is the one surface that reaches a person
@@ -419,8 +423,8 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 			if row.RefusedBecause != nil {
 				why = ": " + *row.RefusedBecause
 			}
-			body = fmt.Sprintf("%s has not been scanned for %d days, and an upload "+
-				"against it was turned away on %s%s", where, days,
+			body = fmt.Sprintf("%s has not been scanned for %s, and an upload "+
+				"against it was turned away on %s%s", where, plainly(days),
 				row.LastRefusedAt.Format("2006-01-02"), why)
 		}
 		holding = append(holding, Holds{
