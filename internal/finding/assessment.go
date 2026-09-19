@@ -801,12 +801,12 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 // Consequence is what agreeing to a milder rating would do, beyond moving
 // things down a list.
 //
-// a downgrade needing a second person gates a downgrade on a second person because it pushes a deadline
-// out. Since a product may say what it considers worth triaging at all
-// , a downgrade that crosses that line does something different in
-// kind: the finding stops being work rather than becoming later work, and it
-// loses its deadline entirely. Those are two different things to
-// agree to, and an approver was told neither.
+// A downgrade is gated on a second person because it pushes a deadline out.
+// Since a product may say what it considers worth triaging at all, a downgrade
+// that crosses that line does something different in kind: the finding stops
+// being work rather than becoming later work, and it loses its deadline
+// entirely. Those are two different things to agree to, and without this an
+// approver is told neither.
 //
 // Counted inside the rating's own product. A rating reaches nothing outside
 // it, so a count that spanned products would describe work this decision does

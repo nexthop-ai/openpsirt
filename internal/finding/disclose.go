@@ -437,12 +437,12 @@ type Waiting struct {
 // Pending lists extension requests waiting for a second person, across every
 // product the subject may read undisclosed work in.
 //
-// **Narrowed in the query rather than afterwards.** The list is itself a
+// Narrowed in the query rather than afterwards. The list is itself a
 // disclosure: a row says an issue exists, is embargoed, and is being kept
-// hidden longer — which is the shape of thing a disclosure date escalating keeps out of every count
-// somebody may not see.
+// hidden longer — which is exactly what a visibility narrowing keeps out of
+// every count somebody may not see.
 //
-// **Their own requests are included.** They cannot agree to one and the
+// Their own requests are included. They cannot agree to one and the
 // endpoint refuses it, but a proposer looking for what is holding a case up
 // should not have their own request hidden from them — which is the opposite
 // of the review queue's rule, where the entry is work the reader might do.
