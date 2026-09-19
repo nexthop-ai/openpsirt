@@ -252,9 +252,8 @@ mean very different things (REQ-13).
 | By identifier | A published identifier compared against an upstream version range. It knows nothing about packaging, and a distribution backports fixes without moving the upstream version, so the match fires whether or not the patch is in. Neither confirmed nor refuted |
 
 That distinction is the first question anybody asks about a distribution's
-packages, and the scanner answers it in every result. It was being discarded,
-which left a finding nobody had confirmed looking exactly like one the packagers
-had.
+packages, and the scanner answers it in every result. Discarded, it leaves a
+finding nobody has confirmed looking exactly like one the packagers have.
 
 The range and the source are kept with the finding, because "somebody has to
 look" is easier to act on with the thing to look at in hand. Neither is compared
@@ -279,9 +278,10 @@ producer's own word. Recorded, and read by nothing that decides anything.
 | An SPDX 2 relationship type | `BUILD_DEPENDENCY_OF`, `DEV_DEPENDENCY_OF`, `RUNTIME_DEPENDENCY_OF` and `OPTIONAL_DEPENDENCY_OF`, recorded as `build`, `development`, `runtime` and `optional`. One fact under two spellings, and a filter cannot be made to ask for the same thing twice — so every relationship that names a phase is here, not a subset of them |
 
 "Not in the runtime path", "build-time only", "test-only" is the largest
-defensible deferral class a vendor has, and it was the one class this could not
-express: a component marked `excluded`, which the specification defines as not
-distributed, produced findings identical to one that ships.
+defensible deferral class a vendor has. Without the producer's declared scope
+it cannot be expressed at all: a component marked `excluded`, which the
+specification defines as not distributed, produces findings identical to one
+that ships.
 
 | Rule | Reason |
 |---|---|
@@ -426,9 +426,9 @@ somebody marking work done and the work being done. It needs evidence, and for a
 recorded flaw there is none: the one path that closes a finding is a scan
 applying what it found, and it passes over anything a person recorded.
 
-So the computation has no input, and what came of that was not "not yet resolved"
-but a finding that stayed open forever — a fix that shipped three releases ago
-still reading as present, invisibly.
+So the computation has no input, and what that produces is not "not yet
+resolved" but a finding that stays open for ever: a fix that shipped three
+releases ago still reading as present, invisibly.
 
 | Rule | Reason |
 |---|---|
@@ -457,7 +457,7 @@ first run after it is written — silently, with a closure reason reading as
 though the issue went away, and nothing reporting it.
 
 The kind exists ahead of the second thing to put in it for that reason: a model
-assuming every finding came from a scan could not take one that did not without
+assuming every finding came from a scan cannot take one that did not without
 changing how closure works.
 
 ## Interval storage
@@ -471,16 +471,16 @@ run for a timestamp.
 
 Three passes did the reaching, all as inner joins: the trend, the deadline
 rewrite when the policy changes, and the urgency recount when a rating moves. A
-finding with no run did not appear in any of them — not wrongly, but **absent**,
-which is the worse failure. A number that is wrong invites somebody to check it;
-a row that is missing looks like there was nothing to say.
+finding with no run appears in none of them — not wrongly, but absent, which is
+the worse failure. A number that is wrong invites somebody to check it; a row
+that is missing looks like there was nothing to say.
 
 Closure carries one more reason. Spelled as "a run closed this", the column
-saying a finding is over could only be filled by something that never looks at it,
-so a finding a run will never close could not be closed at all. The row carries
-the moment, and what closed it sits beside as provenance: the run, or the person
-and their reason. Every index that carried the run to answer "is this open"
-carries the moment instead.
+saying a finding is over can only be filled by something that never looks at
+it, so a finding a run will never close cannot be closed at all. The row
+carries the moment, and what closed it sits beside as provenance: the run, or
+the person and their reason. Every index answering "is this open" carries the
+moment rather than the run.
 
 The run is still recorded where there is one, and it is what "what did this run
 change" is counted by.
@@ -600,21 +600,21 @@ Some places approved and the rest never decided, with nothing waiting or lapsed,
 is none of the four: the row carries no state, and the interface labels it partly
 decided.
 
-Undecided is nothing standing, not nothing ever said. Reading it as "no decision
-row covers this place" left a withdrawn claim in no state at all — the row it
-leaves behind covers the place, deliberately, so that "lapsed" can be said about
-a claim holding no key. A finding somebody claimed and took back was neither
-undecided nor any of the other three, disappeared from the count above the list
-as well as from the list, and was never offered as work again. The product's own
-totals counted it the same way and agreed.
+Undecided is nothing standing, not nothing ever said. Read as "no decision row
+covers this place" it leaves a withdrawn claim in no state at all: the row a
+withdrawal leaves behind covers the place, deliberately, so that "lapsed" can
+be said about a claim holding no key. A finding somebody claimed and took back
+is then neither undecided nor any of the other three, disappears from the count
+above the list as well as from the list, and is never offered as work again —
+with the product's own totals counting it the same way and agreeing.
 
-The word on the row and the filter's own buckets are one rule, not two spellings
-of it. They came apart twice: the filter counted a place as waiting without
-asking whether the claim still held its key, while the row required it, so a
-claim proposed and withdrawn put its group in the waiting list with a blank
-state column; and the row asked "was anything ever said" for undecided where the
-filter asked "does anything stand", so the same group was undecided to one and
-nothing to the other. Both now ask the filter's question.
+The word on the row and the filter's own buckets are one rule, not two
+spellings of it. Two spellings come apart: a filter counting a place as waiting
+without asking whether the claim still holds its key, against a row that
+requires it, puts a claim proposed and withdrawn in the waiting list with a
+blank state column; and a row asking "was anything ever said" for undecided
+against a filter asking "does anything stand" makes one group undecided to one
+and nothing to the other. Both ask the filter's question.
 
 A live decision covers a place at the versions it was keyed on and no other.
 These counts match a live decision by product, issue, place and both versions,
@@ -821,8 +821,8 @@ be done rather than doing it.
 
 ## A year of nightly scans
 
-The interval storage was shaped so a rebuild changing nothing writes nothing, and
-a test asserts that. What nobody had checked was the shape after a year.
+The interval storage is shaped so a rebuild changing nothing writes nothing,
+and a test asserts that. The shape after a year is a separate question.
 
 The model, stated because every number depends on it: a build of 700 components,
 each sitting in 34 containers, so 23,800 places; 260 issues open at the start;
@@ -869,13 +869,12 @@ A quiet night issues **more** statements than the first — 1,699 against 1,077 
 because the first night is bulk inserts five hundred at a time and a quiet night
 is an update per finding that moved.
 
-The correction to the model says what that cost is made of. An earlier run
-applied twice the churn it documented and its figures were withdrawn rather than
-halved. Halving the churn halved MariaDB (0.64 s to 0.32 s) and cut PostgreSQL
-by a third (1.04 s to 0.67 s) — and moved MySQL by four percent, from 5.01 s to
-4.82 s. A cost that barely responds to how many rows changed is paid per
-statement, and the error did not scale the four engines alike, which is why the
-withdrawal was right.
+What that cost is made of is readable from how it responds to churn. Halving
+the churn halves MariaDB (0.64 s to 0.32 s) and cuts PostgreSQL by a third
+(1.04 s to 0.67 s), and moves MySQL by four percent, from 5.01 s to 4.82 s. A
+cost that barely responds to how many rows changed is paid per statement — and
+because churn does not scale the four engines alike, a run applying twice the
+churn it documents is withdrawn rather than halved.
 
 Two reads grow with the calendar rather than with a build:
 
@@ -898,8 +897,8 @@ identifiers in whichever order they reach the table, and "the newest upload this
 run covered" is a question about arrival. The runs are ordered by when they
 finished rather than by identifier, which is the order the page reads them in.
 
-What this does not measure: it was read as an administrator, who sees every
-product, so the queries ran with no narrowing by product — the cheapest plan
+What this does not measure. It is read as an administrator, who sees every
+product, so the queries run with no narrowing by product — the cheapest plan
 available. One build, not the several a deployment tracks. And it assumes a
 churn rate rather than observing one. `make measure` re-runs it, and the
 constants at the top of the harness are the model.
@@ -918,9 +917,9 @@ the list itself pages through.
 
 ## The severity ladder
 
-The severity words were written out ten times under seven names, with three
-different memberships. Three copies of an ordering is three chances for a word
-added to one to be missing from the others.
+The severity words are one list in one place. Written out per reader they
+acquire names and memberships of their own, and a copy of an ordering is a
+chance for a word added to one to be missing from the others.
 
 | List | Purpose |
 |---|---|
@@ -996,32 +995,13 @@ question next year should find the answer rather than the question.
 
 ## Limits
 
-- Incomplete upgrades are stated as inequality, not ordering. Saying that a
-  version moved and is still not the one that fixes it needs no comparison, and
-  the fixed-in field is free text and is sometimes a list. An ordering exists
-  for four ecosystems and refuses the rest — `DESIGN-remediation.md` § Ordering
-  the versions a scanner named holds it — and it is used to rank a set of
-  candidates rather than to decide what a finding says.
-- The inverse is not detected. A component at or past the named fix while the
-  scanner still reports the issue would mean the scanner and the fix data
-  disagree. Deciding that needs an ordering for the ecosystem in hand, which
-  there is for four of them and not for the others, so it is not asked at all
-  rather than asked where it happens to be answerable.
-- A component nothing leads to still has a place — itself. It ships, and an
-  incomplete graph is normal.
-- Severity is stored on the issue, fix state on the finding. Severity is a
-  property of the vulnerability; whether a fix exists is a property of the
-  version in front of you.
-- A place under the product records no consumer at all, rather than recording
-  the root and excluding it later. The root's name differs per variant, and a
-  key that has to be remembered to ignore is one somebody will forget.
-- A derived address refuses a name that is nothing but dots, rather than
-  escaping it. A name and a version become path segments, and "." and ".." are
-  resolved by the browser before the request leaves it. Everything else,
-  separators included, is escaped into its segment (REQ-66).
-- An identifier is matched against an anchored scheme before it resolves. A
-  flaw this deployment recorded is filed under a name it minted, and a loose
-  match would send somebody to a public page about something else.
-- A package kind nothing here knows produces no link. A link that lands on the
-  wrong thing costs more than no link, because it is followed before it is
-  disbelieved.
+| Limit | Detail |
+|---|---|
+| Incomplete upgrades are stated as inequality, not ordering | Saying that a version moved and is still not the one that fixes it needs no comparison, and the fixed-in field is free text and is sometimes a list. An ordering exists for four ecosystems and refuses the rest — `DESIGN-remediation.md` § Version ordering holds it — and it ranks a set of candidates rather than deciding what a finding says |
+| The inverse is not detected | A component at or past the named fix while the scanner still reports the issue means the scanner and the fix data disagree. Deciding that needs an ordering for the ecosystem in hand, which exists for four of them, so it is not asked at all rather than asked where it happens to be answerable |
+| A component nothing leads to still has a place — itself | It ships, and an incomplete graph is normal |
+| Severity is stored on the issue, fix state on the finding | Severity is a property of the vulnerability; whether a fix exists is a property of the version in front of you |
+| A place under the product records no consumer at all | Rather than recording the root and excluding it later. The root's name differs per variant, and a key that has to be remembered to ignore is one somebody will forget |
+| A derived address refuses a name that is nothing but dots, rather than escaping it | A name and a version become path segments, and "." and ".." are resolved by the browser before the request leaves it. Everything else, separators included, is escaped into its segment (REQ-66) |
+| An identifier is matched against an anchored scheme before it resolves | A flaw this deployment recorded is filed under a name it minted, and a loose match sends somebody to a public page about something else |
+| A package kind nothing here knows produces no link | A link that lands on the wrong thing costs more than no link, because it is followed before it is disbelieved |
