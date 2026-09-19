@@ -42,7 +42,7 @@ true is cleared, and running the same pass twice changes nothing.
 |---|---|
 | A condition that returns is a new row, not an edit of an old one | It makes "this cleared, then came back" visible |
 | Acknowledging a condition hides it rather than resolving it | The thing it is about is still true. Worth offering because somebody may have decided to live with it, and worth distinguishing on screen |
-| A standing condition states what is true now, not what was true when it opened | A condition's sentence carries a count, and the row was written once and left alone, so a queue that grew overnight reported the number it had when somebody first looked. The row stays the same row; the sentence changes |
+| A standing condition states what is true now | A condition's sentence carries a count, and a row written once and left alone reports the number it had when somebody first looked. The row stays the same row and the sentence changes |
 | Derived every sweep and never remembered | The alternative needs every path that approves, withdraws, sends back or lapses a claim to clear a notification. The one that forgets leaves somebody told about work that finished a month ago |
 
 ## Triggers and kinds
@@ -192,10 +192,10 @@ than about anybody's work.
 |---|---|
 | The check is inequality, never ordering | What a scanner reports as its data version is opaque — a date for one, a schema revision and a build stamp for another. Whether it is the same string as last time is the only question there is, and it is enough |
 | Only a finished run that stated a version counts | A run that failed says nothing about the data and one still going has not reported yet. A deployment that has never finished a scan has nothing to be stale, which is the quiet-build condition's question |
-| Measured from the most recent time any version was seen for the first time | A version that comes back was not a change the second time. Read instead as the first sighting of whichever version ran last, an air-gapped deployment re-importing an older bundle was told the data had not moved in seven months, and two replicas holding different versions made the condition hold on one sweep and not the next — a fresh unread alert for ever, which is what REQ-49 is about |
+| Measured from the most recent time any version was seen for the first time | A version that comes back was not a change the second time. Read instead as the first sighting of whichever version ran last, an air-gapped deployment re-importing an older bundle is told the data has not moved in seven months, and two replicas holding different versions make the condition hold on one sweep and not the next — a fresh unread alert for ever, which is what REQ-49 is about |
 | How long counts as stopped is a setting, shipping at a week | Long enough that a publisher having a slow few days is not an alert, short enough that a feed nobody fetches any more is noticed in the week it stopped |
 | One key however the data moves | A deployment that fetched once and stalled again never stopped being stale, and a key carrying the version would clear and re-open while nothing about it had changed. What the condition says is rewritten as it changes, so the sentence names the data in force rather than the data the alert was first raised for |
-| The version in force is read apart from when it last moved | They are answers to different questions, and one statement answering both is what made the age wrong |
+| The version in force is read apart from when it last moved | They are answers to different questions, and one statement answering both gets the age wrong |
 | The screen it links to shows both | Otherwise the link is the half that does not work: somebody told the data has stopped moving arrives at the job queue |
 
 ## Absent holders
@@ -224,8 +224,8 @@ not a name.
 ## Claim outcomes
 
 Approval stays silent. The gap silence leaves is closed with a view rather than
-more mail, and that requires the view to record outcomes — both of the queue's
-tabs showed pending work, so approved, withdrawn, lapsed and undone all presented
+more mail, and that requires the view to record outcomes. A queue whose tabs
+show only pending work presents approved, withdrawn, lapsed and undone
 identically, as the row disappearing.
 
 The view carries what happened, as a separate question asked by a separate
@@ -250,8 +250,8 @@ having taken a judgment out of force.
 The lapse message is wired at the deployment rather than inside the scan. What a
 scan does and how anybody hears about it are separate concerns, and this package
 reads what has been ingested, so a scanner reaching it directly would close a
-cycle. It links to the decision rather than the finding, because naming the
-finding needs somebody to read it as and nobody is acting.
+cycle. It links to the decision rather than the finding, because naming the finding
+needs somebody to read it as, and nobody is acting.
 
 ## The digest
 
@@ -274,11 +274,11 @@ what somebody may do, not what they want to read.
 |---|---|
 | Assembled as its reader | Every query narrows by the subject it is handed. The sweep holds no rights of its own |
 | Nothing is repeated | An event records what it was about, kept apart from the name a condition clears against, which is a uniqueness key and would deduplicate two unrelated events into one |
-| It pages past what it has already said | Filtering one page rather than paging until enough survive gave a holder with a page's worth of already-told items an empty digest. Routed work arrives deliberately without a message, so the digest is the only place it is named |
+| It pages past what it has already said | Filtering one page rather than paging until enough survive gives a holder with a page's worth of already-told items an empty digest. Routed work arrives deliberately without a message, so the digest is the only place it is named |
 | A digest with nothing in it is not sent, and the clock still moves | A daily "nothing" is how somebody stops opening the daily message. Leaving the mark unmoved would make a quiet week report itself as new the following Monday |
 | A first digest reports nothing under "nobody owns" | There is no "since" to measure against |
 | **"Nobody owns" is about the assignee alone** | It counts what is open and unassigned, including what somebody has claimed and what is waiting for approval — 8,400 rows against 7,471 for the equivalent findings narrowing on one real build, with a pending approval at the top. Narrowing it would change what people are sent, so the screen asking the same question narrows its own list instead and counts from that |
-| One message is bounded, **and says so** | What is over the bound stays in the application, and the message says how many of how many it listed. Without that a holder of four hundred things read "fifty pieces of work assigned to you" as a statement of fact, with nothing to tell it apart from a message about fifty |
+| One message is bounded, and says so | What is over the bound stays in the application, and the message says how many of how many it listed. Without that a holder of four hundred things reads "fifty pieces of work assigned to you" as a statement of fact, with nothing to tell it apart from a message about fifty |
 
 It names what has been disclosed and gives numbers for what has not. A public
 finding is listed with its issue, component and build. Undisclosed ones become a
@@ -357,20 +357,20 @@ of this table's rules are.
 | Rule | Reason |
 |---|---|
 | Read and cleared rows are included | The question is what was sent, not what is waiting. A line already acknowledged is still a line they were sent |
-| Narrowed by what the reader may see, and the administrator flag is not a way to see more | The flag decides who may ask a question about somebody else's list; the rows that come back are the ones the asker could read on their own account, count included. Granting themselves the product reaches the same rows and lands in the administrative record, where this read left nothing — so the two are not equivalent and the cheaper of them was the silent one |
+| Narrowed by what the reader may see, and the administrator flag is not a way to see more | The flag decides who may ask a question about somebody else's list; the rows that come back are the ones the asker could read on their own account, count included. Granting themselves the product reaches the same rows and lands in the administrative record, which this read does not — so the two are not equivalent, and the cheaper of them would be the silent one |
 
 ## Delivery
 
 | Rule | Reason |
 |---|---|
 | A sweep reconciles everybody it has told, not only everybody it should tell | Reconcile makes one person's open set exactly what it is handed, so somebody never handed a list is never reconciled and their alert stands after the thing was answered. This arises the moment who hears about something depends on who holds it |
-| Who it has told is read for the kind being derived | Two conditions one argument apart read the same list, so for one of them anybody who was neither an administrator nor currently holding the thing was never handed a list and never reconciled. The list is one call for every condition now, which is what stops a third from spelling it a third way |
-| A sweep with no administrator recorded still derives everything that is not an administrator's | Returning early skipped the nine per-person conditions as well, so every alert a triager held stood with nothing able to resolve it. Only the two conditions addressed to administrators alone depend on there being one |
+| Who it has told is read for the kind being derived | Two conditions one argument apart reading the same list leaves anybody who is neither an administrator nor currently holding the thing never handed a list and never reconciled. One call for every condition is what stops a third from spelling it a third way |
+| A sweep with no administrator recorded still derives everything that is not an administrator's | Returning early skips the per-person conditions as well, and every alert a triager holds then stands with nothing able to resolve it. Only the conditions addressed to administrators alone depend on there being one |
 | Nobody is told they were unassigned | A name being removed is not an action directed at the person who held it, and a queue that gets shorter says so already |
 | A failure to tell somebody is logged, not returned | The assignment happened and the claim was sent back; answering the caller with an error invites a retry that does the first thing twice |
 | More than one process sweeps | The chart ships two replicas, each running its own watch. The unique index makes a duplicate one row, and the pass treats a duplicate as the answer already being there — without that it would abort, and every administrator after the one it failed on would be told nothing that cycle |
-| **A duplicate is recognized as one, and every other failure is reported** | Read as "somebody has this one" whatever went wrong, a lost connection during a sweep answered "already claimed" for every destination and the cycle reported nothing sent and nothing failed — which is what a quiet queue looks like too, so an operator could not tell them apart |
-| **A sweep's lease covers a cycle of the work, not the gap between cycles** | The lease is not renewed while the work runs, which is what its own contract says: taken for the interval instead, a batch of two hundred messages to a server answering slowly outlived it by an hour, a second replica took it, read the same rows and sent every one of them again — because what marks a message sent is written after each individual send. Sized from the batch and what one message may take |
+| **A duplicate is recognized as one, and every other failure is reported** | Read as "somebody has this one" whatever went wrong, a lost connection during a sweep answers "already claimed" for every destination and the cycle reports nothing sent and nothing failed — which is what a quiet queue looks like, so an operator cannot tell them apart |
+| **A sweep's lease covers a cycle of the work, not the gap between cycles** | The lease is not renewed while the work runs, which is what its own contract says. Taken for the interval instead, a batch of two hundred messages to a server answering slowly outlives it, a second replica takes it, reads the same rows and sends every one again — because what marks a message sent is written after each individual send. Sized from the batch and what one message may take |
 
 ## Mail
 
@@ -381,11 +381,11 @@ channel there will be. Mail carries the markdown as its text part.
 |---|---|
 | What is unsent is the work list | A sweep reads notifications nobody has carried out yet, sends them, and marks them. A failed message needs no state of its own; a deployment that configures mail after a week finds the week waiting |
 | A condition the application has withdrawn is not carried | The area inside the application stops showing it, so a message about it arrives with nothing to reconcile it against — and for a private condition the message says only that there is something undisclosed needing attention, which is a message about nothing at all |
-| A server and somebody to send as are configured together or not at all | Half of the pair answered as no mail configured, which is a choice an operator is entitled to make and is indistinguishable from the mistake. Refused at startup, and which of the two the process got is logged |
+| A server and somebody to send as are configured together or not at all | Half of the pair reads as no mail configured, which is a choice an operator is entitled to make and is indistinguishable from the mistake. Refused at startup, and which of the two the process got is logged |
 | Tried five times, then left alone | A mailbox that refuses every time has gone. The row stays unsent and stays readable |
 | Somebody with no address is sent nothing | Expressed in the query rather than the loop, so a deployment where nobody has one does no work |
 | Credentials are refused over a connection the server would not secure | The sweep offers STARTTLS and will not send a password without it |
-| Nothing logs the password, and nothing redacts it | A formatter that redacted the configuration was written and removed by the gate refusing exported code nothing reaches. If anything ever formats the configuration, the redaction goes in with it |
+| Nothing logs the password, and nothing redacts it | There is nothing to redact while nothing formats the configuration. If anything ever does, the redaction goes in with it |
 
 ## Outbound HTTP
 
@@ -409,8 +409,8 @@ request-forgery primitive unless governed (REQ-69):
 | What it carries is what the channel rules already allow | Composed by the same code that composes a mail, the address included. A rule enforced in two places is enforced in one and a half, and the address is the part a channel would otherwise build for itself |
 | Tracked per destination and per thing said, not per notification | A condition is opened once for every person who should hear it, and a channel wants it once. An event has no such identity and is tracked by its own |
 | The claim is staked before the request is made | A row with no sent-at stops a second replica, or the next sweep, sending the same thing while the first is in flight |
-| What a sweep reads is what this destination has not settled | Read as "everything not cleared", the window was the oldest two hundred — and an event is never cleared, because only a condition is. So once two hundred events existed the same two hundred were re-read every cycle and nothing created afterwards was ever carried, with no error, no log and no counter |
-| A destination's kind is normalized where it is written | It was stored as typed and compared loosely, so a destination added under one spelling was retired by another only by accident — and a destination believed retired goes on receiving everything it takes, undisclosed findings included |
+| What a sweep reads is what this destination has not settled | Read as "everything not cleared", the window is the oldest two hundred, and an event is never cleared because only a condition is. Past two hundred events the same two hundred are re-read every cycle and nothing created afterwards is ever carried, with no error, no log and no counter |
+| A destination's kind is normalized where it is written | Stored as typed and compared loosely, a destination added under one spelling is retired by another only by accident, and one believed retired goes on receiving everything it takes, undisclosed findings included |
 | Reading and changing where things go is refused in the data layer | It is this table's own rule and the rest of them live there (REQ-42 and REQ-43). What an operator's question needs is named field by field rather than embedding the row, so the signing secret cannot reach a caller that forgets to drop it |
 
 ## Embargo notices
