@@ -25,7 +25,7 @@
     
     
       
-        <title>Sending a build - OpenPSIRT</title>
+        <title>Build pipelines - OpenPSIRT</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#sending-a-builds-inventory" class="md-skip">
+        <a href="#build-pipelines" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Sending a build
+              Build pipelines
             
           </span>
         </div>
@@ -292,7 +292,7 @@
   <span class="md-ellipsis">
     
   
-    What is built
+    Current state
   
 
     
@@ -319,7 +319,7 @@
   <span class="md-ellipsis">
     
   
-    Trying it
+    Evaluation
   
 
     
@@ -355,7 +355,7 @@
   <span class="md-ellipsis">
     
   
-    Sending a build
+    Build pipelines
   
 
     
@@ -373,7 +373,7 @@
   <span class="md-ellipsis">
     
   
-    Sending a build
+    Build pipelines
   
 
     
@@ -399,10 +399,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-has-to-exist-first" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What has to exist first
+        Prerequisites
       
     </span>
   </a>
@@ -410,10 +410,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#minting-a-key" class="md-nav__link">
+  <a href="#the-pipeline-key" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Minting a key
+        The pipeline key
       
     </span>
   </a>
@@ -421,10 +421,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sending-the-inventory" class="md-nav__link">
+  <a href="#the-upload" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sending the inventory
+        The upload
       
     </span>
   </a>
@@ -432,10 +432,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finding-out-what-happened" class="md-nav__link">
+  <a href="#the-result" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Finding out what happened
+        The result
       
     </span>
   </a>
@@ -465,10 +465,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-pipeline-is-not-asked-to-do" class="md-nav__link">
+  <a href="#out-of-a-pipelines-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What a pipeline is not asked to do
+        Out of a pipeline's scope
       
     </span>
   </a>
@@ -591,10 +591,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-has-to-exist-first" class="md-nav__link">
+  <a href="#prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What has to exist first
+        Prerequisites
       
     </span>
   </a>
@@ -602,10 +602,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#minting-a-key" class="md-nav__link">
+  <a href="#the-pipeline-key" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Minting a key
+        The pipeline key
       
     </span>
   </a>
@@ -613,10 +613,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sending-the-inventory" class="md-nav__link">
+  <a href="#the-upload" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sending the inventory
+        The upload
       
     </span>
   </a>
@@ -624,10 +624,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finding-out-what-happened" class="md-nav__link">
+  <a href="#the-result" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Finding out what happened
+        The result
       
     </span>
   </a>
@@ -657,10 +657,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-a-pipeline-is-not-asked-to-do" class="md-nav__link">
+  <a href="#out-of-a-pipelines-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What a pipeline is not asked to do
+        Out of a pipeline's scope
       
     </span>
   </a>
@@ -687,12 +687,12 @@
   
 
 
-<h1 id="sending-a-builds-inventory">Sending a build's inventory<a class="headerlink" href="#sending-a-builds-inventory" title="Permanent link">&para;</a></h1>
+<h1 id="build-pipelines">Build pipelines<a class="headerlink" href="#build-pipelines" title="Permanent link">&para;</a></h1>
 <p>What a build pipeline does, end to end. Everything here is one HTTP request;
 there is no client to install and no agent to run.</p>
-<p>The short version: <strong>declare what you ship once, mint a key once, and post the
-inventory on every build.</strong></p>
-<h2 id="what-has-to-exist-first">What has to exist first<a class="headerlink" href="#what-has-to-exist-first" title="Permanent link">&para;</a></h2>
+<p>The short version: declare what you ship once, mint a key once, and post the
+inventory on every build.</p>
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>A scan is filed against a product, a stream and a variant, and an upload naming
 something undeclared is refused — the error says which part is missing. That is
 deliberate: a typo in a pipeline would otherwise create a fourth product nobody
@@ -722,7 +722,7 @@ meant, and the first anybody would know is a screen with four of everything.</p>
 <p>Declaring is three requests, and you make them once rather than per build.
 Each is administration, so each needs an administrator — a pipeline's key
 cannot declare anything.</p>
-<p><strong>Scripting these needs an <code>Origin</code> header.</strong> A write arriving with no session
+<p>Scripting these needs an <code>Origin</code> header. A write arriving with no session
 of ours behind it is guarded against forgery by the origin it states, so a
 request made from a shell through a trusted-header proxy is refused as "not
 from a page this deployment served" until it says where it came from. Add
@@ -745,7 +745,7 @@ curl -X POST &quot;$OPENPSIRT/v1/products/sonic/variants&quot; \
   -H 'Content-Type: application/json' \
   -d '{&quot;name&quot;: &quot;v2.4.1&quot;, &quot;kind&quot;: &quot;tag&quot;, &quot;parent&quot;: &quot;main&quot;}'
 </code></pre>
-<h2 id="minting-a-key">Minting a key<a class="headerlink" href="#minting-a-key" title="Permanent link">&para;</a></h2>
+<h2 id="the-pipeline-key">The pipeline key<a class="headerlink" href="#the-pipeline-key" title="Permanent link">&para;</a></h2>
 <p>A pipeline authenticates with an API key, which is a credential rather than a
 person: it may file scans and it holds none of a person's rights.</p>
 <pre><code class="language-bash">curl -X POST &quot;$OPENPSIRT/v1/keys&quot; \
@@ -753,7 +753,7 @@ person: it may file scans and it holds none of a person's rights.</p>
   -H 'Content-Type: application/json' \
   -d '{&quot;name&quot;: &quot;sonic-ci&quot;, &quot;product&quot;: &quot;sonic&quot;}'
 </code></pre>
-<p><strong>A key is scoped to one product</strong>, which is required rather than optional, and
+<p>A key is scoped to one product, which is required rather than optional, and
 may be narrowed further to one stream and one variant. So a deployment shipping
 three products has three keys, and a key that leaks reaches one of them.</p>
 <p>The secret comes back once in <code>item.secret</code>, begins <code>opk_</code>, and is stored hashed — a credential
@@ -766,7 +766,7 @@ another, and one that could would outlive the person who made it.</p>
 against it is not, so a person holds nothing on a product until somebody grants
 it — but a key carries the product it was made for, so a pipeline needs no
 grant of its own.</p>
-<h2 id="sending-the-inventory">Sending the inventory<a class="headerlink" href="#sending-the-inventory" title="Permanent link">&para;</a></h2>
+<h2 id="the-upload">The upload<a class="headerlink" href="#the-upload" title="Permanent link">&para;</a></h2>
 <p>Your build already produces an SBOM. Send it.</p>
 <pre><code class="language-bash">curl -X POST \
   &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans&quot; \
@@ -791,11 +791,11 @@ grant of its own.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>A 202 means accepted, not valid.</strong> The documents are parsed afterwards, so the
+<p>A 202 means accepted, not valid. The documents are parsed afterwards, so the
 response says the upload arrived and nothing about whether it could be read.
 That is the one thing to get right in a pipeline: a green step here is not a
 green scan.</p>
-<h2 id="finding-out-what-happened">Finding out what happened<a class="headerlink" href="#finding-out-what-happened" title="Permanent link">&para;</a></h2>
+<h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Permanent link">&para;</a></h2>
 <p>Poll the scans for that build.</p>
 <pre><code class="language-bash">curl -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
   &quot;$OPENPSIRT/v1/products/sonic/streams/main/variants/broadcom/scans&quot;
@@ -838,13 +838,13 @@ only failing the step.</p>
         -H &quot;Authorization: Bearer $OPENPSIRT_KEY&quot; \
         -F &quot;inventory=@sbom.cdx.json&quot;
 </code></pre>
-<p>Naming the stream from <code>$CI_COMMIT_BRANCH</code> is the shape that bites: <strong>the
-stream has to have been declared.</strong> A pipeline running on a branch nobody
+<p>Naming the stream from <code>$CI_COMMIT_BRANCH</code> is the shape that bites: the
+stream has to have been declared. A pipeline running on a branch nobody
 declared is refused, every build, until somebody declares it — and the refusal
 says which part is missing rather than making you guess:</p>
 <pre><code>404  product &quot;sonic&quot;: stream &quot;nobody-declared-this&quot;: not declared
 </code></pre>
-<h2 id="what-a-pipeline-is-not-asked-to-do">What a pipeline is not asked to do<a class="headerlink" href="#what-a-pipeline-is-not-asked-to-do" title="Permanent link">&para;</a></h2>
+<h2 id="out-of-a-pipelines-scope">Out of a pipeline's scope<a class="headerlink" href="#out-of-a-pipelines-scope" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>

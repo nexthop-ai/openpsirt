@@ -316,10 +316,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-it-does" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What it does
+        Scope
       
     </span>
   </a>
@@ -327,10 +327,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-it-does-not-do" class="md-nav__link">
+  <a href="#out-of-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What it does not do
+        Out of scope
       
     </span>
   </a>
@@ -372,10 +372,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-is-tracked" class="md-nav__link">
+  <a href="#the-tracked-unit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What is tracked
+        The tracked unit
       
     </span>
   </a>
@@ -471,10 +471,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#running-it" class="md-nav__link">
+  <a href="#operation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Running it
+        Operation
       
     </span>
   </a>
@@ -487,10 +487,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#where-to-go-next" class="md-nav__link">
+  <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where to go next
+        Next steps
       
     </span>
   </a>
@@ -519,7 +519,7 @@
   <span class="md-ellipsis">
     
   
-    What is built
+    Current state
   
 
     
@@ -546,7 +546,7 @@
   <span class="md-ellipsis">
     
   
-    Trying it
+    Evaluation
   
 
     
@@ -573,7 +573,7 @@
   <span class="md-ellipsis">
     
   
-    Sending a build
+    Build pipelines
   
 
     
@@ -694,10 +694,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-it-does" class="md-nav__link">
+  <a href="#scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What it does
+        Scope
       
     </span>
   </a>
@@ -705,10 +705,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-it-does-not-do" class="md-nav__link">
+  <a href="#out-of-scope" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What it does not do
+        Out of scope
       
     </span>
   </a>
@@ -750,10 +750,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#what-is-tracked" class="md-nav__link">
+  <a href="#the-tracked-unit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What is tracked
+        The tracked unit
       
     </span>
   </a>
@@ -849,10 +849,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#running-it" class="md-nav__link">
+  <a href="#operation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Running it
+        Operation
       
     </span>
   </a>
@@ -865,10 +865,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#where-to-go-next" class="md-nav__link">
+  <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where to go next
+        Next steps
       
     </span>
   </a>
@@ -910,235 +910,234 @@ somewhere to triage what it finds and follow it through to a fix.</p>
 an upgrade may mean recreating the database. What is here describes the
 system as it is being built, and changes as it is.</p>
 </div>
-<h2 id="what-it-does">What it does<a class="headerlink" href="#what-it-does" title="Permanent link">&para;</a></h2>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Takes in inventories</strong> pushed by build pipelines, in CycloneDX or SPDX
- form, along with the suppressions the build carries patches for</li>
-<li><strong>Runs the scan here</strong>, not in the build, so every product is measured
- against the same scanner and the same vulnerability data</li>
-<li><strong>Keeps the dependency graph</strong>, so you can see why a vulnerable component is
- present and which part of the product pulled it in</li>
-<li><strong>Tracks change over time</strong> per release, and works out why a finding
- disappeared rather than guessing</li>
-<li><strong>Carries triage decisions forward</strong>, so a nightly scan does not reset the work</li>
-<li><strong>Rescans shipped releases</strong>, so a vulnerability published after a release
- still gets found</li>
-<li><strong>Reports</strong> on what was fixed between releases, what was dismissed and why,
- what is running out of time, and whether the team is keeping pace</li>
+<li>Takes in inventories pushed by build pipelines, in CycloneDX or SPDX form,
+  along with the suppressions the build carries patches for</li>
+<li>Runs the scan here, not in the build, so every product is measured against
+  the same scanner and the same vulnerability data</li>
+<li>Keeps the dependency graph, so you can see why a vulnerable component is
+  present and which part of the product pulled it in</li>
+<li>Tracks change over time per release, and works out why a finding disappeared
+  rather than guessing</li>
+<li>Carries triage decisions forward, so a nightly scan does not reset the work</li>
+<li>Rescans shipped releases, so a vulnerability published after a release still
+  gets found</li>
+<li>Reports on what was fixed between releases, what was dismissed and why, what
+  is running out of time, and whether the team is keeping pace</li>
 </ul>
-<h2 id="what-it-does-not-do">What it does not do<a class="headerlink" href="#what-it-does-not-do" title="Permanent link">&para;</a></h2>
+<h2 id="out-of-scope">Out of scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Generate SBOMs — your build does that</li>
 <li>Work out what is in a product — the component list always comes from the build</li>
 <li>Build or deploy fixes</li>
 </ul>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
-<p>What the tool is specified to do. <a href="built/">What is built</a> says how far
+<p>What the tool is specified to do. <a href="built/">Current state</a> says how far
 each area has got, and <a href="https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md">REQUIREMENTS.md</a> carries the reasoning
 behind every line of it.</p>
 <h3 id="ingest">Ingest<a class="headerlink" href="#ingest" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Inventories arrive from the build</strong>, in CycloneDX form, one adapter per
- producer. A vulnerability report or a third party's VEX document may be
- uploaded alongside. SPDX is intended and not built</li>
-<li><strong>An upload is accepted, queued and answered later.</strong> A scan applies whole or
- changes nothing, and only a scan newer than the state it replaces is taken</li>
-<li><strong>Releases and variants are declared before a scan may name one</strong>, so a
- misspelled release is rejected rather than quietly created</li>
-<li><strong>Identity is derived from content.</strong> Nothing a scan file supplies is trusted
- to be stable between builds or consistent between producers</li>
-<li><strong>Sized against the largest real input</strong> rather than the average: one
- pipeline spans a thousandfold, and nightly branch scans are transient where
- tagged releases are retained and can be fetched back</li>
+<li>Inventories arrive from the build, in CycloneDX, SPDX 2.x or SPDX 3.x form,
+  one adapter per producer. A vulnerability report or a third party's VEX
+  document may be uploaded alongside. The document says which format it is and
+  the reader is chosen from that, so one upload takes any of them</li>
+<li>An upload is accepted, queued and answered later. A scan applies whole or
+  changes nothing, and only a scan newer than the state it replaces is taken</li>
+<li>Releases and variants are declared before a scan may name one, so a
+  misspelled release is rejected rather than quietly created</li>
+<li>Identity is derived from content. Nothing a scan file supplies is trusted to
+  be stable between builds or consistent between producers</li>
+<li>Sized against the largest real input rather than the average: one pipeline
+  spans a thousandfold, and nightly branch scans are transient where tagged
+  releases are retained and can be fetched back</li>
 </ul>
 <h3 id="scanning">Scanning<a class="headerlink" href="#scanning" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>The deployment runs the scan</strong>, on a schedule, for everything it tracks —
- so every product is measured against the same scanner and the same
- vulnerability data</li>
-<li><strong>The component list always comes from the build.</strong> We re-scan; we do not
- discover</li>
-<li><strong>A build's own suppressions are applied and never re-decided</strong></li>
-<li><strong>The scanner, its vulnerability database and the exploitation feeds all work
- with no network</strong>, so a scan answers the same way twice and no content network
- sits in the path it is available through. An air-gapped install uses the same
- path as any other</li>
-<li><strong>Every finding records what produced it</strong> — which scanner, which version,
- which database, and how the match was made</li>
-<li><strong>OpenPSIRT publishes an inventory of itself</strong>, of the binary and of the
- image, and scans itself with them</li>
+<li>The deployment runs the scan, on a schedule, for everything it tracks — so
+  every product is measured against the same scanner and the same vulnerability
+  data</li>
+<li>The component list always comes from the build. We re-scan; we do not
+  discover</li>
+<li>A build's own suppressions are applied and never re-decided</li>
+<li>The scanner, its vulnerability database and the exploitation feeds all work
+  with no network, so a scan answers the same way twice and no content network
+  sits in the path it is available through. An air-gapped install uses the same
+  path as any other</li>
+<li>Every finding records what produced it — which scanner, which version, which
+  database, and how the match was made</li>
+<li>OpenPSIRT publishes an inventory of itself, of the binary and of the image,
+  and scans itself with them</li>
 </ul>
-<h3 id="what-is-tracked">What is tracked<a class="headerlink" href="#what-is-tracked" title="Permanent link">&para;</a></h3>
+<h3 id="the-tracked-unit">The tracked unit<a class="headerlink" href="#the-tracked-unit" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>The tracked unit is a product, a branch or tag, and a variant.</strong> A release
- carries a reversible end-of-life date, past which nothing is deleted or hidden</li>
-<li><strong>The dependency graph is kept as nodes and edges</strong> and walked when asked,
- never flattened: one shared library was 49,170 flattened paths against 48
- direct consumers</li>
-<li><strong>A finding is one component at one place in one build.</strong> Twelve places is
- twelve findings, and grouping is presentation only</li>
-<li><strong>An issue is one issue across every name it goes by</strong>, and everything each
- report said about it is kept rather than overwritten</li>
-<li><strong>A flaw in our own product is recorded by hand</strong>, under an identifier this
- deployment mints, against every build that ships it</li>
+<li>The tracked unit is a product, a branch or tag, and a variant. A release
+  carries a reversible end-of-life date, past which nothing is deleted or
+  hidden</li>
+<li>The dependency graph is kept as nodes and edges and walked when asked, never
+  flattened: one shared library was 49,170 flattened paths against 48 direct
+  consumers</li>
+<li>A finding is one component at one place in one build. Twelve places is twelve
+  findings, and grouping is presentation only</li>
+<li>An issue is one issue across every name it goes by, and everything each
+  report said about it is kept rather than overwritten</li>
+<li>A flaw in our own product is recorded by hand, under an identifier this
+  deployment mints, against every build that ships it</li>
 </ul>
 <h3 id="state-and-history">State and history<a class="headerlink" href="#state-and-history" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Change over time is a primary query</strong>, not an audit log read backwards</li>
-<li><strong>Findings open and close themselves as scans change</strong>, every closure records
- why, and a disappearance nobody can explain is flagged at any volume</li>
-<li><strong>Triage history is append-only</strong>: records are written and never edited or
- removed, and each is written in the same transaction as the act it describes.
- The database is trusted, and nothing defends against somebody editing rows
- directly</li>
-<li><strong>Administrative changes record who changed what from what</strong>, and what a scan
- observed is never merged with what a person declared</li>
+<li>Change over time is a primary query, not an audit log read backwards</li>
+<li>Findings open and close themselves as scans change, every closure records
+  why, and a disappearance nobody can explain is flagged at any volume</li>
+<li>Triage history is append-only: records are written and never edited or
+  removed, and each is written in the same transaction as the act it describes.
+  The database is trusted, and nothing defends against somebody editing rows
+  directly</li>
+<li>Administrative changes record who changed what from what, and what a scan
+  observed is never merged with what a person declared</li>
 </ul>
 <h3 id="triage">Triage<a class="headerlink" href="#triage" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>One outcome from a fixed set</strong>: affected, not applicable, deferred, will
- not fix, already fixed here, and the two that promise work</li>
-<li><strong>Dismissing something needs a written explanation and a second person's
- approval.</strong> The proposer and the approver are never the same person, with no
- override; short deferrals are exempt up to a cumulative threshold the
- deployment sets</li>
-<li><strong>A decision survives re-scans</strong>, lapses only when the software changes, and
- carries automatically to other releases, tags and variants whose chains and
- versions already match</li>
-<li><strong>One judgment covers every place a finding sits</strong> by default; narrowing it
- is deliberate</li>
-<li><strong>Bulk triage is one action across many issues</strong> at a component, bounded by a
- configurable cap, recording how the set was chosen</li>
-<li><strong>An approver works at the unit the proposer acted at</strong>, approves, sends back
- or undoes a batch as one act, and an approval points at one revision of the
- justification — editing the text withdraws it</li>
-<li><strong>What is recorded against an issue</strong> — a rating that disagrees with the
- published one, or a note for whoever decides — belongs to one product, applies
- to every build of it, and does not lapse when a version moves. Two products may
- record different things about the same issue</li>
-<li><strong>A third party's judgment is evidence, never a decision.</strong> The build's
- suppressions and a supplier's VEX are shown and offered as a prefill</li>
-<li><strong>A deployment says what it considers worth triaging</strong> and a product may say
- something narrower. Below the line a finding is still recorded, counted and
- reportable, and any list that hides something says how much</li>
+<li>One outcome from a fixed set: affected, not applicable, deferred, will not
+  fix, already fixed here, and the two that promise work</li>
+<li>Dismissing something needs a written explanation and a second person's
+  approval. The proposer and the approver are never the same person, with no
+  override; short deferrals are exempt up to a cumulative threshold the
+  deployment sets</li>
+<li>A decision survives re-scans, lapses only when the software changes, and
+  carries automatically to other releases, tags and variants whose chains and
+  versions already match</li>
+<li>One judgment covers every place a finding sits by default; narrowing it is
+  deliberate</li>
+<li>Bulk triage is one action across many issues at a component, bounded by a
+  configurable cap, recording how the set was chosen</li>
+<li>An approver works at the unit the proposer acted at, approves, sends back or
+  undoes a batch as one act, and an approval points at one revision of the
+  justification — editing the text withdraws it</li>
+<li>What is recorded against an issue — a rating that disagrees with the
+  published one, or a note for whoever decides — belongs to one product,
+  applies to every build of it, and does not lapse when a version moves. Two
+  products may record different things about the same issue</li>
+<li>A third party's judgment is evidence, never a decision. The build's
+  suppressions and a supplier's VEX are shown and offered as a prefill</li>
+<li>A deployment says what it considers worth triaging and a product may say
+  something narrower. Below the line a finding is still recorded, counted and
+  reportable, and any list that hides something says how much</li>
 </ul>
 <h3 id="ranking-and-remediation">Ranking and remediation<a class="headerlink" href="#ranking-and-remediation" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>One urgency orders the queue</strong>, worked out from severity, known
- exploitation, exploitation likelihood, and whether the component reaches
- customers</li>
-<li><strong>Deadlines are set by policy</strong> from that urgency. Being overdue is reported,
- never acted on automatically</li>
-<li><strong>Work is assigned to a person or to a team.</strong> A team queue is picked out of
- rather than held, work nobody holds is routed to a team by standing rule, and
- a human assignment always wins</li>
-<li><strong>A fix is declared as the set of releases it targets</strong>, and resolution is
- computed from later scans rather than declared done</li>
-<li><strong>Hand-off to an external tracker is optional</strong> and off by default. This does
- not replace anybody's issue tracker</li>
+<li>One urgency orders the queue, worked out from severity, known exploitation,
+  exploitation likelihood, and whether the component reaches customers</li>
+<li>Deadlines are set by policy from that urgency. Being overdue is reported,
+  never acted on automatically</li>
+<li>Work is assigned to a person or to a team. A team queue is picked out of
+  rather than held, work nobody holds is routed to a team by standing rule, and
+  a human assignment always wins</li>
+<li>A fix is declared as the set of releases it targets, and resolution is
+  computed from later scans rather than declared done</li>
+<li>Hand-off to an external tracker is optional and off by default. This does not
+  replace anybody's issue tracker</li>
 </ul>
 <h3 id="disclosure-and-advisories">Disclosure and advisories<a class="headerlink" href="#disclosure-and-advisories" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>A flaw recorded here starts undisclosed</strong>, carrying a disclosure date that
- defaults to 90 days from when the report was received. Reaching it escalates
- rather than publishes</li>
-<li><strong>Extending that date costs a reason</strong> and, past a threshold, a second
- person — and it is raised before the date rather than on it</li>
-<li><strong>Disclosure makes the whole record public</strong>: comments, decisions, actors.
- People writing in the record know that from the first word</li>
-<li><strong>An advisory is generated as a CSAF document</strong> about flaws in our own
- product, and a VEX document per build from approved dismissals. Generating is
- all it does — nothing is sent anywhere, because a published advisory belongs
- to whoever publishes it</li>
+<li>A flaw recorded here starts undisclosed, carrying a disclosure date that
+  defaults to 90 days from when the report was received. Reaching it escalates
+  rather than publishes</li>
+<li>Extending that date costs a reason and, past a threshold, a second person —
+  and it is raised before the date rather than on it</li>
+<li>Disclosure makes the whole record public: comments, decisions, actors. People
+  writing in the record know that from the first word</li>
+<li>An advisory is generated as a CSAF document about flaws in our own product,
+  and a VEX document per build from approved dismissals. Generating is all it
+  does — nothing is sent anywhere, because a published advisory belongs to
+  whoever publishes it</li>
 </ul>
 <h3 id="access-and-permissions">Access and permissions<a class="headerlink" href="#access-and-permissions" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Sign-in is federated</strong> — OIDC, GitHub or a trusted header — and no account
- is created for anybody nothing authorized in advance. Where roles are derived
- from identity-provider groups, that mapping is the advance grant: somebody it
- covers is recorded on their first arrival, and somebody in no mapped group is
- refused exactly as a stranger is</li>
-<li><strong>Roles are granted per product; administration is global.</strong> A product
- somebody holds no role on is invisible to them: not listed, not counted</li>
-<li><strong>Visibility is enforced in the data-access layer</strong>, with a required subject,
- covering counts, aggregates, search and exports rather than row reads alone</li>
-<li><strong>One person can be brought into one undisclosed case</strong> without being granted
- the product it sits in</li>
-<li><strong>Machine credentials are their own subject type</strong>: scoped, ingest-only,
- rotatable, and able to read back only their own uploads</li>
-<li><strong>Losing a role hands back the work it carried</strong>, because an identity
- provider never tells us an account was disabled</li>
+<li>Sign-in is federated — OIDC, GitHub or a trusted header — and no account is
+  created for anybody nothing authorized in advance. Where roles are derived
+  from identity-provider groups, that mapping is the advance grant: somebody it
+  covers is recorded on their first arrival, and somebody in no mapped group is
+  refused exactly as a stranger is</li>
+<li>Roles are granted per product; administration is global. A product somebody
+  holds no role on is invisible to them: not listed, not counted</li>
+<li>Visibility is enforced in the data-access layer, with a required subject,
+  covering counts, aggregates, search and exports rather than row reads alone</li>
+<li>One person can be brought into one undisclosed case without being granted the
+  product it sits in</li>
+<li>Machine credentials are their own subject type: scoped, ingest-only,
+  rotatable, and able to read back only their own uploads</li>
+<li>Losing a role hands back the work it carried, because an identity provider
+  never tells us an account was disabled</li>
 </ul>
 <h3 id="notifications">Notifications<a class="headerlink" href="#notifications" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Immediate mail only for something a person must act on.</strong> Everything else
- is a digest, off until somebody asks for it</li>
-<li><strong>Nothing leaving this deployment about an undisclosed finding carries
- detail</strong> — not the identifier, not the component, not the summary. That there
- is something, and a link</li>
-<li><strong>Every channel sits behind one interface</strong>, and delivery is queued and
- retried. Email is required; chat adapters are not built</li>
-<li><strong>Operational alerts are their own category</strong>: condition-based ones clear
- themselves, event-based ones are acknowledged</li>
+<li>Immediate mail only for something a person must act on. Everything else is a
+  digest, off until somebody asks for it</li>
+<li>Nothing leaving this deployment about an undisclosed finding carries detail —
+  not the identifier, not the component, not the summary. That there is
+  something, and a link</li>
+<li>Every channel sits behind one interface, and delivery is queued and retried.
+  Email is required; chat adapters are not built</li>
+<li>Operational alerts are their own category: condition-based ones clear
+  themselves, event-based ones are acknowledged</li>
 </ul>
 <h3 id="reporting">Reporting<a class="headerlink" href="#reporting" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Any two releases can be compared</strong> — fixed, newly present, still present —
- in a form that goes into release notes</li>
-<li><strong>Any list that can be read can be exported</strong> as CSV or JSON, through the
- same visibility rules the list was read with, carrying the filters of the
- screen it came from</li>
-<li><strong>Scan coverage is reportable</strong>: what is being scanned, when each artifact
- was last seen, and what has gone stale</li>
-<li><strong>Dismissals, deadlines, approvals and how long triage is taking</strong> are
- reportable in their own right, including the exception report that should
- come back empty</li>
-<li><strong>Trends are plotted on the axis the subject has</strong>: calendar time for a
- branch, release over release for tags</li>
+<li>Any two releases can be compared — fixed, newly present, still present — in a
+  form that goes into release notes</li>
+<li>Any list that can be read can be exported as CSV or JSON, through the same
+  visibility rules the list was read with, carrying the filters of the screen
+  it came from</li>
+<li>Scan coverage is reportable: what is being scanned, when each artifact was
+  last seen, and what has gone stale</li>
+<li>Dismissals, deadlines, approvals and how long triage is taking are reportable
+  in their own right, including the exception report that should come back
+  empty</li>
+<li>Trends are plotted on the axis the subject has: calendar time for a branch,
+  release over release for tags</li>
 </ul>
 <h3 id="interface-and-api">Interface and API<a class="headerlink" href="#interface-and-api" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>REST and JSON, with the OpenAPI document generated from the code</strong> and
- never hand-maintained. The web interface is a client of it, with no private
- endpoints</li>
-<li><strong>Every operation declares what it asks of a caller</strong>, and a gate refuses one
- that declares nothing</li>
-<li><strong>The dependency tree is browsable both ways</strong>: from a finding to where it
- sits, and from any node to the findings beneath it</li>
-<li><strong>The findings list is one row per issue at a component</strong>, with the places
- under it — 335,021 rows for one image is not a list anybody reads — and it is
- the tool for building a batch</li>
-<li><strong>One home page assembled from what the person holds</strong>, and one scope picker
- that narrows the whole interface. A screen that cannot answer at the chosen
- scope says so</li>
-<li><strong>Every screen works on a phone</strong>, for reading and responding rather than
- bulk work</li>
-<li><strong>Nothing a person typed is lost</strong> — not by a failed submission, a
- navigation, or an expired session</li>
+<li>REST and JSON, with the OpenAPI document generated from the code and never
+  hand-maintained. The web interface is a client of it, with no private
+  endpoints</li>
+<li>Every operation declares what it asks of a caller, and a gate refuses one
+  that declares nothing</li>
+<li>The dependency tree is browsable both ways: from a finding to where it sits,
+  and from any node to the findings beneath it</li>
+<li>The findings list is one row per issue at a component, with the places under
+  it — 335,021 rows for one image is not a list anybody reads — and it is the
+  tool for building a batch</li>
+<li>One home page assembled from what the person holds, and one scope picker that
+  narrows the whole interface. A screen that cannot answer at the chosen scope
+  says so</li>
+<li>Every screen works on a phone, for reading and responding rather than bulk
+  work</li>
+<li>Nothing a person typed is lost — not by a failed submission, a navigation, or
+  an expired session</li>
 </ul>
-<h3 id="running-it">Running it<a class="headerlink" href="#running-it" title="Permanent link">&para;</a></h3>
+<h3 id="operation">Operation<a class="headerlink" href="#operation" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>A container image and a Helm chart.</strong> A configuration that cannot work is
- refused at install time, naming what is missing</li>
-<li><strong>Any number of replicas</strong>: no leader, no shared filesystem, and no state in
- one process that decides anything</li>
-<li><strong>Four database engines</strong> are supported and tested: PostgreSQL, MySQL,
- MariaDB, and SQLite for development</li>
-<li><strong>The application creates and migrates its own schema at startup</strong>, one
- instance at a time, so there is no migration step to run</li>
-<li><strong>Untrusted input never becomes SQL, markup or a filesystem path</strong>, and text
- a scan file supplied is never rendered</li>
-<li><strong>Markdown a person writes is policed on the server</strong> at submission: no raw
- HTML, restricted link schemes, and nothing fetched from anywhere when it
- renders</li>
-<li><strong>Attachments are stored outside the database</strong>, in no public bucket, and
- every fetch is authorized against the finding it hangs off before any URL is
- issued</li>
-<li><strong>Static analysis, vulnerability scanning, dependency review, secret scanning
- and a license check gate every change</strong>, and every finding reproduces locally
- with one documented command</li>
+<li>A container image and a Helm chart. A configuration that cannot work is
+  refused at install time, naming what is missing</li>
+<li>Any number of replicas: no leader, no shared filesystem, and no state in one
+  process that decides anything</li>
+<li>Four database engines are supported and tested: PostgreSQL, MySQL, MariaDB,
+  and SQLite for development</li>
+<li>The application creates and migrates its own schema at startup, one instance
+  at a time, so there is no migration step to run</li>
+<li>Untrusted input never becomes SQL, markup or a filesystem path, and text a
+  scan file supplied is never rendered</li>
+<li>Markdown a person writes is policed on the server at submission: no raw HTML,
+  restricted link schemes, and nothing fetched from anywhere when it renders</li>
+<li>Attachments are stored outside the database, in no public bucket, and every
+  fetch is authorized against the finding it hangs off before any URL is issued</li>
+<li>Static analysis, vulnerability scanning, dependency review, secret scanning
+  and a license check gate every change, and every finding reproduces locally
+  with one documented command</li>
 </ul>
-<h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Permanent link">&para;</a></h2>
+<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1148,16 +1147,16 @@ behind every line of it.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="built/">What is built</a></td>
+<td><a href="built/">Current state</a></td>
 <td>How far each area has actually got</td>
 </tr>
 <tr>
-<td><a href="trying/">Trying it</a></td>
+<td><a href="trying/">Evaluation</a></td>
 <td>Standing one up to look at</td>
 </tr>
 <tr>
-<td><a href="pipeline/">Sending a build</a></td>
-<td>What a pipeline does: declare, mint a key, post the inventory</td>
+<td><a href="pipeline/">Build pipelines</a></td>
+<td>A pipeline declares the target, mints a key and posts the inventory</td>
 </tr>
 <tr>
 <td><a href="configuration/">Configuration</a></td>

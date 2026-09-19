@@ -25,7 +25,7 @@
     
     
       
-        <title>Trying it - OpenPSIRT</title>
+        <title>Evaluation - OpenPSIRT</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#trying-it" class="md-skip">
+        <a href="#evaluation" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Trying it
+              Evaluation
             
           </span>
         </div>
@@ -292,7 +292,7 @@
   <span class="md-ellipsis">
     
   
-    What is built
+    Current state
   
 
     
@@ -328,7 +328,7 @@
   <span class="md-ellipsis">
     
   
-    Trying it
+    Evaluation
   
 
     
@@ -346,7 +346,7 @@
   <span class="md-ellipsis">
     
   
-    Trying it
+    Evaluation
   
 
     
@@ -384,10 +384,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#something-has-to-say-who-you-are" class="md-nav__link">
+  <a href="#sign-in" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Something has to say who you are
+        Sign-in
       
     </span>
   </a>
@@ -412,10 +412,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#one-person-cannot-demonstrate-this" class="md-nav__link">
+  <a href="#the-two-person-control" class="md-nav__link">
     <span class="md-ellipsis">
       
-        One person cannot demonstrate this
+        The two-person control
       
     </span>
   </a>
@@ -460,7 +460,7 @@
   <span class="md-ellipsis">
     
   
-    Sending a build
+    Build pipelines
   
 
     
@@ -593,10 +593,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#something-has-to-say-who-you-are" class="md-nav__link">
+  <a href="#sign-in" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Something has to say who you are
+        Sign-in
       
     </span>
   </a>
@@ -621,10 +621,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#one-person-cannot-demonstrate-this" class="md-nav__link">
+  <a href="#the-two-person-control" class="md-nav__link">
     <span class="md-ellipsis">
       
-        One person cannot demonstrate this
+        The two-person control
       
     </span>
   </a>
@@ -667,7 +667,7 @@
   
 
 
-<h1 id="trying-it">Trying it<a class="headerlink" href="#trying-it" title="Permanent link">&para;</a></h1>
+<h1 id="evaluation">Evaluation<a class="headerlink" href="#evaluation" title="Permanent link">&para;</a></h1>
 <p>Two ways, for two different questions. The published image answers "what does
 this thing do"; the checkout answers "what does my change do".</p>
 <h2 id="the-published-image">The published image<a class="headerlink" href="#the-published-image" title="Permanent link">&para;</a></h2>
@@ -689,7 +689,7 @@ one port. The Helm chart is published beside the image, as
 <p>Plain HTTP, and administration handed to whoever a header says they are.
 It is for looking at.</p>
 </div>
-<h3 id="something-has-to-say-who-you-are">Something has to say who you are<a class="headerlink" href="#something-has-to-say-who-you-are" title="Permanent link">&para;</a></h3>
+<h3 id="sign-in">Sign-in<a class="headerlink" href="#sign-in" title="Permanent link">&para;</a></h3>
 <p>Nothing creates an account and no path admits an unknown arrival, so a
 deployment that cannot tell who is asking serves nobody. There are two ways to
 tell it, and the command above uses the second.</p>
@@ -711,7 +711,7 @@ tell it, and the command above uses the second.</p>
 </tr>
 </tbody>
 </table>
-<p><strong>A browser cannot set a header</strong>, so the command above gives you an API to
+<p>A browser cannot set a header, so the command above gives you an API to
 drive with <code>curl</code> rather than an interface to click:</p>
 <pre><code>curl -H &quot;X-User: you&quot; http://localhost:8080/v1/people
 </code></pre>
@@ -735,10 +735,10 @@ change.</p>
 <p>It seeds two products: a real switch image, and OpenPSIRT itself, from the
 inventory the image carries of what it ships, so the screens that compare
 across products have something to compare.</p>
-<h3 id="one-person-cannot-demonstrate-this">One person cannot demonstrate this<a class="headerlink" href="#one-person-cannot-demonstrate-this" title="Permanent link">&para;</a></h3>
+<h3 id="the-two-person-control">The two-person control<a class="headerlink" href="#the-two-person-control" title="Permanent link">&para;</a></h3>
 <p>A judgment is proposed by one person and agreed to by another, and approving
-your own is refused. So the demo opens a door per person, and two browser
-windows are two people:</p>
+your own is refused, so one person cannot demonstrate this. The demo opens a
+door per person, and two browser windows are two people:</p>
 <table>
 <thead>
 <tr>
@@ -809,19 +809,18 @@ windows are two people:</p>
 </tbody>
 </table>
 <ul>
-<li><strong>A demo where every figure reads zero demonstrates nothing.</strong> Without
+<li>A demo where every figure reads zero demonstrates nothing. Without
   <code>demo-triage</code> the review queue, the record of judgments, how long triage is
   taking and what is planned are all empty, and the screens answering those
   questions look broken rather than idle. It records through the cast's own
   doors, because one person proposing and a second agreeing is the control the
   whole tool rests on.</li>
-<li><strong><code>demo-vex</code> is separate from the seed</strong> because the scans run in the
-  background, and a document written before them would name issues this
-  deployment does not have.</li>
-<li><strong><code>make dev</code> needs Go, node and a scanner installed locally</strong>, and it does
-  not exercise the interface the binary embeds. <code>make demo</code> does.</li>
-<li><strong>Everything the demo writes stays in a git-ignored directory</strong> in the
-  checkout.</li>
+<li><code>demo-vex</code> is separate from the seed because the scans run in the background,
+  and a document written before them would name issues this deployment does not
+  have.</li>
+<li><code>make dev</code> needs Go, node and a scanner installed locally, and it does not
+  exercise the interface the binary embeds. <code>make demo</code> does.</li>
+<li>Everything the demo writes stays in a git-ignored directory in the checkout.</li>
 </ul>
 
 
