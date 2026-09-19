@@ -156,11 +156,13 @@ question, paragraphs opening with a bolded claim, a reason three sentences past
 its rule, and a past tense anywhere at all. Rewrite it rather than appending
 to it.
 
-Three rules are checked by `internal/docs/style_test.go`, because those regress
-silently: the heading form, over every markdown file here rather than the
-design documents alone; the heading bound; and the `Contents` list, over the
-documents that carry one. The bold in the API document joins them once that
-document satisfies it. The rest is judgment, and this is the whole of it.
+Four rules are checked, because those regress silently. Three are in
+`internal/docs/style_test.go`: the heading form, over every markdown file here
+rather than the design documents alone; the heading bound; and the `Contents`
+list, over the documents that carry one. The fourth is in
+`internal/httpapi/reference_test.go`: no bold anywhere in the published API
+document, over every summary, description and field. The rest is judgment, and
+this is the whole of it.
 
 ## The work list
 

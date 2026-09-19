@@ -151,7 +151,7 @@ func TestEveryOperationSaysWhatItAsksFor(t *testing.T) {
 				missing = append(missing, method+" "+path+" ("+op.OperationID+")")
 				continue
 			}
-			if !strings.Contains(op.Description, "**Requires:**") {
+			if !strings.Contains(op.Description, "Requires: ") {
 				missing = append(missing, op.OperationID+" states it in the document and not in the reference")
 			}
 		}

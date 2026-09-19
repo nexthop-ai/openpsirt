@@ -85,7 +85,7 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 				// The requirement line is rendered from the declaration rather
 				// than written beside it, so its absence means an operation
 				// went around requiring() altogether.
-				if !strings.Contains(op.Description, "**Requires:**") {
+				if !strings.Contains(op.Description, "Requires: ") {
 					t.Errorf("%s does not say what it requires", where)
 				}
 			}
@@ -132,6 +132,50 @@ func TestAFactTwoBodiesCarryIsDescribedTheSameWay(t *testing.T) {
 		}
 		if len(said) == 0 {
 			t.Fatal("no field was found to check: this is not walking the schemas")
+		}
+	})
+}
+
+// No bold in the published document.
+//
+// A description is read by somebody working through a parameter list, and a
+// claim pressed at them there is noise in the one place a reader is most in a
+// hurry. It is a gate rather than a judgment because a span survives a rewrite
+// of the sentence around it: bold is added one field at a time, and one field
+// at a time is exactly what nobody reviews.
+//
+// Every string the document publishes, not the operations alone: a summary, a
+// description, a schema's own description and the description on each of its
+// properties. A rule over half the document is a rule that holds until
+// somebody writes in the other half.
+func TestThePublishedDocumentCarriesNoBold(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		var checked int
+		bold := func(where, what, text string) {
+			checked++
+			if strings.Contains(text, "**") {
+				t.Errorf("%s: the %s carries a bold span: %q", where, what, text)
+			}
+		}
+		document := r.api.OpenAPI()
+		for path, item := range document.Paths {
+			for method, op := range operations(item) {
+				where := method + " " + path
+				bold(where, "summary", op.Summary)
+				bold(where, "description", op.Description)
+				for _, parameter := range op.Parameters {
+					bold(where+" "+parameter.Name, "parameter", parameter.Description)
+				}
+			}
+		}
+		for name, schema := range document.Components.Schemas.Map() {
+			bold(name, "schema description", schema.Description)
+			for field, property := range schema.Properties {
+				bold(name+"."+field, "field description", property.Description)
+			}
+		}
+		if checked < 500 {
+			t.Fatalf("only %d strings checked: this is not walking the document", checked)
 		}
 	})
 }
