@@ -8122,6 +8122,66 @@ components:
         - claims
         - rows
       type: object
+    UnansweredBody:
+      additionalProperties: false
+      properties:
+        checked:
+          description: When the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked
+          type: string
+        ecosystem:
+          description: Which ecosystem the identifier names, read out of it rather than stored
+          type: string
+        purl:
+          description: The package identifier, which is the name that would be sent
+          type: string
+        why:
+          description: "'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and no index had heard of it. 'unreadable' is an identifier nothing can turn into a request"
+          enum:
+            - ours
+            - unknown
+            - unreadable
+          type: string
+      required:
+        - purl
+        - why
+        - checked
+      type: object
+    UnansweredOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/UnansweredOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/UnansweredBody"
+          type:
+            - array
+            - "null"
+        ours:
+          description: The names this deployment holds back, from its publisher namespace, from what it stated, and from what the builds you may read declared themselves to be. A name here is matched against each part of a package's name, either exactly or followed by one of - . _, and a name carrying a dot also covers a host under it
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        total:
+          description: How many there are in all, through the same filter as the page
+          format: int64
+          type: integer
+        whole:
+          description: Whether every candidate was examined. False means the estate is past what one read classifies, and the total is a floor
+          type: boolean
+      required:
+        - items
+        - total
+        - ours
+        - whole
+      type: object
     UnassignedBody:
       additionalProperties: false
       properties:
@@ -20699,6 +20759,61 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: List findings nobody is dealing with
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
+  /v1/upstream/unanswered:
+    get:
+      description: |-
+        What asking public package indexes did not answer, and why of each.
+
+        Asking sends a component's name to that ecosystem's index, so names this deployment calls its own are never sent. `ours` is what they were matched against, narrowed to the products you may read.
+
+        `unknown` is a component no public index has heard of — a private module or a vendored fork — and is the candidate list for `OPENPSIRT_UPSTREAM_INTERNAL`. `unreadable` is an identifier nothing can turn into a request.
+
+        A component the pass has not reached is not here. It is waiting rather than unanswered.
+
+        Answers only components in products you may read.
+
+        **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: list-unanswered-upstream
+      parameters:
+        - description: How many to return
+          explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            description: How many to return
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - description: How many to skip
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: How many to skip
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnansweredOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List components with no upstream answer
       tags:
         - Findings
       x-openpsirt-requires:

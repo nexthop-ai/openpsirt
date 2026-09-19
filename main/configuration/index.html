@@ -526,6 +526,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#asking-public-indexes-what-is-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking public indexes what is current
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#who-may-sign-in" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -823,6 +834,17 @@
     <span class="md-ellipsis">
       
         Publishing advisories
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asking-public-indexes-what-is-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking public indexes what is current
       
     </span>
   </a>
@@ -1288,6 +1310,100 @@ validation after you have sent it.</p>
 </table>
 <p>On the Helm chart these go through <code>extraEnv</code>, since a deployment that does not
 publish needs none of them.</p>
+<h2 id="asking-public-indexes-what-is-current">Asking public indexes what is current<a class="headerlink" href="#asking-public-indexes-what-is-current" title="Permanent link">&para;</a></h2>
+<p>Off unless an administrator turns it on, under Settings. It is the only thing
+here that reaches the network: everything a scan needs arrives as a file
+somebody imported, and a deployment that cannot reach out loses this answer and
+nothing else.</p>
+<p><strong>What goes out is a component's name.</strong> One request per component to that
+ecosystem's public index, carrying the name and nothing else — no version, no
+build, no product. For an open-source dependency that is public knowledge. For
+something built here it is the name of a project, a team, or a product nobody
+has announced, and a public index records every request made of it.</p>
+<p>So names this deployment calls its own are never sent. Three sources, unioned:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>What it yields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PUBLISHER_NAMESPACE</code></td>
+<td>The organization, spelled the three ways the ecosystems spell one: the host, the host reversed, which is what a Maven group is, and each label short of the top-level domain. A label naming a kind of registration or a forge rather than an organization is dropped, so <code>example.github.io</code> does not hold back everything under <code>github.com</code></td>
+</tr>
+<tr>
+<td>What each build declared itself to be</td>
+<td>The account, scope or group that identifier is published under, where an inventory names one. Read from the scans rather than from here, so a product declared this morning is one whose name does not leave this afternoon</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_UPSTREAM_INTERNAL</code></td>
+<td>Whatever else you name, separated by commas</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_UPSTREAM_INTERNAL</code></td>
+<td>Names never sent to a public index, separated by commas, on top of the two derived sources above. Here rather than among the settings an administrator tunes, beside the namespace the default is derived from: asking upstream is a switch an administrator throws, and what leaves the deployment when it is on is a boundary you drew</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<p>A name matches each part of a package's own name, either exactly or followed by
+<code>-</code>, <code>.</code> or <code>_</code>. A name carrying a dot also covers a host under it. So a
+deployment publishing under <code>example.test</code> holds back:</p>
+<table>
+<thead>
+<tr>
+<th>Identifier</th>
+<th>On the label</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pkg:npm/@example/agent</code></td>
+<td><code>example</code></td>
+</tr>
+<tr>
+<td><code>pkg:golang/github.com/example-corp/thing</code></td>
+<td><code>example</code></td>
+</tr>
+<tr>
+<td><code>pkg:golang/test.example/lib</code></td>
+<td><code>test.example</code>, the same organization spelled the way a module path spells it</td>
+</tr>
+<tr>
+<td><code>pkg:golang/go.example.test/team/agent</code></td>
+<td><code>example.test</code>, which covers a host under it</td>
+</tr>
+</tbody>
+</table>
+<p><code>pkg:npm/exampler</code> is left alone. Case does not decide.</p>
+<p><strong>This is a better default, not a control.</strong> A deployment that needs certainty
+about what leaves it leaves the whole feature off, which is where it ships. It
+is biased toward holding back: over-excluding loses an answer, which is visible
+on the screen that would have shown it, and under-excluding sends a name to
+somebody else's service, which is visible nowhere.</p>
+<p><strong>Turning it off again drops what was fetched.</strong> On a deployment that had
+asking on before a name was held back, the version an index gave for that name
+is removed the next time the pass reaches it, along with the summary and the
+project address. All of it came from sending the name. Nothing else is
+affected and no upgrade step is needed.</p>
+<p><strong>Read what it held back, and what no index knew.</strong> The report is at
+<code>/v1/upstream/unanswered</code> and on the System screen. Held-back names say what
+the default is costing; names no public index has heard of are private modules
+and vendored forks, and they are the candidates to promote into
+<code>OPENPSIRT_UPSTREAM_INTERNAL</code> so they stop being asked about at all.</p>
 <h2 id="who-may-sign-in">Who may sign in<a class="headerlink" href="#who-may-sign-in" title="Permanent link">&para;</a></h2>
 <p>The process refuses to start until somebody can administer it, and naming
 somebody grants a role — it does not let anybody in without signing in.</p>
