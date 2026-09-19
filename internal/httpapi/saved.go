@@ -14,13 +14,13 @@ import (
 
 // SavedBody is a narrowing somebody kept.
 type SavedBody struct {
-	Name string `json:"name" minLength:"1" maxLength:"120" doc:"What to call it. Matched without regard to capitals, and one of a name replaces the one before"`
+	Name string `json:"name" minLength:"1" maxLength:"120" doc:"The name. Matched without regard to capitals, and one of a name replaces the one before"`
 	// Query is the list's own query string, without a leading "?". Kept as
 	// text because the filters belong to the list: a saved filter is a way
 	// back to one, and the list is what knows how to read it.
 	Query string `json:"query" maxLength:"2000" doc:"The findings list's query string, without a leading ?"`
 	// Prepares is the claim this filter offers, where it offers one.
-	Prepares *PreparedBody `json:"prepares,omitempty" doc:"What this filter offers to claim about what it catches. Absent on an ordinary saved filter, which is most of them"`
+	Prepares *PreparedBody `json:"prepares,omitempty" doc:"The claim this filter offers about what it catches. Absent on an ordinary saved filter, which is most of them"`
 }
 
 // PreparedBody is the claim a saved filter prepares.
@@ -34,13 +34,13 @@ type SavedBody struct {
 // the record. The difference shows up on the day a dismissal turns out to have
 // been wrong and somebody asks who made it.
 type PreparedBody struct {
-	Outcome       outcomeInBulk `json:"outcome" doc:"What it offers to say"`
+	Outcome       outcomeInBulk `json:"outcome" doc:"The reasoning it offers"`
 	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, where the outcome takes one"`
 	// Reasoning is required, because it is what somebody will be putting
 	// their name to: a prefill with an empty argument is a button that
 	// proposes a dismissal saying nothing.
 	Reasoning string `json:"reasoning" minLength:"1" maxLength:"10000" doc:"The words it offers. Required: this is what whoever submits it is putting their name to"`
-	DeferDays int    `json:"defer_days,omitempty" minimum:"1" maximum:"3650" doc:"How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else"`
+	DeferDays int    `json:"defer_days,omitempty" minimum:"1" maximum:"3650" doc:"The deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else"`
 }
 
 func registerSaved(api huma.API, in Ingest) {
@@ -113,7 +113,7 @@ func registerSaved(api huma.API, in Ingest) {
 			// — and left out on a filter that used to prepare
 			// something takes that off, because saving over a name
 			// is deciding what the name means now.
-			Prepares *PreparedBody `json:"prepares,omitempty" doc:"What this filter should offer to claim about what it catches. Left out, it prepares nothing — including on a name that used to"`
+			Prepares *PreparedBody `json:"prepares,omitempty" doc:"The claim this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to"`
 		}
 	}) (*struct{}, error) {
 		who, store, err := keeping(ctx, in)

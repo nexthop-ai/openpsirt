@@ -14,11 +14,11 @@ import (
 // AgreedBody is one person agreeing to one judgment, and when.
 type AgreedBody struct {
 	By string `json:"by" doc:"Their sign-in identity"`
-	At string `json:"at" doc:"When they agreed"`
+	At string `json:"at" doc:"The moment they agreed"`
 	// WithdrawnAt is part of the record rather than a reason to leave the
 	// agreement out: what somebody agreed to and then stopped agreeing to is
 	// what an audit is looking for.
-	WithdrawnAt string `json:"withdrawn_at,omitempty" doc:"When the agreement was taken back, by the approver or by somebody editing the words it was given for"`
+	WithdrawnAt string `json:"withdrawn_at,omitempty" doc:"The moment the agreement was taken back, by the approver or by somebody editing the words it was given for"`
 	// Carried says this agreement was given for an earlier claim and carried
 	// onto this one, which is what a re-affirmation stands on. The person
 	// named read those words rather than these.
@@ -36,11 +36,11 @@ type JudgedBody struct {
 	// blank.
 	Component string `json:"component"`
 	Version   string `json:"version,omitempty"`
-	Consumer  string `json:"consumer,omitempty" doc:"What pulls the component in. Absent where the build holds it directly"`
+	Consumer  string `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
 
 	Outcome       outcome       `json:"outcome"`
 	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply"`
-	Mitigation    string        `json:"mitigation,omitempty" doc:"What a holder can do about it. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
+	Mitigation    string        `json:"mitigation,omitempty" doc:"The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks"`
 	DeferredUntil string        `json:"deferred_until,omitempty"`
 	FixedVersion  string        `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record"`
 	Reasoning     string        `json:"reasoning" doc:"The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart"`
@@ -50,7 +50,7 @@ type JudgedBody struct {
 
 	ProposedBy string       `json:"proposed_by"`
 	ProposedAt string       `json:"proposed_at"`
-	EndedAt    string       `json:"ended_at,omitempty" doc:"When it stopped applying — withdrawn, or lapsed because the code moved"`
+	EndedAt    string       `json:"ended_at,omitempty" doc:"The moment it stopped applying — withdrawn, or lapsed because the code moved"`
 	Approvals  []AgreedBody `json:"approvals"`
 	// TwoPeople is the separation-of-duties control stated as a fact about
 	// this record rather than as a rule that exists. Read from the names: a
@@ -83,7 +83,7 @@ type Auditing struct {
 	// carries across releases sharing the code — so this asks which judgments
 	// are about something one build actually ships.
 	Stream  string `query:"stream" doc:"Only judgments about places this branch or tag holds. Needs exactly one product and a variant"`
-	Variant string `query:"variant" doc:"Which build of that stream. Needs exactly one product and a stream"`
+	Variant string `query:"variant" doc:"The build of that stream. Needs exactly one product and a stream"`
 }
 
 // narrow turns what was asked for into what the store reads by, resolving the

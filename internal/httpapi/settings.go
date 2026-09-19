@@ -27,7 +27,7 @@ type SettingBody struct {
 	Name    string `json:"name"`
 	Value   string `json:"value"`
 	Default bool   `json:"default,omitempty" doc:"Nobody has set this; the shipped value is in use"`
-	Means   string `json:"means" doc:"What it decides"`
+	Means   string `json:"means" doc:"The thing it decides"`
 	// Kind is what the value is, so a client offers the control the value
 	// takes rather than a text field somebody types a refused value into.
 	//
@@ -35,7 +35,7 @@ type SettingBody struct {
 	// interface keyed on setting names, beside the server's own — five copies
 	// of one fact, and a setting added to any of them was a control that
 	// offered the wrong thing or none.
-	Kind string `json:"kind" enum:"duration,count,size,word,switch" doc:"What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off"`
+	Kind string `json:"kind" enum:"duration,count,size,word,switch" doc:"The kind of value: a length of time, a count of things, a count of bytes, one of a few words, or on and off"`
 	// Words is what a word setting may be set to, in the order to offer them.
 	// Empty for every other kind.
 	Words []string `json:"words,omitempty" doc:"For a word setting, the values it takes, in the order to offer them"`

@@ -129,9 +129,9 @@ func registerComments(api huma.API, in Ingest) {
 
 // WasSaidBody is one version of a comment that has been replaced.
 type WasSaidBody struct {
-	Version    int    `json:"version" doc:"Which version this was, counting from one"`
-	Body       string `json:"body" doc:"What it said, in markdown"`
-	ReplacedAt string `json:"replaced_at" doc:"When it stopped saying that"`
+	Version    int    `json:"version" doc:"The version number, counting from one"`
+	Body       string `json:"body" doc:"Its text, in markdown"`
+	ReplacedAt string `json:"replaced_at" doc:"The moment it stopped saying that"`
 }
 
 // DecisionsOutput is a page of decisions, with how many there are behind it.

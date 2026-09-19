@@ -14,13 +14,13 @@ import (
 // SightingBody is one issue in one component of one build.
 type SightingBody struct {
 	Product     string `json:"product" doc:"The product's name, as an address takes it"`
-	ProductName string `json:"product_name" doc:"How it is spelled on screen"`
+	ProductName string `json:"product_name" doc:"Its spelling on screen"`
 	Stream      string `json:"stream"`
 	Variant     string `json:"variant"`
 	Component   string `json:"component"`
 	Version     string `json:"version"`
-	Places      int    `json:"places" doc:"How many times that component sits in that build carrying this issue"`
-	State       string `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"How far it has been decided here, by the definition the findings list uses"`
+	Places      int    `json:"places" doc:"The number of times that component sits in that build carrying this issue"`
+	State       string `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state here, by the definition the findings list uses"`
 	Undisclosed bool   `json:"undisclosed,omitempty"`
 	Due         string `json:"due,omitempty" doc:"The earliest deadline among its places"`
 	FixedIn     string `json:"fixed_in,omitempty"`
@@ -38,7 +38,7 @@ type IssueOutput struct {
 		Items         []SightingBody `json:"items"`
 		// Total counts build-and-component pairs, which is what a row is.
 		Total    int `json:"total"`
-		Products int `json:"products" doc:"How many of your products carry it"`
+		Products int `json:"products" doc:"The number of your products carrying it"`
 	}
 }
 

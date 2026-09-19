@@ -17,7 +17,7 @@ components:
           description: Whether they may read this deployment's own records. It grants no product's findings or decisions
           type: boolean
         deactivated_at:
-          description: When they left. Absent means they are active
+          description: The date they left. Absent means they are active
           type: string
         display_name:
           type: string
@@ -28,7 +28,7 @@ components:
             - array
             - "null"
         held_total:
-          description: How many role changes there are, of which the list above is a page
+          description: The number of role changes, of which the list above is a page
           format: int64
           type: integer
         holds:
@@ -51,7 +51,7 @@ components:
             - array
             - "null"
         told_total:
-          description: "How many things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"
+          description: "The number of things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"
           format: int64
           type: integer
       required:
@@ -71,7 +71,7 @@ components:
           readOnly: true
           type: string
         acknowledged:
-          description: How many were waiting
+          description: The number that were waiting
           format: int64
           type: integer
       required:
@@ -109,12 +109,12 @@ components:
           minLength: 1
           type: string
         secret:
-          description: What requests are signed with. Never returned by any endpoint
+          description: The signing secret. Never returned by any endpoint
           maxLength: 400
           minLength: 16
           type: string
         url:
-          description: Where to send it. https only
+          description: The address to send to. https only
           maxLength: 1000
           minLength: 1
           type: string
@@ -142,7 +142,7 @@ components:
           minLength: 1
           type: string
         team:
-          description: Where work lands, by team name
+          description: The team work lands on, by name
           minLength: 1
           type: string
         upstream:
@@ -178,7 +178,7 @@ components:
       additionalProperties: false
       properties:
         at:
-          description: When they agreed
+          description: The moment they agreed
           type: string
         by:
           description: Their sign-in identity
@@ -187,7 +187,7 @@ components:
           description: Whether this agreement was carried forward from an earlier claim rather than given for this one
           type: boolean
         withdrawn_at:
-          description: When the agreement was taken back, by the approver or by somebody editing the words it was given for
+          description: The moment the agreement was taken back, by the approver or by somebody editing the words it was given for
           type: string
       required:
         - by
@@ -252,11 +252,11 @@ components:
           format: int64
           type: integer
         revision_id:
-          description: Which revision of the justification was agreed to
+          description: The revision of the justification that was agreed to
           format: int64
           type: integer
         withdrawn_at:
-          description: When this approval was taken back, if it was
+          description: The moment this approval was taken back, if it was
           type: string
       required:
         - id
@@ -275,14 +275,14 @@ components:
           readOnly: true
           type: string
         above:
-          description: What pulls this in — usually short, and the direction people use
+          description: The consumers that pull this in — usually short, and the direction people use
           items:
             $ref: "#/components/schemas/NeighborBody"
           type:
             - array
             - "null"
         below:
-          description: What it pulls in
+          description: The components it pulls in, downward
           items:
             $ref: "#/components/schemas/NeighborBody"
           type:
@@ -312,7 +312,7 @@ components:
           description: Whether a second person has to agree before it takes effect
           type: boolean
         off_the_list:
-          description: How many of them this rating would put below the product's triage line, where they stop being work and carry no deadline
+          description: The number this rating would put below the product's triage line, where they stop being work and carry no deadline
           format: int64
           type: integer
         open:
@@ -323,18 +323,18 @@ components:
           description: The product this rating belongs to, by the name an address takes
           type: string
         product_name:
-          description: How that product is spelled on screen
+          description: That product's spelling on screen
           type: string
         published:
-          description: What was published when this was made, kept so a reader can see what we disagreed with
+          description: The published rating when this was made, kept so a reader can see what we disagreed with
           type: string
         reasoning:
-          description: Why. It outlives the version it was made about, so the next person needs the argument
+          description: The reasoning. It outlives the version it was made about, so the next person needs the argument
           maxLength: 65536
           minLength: 1
           type: string
         severity:
-          description: What this product rates it
+          description: This product's own rating
           enum:
             - low
             - medium
@@ -375,7 +375,7 @@ components:
       additionalProperties: false
       properties:
         due:
-          description: When it runs out, as a date. The earliest among its places here, which is the one that makes it late
+          description: The date it runs out. The earliest among its places here, which is the one that makes it late
           type: string
         exploited:
           description: Somebody is known to be exploiting this
@@ -388,11 +388,11 @@ components:
           format: double
           type: number
         places:
-          description: How many places in this build it sits at
+          description: The number of places in this build it sits at
           format: int64
           type: integer
         severity:
-          description: How bad the report rates it
+          description: The severity the report gives it
           type: string
         summary:
           description: The first line of what the issue says about itself, cut to fit a row
@@ -414,10 +414,10 @@ components:
           readOnly: true
           type: string
         content_type:
-          description: What it is served as, which is decided here and is not what the uploader called it
+          description: The type it is served as, which is decided here and is not what the uploader called it
           type: string
         filename:
-          description: What it was called when it arrived
+          description: Its name when it arrived
           type: string
         inline:
           description: Whether it is displayed in the page rather than downloaded. Only a small allowlist of raster image types is
@@ -426,10 +426,10 @@ components:
           description: The file was removed on purpose. The record of it remains
           type: boolean
         redacted_reason:
-          description: Why it was removed
+          description: The reason it was removed
           type: string
         reference:
-          description: What to paste into a justification or a comment
+          description: The reference to paste into a justification or a comment
           type: string
         size:
           description: Bytes
@@ -452,21 +452,21 @@ components:
       additionalProperties: false
       properties:
         by:
-          description: Who did it, where a person did
+          description: The person who did it, where a person did
           type: string
         claim:
           $ref: "#/components/schemas/ClaimBody"
         decision:
           $ref: "#/components/schemas/DecisionBody"
         decisions:
-          description: How many rows the claim wrote
+          description: The number of rows the claim wrote
           format: int64
           type: integer
         finding:
           $ref: "#/components/schemas/FindingRefBody"
-          description: What the representative decision is about. Absent where no open finding sits at its place
+          description: The representative decision's subject. Absent where no open finding sits at its place
         happened:
-          description: What became of the claim
+          description: The claim's outcome
           enum:
             - waiting
             - sent-back
@@ -477,22 +477,22 @@ components:
             - mixed
           type: string
         issues:
-          description: How many distinct issues it covers
+          description: The number of distinct issues it covers
           format: int64
           type: integer
         outliers:
           $ref: "#/components/schemas/OutliersBody"
-          description: What in a bulk claim does not look like the rest. Absent for a claim about one issue and for one nothing can still be held back from
+          description: The rows in a bulk claim that do not look like the rest. Absent for a claim about one issue and for one nothing can still be held back from
         place:
           $ref: "#/components/schemas/PlaceBody"
         places:
-          description: How many distinct places it covers
+          description: The number of distinct places it covers
           format: int64
           type: integer
         reasoning:
           type: string
         when:
-          description: When it became that, as a date and time
+          description: The moment it became that
           type: string
       required:
         - claim
@@ -546,10 +546,10 @@ components:
           description: The product the role is held against, by the name that addresses it
           type: string
         product_display_name:
-          description: What to call that product, where it was declared with a display name
+          description: That product's display name, where it was declared with one
           type: string
         role:
-          description: What membership of this group grants
+          description: The roles membership of this group grants
           enum:
             - approver
             - assigner
@@ -574,13 +574,13 @@ components:
         exploited:
           type: boolean
         places:
-          description: How many places of the build it sits at
+          description: The number of places of the build it sits at
           format: int64
           type: integer
         severity:
           type: string
         state:
-          description: How far it has been decided. Anything agreed is not in this list
+          description: The decision state. Anything agreed is not in this list
           enum:
             - undecided
             - waiting
@@ -625,7 +625,7 @@ components:
           description: The same count by how the issues were rated. 'unrated' is what nobody scored
           type: object
         days:
-          description: Where the stretch starts, so these can be ordered without reading the label
+          description: The start of the stretch, so these can be ordered without reading the label
           format: int64
           type: integer
         label:
@@ -634,7 +634,7 @@ components:
           format: int64
           type: integer
         undecided:
-          description: How many of them nobody has said anything about. A claim waiting for a second person is not an answer
+          description: The number nobody has said anything about. A claim waiting for a second person is not an answer
           format: int64
           type: integer
       required:
@@ -696,22 +696,22 @@ components:
       additionalProperties: false
       properties:
         agreed:
-          description: How many are answered at every place by a standing decision
+          description: The number answered at every place by a standing decision
           format: int64
           type: integer
         exploited:
-          description: How many somebody is known to be exploiting
+          description: The number somebody is known to be exploiting
           format: int64
           type: integer
         last_scan_at:
-          description: When a scan last arrived here. Absent where none ever has
+          description: The last scan to arrive here. Absent where none ever has
           type: string
         open:
           description: Issues at components, the unit every count here uses
           format: int64
           type: integer
         overdue:
-          description: How many of those are past a deadline
+          description: The number past a deadline
           format: int64
           type: integer
         retired:
@@ -726,7 +726,7 @@ components:
             - tag
           type: string
         undecided:
-          description: How many nobody has claimed anything about
+          description: The number nobody has claimed anything about
           format: int64
           type: integer
         variant:
@@ -762,7 +762,7 @@ components:
       additionalProperties: false
       properties:
         builds:
-          description: How many builds of the selection hold any of it. Absent where the selection is one build
+          description: The number of builds of the selection holding any of it. Absent where the selection is one build
           format: int64
           type: integer
         components:
@@ -790,7 +790,7 @@ components:
           format: int64
           type: integer
         places:
-          description: How many findings those sit at
+          description: The number of findings those sit at
           format: int64
           type: integer
         severity:
@@ -800,7 +800,7 @@ components:
           description: The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped
           type: string
         upstream:
-          description: "What the upgrade is of: the source package where one is recorded, and the component's own name otherwise"
+          description: "The upgrade's subject: the source package where one is recorded, and the component's own name otherwise"
           type: string
       required:
         - upstream
@@ -848,7 +848,7 @@ components:
           description: Argue about a finding
           type: boolean
         name:
-          description: What to show for it
+          description: The label shown for it
           type: string
         product:
           type: string
@@ -912,22 +912,22 @@ components:
           description: The claim arrived attached to a component — a carried patch saying what it fixes — rather than in a document of its own
           type: boolean
         since:
-          description: When the build first said it, by the scan it arrived in
+          description: The scan the build first said it in
           type: string
         statement:
           description: The build's own reasoning, shown as written and never rendered
           type: string
         status:
-          description: What it claimed, in the exchange format's own vocabulary
+          description: The claim, in the exchange format's own vocabulary
           type: string
         subject:
-          description: What it said the claim was about — a package name, or its identifier where it named no name
+          description: The claim's subject — a package name, or its identifier where it named no name
           type: string
         suppresses:
           description: Whether it takes a finding off the list. 'affected' and 'under investigation' are information, not answers
           type: boolean
         until:
-          description: When it stopped saying it. Absent while it is still being said
+          description: The moment it stopped saying it. Absent while it is still being said
           type: string
         vulnerability:
           description: The identifier the build argued about, as it wrote it
@@ -951,7 +951,7 @@ components:
           readOnly: true
           type: string
         decisions:
-          description: Which of the offered judgments to carry
+          description: The offered judgments to carry
           items:
             format: int64
             type: integer
@@ -973,7 +973,7 @@ components:
           readOnly: true
           type: string
         carried:
-          description: How many claims were written, each waiting for a second person
+          description: The number of claims written, each waiting for a second person
           format: int64
           type: integer
       required:
@@ -997,11 +997,11 @@ components:
             - array
             - "null"
         total:
-          description: How many distinct components it matches. More than the list where the list was cut
+          description: The number of distinct components it matches. More than the list where the list was cut
           format: int64
           type: integer
         unheld:
-          description: How many of those nobody holds, which is what a rule may place
+          description: The number of those nobody holds, which is what a rule may place
           format: int64
           type: integer
         work:
@@ -1024,13 +1024,13 @@ components:
         became:
           type: string
         by:
-          description: Who made the change, by sign-in identity
+          description: The person who made the change, by sign-in identity
           type: string
         cleared:
           description: This change cleared it
           type: boolean
         kind:
-          description: What sort of thing changed
+          description: The kind of thing that changed
           enum:
             - setting
             - role
@@ -1061,7 +1061,7 @@ components:
           description: The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix
           type: string
         because:
-          description: Why it went. Only on fixed entries
+          description: The reason it went. Only on fixed entries
           enum:
             - removed
             - upgraded
@@ -1094,7 +1094,7 @@ components:
           description: The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither
           type: string
         outcome:
-          description: What was decided, where every standing decision over its places says the same thing
+          description: The decision, where every standing one over its places says the same thing
           enum:
             - affected
             - not-applicable
@@ -1107,7 +1107,7 @@ components:
         severity:
           type: string
         state:
-          description: How far this build has decided it. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four
+          description: The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four
           enum:
             - undecided
             - waiting
@@ -1135,7 +1135,7 @@ components:
           maxLength: 64
           type: string
         because:
-          description: Why the rows in except are set aside, in markdown. Required when any are
+          description: The reason the rows in except are set aside, in markdown. Required when any are
           type: string
         except:
           description: Decisions in this claim to set aside rather than approve. They return to the proposer as a claim of their own, carrying the reason given in because
@@ -1158,7 +1158,7 @@ components:
           readOnly: true
           type: string
         approved:
-          description: How many decisions were agreed to
+          description: The number of decisions agreed to
           format: int64
           type: integer
         returned_claim:
@@ -1182,7 +1182,7 @@ components:
           format: int64
           type: integer
         kind:
-          description: "What sort of action it was: one judgment about a finding, one about many issues at a component, an approved claim carried to a new issue, or rows set aside from a larger claim — by an approver agreeing to the rest, or by the author holding them back"
+          description: "The sort of action: one judgment about a finding, one about many issues at a component, an approved claim carried to a new issue, or rows set aside from a larger claim — by an approver agreeing to the rest, or by the author holding them back"
           enum:
             - finding
             - together
@@ -1190,12 +1190,12 @@ components:
             - returned
           type: string
         proposed_at:
-          description: When the action was taken, as a date and time
+          description: The moment the action was taken
           type: string
         proposed_by:
           type: string
         selected_by:
-          description: How a bulk set was narrowed. Never part of the claim itself
+          description: The narrowing behind a bulk set. Never part of the claim itself
           type: string
         selection:
           $ref: "#/components/schemas/SelectionBody"
@@ -1217,12 +1217,12 @@ components:
           readOnly: true
           type: string
         age_days:
-          description: How long the claim has stood. An old judgment should look like one
+          description: The age of the claim. An old judgment should look like one
           format: int64
           type: integer
         argument:
           $ref: "#/components/schemas/DecisionBody"
-          description: "What the claim says: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands"
+          description: "The claim's contents: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands"
         builds:
           description: Every build the claim currently covers, as stream and variant
           items:
@@ -1231,28 +1231,28 @@ components:
             - array
             - "null"
         by:
-          description: Who did it, where a person did
+          description: The person who did it, where a person did
           type: string
         claim:
           $ref: "#/components/schemas/ClaimBody"
-          description: Who acted, when, what sort of action it was, how a bulk set was narrowed, and where the work is happening
+          description: The actor, the moment, the sort of action, the narrowing behind a bulk set, and where the work is happening
         consumers:
-          description: How many things pull them in
+          description: The number of things pulling them in
           format: int64
           type: integer
         finding:
           $ref: "#/components/schemas/FindingRefBody"
-          description: What a representative row is about — build, issue, component, where it sits. Absent where no open finding sits at its place
+          description: A representative row's subject — build, issue, component, where it sits. Absent where no open finding sits at its place
         findings:
-          description: How many findings sit underneath, which is what the disposition register expands to
+          description: The number of findings underneath, which is what the disposition register expands to
           format: int64
           type: integer
         folds:
-          description: How many things there are to decide about
+          description: The number of things to decide about
           format: int64
           type: integer
         happened:
-          description: What became of the claim. mixed is a claim whose rows did not all end the same way
+          description: The claim's outcome. mixed is a claim whose rows did not all end the same way
           enum:
             - waiting
             - sent-back
@@ -1263,34 +1263,34 @@ components:
             - mixed
           type: string
         issues:
-          description: How many distinct issues it covers
+          description: The number of distinct issues it covers
           format: int64
           type: integer
         outliers:
           $ref: "#/components/schemas/OutliersBody"
           description: "For a claim over many issues: the rows that do not look like the rest, and how many there are"
         packages:
-          description: How many binaries those fold together
+          description: The number of binaries those fold together
           format: int64
           type: integer
         place:
           $ref: "#/components/schemas/PlaceBody"
         places:
-          description: How many distinct places it wrote at. What the bulk cap is measured against
+          description: The number of distinct places it wrote at. The bulk cap is measured against this
           format: int64
           type: integer
         previously_approved:
           description: This was agreed to before and came back
           type: boolean
         rows:
-          description: How many decisions the claim wrote
+          description: The number of decisions the claim wrote
           format: int64
           type: integer
         undisclosed:
           description: At least one row is about a finding nobody has announced
           type: boolean
         when:
-          description: "When it became that. Absent while it is waiting: nothing has happened to it"
+          description: "The moment it became that. Absent while it is waiting: nothing has happened to it"
           type: string
       required:
         - claim
@@ -1317,7 +1317,7 @@ components:
         identity:
           type: string
         name:
-          description: What to call them, where they have a display name
+          description: Their display name, where they have one
           type: string
       required:
         - identity
@@ -1370,7 +1370,7 @@ components:
           description: The comment text, in markdown
           type: string
         edited_at:
-          description: When the author last changed it, if they did
+          description: The author's last change to it, if they made one
           type: string
         id:
           format: int64
@@ -1448,7 +1448,7 @@ components:
           format: int64
           type: integer
         places:
-          description: How many times those sit somewhere in the build
+          description: The number of times those sit somewhere in the build
           format: int64
           type: integer
         source_package:
@@ -1462,7 +1462,7 @@ components:
             - array
             - "null"
         upstream:
-          description: What a fork was cut from, where one is known
+          description: The upstream a fork was cut from, where one is known
           type: string
         version:
           type: string
@@ -1522,10 +1522,10 @@ components:
       additionalProperties: false
       properties:
         last_received_at:
-          description: When a scan last arrived. Absent where none ever has
+          description: The last arrival of a scan. Absent where none ever has
           type: string
         last_refused_at:
-          description: When an upload against this build was last turned away. Absent where none has been
+          description: The last upload against this build to be turned away. Absent where none has been
           type: string
         product:
           type: string
@@ -1533,11 +1533,11 @@ components:
           description: Whether that is longer than this deployment allows
           type: boolean
         quiet_days:
-          description: How long it has been, in days, measured from the last arrival or from when the build was declared
+          description: The span since, in days, measured from the last arrival or from when the build was declared
           format: int64
           type: integer
         refused_because:
-          description: What the producer was told the last time one was turned away, in the same words they were given
+          description: The words the producer was given the last time one was turned away, in the same words they were given
           type: string
         retired:
           description: Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet
@@ -1576,23 +1576,23 @@ components:
             - array
             - "null"
         never:
-          description: How many in support have never been scanned, across every build and not only this page
+          description: The number in support never scanned, across every build and not only this page
           format: int64
           type: integer
         quiet:
-          description: How many have gone quiet, across every build and not only this page
+          description: The number gone quiet, across every build and not only this page
           format: int64
           type: integer
         quiet_after_days:
-          description: How long this deployment allows, in days
+          description: The span this deployment allows, in days
           format: int64
           type: integer
         total:
-          description: How many builds there are to report on
+          description: The number of builds to report on
           format: int64
           type: integer
         unsupported:
-          description: How many are out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
+          description: The number out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
           format: int64
           type: integer
       required:
@@ -1607,11 +1607,11 @@ components:
       additionalProperties: false
       properties:
         covered:
-          description: How many findings those places hold
+          description: The number of findings those places hold
           format: int64
           type: integer
         recorded:
-          description: How many places it was written against there
+          description: The number of places it was written against there
           format: int64
           type: integer
         stream:
@@ -1644,7 +1644,7 @@ components:
           format: int64
           type: integer
         since:
-          description: When they left
+          description: The date they left
           type: string
       required:
         - released
@@ -1688,11 +1688,11 @@ components:
             - already-fixed
           type: string
         reasoning:
-          description: Why this holds for every issue named
+          description: The reasoning, holding for every issue named
           minLength: 1
           type: string
         selected_by:
-          description: How you narrowed this set, in your own words. Recorded, and never part of the claim
+          description: The narrowing, in your own words. Recorded, and never part of the claim
           maxLength: 500
           minLength: 1
           type: string
@@ -1751,7 +1751,7 @@ components:
           readOnly: true
           type: string
         also:
-          description: What this judgment wrote in each other build it was applied to
+          description: The rows this judgment wrote in each other build it reached
           items:
             $ref: "#/components/schemas/CoveredBuild"
           type:
@@ -1762,7 +1762,7 @@ components:
           format: int64
           type: integer
         covered:
-          description: How many findings those places hold
+          description: The number of findings those places hold
           format: int64
           type: integer
         ids:
@@ -1780,7 +1780,7 @@ components:
           description: Whether a second person has to agree
           type: boolean
         recorded:
-          description: How many places it was written against
+          description: The number of places it was written against
           format: int64
           type: integer
       required:
@@ -1806,10 +1806,10 @@ components:
           format: int64
           type: integer
         committed_to:
-          description: When the promised work will be done, as a date. Required for patch-needed and upgrade-needed, and refused with any other
+          description: The date the promised work lands. Required for patch-needed and upgrade-needed, and refused with any other
           type: string
         deferred_until:
-          description: When a deferral returns, as a date. Required for a deferral
+          description: The date a deferral returns. Required for a deferral
           type: string
         fixed_version:
           description: The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other. Recorded and never compared against the version shipping
@@ -1819,11 +1819,11 @@ components:
           format: int64
           type: integer
         id:
-          description: What to name this decision in a later request
+          description: The name for this decision in a later request
           format: int64
           type: integer
         justification:
-          description: Why it does not apply. Required when it does not
+          description: The reason it does not apply. Required when it does not
           enum:
             - component_not_present
             - vulnerable_code_not_present
@@ -1832,14 +1832,14 @@ components:
             - inline_mitigations_already_exist
           type: string
         mitigation:
-          description: What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise
+          description: The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise
           maxLength: 65536
           type: string
         needs_approval:
           description: Whether a second person has to agree before it takes effect
           type: boolean
         outcome:
-          description: What was decided
+          description: The outcome
           enum:
             - affected
             - not-applicable
@@ -1850,21 +1850,21 @@ components:
             - patch-needed
           type: string
         places:
-          description: How many findings this decision covers
+          description: The number of findings this decision covers
           format: int64
           type: integer
         reasoning:
-          description: Why, in markdown. Somebody else has to agree with this
+          description: The reasoning, in markdown. Somebody else has to agree with this
           minLength: 1
           type: string
         selected_by:
-          description: How the set was narrowed, for a claim recorded as one of many. Never part of the claim itself
+          description: The narrowing behind a claim recorded as one of many. Never part of the claim itself
           type: string
         sent_back_at:
-          description: When an approver last asked for more. Empty means nobody has
+          description: The last time an approver asked for more. Empty means nobody has
           type: string
         state:
-          description: Where it has got to
+          description: The state it has reached
           enum:
             - proposed
             - approved
@@ -1875,7 +1875,7 @@ components:
           description: The version an upgrade moves to. Carried on an upgrade-needed decision, which is recorded from a component rather than from one finding
           type: string
         versions:
-          description: How many versions of the component sit here. More than one needs care
+          description: The number of versions of the component here. More than one needs care
           format: int64
           type: integer
       required:
@@ -1893,18 +1893,18 @@ components:
           readOnly: true
           type: string
         age_days:
-          description: How long the claim has stood. An old judgment should look like one
+          description: The age of the claim. An old judgment should look like one
           format: int64
           type: integer
         decision:
           $ref: "#/components/schemas/DecisionBody"
         finding:
           $ref: "#/components/schemas/FindingRefBody"
-          description: What the decision is about — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there
+          description: The decision's subject — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there
         place:
           $ref: "#/components/schemas/PlaceBody"
         proposed_at:
-          description: When the claim was made, as a date and time
+          description: The moment the claim was made
           type: string
         proposed_by:
           type: string
@@ -2059,12 +2059,12 @@ components:
         approved_at:
           type: string
         approved_by:
-          description: Who agreed. Two different people is the whole of the control, so both names are carried rather than a count
+          description: The people who agreed. Two different people is the whole of the control, so both names are carried rather than a count
           type: string
         closed:
           type: string
         closed_because:
-          description: Why it closed, in the tool's terms. Only on a closed row
+          description: The reason it closed, in the tool's terms. Only on a closed row
           enum:
             - removed
             - upgraded
@@ -2075,12 +2075,12 @@ components:
             - fixed
           type: string
         closed_note:
-          description: Why a person closed it, in their words. Only where a person did
+          description: The person's own reason for closing it. Only where a person did
           type: string
         component:
           type: string
         consumer:
-          description: What pulls the component in. Absent where the build holds it directly
+          description: The consumer that pulls the component in. Absent where the build holds it directly
           type: string
         due:
           type: string
@@ -2108,7 +2108,7 @@ components:
             - patch-needed
           type: string
         place:
-          description: Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half
+          description: The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half
           type: string
         proposed_at:
           type: string
@@ -2117,7 +2117,7 @@ components:
         severity:
           type: string
         state:
-          description: Where this stands. undecided is the row every other report leaves out and the one an auditor is looking for
+          description: The decision state. undecided is the row every other report leaves out and the one an auditor is looking for
           enum:
             - undecided
             - waiting
@@ -2173,7 +2173,7 @@ components:
           description: The component upstream version it was a claim about
           type: string
         approved_by:
-          description: Who last agreed to it, where anybody did
+          description: The person who last agreed to it, where anybody did
           type: string
         claim_id:
           format: int64
@@ -2184,7 +2184,7 @@ components:
         deferred_until:
           type: string
         ended:
-          description: Why it stopped applying
+          description: The reason it stopped applying
           enum:
             - lapsed
             - withdrawn
@@ -2255,7 +2255,7 @@ components:
           readOnly: true
           type: string
         body:
-          description: What it should say now, in markdown
+          description: The replacement text, in markdown
           minLength: 1
           type: string
       required:
@@ -2310,13 +2310,13 @@ components:
         component:
           type: string
         disclose_at:
-          description: When the embargo ends. Reaching it discloses nothing
+          description: The date the embargo ends. Reaching it discloses nothing
           type: string
         passed:
           description: Whether the date has already arrived
           type: boolean
         places:
-          description: How many findings this covers
+          description: The number of findings this covers
           format: int64
           type: integer
         product:
@@ -2379,20 +2379,20 @@ components:
           readOnly: true
           type: string
         builds:
-          description: How many builds it was recorded against
+          description: The number of builds it was recorded against
           format: int64
           type: integer
         component:
-          description: What in the build carries it
+          description: The component in the build that carries it
           type: string
         due_at:
-          description: When it has to be answered by
+          description: The date it has to be answered by
           type: string
         identifier:
-          description: What this deployment filed it as, such as SONIC-2026-0001
+          description: The identifier this deployment filed it under, such as SONIC-2026-0001
           type: string
         places:
-          description: How many findings that opened. One per place the component sits in, in each build
+          description: The number of findings that opened. One per place the component sits in, in each build
           format: int64
           type: integer
         visibility:
@@ -2478,7 +2478,7 @@ components:
           readOnly: true
           type: string
         advisory:
-          description: Where the issue is written up
+          description: The issue's write-up
           type: string
         aliases:
           description: Other names the same issue is known by
@@ -2491,10 +2491,10 @@ components:
           description: The version this was upgraded from, where the upgrade did not resolve it
           type: string
         assessed:
-          description: What we rate it, where we have said something. This is what ranks; severity is what was published
+          description: This deployment's own rating, where somebody has said something. This is what ranks; severity is the published word
           type: string
         assigned_to:
-          description: Who is dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person
+          description: The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person
           type: string
         component:
           type: string
@@ -2505,10 +2505,10 @@ components:
         description:
           type: string
         disclose_at:
-          description: When the embargo ends, as a date. Reaching it discloses nothing by itself
+          description: The date the embargo ends. Reaching it discloses nothing by itself
           type: string
         due:
-          description: When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late
+          description: The date it runs out. The earliest among its places, which is the one that makes the whole finding late
           type: string
         elsewhere:
           description: Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five
@@ -2529,16 +2529,16 @@ components:
             - mixed
           type: string
         fixed_at:
-          description: When that version became available
+          description: The date that version became available
           type: string
         fixed_in:
           description: The version that resolves it
           type: string
         found_by:
           $ref: "#/components/schemas/MeasuredBody"
-          description: "What produced this: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"
+          description: "The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"
         latest_released_at:
-          description: When that version shipped
+          description: The date that version shipped
           type: string
         latest_version:
           description: The newest version the ecosystem's own index knows of
@@ -2551,7 +2551,7 @@ components:
           description: The day the estimate was computed for, as a date
           type: string
         likelihood_percentile:
-          description: Where that estimate stands among all published ones, 0 to 1
+          description: The estimate's standing among all published ones, 0 to 1
           format: double
           type: number
         links:
@@ -2566,16 +2566,16 @@ components:
             - identifier
           type: string
         matched_from:
-          description: Where this match came from
+          description: The source of this match
           type: string
         matched_in:
-          description: Which body of vulnerability data answered, as the scanner names it — an ecosystem's own advisories against the national database's identifiers
+          description: The body of vulnerability data that answered, as the scanner names it — an ecosystem's own advisories against the national database's identifiers
           type: string
         matched_range:
           description: The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix
           type: string
         no_deadline:
-          description: "Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
+          description: "The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
             - below-the-line
             - nothing-to-take
@@ -2585,7 +2585,7 @@ components:
           description: Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned
           type: boolean
         opened:
-          description: When the earliest of these places first appeared here, as a date
+          description: The earliest of these places first appearing here, as a date
           type: string
         places:
           items:
@@ -2617,13 +2617,13 @@ components:
           format: double
           type: number
         score_kind:
-          description: Whether it is the primary rating or a secondary one
+          description: "The rating's rank: primary or secondary"
           type: string
         score_source:
-          description: Who published it, where the report names them
+          description: The publisher, where the report names them
           type: string
         score_version:
-          description: Which scoring system the number is on, as the report states it
+          description: The scoring system the number is on, as the report states it
           type: string
         severity:
           description: As the data rates it. A word
@@ -2653,15 +2653,15 @@ components:
           description: This has not been announced. Anything said about it outside this deployment discloses it
           type: boolean
         upstream:
-          description: What a fork was made from, where it is one
+          description: The upstream a fork was made from, where it is one
           type: string
         vector:
-          description: What the score assumes — reachability, privilege, interaction
+          description: The score's assumptions — reachability, privilege, interaction
           type: string
         version:
           type: string
         vex:
-          description: What VEX documents uploaded here say about this. Evidence, never applied
+          description: Statements from VEX documents uploaded here. Evidence, never applied
           items:
             $ref: "#/components/schemas/VexSaidBody"
           type:
@@ -2670,7 +2670,7 @@ components:
         vulnerability:
           type: string
         weaknesses:
-          description: What kind of flaw this is, as CWE identifiers
+          description: The kind of flaw, as CWE identifiers
           items:
             type: string
           type:
@@ -2698,12 +2698,12 @@ components:
           readOnly: true
           type: string
         reason:
-          description: Why it is being extended
+          description: The reason it is being extended
           maxLength: 65536
           minLength: 1
           type: string
         until:
-          description: Where the embargo should end, as a date
+          description: The date the embargo should end
           type: string
       required:
         - until
@@ -2738,10 +2738,10 @@ components:
         reason:
           type: string
         until:
-          description: Where it was asked to end
+          description: The end that was asked for
           type: string
         was:
-          description: Where the embargo ended before
+          description: The embargo's previous end
           type: string
       required:
         - id
@@ -2757,22 +2757,22 @@ components:
       additionalProperties: false
       properties:
         answered:
-          description: How many of those the build has already argued do not apply
+          description: The number of those the build has already argued do not apply
           format: int64
           type: integer
         builds:
-          description: How many builds in the selection hold this. Absent where the selection is one build
+          description: The number of builds in the selection holding this. Absent where the selection is one build
           format: int64
           type: integer
         chains:
-          description: How many distinct ways down there are. More than one means the pair above is one of them
+          description: The number of distinct ways down. More than one means the pair above is one of them
           format: int64
           type: integer
         component:
-          description: What carries it
+          description: The component that carries it
           type: string
         consumers:
-          description: How many things pull those in here. The build itself counts as one where anything is pulled in directly
+          description: The number of things pulling those in here. The build itself counts as one where anything is pulled in directly
           format: int64
           type: integer
         days_left:
@@ -2780,10 +2780,10 @@ components:
           format: int64
           type: integer
         disclose_at:
-          description: When the embargo ends, as a date. Reaching it discloses nothing by itself
+          description: The date the embargo ends. Reaching it discloses nothing by itself
           type: string
         due:
-          description: When it is due, as a date. Absent where there is none, and then no_deadline says why
+          description: The date it is due. Absent where there is none, and then no_deadline gives the reason
           type: string
         ecosystem:
           description: "The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"
@@ -2792,7 +2792,7 @@ components:
           description: Somebody is known to be exploiting this
           type: boolean
         fix_state:
-          description: What upstream has done about it
+          description: Upstream's answer about it
           enum:
             - fixed
             - none
@@ -2804,51 +2804,51 @@ components:
           description: The version that resolves it, where one exists
           type: string
         fold:
-          description: "What this row is about: the source package at the version it was built at, in the ecosystem and distribution it came from"
+          description: "The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from"
           type: string
         likelihood:
           description: Published estimate that this will be exploited, 0 to 1
           format: double
           type: number
         matched:
-          description: How the scanner reached this
+          description: The scanner's route to this
           enum:
             - advisory
             - identifier
           type: string
         middle:
-          description: How many steps sit between those two
+          description: The number of steps between those two
           format: int64
           type: integer
         no_deadline:
-          description: "Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
+          description: "The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
             - below-the-line
             - nothing-to-take
             - out-of-support
           type: string
         opened:
-          description: When the earliest of these places opened here, as a date. The age a deadline relates to
+          description: The earliest of these places opening here, as a date. The age a deadline relates to
           type: string
         owner:
           description: The part of the product this belongs to. Absent where the inventory placed the component nowhere
           type: string
         packages:
-          description: How many binaries of the source package sit here. More than one means deciding on this row decides about all of them
+          description: The number of binaries of the source package here. More than one means deciding on this row decides about all of them
           format: int64
           type: integer
         parent:
-          description: What directly pulls it in, which is what a decision is about
+          description: The component that directly pulls it in, which is what a decision is about
           type: string
         places:
-          description: How many findings sit under this row. What the bulk cap counts and what the disposition register expands to, rather than a number to reconcile with the two above
+          description: The number of findings under this row. The bulk cap counts these, and the disposition register expands to them, so it is not a number to reconcile with the two above
           format: int64
           type: integer
         product:
-          description: Which product this is open in. Present only on the list that spans products
+          description: The product this is open in. Present only on the list that spans products
           type: string
         product_name:
-          description: What that product is called, where it has a display name
+          description: That product's display name, where it has one
           type: string
         score:
           description: The severity as a number, which is what the order compares
@@ -2864,7 +2864,7 @@ components:
           description: "The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"
           type: string
         state:
-          description: "How far this has been decided: undecided when no place has a decision of any kind, waiting when a claim stands proposed and nobody has agreed, agreed when every place is answered by a standing decision, lapsed when a decision here stopped applying and nothing replaced it. Absent where some places are approved and the rest never decided"
+          description: "The decision state: undecided when no place has a decision of any kind, waiting when a claim stands proposed and nobody has agreed, agreed when every place is answered by a standing decision, lapsed when a decision here stopped applying and nothing replaced it. Absent where some places are approved and the rest never decided"
           enum:
             - undecided
             - waiting
@@ -2888,7 +2888,7 @@ components:
           description: Nothing here has been announced. Anything said about it outside this deployment discloses it
           type: boolean
         upstream:
-          description: What a fork was made from, where it is one
+          description: The upstream a fork was made from, where it is one
           type: string
         variant:
           description: The variant of that build
@@ -2927,7 +2927,7 @@ components:
             - array
             - "null"
         committed_to:
-          description: When a promised backport lands, as a date. Required for patch-needed and refused with any other
+          description: The date a promised backport lands. Required for patch-needed and refused with any other
           type: string
         deferred_until:
           description: Required when it is deferred. A date, as 2026-03-31
@@ -2944,7 +2944,7 @@ components:
           format: int64
           type: integer
         justification:
-          description: Why it does not apply. Required when it does not
+          description: The reason it does not apply. Required when it does not
           enum:
             - component_not_present
             - vulnerable_code_not_present
@@ -2953,7 +2953,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         mitigation:
-          description: What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise
+          description: The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise
           maxLength: 65536
           type: string
         outcome:
@@ -2966,7 +2966,7 @@ components:
             - patch-needed
           type: string
         places:
-          description: Which places this covers, as the finding names them. Omit for all of them
+          description: The places this covers, as the finding names them. Omit for all of them
           items:
             maxLength: 191
             type: string
@@ -2975,7 +2975,7 @@ components:
             - array
             - "null"
         reasoning:
-          description: Why this holds
+          description: The reasoning
           minLength: 1
           type: string
         remaining:
@@ -2991,7 +2991,7 @@ components:
         component:
           type: string
         decided:
-          description: How many of those this claim covers
+          description: The number of those this claim covers
           format: int64
           type: integer
         description:
@@ -3013,10 +3013,10 @@ components:
           description: The part of the product this belongs to
           type: string
         parent:
-          description: What directly pulls it in, which is what the decision is about
+          description: The component that directly pulls it in, which is what the decision is about
           type: string
         places:
-          description: How many places the issue sits at in that component in that build
+          description: The number of places the issue sits at in that component in that build
           format: int64
           type: integer
         product:
@@ -3108,7 +3108,7 @@ components:
             - "null"
         measured:
           $ref: "#/components/schemas/MeasuredBody"
-          description: What the register was measured with. Absent where nothing has been uploaded to the build
+          description: The tools the register was measured with. Absent where nothing has been uploaded to the build
         total:
           format: int64
           type: integer
@@ -3145,7 +3145,7 @@ components:
           description: The product the role is held against. Omit it and set everywhere instead to hold it across the estate
           type: string
         role:
-          description: What they may do with it
+          description: The rights it carries
           enum:
             - approver
             - assigner
@@ -3168,11 +3168,11 @@ components:
           format: int64
           type: integer
         covered:
-          description: What the claim covered when it was agreed to
+          description: The claim's reach when it was agreed to
           format: int64
           type: integer
         covers_now:
-          description: What it covers now, having reached it by matching rather than by anybody acting
+          description: Its reach now, arrived at by matching rather than by anybody acting
           format: int64
           type: integer
         outcome:
@@ -3204,7 +3204,7 @@ components:
           readOnly: true
           type: string
         to:
-          description: Who takes it on. Omit to return it to nobody
+          description: The party taking it on. Omit to return it to nobody
           type: string
       type: object
     Hand-back-assignmentsResponse:
@@ -3236,10 +3236,10 @@ components:
           description: The product the role is held against, by the name that addresses it. Absent where it is held across every product
           type: string
         product_display_name:
-          description: What to call that product, where it was declared with a display name
+          description: That product's display name, where it was declared with one
           type: string
         role:
-          description: What they may do with it
+          description: The rights it carries
           enum:
             - approver
             - assigner
@@ -3262,18 +3262,18 @@ components:
       additionalProperties: false
       properties:
         about:
-          description: What it was against, as the trail records it
+          description: The subject, as the trail records it
           type: string
         at:
           type: string
         by:
-          description: Who made the change
+          description: The person who made the change
           type: string
         now:
-          description: What they hold after. Absent means it was withdrawn
+          description: The roles held after. Absent means a withdrawal
           type: string
         was:
-          description: What they held before. Absent means they held nothing
+          description: The roles held before. Absent means nothing
           type: string
       required:
         - at
@@ -3284,7 +3284,7 @@ components:
       additionalProperties: false
       properties:
         identity:
-          description: What names it when handing work over
+          description: The name used when handing work over
           type: string
         kind:
           description: Whether this is a person or a team. Work is held by a party, and both are one
@@ -3293,7 +3293,7 @@ components:
             - team
           type: string
         name:
-          description: What to show, which is the spelling somebody typed where there is one
+          description: The label, which is the spelling somebody typed where there is one
           type: string
       required:
         - kind
@@ -3308,14 +3308,14 @@ components:
           format: int64
           type: integer
         overdue:
-          description: How many of those pieces are past their deadline
+          description: The number of those pieces past their deadline
           format: int64
           type: integer
         person:
-          description: Whoever holds it, by the name they are shown under. A person or a team
+          description: The holder, by the name they are shown under. A person or a team
           type: string
         places:
-          description: How many findings those cover, across every build
+          description: The number of findings those cover, across every build
           format: int64
           type: integer
         team:
@@ -3370,11 +3370,11 @@ components:
           format: int64
           type: integer
         deferred_days:
-          description: How long this has already been put off, across every line it has been carried through
+          description: The total this has already been put off for, across every line it has been carried through
           format: int64
           type: integer
         now:
-          description: What the new line has
+          description: The new line's contents
           type: string
         outcome:
           enum:
@@ -3422,14 +3422,14 @@ components:
           readOnly: true
           type: string
         digest:
-          description: What went out, hashed, so that what is published and what we would generate stay answerable against each other
+          description: A digest of what went out, so that what is published and what we would generate stay answerable against each other
           type: string
         issued_at:
           type: string
         summary:
           type: string
         version:
-          description: Which issuance this is, counting from one. It is what the next document's version says
+          description: The issuance number, counting from one. It is what the next document's version says
           format: int64
           type: integer
       required:
@@ -3479,7 +3479,7 @@ components:
             - array
             - "null"
         products:
-          description: How many of your products carry it
+          description: The number of your products carrying it
           format: int64
           type: integer
         score:
@@ -3531,7 +3531,7 @@ components:
           minLength: 1
           type: string
         variant:
-          description: How that line is built
+          description: The way that line is built
           minLength: 1
           type: string
       required:
@@ -3563,12 +3563,12 @@ components:
         component:
           type: string
         consumer:
-          description: What pulls the component in. Absent where the build holds it directly
+          description: The consumer that pulls the component in. Absent where the build holds it directly
           type: string
         deferred_until:
           type: string
         ended_at:
-          description: When it stopped applying — withdrawn, or lapsed because the code moved
+          description: The moment it stopped applying — withdrawn, or lapsed because the code moved
           type: string
         fixed_version:
           description: The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record
@@ -3589,7 +3589,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         mitigation:
-          description: What a holder can do about it. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks
+          description: The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks
           type: string
         outcome:
           enum:
@@ -3650,13 +3650,13 @@ components:
           readOnly: true
           type: string
         created_at:
-          description: When it was issued. A pipeline key does not expire, so this is the only thing that dates it
+          description: The date it was issued. A pipeline key does not expire, so this is the only thing that dates it
           type: string
         last_used_at:
-          description: When it last sent something
+          description: The last time it sent something
           type: string
         name:
-          description: What this credential is for
+          description: The credential's purpose
           maxLength: 191
           minLength: 1
           type: string
@@ -3665,7 +3665,7 @@ components:
           minLength: 1
           type: string
         product_display_name:
-          description: What to call that product, where it was declared with a display name
+          description: That product's display name, where it was declared with one
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
@@ -3729,12 +3729,12 @@ components:
           format: int64
           type: integer
         due:
-          description: When it is due, as a date
+          description: The date it is due
           type: string
         exploited:
           type: boolean
         places:
-          description: How many places in that build this sits at
+          description: The number of places in that build this sits at
           format: int64
           type: integer
         product:
@@ -3746,7 +3746,7 @@ components:
         variant:
           type: string
         version:
-          description: Which version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved
+          description: The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved
           type: string
         vulnerability:
           type: string
@@ -3764,7 +3764,7 @@ components:
       additionalProperties: false
       properties:
         name:
-          description: What is at the other end — the issue's record, a distribution's answer about it, or the package's own page
+          description: The destination — the issue's record, a distribution's answer about it, or the package's own page
           type: string
         url:
           type: string
@@ -3881,7 +3881,7 @@ components:
             - array
             - "null"
         total:
-          description: How many there are in all, so a page says what it is a page of
+          description: The total, so a page says what it is a page of
           format: int64
           type: integer
       required:
@@ -4773,7 +4773,7 @@ components:
           description: This is another version in the same build, not another build
           type: boolean
         places:
-          description: How many places it sits at there
+          description: The number of places it sits at there
           format: int64
           type: integer
         stream:
@@ -4792,7 +4792,7 @@ components:
       additionalProperties: false
       properties:
         built_at:
-          description: When the build it describes was built
+          description: The build time it describes
           type: string
         database_version:
           description: The vulnerability database it read
@@ -4802,7 +4802,7 @@ components:
           format: int64
           type: integer
         document_at:
-          description: Where to fetch the inventory that was read. Absent where its contents were let go
+          description: The address of the inventory that was read. Absent where its contents were let go
           type: string
         document_hash:
           description: The hash of the inventory as it arrived
@@ -4811,7 +4811,7 @@ components:
           description: Whether the inventory itself is still here
           type: boolean
         ran_at:
-          description: When that run finished
+          description: The moment that run finished
           type: string
         ran_here:
           description: We ran the scanner, rather than the build sending what its own found
@@ -4828,7 +4828,7 @@ components:
           description: The hash of what was uploaded
           type: string
         scanner:
-          description: Which scanner produced the findings
+          description: The scanner that produced the findings
           type: string
         scanner_version:
           type: string
@@ -4849,7 +4849,7 @@ components:
           description: The ceiling was reached, so the spans describe the most recent part of the window rather than all of it
           type: boolean
         sampled:
-          description: How many observations the two spans were worked out from
+          description: The number of observations behind the two spans
           format: int64
           type: integer
         sent_back:
@@ -4859,21 +4859,21 @@ components:
         since:
           type: string
         throughput:
-          description: What each person got through, most first
+          description: Each person's throughput, most first
           items:
             $ref: "#/components/schemas/WorkedBody"
           type:
             - array
             - "null"
         time_to_agree:
-          description: How long a claim waited for a second person, per severity
+          description: The wait for a second person, per severity
           items:
             $ref: "#/components/schemas/SpreadBody"
           type:
             - array
             - "null"
         time_to_decide:
-          description: How long a finding sat before anybody proposed anything about it, per severity
+          description: The wait before anybody proposed anything, per severity
           items:
             $ref: "#/components/schemas/SpreadBody"
           type:
@@ -4894,10 +4894,10 @@ components:
       additionalProperties: false
       properties:
         identity:
-          description: What to write after the @
+          description: The name written after the @
           type: string
         name:
-          description: What to show while choosing
+          description: The label shown while choosing
           type: string
       required:
         - identity
@@ -5003,7 +5003,7 @@ components:
           description: The same number by how the issues were rated, which is what says whether a branch is worth opening. 'unrated' is what nobody scored, and the bands sum to beneath
           type: object
         children:
-          description: How many components it pulls in. Zero means nothing to open
+          description: The number of components it pulls in. Zero means nothing to open
           format: int64
           type: integer
         component:
@@ -5048,7 +5048,7 @@ components:
           readOnly: true
           type: string
         body:
-          description: What to say, in markdown
+          description: The text, in markdown
           minLength: 1
           type: string
       required:
@@ -5058,10 +5058,10 @@ components:
       additionalProperties: false
       properties:
         body:
-          description: What it says, in markdown
+          description: The text, in markdown
           type: string
         edited_at:
-          description: When the author last changed it, where they have
+          description: The author's last change, where they made one
           type: string
         id:
           format: int64
@@ -5069,7 +5069,7 @@ components:
         written_at:
           type: string
         written_by:
-          description: Who wrote it
+          description: The author
           type: string
       required:
         - id
@@ -5104,20 +5104,20 @@ components:
       additionalProperties: false
       properties:
         about:
-          description: What a condition is about. Absent for an event
+          description: A condition's subject. Absent for an event
           type: string
         at:
-          description: When it was recorded
+          description: The moment it was recorded
           type: string
         body:
-          description: What to say. Describes the moment it was written rather than the world now
+          description: The message. It describes the moment it was written rather than the world now
           type: string
         id:
-          description: What to name this when acknowledging it
+          description: The name for this when acknowledging it
           format: int64
           type: integer
         kind:
-          description: "What happened, as a word: assigned, sent-back, build-quiet"
+          description: "The kind, as a word: assigned, sent-back, build-quiet"
           type: string
         lifetime:
           description: An event happened once and is acknowledged; a condition holds until what it is about changes
@@ -5126,7 +5126,7 @@ components:
             - condition
           type: string
         link:
-          description: Where it points, where there is somewhere to go
+          description: The destination, where there is somewhere to go
           type: string
       required:
         - id
@@ -5152,7 +5152,7 @@ components:
             - array
             - "null"
         total:
-          description: How many are waiting on you
+          description: The number waiting on you
           format: int64
           type: integer
       required:
@@ -5193,20 +5193,20 @@ components:
           readOnly: true
           type: string
         because:
-          description: Why the last one failed, where one did
+          description: The reason the last one failed, where one did
           type: string
         failing:
-          description: How many are being retried or have been given up on
+          description: The number being retried or given up on
           format: int64
           type: integer
         kind:
-          description: Which notifications go here, or * for all of them
+          description: The notifications that go here, or * for all of them
           type: string
         name:
-          description: What it is called, so a log line and a screen can name it
+          description: The name, so a log line and a screen can use it
           type: string
         sent:
-          description: How many things have gone there
+          description: The number of things delivered there
           format: int64
           type: integer
         url:
@@ -5237,7 +5237,7 @@ components:
         vulnerability:
           type: string
         why:
-          description: Which of the four signals made it stand out
+          description: The signal that made it stand out
           items:
             type: string
           type:
@@ -5387,7 +5387,7 @@ components:
         display_name:
           type: string
         end_of_life:
-          description: When the product goes out of support, where a date is set
+          description: The date the product goes out of support, where one is set
           type: string
         name:
           type: string
@@ -5429,7 +5429,7 @@ components:
           format: int64
           type: integer
         share:
-          description: How much of everything agreed to here ran between these two, as a percentage of rows
+          description: The share of everything agreed to here that ran between these two, as a percentage of rows
           format: int64
           type: integer
       required:
@@ -5445,10 +5445,10 @@ components:
         asked_at:
           type: string
         by:
-          description: Who asked
+          description: The person who asked
           type: string
         days:
-          description: How much later that is, in days
+          description: The distance later, in days
           format: int64
           type: integer
         id:
@@ -5462,12 +5462,12 @@ components:
         reason:
           type: string
         until:
-          description: Where it is asked to end
+          description: The end being asked for
           type: string
         vulnerability:
           type: string
         was:
-          description: Where the embargo ends now
+          description: The embargo's end now
           type: string
       required:
         - id
@@ -5487,14 +5487,14 @@ components:
           additionalProperties:
             format: int64
             type: integer
-          description: What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count
+          description: Everything open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count
           type: object
         committed_to:
-          description: When the work promised here is due
+          description: The date the work promised here is due
           format: date-time
           type: string
         consumers:
-          description: How many things pull it in here
+          description: The number of things pulling it in here
           format: int64
           type: integer
         due_at:
@@ -5502,17 +5502,17 @@ components:
           format: date-time
           type: string
         ecosystem:
-          description: Which ecosystem the identifier names, read out of it rather than stored
+          description: The ecosystem the identifier names, read out of it rather than stored
           type: string
         exploited:
           description: Whether any of what is open here is known to be exploited, which outranks everything else about it
           type: boolean
         first_seen:
-          description: When a scan of this deployment first reported the component
+          description: The first scan of this deployment to report the component
           format: date-time
           type: string
         fixable:
-          description: How many of what is open here any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue
+          description: The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue
           format: int64
           type: integer
         issues:
@@ -5520,24 +5520,24 @@ components:
           format: int64
           type: integer
         newest_released_at:
-          description: When that version shipped, where the index said
+          description: The date that version shipped, where the index said
           format: date-time
           type: string
         newest_version:
           description: The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package
           type: string
         package_page_name:
-          description: What to call that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is
+          description: The name for that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is
           type: string
         package_page_url:
-          description: Where this package is published, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like
+          description: The address this package is published at, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like
           type: string
         places:
-          description: How many times those sit somewhere in this build. What the bulk cap is measured against
+          description: The number of times those sit somewhere in this build. What the bulk cap is measured against
           format: int64
           type: integer
         project_url:
-          description: Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier
+          description: The address the index gives for where the package is developed. Absent where it does not say, in which case an address can still be built from the identifier
           type: string
         purl:
           description: The package identifier this build ships it under
@@ -5548,7 +5548,7 @@ components:
           description: One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package
           type: string
         supplier:
-          description: Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it
+          description: The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it
           type: string
         upgrade_to:
           description: The version somebody has committed to moving this build to
@@ -5563,7 +5563,7 @@ components:
         variant:
           type: string
         version:
-          description: What this build ships
+          description: The version this build ships
           type: string
       required:
         - stream
@@ -5586,16 +5586,16 @@ components:
           description: Whether they may read this deployment's own records. It grants no product's findings or decisions
           type: boolean
         deactivated_at:
-          description: When they left. Absent means they may still sign in
+          description: The date they left. Absent means they may still sign in
           type: string
         display_name:
-          description: What to show instead of the identity
+          description: The label shown instead of the identity
           type: string
         email:
-          description: Where they are reached outside the application
+          description: The address they are reached at outside the application
           type: string
         email_source:
-          description: Who last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten
+          description: The source that last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten
           enum:
             - provider
             - recorded
@@ -5607,7 +5607,7 @@ components:
             - array
             - "null"
         identity:
-          description: What to call them here
+          description: The name for them here
           maxLength: 191
           minLength: 1
           type: string
@@ -5653,7 +5653,7 @@ components:
       additionalProperties: false
       properties:
         place:
-          description: Which place in the build, as the findings list gives it
+          description: The place in the build, as the findings list gives it
           minLength: 1
           type: string
         product:
@@ -5687,13 +5687,13 @@ components:
             - array
             - "null"
         by:
-          description: When the work will be done, as 2026-03-31. What a missed target is measured against
+          description: The date the work lands, as 2026-03-31. A missed target is measured against it
           type: string
         person:
-          description: Who is carrying it, by sign-in identity. Leave both out and it is held by nobody
+          description: The party carrying it, by sign-in identity. Leave both out and it is held by nobody
           type: string
         reasoning:
-          description: "Why this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome"
+          description: "The reason this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome"
           minLength: 1
           type: string
         team:
@@ -5727,7 +5727,7 @@ components:
             - array
             - "null"
         declared_at:
-          description: When the commitment was made, which is what this release has been waiting since
+          description: The moment the commitment was made, which is what this release has been waiting since
           type: string
         fold:
           description: "The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from"
@@ -5742,11 +5742,11 @@ components:
           format: int64
           type: integer
         places:
-          description: How many findings those issues sit at
+          description: The number of findings those issues sit at
           format: int64
           type: integer
         state:
-          description: Where it stands. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this
+          description: The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this
           enum:
             - planned
             - landed
@@ -5756,7 +5756,7 @@ components:
           description: The version it moves to, as the commitment recorded it
           type: string
         upstream:
-          description: "What to call it: the source package"
+          description: "The name: the source package"
           type: string
       required:
         - fold
@@ -5784,7 +5784,7 @@ components:
           format: int64
           type: integer
         components:
-          description: How many packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together
+          description: The number of packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together
           format: int64
           type: integer
         decisions:
@@ -5825,7 +5825,7 @@ components:
           readOnly: true
           type: string
         elsewhere:
-          description: Where the work is happening. Empty clears it
+          description: The place the work is happening. Empty clears it
           maxLength: 1000
           type: string
       required:
@@ -5853,7 +5853,7 @@ components:
           additionalProperties:
             format: int64
             type: integer
-          description: What appeared, split by severity
+          description: Everything that appeared, split by severity
           type: object
         resolved:
           description: Findings that went away during this step
@@ -5863,7 +5863,7 @@ components:
           additionalProperties:
             format: int64
             type: integer
-          description: What went away, split by the severity it held while it was open
+          description: Everything that went away, split by the severity it held while it was open
           type: object
       required:
         - at
@@ -5878,7 +5878,7 @@ components:
       additionalProperties: false
       properties:
         defer_days:
-          description: How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else
+          description: The deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else
           format: int64
           maximum: 3650
           minimum: 1
@@ -5893,7 +5893,7 @@ components:
             - inline_mitigations_already_exist
           type: string
         outcome:
-          description: What it offers to say
+          description: The reasoning it offers
           enum:
             - affected
             - not-applicable
@@ -5921,21 +5921,21 @@ components:
           readOnly: true
           type: string
         branches:
-          description: How many branches are declared
+          description: The number of branches declared
           format: int64
           type: integer
         display_name:
-          description: What people see. Defaults to the name
+          description: The display name. Defaults to the name
           maxLength: 191
           type: string
         end_of_life:
           description: The date support ends for releases that have not stated their own, as YYYY-MM-DD
           type: string
         last_scan_at:
-          description: When a scan last arrived for any of its builds
+          description: The last scan to arrive for any of its builds
           type: string
         name:
-          description: How scans name this product
+          description: The name scans use for this product
           maxLength: 191
           minLength: 1
           type: string
@@ -5944,11 +5944,11 @@ components:
           format: int64
           type: integer
         tags:
-          description: How many tags are declared
+          description: The number of tags declared
           format: int64
           type: integer
         triage_floor:
-          description: What this product considers worth triaging, where it says something other than the deployment. Absent means it follows the deployment
+          description: The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment
           enum:
             - everything
             - low
@@ -5957,7 +5957,7 @@ components:
             - critical
           type: string
         variants:
-          description: How many variants are declared
+          description: The number of variants declared
           format: int64
           type: integer
       required:
@@ -5977,10 +5977,10 @@ components:
       additionalProperties: false
       properties:
         name:
-          description: What to put in the sign-in path
+          description: The segment in the sign-in path
           type: string
         path:
-          description: Where to send the browser to start
+          description: The address to send the browser to
           type: string
       required:
         - name
@@ -6013,14 +6013,14 @@ components:
       additionalProperties: false
       properties:
         kind:
-          description: Which worker the work is for
+          description: The worker the work is for
           type: string
         limit:
-          description: How much of this kind may wait before more is refused
+          description: The depth of this kind allowed before more is refused
           format: int64
           type: integer
         waiting:
-          description: How much is waiting, including work held by a worker that has stopped reporting
+          description: The depth waiting, including work held by a worker that has stopped reporting
           format: int64
           type: integer
       required:
@@ -6032,7 +6032,7 @@ components:
       additionalProperties: false
       properties:
         closed:
-          description: How many issue-and-component groups are wholly closed, with a deadline to be judged against
+          description: The number of issue-and-component groups wholly closed, with a deadline to be judged against
           format: int64
           type: integer
         deferred:
@@ -6040,11 +6040,11 @@ components:
           format: int64
           type: integer
         late:
-          description: How many did not
+          description: The number that did not
           format: int64
           type: integer
         met:
-          description: How many of those closed by it. Closed exactly at the deadline met it, because something still open at that instant is not yet overdue
+          description: The number of those closed by it. Closed exactly at the deadline met it, because something still open at that instant is not yet overdue
           format: int64
           type: integer
         open:
@@ -6110,11 +6110,11 @@ components:
           readOnly: true
           type: string
         blockers:
-          description: How many pieces of work nobody has agreed to ship with
+          description: The number of pieces of work nobody has agreed to ship with
           format: int64
           type: integer
         blocking:
-          description: What nobody has agreed to ship with, worst first. Bounded; total says how many there are
+          description: The work nobody has agreed to ship with, worst first. Bounded; total says how many there are
           items:
             $ref: "#/components/schemas/BlockingBody"
           type:
@@ -6128,7 +6128,7 @@ components:
         shipped:
           $ref: "#/components/schemas/BuildCountsBody"
         why:
-          description: What is missing, where there is nothing to compare against
+          description: The missing half, where there is nothing to compare against
           type: string
       required:
         - now
@@ -6146,7 +6146,7 @@ components:
           readOnly: true
           type: string
         reasoning:
-          description: Why every one of them still holds, in markdown
+          description: The reason every one of them still holds, in markdown
           minLength: 1
           type: string
       required:
@@ -6167,7 +6167,7 @@ components:
           format: int64
           type: integer
         reasoning:
-          description: Why it still holds, in markdown
+          description: The reason it still holds, in markdown
           minLength: 1
           type: string
       required:
@@ -6196,7 +6196,7 @@ components:
             - array
             - "null"
         places:
-          description: How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
+          description: The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
           format: int64
           type: integer
         waiting:
@@ -6212,35 +6212,35 @@ components:
       additionalProperties: false
       properties:
         built_at:
-          description: When the producer says the build was made
+          description: The build time the producer states
           type: string
         caution:
-          description: "What the scanner said while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours"
+          description: "The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours"
           type: string
         closed:
           description: Issues that were open and are not any more. Absent for the same reasons as the count beside it
           format: int64
           type: integer
         components:
-          description: How many components the inventory described
+          description: The number of components the inventory described
           format: int64
           type: integer
         failure:
-          description: Why it could not be used, where it could not
+          description: The reason it could not be used, where it could not
           type: string
         measured:
           $ref: "#/components/schemas/MeasuredBody"
-          description: What the run answering this upload was measured with. Absent until a run has covered it
+          description: The tools the run answering this upload was measured with. Absent until a run has covered it
         opened:
           description: Issues this run found that were not open before. Absent where this upload's run is reported against a newer one, or where none has covered it yet
           format: int64
           type: integer
         placed:
-          description: How many of them something placed in the graph
+          description: The number of them something placed in the graph
           format: int64
           type: integer
         received_at:
-          description: When it arrived here
+          description: The moment it arrived here
           type: string
         run_id:
           description: The run that answered this upload. Absent until one has
@@ -6261,7 +6261,7 @@ components:
           description: The identity the inventory carries for itself
           type: string
         state:
-          description: How far it has got
+          description: The state it has reached
           enum:
             - reading
             - scanning
@@ -6291,7 +6291,7 @@ components:
             - "null"
         measured_against:
           $ref: "#/components/schemas/MeasuredBody"
-          description: What the last completed run was measured with
+          description: The tools the last completed run was measured with
         total:
           format: int64
           type: integer
@@ -6310,7 +6310,7 @@ components:
           readOnly: true
           type: string
         summary:
-          description: What this revision says, for the document's revision history. A history whose every entry reads the same is one nobody reads
+          description: The revision's summary, for the document's revision history. A history whose every entry reads the same is one nobody reads
           maxLength: 191
           type: string
       type: object
@@ -6334,32 +6334,32 @@ components:
             - array
             - "null"
         component:
-          description: What carries it. Omit for the build itself
+          description: The component that carries it. Omit for the build itself
           type: string
         contact:
-          description: How to reach them. A researcher has no account here, which is the shape of the thing
+          description: The address to reach them at. A researcher has no account here, which is the shape of the thing
           maxLength: 191
           type: string
         credit:
-          description: How they wish to be credited in an advisory, where that is not the name they reported under. "anonymous" is a real answer
+          description: The credit they asked for in an advisory, where that is not the name they reported under. "anonymous" is a real answer
           maxLength: 191
           type: string
         disclosed:
           description: Whether this is already public. Undisclosed by default
           type: boolean
         ecosystem:
-          description: Which one, where two share a name and a version
+          description: The ecosystem, where two share a name and a version
           type: string
         received:
           description: The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless
           format: date
           type: string
         reported_by:
-          description: Who found it, as they gave their name
+          description: The finder, as they gave their name
           maxLength: 191
           type: string
         severity:
-          description: How bad it is. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given
+          description: The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given
           enum:
             - critical
             - high
@@ -6369,17 +6369,17 @@ components:
             - none
           type: string
         summary:
-          description: What the flaw is, in your own words
+          description: The flaw, in your own words
           minLength: 1
           type: string
         vector:
           description: A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula
           type: string
         version:
-          description: Which one, where the build holds that name at several versions
+          description: The version, where the build holds that name at several
           type: string
         weaknesses:
-          description: What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which
+          description: The kind of flaw, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which
           items:
             type: string
           type:
@@ -6406,10 +6406,10 @@ components:
           description: "Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is"
           type: boolean
         display_name:
-          description: What to show instead of the identity
+          description: The label shown instead of the identity
           type: string
         email:
-          description: Where to reach them outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was
+          description: The address to reach them at outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was
           type: string
         holds:
           items:
@@ -6418,7 +6418,7 @@ components:
             - array
             - "null"
         identity:
-          description: What to call them here
+          description: The name for them here
           maxLength: 191
           minLength: 1
           type: string
@@ -6436,7 +6436,7 @@ components:
           readOnly: true
           type: string
         reason:
-          description: Why the file is being removed. Recorded and shown wherever the text referred to it
+          description: The reason the file is being removed. Recorded and shown wherever the text referred to it
           maxLength: 1000
           minLength: 1
           type: string
@@ -6460,7 +6460,7 @@ components:
       additionalProperties: false
       properties:
         kind:
-          description: What it appears to be. A patch is the change itself
+          description: The kind of reference. A patch is the change itself
           enum:
             - patch
             - advisory
@@ -6483,7 +6483,7 @@ components:
           description: That total split by the rating in force
           type: object
         kind:
-          description: Whether that is a branch or a tag
+          description: "The kind of stream: a branch or a tag"
           type: string
         open:
           description: Every open finding at this build
@@ -6509,7 +6509,7 @@ components:
             type: integer
           type: object
         cut:
-          description: When the release was declared. It orders them and labels them; the axis is the sequence
+          description: The date the release was declared. It orders and labels them; the axis is the sequence
           type: string
         open:
           description: Distinct issues open against it now, against today's vulnerability data rather than the day it was cut
@@ -6550,7 +6550,7 @@ components:
           readOnly: true
           type: string
         aging:
-          description: What is open now, by how long it has been. About now whatever period was asked for
+          description: Everything open now, by how long it has been. About now whatever period was asked for
           items:
             $ref: "#/components/schemas/BucketBody"
           type:
@@ -6599,11 +6599,11 @@ components:
           description: A deferral is in force now. Something put off three times and since decided is history; the same thing still being put off is the pattern
           type: boolean
         times:
-          description: How often it has been put off
+          description: The number of times it has been put off
           format: int64
           type: integer
         total_days:
-          description: How long it has been put off for, added up
+          description: The total it has been put off for
           format: int64
           type: integer
         vulnerability:
@@ -6632,7 +6632,7 @@ components:
         contact:
           type: string
         credit:
-          description: How they wish to be credited in an advisory
+          description: The credit they asked for in an advisory
           type: string
         received:
           description: The day it arrived, which the embargo is counted from
@@ -6659,7 +6659,7 @@ components:
           format: date
           type: string
         reasoning:
-          description: Why the promise is changing, in markdown
+          description: The reason the promise is changing, in markdown
           minLength: 1
           type: string
         to:
@@ -6682,7 +6682,7 @@ components:
           readOnly: true
           type: string
         because:
-          description: What fixed it
+          description: The fix
           minLength: 1
           type: string
       required:
@@ -6699,10 +6699,10 @@ components:
           readOnly: true
           type: string
         at:
-          description: When it was closed
+          description: The moment it closed
           type: string
         closed:
-          description: How many locations of the issue in this build were closed
+          description: The number of locations of the issue in this build that closed
           format: int64
           type: integer
       required:
@@ -6716,7 +6716,7 @@ components:
           description: The date has passed. False is a release that is about to go out of support
           type: boolean
         ended_days:
-          description: How many days ago support ended. Negative where the date has not arrived, which is how many days are left
+          description: The days since support ended. Negative where the date has not arrived, which is how many days are left
           format: int64
           type: integer
         ended_on:
@@ -6780,11 +6780,11 @@ components:
           format: int64
           type: integer
         total:
-          description: How many releases are out of support
+          description: The number of releases out of support
           format: int64
           type: integer
         within:
-          description: How many days ahead this looked
+          description: The days ahead this looked
           format: int64
           type: integer
       required:
@@ -6833,11 +6833,11 @@ components:
           description: The justification text, in markdown
           type: string
         id:
-          description: What an approval names when it says which words were agreed to
+          description: The identifier an approval names when it says which words were agreed to
           format: int64
           type: integer
         ordinal:
-          description: Which revision this is, counting from one
+          description: The revision number, counting from one
           format: int64
           type: integer
         written_at:
@@ -6862,11 +6862,11 @@ components:
           readOnly: true
           type: string
         components:
-          description: How many components this build holds
+          description: The number of components this build holds
           format: int64
           type: integer
         edges:
-          description: How many edges place them
+          description: The number of edges placing them
           format: int64
           type: integer
         items:
@@ -6923,17 +6923,17 @@ components:
           format: int64
           type: integer
         name:
-          description: What to call it, so a placement can be explained in words
+          description: The name, so a placement can be explained in words
           type: string
         order:
-          description: Where it sits among the others. The first rule that matches places the work
+          description: Its position among the others. The first rule that matches places the work
           format: int64
           type: integer
         team:
-          description: Where work lands, by the name that addresses the team
+          description: The team work lands on, by the name that addresses it
           type: string
         team_display_name:
-          description: What to call that team, where it was declared with a display name
+          description: That team's display name, where it was declared with one
           type: string
         upstream:
           description: A source package name. Catches every binary package built from it
@@ -6955,7 +6955,7 @@ components:
           readOnly: true
           type: string
         caution:
-          description: What the scanner said while succeeding — a qualification on what it found rather than a failure
+          description: The scanner's own words while succeeding — a qualification on what it found rather than a failure
           type: string
         closed:
           $ref: "#/components/schemas/RunChangeBody"
@@ -6963,7 +6963,7 @@ components:
           description: The vulnerability database it read
           type: string
         failure:
-          description: Why it produced nothing
+          description: The reason it produced nothing
           type: string
         finished_at:
           description: Absent while it is still going
@@ -6971,7 +6971,7 @@ components:
         opened:
           $ref: "#/components/schemas/RunChangeBody"
         opened_exploited:
-          description: How many of what it opened somebody is known to be exploiting
+          description: The number it opened that somebody is known to be exploiting
           format: int64
           type: integer
         ran_here:
@@ -7028,7 +7028,7 @@ components:
           type: string
         prepares:
           $ref: "#/components/schemas/PreparedBody"
-          description: What this filter should offer to claim about what it catches. Left out, it prepares nothing — including on a name that used to
+          description: The claim this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to
         query:
           description: The list's query string, without a leading ?
           maxLength: 2000
@@ -7040,13 +7040,13 @@ components:
       additionalProperties: false
       properties:
         name:
-          description: What to call it. Matched without regard to capitals, and one of a name replaces the one before
+          description: The name. Matched without regard to capitals, and one of a name replaces the one before
           maxLength: 120
           minLength: 1
           type: string
         prepares:
           $ref: "#/components/schemas/PreparedBody"
-          description: What this filter offers to claim about what it catches. Absent on an ordinary saved filter, which is most of them
+          description: The claim this filter offers about what it catches. Absent on an ordinary saved filter, which is most of them
         query:
           description: The findings list's query string, without a leading ?
           maxLength: 2000
@@ -7168,11 +7168,11 @@ components:
           description: The text the candidate list was narrowed by. Absent where it was not narrowed, which means every issue at the component was on the page
           type: string
         matched:
-          description: How many issues that narrowing reached when the claim was written, read here rather than taken from the caller
+          description: The number of issues that narrowing reached when the claim was written, read here rather than taken from the caller
           format: int64
           type: integer
         named:
-          description: How many the claim was then made about
+          description: The number the claim was then made about
           format: int64
           type: integer
       required:
@@ -7190,7 +7190,7 @@ components:
           readOnly: true
           type: string
         because:
-          description: What needs to change, in markdown
+          description: The change being asked for, in markdown
           minLength: 1
           type: string
       required:
@@ -7200,7 +7200,7 @@ components:
       additionalProperties: false
       properties:
         document_id:
-          description: What to name to read this document back
+          description: The name that reads this document back
           format: int64
           type: integer
         hash:
@@ -7210,13 +7210,13 @@ components:
           description: Whether the contents are still kept
           type: boolean
         kind:
-          description: What the document is
+          description: The kind of document
           enum:
             - inventory
             - suppressions
           type: string
         size_bytes:
-          description: How large it was
+          description: Its size
           format: int64
           type: integer
       required:
@@ -7246,7 +7246,7 @@ components:
             - array
             - "null"
         reason:
-          description: Why any build is being taken out. Required whenever one is
+          description: The reason any build is being taken out. Required whenever one is
           type: string
       required:
         - builds
@@ -7309,7 +7309,7 @@ components:
       additionalProperties: false
       properties:
         attempts:
-          description: How many times it was tried
+          description: The number of attempts
           format: int64
           type: integer
         id:
@@ -7317,16 +7317,16 @@ components:
           format: int64
           type: integer
         kind:
-          description: Which worker the job was for
+          description: The worker the job was for
           type: string
         last_error:
-          description: Why it stopped, where anything reported one. Worker output, which may quote what the job was about
+          description: The reason it stopped, where anything reported one. Worker output, which may quote what the job was about
           type: string
         reference:
-          description: What the work was about
+          description: The subject of the work
           type: string
         stopped_at:
-          description: When it was set aside
+          description: The moment it was set aside
           format: date-time
           type: string
       required:
@@ -7343,7 +7343,7 @@ components:
           description: Nobody has set this; the shipped value is in use
           type: boolean
         kind:
-          description: "What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off"
+          description: "The kind of value: a length of time, a count of things, a count of bytes, one of a few words, or on and off"
           enum:
             - duration
             - count
@@ -7352,7 +7352,7 @@ components:
             - switch
           type: string
         means:
-          description: What it decides
+          description: The thing it decides
           type: string
         name:
           type: string
@@ -7396,17 +7396,17 @@ components:
         fixed_in:
           type: string
         places:
-          description: How many times that component sits in that build carrying this issue
+          description: The number of times that component sits in that build carrying this issue
           format: int64
           type: integer
         product:
           description: The product's name, as an address takes it
           type: string
         product_name:
-          description: How it is spelled on screen
+          description: Its spelling on screen
           type: string
         state:
-          description: How far it has been decided here, by the definition the findings list uses
+          description: The decision state here, by the definition the findings list uses
           enum:
             - undecided
             - waiting
@@ -7456,7 +7456,7 @@ components:
           format: int64
           type: integer
         issues:
-          description: How many distinct issues the claim covers
+          description: The number of distinct issues the claim covers
           format: int64
           type: integer
         justification:
@@ -7490,17 +7490,17 @@ components:
           format: int64
           type: integer
         component:
-          description: Which package of the source package this place is
+          description: The package of the source package this place is
           type: string
         consumer:
-          description: What pulls the component in here. Absent under the product itself
+          description: The consumer that pulls the component in here. Absent under the product itself
           type: string
         decision:
           description: The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument
           format: int64
           type: integer
         declared_as:
-          description: "What the producer called this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"
+          description: "The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it"
           type: string
         place:
           description: Name this when recording a decision about it
@@ -7520,7 +7520,7 @@ components:
           format: int64
           type: integer
         component:
-          description: What the judgments were about, by name. Empty where nothing in any build carries the place any more
+          description: The subject of the judgments, by name. Empty where nothing in any build carries the place any more
           type: string
         decisions:
           description: Places those reached
@@ -7535,7 +7535,7 @@ components:
           format: int64
           type: integer
         people:
-          description: How many different people argued about it
+          description: The number of different people who argued about it
           format: int64
           type: integer
         product:
@@ -7565,7 +7565,7 @@ components:
           readOnly: true
           type: string
         because:
-          description: Why they are being held back, in markdown
+          description: The reason they are being held back, in markdown
           minLength: 1
           type: string
         rows:
@@ -7605,7 +7605,7 @@ components:
           description: The severity these were rated at. 'unrated' is what nobody scored
           type: string
         count:
-          description: How many observations this is worked out from
+          description: The number of observations behind it
           format: int64
           type: integer
         median_days:
@@ -7613,7 +7613,7 @@ components:
           format: double
           type: number
         p90_days:
-          description: "What nine in ten came in under, in days. Nearest-rank rather than interpolated: these are waits something actually had"
+          description: "The span nine in ten came in under, in days. Nearest-rank rather than interpolated: these are waits something actually had"
           format: double
           type: number
         worst_days:
@@ -7703,7 +7703,7 @@ components:
             - patch-needed
           type: string
         places:
-          description: How many of this finding's places the claim covers
+          description: The number of this finding's places the claim covers
           format: int64
           type: integer
         proposed_at:
@@ -7712,9 +7712,9 @@ components:
           type: string
         rows:
           $ref: "#/components/schemas/RowsStandingBody"
-          description: How the claim's rows here stand
+          description: The state of the claim's rows here
         sent_back_at:
-          description: When rows were last sent back to the author
+          description: The last time rows were sent back to the author
           type: string
         sent_back_because:
           description: The reason given when they were, in markdown
@@ -7815,17 +7815,17 @@ components:
           readOnly: true
           type: string
         digest:
-          description: What the document hashed to, which is how a revision is noticed later
+          description: The document's digest, which is how a revision is noticed later
           type: string
         publisher:
-          description: Who the document says it is from
+          description: The publisher the document names
           type: string
         recorded:
           description: Statements taken from it
           format: int64
           type: integer
         superseded:
-          description: What this publisher had said before, set aside rather than deleted
+          description: This publisher's previous statements, set aside rather than deleted
           format: int64
           type: integer
       required:
@@ -7883,10 +7883,10 @@ components:
             - tag
           type: string
         last_scan_at:
-          description: When a scan last arrived for any build of it
+          description: The last scan to arrive for any build of it
           type: string
         name:
-          description: How scans name this branch or tag
+          description: The name scans use for this branch or tag
           maxLength: 191
           minLength: 1
           type: string
@@ -7926,7 +7926,7 @@ components:
             - array
             - "null"
         name:
-          description: What the team is called. Matched without regard to capitals
+          description: The team's name. Matched without regard to capitals
           type: string
       required:
         - name
@@ -7943,17 +7943,17 @@ components:
           readOnly: true
           type: string
         display_name:
-          description: How to spell it when it is shown. Defaults to the name
+          description: The display spelling. Defaults to the name
           type: string
         members:
-          description: Who is on it, by sign-in identity. Everybody named must already have been recorded
+          description: The members, by sign-in identity. Everybody named must already have been recorded
           items:
             type: string
           type:
             - array
             - "null"
         name:
-          description: What to call the team
+          description: The team's name
           minLength: 1
           type: string
       required:
@@ -7970,10 +7970,10 @@ components:
           readOnly: true
           type: string
         created_at:
-          description: When it was minted
+          description: The moment it was minted
           type: string
         expires_at:
-          description: When it stops working
+          description: The moment it stops working
           type: string
         holds:
           description: Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none
@@ -7990,24 +7990,24 @@ components:
             - array
             - "null"
         last_used_at:
-          description: When it was last used
+          description: The last time it was used
           type: string
         lifetime:
-          description: How long it lasts, such as "720h". There is a configured maximum
+          description: The lifetime, such as "720h". There is a configured maximum
           type: string
         name:
-          description: What its owner calls it
+          description: The owner's name for it
           maxLength: 191
           minLength: 1
           type: string
         owner:
-          description: Whose it is. Shown to an administrator listing everybody's
+          description: The owner. Shown to an administrator listing everybody's
           type: string
         product:
           description: Optionally, the one product it may reach, by the name that addresses it
           type: string
         product_display_name:
-          description: What to call that product, where it was declared with a display name
+          description: That product's display name, where it was declared with one
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
@@ -8101,7 +8101,7 @@ components:
       additionalProperties: false
       properties:
         claims:
-          description: How many acts
+          description: The number of acts
           format: int64
           type: integer
         outcome:
@@ -8114,7 +8114,7 @@ components:
             - patch-needed
           type: string
         rows:
-          description: How many decisions those acts wrote
+          description: The number of decisions those acts wrote
           format: int64
           type: integer
       required:
@@ -8126,10 +8126,10 @@ components:
       additionalProperties: false
       properties:
         checked:
-          description: When the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked
+          description: The moment the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked
           type: string
         ecosystem:
-          description: Which ecosystem the identifier names, read out of it rather than stored
+          description: The ecosystem the identifier names, read out of it rather than stored
           type: string
         purl:
           description: The package identifier, which is the name that would be sent
@@ -8170,7 +8170,7 @@ components:
             - array
             - "null"
         total:
-          description: How many there are in all, through the same filter as the page
+          description: The total, through the same filter as the page
           format: int64
           type: integer
         whole:
@@ -8186,7 +8186,7 @@ components:
       additionalProperties: false
       properties:
         builds:
-          description: How many builds hold it. More than one means the same code built more than one way, which one judgment answers
+          description: The number of builds holding it. More than one means the same code built more than one way, which one judgment answers
           format: int64
           type: integer
         component:
@@ -8194,7 +8194,7 @@ components:
         exploited:
           type: boolean
         places:
-          description: How many findings a judgment here would be recorded against, across every build it is in
+          description: The number of findings a judgment here would be recorded against, across every build it is in
           format: int64
           type: integer
         product:
@@ -8241,14 +8241,14 @@ components:
       additionalProperties: false
       properties:
         fixed_here:
-          description: How many of what is open here name this exact version as their fix — that release's own security content
+          description: The number of open findings naming this exact version as their fix — that release's own security content
           format: int64
           type: integer
         ordered:
           description: Whether these versions could be ordered at all. False means the list is not ranked and reached says no more than fixed_here
           type: boolean
         reached:
-          description: How many moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered
+          description: The number moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered
           format: int64
           type: integer
         to:
@@ -8271,7 +8271,7 @@ components:
           readOnly: true
           type: string
         built_at:
-          description: When the producer says the build was made
+          description: The build time the producer states
           type: string
         outcome:
           description: Whether this upload was taken or matched one already held
@@ -8300,7 +8300,7 @@ components:
         component:
           type: string
         depth:
-          description: How far below the build's root it sits, so the tree is drawn by indenting
+          description: The depth below the build's root, so the tree is drawn by indenting
           format: int64
           type: integer
         findings:
@@ -8334,7 +8334,7 @@ components:
           description: Whether this reaches customers. Defaults to yes
           type: boolean
         name:
-          description: How scans name this build of the stream
+          description: The name scans use for this build of the stream
           maxLength: 191
           minLength: 1
           type: string
@@ -8349,7 +8349,7 @@ components:
       additionalProperties: false
       properties:
         at:
-          description: When it was uploaded here
+          description: The moment it was uploaded here
           type: string
         document:
           description: The document it came from
@@ -8371,10 +8371,10 @@ components:
         publisher:
           type: string
         statement:
-          description: Why they reached that answer. What a triager otherwise types from memory
+          description: Their reasoning. What a triager otherwise types from memory
           type: string
         status:
-          description: What they said, in the format's own vocabulary
+          description: Their statement, in the format's own vocabulary
           type: string
       required:
         - id
@@ -8440,17 +8440,17 @@ components:
           readOnly: true
           type: string
         moved_at:
-          description: "When the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"
+          description: "The data's last move: the most recent time any version was seen for the first time. A version that comes back is not a change"
           format: date-time
           type: string
         stale:
           description: Whether it has been that long. The same question the condition told to administrators asks
           type: boolean
         stale_after:
-          description: How long without moving counts as stopped, as this deployment has it set
+          description: The span without moving that counts as stopped, as this deployment has it set
           type: string
         version:
-          description: What the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said
+          description: The version the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said
           type: string
       required:
         - stale_after
@@ -8460,7 +8460,7 @@ components:
       additionalProperties: false
       properties:
         age_days:
-          description: How long the claim has stood. An old judgment should look like one
+          description: The age of the claim. An old judgment should look like one
           format: int64
           type: integer
         builds:
@@ -8474,22 +8474,22 @@ components:
           $ref: "#/components/schemas/ClaimBody"
         counter:
           $ref: "#/components/schemas/CounterBody"
-          description: "What a careful reader would go and look up: what was decided about this issue elsewhere, and how much else at the same place nobody has answered"
+          description: "The context a careful reader looks up: what was decided about this issue elsewhere, and how much else at the same place nobody has answered"
         decision:
           $ref: "#/components/schemas/DecisionBody"
         decisions:
-          description: How many rows the claim wrote
+          description: The number of rows the claim wrote
           format: int64
           type: integer
         deferred_days:
-          description: How long this finding has been put off in total
+          description: The total this finding has been put off for
           format: int64
           type: integer
         finding:
           $ref: "#/components/schemas/FindingRefBody"
-          description: What the representative decision is about — build, issue, component, where it sits — so the card can be judged without opening it. Absent where no open finding sits at its place
+          description: The representative decision's subject — build, issue, component, where it sits — so the card can be judged without opening it. Absent where no open finding sits at its place
         issues:
-          description: How many distinct issues it covers
+          description: The number of distinct issues it covers
           format: int64
           type: integer
         outliers:
@@ -8498,7 +8498,7 @@ components:
         place:
           $ref: "#/components/schemas/PlaceBody"
         places:
-          description: How many distinct places it covers
+          description: The number of distinct places it covers
           format: int64
           type: integer
         previously_approved:
@@ -8524,13 +8524,13 @@ components:
       additionalProperties: false
       properties:
         body:
-          description: What it said, in markdown
+          description: Its text, in markdown
           type: string
         replaced_at:
-          description: When it stopped saying that
+          description: The moment it stopped saying that
           type: string
         version:
-          description: Which version this was, counting from one
+          description: The version number, counting from one
           format: int64
           type: integer
       required:
@@ -8553,7 +8553,7 @@ components:
       additionalProperties: false
       properties:
         digest:
-          description: What the document hashed to when it went out. The published document belongs to whoever published it; this is what makes comparing it possible
+          description: The document's digest when it went out. The published document belongs to whoever published it; this is what makes comparing it possible
           type: string
         issue:
           description: The flaw it was written about, under the identifier it is filed here
@@ -8563,7 +8563,7 @@ components:
         issued_by:
           type: string
         ordinal:
-          description: Which issuance this was, counting from one. Above one is a revision
+          description: The issuance number, counting from one. Above one is a revision
           format: int64
           type: integer
         product:
@@ -8595,11 +8595,11 @@ components:
           description: May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them
           type: boolean
         bulk_cap:
-          description: How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
+          description: The number of rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
           format: int64
           type: integer
         deferral_days:
-          description: How long a deferral may run before a second person has to agree, in days. A screen taking a date needs it before the date is written, not after it is submitted
+          description: The deferral a second person has to agree past, in days. A screen taking a date needs it before the date is written, not after it is submitted
           format: int64
           type: integer
         digest:
@@ -8609,7 +8609,7 @@ components:
           description: Their digest lists findings nobody owns as well as their own outstanding work
           type: boolean
         identity:
-          description: What this deployment calls them
+          description: The identity this deployment holds for them
           type: string
         kind:
           description: A person who signed in, or a credential
@@ -8618,7 +8618,7 @@ components:
             - key
           type: string
         name:
-          description: What to show instead of the identity, where one is recorded
+          description: The display name, where one is recorded
           type: string
         reach:
           description: The products they can reach, and what they may do in each
@@ -9018,13 +9018,13 @@ paths:
             maximum: 3650
             minimum: 1
             type: integer
-        - description: How many rows each section carries at most. capped says a section reached it
+        - description: The number of rows each section carries at most. capped says a section reached it
           explode: false
           in: query
           name: limit
           schema:
             default: 100
-            description: How many rows each section carries at most. capped says a section reached it
+            description: The number of rows each section carries at most. capped says a section reached it
             format: int64
             maximum: 500
             minimum: 1
@@ -9078,23 +9078,23 @@ paths:
               - live
               - withdrawn
             type: string
-        - description: How many to return
+        - description: The number returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many to return
+            description: The number returned
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -9412,12 +9412,12 @@ paths:
           schema:
             description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
             type: string
-        - description: Which build of that stream. Needs exactly one product and a stream
+        - description: The build of that stream. Needs exactly one product and a stream
           explode: false
           in: query
           name: variant
           schema:
-            description: Which build of that stream. Needs exactly one product and a stream
+            description: The build of that stream. Needs exactly one product and a stream
             type: string
         - explode: false
           in: query
@@ -9572,12 +9572,12 @@ paths:
           schema:
             description: Only judgments about places this branch or tag holds. Needs exactly one product and a variant
             type: string
-        - description: Which build of that stream. Needs exactly one product and a stream
+        - description: The build of that stream. Needs exactly one product and a stream
           explode: false
           in: query
           name: variant
           schema:
-            description: Which build of that stream. Needs exactly one product and a stream
+            description: The build of that stream. Needs exactly one product and a stream
             type: string
         - in: path
           name: format
@@ -10457,13 +10457,13 @@ paths:
           schema:
             description: Limit to one product, by name. Empty means every product you can see
             type: string
-        - description: How many deferrals make something worth listing. One is an ordinary judgment
+        - description: The number of deferrals that makes something worth listing. One is an ordinary judgment
           explode: false
           in: query
           name: at_least
           schema:
             default: 2
-            description: How many deferrals make something worth listing. One is an ordinary judgment
+            description: The number of deferrals that makes something worth listing. One is an ordinary judgment
             format: int64
             maximum: 50
             minimum: 2
@@ -10477,12 +10477,12 @@ paths:
             maximum: 500
             minimum: 1
             type: integer
-        - description: Where in the list to start
+        - description: The offset into the list
           explode: false
           in: query
           name: offset
           schema:
-            description: Where in the list to start
+            description: The offset into the list
             format: int64
             minimum: 0
             type: integer
@@ -10530,13 +10530,13 @@ paths:
           schema:
             description: Limit to one product, by name. Empty means every product you can see
             type: string
-        - description: How many deferrals make something worth listing. One is an ordinary judgment
+        - description: The number of deferrals that makes something worth listing. One is an ordinary judgment
           explode: false
           in: query
           name: at_least
           schema:
             default: 2
-            description: How many deferrals make something worth listing. One is an ordinary judgment
+            description: The number of deferrals that makes something worth listing. One is an ordinary judgment
             format: int64
             maximum: 50
             minimum: 2
@@ -10593,12 +10593,12 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - description: How many days ahead to look. Left off, this deployment's own embargo length
+        - description: The number of days ahead to look. Left off, this deployment's own embargo length
           explode: false
           in: query
           name: within
           schema:
-            description: How many days ahead to look. Left off, this deployment's own embargo length
+            description: The number of days ahead to look. Left off, this deployment's own embargo length
             format: int64
             maximum: 365
             minimum: 1
@@ -10612,12 +10612,12 @@ paths:
             maximum: 500
             minimum: 1
             type: integer
-        - description: Where in the list to start
+        - description: The offset into the list
           explode: false
           in: query
           name: offset
           schema:
-            description: Where in the list to start
+            description: The offset into the list
             format: int64
             minimum: 0
             type: integer
@@ -10667,12 +10667,12 @@ paths:
             maximum: 200
             minimum: 1
             type: integer
-        - description: Where in the list to start
+        - description: The offset into the list
           explode: false
           in: query
           name: offset
           schema:
-            description: Where in the list to start
+            description: The offset into the list
             format: int64
             minimum: 0
             type: integer
@@ -11198,12 +11198,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -11219,23 +11219,23 @@ paths:
           schema:
             description: Order the other way — oldest, nearest deadline, fewest places, lowest first
             type: boolean
-        - description: How many to return
+        - description: The number returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many to return
+            description: The number returned
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -11654,12 +11654,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -12106,23 +12106,23 @@ paths:
         Requires: your own credential
       operationId: list-notifications
       parameters:
-        - description: How many to return
+        - description: The number returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many to return
+            description: The number returned
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -12401,13 +12401,13 @@ paths:
           schema:
             maxLength: 191
             type: string
-        - description: How many of each list to return
+        - description: The number of each list returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many of each list to return
+            description: The number of each list returned
             format: int64
             maximum: 200
             minimum: 1
@@ -13672,12 +13672,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -13693,23 +13693,23 @@ paths:
           schema:
             description: Order the other way — oldest, nearest deadline, fewest places, lowest first
             type: boolean
-        - description: How many to return
+        - description: The number returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many to return
+            description: The number returned
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -14205,12 +14205,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -14662,12 +14662,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -14683,23 +14683,23 @@ paths:
           schema:
             description: Order the other way — oldest, nearest deadline, fewest places, lowest first
             type: boolean
-        - description: How many to return
+        - description: The number returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many to return
+            description: The number returned
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -15145,12 +15145,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -15271,12 +15271,12 @@ paths:
               - agreed
               - lapsed
             type: string
-        - description: Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
+        - description: The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
           explode: false
           in: query
           name: sort
           schema:
-            description: Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
+            description: The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
             enum:
               - urgency
               - severity
@@ -15417,12 +15417,12 @@ paths:
               - agreed
               - lapsed
             type: string
-        - description: Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
+        - description: The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
           explode: false
           in: query
           name: sort
           schema:
-            description: Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
+            description: The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for
             enum:
               - urgency
               - severity
@@ -16351,13 +16351,13 @@ paths:
           required: true
           schema:
             type: string
-        - description: Which kind of finding the text is about
+        - description: The kind of finding the text is about
           explode: false
           in: query
           name: visibility
           schema:
             default: public
-            description: Which kind of finding the text is about
+            description: The kind of finding the text is about
             enum:
               - public
               - private
@@ -17148,23 +17148,23 @@ paths:
           schema:
             description: Narrow to what one package was claimed about
             type: string
-        - description: How many to return
+        - description: The number returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many to return
+            description: The number returned
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -17224,13 +17224,13 @@ paths:
             description: Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly
             maxLength: 200
             type: string
-        - description: How many matches to return. Only read when searching
+        - description: The number of matches returned. Only read when searching
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many matches to return. Only read when searching
+            description: The number of matches returned. Only read when searching
             format: int64
             maximum: 200
             minimum: 1
@@ -17338,19 +17338,19 @@ paths:
           schema:
             description: The component's name, as the findings list gives it
             type: string
-        - description: Which version, where the build ships that name at more than one
+        - description: The version, where the build ships that name at more than one
           explode: false
           in: query
           name: version
           schema:
-            description: Which version, where the build ships that name at more than one
+            description: The version, where the build ships that name at more than one
             type: string
-        - description: Which ecosystem, for the few names one build holds at one version as two components
+        - description: The ecosystem, for the few names one build holds at one version as two components
           explode: false
           in: query
           name: ecosystem
           schema:
-            description: Which ecosystem, for the few names one build holds at one version as two components
+            description: The ecosystem, for the few names one build holds at one version as two components
             type: string
       responses:
         "200":
@@ -17547,19 +17547,19 @@ paths:
           schema:
             description: The component's name, as the findings list gives it
             type: string
-        - description: Which version, where the build ships that name at more than one
+        - description: The version, where the build ships that name at more than one
           explode: false
           in: query
           name: version
           schema:
-            description: Which version, where the build ships that name at more than one
+            description: The version, where the build ships that name at more than one
             type: string
-        - description: Which ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+        - description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
           explode: false
           in: query
           name: ecosystem
           schema:
-            description: Which ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
             type: string
       responses:
         "200":
@@ -17694,12 +17694,12 @@ paths:
           schema:
             description: The component, as the findings list gives it
             type: string
-        - description: Which version, where the build ships more than one under that name
+        - description: The version, where the build ships more than one under that name
           explode: false
           in: query
           name: version
           schema:
-            description: Which version, where the build ships more than one under that name
+            description: The version, where the build ships more than one under that name
             type: string
       requestBody:
         content:
@@ -17765,12 +17765,12 @@ paths:
           required: true
           schema:
             type: string
-        - description: Which version, where the build holds that name at more than one
+        - description: The version, where the build holds that name at more than one
           explode: false
           in: query
           name: version
           schema:
-            description: Which version, where the build holds that name at more than one
+            description: The version, where the build holds that name at more than one
             type: string
       responses:
         "200":
@@ -17948,12 +17948,12 @@ paths:
           schema:
             description: The issue, by any name it is known under
             type: string
-        - description: Which place, as the findings list gives it
+        - description: The place, as the findings list gives it
           in: path
           name: place
           required: true
           schema:
-            description: Which place, as the findings list gives it
+            description: The place, as the findings list gives it
             type: string
       responses:
         "200":
@@ -18015,12 +18015,12 @@ paths:
           schema:
             description: The issue, by any name it is known under
             type: string
-        - description: Which place, as the findings list gives it
+        - description: The place, as the findings list gives it
           in: path
           name: place
           required: true
           schema:
-            description: Which place, as the findings list gives it
+            description: The place, as the findings list gives it
             type: string
       requestBody:
         content:
@@ -18691,23 +18691,23 @@ paths:
           required: true
           schema:
             type: string
-        - description: How many to return
+        - description: The number returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many to return
+            description: The number returned
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -18844,12 +18844,12 @@ paths:
             description: The upload, as the receipt names it
             format: int64
             type: integer
-        - description: Which of its documents, as the receipt names it
+        - description: The document, as the receipt names it
           in: path
           name: document
           required: true
           schema:
-            description: Which of its documents, as the receipt names it
+            description: The document, as the receipt names it
             format: int64
             type: integer
       responses:
@@ -19107,12 +19107,12 @@ paths:
           required: true
           schema:
             type: string
-        - description: Who published it, where the document does not name itself. At most 191 characters
+        - description: The publisher, where the document does not name itself. At most 191 characters
           explode: false
           in: query
           name: publisher
           schema:
-            description: Who published it, where the document does not name itself. At most 191 characters
+            description: The publisher, where the document does not name itself. At most 191 characters
             maxLength: 191
             type: string
       requestBody:
@@ -19668,13 +19668,13 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - description: How far ahead to look
+        - description: The distance ahead to look
           explode: false
           in: query
           name: days
           schema:
             default: 14
-            description: How far ahead to look
+            description: The distance ahead to look
             format: int64
             maximum: 365
             minimum: 0
@@ -19688,12 +19688,12 @@ paths:
             maximum: 200
             minimum: 1
             type: integer
-        - description: Where in the list to start
+        - description: The offset into the list
           explode: false
           in: query
           name: offset
           schema:
-            description: Where in the list to start
+            description: The offset into the list
             format: int64
             minimum: 0
             type: integer
@@ -19757,13 +19757,13 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - description: How far ahead to look
+        - description: The distance ahead to look
           explode: false
           in: query
           name: days
           schema:
             default: 14
-            description: How far ahead to look
+            description: The distance ahead to look
             format: int64
             maximum: 365
             minimum: 0
@@ -19816,23 +19816,23 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - description: How many to return. Quietest first, so the default is the answer for any estate somebody reads by hand
+        - description: The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand
           explode: false
           in: query
           name: limit
           schema:
             default: 200
-            description: How many to return. Quietest first, so the default is the answer for any estate somebody reads by hand
+            description: The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand
             format: int64
             maximum: 500
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer
@@ -20505,19 +20505,19 @@ paths:
           schema:
             description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build
             type: string
-        - description: Which one, where the build holds that name at several versions
+        - description: The version, where the build holds that name at several
           explode: false
           in: query
           name: beneath_version
           schema:
-            description: Which one, where the build holds that name at several versions
+            description: The version, where the build holds that name at several
             type: string
-        - description: Which one, for the few names a build holds at one version as two components
+        - description: The ecosystem, for the few names a build holds at one version as two components
           explode: false
           in: query
           name: beneath_ecosystem
           schema:
-            description: Which one, for the few names a build holds at one version as two components
+            description: The ecosystem, for the few names a build holds at one version as two components
             type: string
       responses:
         "200":
@@ -20602,19 +20602,19 @@ paths:
           schema:
             description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build
             type: string
-        - description: Which one, where the build holds that name at several versions
+        - description: The version, where the build holds that name at several
           explode: false
           in: query
           name: beneath_version
           schema:
-            description: Which one, where the build holds that name at several versions
+            description: The version, where the build holds that name at several
             type: string
-        - description: Which one, for the few names a build holds at one version as two components
+        - description: The ecosystem, for the few names a build holds at one version as two components
           explode: false
           in: query
           name: beneath_ecosystem
           schema:
-            description: Which one, for the few names a build holds at one version as two components
+            description: The ecosystem, for the few names a build holds at one version as two components
             type: string
       responses:
         "200":
@@ -20666,13 +20666,13 @@ paths:
           schema:
             description: Limit to one variant. Only meaningful with a product, and independent of the branch
             type: string
-        - description: How many releases, most recent kept
+        - description: The number of releases, most recent kept
           explode: false
           in: query
           name: limit
           schema:
             default: 12
-            description: How many releases, most recent kept
+            description: The number of releases, most recent kept
             format: int64
             maximum: 50
             minimum: 1
@@ -20780,23 +20780,23 @@ paths:
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-unanswered-upstream
       parameters:
-        - description: How many to return
+        - description: The number returned
           explode: false
           in: query
           name: limit
           schema:
             default: 50
-            description: How many to return
+            description: The number returned
             format: int64
             maximum: 200
             minimum: 1
             type: integer
-        - description: How many to skip
+        - description: The number skipped
           explode: false
           in: query
           name: offset
           schema:
-            description: How many to skip
+            description: The number skipped
             format: int64
             minimum: 0
             type: integer

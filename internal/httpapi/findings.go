@@ -658,7 +658,7 @@ type EvidenceBody struct {
 	// carried none.
 	ScoreVersion string  `json:"score_version,omitempty" doc:"The scoring system the number is on, as the report states it"`
 	ScoreSource  string  `json:"score_source,omitempty" doc:"The publisher, where the report names them"`
-	ScoreKind    string  `json:"score_kind,omitempty" doc:"Whether it is the primary rating or a secondary one"`
+	ScoreKind    string  `json:"score_kind,omitempty" doc:"The rating's rank: primary or secondary"`
 	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
 	// LikelihoodPercentile is what the estimate means and whether it is

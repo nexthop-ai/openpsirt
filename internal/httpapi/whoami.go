@@ -26,7 +26,7 @@ import (
 // leading to a refusal.
 type CanBody struct {
 	Product   string `json:"product"`
-	Name      string `json:"name" doc:"What to show for it"`
+	Name      string `json:"name" doc:"The label shown for it"`
 	MaySee    bool   `json:"may_see" doc:"Read findings that have been disclosed"`
 	SeesAll   bool   `json:"sees_all" doc:"Read findings nobody has disclosed yet"`
 	MayTriage bool   `json:"may_triage" doc:"Argue about a finding"`
@@ -37,8 +37,8 @@ type CanBody struct {
 
 // WhoBody is the caller, as the caller.
 type WhoBody struct {
-	Identity string    `json:"identity" doc:"What this deployment calls them"`
-	Name     string    `json:"name" doc:"What to show instead of the identity, where one is recorded"`
+	Identity string    `json:"identity" doc:"The identity this deployment holds for them"`
+	Name     string    `json:"name" doc:"The display name, where one is recorded"`
 	Admin    bool      `json:"admin" doc:"Administers this deployment"`
 	Audits   bool      `json:"audits,omitempty" doc:"May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them"`
 	Kind     string    `json:"kind" enum:"person,key" doc:"A person who signed in, or a credential"`
@@ -58,13 +58,13 @@ type WhoBody struct {
 	// second person, and that changes what somebody is about to do. It is a
 	// policy rather than a secret — the same rule everybody here is subject
 	// to — so it is answered to anybody who may ask about themselves.
-	DeferralDays int `json:"deferral_days,omitempty" doc:"How long a deferral may run before a second person has to agree, in days. A screen taking a date needs it before the date is written, not after it is submitted"`
+	DeferralDays int `json:"deferral_days,omitempty" doc:"The deferral a second person has to agree past, in days. A screen taking a date needs it before the date is written, not after it is submitted"`
 	// BulkCap is how many rows one action may write. A screen offering a
 	// selection has to know it before the selection is acted on: a loop of
 	// single writes bounded by nothing turns one click into as many round
 	// trips as the filter matched, which is a page nobody can use and
 	// nothing can cancel.
-	BulkCap int `json:"bulk_cap,omitempty" doc:"How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
+	BulkCap int `json:"bulk_cap,omitempty" doc:"The number of rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time"`
 }
 
 func registerWhoAmI(api huma.API, in Ingest) {

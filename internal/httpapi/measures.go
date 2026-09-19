@@ -13,9 +13,9 @@ import (
 // SpreadBody is a set of waits said in the three ways worth saying.
 type SpreadBody struct {
 	Band   string  `json:"band" doc:"The severity these were rated at. 'unrated' is what nobody scored"`
-	Count  int     `json:"count" doc:"How many observations this is worked out from"`
+	Count  int     `json:"count" doc:"The number of observations behind it"`
 	Median float64 `json:"median_days" doc:"The middle one, in days"`
-	P90    float64 `json:"p90_days" doc:"What nine in ten came in under, in days. Nearest-rank rather than interpolated: these are waits something actually had"`
+	P90    float64 `json:"p90_days" doc:"The span nine in ten came in under, in days. Nearest-rank rather than interpolated: these are waits something actually had"`
 	Worst  float64 `json:"worst_days" doc:"The longest single one, in days"`
 }
 
@@ -31,11 +31,11 @@ type WorkedBody struct {
 type MeasuresBody struct {
 	Since    string       `json:"since"`
 	Until    string       `json:"until"`
-	ToDecide []SpreadBody `json:"time_to_decide" doc:"How long a finding sat before anybody proposed anything about it, per severity"`
-	ToAgree  []SpreadBody `json:"time_to_agree" doc:"How long a claim waited for a second person, per severity"`
-	Worked   []WorkedBody `json:"throughput" doc:"What each person got through, most first"`
+	ToDecide []SpreadBody `json:"time_to_decide" doc:"The wait before anybody proposed anything, per severity"`
+	ToAgree  []SpreadBody `json:"time_to_agree" doc:"The wait for a second person, per severity"`
+	Worked   []WorkedBody `json:"throughput" doc:"Each person's throughput, most first"`
 	SentBack int          `json:"sent_back" doc:"Claims an approver asked more of in the window. Counted for the deployment rather than per person: the record holds that a claim was sent back and not by whom"`
-	Sampled  int          `json:"sampled" doc:"How many observations the two spans were worked out from"`
+	Sampled  int          `json:"sampled" doc:"The number of observations behind the two spans"`
 	Capped   bool         `json:"capped,omitempty" doc:"The ceiling was reached, so the spans describe the most recent part of the window rather than all of it"`
 }
 

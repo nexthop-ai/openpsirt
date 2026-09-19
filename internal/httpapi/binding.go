@@ -27,8 +27,8 @@ type BindingBody struct {
 	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it"`
 	// ProductDisplayName is what to show beside it, for the reason HeldBody
 	// carries one: unbind resolves the field above.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
-	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"What membership of this group grants"`
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
+	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"The roles membership of this group grants"`
 }
 
 func registerBindings(api huma.API, a Administering, settings func(bun.IDB) *setting.Store) {

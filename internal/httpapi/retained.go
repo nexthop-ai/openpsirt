@@ -42,7 +42,7 @@ func registerRetained(api huma.API, in Ingest) {
 		Stream   string `path:"stream"`
 		Variant  string `path:"variant"`
 		Scan     int64  `path:"scan" doc:"The upload, as the receipt names it"`
-		Document int64  `path:"document" doc:"Which of its documents, as the receipt names it"`
+		Document int64  `path:"document" doc:"The document, as the receipt names it"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := requester(ctx)
 		if err != nil {

@@ -4535,13 +4535,13 @@ export interface components {
             admin?: boolean;
             /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
             audits?: boolean;
-            /** @description When they left. Absent means they are active */
+            /** @description The date they left. Absent means they are active */
             deactivated_at?: string;
             display_name?: string;
             held?: components["schemas"]["HeldChangeBody"][] | null;
             /**
              * Format: int64
-             * @description How many role changes there are, of which the list above is a page
+             * @description The number of role changes, of which the list above is a page
              */
             held_total: number;
             holds?: components["schemas"]["HeldBody"][] | null;
@@ -4552,7 +4552,7 @@ export interface components {
             told?: components["schemas"]["ToldBody"][] | null;
             /**
              * Format: int64
-             * @description How many things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains
+             * @description The number of things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains
              */
             told_total: number;
         };
@@ -4565,7 +4565,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many were waiting
+             * @description The number that were waiting
              */
             acknowledged: number;
         };
@@ -4583,9 +4583,9 @@ export interface components {
             /** @description One notification kind, or * for all of them */
             kind: string;
             name: string;
-            /** @description What requests are signed with. Never returned by any endpoint */
+            /** @description The signing secret. Never returned by any endpoint */
             secret: string;
-            /** @description Where to send it. https only */
+            /** @description The address to send to. https only */
             url: string;
         };
         "Add-routing-ruleRequest": {
@@ -4598,7 +4598,7 @@ export interface components {
             /** @description A component name, matching it and everything under it */
             beneath?: string;
             name: string;
-            /** @description Where work lands, by team name */
+            /** @description The team work lands on, by name */
             team: string;
             /** @description A source package name */
             upstream?: string;
@@ -4622,13 +4622,13 @@ export interface components {
             closed: number;
         };
         AgreedBody: {
-            /** @description When they agreed */
+            /** @description The moment they agreed */
             at: string;
             /** @description Their sign-in identity */
             by: string;
             /** @description Whether this agreement was carried forward from an earlier claim rather than given for this one */
             carried?: boolean;
-            /** @description When the agreement was taken back, by the approver or by somebody editing the words it was given for */
+            /** @description The moment the agreement was taken back, by the approver or by somebody editing the words it was given for */
             withdrawn_at?: string;
         };
         AlsoBuild: {
@@ -4667,10 +4667,10 @@ export interface components {
             id: number;
             /**
              * Format: int64
-             * @description Which revision of the justification was agreed to
+             * @description The revision of the justification that was agreed to
              */
             revision_id: number;
-            /** @description When this approval was taken back, if it was */
+            /** @description The moment this approval was taken back, if it was */
             withdrawn_at?: string;
         };
         AroundBody: {
@@ -4680,9 +4680,9 @@ export interface components {
              * @example https://example.com/schemas/AroundBody.json
              */
             readonly $schema?: string;
-            /** @description What pulls this in — usually short, and the direction people use */
+            /** @description The consumers that pull this in — usually short, and the direction people use */
             above: components["schemas"]["NeighborBody"][] | null;
-            /** @description What it pulls in */
+            /** @description The components it pulls in, downward */
             below: components["schemas"]["NeighborBody"][] | null;
         };
         AssessmentBody: {
@@ -4700,7 +4700,7 @@ export interface components {
             needs_approval?: boolean;
             /**
              * Format: int64
-             * @description How many of them this rating would put below the product's triage line, where they stop being work and carry no deadline
+             * @description The number this rating would put below the product's triage line, where they stop being work and carry no deadline
              */
             off_the_list?: number;
             /**
@@ -4710,14 +4710,14 @@ export interface components {
             open?: number;
             /** @description The product this rating belongs to, by the name an address takes */
             product?: string;
-            /** @description How that product is spelled on screen */
+            /** @description That product's spelling on screen */
             product_name?: string;
-            /** @description What was published when this was made, kept so a reader can see what we disagreed with */
+            /** @description The published rating when this was made, kept so a reader can see what we disagreed with */
             published?: string;
-            /** @description Why. It outlives the version it was made about, so the next person needs the argument */
+            /** @description The reasoning. It outlives the version it was made about, so the next person needs the argument */
             reasoning: string;
             /**
-             * @description What this product rates it
+             * @description This product's own rating
              * @enum {string}
              */
             severity: "low" | "medium" | "high" | "critical";
@@ -4739,7 +4739,7 @@ export interface components {
             team?: string;
         };
         AtComponentBody: {
-            /** @description When it runs out, as a date. The earliest among its places here, which is the one that makes it late */
+            /** @description The date it runs out. The earliest among its places here, which is the one that makes it late */
             due?: string;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
@@ -4752,10 +4752,10 @@ export interface components {
             likelihood?: number;
             /**
              * Format: int64
-             * @description How many places in this build it sits at
+             * @description The number of places in this build it sits at
              */
             places: number;
-            /** @description How bad the report rates it */
+            /** @description The severity the report gives it */
             severity?: string;
             /** @description The first line of what the issue says about itself, cut to fit a row */
             summary?: string;
@@ -4768,17 +4768,17 @@ export interface components {
              * @example https://example.com/schemas/AttachmentBody.json
              */
             readonly $schema?: string;
-            /** @description What it is served as, which is decided here and is not what the uploader called it */
+            /** @description The type it is served as, which is decided here and is not what the uploader called it */
             content_type: string;
-            /** @description What it was called when it arrived */
+            /** @description Its name when it arrived */
             filename: string;
             /** @description Whether it is displayed in the page rather than downloaded. Only a small allowlist of raster image types is */
             inline?: boolean;
             /** @description The file was removed on purpose. The record of it remains */
             redacted?: boolean;
-            /** @description Why it was removed */
+            /** @description The reason it was removed */
             redacted_reason?: string;
-            /** @description What to paste into a justification or a comment */
+            /** @description The reference to paste into a justification or a comment */
             reference: string;
             /**
              * Format: int64
@@ -4790,37 +4790,37 @@ export interface components {
             uploaded_at: string;
         };
         BecameBody: {
-            /** @description Who did it, where a person did */
+            /** @description The person who did it, where a person did */
             by?: string;
             claim: components["schemas"]["ClaimBody"];
             decision: components["schemas"]["DecisionBody"];
             /**
              * Format: int64
-             * @description How many rows the claim wrote
+             * @description The number of rows the claim wrote
              */
             decisions: number;
-            /** @description What the representative decision is about. Absent where no open finding sits at its place */
+            /** @description The representative decision's subject. Absent where no open finding sits at its place */
             finding?: components["schemas"]["FindingRefBody"];
             /**
-             * @description What became of the claim
+             * @description The claim's outcome
              * @enum {string}
              */
             happened: "waiting" | "sent-back" | "approved" | "withdrawn" | "lapsed" | "undone" | "mixed";
             /**
              * Format: int64
-             * @description How many distinct issues it covers
+             * @description The number of distinct issues it covers
              */
             issues: number;
-            /** @description What in a bulk claim does not look like the rest. Absent for a claim about one issue and for one nothing can still be held back from */
+            /** @description The rows in a bulk claim that do not look like the rest. Absent for a claim about one issue and for one nothing can still be held back from */
             outliers?: components["schemas"]["OutliersBody"];
             place: components["schemas"]["PlaceBody"];
             /**
              * Format: int64
-             * @description How many distinct places it covers
+             * @description The number of distinct places it covers
              */
             places: number;
             reasoning: string;
-            /** @description When it became that, as a date and time */
+            /** @description The moment it became that */
             when?: string;
         };
         BecameOutputBody: {
@@ -4845,10 +4845,10 @@ export interface components {
             group: string;
             /** @description The product the role is held against, by the name that addresses it */
             product?: string;
-            /** @description What to call that product, where it was declared with a display name */
+            /** @description That product's display name, where it was declared with one */
             product_display_name?: string;
             /**
-             * @description What membership of this group grants
+             * @description The roles membership of this group grants
              * @enum {string}
              */
             role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage" | "admin" | "audit";
@@ -4859,12 +4859,12 @@ export interface components {
             exploited?: boolean;
             /**
              * Format: int64
-             * @description How many places of the build it sits at
+             * @description The number of places of the build it sits at
              */
             places: number;
             severity?: string;
             /**
-             * @description How far it has been decided. Anything agreed is not in this list
+             * @description The decision state. Anything agreed is not in this list
              * @enum {string}
              */
             state?: "undecided" | "waiting" | "lapsed";
@@ -4885,7 +4885,7 @@ export interface components {
             };
             /**
              * Format: int64
-             * @description Where the stretch starts, so these can be ordered without reading the label
+             * @description The start of the stretch, so these can be ordered without reading the label
              */
             days: number;
             label: string;
@@ -4893,7 +4893,7 @@ export interface components {
             open: number;
             /**
              * Format: int64
-             * @description How many of them nobody has said anything about. A claim waiting for a second person is not an answer
+             * @description The number nobody has said anything about. A claim waiting for a second person is not an answer
              */
             undecided: number;
         };
@@ -4921,15 +4921,15 @@ export interface components {
         BuildStandingBody: {
             /**
              * Format: int64
-             * @description How many are answered at every place by a standing decision
+             * @description The number answered at every place by a standing decision
              */
             agreed?: number;
             /**
              * Format: int64
-             * @description How many somebody is known to be exploiting
+             * @description The number somebody is known to be exploiting
              */
             exploited?: number;
-            /** @description When a scan last arrived here. Absent where none ever has */
+            /** @description The last scan to arrive here. Absent where none ever has */
             last_scan_at?: string;
             /**
              * Format: int64
@@ -4938,7 +4938,7 @@ export interface components {
             open: number;
             /**
              * Format: int64
-             * @description How many of those are past a deadline
+             * @description The number past a deadline
              */
             overdue?: number;
             /** @description This build's release is out of support */
@@ -4951,7 +4951,7 @@ export interface components {
             stream_kind?: "branch" | "tag";
             /**
              * Format: int64
-             * @description How many nobody has claimed anything about
+             * @description The number nobody has claimed anything about
              */
             undecided?: number;
             variant: string;
@@ -4968,7 +4968,7 @@ export interface components {
         BundleBody: {
             /**
              * Format: int64
-             * @description How many builds of the selection hold any of it. Absent where the selection is one build
+             * @description The number of builds of the selection holding any of it. Absent where the selection is one build
              */
             builds?: number;
             /** @description The packages this one upgrade moves. More than one where a source package builds several */
@@ -4986,14 +4986,14 @@ export interface components {
             issues: number;
             /**
              * Format: int64
-             * @description How many findings those sit at
+             * @description The number of findings those sit at
              */
             places: number;
             /** @description The worst of what it closes */
             severity?: string;
             /** @description The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped */
             to: string;
-            /** @description What the upgrade is of: the source package where one is recorded, and the component's own name otherwise */
+            /** @description The upgrade's subject: the source package where one is recorded, and the component's own name otherwise */
             upstream: string;
         };
         CVSSv3: {
@@ -5014,7 +5014,7 @@ export interface components {
             may_see: boolean;
             /** @description Argue about a finding */
             may_triage: boolean;
-            /** @description What to show for it */
+            /** @description The label shown for it */
             name: string;
             product: string;
             /** @description Read findings nobody has disclosed yet */
@@ -5046,17 +5046,17 @@ export interface components {
             justification?: string;
             /** @description The claim arrived attached to a component — a carried patch saying what it fixes — rather than in a document of its own */
             pedigree: boolean;
-            /** @description When the build first said it, by the scan it arrived in */
+            /** @description The scan the build first said it in */
             since: string;
             /** @description The build's own reasoning, shown as written and never rendered */
             statement?: string;
-            /** @description What it claimed, in the exchange format's own vocabulary */
+            /** @description The claim, in the exchange format's own vocabulary */
             status: string;
-            /** @description What it said the claim was about — a package name, or its identifier where it named no name */
+            /** @description The claim's subject — a package name, or its identifier where it named no name */
             subject: string;
             /** @description Whether it takes a finding off the list. 'affected' and 'under investigation' are information, not answers */
             suppresses: boolean;
-            /** @description When it stopped saying it. Absent while it is still being said */
+            /** @description The moment it stopped saying it. Absent while it is still being said */
             until?: string;
             /** @description The identifier the build argued about, as it wrote it */
             vulnerability: string;
@@ -5068,7 +5068,7 @@ export interface components {
              * @example https://example.com/schemas/Carry-decisionsRequest.json
              */
             readonly $schema?: string;
-            /** @description Which of the offered judgments to carry */
+            /** @description The offered judgments to carry */
             decisions: number[] | null;
         };
         "Carry-decisionsResponse": {
@@ -5080,7 +5080,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many claims were written, each waiting for a second person
+             * @description The number of claims written, each waiting for a second person
              */
             carried: number;
         };
@@ -5095,12 +5095,12 @@ export interface components {
             components: string[] | null;
             /**
              * Format: int64
-             * @description How many distinct components it matches. More than the list where the list was cut
+             * @description The number of distinct components it matches. More than the list where the list was cut
              */
             total: number;
             /**
              * Format: int64
-             * @description How many of those nobody holds, which is what a rule may place
+             * @description The number of those nobody holds, which is what a rule may place
              */
             unheld: number;
             /**
@@ -5113,12 +5113,12 @@ export interface components {
             about: string;
             at: string;
             became?: string;
-            /** @description Who made the change, by sign-in identity */
+            /** @description The person who made the change, by sign-in identity */
             by: string;
             /** @description This change cleared it */
             cleared?: boolean;
             /**
-             * @description What sort of thing changed
+             * @description The kind of thing that changed
              * @enum {string}
              */
             kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
@@ -5130,7 +5130,7 @@ export interface components {
             /** @description The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix */
             arrived_from?: string;
             /**
-             * @description Why it went. Only on fixed entries
+             * @description The reason it went. Only on fixed entries
              * @enum {string}
              */
             because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained";
@@ -5152,13 +5152,13 @@ export interface components {
             /** @description The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither */
             moved_to?: string;
             /**
-             * @description What was decided, where every standing decision over its places says the same thing
+             * @description The decision, where every standing one over its places says the same thing
              * @enum {string}
              */
             outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             severity?: string;
             /**
-             * @description How far this build has decided it. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four
+             * @description The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four
              * @enum {string}
              */
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
@@ -5173,7 +5173,7 @@ export interface components {
             readonly $schema?: string;
             /** @description Name a batch to agree to several claims under one name, so they can be undone together. At most 64 characters */
             batch?: string;
-            /** @description Why the rows in except are set aside, in markdown. Required when any are */
+            /** @description The reason the rows in except are set aside, in markdown. Required when any are */
             because?: string;
             /** @description Decisions in this claim to set aside rather than approve. They return to the proposer as a claim of their own, carrying the reason given in because */
             except?: number[] | null;
@@ -5187,7 +5187,7 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many decisions were agreed to
+             * @description The number of decisions agreed to
              */
             approved: number;
             /**
@@ -5207,14 +5207,14 @@ export interface components {
             /** Format: int64 */
             id: number;
             /**
-             * @description What sort of action it was: one judgment about a finding, one about many issues at a component, an approved claim carried to a new issue, or rows set aside from a larger claim — by an approver agreeing to the rest, or by the author holding them back
+             * @description The sort of action: one judgment about a finding, one about many issues at a component, an approved claim carried to a new issue, or rows set aside from a larger claim — by an approver agreeing to the rest, or by the author holding them back
              * @enum {string}
              */
             kind: "finding" | "together" | "extension" | "returned";
-            /** @description When the action was taken, as a date and time */
+            /** @description The moment the action was taken */
             proposed_at: string;
             proposed_by: string;
-            /** @description How a bulk set was narrowed. Never part of the claim itself */
+            /** @description The narrowing behind a bulk set. Never part of the claim itself */
             selected_by?: string;
             /** @description The narrowing behind a bulk claim, as something you can re-run. Absent on a claim that was not one */
             selection?: components["schemas"]["SelectionBody"];
@@ -5228,74 +5228,74 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How long the claim has stood. An old judgment should look like one
+             * @description The age of the claim. An old judgment should look like one
              */
             age_days: number;
-            /** @description What the claim says: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands */
+            /** @description The claim's contents: the outcome, the reason, the dates, the version an upgrade moves to, and the justification as it currently stands */
             argument: components["schemas"]["DecisionBody"];
             /** @description Every build the claim currently covers, as stream and variant */
             builds: string[] | null;
-            /** @description Who did it, where a person did */
+            /** @description The person who did it, where a person did */
             by?: string;
-            /** @description Who acted, when, what sort of action it was, how a bulk set was narrowed, and where the work is happening */
+            /** @description The actor, the moment, the sort of action, the narrowing behind a bulk set, and where the work is happening */
             claim: components["schemas"]["ClaimBody"];
             /**
              * Format: int64
-             * @description How many things pull them in
+             * @description The number of things pulling them in
              */
             consumers: number;
-            /** @description What a representative row is about — build, issue, component, where it sits. Absent where no open finding sits at its place */
+            /** @description A representative row's subject — build, issue, component, where it sits. Absent where no open finding sits at its place */
             finding?: components["schemas"]["FindingRefBody"];
             /**
              * Format: int64
-             * @description How many findings sit underneath, which is what the disposition register expands to
+             * @description The number of findings underneath, which is what the disposition register expands to
              */
             findings: number;
             /**
              * Format: int64
-             * @description How many things there are to decide about
+             * @description The number of things to decide about
              */
             folds: number;
             /**
-             * @description What became of the claim. mixed is a claim whose rows did not all end the same way
+             * @description The claim's outcome. mixed is a claim whose rows did not all end the same way
              * @enum {string}
              */
             happened: "waiting" | "sent-back" | "approved" | "withdrawn" | "lapsed" | "undone" | "mixed";
             /**
              * Format: int64
-             * @description How many distinct issues it covers
+             * @description The number of distinct issues it covers
              */
             issues: number;
             /** @description For a claim over many issues: the rows that do not look like the rest, and how many there are */
             outliers?: components["schemas"]["OutliersBody"];
             /**
              * Format: int64
-             * @description How many binaries those fold together
+             * @description The number of binaries those fold together
              */
             packages: number;
             place: components["schemas"]["PlaceBody"];
             /**
              * Format: int64
-             * @description How many distinct places it wrote at. What the bulk cap is measured against
+             * @description The number of distinct places it wrote at. The bulk cap is measured against this
              */
             places: number;
             /** @description This was agreed to before and came back */
             previously_approved?: boolean;
             /**
              * Format: int64
-             * @description How many decisions the claim wrote
+             * @description The number of decisions the claim wrote
              */
             rows: number;
             /** @description At least one row is about a finding nobody has announced */
             undisclosed?: boolean;
-            /** @description When it became that. Absent while it is waiting: nothing has happened to it */
+            /** @description The moment it became that. Absent while it is waiting: nothing has happened to it */
             when?: string;
         };
         CollaboratorBody: {
             added_at: string;
             added_by: string;
             identity: string;
-            /** @description What to call them, where they have a display name */
+            /** @description Their display name, where they have one */
             name?: string;
         };
         "Comment-on-claimRequest": {
@@ -5322,7 +5322,7 @@ export interface components {
         CommentBody: {
             /** @description The comment text, in markdown */
             body: string;
-            /** @description When the author last changed it, if they did */
+            /** @description The author's last change to it, if they made one */
             edited_at?: string;
             /** Format: int64 */
             id: number;
@@ -5359,14 +5359,14 @@ export interface components {
             issues: number;
             /**
              * Format: int64
-             * @description How many times those sit somewhere in the build
+             * @description The number of times those sit somewhere in the build
              */
             places: number;
             /** @description The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary */
             source_package?: string;
             /** @description Versions upstream released that would close some of what is open here, furthest along first where the ecosystem defines an ordering and unranked where it does not */
             upgrades?: components["schemas"]["UpgradeBody"][] | null;
-            /** @description What a fork was cut from, where one is known */
+            /** @description The upstream a fork was cut from, where one is known */
             upstream?: string;
             version: string;
             /**
@@ -5398,19 +5398,19 @@ export interface components {
             undecided?: number;
         };
         CoverageBody: {
-            /** @description When a scan last arrived. Absent where none ever has */
+            /** @description The last arrival of a scan. Absent where none ever has */
             last_received_at?: string;
-            /** @description When an upload against this build was last turned away. Absent where none has been */
+            /** @description The last upload against this build to be turned away. Absent where none has been */
             last_refused_at?: string;
             product: string;
             /** @description Whether that is longer than this deployment allows */
             quiet?: boolean;
             /**
              * Format: int64
-             * @description How long it has been, in days, measured from the last arrival or from when the build was declared
+             * @description The span since, in days, measured from the last arrival or from when the build was declared
              */
             quiet_days: number;
-            /** @description What the producer was told the last time one was turned away, in the same words they were given */
+            /** @description The words the producer was given the last time one was turned away, in the same words they were given */
             refused_because?: string;
             /** @description Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet */
             retired?: boolean;
@@ -5432,39 +5432,39 @@ export interface components {
             items: components["schemas"]["CoverageBody"][] | null;
             /**
              * Format: int64
-             * @description How many in support have never been scanned, across every build and not only this page
+             * @description The number in support never scanned, across every build and not only this page
              */
             never: number;
             /**
              * Format: int64
-             * @description How many have gone quiet, across every build and not only this page
+             * @description The number gone quiet, across every build and not only this page
              */
             quiet: number;
             /**
              * Format: int64
-             * @description How long this deployment allows, in days
+             * @description The span this deployment allows, in days
              */
             quiet_after_days: number;
             /**
              * Format: int64
-             * @description How many builds there are to report on
+             * @description The number of builds to report on
              */
             total: number;
             /**
              * Format: int64
-             * @description How many are out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
+             * @description The number out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
              */
             unsupported: number;
         };
         CoveredBuild: {
             /**
              * Format: int64
-             * @description How many findings those places hold
+             * @description The number of findings those places hold
              */
             covered: number;
             /**
              * Format: int64
-             * @description How many places it was written against there
+             * @description The number of places it was written against there
              */
             recorded: number;
             stream: string;
@@ -5485,7 +5485,7 @@ export interface components {
              * @description Findings handed back because they are gone
              */
             released: number;
-            /** @description When they left */
+            /** @description The date they left */
             since: string;
         };
         "Decide-togetherRequest": {
@@ -5508,9 +5508,9 @@ export interface components {
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
-            /** @description Why this holds for every issue named */
+            /** @description The reasoning, holding for every issue named */
             reasoning: string;
-            /** @description How you narrowed this set, in your own words. Recorded, and never part of the claim */
+            /** @description The narrowing, in your own words. Recorded, and never part of the claim */
             selected_by: string;
             /** @description The issues this claim covers, by name */
             vulnerabilities: string[] | null;
@@ -5538,7 +5538,7 @@ export interface components {
              * @example https://example.com/schemas/DecidedBody.json
              */
             readonly $schema?: string;
-            /** @description What this judgment wrote in each other build it was applied to */
+            /** @description The rows this judgment wrote in each other build it reached */
             also?: components["schemas"]["CoveredBuild"][] | null;
             /**
              * Format: int64
@@ -5547,7 +5547,7 @@ export interface components {
             claim_id: number;
             /**
              * Format: int64
-             * @description How many findings those places hold
+             * @description The number of findings those places hold
              */
             covered: number;
             ids: number[] | null;
@@ -5560,7 +5560,7 @@ export interface components {
             needs_approval: boolean;
             /**
              * Format: int64
-             * @description How many places it was written against
+             * @description The number of places it was written against
              */
             recorded: number;
         };
@@ -5576,9 +5576,9 @@ export interface components {
              * @description The claim this decision is one row of: the action that wrote it, which is what the review queue lists and what is approved
              */
             claim_id?: number;
-            /** @description When the promised work will be done, as a date. Required for patch-needed and upgrade-needed, and refused with any other */
+            /** @description The date the promised work lands. Required for patch-needed and upgrade-needed, and refused with any other */
             committed_to?: string;
-            /** @description When a deferral returns, as a date. Required for a deferral */
+            /** @description The date a deferral returns. Required for a deferral */
             deferred_until?: string;
             /** @description The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other. Recorded and never compared against the version shipping */
             fixed_version?: string;
@@ -5589,36 +5589,36 @@ export interface components {
             from_statement?: number;
             /**
              * Format: int64
-             * @description What to name this decision in a later request
+             * @description The name for this decision in a later request
              */
             id?: number;
             /**
-             * @description Why it does not apply. Required when it does not
+             * @description The reason it does not apply. Required when it does not
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
+            /** @description The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
             mitigation?: string;
             /** @description Whether a second person has to agree before it takes effect */
             needs_approval?: boolean;
             /**
-             * @description What was decided
+             * @description The outcome
              * @enum {string}
              */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /**
              * Format: int64
-             * @description How many findings this decision covers
+             * @description The number of findings this decision covers
              */
             places?: number;
-            /** @description Why, in markdown. Somebody else has to agree with this */
+            /** @description The reasoning, in markdown. Somebody else has to agree with this */
             reasoning: string;
-            /** @description How the set was narrowed, for a claim recorded as one of many. Never part of the claim itself */
+            /** @description The narrowing behind a claim recorded as one of many. Never part of the claim itself */
             selected_by?: string;
-            /** @description When an approver last asked for more. Empty means nobody has */
+            /** @description The last time an approver asked for more. Empty means nobody has */
             sent_back_at?: string;
             /**
-             * @description Where it has got to
+             * @description The state it has reached
              * @enum {string}
              */
             state?: "proposed" | "approved" | "withdrawn" | "lapsed";
@@ -5626,7 +5626,7 @@ export interface components {
             upgrade_to?: string;
             /**
              * Format: int64
-             * @description How many versions of the component sit here. More than one needs care
+             * @description The number of versions of the component here. More than one needs care
              */
             versions?: number;
         };
@@ -5639,14 +5639,14 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How long the claim has stood. An old judgment should look like one
+             * @description The age of the claim. An old judgment should look like one
              */
             age_days: number;
             decision: components["schemas"]["DecisionBody"];
-            /** @description What the decision is about — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there */
+            /** @description The decision's subject — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there */
             finding?: components["schemas"]["FindingRefBody"];
             place: components["schemas"]["PlaceBody"];
-            /** @description When the claim was made, as a date and time */
+            /** @description The moment the claim was made */
             proposed_at: string;
             proposed_by: string;
             /** @description The justification as it currently stands, in markdown */
@@ -5727,18 +5727,18 @@ export interface components {
             /** @description Whether the agreement was carried forward from an earlier claim rather than given for this one */
             agreement_carried?: boolean;
             approved_at?: string;
-            /** @description Who agreed. Two different people is the whole of the control, so both names are carried rather than a count */
+            /** @description The people who agreed. Two different people is the whole of the control, so both names are carried rather than a count */
             approved_by?: string;
             closed?: string;
             /**
-             * @description Why it closed, in the tool's terms. Only on a closed row
+             * @description The reason it closed, in the tool's terms. Only on a closed row
              * @enum {string}
              */
             closed_because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained" | "invalid" | "fixed";
-            /** @description Why a person closed it, in their words. Only where a person did */
+            /** @description The person's own reason for closing it. Only where a person did */
             closed_note?: string;
             component: string;
-            /** @description What pulls the component in. Absent where the build holds it directly */
+            /** @description The consumer that pulls the component in. Absent where the build holds it directly */
             consumer?: string;
             due?: string;
             /** @enum {string} */
@@ -5748,13 +5748,13 @@ export interface components {
             opened: string;
             /** @enum {string} */
             outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
-            /** @description Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half */
+            /** @description The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half */
             place: string;
             proposed_at?: string;
             proposed_by?: string;
             severity?: string;
             /**
-             * @description Where this stands. undecided is the row every other report leaves out and the one an auditor is looking for
+             * @description The decision state. undecided is the row every other report leaves out and the one an auditor is looking for
              * @enum {string}
              */
             state: "undecided" | "waiting" | "agreed" | "lapsed";
@@ -5778,7 +5778,7 @@ export interface components {
         EarlierBody: {
             /** @description The component upstream version it was a claim about */
             about?: string;
-            /** @description Who last agreed to it, where anybody did */
+            /** @description The person who last agreed to it, where anybody did */
             approved_by?: string;
             /** Format: int64 */
             claim_id: number;
@@ -5786,7 +5786,7 @@ export interface components {
             decision_id: number;
             deferred_until?: string;
             /**
-             * @description Why it stopped applying
+             * @description The reason it stopped applying
              * @enum {string}
              */
             ended: "lapsed" | "withdrawn";
@@ -5818,7 +5818,7 @@ export interface components {
              * @example https://example.com/schemas/Edit-issue-noteRequest.json
              */
             readonly $schema?: string;
-            /** @description What it should say now, in markdown */
+            /** @description The replacement text, in markdown */
             body: string;
         };
         ElsewhereBody: {
@@ -5838,13 +5838,13 @@ export interface components {
         };
         EmbargoedBody: {
             component: string;
-            /** @description When the embargo ends. Reaching it discloses nothing */
+            /** @description The date the embargo ends. Reaching it discloses nothing */
             disclose_at: string;
             /** @description Whether the date has already arrived */
             passed: boolean;
             /**
              * Format: int64
-             * @description How many findings this covers
+             * @description The number of findings this covers
              */
             places: number;
             product: string;
@@ -5877,18 +5877,18 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many builds it was recorded against
+             * @description The number of builds it was recorded against
              */
             builds: number;
-            /** @description What in the build carries it */
+            /** @description The component in the build that carries it */
             component: string;
-            /** @description When it has to be answered by */
+            /** @description The date it has to be answered by */
             due_at?: string;
-            /** @description What this deployment filed it as, such as SONIC-2026-0001 */
+            /** @description The identifier this deployment filed it under, such as SONIC-2026-0001 */
             identifier: string;
             /**
              * Format: int64
-             * @description How many findings that opened. One per place the component sits in, in each build
+             * @description The number of findings that opened. One per place the component sits in, in each build
              */
             places: number;
             /**
@@ -5951,15 +5951,15 @@ export interface components {
              * @example https://example.com/schemas/EvidenceBody.json
              */
             readonly $schema?: string;
-            /** @description Where the issue is written up */
+            /** @description The issue's write-up */
             advisory?: string;
             /** @description Other names the same issue is known by */
             aliases?: string[] | null;
             /** @description The version this was upgraded from, where the upgrade did not resolve it */
             arrived_from?: string;
-            /** @description What we rate it, where we have said something. This is what ranks; severity is what was published */
+            /** @description This deployment's own rating, where somebody has said something. This is what ranks; severity is the published word */
             assessed?: string;
-            /** @description Who is dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person */
+            /** @description The party dealing with this, by sign-in identity. Empty means nobody, or not everywhere the same person */
             assigned_to?: string;
             component: string;
             /**
@@ -5968,9 +5968,9 @@ export interface components {
              */
             days_left?: number;
             description?: string;
-            /** @description When the embargo ends, as a date. Reaching it discloses nothing by itself */
+            /** @description The date the embargo ends. Reaching it discloses nothing by itself */
             disclose_at?: string;
-            /** @description When it runs out, as a date. The earliest among its places, which is the one that makes the whole finding late */
+            /** @description The date it runs out. The earliest among its places, which is the one that makes the whole finding late */
             due?: string;
             /** @description Approved claims about this same issue at this same place in another product. Evidence to read and quote, and never a decision about this product. At most five */
             elsewhere: components["schemas"]["ElsewhereBody"][] | null;
@@ -5978,13 +5978,13 @@ export interface components {
             exploited?: boolean;
             /** @enum {string} */
             fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
-            /** @description When that version became available */
+            /** @description The date that version became available */
             fixed_at?: string;
             /** @description The version that resolves it */
             fixed_in?: string;
-            /** @description What produced this: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found */
+            /** @description The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found */
             found_by?: components["schemas"]["MeasuredBody"];
-            /** @description When that version shipped */
+            /** @description The date that version shipped */
             latest_released_at?: string;
             /** @description The newest version the ecosystem's own index knows of */
             latest_version?: string;
@@ -5997,26 +5997,26 @@ export interface components {
             likelihood_on?: string;
             /**
              * Format: double
-             * @description Where that estimate stands among all published ones, 0 to 1
+             * @description The estimate's standing among all published ones, 0 to 1
              */
             likelihood_percentile?: number;
             links?: components["schemas"]["LinkBody"][] | null;
             /** @enum {string} */
             matched?: "advisory" | "identifier";
-            /** @description Where this match came from */
+            /** @description The source of this match */
             matched_from?: string;
-            /** @description Which body of vulnerability data answered, as the scanner names it — an ecosystem's own advisories against the national database's identifiers */
+            /** @description The body of vulnerability data that answered, as the scanner names it — an ecosystem's own advisories against the national database's identifiers */
             matched_in?: string;
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
             /** @description Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned */
             nothing_since?: boolean;
-            /** @description When the earliest of these places first appeared here, as a date */
+            /** @description The earliest of these places first appearing here, as a date */
             opened?: string;
             places: components["schemas"]["SittingBody"][] | null;
             /** @description Decisions made at these places that lapsed or were withdrawn, newest first, with their reasoning */
@@ -6031,11 +6031,11 @@ export interface components {
              * @description The same judgment as a number, where one is published
              */
             score?: number;
-            /** @description Whether it is the primary rating or a secondary one */
+            /** @description The rating's rank: primary or secondary */
             score_kind?: string;
-            /** @description Who published it, where the report names them */
+            /** @description The publisher, where the report names them */
             score_source?: string;
-            /** @description Which scoring system the number is on, as the report states it */
+            /** @description The scoring system the number is on, as the report states it */
             score_version?: string;
             /** @description As the data rates it. A word */
             severity?: string;
@@ -6047,15 +6047,15 @@ export interface components {
             tags?: string[] | null;
             /** @description This has not been announced. Anything said about it outside this deployment discloses it */
             undisclosed?: boolean;
-            /** @description What a fork was made from, where it is one */
+            /** @description The upstream a fork was made from, where it is one */
             upstream?: string;
-            /** @description What the score assumes — reachability, privilege, interaction */
+            /** @description The score's assumptions — reachability, privilege, interaction */
             vector?: string;
             version: string;
-            /** @description What VEX documents uploaded here say about this. Evidence, never applied */
+            /** @description Statements from VEX documents uploaded here. Evidence, never applied */
             vex: components["schemas"]["VexSaidBody"][] | null;
             vulnerability: string;
-            /** @description What kind of flaw this is, as CWE identifiers */
+            /** @description The kind of flaw, as CWE identifiers */
             weaknesses?: string[] | null;
         };
         "Extend-disclosureRequest": {
@@ -6065,9 +6065,9 @@ export interface components {
              * @example https://example.com/schemas/Extend-disclosureRequest.json
              */
             readonly $schema?: string;
-            /** @description Why it is being extended */
+            /** @description The reason it is being extended */
             reason: string;
-            /** @description Where the embargo should end, as a date */
+            /** @description The date the embargo should end */
             until: string;
         };
         ExtensionBody: {
@@ -6087,32 +6087,32 @@ export interface components {
             /** @description Whether a second person had to agree */
             needs_approval: boolean;
             reason: string;
-            /** @description Where it was asked to end */
+            /** @description The end that was asked for */
             until: string;
-            /** @description Where the embargo ended before */
+            /** @description The embargo's previous end */
             was: string;
         };
         FindingBody: {
             /**
              * Format: int64
-             * @description How many of those the build has already argued do not apply
+             * @description The number of those the build has already argued do not apply
              */
             answered?: number;
             /**
              * Format: int64
-             * @description How many builds in the selection hold this. Absent where the selection is one build
+             * @description The number of builds in the selection holding this. Absent where the selection is one build
              */
             builds?: number;
             /**
              * Format: int64
-             * @description How many distinct ways down there are. More than one means the pair above is one of them
+             * @description The number of distinct ways down. More than one means the pair above is one of them
              */
             chains?: number;
-            /** @description What carries it */
+            /** @description The component that carries it */
             component: string;
             /**
              * Format: int64
-             * @description How many things pull those in here. The build itself counts as one where anything is pulled in directly
+             * @description The number of things pulling those in here. The build itself counts as one where anything is pulled in directly
              */
             consumers: number;
             /**
@@ -6120,22 +6120,22 @@ export interface components {
              * @description Negative once it is overdue. Absent where there is no deadline
              */
             days_left?: number;
-            /** @description When the embargo ends, as a date. Reaching it discloses nothing by itself */
+            /** @description The date the embargo ends. Reaching it discloses nothing by itself */
             disclose_at?: string;
-            /** @description When it is due, as a date. Absent where there is none, and then no_deadline says why */
+            /** @description The date it is due. Absent where there is none, and then no_deadline gives the reason */
             due?: string;
             /** @description The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it */
             ecosystem?: string;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
             /**
-             * @description What upstream has done about it
+             * @description Upstream's answer about it
              * @enum {string}
              */
             fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
             /** @description The version that resolves it, where one exists */
             fixed_in?: string;
-            /** @description What this row is about: the source package at the version it was built at, in the ecosystem and distribution it came from */
+            /** @description The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;
             /**
              * Format: double
@@ -6143,39 +6143,39 @@ export interface components {
              */
             likelihood?: number;
             /**
-             * @description How the scanner reached this
+             * @description The scanner's route to this
              * @enum {string}
              */
             matched?: "advisory" | "identifier";
             /**
              * Format: int64
-             * @description How many steps sit between those two
+             * @description The number of steps between those two
              */
             middle?: number;
             /**
-             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
-            /** @description When the earliest of these places opened here, as a date. The age a deadline relates to */
+            /** @description The earliest of these places opening here, as a date. The age a deadline relates to */
             opened?: string;
             /** @description The part of the product this belongs to. Absent where the inventory placed the component nowhere */
             owner?: string;
             /**
              * Format: int64
-             * @description How many binaries of the source package sit here. More than one means deciding on this row decides about all of them
+             * @description The number of binaries of the source package here. More than one means deciding on this row decides about all of them
              */
             packages: number;
-            /** @description What directly pulls it in, which is what a decision is about */
+            /** @description The component that directly pulls it in, which is what a decision is about */
             parent?: string;
             /**
              * Format: int64
-             * @description How many findings sit under this row. What the bulk cap counts and what the disposition register expands to, rather than a number to reconcile with the two above
+             * @description The number of findings under this row. The bulk cap counts these, and the disposition register expands to them, so it is not a number to reconcile with the two above
              */
             places: number;
-            /** @description Which product this is open in. Present only on the list that spans products */
+            /** @description The product this is open in. Present only on the list that spans products */
             product?: string;
-            /** @description What that product is called, where it has a display name */
+            /** @description That product's display name, where it has one */
             product_name?: string;
             /**
              * Format: double
@@ -6189,7 +6189,7 @@ export interface components {
             /** @description The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule */
             source?: string;
             /**
-             * @description How far this has been decided: undecided when no place has a decision of any kind, waiting when a claim stands proposed and nobody has agreed, agreed when every place is answered by a standing decision, lapsed when a decision here stopped applying and nothing replaced it. Absent where some places are approved and the rest never decided
+             * @description The decision state: undecided when no place has a decision of any kind, waiting when a claim stands proposed and nobody has agreed, agreed when every place is answered by a standing decision, lapsed when a decision here stopped applying and nothing replaced it. Absent where some places are approved and the rest never decided
              * @enum {string}
              */
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
@@ -6201,7 +6201,7 @@ export interface components {
             tags?: string[] | null;
             /** @description Nothing here has been announced. Anything said about it outside this deployment discloses it */
             undisclosed?: boolean;
-            /** @description What a fork was made from, where it is one */
+            /** @description The upstream a fork was made from, where it is one */
             upstream?: string;
             /** @description The variant of that build */
             variant?: string;
@@ -6219,7 +6219,7 @@ export interface components {
             readonly $schema?: string;
             /** @description Other builds of this product the same judgment covers. All of it is written together or none of it is */
             also?: components["schemas"]["AlsoBuild"][] | null;
-            /** @description When a promised backport lands, as a date. Required for patch-needed and refused with any other */
+            /** @description The date a promised backport lands. Required for patch-needed and refused with any other */
             committed_to?: string;
             /** @description Required when it is deferred. A date, as 2026-03-31 */
             deferred_until?: string;
@@ -6236,17 +6236,17 @@ export interface components {
              */
             from_statement?: number;
             /**
-             * @description Why it does not apply. Required when it does not
+             * @description The reason it does not apply. Required when it does not
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
+            /** @description The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "patch-needed";
-            /** @description Which places this covers, as the finding names them. Omit for all of them */
+            /** @description The places this covers, as the finding names them. Omit for all of them */
             places?: string[] | null;
-            /** @description Why this holds */
+            /** @description The reasoning */
             reasoning: string;
             /** @description Decide only the places nothing currently stands at, and leave the rest as they are. For applying a decision to another build, where some of its places are already reached by lookup */
             remaining?: boolean;
@@ -6255,7 +6255,7 @@ export interface components {
             component: string;
             /**
              * Format: int64
-             * @description How many of those this claim covers
+             * @description The number of those this claim covers
              */
             decided: number;
             /** @description The first four hundred characters of what the report says, as plain text */
@@ -6266,11 +6266,11 @@ export interface components {
             fixed_in?: string;
             /** @description The part of the product this belongs to */
             owner?: string;
-            /** @description What directly pulls it in, which is what the decision is about */
+            /** @description The component that directly pulls it in, which is what the decision is about */
             parent?: string;
             /**
              * Format: int64
-             * @description How many places the issue sits at in that component in that build
+             * @description The number of places the issue sits at in that component in that build
              */
             places: number;
             /** @description The build to link to, by product, branch or tag, and variant */
@@ -6317,7 +6317,7 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["DisposedBody"][] | null;
-            /** @description What the register was measured with. Absent where nothing has been uploaded to the build */
+            /** @description The tools the register was measured with. Absent where nothing has been uploaded to the build */
             measured?: components["schemas"]["MeasuredBody"];
             /** Format: int64 */
             total: number;
@@ -6337,7 +6337,7 @@ export interface components {
             /** @description The product the role is held against. Omit it and set everywhere instead to hold it across the estate */
             product?: string;
             /**
-             * @description What they may do with it
+             * @description The rights it carries
              * @enum {string}
              */
             role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage";
@@ -6349,12 +6349,12 @@ export interface components {
             claim_id: number;
             /**
              * Format: int64
-             * @description What the claim covered when it was agreed to
+             * @description The claim's reach when it was agreed to
              */
             covered: number;
             /**
              * Format: int64
-             * @description What it covers now, having reached it by matching rather than by anybody acting
+             * @description Its reach now, arrived at by matching rather than by anybody acting
              */
             covers_now: number;
             /** @enum {string} */
@@ -6367,7 +6367,7 @@ export interface components {
              * @example https://example.com/schemas/Hand-back-assignmentsRequest.json
              */
             readonly $schema?: string;
-            /** @description Who takes it on. Omit to return it to nobody */
+            /** @description The party taking it on. Omit to return it to nobody */
             to?: string;
         };
         "Hand-back-assignmentsResponse": {
@@ -6387,10 +6387,10 @@ export interface components {
             everywhere?: boolean;
             /** @description The product the role is held against, by the name that addresses it. Absent where it is held across every product */
             product?: string;
-            /** @description What to call that product, where it was declared with a display name */
+            /** @description That product's display name, where it was declared with one */
             product_display_name?: string;
             /**
-             * @description What they may do with it
+             * @description The rights it carries
              * @enum {string}
              */
             role: "approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage";
@@ -6401,25 +6401,25 @@ export interface components {
             source?: "assigned" | "derived";
         };
         HeldChangeBody: {
-            /** @description What it was against, as the trail records it */
+            /** @description The subject, as the trail records it */
             about: string;
             at: string;
-            /** @description Who made the change */
+            /** @description The person who made the change */
             by: string;
-            /** @description What they hold after. Absent means it was withdrawn */
+            /** @description The roles held after. Absent means a withdrawal */
             now?: string;
-            /** @description What they held before. Absent means they held nothing */
+            /** @description The roles held before. Absent means nothing */
             was?: string;
         };
         HolderBody: {
-            /** @description What names it when handing work over */
+            /** @description The name used when handing work over */
             identity: string;
             /**
              * @description Whether this is a person or a team. Work is held by a party, and both are one
              * @enum {string}
              */
             kind: "person" | "team";
-            /** @description What to show, which is the spelling somebody typed where there is one */
+            /** @description The label, which is the spelling somebody typed where there is one */
             name: string;
         };
         HoldingBody: {
@@ -6430,14 +6430,14 @@ export interface components {
             open: number;
             /**
              * Format: int64
-             * @description How many of those pieces are past their deadline
+             * @description The number of those pieces past their deadline
              */
             overdue: number;
-            /** @description Whoever holds it, by the name they are shown under. A person or a team */
+            /** @description The holder, by the name they are shown under. A person or a team */
             person: string;
             /**
              * Format: int64
-             * @description How many findings those cover, across every build
+             * @description The number of findings those cover, across every build
              */
             places: number;
             /** @description This is a team's queue rather than one person's work */
@@ -6468,10 +6468,10 @@ export interface components {
             decision: number;
             /**
              * Format: int64
-             * @description How long this has already been put off, across every line it has been carried through
+             * @description The total this has already been put off for, across every line it has been carried through
              */
             deferred_days?: number;
-            /** @description What the new line has */
+            /** @description The new line's contents */
             now: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
@@ -6491,13 +6491,13 @@ export interface components {
              * @example https://example.com/schemas/IssuanceBody.json
              */
             readonly $schema?: string;
-            /** @description What went out, hashed, so that what is published and what we would generate stay answerable against each other */
+            /** @description A digest of what went out, so that what is published and what we would generate stay answerable against each other */
             digest: string;
             issued_at: string;
             summary?: string;
             /**
              * Format: int64
-             * @description Which issuance this is, counting from one. It is what the next document's version says
+             * @description The issuance number, counting from one. It is what the next document's version says
              */
             version: number;
         };
@@ -6519,7 +6519,7 @@ export interface components {
             items: components["schemas"]["SightingBody"][] | null;
             /**
              * Format: int64
-             * @description How many of your products carry it
+             * @description The number of your products carrying it
              */
             products: number;
             /** Format: double */
@@ -6541,7 +6541,7 @@ export interface components {
         Item: {
             /** @description A branch or a tag */
             stream: string;
-            /** @description How that line is built */
+            /** @description The way that line is built */
             variant: string;
         };
         Item1: {
@@ -6551,10 +6551,10 @@ export interface components {
         JudgedBody: {
             approvals: components["schemas"]["AgreedBody"][] | null;
             component: string;
-            /** @description What pulls the component in. Absent where the build holds it directly */
+            /** @description The consumer that pulls the component in. Absent where the build holds it directly */
             consumer?: string;
             deferred_until?: string;
-            /** @description When it stopped applying — withdrawn, or lapsed because the code moved */
+            /** @description The moment it stopped applying — withdrawn, or lapsed because the code moved */
             ended_at?: string;
             /** @description The package version the claim says the fix arrived in, where it claims one has. What somebody auditing an already-fixed claim checks against the packager's own record */
             fixed_version?: string;
@@ -6567,7 +6567,7 @@ export interface components {
              * @enum {string}
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
-            /** @description What a holder can do about it. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks */
+            /** @description The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
@@ -6591,15 +6591,15 @@ export interface components {
              * @example https://example.com/schemas/KeyBody.json
              */
             readonly $schema?: string;
-            /** @description When it was issued. A pipeline key does not expire, so this is the only thing that dates it */
+            /** @description The date it was issued. A pipeline key does not expire, so this is the only thing that dates it */
             created_at?: string;
-            /** @description When it last sent something */
+            /** @description The last time it sent something */
             last_used_at?: string;
-            /** @description What this credential is for */
+            /** @description The credential's purpose */
             name: string;
             /** @description The product it may send scans for, by the name that addresses it. Always required */
             product: string;
-            /** @description What to call that product, where it was declared with a display name */
+            /** @description That product's display name, where it was declared with one */
             product_display_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
@@ -6630,24 +6630,24 @@ export interface components {
              * @description Negative once it is overdue
              */
             days_left: number;
-            /** @description When it is due, as a date */
+            /** @description The date it is due */
             due: string;
             exploited?: boolean;
             /**
              * Format: int64
-             * @description How many places in that build this sits at
+             * @description The number of places in that build this sits at
              */
             places: number;
             product: string;
             severity?: string;
             stream: string;
             variant: string;
-            /** @description Which version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved */
+            /** @description The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved */
             version?: string;
             vulnerability: string;
         };
         LinkBody: {
-            /** @description What is at the other end — the issue's record, a distribution's answer about it, or the package's own page */
+            /** @description The destination — the issue's record, a distribution's answer about it, or the package's own page */
             name: string;
             url: string;
         };
@@ -6705,7 +6705,7 @@ export interface components {
             items: components["schemas"]["CarriedClaimBody"][] | null;
             /**
              * Format: int64
-             * @description How many there are in all, so a page says what it is a page of
+             * @description The total, so a page says what it is a page of
              */
             total: number;
         };
@@ -7148,7 +7148,7 @@ export interface components {
             here?: boolean;
             /**
              * Format: int64
-             * @description How many places it sits at there
+             * @description The number of places it sits at there
              */
             places: number;
             stream: string;
@@ -7157,7 +7157,7 @@ export interface components {
             version?: string;
         };
         MeasuredBody: {
-            /** @description When the build it describes was built */
+            /** @description The build time it describes */
             built_at?: string;
             /** @description The vulnerability database it read */
             database_version?: string;
@@ -7166,13 +7166,13 @@ export interface components {
              * @description The inventory that was read, as the receipt names it
              */
             document?: number;
-            /** @description Where to fetch the inventory that was read. Absent where its contents were let go */
+            /** @description The address of the inventory that was read. Absent where its contents were let go */
             document_at?: string;
             /** @description The hash of the inventory as it arrived */
             document_hash?: string;
             /** @description Whether the inventory itself is still here */
             document_held?: boolean;
-            /** @description When that run finished */
+            /** @description The moment that run finished */
             ran_at?: string;
             /** @description We ran the scanner, rather than the build sending what its own found */
             ran_here?: boolean;
@@ -7188,7 +7188,7 @@ export interface components {
             scan?: number;
             /** @description The hash of what was uploaded */
             scan_hash?: string;
-            /** @description Which scanner produced the findings */
+            /** @description The scanner that produced the findings */
             scanner: string;
             scanner_version?: string;
         };
@@ -7203,7 +7203,7 @@ export interface components {
             capped?: boolean;
             /**
              * Format: int64
-             * @description How many observations the two spans were worked out from
+             * @description The number of observations behind the two spans
              */
             sampled: number;
             /**
@@ -7212,18 +7212,18 @@ export interface components {
              */
             sent_back: number;
             since: string;
-            /** @description What each person got through, most first */
+            /** @description Each person's throughput, most first */
             throughput: components["schemas"]["WorkedBody"][] | null;
-            /** @description How long a claim waited for a second person, per severity */
+            /** @description The wait for a second person, per severity */
             time_to_agree: components["schemas"]["SpreadBody"][] | null;
-            /** @description How long a finding sat before anybody proposed anything about it, per severity */
+            /** @description The wait before anybody proposed anything, per severity */
             time_to_decide: components["schemas"]["SpreadBody"][] | null;
             until: string;
         };
         MentionableBody: {
-            /** @description What to write after the @ */
+            /** @description The name written after the @ */
             identity: string;
-            /** @description What to show while choosing */
+            /** @description The label shown while choosing */
             name: string;
         };
         MentionsBody: {
@@ -7277,7 +7277,7 @@ export interface components {
             };
             /**
              * Format: int64
-             * @description How many components it pulls in. Zero means nothing to open
+             * @description The number of components it pulls in. Zero means nothing to open
              */
             children: number;
             component: string;
@@ -7302,18 +7302,18 @@ export interface components {
              * @example https://example.com/schemas/Note-on-issueRequest.json
              */
             readonly $schema?: string;
-            /** @description What to say, in markdown */
+            /** @description The text, in markdown */
             body: string;
         };
         NoteBody: {
-            /** @description What it says, in markdown */
+            /** @description The text, in markdown */
             body: string;
-            /** @description When the author last changed it, where they have */
+            /** @description The author's last change, where they made one */
             edited_at?: string;
             /** Format: int64 */
             id: number;
             written_at: string;
-            /** @description Who wrote it */
+            /** @description The author */
             written_by: string;
         };
         NoteWritten: {
@@ -7329,25 +7329,25 @@ export interface components {
             not_notified?: string[] | null;
         };
         NotificationBody: {
-            /** @description What a condition is about. Absent for an event */
+            /** @description A condition's subject. Absent for an event */
             about?: string;
-            /** @description When it was recorded */
+            /** @description The moment it was recorded */
             at: string;
-            /** @description What to say. Describes the moment it was written rather than the world now */
+            /** @description The message. It describes the moment it was written rather than the world now */
             body: string;
             /**
              * Format: int64
-             * @description What to name this when acknowledging it
+             * @description The name for this when acknowledging it
              */
             id: number;
-            /** @description What happened, as a word: assigned, sent-back, build-quiet */
+            /** @description The kind, as a word: assigned, sent-back, build-quiet */
             kind: string;
             /**
              * @description An event happened once and is acknowledged; a condition holds until what it is about changes
              * @enum {string}
              */
             lifetime: "event" | "condition";
-            /** @description Where it points, where there is somewhere to go */
+            /** @description The destination, where there is somewhere to go */
             link?: string;
         };
         NotificationsOutputBody: {
@@ -7360,7 +7360,7 @@ export interface components {
             items: components["schemas"]["NotificationBody"][] | null;
             /**
              * Format: int64
-             * @description How many are waiting on you
+             * @description The number waiting on you
              */
             total: number;
         };
@@ -7382,20 +7382,20 @@ export interface components {
              * @example https://example.com/schemas/OutboundBody.json
              */
             readonly $schema?: string;
-            /** @description Why the last one failed, where one did */
+            /** @description The reason the last one failed, where one did */
             because?: string;
             /**
              * Format: int64
-             * @description How many are being retried or have been given up on
+             * @description The number being retried or given up on
              */
             failing: number;
-            /** @description Which notifications go here, or * for all of them */
+            /** @description The notifications that go here, or * for all of them */
             kind: string;
-            /** @description What it is called, so a log line and a screen can name it */
+            /** @description The name, so a log line and a screen can use it */
             name: string;
             /**
              * Format: int64
-             * @description How many things have gone there
+             * @description The number of things delivered there
              */
             sent: number;
             url: string;
@@ -7412,7 +7412,7 @@ export interface components {
             fixed_in?: string;
             severity?: string;
             vulnerability: string;
-            /** @description Which of the four signals made it stand out */
+            /** @description The signal that made it stand out */
             why: string[] | null;
         };
         OutliersBody: {
@@ -7493,7 +7493,7 @@ export interface components {
             readonly $schema?: string;
             builds: components["schemas"]["BuildStandingBody"][] | null;
             display_name?: string;
-            /** @description When the product goes out of support, where a date is set */
+            /** @description The date the product goes out of support, where one is set */
             end_of_life?: string;
             name: string;
             /** Format: int64 */
@@ -7519,17 +7519,17 @@ export interface components {
             rows: number;
             /**
              * Format: int64
-             * @description How much of everything agreed to here ran between these two, as a percentage of rows
+             * @description The share of everything agreed to here that ran between these two, as a percentage of rows
              */
             share: number;
         };
         PendingExtensionBody: {
             asked_at: string;
-            /** @description Who asked */
+            /** @description The person who asked */
             by: string;
             /**
              * Format: int64
-             * @description How much later that is, in days
+             * @description The distance later, in days
              */
             days: number;
             /** Format: int64 */
@@ -7538,25 +7538,25 @@ export interface components {
             mine?: boolean;
             product: string;
             reason: string;
-            /** @description Where it is asked to end */
+            /** @description The end being asked for */
             until: string;
             vulnerability: string;
-            /** @description Where the embargo ends now */
+            /** @description The embargo's end now */
             was: string;
         };
         PerBuildBody: {
-            /** @description What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count */
+            /** @description Everything open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count */
             by_severity?: {
                 [key: string]: number;
             };
             /**
              * Format: date-time
-             * @description When the work promised here is due
+             * @description The date the work promised here is due
              */
             committed_to?: string;
             /**
              * Format: int64
-             * @description How many things pull it in here
+             * @description The number of things pulling it in here
              */
             consumers: number;
             /**
@@ -7564,18 +7564,18 @@ export interface components {
              * @description The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees, because that defers the worst thing it covers
              */
             due_at?: string;
-            /** @description Which ecosystem the identifier names, read out of it rather than stored */
+            /** @description The ecosystem the identifier names, read out of it rather than stored */
             ecosystem?: string;
             /** @description Whether any of what is open here is known to be exploited, which outranks everything else about it */
             exploited: boolean;
             /**
              * Format: date-time
-             * @description When a scan of this deployment first reported the component
+             * @description The first scan of this deployment to report the component
              */
             first_seen: string;
             /**
              * Format: int64
-             * @description How many of what is open here any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue
+             * @description The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue
              */
             fixable: number;
             /**
@@ -7585,35 +7585,35 @@ export interface components {
             issues: number;
             /**
              * Format: date-time
-             * @description When that version shipped, where the index said
+             * @description The date that version shipped, where the index said
              */
             newest_released_at?: string;
             /** @description The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package */
             newest_version?: string;
-            /** @description What to call that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is */
+            /** @description The name for that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is */
             package_page_name?: string;
-            /** @description Where this package is published, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like */
+            /** @description The address this package is published at, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like */
             package_page_url?: string;
             /**
              * Format: int64
-             * @description How many times those sit somewhere in this build. What the bulk cap is measured against
+             * @description The number of times those sit somewhere in this build. What the bulk cap is measured against
              */
             places: number;
-            /** @description Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier */
+            /** @description The address the index gives for where the package is developed. Absent where it does not say, in which case an address can still be built from the identifier */
             project_url?: string;
             /** @description The package identifier this build ships it under */
             purl?: string;
             stream: string;
             /** @description One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package */
             summary?: string;
-            /** @description Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it */
+            /** @description The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it */
             supplier?: string;
             /** @description The version somebody has committed to moving this build to */
             upgrade_to?: string;
             /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets */
             upgrades?: components["schemas"]["UpgradeBody"][] | null;
             variant: string;
-            /** @description What this build ships */
+            /** @description The version this build ships */
             version: string;
         };
         PersonBody: {
@@ -7621,19 +7621,19 @@ export interface components {
             admin?: boolean;
             /** @description Whether they may read this deployment's own records. It grants no product's findings or decisions */
             audits?: boolean;
-            /** @description When they left. Absent means they may still sign in */
+            /** @description The date they left. Absent means they may still sign in */
             deactivated_at?: string;
-            /** @description What to show instead of the identity */
+            /** @description The label shown instead of the identity */
             display_name?: string;
-            /** @description Where they are reached outside the application */
+            /** @description The address they are reached at outside the application */
             email?: string;
             /**
-             * @description Who last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten
+             * @description The source that last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten
              * @enum {string}
              */
             email_source?: "provider" | "recorded";
             holds?: components["schemas"]["HeldBody"][] | null;
-            /** @description What to call them here */
+            /** @description The name for them here */
             identity: string;
             /** @description Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing */
             sees_nothing?: boolean;
@@ -7661,7 +7661,7 @@ export interface components {
             withdrawn: number;
         };
         PlaceBody: {
-            /** @description Which place in the build, as the findings list gives it */
+            /** @description The place in the build, as the findings list gives it */
             place: string;
             product: string;
             /** @description The issue, by any name it is known under */
@@ -7676,11 +7676,11 @@ export interface components {
             readonly $schema?: string;
             /** @description The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version */
             builds: components["schemas"]["BuildName"][] | null;
-            /** @description When the work will be done, as 2026-03-31. What a missed target is measured against */
+            /** @description The date the work lands, as 2026-03-31. A missed target is measured against it */
             by: string;
-            /** @description Who is carrying it, by sign-in identity. Leave both out and it is held by nobody */
+            /** @description The party carrying it, by sign-in identity. Leave both out and it is held by nobody */
             person?: string;
-            /** @description Why this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome */
+            /** @description The reason this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome */
             reasoning: string;
             /** @description A team carrying it, by name. A queue rather than a holding: it stays unheld until somebody takes it */
             team?: string;
@@ -7696,7 +7696,7 @@ export interface components {
              */
             claim_id?: number;
             components: string[] | null;
-            /** @description When the commitment was made, which is what this release has been waiting since */
+            /** @description The moment the commitment was made, which is what this release has been waiting since */
             declared_at: string;
             /** @description The upgrade's own key: the source package at the version it was built at, in the ecosystem and distribution it came from */
             fold: string;
@@ -7710,17 +7710,17 @@ export interface components {
             issues: number;
             /**
              * Format: int64
-             * @description How many findings those issues sit at
+             * @description The number of findings those issues sit at
              */
             places: number;
             /**
-             * @description Where it stands. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this
+             * @description The promise state. 'landed' is nothing left open under it here, which the scans say; 'lapsed' is the date past with work outstanding. Nobody sets this
              * @enum {string}
              */
             state: "planned" | "landed" | "lapsed";
             /** @description The version it moves to, as the commitment recorded it */
             to: string;
-            /** @description What to call it: the source package */
+            /** @description The name: the source package */
             upstream: string;
         };
         PlannedUpgradeBody: {
@@ -7737,7 +7737,7 @@ export interface components {
             claim_id: number;
             /**
              * Format: int64
-             * @description How many packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together
+             * @description The number of packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together
              */
             components: number;
             /**
@@ -7770,7 +7770,7 @@ export interface components {
              * @example https://example.com/schemas/Point-claim-elsewhereRequest.json
              */
             readonly $schema?: string;
-            /** @description Where the work is happening. Empty clears it */
+            /** @description The place the work is happening. Empty clears it */
             elsewhere: string;
         };
         PointBody: {
@@ -7786,7 +7786,7 @@ export interface components {
              * @description Findings that appeared during this step
              */
             opened: number;
-            /** @description What appeared, split by severity */
+            /** @description Everything that appeared, split by severity */
             opened_by_severity: {
                 [key: string]: number;
             };
@@ -7795,7 +7795,7 @@ export interface components {
              * @description Findings that went away during this step
              */
             resolved: number;
-            /** @description What went away, split by the severity it held while it was open */
+            /** @description Everything that went away, split by the severity it held while it was open */
             resolved_by_severity: {
                 [key: string]: number;
             };
@@ -7803,7 +7803,7 @@ export interface components {
         PreparedBody: {
             /**
              * Format: int64
-             * @description How long a deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else
+             * @description The deferral it prepares, in days from whenever somebody submits it. A date would be wrong the week after it was saved. Required where the outcome is a deferral, and refused where it is anything else
              */
             defer_days?: number;
             /**
@@ -7812,7 +7812,7 @@ export interface components {
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /**
-             * @description What it offers to say
+             * @description The reasoning it offers
              * @enum {string}
              */
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
@@ -7828,16 +7828,16 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many branches are declared
+             * @description The number of branches declared
              */
             branches?: number;
-            /** @description What people see. Defaults to the name */
+            /** @description The display name. Defaults to the name */
             display_name?: string;
             /** @description The date support ends for releases that have not stated their own, as YYYY-MM-DD */
             end_of_life?: string;
-            /** @description When a scan last arrived for any of its builds */
+            /** @description The last scan to arrive for any of its builds */
             last_scan_at?: string;
-            /** @description How scans name this product */
+            /** @description The name scans use for this product */
             name: string;
             /**
              * Format: int64
@@ -7846,17 +7846,17 @@ export interface components {
             open?: number;
             /**
              * Format: int64
-             * @description How many tags are declared
+             * @description The number of tags declared
              */
             tags?: number;
             /**
-             * @description What this product considers worth triaging, where it says something other than the deployment. Absent means it follows the deployment
+             * @description The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment
              * @enum {string}
              */
             triage_floor?: "everything" | "low" | "medium" | "high" | "critical";
             /**
              * Format: int64
-             * @description How many variants are declared
+             * @description The number of variants declared
              */
             variants?: number;
         };
@@ -7864,9 +7864,9 @@ export interface components {
             branches?: components["schemas"]["Branch"][] | null;
         };
         ProviderBody: {
-            /** @description What to put in the sign-in path */
+            /** @description The segment in the sign-in path */
             name: string;
-            /** @description Where to send the browser to start */
+            /** @description The address to send the browser to */
             path: string;
         };
         QueueOutputBody: {
@@ -7881,23 +7881,23 @@ export interface components {
             total: number;
         };
         QueuedBody: {
-            /** @description Which worker the work is for */
+            /** @description The worker the work is for */
             kind: string;
             /**
              * Format: int64
-             * @description How much of this kind may wait before more is refused
+             * @description The depth of this kind allowed before more is refused
              */
             limit: number;
             /**
              * Format: int64
-             * @description How much is waiting, including work held by a worker that has stopped reporting
+             * @description The depth waiting, including work held by a worker that has stopped reporting
              */
             waiting: number;
         };
         RateBody: {
             /**
              * Format: int64
-             * @description How many issue-and-component groups are wholly closed, with a deadline to be judged against
+             * @description The number of issue-and-component groups wholly closed, with a deadline to be judged against
              */
             closed: number;
             /**
@@ -7907,12 +7907,12 @@ export interface components {
             deferred: number;
             /**
              * Format: int64
-             * @description How many did not
+             * @description The number that did not
              */
             late: number;
             /**
              * Format: int64
-             * @description How many of those closed by it. Closed exactly at the deadline met it, because something still open at that instant is not yet overdue
+             * @description The number of those closed by it. Closed exactly at the deadline met it, because something still open at that instant is not yet overdue
              */
             met: number;
             /**
@@ -7953,16 +7953,16 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many pieces of work nobody has agreed to ship with
+             * @description The number of pieces of work nobody has agreed to ship with
              */
             blockers: number;
-            /** @description What nobody has agreed to ship with, worst first. Bounded; total says how many there are */
+            /** @description The work nobody has agreed to ship with, worst first. Bounded; total says how many there are */
             blocking: components["schemas"]["BlockingBody"][] | null;
             /** @description The least severity counted, or empty where everything is */
             floor?: string;
             now: components["schemas"]["BuildCountsBody"];
             shipped?: components["schemas"]["BuildCountsBody"];
-            /** @description What is missing, where there is nothing to compare against */
+            /** @description The missing half, where there is nothing to compare against */
             why?: string;
         };
         "Reaffirm-claimRequest": {
@@ -7972,7 +7972,7 @@ export interface components {
              * @example https://example.com/schemas/Reaffirm-claimRequest.json
              */
             readonly $schema?: string;
-            /** @description Why every one of them still holds, in markdown */
+            /** @description The reason every one of them still holds, in markdown */
             reasoning: string;
         };
         "Reaffirm-decisionRequest": {
@@ -7987,7 +7987,7 @@ export interface components {
              * @description The decision being re-made
              */
             previous: number;
-            /** @description Why it still holds, in markdown */
+            /** @description The reason it still holds, in markdown */
             reasoning: string;
         };
         ReaffirmedBody: {
@@ -8005,16 +8005,16 @@ export interface components {
             decisions: number[] | null;
             /**
              * Format: int64
-             * @description How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
+             * @description The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
              */
             places: number;
             /** @description Whether a second person has to agree */
             waiting: boolean;
         };
         ReceiptBody: {
-            /** @description When the producer says the build was made */
+            /** @description The build time the producer states */
             built_at?: string;
-            /** @description What the scanner said while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours */
+            /** @description The scanner's own words while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours */
             caution?: string;
             /**
              * Format: int64
@@ -8023,12 +8023,12 @@ export interface components {
             closed?: number;
             /**
              * Format: int64
-             * @description How many components the inventory described
+             * @description The number of components the inventory described
              */
             components?: number;
-            /** @description Why it could not be used, where it could not */
+            /** @description The reason it could not be used, where it could not */
             failure?: string;
-            /** @description What the run answering this upload was measured with. Absent until a run has covered it */
+            /** @description The tools the run answering this upload was measured with. Absent until a run has covered it */
             measured?: components["schemas"]["MeasuredBody"];
             /**
              * Format: int64
@@ -8037,10 +8037,10 @@ export interface components {
             opened?: number;
             /**
              * Format: int64
-             * @description How many of them something placed in the graph
+             * @description The number of them something placed in the graph
              */
             placed?: number;
-            /** @description When it arrived here */
+            /** @description The moment it arrived here */
             received_at: string;
             /**
              * Format: int64
@@ -8057,7 +8057,7 @@ export interface components {
             /** @description The identity the inventory carries for itself */
             serial?: string;
             /**
-             * @description How far it has got
+             * @description The state it has reached
              * @enum {string}
              */
             state: "reading" | "scanning" | "scanned" | "failed";
@@ -8070,7 +8070,7 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ReceiptBody"][] | null;
-            /** @description What the last completed run was measured with */
+            /** @description The tools the last completed run was measured with */
             measured_against?: components["schemas"]["MeasuredBody"];
             /** Format: int64 */
             total: number;
@@ -8082,7 +8082,7 @@ export interface components {
              * @example https://example.com/schemas/Record-advisory-issuedRequest.json
              */
             readonly $schema?: string;
-            /** @description What this revision says, for the document's revision history. A history whose every entry reads the same is one nobody reads */
+            /** @description The revision's summary, for the document's revision history. A history whose every entry reads the same is one nobody reads */
             summary?: string;
         };
         "Record-findingRequest": {
@@ -8094,35 +8094,35 @@ export interface components {
             readonly $schema?: string;
             /** @description Every build that ships it. One issue, and one finding for each place the component sits at in each build — which is the shape a scanner's findings already take */
             builds: components["schemas"]["Item"][] | null;
-            /** @description What carries it. Omit for the build itself */
+            /** @description The component that carries it. Omit for the build itself */
             component?: string;
-            /** @description How to reach them. A researcher has no account here, which is the shape of the thing */
+            /** @description The address to reach them at. A researcher has no account here, which is the shape of the thing */
             contact?: string;
-            /** @description How they wish to be credited in an advisory, where that is not the name they reported under. "anonymous" is a real answer */
+            /** @description The credit they asked for in an advisory, where that is not the name they reported under. "anonymous" is a real answer */
             credit?: string;
             /** @description Whether this is already public. Undisclosed by default */
             disclosed?: boolean;
-            /** @description Which one, where two share a name and a version */
+            /** @description The ecosystem, where two share a name and a version */
             ecosystem?: string;
             /**
              * Format: date
              * @description The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless
              */
             received?: string;
-            /** @description Who found it, as they gave their name */
+            /** @description The finder, as they gave their name */
             reported_by?: string;
             /**
-             * @description How bad it is. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given
+             * @description The severity. May be left out during early triage, before anybody has worked that out — an unrated finding is carried and listed, and what it does not get is a deadline. Worked out from the vector where one is given
              * @enum {string}
              */
             severity?: "critical" | "high" | "medium" | "low" | "negligible" | "none";
-            /** @description What the flaw is, in your own words */
+            /** @description The flaw, in your own words */
             summary: string;
             /** @description A CVSS 3.0 or 3.1 base vector. The score and the severity are worked out from it, so a score is never taken alongside it. Anything else is refused rather than scored with the wrong formula */
             vector?: string;
-            /** @description Which one, where the build holds that name at several versions */
+            /** @description The version, where the build holds that name at several */
             version?: string;
-            /** @description What kind of flaw it is, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which */
+            /** @description The kind of flaw, by the classification the world uses, such as CWE-125. Recorded as given, and the first is the root cause — a published advisory states one weakness, and this is what says which */
             weaknesses?: string[] | null;
         };
         RecordBody: {
@@ -8136,12 +8136,12 @@ export interface components {
             admin?: boolean;
             /** @description Whether they may read this deployment's own records: the settings, who holds what, and the administrative change log. It grants no product's findings or decisions. Omit it to leave it as it is */
             audits?: boolean;
-            /** @description What to show instead of the identity */
+            /** @description The label shown instead of the identity */
             display_name?: string;
-            /** @description Where to reach them outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was */
+            /** @description The address to reach them at outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was */
             email?: string;
             holds?: components["schemas"]["GrantBody"][] | null;
-            /** @description What to call them here */
+            /** @description The name for them here */
             identity: string;
         };
         "Redact-attachmentRequest": {
@@ -8151,7 +8151,7 @@ export interface components {
              * @example https://example.com/schemas/Redact-attachmentRequest.json
              */
             readonly $schema?: string;
-            /** @description Why the file is being removed. Recorded and shown wherever the text referred to it */
+            /** @description The reason the file is being removed. Recorded and shown wherever the text referred to it */
             reason: string;
         };
         Reference: {
@@ -8161,7 +8161,7 @@ export interface components {
         };
         ReferenceBody: {
             /**
-             * @description What it appears to be. A patch is the change itself
+             * @description The kind of reference. A patch is the change itself
              * @enum {string}
              */
             kind: "patch" | "advisory" | "report" | "other";
@@ -8172,7 +8172,7 @@ export interface components {
             by_severity?: {
                 [key: string]: number;
             };
-            /** @description Whether that is a branch or a tag */
+            /** @description The kind of stream: a branch or a tag */
             kind: string;
             /**
              * Format: int64
@@ -8187,7 +8187,7 @@ export interface components {
             by_severity?: {
                 [key: string]: number;
             };
-            /** @description When the release was declared. It orders them and labels them; the axis is the sequence */
+            /** @description The date the release was declared. It orders and labels them; the axis is the sequence */
             cut: string;
             /**
              * Format: int64
@@ -8208,7 +8208,7 @@ export interface components {
              * @example https://example.com/schemas/RemediationOutputBody.json
              */
             readonly $schema?: string;
-            /** @description What is open now, by how long it has been. About now whatever period was asked for */
+            /** @description Everything open now, by how long it has been. About now whatever period was asked for */
             aging: components["schemas"]["BucketBody"][] | null;
             /**
              * Format: int64
@@ -8240,12 +8240,12 @@ export interface components {
             standing?: boolean;
             /**
              * Format: int64
-             * @description How often it has been put off
+             * @description The number of times it has been put off
              */
             times: number;
             /**
              * Format: int64
-             * @description How long it has been put off for, added up
+             * @description The total it has been put off for
              */
             total_days: number;
             vulnerability: string;
@@ -8260,7 +8260,7 @@ export interface components {
             acknowledged?: string;
             acknowledged_by?: string;
             contact?: string;
-            /** @description How they wish to be credited in an advisory */
+            /** @description The credit they asked for in an advisory */
             credit?: string;
             /** @description The day it arrived, which the embargo is counted from */
             received?: string;
@@ -8279,7 +8279,7 @@ export interface components {
              * @description The date the work will be done by
              */
             by: string;
-            /** @description Why the promise is changing, in markdown */
+            /** @description The reason the promise is changing, in markdown */
             reasoning: string;
             /** @description The version it now moves to */
             to: string;
@@ -8291,7 +8291,7 @@ export interface components {
              * @example https://example.com/schemas/Resolve-findingRequest.json
              */
             readonly $schema?: string;
-            /** @description What fixed it */
+            /** @description The fix */
             because: string;
         };
         ResolvedBody: {
@@ -8301,11 +8301,11 @@ export interface components {
              * @example https://example.com/schemas/ResolvedBody.json
              */
             readonly $schema?: string;
-            /** @description When it was closed */
+            /** @description The moment it closed */
             at: string;
             /**
              * Format: int64
-             * @description How many locations of the issue in this build were closed
+             * @description The number of locations of the issue in this build that closed
              */
             closed: number;
         };
@@ -8314,7 +8314,7 @@ export interface components {
             ended: boolean;
             /**
              * Format: int64
-             * @description How many days ago support ended. Negative where the date has not arrived, which is how many days are left
+             * @description The days since support ended. Negative where the date has not arrived, which is how many days are left
              */
             ended_days: number;
             /** @description The date support ended, as YYYY-MM-DD */
@@ -8356,12 +8356,12 @@ export interface components {
             open: number;
             /**
              * Format: int64
-             * @description How many releases are out of support
+             * @description The number of releases out of support
              */
             total: number;
             /**
              * Format: int64
-             * @description How many days ahead this looked
+             * @description The days ahead this looked
              */
             within: number;
         };
@@ -8385,12 +8385,12 @@ export interface components {
             body: string;
             /**
              * Format: int64
-             * @description What an approval names when it says which words were agreed to
+             * @description The identifier an approval names when it says which words were agreed to
              */
             id: number;
             /**
              * Format: int64
-             * @description Which revision this is, counting from one
+             * @description The revision number, counting from one
              */
             ordinal: number;
             written_at: string;
@@ -8405,12 +8405,12 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: int64
-             * @description How many components this build holds
+             * @description The number of components this build holds
              */
             components: number;
             /**
              * Format: int64
-             * @description How many edges place them
+             * @description The number of edges placing them
              */
             edges: number;
             items: components["schemas"]["NeighborBody"][] | null;
@@ -8447,16 +8447,16 @@ export interface components {
             beneath?: string;
             /** Format: int64 */
             id: number;
-            /** @description What to call it, so a placement can be explained in words */
+            /** @description The name, so a placement can be explained in words */
             name: string;
             /**
              * Format: int64
-             * @description Where it sits among the others. The first rule that matches places the work
+             * @description Its position among the others. The first rule that matches places the work
              */
             order: number;
-            /** @description Where work lands, by the name that addresses the team */
+            /** @description The team work lands on, by the name that addresses it */
             team: string;
-            /** @description What to call that team, where it was declared with a display name */
+            /** @description That team's display name, where it was declared with one */
             team_display_name?: string;
             /** @description A source package name. Catches every binary package built from it */
             upstream?: string;
@@ -8468,19 +8468,19 @@ export interface components {
              * @example https://example.com/schemas/RunBody.json
              */
             readonly $schema?: string;
-            /** @description What the scanner said while succeeding — a qualification on what it found rather than a failure */
+            /** @description The scanner's own words while succeeding — a qualification on what it found rather than a failure */
             caution?: string;
             closed: components["schemas"]["RunChangeBody"];
             /** @description The vulnerability database it read */
             database_version?: string;
-            /** @description Why it produced nothing */
+            /** @description The reason it produced nothing */
             failure?: string;
             /** @description Absent while it is still going */
             finished_at?: string;
             opened: components["schemas"]["RunChangeBody"];
             /**
              * Format: int64
-             * @description How many of what it opened somebody is known to be exploiting
+             * @description The number it opened that somebody is known to be exploiting
              */
             opened_exploited?: number;
             /** @description We ran the scanner, rather than the build sending what its own found */
@@ -8516,15 +8516,15 @@ export interface components {
              * @example https://example.com/schemas/Save-filterRequest.json
              */
             readonly $schema?: string;
-            /** @description What this filter should offer to claim about what it catches. Left out, it prepares nothing — including on a name that used to */
+            /** @description The claim this filter should offer about what it catches. Left out, it prepares nothing — including on a name that used to */
             prepares?: components["schemas"]["PreparedBody"];
             /** @description The list's query string, without a leading ? */
             query: string;
         };
         SavedBody: {
-            /** @description What to call it. Matched without regard to capitals, and one of a name replaces the one before */
+            /** @description The name. Matched without regard to capitals, and one of a name replaces the one before */
             name: string;
-            /** @description What this filter offers to claim about what it catches. Absent on an ordinary saved filter, which is most of them */
+            /** @description The claim this filter offers about what it catches. Absent on an ordinary saved filter, which is most of them */
             prepares?: components["schemas"]["PreparedBody"];
             /** @description The findings list's query string, without a leading ? */
             query: string;
@@ -8579,12 +8579,12 @@ export interface components {
             contains?: string;
             /**
              * Format: int64
-             * @description How many issues that narrowing reached when the claim was written, read here rather than taken from the caller
+             * @description The number of issues that narrowing reached when the claim was written, read here rather than taken from the caller
              */
             matched: number;
             /**
              * Format: int64
-             * @description How many the claim was then made about
+             * @description The number the claim was then made about
              */
             named: number;
         };
@@ -8595,13 +8595,13 @@ export interface components {
              * @example https://example.com/schemas/Send-claim-backRequest.json
              */
             readonly $schema?: string;
-            /** @description What needs to change, in markdown */
+            /** @description The change being asked for, in markdown */
             because: string;
         };
         SentBody: {
             /**
              * Format: int64
-             * @description What to name to read this document back
+             * @description The name that reads this document back
              */
             document_id: number;
             /** @description SHA-256 of the bytes as they arrived */
@@ -8609,13 +8609,13 @@ export interface components {
             /** @description Whether the contents are still kept */
             held: boolean;
             /**
-             * @description What the document is
+             * @description The kind of document
              * @enum {string}
              */
             kind: "inventory" | "suppressions";
             /**
              * Format: int64
-             * @description How large it was
+             * @description Its size
              */
             size_bytes: number;
         };
@@ -8628,7 +8628,7 @@ export interface components {
             readonly $schema?: string;
             /** @description Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding */
             builds: components["schemas"]["Item1"][] | null;
-            /** @description Why any build is being taken out. Required whenever one is */
+            /** @description The reason any build is being taken out. Required whenever one is */
             reason?: string;
         };
         "Set-digestRequest": {
@@ -8667,7 +8667,7 @@ export interface components {
         SetAsideBody: {
             /**
              * Format: int64
-             * @description How many times it was tried
+             * @description The number of attempts
              */
             attempts: number;
             /**
@@ -8675,15 +8675,15 @@ export interface components {
              * @description The job, for putting it back
              */
             id: number;
-            /** @description Which worker the job was for */
+            /** @description The worker the job was for */
             kind: string;
-            /** @description Why it stopped, where anything reported one. Worker output, which may quote what the job was about */
+            /** @description The reason it stopped, where anything reported one. Worker output, which may quote what the job was about */
             last_error?: string;
-            /** @description What the work was about */
+            /** @description The subject of the work */
             reference: string;
             /**
              * Format: date-time
-             * @description When it was set aside
+             * @description The moment it was set aside
              */
             stopped_at: string;
         };
@@ -8691,11 +8691,11 @@ export interface components {
             /** @description Nobody has set this; the shipped value is in use */
             default?: boolean;
             /**
-             * @description What the value is: a length of time, a count of things, a count of bytes, one of a few words, or on and off
+             * @description The kind of value: a length of time, a count of things, a count of bytes, one of a few words, or on and off
              * @enum {string}
              */
             kind: "duration" | "count" | "size" | "word" | "switch";
-            /** @description What it decides */
+            /** @description The thing it decides */
             means: string;
             name: string;
             value: string;
@@ -8713,15 +8713,15 @@ export interface components {
             fixed_in?: string;
             /**
              * Format: int64
-             * @description How many times that component sits in that build carrying this issue
+             * @description The number of times that component sits in that build carrying this issue
              */
             places: number;
             /** @description The product's name, as an address takes it */
             product: string;
-            /** @description How it is spelled on screen */
+            /** @description Its spelling on screen */
             product_name: string;
             /**
-             * @description How far it has been decided here, by the definition the findings list uses
+             * @description The decision state here, by the definition the findings list uses
              * @enum {string}
              */
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
@@ -8746,7 +8746,7 @@ export interface components {
             decision_id: number;
             /**
              * Format: int64
-             * @description How many distinct issues the claim covers
+             * @description The number of distinct issues the claim covers
              */
             issues: number;
             /** @enum {string} */
@@ -8761,16 +8761,16 @@ export interface components {
              * @description The action that decision was one row of, so a claim shown on this finding can name the places it covers rather than only count them
              */
             claim?: number;
-            /** @description Which package of the source package this place is */
+            /** @description The package of the source package this place is */
             component: string;
-            /** @description What pulls the component in here. Absent under the product itself */
+            /** @description The consumer that pulls the component in here. Absent under the product itself */
             consumer?: string;
             /**
              * Format: int64
              * @description The claim already standing here, where one does. Not the same as suppressed, which is the build's own argument
              */
             decision?: number;
-            /** @description What the producer called this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it */
+            /** @description The producer's own word for this dependency, where it said anything: a CycloneDX component scope, or an SPDX lifecycle scope. Evidence, and nothing acts on it */
             declared_as?: string;
             /** @description Name this when recording a decision about it */
             place: string;
@@ -8783,7 +8783,7 @@ export interface components {
              * @description Arguments made about it in the period
              */
             claims: number;
-            /** @description What the judgments were about, by name. Empty where nothing in any build carries the place any more */
+            /** @description The subject of the judgments, by name. Empty where nothing in any build carries the place any more */
             component: string;
             /**
              * Format: int64
@@ -8802,7 +8802,7 @@ export interface components {
             dismissed: number;
             /**
              * Format: int64
-             * @description How many different people argued about it
+             * @description The number of different people who argued about it
              */
             people: number;
             product: string;
@@ -8819,7 +8819,7 @@ export interface components {
              * @example https://example.com/schemas/Split-claimRequest.json
              */
             readonly $schema?: string;
-            /** @description Why they are being held back, in markdown */
+            /** @description The reason they are being held back, in markdown */
             because: string;
             /** @description The decisions to hold back, which must be this claim's */
             rows: number[] | null;
@@ -8842,7 +8842,7 @@ export interface components {
             band: string;
             /**
              * Format: int64
-             * @description How many observations this is worked out from
+             * @description The number of observations behind it
              */
             count: number;
             /**
@@ -8852,7 +8852,7 @@ export interface components {
             median_days: number;
             /**
              * Format: double
-             * @description What nine in ten came in under, in days. Nearest-rank rather than interpolated: these are waits something actually had
+             * @description The span nine in ten came in under, in days. Nearest-rank rather than interpolated: these are waits something actually had
              */
             p90_days: number;
             /**
@@ -8896,14 +8896,14 @@ export interface components {
             outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /**
              * Format: int64
-             * @description How many of this finding's places the claim covers
+             * @description The number of this finding's places the claim covers
              */
             places: number;
             proposed_at: string;
             proposed_by: string;
-            /** @description How the claim's rows here stand */
+            /** @description The state of the claim's rows here */
             rows: components["schemas"]["RowsStandingBody"];
-            /** @description When rows were last sent back to the author */
+            /** @description The last time rows were sent back to the author */
             sent_back_at?: string;
             /** @description The reason given when they were, in markdown */
             sent_back_because?: string;
@@ -8947,9 +8947,9 @@ export interface components {
              * @example https://example.com/schemas/StatementsTakenBody.json
              */
             readonly $schema?: string;
-            /** @description What the document hashed to, which is how a revision is noticed later */
+            /** @description The document's digest, which is how a revision is noticed later */
             digest: string;
-            /** @description Who the document says it is from */
+            /** @description The publisher the document names */
             publisher: string;
             /**
              * Format: int64
@@ -8958,7 +8958,7 @@ export interface components {
             recorded: number;
             /**
              * Format: int64
-             * @description What this publisher had said before, set aside rather than deleted
+             * @description This publisher's previous statements, set aside rather than deleted
              */
             superseded: number;
         };
@@ -8986,9 +8986,9 @@ export interface components {
              * @enum {string}
              */
             kind: "branch" | "tag";
-            /** @description When a scan last arrived for any build of it */
+            /** @description The last scan to arrive for any build of it */
             last_scan_at?: string;
-            /** @description How scans name this branch or tag */
+            /** @description The name scans use for this branch or tag */
             name: string;
             /**
              * Format: int64
@@ -9007,7 +9007,7 @@ export interface components {
         TeamBody: {
             display_name?: string;
             members: string[] | null;
-            /** @description What the team is called. Matched without regard to capitals */
+            /** @description The team's name. Matched without regard to capitals */
             name: string;
         };
         TeamRecordBody: {
@@ -9017,11 +9017,11 @@ export interface components {
              * @example https://example.com/schemas/TeamRecordBody.json
              */
             readonly $schema?: string;
-            /** @description How to spell it when it is shown. Defaults to the name */
+            /** @description The display spelling. Defaults to the name */
             display_name?: string;
-            /** @description Who is on it, by sign-in identity. Everybody named must already have been recorded */
+            /** @description The members, by sign-in identity. Everybody named must already have been recorded */
             members?: string[] | null;
-            /** @description What to call the team */
+            /** @description The team's name */
             name: string;
         };
         TokenBody: {
@@ -9031,23 +9031,23 @@ export interface components {
              * @example https://example.com/schemas/TokenBody.json
              */
             readonly $schema?: string;
-            /** @description When it was minted */
+            /** @description The moment it was minted */
             created_at?: string;
-            /** @description When it stops working */
+            /** @description The moment it stops working */
             expires_at?: string;
             /** @description Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none */
             holds?: ("approver" | "assigner" | "public-read" | "private-read" | "public-triage" | "private-triage")[] | null;
-            /** @description When it was last used */
+            /** @description The last time it was used */
             last_used_at?: string;
-            /** @description How long it lasts, such as "720h". There is a configured maximum */
+            /** @description The lifetime, such as "720h". There is a configured maximum */
             lifetime?: string;
-            /** @description What its owner calls it */
+            /** @description The owner's name for it */
             name: string;
-            /** @description Whose it is. Shown to an administrator listing everybody's */
+            /** @description The owner. Shown to an administrator listing everybody's */
             owner?: string;
             /** @description Optionally, the one product it may reach, by the name that addresses it */
             product?: string;
-            /** @description What to call that product, where it was declared with a display name */
+            /** @description That product's display name, where it was declared with one */
             product_display_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
@@ -9093,21 +9093,21 @@ export interface components {
         UnagreedBody: {
             /**
              * Format: int64
-             * @description How many acts
+             * @description The number of acts
              */
             claims: number;
             /** @enum {string} */
             outcome: "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /**
              * Format: int64
-             * @description How many decisions those acts wrote
+             * @description The number of decisions those acts wrote
              */
             rows: number;
         };
         UnansweredBody: {
-            /** @description When the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked */
+            /** @description The moment the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked */
             checked: string;
-            /** @description Which ecosystem the identifier names, read out of it rather than stored */
+            /** @description The ecosystem the identifier names, read out of it rather than stored */
             ecosystem?: string;
             /** @description The package identifier, which is the name that would be sent */
             purl: string;
@@ -9129,7 +9129,7 @@ export interface components {
             ours: string[] | null;
             /**
              * Format: int64
-             * @description How many there are in all, through the same filter as the page
+             * @description The total, through the same filter as the page
              */
             total: number;
             /** @description Whether every candidate was examined. False means the estate is past what one read classifies, and the total is a floor */
@@ -9138,14 +9138,14 @@ export interface components {
         UnassignedBody: {
             /**
              * Format: int64
-             * @description How many builds hold it. More than one means the same code built more than one way, which one judgment answers
+             * @description The number of builds holding it. More than one means the same code built more than one way, which one judgment answers
              */
             builds: number;
             component: string;
             exploited?: boolean;
             /**
              * Format: int64
-             * @description How many findings a judgment here would be recorded against, across every build it is in
+             * @description The number of findings a judgment here would be recorded against, across every build it is in
              */
             places: number;
             product: string;
@@ -9170,14 +9170,14 @@ export interface components {
         UpgradeBody: {
             /**
              * Format: int64
-             * @description How many of what is open here name this exact version as their fix — that release's own security content
+             * @description The number of open findings naming this exact version as their fix — that release's own security content
              */
             fixed_here: number;
             /** @description Whether these versions could be ordered at all. False means the list is not ranked and reached says no more than fixed_here */
             ordered: boolean;
             /**
              * Format: int64
-             * @description How many moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered
+             * @description The number moving here would close altogether, counting everything fixed at or before it. Equal to fixed_here where the versions could not be ordered
              */
             reached: number;
             /** @description The version, as whoever packages the component wrote it */
@@ -9190,7 +9190,7 @@ export interface components {
              * @example https://example.com/schemas/UploadResult.json
              */
             readonly $schema?: string;
-            /** @description When the producer says the build was made */
+            /** @description The build time the producer states */
             built_at?: string;
             /**
              * @description Whether this upload was taken or matched one already held
@@ -9214,7 +9214,7 @@ export interface components {
             component: string;
             /**
              * Format: int64
-             * @description How far below the build's root it sits, so the tree is drawn by indenting
+             * @description The depth below the build's root, so the tree is drawn by indenting
              */
             depth: number;
             /**
@@ -9235,7 +9235,7 @@ export interface components {
             readonly $schema?: string;
             /** @description Whether this reaches customers. Defaults to yes */
             customer_facing?: boolean;
-            /** @description How scans name this build of the stream */
+            /** @description The name scans use for this build of the stream */
             name: string;
             /**
              * Format: int64
@@ -9244,7 +9244,7 @@ export interface components {
             open?: number;
         };
         VexSaidBody: {
-            /** @description When it was uploaded here */
+            /** @description The moment it was uploaded here */
             at: string;
             /** @description The document it came from */
             document: string;
@@ -9261,9 +9261,9 @@ export interface components {
              */
             offers?: "not-applicable" | "wont-fix" | "already-fixed";
             publisher: string;
-            /** @description Why they reached that answer. What a triager otherwise types from memory */
+            /** @description Their reasoning. What a triager otherwise types from memory */
             statement?: string;
-            /** @description What they said, in the format's own vocabulary */
+            /** @description Their statement, in the format's own vocabulary */
             status: string;
         };
         Vulnerability: {
@@ -9287,43 +9287,43 @@ export interface components {
             readonly $schema?: string;
             /**
              * Format: date-time
-             * @description When the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change
+             * @description The data's last move: the most recent time any version was seen for the first time. A version that comes back is not a change
              */
             moved_at?: string;
             /** @description Whether it has been that long. The same question the condition told to administrators asks */
             stale: boolean;
-            /** @description How long without moving counts as stopped, as this deployment has it set */
+            /** @description The span without moving that counts as stopped, as this deployment has it set */
             stale_after: string;
-            /** @description What the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said */
+            /** @description The version the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said */
             version?: string;
         };
         WaitingBody: {
             /**
              * Format: int64
-             * @description How long the claim has stood. An old judgment should look like one
+             * @description The age of the claim. An old judgment should look like one
              */
             age_days: number;
             /** @description Every build the claim currently covers, as stream and variant */
             builds: string[] | null;
             claim: components["schemas"]["ClaimBody"];
-            /** @description What a careful reader would go and look up: what was decided about this issue elsewhere, and how much else at the same place nobody has answered */
+            /** @description The context a careful reader looks up: what was decided about this issue elsewhere, and how much else at the same place nobody has answered */
             counter?: components["schemas"]["CounterBody"];
             decision: components["schemas"]["DecisionBody"];
             /**
              * Format: int64
-             * @description How many rows the claim wrote
+             * @description The number of rows the claim wrote
              */
             decisions: number;
             /**
              * Format: int64
-             * @description How long this finding has been put off in total
+             * @description The total this finding has been put off for
              */
             deferred_days?: number;
-            /** @description What the representative decision is about — build, issue, component, where it sits — so the card can be judged without opening it. Absent where no open finding sits at its place */
+            /** @description The representative decision's subject — build, issue, component, where it sits — so the card can be judged without opening it. Absent where no open finding sits at its place */
             finding?: components["schemas"]["FindingRefBody"];
             /**
              * Format: int64
-             * @description How many distinct issues it covers
+             * @description The number of distinct issues it covers
              */
             issues: number;
             /** @description For a claim over many issues: the rows that do not look like the rest, and how many there are */
@@ -9331,7 +9331,7 @@ export interface components {
             place: components["schemas"]["PlaceBody"];
             /**
              * Format: int64
-             * @description How many distinct places it covers
+             * @description The number of distinct places it covers
              */
             places: number;
             /** @description This was agreed to before and came back */
@@ -9340,13 +9340,13 @@ export interface components {
             reasoning: string;
         };
         WasSaidBody: {
-            /** @description What it said, in markdown */
+            /** @description Its text, in markdown */
             body: string;
-            /** @description When it stopped saying that */
+            /** @description The moment it stopped saying that */
             replaced_at: string;
             /**
              * Format: int64
-             * @description Which version this was, counting from one
+             * @description The version number, counting from one
              */
             version: number;
         };
@@ -9355,7 +9355,7 @@ export interface components {
             name: string;
         };
         WentBody: {
-            /** @description What the document hashed to when it went out. The published document belongs to whoever published it; this is what makes comparing it possible */
+            /** @description The document's digest when it went out. The published document belongs to whoever published it; this is what makes comparing it possible */
             digest: string;
             /** @description The flaw it was written about, under the identifier it is filed here */
             issue: string;
@@ -9363,7 +9363,7 @@ export interface components {
             issued_by: string;
             /**
              * Format: int64
-             * @description Which issuance this was, counting from one. Above one is a revision
+             * @description The issuance number, counting from one. Above one is a revision
              */
             ordinal: number;
             product: string;
@@ -9382,26 +9382,26 @@ export interface components {
             audits?: boolean;
             /**
              * Format: int64
-             * @description How many rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
+             * @description The number of rows one action may write here. A screen acting on a selection bounds it by this, and says so, rather than discovering the limit one refusal at a time
              */
             bulk_cap?: number;
             /**
              * Format: int64
-             * @description How long a deferral may run before a second person has to agree, in days. A screen taking a date needs it before the date is written, not after it is submitted
+             * @description The deferral a second person has to agree past, in days. A screen taking a date needs it before the date is written, not after it is submitted
              */
             deferral_days?: number;
             /** @description They asked for a daily digest */
             digest?: boolean;
             /** @description Their digest lists findings nobody owns as well as their own outstanding work */
             digest_unassigned?: boolean;
-            /** @description What this deployment calls them */
+            /** @description The identity this deployment holds for them */
             identity: string;
             /**
              * @description A person who signed in, or a credential
              * @enum {string}
              */
             kind: "person" | "key";
-            /** @description What to show instead of the identity, where one is recorded */
+            /** @description The display name, where one is recorded */
             name: string;
             /** @description The products they can reach, and what they may do in each */
             reach: components["schemas"]["CanBody"][] | null;
@@ -9619,7 +9619,7 @@ export interface operations {
                 to?: string;
                 /** @description A rolling window of this many days ending now. An alternative to a period, not an addition to one */
                 days?: number;
-                /** @description How many rows each section carries at most. capped says a section reached it */
+                /** @description The number of rows each section carries at most. capped says a section reached it */
                 limit?: number;
             };
             header?: never;
@@ -9655,9 +9655,9 @@ export interface operations {
                 product?: string;
                 /** @description Limit to one state */
                 state?: "proposed" | "live" | "withdrawn";
-                /** @description How many to return */
+                /** @description The number returned */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -9866,7 +9866,7 @@ export interface operations {
                 component?: string;
                 /** @description Only judgments about places this branch or tag holds. Needs exactly one product and a variant */
                 stream?: string;
-                /** @description Which build of that stream. Needs exactly one product and a stream */
+                /** @description The build of that stream. Needs exactly one product and a stream */
                 variant?: string;
                 limit?: number;
                 offset?: number;
@@ -9922,7 +9922,7 @@ export interface operations {
                 component?: string;
                 /** @description Only judgments about places this branch or tag holds. Needs exactly one product and a variant */
                 stream?: string;
-                /** @description Which build of that stream. Needs exactly one product and a stream */
+                /** @description The build of that stream. Needs exactly one product and a stream */
                 variant?: string;
             };
             header?: never;
@@ -10564,10 +10564,10 @@ export interface operations {
             query?: {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
-                /** @description How many deferrals make something worth listing. One is an ordinary judgment */
+                /** @description The number of deferrals that makes something worth listing. One is an ordinary judgment */
                 at_least?: number;
                 limit?: number;
-                /** @description Where in the list to start */
+                /** @description The offset into the list */
                 offset?: number;
             };
             header?: never;
@@ -10601,7 +10601,7 @@ export interface operations {
             query?: {
                 /** @description Limit to one product, by name. Empty means every product you can see */
                 product?: string;
-                /** @description How many deferrals make something worth listing. One is an ordinary judgment */
+                /** @description The number of deferrals that makes something worth listing. One is an ordinary judgment */
                 at_least?: number;
             };
             header?: never;
@@ -10639,10 +10639,10 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How many days ahead to look. Left off, this deployment's own embargo length */
+                /** @description The number of days ahead to look. Left off, this deployment's own embargo length */
                 within?: number;
                 limit?: number;
-                /** @description Where in the list to start */
+                /** @description The offset into the list */
                 offset?: number;
             };
             header?: never;
@@ -10675,7 +10675,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
-                /** @description Where in the list to start */
+                /** @description The offset into the list */
                 offset?: number;
             };
             header?: never;
@@ -10845,13 +10845,13 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
                 asc?: boolean;
-                /** @description How many to return */
+                /** @description The number returned */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -10951,7 +10951,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
                 asc?: boolean;
@@ -11278,9 +11278,9 @@ export interface operations {
     "list-notifications": {
         parameters: {
             query?: {
-                /** @description How many to return */
+                /** @description The number returned */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -11558,7 +11558,7 @@ export interface operations {
     "read-person": {
         parameters: {
             query?: {
-                /** @description How many of each list to return */
+                /** @description The number of each list returned */
                 limit?: number;
             };
             header?: never;
@@ -12253,13 +12253,13 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
                 asc?: boolean;
-                /** @description How many to return */
+                /** @description The number returned */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -12402,7 +12402,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
                 asc?: boolean;
@@ -12513,13 +12513,13 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
                 asc?: boolean;
-                /** @description How many to return */
+                /** @description The number returned */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -12627,7 +12627,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description Which order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "places" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest places, lowest first */
                 asc?: boolean;
@@ -12678,7 +12678,7 @@ export interface operations {
                 ecosystem?: string;
                 /** @description Keep only groups this far decided */
                 state?: "undecided" | "waiting" | "agreed" | "lapsed";
-                /** @description Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "severity" | "issues" | "places" | "builds" | "deadline";
                 /** @description Order the other way — fewest, least urgent, nearest deadline first */
                 asc?: boolean;
@@ -12732,7 +12732,7 @@ export interface operations {
                 ecosystem?: string;
                 /** @description Keep only groups this far decided */
                 state?: "undecided" | "waiting" | "agreed" | "lapsed";
-                /** @description Which order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Worst first by default. A bundle with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "severity" | "issues" | "places" | "builds" | "deadline";
                 /** @description Order the other way — fewest, least urgent, nearest deadline first */
                 asc?: boolean;
@@ -13379,7 +13379,7 @@ export interface operations {
     "list-mentionable": {
         parameters: {
             query?: {
-                /** @description Which kind of finding the text is about */
+                /** @description The kind of finding the text is about */
                 visibility?: "public" | "private";
                 /** @description Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name */
                 q?: string;
@@ -13959,9 +13959,9 @@ export interface operations {
             query?: {
                 /** @description Narrow to what one package was claimed about */
                 component?: string;
-                /** @description How many to return */
+                /** @description The number returned */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -13999,7 +13999,7 @@ export interface operations {
             query?: {
                 /** @description Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly */
                 q?: string;
-                /** @description How many matches to return. Only read when searching */
+                /** @description The number of matches returned. Only read when searching */
                 limit?: number;
             };
             header?: never;
@@ -14068,9 +14068,9 @@ export interface operations {
     "get-component-neighbors": {
         parameters: {
             query?: {
-                /** @description Which version, where the build ships that name at more than one */
+                /** @description The version, where the build ships that name at more than one */
                 version?: string;
-                /** @description Which ecosystem, for the few names one build holds at one version as two components */
+                /** @description The ecosystem, for the few names one build holds at one version as two components */
                 ecosystem?: string;
             };
             header?: never;
@@ -14185,9 +14185,9 @@ export interface operations {
     "get-finding": {
         parameters: {
             query?: {
-                /** @description Which version, where the build ships that name at more than one */
+                /** @description The version, where the build ships that name at more than one */
                 version?: string;
-                /** @description Which ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
                 ecosystem?: string;
             };
             header?: never;
@@ -14264,7 +14264,7 @@ export interface operations {
     "decide-finding": {
         parameters: {
             query?: {
-                /** @description Which version, where the build ships more than one under that name */
+                /** @description The version, where the build ships more than one under that name */
                 version?: string;
             };
             header?: never;
@@ -14308,7 +14308,7 @@ export interface operations {
     "get-finding-reach": {
         parameters: {
             query?: {
-                /** @description Which version, where the build holds that name at more than one */
+                /** @description The version, where the build holds that name at more than one */
                 version?: string;
             };
             header?: never;
@@ -14423,7 +14423,7 @@ export interface operations {
                 variant: string;
                 /** @description The issue, by any name it is known under */
                 vulnerability: string;
-                /** @description Which place, as the findings list gives it */
+                /** @description The place, as the findings list gives it */
                 place: string;
             };
             cookie?: never;
@@ -14460,7 +14460,7 @@ export interface operations {
                 variant: string;
                 /** @description The issue, by any name it is known under */
                 vulnerability: string;
-                /** @description Which place, as the findings list gives it */
+                /** @description The place, as the findings list gives it */
                 place: string;
             };
             cookie?: never;
@@ -14828,9 +14828,9 @@ export interface operations {
     "list-scans": {
         parameters: {
             query?: {
-                /** @description How many to return */
+                /** @description The number returned */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -14917,7 +14917,7 @@ export interface operations {
                 variant: string;
                 /** @description The upload, as the receipt names it */
                 scan: number;
-                /** @description Which of its documents, as the receipt names it */
+                /** @description The document, as the receipt names it */
                 document: number;
             };
             cookie?: never;
@@ -15114,7 +15114,7 @@ export interface operations {
     "upload-vex-statements": {
         parameters: {
             query?: {
-                /** @description Who published it, where the document does not name itself. At most 191 characters */
+                /** @description The publisher, where the document does not name itself. At most 191 characters */
                 publisher?: string;
             };
             header?: never;
@@ -15504,10 +15504,10 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How far ahead to look */
+                /** @description The distance ahead to look */
                 days?: number;
                 limit?: number;
-                /** @description Where in the list to start */
+                /** @description The offset into the list */
                 offset?: number;
             };
             header?: never;
@@ -15545,7 +15545,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How far ahead to look */
+                /** @description The distance ahead to look */
                 days?: number;
             };
             header?: never;
@@ -15583,9 +15583,9 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How many to return. Quietest first, so the default is the answer for any estate somebody reads by hand */
+                /** @description The number returned. Quietest first, so the default is the answer for any estate somebody reads by hand */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;
@@ -16158,9 +16158,9 @@ export interface operations {
                 component?: string;
                 /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build */
                 beneath?: string;
-                /** @description Which one, where the build holds that name at several versions */
+                /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
-                /** @description Which one, for the few names a build holds at one version as two components */
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
                 beneath_ecosystem?: string;
             };
             header?: never;
@@ -16203,9 +16203,9 @@ export interface operations {
                 component?: string;
                 /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build */
                 beneath?: string;
-                /** @description Which one, where the build holds that name at several versions */
+                /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
-                /** @description Which one, for the few names a build holds at one version as two components */
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
                 beneath_ecosystem?: string;
             };
             header?: never;
@@ -16243,7 +16243,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description How many releases, most recent kept */
+                /** @description The number of releases, most recent kept */
                 limit?: number;
             };
             header?: never;
@@ -16313,9 +16313,9 @@ export interface operations {
     "list-unanswered-upstream": {
         parameters: {
             query?: {
-                /** @description How many to return */
+                /** @description The number returned */
                 limit?: number;
-                /** @description How many to skip */
+                /** @description The number skipped */
                 offset?: number;
             };
             header?: never;

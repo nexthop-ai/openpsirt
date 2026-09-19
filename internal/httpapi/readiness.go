@@ -37,7 +37,7 @@ type ReadinessBody struct {
 	// shipped with" are answers a person acts on differently, so the second is
 	// never dressed up as the first.
 	Shipped *BuildCountsBody `json:"shipped,omitempty"`
-	Why     string           `json:"why,omitempty" doc:"What is missing, where there is nothing to compare against"`
+	Why     string           `json:"why,omitempty" doc:"The missing half, where there is nothing to compare against"`
 	// Floor is the line both counts are at or above, named so a shared number
 	// says whose it is.
 	Floor string `json:"floor,omitempty" doc:"The least severity counted, or empty where everything is"`
@@ -46,10 +46,10 @@ type ReadinessBody struct {
 	// somebody has to go and assemble by hand before they can do anything
 	// about it, and this is read at exactly the moment there is no time for
 	// that.
-	Blocking []BlockingBody `json:"blocking" doc:"What nobody has agreed to ship with, worst first. Bounded; total says how many there are"`
+	Blocking []BlockingBody `json:"blocking" doc:"The work nobody has agreed to ship with, worst first. Bounded; total says how many there are"`
 	// Blockers is how many there are altogether, which is what the list is a
 	// page of.
-	Blockers int `json:"blockers" doc:"How many pieces of work nobody has agreed to ship with"`
+	Blockers int `json:"blockers" doc:"The number of pieces of work nobody has agreed to ship with"`
 }
 
 // BlockingBody is one thing standing between a branch and a release.
@@ -64,8 +64,8 @@ type BlockingBody struct {
 	Version   string `json:"version,omitempty" doc:"The version this sits at, which is what tells two rows of one component apart"`
 	Severity  string `json:"severity,omitempty"`
 	Exploited bool   `json:"exploited,omitempty"`
-	Places    int    `json:"places" doc:"How many places of the build it sits at"`
-	State     string `json:"state,omitempty" enum:"undecided,waiting,lapsed" doc:"How far it has been decided. Anything agreed is not in this list"`
+	Places    int    `json:"places" doc:"The number of places of the build it sits at"`
+	State     string `json:"state,omitempty" enum:"undecided,waiting,lapsed" doc:"The decision state. Anything agreed is not in this list"`
 	Due       string `json:"due,omitempty"`
 }
 

@@ -14,12 +14,12 @@ import (
 // SpentBody is what the work went into, for one component in one product.
 type SpentBody struct {
 	Product   string `json:"product"`
-	Component string `json:"component" doc:"What the judgments were about, by name. Empty where nothing in any build carries the place any more"`
+	Component string `json:"component" doc:"The subject of the judgments, by name. Empty where nothing in any build carries the place any more"`
 	// Claims is the unit somebody works in — one argument, however many rows
 	// it wrote — and Decisions how many places those reached.
 	Claims    int `json:"claims" doc:"Arguments made about it in the period"`
 	Decisions int `json:"decisions" doc:"Places those reached"`
-	People    int `json:"people" doc:"How many different people argued about it"`
+	People    int `json:"people" doc:"The number of different people who argued about it"`
 	// Promised is what came out of them, counted as claims for the same
 	// reason.
 	Promised  int `json:"promised" doc:"Claims that promised work: an upgrade or a backport"`

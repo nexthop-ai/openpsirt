@@ -608,7 +608,7 @@ func inherited(rows []triage.Inherited) []InheritedBody {
 // ReleaseBody is one build and how much stands open against it.
 type ReleaseBody struct {
 	Stream     string         `json:"stream" doc:"The branch or tag"`
-	Kind       string         `json:"kind" doc:"Whether that is a branch or a tag"`
+	Kind       string         `json:"kind" doc:"The kind of stream: a branch or a tag"`
 	Variant    string         `json:"variant"`
 	Open       int            `json:"open" doc:"Every open finding at this build"`
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"That total split by the rating in force"`

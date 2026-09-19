@@ -10,8 +10,8 @@ import (
 
 // ProviderBody is one way in.
 type ProviderBody struct {
-	Name string `json:"name" doc:"What to put in the sign-in path"`
-	Path string `json:"path" doc:"Where to send the browser to start"`
+	Name string `json:"name" doc:"The segment in the sign-in path"`
+	Path string `json:"path" doc:"The address to send the browser to"`
 }
 
 func registerProviders(api huma.API, in Ingest) {

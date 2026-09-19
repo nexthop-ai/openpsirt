@@ -31,7 +31,7 @@ type RetiredBody struct {
 	//
 	// Negative on a release whose date has not arrived: the same figure read
 	// the other way, which is how long there is left.
-	EndedDays int `json:"ended_days" doc:"How many days ago support ended. Negative where the date has not arrived, which is how many days are left"`
+	EndedDays int `json:"ended_days" doc:"The days since support ended. Negative where the date has not arrived, which is how many days are left"`
 	Open      int `json:"open" doc:"Issues open against it, counted at components rather than at every place they sit"`
 	// Ended says the date has passed. The two populations are drawn apart
 	// rather than sorted together, because one is exposure nobody can work on
@@ -166,7 +166,7 @@ func registerOutOfSupport(api huma.API, in Ingest) {
 type retiredOutput struct {
 	Body struct {
 		Items []RetiredBody `json:"items"`
-		Total int           `json:"total" doc:"How many releases are out of support"`
+		Total int           `json:"total" doc:"The number of releases out of support"`
 		Open  int           `json:"open" doc:"Issues open across all of them"`
 		// Ending is what has not gone yet, kept apart rather than mixed in.
 		// The day a release crosses, the deadline comes off every open
@@ -175,7 +175,7 @@ type retiredOutput struct {
 		// list is how the warning is missed.
 		Ending     []RetiredBody `json:"ending" doc:"Releases whose date has not arrived yet, soonest first. Empty unless within was asked for"`
 		EndingOpen int           `json:"ending_open" doc:"Issues open across those, which is what leaves every overdue count on the day they cross"`
-		Within     int           `json:"within" doc:"How many days ahead this looked"`
+		Within     int           `json:"within" doc:"The days ahead this looked"`
 	}
 }
 

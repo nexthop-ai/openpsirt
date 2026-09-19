@@ -18,7 +18,7 @@ import (
 type ReportBody struct {
 	ReportedBy string `json:"reported_by,omitempty"`
 	Contact    string `json:"contact,omitempty"`
-	Credit     string `json:"credit,omitempty" doc:"How they wish to be credited in an advisory"`
+	Credit     string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
 	Received   string `json:"received,omitempty" doc:"The day it arrived, which the embargo is counted from"`
 	// Acknowledged is when somebody answered them, and by whom. Absent is
 	// the condition an unacknowledged report reports: prompt

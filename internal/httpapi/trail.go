@@ -102,8 +102,8 @@ func dayOf(at *time.Time) string {
 // ChangeBody is one administrative act, as an administrator reads it.
 type ChangeBody struct {
 	At   string `json:"at"`
-	By   string `json:"by" doc:"Who made the change, by sign-in identity"`
-	Kind string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"What sort of thing changed"`
+	By   string `json:"by" doc:"The person who made the change, by sign-in identity"`
+	Kind string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"The kind of thing that changed"`
 	// About is which one: the setting's name, the person and product a role
 	// was granted on, the release whose support date moved.
 	About string `json:"about"`

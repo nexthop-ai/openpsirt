@@ -14,8 +14,8 @@ import (
 // it has been saying so.
 type CarriedClaimBody struct {
 	Vulnerability string `json:"vulnerability" doc:"The identifier the build argued about, as it wrote it"`
-	Subject       string `json:"subject" doc:"What it said the claim was about — a package name, or its identifier where it named no name"`
-	Status        string `json:"status" doc:"What it claimed, in the exchange format's own vocabulary"`
+	Subject       string `json:"subject" doc:"The claim's subject — a package name, or its identifier where it named no name"`
+	Status        string `json:"status" doc:"The claim, in the exchange format's own vocabulary"`
 	Justification string `json:"justification,omitempty"`
 	Statement     string `json:"statement,omitempty" doc:"The build's own reasoning, shown as written and never rendered"`
 	// Pedigree is the one that matters here: a claim attached to a component
@@ -25,8 +25,8 @@ type CarriedClaimBody struct {
 	// Suppresses says the claim takes a finding off the list rather than
 	// merely recording what the build thinks.
 	Suppresses bool   `json:"suppresses" doc:"Whether it takes a finding off the list. 'affected' and 'under investigation' are information, not answers"`
-	Since      string `json:"since" doc:"When the build first said it, by the scan it arrived in"`
-	Until      string `json:"until,omitempty" doc:"When it stopped saying it. Absent while it is still being said"`
+	Since      string `json:"since" doc:"The scan the build first said it in"`
+	Until      string `json:"until,omitempty" doc:"The moment it stopped saying it. Absent while it is still being said"`
 }
 
 // registerCarried answers what a build has been declaring it deals with itself
@@ -69,7 +69,7 @@ func registerCarried(api huma.API, in Ingest) {
 	}) (*struct {
 		Body struct {
 			Items []CarriedClaimBody `json:"items"`
-			Total int                `json:"total" doc:"How many there are in all, so a page says what it is a page of"`
+			Total int                `json:"total" doc:"The total, so a page says what it is a page of"`
 		}
 	}, error) {
 		subject, err := reading(ctx)
@@ -95,7 +95,7 @@ func registerCarried(api huma.API, in Ingest) {
 		out := &struct {
 			Body struct {
 				Items []CarriedClaimBody `json:"items"`
-				Total int                `json:"total" doc:"How many there are in all, so a page says what it is a page of"`
+				Total int                `json:"total" doc:"The total, so a page says what it is a page of"`
 			}
 		}{}
 		out.Body.Total = total

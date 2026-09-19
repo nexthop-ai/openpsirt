@@ -13,8 +13,8 @@ import (
 // HolderBody is somebody or something work can be handed to.
 type HolderBody struct {
 	Kind     string `json:"kind" enum:"person,team" doc:"Whether this is a person or a team. Work is held by a party, and both are one"`
-	Identity string `json:"identity" doc:"What names it when handing work over"`
-	Name     string `json:"name" doc:"What to show, which is the spelling somebody typed where there is one"`
+	Identity string `json:"identity" doc:"The name used when handing work over"`
+	Name     string `json:"name" doc:"The label, which is the spelling somebody typed where there is one"`
 }
 
 // teamShare is how much of the picker teams may take.

@@ -51,7 +51,7 @@ type MatchBody struct {
 	// asked. It is the version the decision route resolves a name by, so a
 	// caller applying the decision there passes it back as ?version=.
 	Version string `json:"version,omitempty" doc:"The version that build ships under this name — pass it as ?version= when applying a decision there"`
-	Places  int    `json:"places" doc:"How many places it sits at there"`
+	Places  int    `json:"places" doc:"The number of places it sits at there"`
 	// Here says this is another version in the build being decided in, rather
 	// than in another release or variant. A build commonly ships one name at
 	// several versions, and those sit beside the one in hand.
@@ -125,7 +125,7 @@ func registerReachAcross(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability"`
 		Component     string `path:"component"`
-		Version       string `query:"version" doc:"Which version, where the build holds that name at more than one"`
+		Version       string `query:"version" doc:"The version, where the build holds that name at more than one"`
 	}) (*struct{ Body ReachBody }, error) {
 		subject, _, err := triaging(ctx, in)
 		if err != nil {

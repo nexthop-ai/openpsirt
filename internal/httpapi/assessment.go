@@ -25,10 +25,10 @@ type AssessmentBody struct {
 	// same field on both operations has to mean the same thing, and this is
 	// the one a client feeds back to the filter beside it.
 	Product       string `json:"product,omitempty" doc:"The product this rating belongs to, by the name an address takes"`
-	ProductName   string `json:"product_name,omitempty" doc:"How that product is spelled on screen"`
-	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"What this product rates it"`
-	Published     string `json:"published,omitempty" doc:"What was published when this was made, kept so a reader can see what we disagreed with"`
-	Reasoning     string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"Why. It outlives the version it was made about, so the next person needs the argument"`
+	ProductName   string `json:"product_name,omitempty" doc:"That product's spelling on screen"`
+	Severity      string `json:"severity" enum:"low,medium,high,critical" doc:"This product's own rating"`
+	Published     string `json:"published,omitempty" doc:"The published rating when this was made, kept so a reader can see what we disagreed with"`
+	Reasoning     string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"The reasoning. It outlives the version it was made about, so the next person needs the argument"`
 	State         string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
 	NeedsApproval bool   `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
 	// Open is what agreeing would do beyond moving things down a list, on
@@ -43,7 +43,7 @@ type AssessmentBody struct {
 	// OffTheList is the number an approver is really being asked about: these
 	// stop being work rather than becoming later work, and lose their deadline
 	// with it.
-	OffTheList int `json:"off_the_list,omitempty" doc:"How many of them this rating would put below the product's triage line, where they stop being work and carry no deadline"`
+	OffTheList int `json:"off_the_list,omitempty" doc:"The number this rating would put below the product's triage line, where they stop being work and carry no deadline"`
 	// Mine says you made this one, so you may not be the second person. The
 	// server refuses it either way; carried so a screen can say why rather
 	// than offering a button that answers 422 — which is what the embargo

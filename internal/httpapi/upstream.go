@@ -14,16 +14,16 @@ import (
 // none.
 type UnansweredBody struct {
 	Purl      string `json:"purl" doc:"The package identifier, which is the name that would be sent"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"Which ecosystem the identifier names, read out of it rather than stored"`
+	Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem the identifier names, read out of it rather than stored"`
 	Why       string `json:"why" enum:"ours,unknown,unreadable" doc:"'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and no index had heard of it. 'unreadable' is an identifier nothing can turn into a request"`
-	Checked   string `json:"checked" doc:"When the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked"`
+	Checked   string `json:"checked" doc:"The moment the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked"`
 }
 
 // UnansweredOutput is a page of what has no upstream answer.
 type UnansweredOutput struct {
 	Body struct {
 		Items []UnansweredBody `json:"items"`
-		Total int              `json:"total" doc:"How many there are in all, through the same filter as the page"`
+		Total int              `json:"total" doc:"The total, through the same filter as the page"`
 		// Ours is what a name is matched against, so a row saying "ours" can
 		// be checked rather than taken on trust. It is the whole reason the
 		// derived default is safe to ship on: a default nobody can see is one

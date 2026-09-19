@@ -26,21 +26,21 @@ type UnassignedBody struct {
 	// says there are several is `builds`.
 	Stream  string `json:"stream" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
 	Variant string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
-	Places  int    `json:"places" doc:"How many findings a judgment here would be recorded against, across every build it is in"`
-	Builds  int    `json:"builds" doc:"How many builds hold it. More than one means the same code built more than one way, which one judgment answers"`
+	Places  int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
+	Builds  int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
 }
 
 // HoldingBody is how much work one person has.
 type HoldingBody struct {
-	Person string `json:"person" doc:"Whoever holds it, by the name they are shown under. A person or a team"`
+	Person string `json:"person" doc:"The holder, by the name they are shown under. A person or a team"`
 	// Team says this is a queue rather than a holding: work routed to a
 	// team is unheld until somebody takes it.
 	Team bool `json:"team,omitempty" doc:"This is a team's queue rather than one person's work"`
 	// Open counts pieces of work — an issue in a component in a product — and
 	// not the findings they cover, so this agrees with the list behind it.
 	Open    int `json:"open" doc:"Pieces of work assigned to them: an issue in a component in a product"`
-	Places  int `json:"places" doc:"How many findings those cover, across every build"`
-	Overdue int `json:"overdue" doc:"How many of those pieces are past their deadline"`
+	Places  int `json:"places" doc:"The number of findings those cover, across every build"`
+	Overdue int `json:"overdue" doc:"The number of those pieces past their deadline"`
 }
 
 // registerAssignment registers the two halves of deciding who deals with
@@ -270,7 +270,7 @@ func registerAssigning(api huma.API, in Ingest) {
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Identity string `path:"identity"`
 		Body     struct {
-			To string `json:"to,omitempty" doc:"Who takes it on. Omit to return it to nobody"`
+			To string `json:"to,omitempty" doc:"The party taking it on. Omit to return it to nobody"`
 		}
 	}) (*struct {
 		Body struct {
