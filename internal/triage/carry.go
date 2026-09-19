@@ -45,7 +45,7 @@ func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, t
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		carried = 0
 
-		// What the new line would inherit, read through the same rule
+		// The claims the new line inherits, read through the same rule
 		// that shows it — so a caller cannot carry something the
 		// preview would not offer, and the two cannot come to disagree
 		// about which those are.
@@ -183,7 +183,7 @@ func (s *Store) placeOnLine(ctx context.Context, toTarget, decisionID int64) (*P
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL), '')
 			AS "consumer_now"`, toTarget).
-		// Whether the line being carried onto was built once. It is a fact
+		// A line carried onto that was built once. It is a fact
 		// about the target rather than about the decision, and leaving it
 		// off made every carried place read as a branch — so the rule that
 		// refuses a dated judgment on a tag could not fire here however

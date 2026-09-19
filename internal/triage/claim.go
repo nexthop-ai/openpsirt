@@ -783,7 +783,7 @@ func (s *Store) SendBackClaim(ctx context.Context, subject access.Subject, claim
 			if len(ids) == 0 {
 				result.Decision = row
 			}
-			// Whether anything in this claim is undisclosed, which
+			// Anything in this claim undisclosed, which
 			// decides what may be said about it outside the
 			// application. Any row is enough: a claim is one
 			// action over many places and its rows need not agree,

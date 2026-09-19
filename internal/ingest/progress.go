@@ -194,7 +194,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 		return nil, 0, err
 	}
 
-	// Which upload each run is attributed to, worked out over *every* scan
+	// The upload each run is attributed to, worked out over *every* scan
 	// rather than over this page.
 	//
 	// A page is a window on the same history, so deciding "the newest upload
@@ -213,7 +213,7 @@ func (s *Store) Receipts(ctx context.Context, subject access.Subject, targetID i
 		state, failure, caution, run := progressOf(sc, read[strconv.FormatInt(sc.ID, 10)], runs)
 		receipt := Receipt{Scan: sc, State: state, Failure: failure, Caution: caution}
 		if run != nil {
-			// What it was measured with, on every receipt the run answers —
+			// The tooling it was measured with, on every receipt the run answers —
 			// and the counts only on the one it is attributed to.
 			for i := range runs {
 				if runs[i].ID == *run {

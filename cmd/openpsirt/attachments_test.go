@@ -19,7 +19,7 @@ const password = "hunter2"
 
 var withPassword = "http://minio:" + password + "@minio.internal:9000"
 
-// What a plaintext store costs is said at every start.
+// The cost of a plaintext store is stated at every start.
 //
 // The refusal that governs which endpoints may exist is pinned where it is
 // made. This pins the other half: a deployment that lifted the refusal is told

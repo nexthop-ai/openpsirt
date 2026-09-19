@@ -200,7 +200,7 @@ func TestTheTrailRefusesAReaderWhoDoesNotAdminister(t *testing.T) {
 
 // TestARecordCannotOverflowItsOwnColumn pins the backstop under every caller.
 //
-// What is written here is composed by whoever is recording — a collaborator is
+// The rows here are composed by whoever is recording — a collaborator is
 // a product, an issue and a person — and the column is sized for three names
 // and their separators. Every caller composes from stored values, so this
 // never fires; it is here because "every caller does the right thing" is not a

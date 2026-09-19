@@ -64,7 +64,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 }
 
 func TestSomebodyUnknownAndSomebodyUngrantedGetTheSameAnswer(t *testing.T) {
-	// Telling an outsider which of the two applies is free reconnaissance:
+	// Told apart, the two are free reconnaissance for an outsider:
 	// one answer says the name is wrong, the other says the name is right.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

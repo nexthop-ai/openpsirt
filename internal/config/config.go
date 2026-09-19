@@ -84,7 +84,7 @@ type Config struct {
 	// without inverting that import. The consequence to accept is that
 	// changing one needs a restart.
 	//
-	// How deep the queue may get is the exception and is a stored setting: an
+	// The queue's depth is the exception and is a stored setting: an
 	// operator meeting a refused upload wants that remedy without one.
 	QueueMaxAttempts  int
 	QueueClaimTimeout time.Duration

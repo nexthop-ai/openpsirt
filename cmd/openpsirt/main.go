@@ -48,7 +48,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	showVersion := fs.Bool("version", false, "print the build and exit")
 	dumpSpec := fs.Bool("openapi", false, "write the OpenAPI document to stdout and exit")
 	if err := fs.Parse(args); err != nil {
-		// Asking for help is not a failure.
+		// A request for help is not a failure.
 		if errors.Is(err, flag.ErrHelp) {
 			return nil
 		}
@@ -200,7 +200,7 @@ func run(args []string, stdout, stderr *os.File) error {
 			"because a provider is configured")
 	}
 
-	// Where files hanging off an issue are kept. Nothing configured is the
+	// The store files hanging off an issue are kept in. Nothing configured is the
 	// ordinary case: attachments are off and everything else works.
 	logger.Info("checking the attachment store")
 	files, err := attachmentStore(ctx, cfg, logger)
@@ -223,7 +223,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 
 	queueing := queue.DefaultOptions()
-	// What the deployment sizes. How deep the queue may get is not among
+	// The sizes the deployment sets. The queue's depth is not among
 	// these: it is a stored setting, so an operator meeting a refused upload
 	// has a remedy that does not need a restart.
 	queueing.MaxAttempts = cfg.QueueMaxAttempts
@@ -251,7 +251,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// work that must happen once — rewriting deadlines after a policy
 	// change — is held by one replica, and the name is what holds it.
 	name := workerName()
-	// What this deployment calls its own, and so never sends to a public
+	// The names this deployment calls its own, and so never sends to a public
 	// package index. Derived from the namespace it publishes under, which is
 	// the one place it has already said who it is, and unioned with whatever
 	// else the deployment stated. What a scan was about is folded in as the
@@ -283,7 +283,7 @@ func run(args []string, stdout, stderr *os.File) error {
 		},
 		Mode:  roleMode(settings),
 		Files: files,
-		// What never leaves, derived once here and read by the pass that
+		// The names that never leave, derived once here and read by the pass that
 		// asks and by the report saying what it held back. Two derivations
 		// of one boundary would be two boundaries the first time either
 		// moved.
@@ -318,7 +318,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// sweeps thousands of findings, and saving a form must not hold a
 	// transaction open across the estate.
 	routing := finding.NewSweeper(db, work, logger, name)
-	// What the tool has to say about its own health. It needs nothing
+	// The tool's own health. It needs nothing
 	// configured, which is the point: an operator who never set up mail is
 	// exactly the one who would otherwise never hear that a build stopped
 	// being scanned.
@@ -329,7 +329,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// two scans of one build on the queue and the second would find
 	// nothing to do.
 	schedule := scanner.NewSchedule(db, work, logger, name)
-	// What leaves the application, where an operator configured somewhere for
+	// The messages that leave the application, where an operator configured somewhere for
 	// it to go. Nil when they did not, which is ordinary rather than broken:
 	// the notification area is the channel that always exists.
 	post := notify.NewPost(db.DB, mailChannel(cfg, logger), cfg.BaseURL, logger, name)
@@ -450,7 +450,7 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // schemaIsCurrent refuses to serve against a schema this build is ahead of.
 //
 // Applying migrations separately is supported and is why the setting exists.
-// What it leaves is a binary and a schema that move independently, and nothing
+// It leaves a binary and a schema that move independently, and nothing
 // compared them: a build carrying a new migration started, granted
 // administrators, answered the readiness probe, and failed every request that
 // touched the new table. In a rolling deployment the probe passing is what
@@ -867,7 +867,7 @@ func roleMode(settings *setting.Store) func(context.Context) access.Mode {
 // Returned as the interface rather than the concrete type, and deliberately
 // through a function that can answer nil: a typed nil pointer handed to an
 // interface is not nil, and the sweep asks whether it has a channel.
-// Which of the two it got is logged, the way the attachment store logs what it
+// The one it got is logged, the way the attachment store logs what it
 // chose. Half a configuration is refused where it is read, so what reaches
 // here is either a whole one or none — and "none" is ordinary rather than a
 // fault, which is exactly why it has to be said out loud.

@@ -1,6 +1,6 @@
 // Package walk visits the files of this repository for the gate programs.
 //
-// What counts as "part of this repository" was decided six times, with five
+// "Part of this repository" is decided six times over, with five
 // different answers, and nothing recorded why they differed. `reserved` walked
 // the build output directory and the other Go gates did not, so a generated
 // file there would have failed one gate and been invisible to the rest;

@@ -38,7 +38,7 @@ func refused(t *testing.T, err error) bool {
 }
 
 func TestAnOversizedValueIsRefusedRatherThanTruncated(t *testing.T) {
-	// Asking two of the engines for standard identifier quoting nearly cost
+	// A request to two of the engines for standard identifier quoting nearly cost
 	// this the strictness that makes an oversized value an error. Setting a
 	// mode replaces it rather than adding to it, and what it replaced included
 	// the rule that refuses a value too long for its column — so a nine

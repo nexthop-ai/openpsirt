@@ -9,7 +9,7 @@ import (
 )
 
 func TestTheRecordCarriesWhoProposedAndWhoAgreed(t *testing.T) {
-	// What an auditor asks for: the judgment, the words it rests on, and two
+	// The things an auditor asks for: the judgment, the words it rests on, and two
 	// different people with the date each of them acted. Assembled for a page
 	// rather than looked up one decision at a time, because the question is
 	// about a period rather than about a row.
@@ -68,7 +68,7 @@ func TestTheRecordCarriesWhoProposedAndWhoAgreed(t *testing.T) {
 }
 
 func TestTheRecordKeepsAnAgreementThatWasTakenBack(t *testing.T) {
-	// What somebody agreed to and then stopped agreeing to is exactly what
+	// An agreement somebody made and then took back is exactly what
 	// an audit is looking for, so a withdrawn approval is part of the
 	// record rather than removed from it.
 	each(t, func(t *testing.T, f *fixture) {
@@ -114,7 +114,7 @@ func TestTheExceptionReportIsTheOneExpectedToComeBackEmpty(t *testing.T) {
 	// person. Read as "the exceptions", the filter proves the opposite of
 	// what its name suggests.
 	//
-	// What it is for is showing that no *dismissal* sits in that
+	// It exists to show that no *dismissal* sits in that
 	// population. Not-applicable, will-not-fix and already-fixed all require
 	// approval, so asked of one of those it should return nothing, and a
 	// row in it is a control that failed.

@@ -25,7 +25,7 @@ func TestAClaimThatWasRolledBackIsNotReturned(t *testing.T) {
 	var handle *database.DB
 	var owner *dbtest.Race
 	handle, owner = dbtest.Racing(t, func() {
-		// What the other worker did while the first attempt was losing: it
+		// The other worker's own act while the first attempt was losing: it
 		// finished the job, so there is nothing left for the retry to claim.
 		if _, err := handle.ExecContext(context.WithoutCancel(ctx),
 			`UPDATE "job" SET "state" = 'done'`); err != nil {

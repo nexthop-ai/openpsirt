@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// Deciding about everything at one component at once.
+// One decision covering everything at one component.
 //
 // A distinct act with its own resolution: the places are worked out from a
 // component and a build rather than named, the bound is on how many places one
@@ -258,7 +258,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
-		// What this product rates the issue, which is the rating in force
+		// This product's rating of the issue, which is the rating in force
 		// here. The read spans products, so each row reads its own stream's.
 		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`st.product_id AS "product_id"`).
@@ -275,7 +275,7 @@ func placesWithin(ctx context.Context, tx bun.Tx, subject access.Subject,
 		ColumnExpr(`COALESCE(v.severity, '') AS "published_severity"`).
 		ColumnExpr(`COALESCE(ir.severity, '') AS "assessed_severity"`).
 		ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
-		// Whether the release was built once, which decides what may be said
+		// A release built once, which decides what may be said
 		// about it. As an integer rather than a boolean: the four engines
 		// spell a boolean three ways.
 		ColumnExpr(`MAX(CASE WHEN st.kind = ? THEN 1 ELSE 0 END) AS "on_tag"`, catalog.Tag).

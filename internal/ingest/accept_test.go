@@ -187,7 +187,7 @@ func TestTheBuildInForceIsTheJudgmentsThatArrivedLast(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// What the arrival decision reads to tell a build re-argued from a
+		// The fields the arrival decision reads to tell a build re-argued from a
 		// second document claiming the same build time.
 		if _, err := ingest.NewDocuments(s.DB()).Write(ctx, taken.ID,
 			ingest.InventoryKind, 0, bytes.NewReader(inventory)); err != nil {

@@ -341,7 +341,7 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 	if capped(len(grew)) {
 		out.Capped, grew = true, grew[:limit]
 	}
-	// What each of them covers now, asked the way a finding asks whether a
+	// Each one's present reach, asked the way a finding asks whether a
 	// decision applies to it — in one statement over the whole page. It was
 	// three round trips per claim, in a loop, with nothing between them: on
 	// ten thousand claims that is thirty thousand sequential statements in one
@@ -444,7 +444,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 // path got around. Asked as the outcome alone this saw none of them, and said
 // so in a design document.
 //
-// Whether somebody agreed is asked of the record, never of a flag. No
+// An agreement is asked of the record, never of a flag. No
 // approval from anybody other than the proposer, and none taken back, which is
 // the same question the report that shows these rows asks — the test that
 // matters writes a self-approval straight to the table, and a flag would be

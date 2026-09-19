@@ -525,7 +525,7 @@ func (s Subject) Sees(productID int64) bool {
 		return false
 	}
 	// An administrator administers the catalog, so they know what is in it.
-	// What is open against it is a different question, answered by
+	// The findings open against it are a different question, answered by
 	// Products.
 	if s.Admin || s.unnarrowed {
 		return true
@@ -607,7 +607,7 @@ func (s Subject) Products() (ids []int64, all bool) {
 // because a product somebody holds nothing on is invisible rather than merely
 // unreadable.
 //
-// What it narrows is the catalog. What Products narrows is findings, counts,
+// It narrows the catalog. Products narrows findings, counts,
 // aggregates and exports — so an administrator holding no role sees the
 // products they administer with nothing open against them, which is the honest
 // answer rather than a hidden one.

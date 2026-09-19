@@ -14,7 +14,7 @@
 // symbol is the ordinary case and is left alone, because the convention is a
 // convention and this is a check for a specific accident.
 //
-// What a symbol is, is decided over the package rather than over the file in
+// A symbol's kind is decided over the package rather than over the file in
 // hand. Read per file, the check could not see the very accident it is for —
 // a block left behind when its symbol moved to another file names something
 // the file it sits in does not declare, so the same-file test read it as

@@ -16,7 +16,7 @@ import (
 const held = time.Hour
 
 func TestOnlyOneReplicaTakesALease(t *testing.T) {
-	// What makes a pass that runs on every replica happen on one of them. The
+	// The lease is what makes a pass running on every replica happen on one. The
 	// currency refresher is the case: the politeness it is built around is a
 	// rate per deployment, so three replicas each keeping to it would be three
 	// times the traffic at somebody else's free service.

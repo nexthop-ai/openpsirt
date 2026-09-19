@@ -159,7 +159,7 @@ type Queue struct {
 	db   *database.DB
 	opts Options
 	now  func() time.Time
-	// Whether the claim holds the row it is about to take. Always true for a
+	// The claim's hold on the row it is about to take. Always true for a
 	// queue anything but a test builds, and a field rather than an option
 	// because the only thing that turns it off is the test that demonstrates
 	// exclusivity does not rest on it.

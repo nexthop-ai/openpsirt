@@ -82,7 +82,8 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	// checked rather than assumed, and the three constants further down hold
 	// across every revision of the fixture so far.
 	//
-	// Where the earlier counts went. The document described 7,693, then 7,035,
+	// The earlier counts, and where they went. The document described 7,693,
+	// then 7,035,
 	// then 6,845, and each drop is the producer being fixed. The 658 that went
 	// first are the build container's own toolchain — Go and Rust dependencies
 	// harvested from `usr/` and `root/.cargo` trees inside the build slaves,

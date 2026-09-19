@@ -279,7 +279,7 @@ func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch str
 		return Undone{}, nil
 	}
 
-	// Who proposed them, read inside the same transaction as the writes
+	// The proposers, read inside the same transaction as the writes
 	// that follow and before them, because what is being reported is who
 	// wrote the claims this batch agreed to — which is a fact about the
 	// rows that the undo does not change.

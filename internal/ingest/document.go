@@ -189,7 +189,7 @@ func (d *Documents) Open(ctx context.Context, documentID int64) io.Reader {
 
 // Discard lets go of a scan's contents, keeping the record of what arrived.
 //
-// What a nightly build sent is superseded the next night, so keeping it costs
+// A nightly build's documents are superseded the next night, so keeping them costs
 // storage that grows with the calendar. What a tagged release sent is kept,
 // because re-scanning it years from now needs both what it contained and what
 // the build had already argued about its own patches — so this is called for

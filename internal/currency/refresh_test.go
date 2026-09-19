@@ -72,7 +72,7 @@ func seed(t *testing.T, db *database.DB, of []component,
 			t.Fatalf("seed component %d: %v", i, insert)
 		}
 	}
-	// Asking is off unless a deployment turns it on, and `Once` enforces that
+	// The pass is off unless a deployment turns it on, and `Once` enforces that
 	// on every component rather than trusting `Run` to have checked — a guard
 	// beside the work cannot be skipped by calling the work another way.
 	if err := setting.NewStore(db.DB).Set(ctx, setting.UpstreamCurrency, setting.On); err != nil {
@@ -747,7 +747,7 @@ func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
 
 // A name this deployment calls its own never reaches an index.
 //
-// What a pass sends is a component's name, and for something built here
+// A pass sends a component's name, and for something built here
 // that is the name of a project, a team or a product nobody has announced. The
 // assertion is on what was asked rather than on what was stored, because the
 // two are recorded identically on purpose and a check on storage alone would

@@ -77,7 +77,7 @@ type Outlier struct {
 	Exploited     bool
 	FixedIn       string
 	Description   string
-	// Why is why says which of the four things made it stand out.
+	// Why names which of the four things made it stand out.
 	Why []string
 }
 

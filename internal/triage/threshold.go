@@ -279,7 +279,7 @@ func (s *Store) NeedsApproval(ctx context.Context, p Proposal, threshold time.Du
 		}
 	}
 
-	// What has already been asked for about this same place.
+	// The postponements already asked for about this same place.
 	already, err := s.DeferredSoFar(ctx, Decision{
 		ProductID: p.Place.ProductID, VulnerabilityID: p.Place.VulnerabilityID,
 		PlaceIdentity: p.Place.PlaceIdentity,

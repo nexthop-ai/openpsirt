@@ -15,7 +15,7 @@ import (
 // answer.
 //
 // One report rather than two, because the two questions are asked together.
-// What was held back says what the default is costing, and what no index knows
+// The held-back list says what the default costs, and the list no index knows
 // is the list an operator reads to decide what else should be held back — so a
 // name promoted from the second appears in the first afterwards, which is the
 // confirmation that the promotion worked.

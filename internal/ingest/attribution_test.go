@@ -12,7 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
-// What became of an upload, and which run's numbers belong to it.
+// The fate of an upload, and the run whose numbers belong to it.
 //
 // None of this had a test. The runs query went from "the newest finished one"
 // to every finished one, a receipt gained the run that answered it, and both
@@ -266,10 +266,10 @@ func TestEachReceiptSaysWhatItsOwnRunWasMeasuredWith(t *testing.T) {
 }
 
 func TestARunIsAttributedToTheUploadThatArrivedLastBeforeIt(t *testing.T) {
-	// Which upload a run answers is decided by when the uploads arrived, and
+	// The upload a run answers is decided by when the uploads arrived, and
 	// identifiers are not arrival order: two uploads recorded at the same
 	// moment take their identifiers in whichever order they reach the table.
-	// Deciding it by identifier attributed a run's numbers to the older of the
+	// Decided by identifier, a run's numbers are attributed to the older of the
 	// two, and the receipt for the upload the run actually read said nothing.
 	scanned(t, func(t *testing.T, _ *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()

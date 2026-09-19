@@ -69,7 +69,7 @@ var resolving = map[string]string{
 	"append":             "collecting resolved builds to ask about together",
 }
 
-// What a resolver hands back stands for the same permissive resolution and is
+// A resolver's answer stands for the same permissive resolution and is
 // followed as another name, which is what makes this check reach the read: at
 // nearly every site the one visible use of the resolved names is the resolver
 // call, and the finding query is keyed on what it returned.
@@ -182,7 +182,7 @@ func main() {
 func looseIn(body *ast.BlockStmt, resolved map[string]token.Pos) (map[string][]token.Pos, int, int) {
 	held := len(resolved)
 	followed := 0
-	// What the address resolvers handed back, which is where nearly every
+	// The values the address resolvers handed back, which is where nearly every
 	// site does its reading.
 	for name, from := range derivedIn(body, resolved) {
 		if _, already := resolved[name]; !already {

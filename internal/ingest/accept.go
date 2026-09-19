@@ -260,7 +260,7 @@ func (s *Store) Record(ctx context.Context, a Arriving) (*Scan, Outcome, error) 
 		return taken, Retake, err
 
 	case NotNewer:
-		// What is already here, which is the whole content of the refusal. A
+		// The scan already here, which is the whole content of the refusal. A
 		// read that failed is not "none": telling a producer their build holds
 		// no scan, in the sentence refusing the one they just sent, is the
 		// most confusing answer available.
@@ -456,7 +456,7 @@ type Refusal struct {
 // about one build and reads nothing back.
 func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) error {
 	r.At = s.now().Truncate(time.Microsecond)
-	// Who was turned away comes from the subject rather than from the caller.
+	// The sender turned away comes from the subject rather than from the caller.
 	// The caller already has the name in two shapes and would be choosing
 	// between them here, which is one place for the record to disagree with
 	// what the request was actually resolved as.

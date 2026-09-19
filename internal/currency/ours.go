@@ -279,7 +279,7 @@ func RootOwners(ctx context.Context, db bun.IDB) ([]string, error) {
 
 // RootOwnersFor is RootOwners narrowed to the products a subject may read.
 //
-// What a build declared itself to be is a product's name, so the labels
+// A build's own declaration is a product's name, so the labels
 // derived from it are an answer about products rather than about the
 // deployment (REQ-42). The pass holds a name back against every root; what
 // travels back to a reader is only the part of that they may be told.

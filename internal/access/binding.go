@@ -103,7 +103,7 @@ func (s *Store) Bind(ctx context.Context, group string, productID int64, role Ro
 	if _, err := s.db.NewInsert().Model(binding).Exec(ctx); err != nil {
 		return s.alreadyThere(ctx, err, fmt.Sprintf("bind %q to %q", group, role),
 			func(ctx context.Context) (bool, error) {
-				// Whether the row is there, which is what the index refused.
+				// The row's presence, which is what the index refused.
 				// A binding has nothing to be in force: it grants at each
 				// member's next sign-in and holds nothing of its own.
 				return s.db.NewSelect().Model((*Binding)(nil)).
@@ -304,7 +304,7 @@ func (s *Store) AdmitByGroups(ctx context.Context, who Arrival, groups []string)
 
 	// Somebody who has left is refused before anything is written.
 	//
-	// Whether anybody else gets in is settled after the writes, deliberately,
+	// Anybody else getting in is settled after the writes, deliberately,
 	// because their roles are what this sign-in derives. Deactivation is not
 	// that: it is a standing fact about the account, unchanged by the groups
 	// they arrived with, so rewriting their derived grants on the way to
@@ -324,7 +324,7 @@ func (s *Store) AdmitByGroups(ctx context.Context, who Arrival, groups []string)
 	}
 
 	// Read after the writes are committed, and deliberately not inside them.
-	// What this sign-in yields is whatever they now hold, and somebody who
+	// This sign-in yields whatever they now hold, and somebody who
 	// left every group holds nothing — but the leaving has to stand. Deciding
 	// inside the transaction would make the refusal roll back the very
 	// withdrawal that caused it, so their roles would come back each time they
@@ -365,7 +365,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		// path they arrived on, the two were different rows and this arrival
 		// quietly became a second account.
 		//
-		// Whether they administer is left alone: it is derived below from the
+		// Their administration is left alone: it is derived below from the
 		// groups they arrived with, and reading it from here would overwrite
 		// that with what the row happened to say.
 		if waiting, err := s.ByIdentity(ctx, who.handle()); err == nil {
@@ -607,7 +607,7 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 		// make a mode switch destroy access that was never derived and cannot
 		// be restored by switching back.
 		//
-		// Which is which is knowable from the identity: a person admitted by a
+		// The two are told apart by the identity: a person admitted by a
 		// group mapping is the one whose administration came from one. Anybody
 		// holding a role assigned to them, or named in configuration, keeps it.
 		if _, err := s.db.NewUpdate().Model((*Account)(nil)).

@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
-// What a deployment runs beside the server, and what it does not.
+// The passes a deployment runs beside the server, and the ones it does not.
 //
 // Ten loops were each guarded against a nil constructor result, and the doc
 // comment above them said any of the ten might be absent because the thing it

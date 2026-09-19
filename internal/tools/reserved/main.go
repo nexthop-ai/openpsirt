@@ -21,7 +21,7 @@
 // It found 1,418 of them against 34 already quoted, so no reader could tell
 // which was the convention.
 //
-// What it still cannot see is a name that is not in a literal. An alias
+// A name that is not in a literal stays invisible to it. An alias
 // assembled from two pieces — `"… AS " + state.alias` — is invisible to
 // anything reading source as text, and there is no parser here for four
 // dialects. That is the safe direction for a check that fails a build, and it
@@ -69,7 +69,7 @@ var invented = regexp.MustCompile(`(?i)\bAS\s+([A-Za-z_][A-Za-z0-9_]*)\b`)
 // Reading only the arguments of the builder's own methods missed every query
 // held in a const, returned by a helper, or handed to the raw-query
 // constructor — about thirty bare names, while the gate printed an all-clear.
-// Where a query lives is not what makes it a query.
+// A query's home is not what makes it a query.
 //
 // `FROM "` or `JOIN "` is the marker because every table in this schema is
 // quoted, so it appears in SQL and not in prose. Matching the bare keywords
@@ -185,7 +185,7 @@ func main() {
 		reserved[word] = true
 	}
 
-	// What the migrations made, read first, because the check below tells a
+	// The objects the migrations made, read first, because the check below tells a
 	// table from a keyword by asking whether this schema has one of that name.
 	schema := map[string]bool{}
 	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
@@ -440,7 +440,7 @@ func assembledFrom(arg ast.Expr) string {
 // this function, which is a name somebody wrote bare either way — and reading
 // too little is what left three assembled clauses unread.
 //
-// What the statement pass has already read is left out, so a clause written
+// Everything the statement pass has already read is left out, so a clause written
 // whole and then handed over as a variable is one defect and not two.
 func assembled(fset *token.FileSet, fn *ast.FuncDecl, seen map[int]bool) map[string]string {
 	pieces := map[string]string{}

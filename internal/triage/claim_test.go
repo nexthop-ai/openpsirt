@@ -320,7 +320,7 @@ func TestAnExtensionCarriesOnlyAnApprovedClaimToTheSamePlaces(t *testing.T) {
 }
 
 func TestAFindingReportsWhatStandsWhatStoodAndWhatMightCarry(t *testing.T) {
-	// What somebody returning to a finding asks: what stands here, what
+	// The questions somebody returning to a finding asks: what stands here, what
 	// was argued before, and whether an argument already agreed to reaches
 	// this .
 	each(t, func(t *testing.T, f *fixture) {

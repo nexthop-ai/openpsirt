@@ -141,13 +141,13 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 		fixedVersion = *previous.Claim.FixedVersion
 	}
 
-	// Whether this needs a second person is decided before it is written, and
+	// The need for a second person is decided before this is written, and
 	// recorded on the claim. Without it the claim was stored as needing
 	// nobody — so a re-affirmation sent back for full approval suppressed the
 	// finding the moment it was made and never appeared in the review queue,
 	// which is one person's action producing a live dismissal no second person
 	// ever sees.
-	// Whether there is an agreement to carry at all, asked of the approvals
+	// An agreement to carry at all, asked of the approvals
 	// rather than inferred from the state. A claim lapses from Proposed as
 	// well as from Approved (the code moved out from under it either way), so
 	// "it lapsed" says nothing about whether anybody ever agreed to it.
@@ -702,7 +702,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
 			  AND f.place_identity = de.place_identity AND f.closed_at IS NULL)
 			AS "still_there"`, toTarget).
-		// Whether the date it carries has already gone by, either date.
+		// A date it carries that has already gone by, either of them.
 		ColumnExpr(`(COALESCE(cl.deferred_until, cl.committed_to) IS NOT NULL
 			AND COALESCE(cl.deferred_until, cl.committed_to) <= ?) AS "ran_out"`, s.now()).
 		Where("de.live_key IS NOT NULL").
@@ -857,7 +857,7 @@ type Reaffirmed struct {
 
 // ReaffirmClaim re-makes every lapsed row of one action, in one act.
 //
-// Deciding is bulk-capable at three grains and re-deciding was capable at
+// A decision is bulk-capable at three grains and a re-decision at
 // none. A team answering one kernel issue writes a decision at each of its 45
 // places in one action; when the kernel moves, those 45 lapse and restoring
 // them was 45 requests with 45 separately typed justifications. This is the one
@@ -943,7 +943,7 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 		return Reaffirmed{}, err
 	}
 
-	// Whether a second person has to agree, decided over the whole act before
+	// The need for a second person, decided over the whole act before
 	// any of it is written. Any row escalating carries the rest with it: an
 	// approver works at the unit the proposer acted at, and splitting the act
 	// would be agreeing to part of an argument they were shown whole.

@@ -38,7 +38,7 @@ type decl struct {
 
 func main() {
 	var declared []decl
-	// How many times each name is written anywhere, declarations included.
+	// The number of times each name is written anywhere, declarations included.
 	// A symbol nothing reaches is written exactly once: where it is declared.
 	mentions := map[string]int{}
 	fset := token.NewFileSet()

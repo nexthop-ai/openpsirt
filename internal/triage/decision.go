@@ -251,7 +251,7 @@ type Proposal struct {
 	UpgradeTo string
 	// Binding is the earliest deadline among the findings this act covers.
 	//
-	// What the commitment is gated against. Inside it, promising to act by a
+	// The gate the commitment is measured against. Inside it, promising to act by a
 	// date is ordinary triage — the work is already allowed to stay open that
 	// long. Past it, the promise is a deferral of the worst thing the act
 	// covers, and a second person agrees. Computed over the whole set by the
@@ -591,7 +591,7 @@ func (p Proposal) valid(now time.Time) error {
 	// deferral's date is a review date rather than a commitment, and it is as
 	// meaningless here as the other two.
 	//
-	// What can still be said about a tag is what is true of it — affected, not
+	// A tag still takes what is true of it — affected, not
 	// applicable, will not fix, already fixed here — which is the whole point
 	// of triaging one.
 	if p.Place.OnTag && p.Outcome.Dated() {

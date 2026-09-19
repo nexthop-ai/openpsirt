@@ -185,7 +185,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// raising a setting that guards the dismissal path this one has
 		// nothing to do with.
 		//
-		// What one of that size costs to commit is measured rather than
+		// The cost of committing one of that size is measured rather than
 		// assumed: 8.3 s on SQLite, 8.4 s on MariaDB, 10.9 s on MySQL and
 		// 23.9 s on PostgreSQL, under "make measure".
 		if err := permitted(subject, proposals, s.now()); err != nil {
@@ -226,7 +226,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 			}
 			out.Targets += n
 		}
-		// Who is carrying it, where somebody said. Part of the same act rather
+		// The person carrying it, where somebody said. Part of the same act rather
 		// than a second one: a bump nobody is holding is a promise with no
 		// owner, and the screen that records it is the screen that knows who
 		// the owner is.

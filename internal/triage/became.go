@@ -67,7 +67,7 @@ type Became struct {
 	Decision  Decision
 	Reasoning string
 	Happened  WhatHappened
-	// When is when is when it became that, and By is who did it where a
+	// When is the moment it became that, and By is who did it where a
 	// person did. Both are absent for a claim still waiting: nothing has
 	// happened to it, which is the whole of what it has to report.
 	When *time.Time

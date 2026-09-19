@@ -500,7 +500,7 @@ type Retired struct {
 // OutOfSupport lists the releases somebody may see that have gone out of
 // support.
 //
-// Which releases those are is asked of StreamsEndingBy rather than spelled
+// The releases themselves are asked of StreamsEndingBy rather than spelled
 // again. The date comparison lives in exactly one place. A report that works
 // it out for itself eventually describes a different set of releases from the
 // one whose deadlines were stripped, and it is the report people believe.

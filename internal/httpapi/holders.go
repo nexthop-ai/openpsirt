@@ -80,7 +80,7 @@ func registerHolders(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		// Asking who may hold undisclosed work is itself a question about
+		// A request for who may hold undisclosed work is itself about
 		// undisclosed work, and is answered the way every other path answers
 		// it: as though the product were not there.
 		wanted := access.AsVisibility(input.Visibility)
