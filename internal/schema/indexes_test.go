@@ -138,11 +138,11 @@ func columnsOf(ctx context.Context, db *database.DB, index string) ([]string, er
 // leads reports whether one column list is answered by another: the same
 // columns in the same order, for as far as the first one goes.
 //
-// **Equal lengths count.** Skipped, the commonest accidental duplicate there
-// is — a hand-written index repeating a UNIQUE constraint — was the one shape
-// this could not see, and it was skipped twice: once by the caller's length
-// test and once here. An identical pair now reports in both directions, which
-// names both indexes and is what somebody has to read to decide which goes.
+// Equal lengths count. Skipped, the commonest accidental duplicate there is —
+// a hand-written index repeating a UNIQUE constraint — is the one shape this
+// cannot see, and it is skipped twice: once by the caller's length test and
+// once here. An identical pair reports in both directions, which names both
+// indexes and is what somebody reads to decide which goes.
 func leads(shorter, longer []string) bool {
 	if len(shorter) > len(longer) {
 		return false

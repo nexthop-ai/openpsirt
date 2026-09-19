@@ -47,7 +47,7 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		// not a configuration, it is half of one — and half of one answered
 		// as "no mail configured", which is a choice an operator is entitled
 		// to make and is indistinguishable from the mistake. Embargo mail is
-		// what a coordinated disclosure runs on, and it was silently off.
+		// what a coordinated disclosure runs on, and it goes silently off.
 		{"MAIL_SERVER", "smtp.example.test:587"},
 		{"MAIL_FROM", "psirt@example.test"},
 		// The standard permits exactly six words here and the value reaches
@@ -126,8 +126,8 @@ func TestAMailServerAndWhoItSendsAsAreAcceptedTogether(t *testing.T) {
 }
 
 func TestASwitchMeansWhatItSays(t *testing.T) {
-	// "PLAIN_HTTP=false" used to turn plain HTTP on, because any value at all
-	// did, and "AUTO_MIGRATE=0" still migrated because only "false" did not.
+	// Read as "set at all", "PLAIN_HTTP=false" turns plain HTTP on; read as
+	// "anything but the word false", "AUTO_MIGRATE=0" still migrates.
 	for _, tc := range []struct {
 		key   string
 		value string
@@ -204,10 +204,10 @@ func TestAutoMigrateIsOnUnlessTurnedOff(t *testing.T) {
 }
 
 func TestASignInLifetimeOverTheCeilingIsRefusedAtStartup(t *testing.T) {
-	// The ceiling was enforced where a session is started and nowhere on the
-	// way in, so a deployment following the documented configuration started
-	// cleanly and then failed every browser sign-in with a fault — and the way
-	// back needed an administrator's key, because nobody could sign in.
+	// Enforced where a session is started and nowhere on the way in, a
+	// deployment following the documented configuration starts cleanly and
+	// then fails every browser sign-in with a fault — and the way back needs
+	// an administrator's key, because nobody can sign in.
 	t.Setenv("OPENPSIRT_DATABASE_URL", "sqlite://test.db")
 	t.Setenv("OPENPSIRT_SESSION_LIFETIME", "8760h")
 	if _, err := Load(); err == nil {
@@ -226,13 +226,13 @@ func TestASignInLifetimeOverTheCeilingIsRefusedAtStartup(t *testing.T) {
 }
 
 func TestTheDeploymentsOwnAddressHasToBeOne(t *testing.T) {
-	// It was the one string setting with a required shape that nothing
-	// parsed, and the failure was silent exactly where it mattered:
-	// `psirt.example.com` — the form the value takes in a DNS record or an
-	// Ingress host field — parses, puts the whole string in Path and leaves
-	// Host empty. The same-origin check then fell through to origins derived
-	// from the request's own Host header, so the guard echoed what the request
-	// said and the operator believed the origin was pinned.
+	// A string setting with a required shape that nothing parses fails
+	// silently exactly where it matters: `psirt.example.com` — the form the
+	// value takes in a DNS record or an Ingress host field — parses, puts the
+	// whole string in Path and leaves Host empty. The same-origin check then
+	// falls through to origins derived from the request's own Host header, so
+	// the guard echoes what the request said while the operator believes the
+	// origin is pinned.
 	for _, c := range []struct {
 		what    string
 		base    string

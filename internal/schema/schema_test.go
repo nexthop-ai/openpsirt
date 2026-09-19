@@ -72,10 +72,10 @@ func TestMigrationsApplyOnEveryEngine(t *testing.T) {
 		// The table must be usable with the same portable Go on every engine,
 		// which means writing and reading a real time.Time.
 		//
-		// An earlier version of this test inserted the timestamp as a string
-		// literal and read back only the value column — so the one column the
-		// migration branches per engine for was never read, and SQLite's
-		// column type was wrong for months of nobody noticing.
+		// Inserting the timestamp as a string literal and reading back only
+		// the value column leaves the one column the migration branches per
+		// engine for unread, and SQLite's column type wrong with nothing
+		// saying so.
 		name := uniqueName(t)
 		want := time.Now().UTC().Truncate(time.Second)
 		if _, err := db.ExecContext(ctx,
@@ -108,9 +108,9 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 		if err := schema.Up(ctx, db, quiet()); err != nil {
 			t.Fatalf("first run: %v", err)
 		}
-		// Checked, because two discarded errors are two zeros, and a pair of
-		// zeros compares equal — so idempotency was "proved" by a test that
-		// had read no version at all.
+		// Checked, because two discarded errors are two zeros and a pair of
+		// zeros compares equal: idempotency then "holds" in a test that read
+		// no version at all.
 		first, err := schema.Version(ctx, db)
 		if err != nil {
 			t.Fatalf("read the version after the first run: %v", err)
@@ -129,11 +129,10 @@ func TestMigrationsAreIdempotent(t *testing.T) {
 }
 
 func TestEveryMigrationRollsBack(t *testing.T) {
-	// Rolling back one migration at a time to zero, rather than once. An
-	// earlier version rolled back once and asserted the first migration's
-	// table was gone, which quietly stopped testing anything the moment a
-	// second migration was added — it was then rolling back the second and
-	// asserting about the first.
+	// Rolling back one migration at a time to zero, rather than once. Rolling
+	// back once and asserting the first migration's table is gone stops
+	// testing anything the moment a second migration is added: it then rolls
+	// back the second and asserts about the first.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		if err := schema.Up(ctx, db, quiet()); err != nil {
@@ -168,10 +167,10 @@ func TestEveryMigrationRollsBack(t *testing.T) {
 			t.Fatalf("after rolling everything back: version %d, err %v", final, err)
 		}
 		// Every table the migrations make, not the handful somebody named.
-		// Written out by hand, this passed over most of the schema — so a Down
-		// that forgot its DROP was caught for the few that were listed and
-		// left behind for the rest, where it shows up as the next Up failing
-		// on a table that is already there.
+		// Written out by hand it passes over most of the schema, so a Down
+		// that forgot its DROP is caught for the few listed and left behind
+		// for the rest — where it shows up as the next Up failing on a table
+		// that is already there.
 		left := dbtest.Tables()
 		if len(left) < 50 {
 			t.Fatalf("the table list holds %d names, so this checked almost nothing", len(left))
