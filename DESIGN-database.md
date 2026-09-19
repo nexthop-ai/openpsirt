@@ -99,15 +99,13 @@ reads the tests too: a branch in a test is a branch, and the one thing it lets
 past there is an engine named to choose which engine runs.
 
 What it looks for is the branch rather than the SQL: the two upsert idioms as
-bun spells them, and asking a handle which engine it is. Those were absent
-from it at first, which made the one live branch in the tree written that way
-invisible to it — a gate that cannot see the idiom the code actually uses is a
-sentence rather than a check. The
-sentence asserted that check before anything performed it, which is the shape
-this list was written about: it stated three while there were five, because
-each new one arrived under a comment calling itself one of the few places an
-engine has to be asked. Two turned out to be the same expression written twice
-in two packages.
+bun spells them, and asking a handle which engine it is. A gate blind to the
+idiom the code actually uses is a sentence rather than a check.
+
+A list of exceptions kept by hand grows without saying so, because each new one
+arrives under a comment calling itself one of the few places an engine has to
+be asked — and two of them turn out to be the same expression written twice in
+two packages.
 
 ### Silently wrong query shapes
 
@@ -143,10 +141,9 @@ the deployment has said that encryption is required.
 ## Connection encryption
 
 Every engine negotiates opportunistically, and neither driver says which way it
-went. So a deployment that believed the connection to its findings was
-encrypted had nowhere to look, and the two drivers disagreed about the default:
-one negotiated where the server offered it, the other connected in cleartext
-unless asked.
+went, so a deployment believing the connection to its findings is encrypted has
+nowhere to look. The two drivers disagree about the default: one negotiates
+where the server offers it, the other connects in cleartext unless asked.
 
 | | |
 |---|---|
@@ -170,11 +167,11 @@ and `openpsirt migrate up|down|status` runs them separately for an operator who
 would rather use different credentials at a time they choose.
 
 With automatic application off, the schema is compared before anything is
-served. The binary and the schema then move independently, and nothing
-compared them: a build carrying a new migration started, granted
-administrators, answered the readiness probe — which is a ping — and failed
-every request touching the new table. In a rolling deployment the probe passing
-is what retires the last replica that worked.
+served. The binary and the schema move independently, and uncompared, a build
+carrying a new migration starts, grants administrators, answers the readiness
+probe — which is a ping — and fails every request touching the new table. In a
+rolling deployment the probe passing is what retires the last replica that
+worked.
 
 | Applied version | What happens |
 |---|---|
@@ -222,22 +219,20 @@ development database recreates it. The migrations that exist are kept only
 because walking the chain up and down catches an ordering mistake between two of
 them, and they collapse into a single initial migration before 1.0.
 
-Ten of them did the opposite and have been folded back into the migrations
-that created their tables. What that cost while they stood: a four-statement
-engine-specific rollback that existed only because a column was added later,
-four files to read to know what one table holds, and ten more migrations for
-the collapse to unpick. Every migration now creates something.
+Every migration creates something. A migration that alters what an earlier one
+created costs a rollback per engine that exists only because the column arrived
+late, a file per alteration to read before anybody knows what one table holds,
+and one more migration for the collapse at 1.0 to unpick.
 
 A migration is its statements and nothing else. What every one of them does
 around those statements — asking which engine this is, refusing an engine there
 are no spellings for, running each statement, naming the one that failed — is
-one place. Thirty-three copies of it had already become four spellings of one
-failure: two printed the whole statement rather than its first line, so a failed
-table declaration reported ninety lines of data definition, and two more named
-the table and not the statement. Dropping a table and dropping an index are the
-same: two engines name an index's table and the other two refuse to, and that
-rule stood in two independent copies with a third migration free to write it a
-third time with one arm missing.
+one place. A copy per migration becomes a spelling per migration: one prints
+the whole statement rather than its first line, so a failed table declaration
+reports ninety lines of data definition, and another names the table and not
+the statement. Dropping a table and dropping an index are the same rule — two
+engines name an index's table and the other two refuse to — and held in copies,
+the next migration is free to write it again with one arm missing.
 
 ### Migrations that stop half way
 
@@ -261,7 +256,7 @@ asked.
 | What is stepped over | Only the exact object the statement names. One that cannot be identified is run, and fails as it always did — a skip on any collision could hide a real one |
 | What it cannot tell apart | A statement that collides with something an earlier run made, and one that collides with something the same migration made two statements ago. The log is what surfaces the second |
 
-CI runs the success path on four engines, which is why this was invisible: the
+CI runs the success path on four engines, which is where this hides: the
 engines agree about what a migration does and disagree only about what is left
 when one stops half way.
 
@@ -277,15 +272,16 @@ keeps its dialect in package-level state, so two goroutines migrating at once
 race on it regardless of any database lock. The advisory lock exists because a
 rolling deployment starts several instances at once.
 
-SQLite takes its lock outside the database, because it cannot take one
-inside. The handle is capped at a single connection — the file has one writer
-— so a lock held on a pinned connection would be holding the only connection
-the migration needs. What stood instead was the assumption that SQLite is only
-ever used by one process, enforced by one chart template while the binary
-accepts a SQLite URL with a warning. Four processes against one file with no
-lock: one migrated and three failed, on the migration library's own
-bookkeeping. Nothing was corrupted and the schema ended correct, so what the
-lock buys is those three waiting and finding the work already done.
+SQLite takes its lock outside the database, because it cannot take one inside.
+The handle is capped at a single connection — the file has one writer — so a
+lock held on a pinned connection would hold the only connection the migration
+needs.
+
+Assuming one process instead is enforced by one chart template, while the
+binary accepts a SQLite URL with a warning. Four processes against one file
+with no lock: one migrates and three fail on the migration library's own
+bookkeeping. Nothing is corrupted and the schema ends correct, so what the lock
+buys is those three waiting and finding the work already done.
 
 The operating system's own advisory locking rather than a lock file written and
 removed by hand, because the kernel drops it when a process ends however it
@@ -322,21 +318,22 @@ A column reference a statement composes is quoted through one function, which
 is the package's to own. The character it uses is the engine's own answer
 rather than the standard quote the schema is written in: two of the four name
 the backtick and take both, so either works today, and asking makes it true of
-an engine that does not. It owned none, so every caller wrote identifiers bare
-and two helpers took a column name as an ordinary string parameter — with
-nothing between them and a name arriving from a query parameter except that
-every caller happened to pass a literal. What a caller may pass is a named type
-now: a quoted column, or an expression the caller composed and stands behind.
+an engine that does not.
+
+Owned nowhere, every caller writes identifiers bare and a helper takes a column
+name as an ordinary string parameter, with nothing between it and a name
+arriving from a query parameter but the habit of passing a literal. What a
+caller may pass is a named type: a quoted column, or an expression the caller
+composed and stands behind.
 
 Two engines quote with backticks by default, so their connections are asked for
 standard quoting. Backticks keep working and string literals are untouched: this
 changes what a double quote means, not what a quote means.
 
 The mode is appended to what is already in force, never assigned. Assigning
-replaces the mode, and what it replaces includes whatever else an operator set.
-The first version assigned, and a nine-character string stored in a
-four-character column came back four characters long, with no error, on those
-two engines.
+replaces the mode, and what it replaces includes whatever else an operator set:
+a nine-character string stored in a four-character column then comes back four
+characters long, with no error, on those two engines.
 
 Strictness is named in the same breath rather than inherited. Appending alone
 keeps whatever the server already held, and a server whose mode omits
@@ -345,42 +342,42 @@ that way for older applications. Naming it makes the mode a property of this
 application rather than of the server it was pointed at, and the set is
 deduplicated, so naming one a server already holds changes nothing.
 
-The gate reads three places, because it read one. `AS <word>` is the syntax for
-inventing a name and was the whole of what it matched — so a table renamed in a
-migration, which names no alias, and a table alias declared in a model's own
-struct tag were both invisible to it. The settings table was aliased `as`, which
-all four engines reserve, and worked only because the library quotes what a tag
-declares; the first raw expression naming that alias would have been a syntax
-error on every one of them. Inside the migrations it reads the data-definition
-keywords as well, with the comments beside them stripped first — the prose that
-makes a schema legible is full of the words an engine reserves.
+The gate reads three places. `AS <word>` is the syntax for inventing a name,
+and matching that alone leaves a table renamed in a migration, which names no
+alias, and a table alias declared in a model's own struct tag both invisible.
+An alias of `as` — a word all four engines reserve — works only because the
+library quotes what a tag declares, and the first raw expression naming it is a
+syntax error on every one of them. Inside the migrations the gate reads the
+data-definition keywords as well, with the comments beside them stripped first:
+the prose that makes a schema legible is full of the words an engine
+reserves.
 
-A name a query invents needs the same care. A grouped count wrapped its subquery
-in `AS groups`, and `GROUPS` is a reserved word in MySQL 8, where it names a
-window frame type. Three engines parsed it and one returned a syntax error,
-which the handler above turned into a 500 with the driver's message discarded.
+A name a query invents needs the same care. `GROUPS` is a reserved word in
+MySQL 8, where it names a window frame type, so a grouped count wrapping its
+subquery in `AS groups` parses on three engines and is a syntax error on the
+fourth — which the handler above turns into a 500 with the driver's message
+discarded.
 
 A name a query invents is checked for being bare, not for being reserved.
-The check compared each one against a list of 321 words the four engines
-reserve, which is a strictly weaker property than the rule it was the
-enforcement of: a name nobody has reserved *yet* passed, and MySQL 8.0 reserved
-`rank`, `groups`, `lead` and `cume_dist` with nothing refreshing the list. A
-quoted name does not match the pattern at all, so every hit is by construction
-an unquoted one and the fix is one pair of quotes. There were 1,418 of them
-against 34 already quoted, so no reader could tell which was the convention.
+Compared against the list of words the four engines reserve, a name nobody has
+reserved yet passes — and MySQL 8.0 reserved `rank`, `groups`, `lead` and
+`cume_dist` with nothing refreshing the list, which is a strictly weaker
+property than the rule it is meant to enforce. A quoted name does not match the
+pattern at all, so every hit is by construction an unquoted one and the fix is
+one pair of quotes.
 
 The list of reserved words stays, for the other half. A name a migration
-*declares* is not invented — it was accepted by every engine when the migration
-ran — and the question there is whether it collides with a word one of them
-reserves, which is what a list of those words answers.
+declares is not invented — every engine accepted it when the migration ran —
+and the question there is whether it collides with a word one of them reserves,
+which is what a list of those words answers.
 
 Where a query is written is not what makes it a query. Reading only the
-arguments of the query builder's own methods left every statement held in a
+arguments of the query builder's own methods leaves every statement held in a
 constant, returned from a helper or handed to the raw-query constructor
-unchecked — thirty-eight bare names, under an all-clear. Every string literal
-that looks like a statement is read now, and `FROM "` or `JOIN "` is what
-marks one: every table here is quoted, so that appears in SQL and not in
-prose, where matching the bare keywords reported sixty-odd English sentences.
+unchecked, under an all-clear. Every string literal that looks like a statement
+is read, and `FROM "` or `JOIN "` is what marks one: every table here is
+quoted, so that appears in SQL and not in prose, where matching the bare
+keywords reports English sentences.
 
 A table a query names is quoted too, and is checked outside the migrations.
 A table is declared rather than invented, so the alias pattern cannot see one
@@ -416,15 +413,15 @@ reported once.
 A name that reaches SQL from outside the file is still invisible, because the
 check reads source as text and there is no parser here for four dialects. That
 is the safe direction for a check that fails a build. It looks only inside the
-builder's own methods: a version that read doc comments reported eighteen
-names, every one the English word "as".
+builder's own methods: reading doc comments too reports the English word "as"
+as an invented name.
 
 The schema is also read back from the database and checked there, on the same
 principle as the index test: what matters is what an operator ends up with.
 
 Two tests hold silent truncation, which is the worst shape a portability
-difference can take — nothing fails and the data is wrong. Both were checked by
-reverting the fix and watching them fail.
+difference can take: nothing fails and the data is wrong. Each was checked by
+reverting the fix and watching it fail.
 
 ## Pattern matching
 
@@ -435,12 +432,12 @@ A search box is not a pattern language. Typing "50%" means a name containing
 |---|---|
 | Every value in a `LIKE` is escaped, and every clause states its escape character | SQLite has no default escape character at all, so omitting the clause makes a backslash mean one thing on three engines and another on the fourth |
 | The escape character is `#`, and never a backslash | MySQL and MariaDB treat a backslash as an escape inside a string literal, so `ESCAPE '\'` is an unterminated string: a syntax error on two engines and parsed happily by the other two |
-| The escaping lives here, with the other engine differences | It was written out twice, unexported in one package and copied into another, while four predicates in two further packages had none |
+| The escaping lives here, with the other engine differences | Written out per package it is unexported in one and copied into the next, and the predicates in the package after that have none |
 | A pattern the code wrote is not escaped; a value somebody supplied is | A trailing `/%` matching an ecosystem prefix is the pattern. The ecosystem inside it is not |
 
-What that cost where it was missing: the picker deciding who may be named on
-an embargoed case answered a term of "%" with every person the deployment
-could offer, in one request.
+What its absence costs: the picker deciding who may be named on an embargoed
+case answers a term of "%" with every person the deployment can offer, in one
+request.
 
 Folding happens in Go and again in the engine. Folding in Go is Unicode-aware
 and `LOWER()` on SQLite is ASCII-only, so a term carrying a non-ASCII capital
@@ -457,8 +454,8 @@ update touched. Zero means somebody got there first.
 Two engines report rows *changed* by default; the other two report rows
 *matched*. Under the first reading, a write whose condition held but whose
 values were already correct reports zero, and the caller announces a conflict
-that never happened. It surfaced as an approval refused with "the reasoning
-changed while this was being agreed to", for a decision nobody had touched.
+that never happened — an approval refused with "the reasoning changed while
+this was being agreed to", for a decision nobody has touched.
 
 The connection asks for matched rows on the engines that need it. The alternative
 — writing every conditional update so its values are guaranteed to differ —
@@ -488,16 +485,14 @@ and a store that wraps both alike makes every caller above it wrong at once.
 | A reader says which of the two it hit | The caller chooses a status from it. Wrapped alike, the only status available is the one that asserts something the read never established |
 | Absence is a sentinel each package words for itself | A caller matches on the sentinel through the wrapping. Matching on a message is the same mistake as reading an engine's error text |
 | A failed read names the act, and the act reaches the log | "Look up product 12" is what an operator needs. What the driver said is not a thing to publish |
-| One helper, not a rule people remember | The split was made by hand at thirty-eight call sites and made correctly at five |
+| One helper, not a rule people remember | Made by hand at every call site, it is made differently at most of them |
 
-The correct spelling already existed six times in the catalog beside readers
-that did not have it — `TargetFor` and `ExistingTarget` are the same two-column
-select, and only one of them told the two apart. `ExistingTarget` has
-twenty-three callers, twenty-one of which turned its error into "nothing has
-been scanned there".
+Two readers of one two-column select telling the two apart differently is the
+ordinary shape: `TargetFor` and `ExistingTarget` are that select, and a caller
+of the one that does not turns its error into "nothing has been scanned there".
 
-What that cost: a database nobody could reach reported to every authenticated
-caller that their products, builds, issues and findings did not exist.
+What that costs: a database nobody can reach reports to every authenticated
+caller that their products, builds, issues and findings do not exist.
 
 ## Collation
 
@@ -597,11 +592,11 @@ because written by hand it reads as a fallback to writing outside a transaction.
 The reads rule reaches further in that case, not less far: the closure may be
 re-run by a retry it cannot see.
 
-The helper names every handle it accepts, and refuses the rest. A test for
-one handle type is failed by a handle that merely embeds it, and the arm that
-answered the failure ran each statement as its own autocommit — no transaction,
-no retry, nothing said, and the two spellings differ by four characters. A
-handle nothing recognizes is a fault rather than a further silent path.
+The helper names every handle it accepts, and refuses the rest. A test for one
+handle type is failed by a handle that merely embeds it, and an arm answering
+that failure by running each statement as its own autocommit is no transaction,
+no retry and nothing said — while the two spellings differ by four characters.
+A handle nothing recognizes is a fault rather than a further silent path.
 
 Giving up does not back off first. Nothing follows the last attempt, so a wait
 before returning an error already decided holds the caller and its connection
