@@ -1270,12 +1270,12 @@ other, and two that could not be asked at all.
 | What they hold | The roles in force, and whether a role they hold grants nothing — which reads very differently from holding none |
 | Their part in the record | How many claims they argued, how many they agreed to that still stand, and how many agreements they took back. What the rubber-stamp report asks across a program, asked about one person |
 | Roles granted and withdrawn | Every change against them, newest first, with who made it. Absent before means nobody had set it; absent after means it was withdrawn, and a blank cannot tell the two apart |
-| What they were told | Everything sent to them, acknowledged and cleared included |
+| Notifications sent | Everything sent to them, acknowledged and cleared included |
 
 | Rule | |
 |---|---|
 | An agreement taken back is counted apart from one that stands | It is not somebody who agrees, and the record's own file already says so |
-| What they were told is not narrowed by what they may read now | The area somebody reads themselves is narrowed; this is a different question, asked by somebody who administers the deployment. A line about an undisclosed finding, sent while they held the role that reached it, is what the screen is for |
+| The record of what they were told is not narrowed by what they may read now | The area somebody reads themselves is narrowed; this is a different question, asked by somebody who administers the deployment. A line about an undisclosed finding, sent while they held the role that reached it, is what the screen is for |
 | A name nobody holds and a name the caller may not reach answer alike | Resolving first and refusing after makes the refusal informative, which turns a lookup into a directory |
 | Each list is a page, with its total beside it | Both only grow, and a screen that asks for all of either is one that stops answering |
 
@@ -1401,7 +1401,7 @@ said so.
 
 | Rule | |
 |---|---|
-| **What kind of flaw it is, all of it and named** | One identifier was shown and the rest dropped, as a bare number — "CWE-401" is not something a reader knows, and the four commonest in a kernel backlog are a memory leak, a race, improper locking and a double free, none of which was named. The common ones are named inline and every one links to where it is written up, built from the identifier rather than stored. The two words a feed uses to say it has no classification are said rather than drawn as one |
+| **The kind of flaw, all of it and named** | One identifier shown and the rest dropped, as a bare number, leaves a reader with "CWE-401" — and the four commonest in a kernel backlog are a memory leak, a race, improper locking and a double free, none of them named. The common ones are named inline and every one links to where it is written up, built from the identifier rather than stored. The two words a feed uses to say it has no classification are stated rather than drawn as one |
 | **The band a row is drawn in and the word it says are two answers** | They differ for exactly the two words a scanner reports below low. Both rank inside the low band everywhere that sorts and filters, so that is the color; what the row says is what was rated. Folded together, "rated negligible" read as "Unrated" — which tells a reader nobody has looked at a finding somebody looked at and dismissed |
 | Known-exploited is its own badge, not a replacement for the severity word | Replacing it answers one question by destroying another: an exploited medium is still a medium, and the reader needs both facts to see why it sits above an unexploited high |
 | The score sits beside the word | They come from different places and can tie while the words differ — a 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under v3. Two rows tied at 10.0 with different words look mis-sorted until the number is there. Genuine disagreement between word and number is rare, measured at 3 of 2,645; the vocabulary difference is not |

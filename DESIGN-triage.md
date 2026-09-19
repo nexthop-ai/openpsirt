@@ -224,7 +224,7 @@ what became of it, what it wrote, and what it covers now.
 | **What it says** | The outcome, the reason, the mitigation, the dates, the version an upgrade moves to, and the justification as it stands — the claim's, however many rows it wrote. It names no decision and carries no row state |
 | **What became of it** | One word over every row, the same word the proposer's own list reads, with when it became that and who did it. A claim whose rows did not all end the same way is said to be mixed rather than reported as whichever came first. A claim marked as having come back is one with an approval on record that is not standing on one — asked of a claim that is currently approved, "was this ever approved" answers about the agreement being read |
 | **What it wrote** | Rows, distinct issues, distinct places. The place count is what the bulk cap is measured against |
-| **What it covers now** | Folds, packages, consumers and findings, matched the way a finding asks whether a decision applies to it, and every build it reaches |
+| **Present reach** | Folds, packages, consumers and findings, matched the way a finding asks whether a decision applies to it, and every build it reaches |
 
 | Rule | |
 |---|---|
