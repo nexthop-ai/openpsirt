@@ -363,7 +363,7 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 			t.Errorf("what the claim wrote reads as %d rows, %d issues, %d places",
 				whole.Rows, whole.Issues, whole.Places)
 		}
-		// What it covers now, in the units somebody acts in. One judgment at
+		// Its present reach, in the units somebody acts in. One judgment at
 		// one fold, over the one package that fold holds here, under whatever
 		// pulls it in — never a place count, which is a unit nobody acted in.
 		if whole.Folds != 1 || whole.Packages != 1 || whole.Consumers != 1 ||
@@ -1126,7 +1126,7 @@ func TestOnlyPeopleWhoCanAlreadySeeItAreOfferedAsMentions(t *testing.T) {
 			t.Error("nobody at all may be mentioned on an undisclosed finding")
 		}
 
-		// Asking who may be told about an undisclosed finding is itself a
+		// A request for who may be told about an undisclosed finding is itself a
 		// question about undisclosed findings, so somebody who cannot read
 		// them is answered as though the product were not there.
 		if got := asPerson(t, r, "triager", http.MethodGet,

@@ -15,7 +15,7 @@ import (
 // product does not exist, while the tree beside it, which has this right,
 // draws their work.
 //
-// What the refusal protects is kept: nothing of theirs in a product they
+// The refusal's own property is kept: nothing of theirs in a product they
 // cannot read still answers as a product that was never declared, so this
 // cannot be used to find out which products exist.
 func TestWhatSomebodyHoldsIsReadableInABuildTheyCannotRead(t *testing.T) {

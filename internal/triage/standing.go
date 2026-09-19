@@ -203,7 +203,7 @@ type Earlier struct {
 // EarlierAt reads the decisions at a finding's places that stopped applying,
 // newest first.
 //
-// What was argued last time is offered back rather than thrown away. A claim
+// The earlier argument is offered back rather than thrown away. A claim
 // that lapsed on a version bump is usually still the right answer, and making
 // somebody start from a blank page is how a tool teaches people to stop
 // writing reasoning at all.

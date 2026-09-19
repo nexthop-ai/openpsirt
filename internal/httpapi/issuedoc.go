@@ -133,7 +133,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	if len(known.Aliases) > 0 {
 		fmt.Fprintf(&out, "- Also known as %s\n", strings.Join(known.Aliases, ", "))
 	}
-	// Where it is written up, each address through the rule an address stored
+	// The places it is written up, each address through the rule an address stored
 	// beside a claim goes through: this is a document somebody forwards.
 	//
 	// Read on its own, because the issue itself and the places it is written
@@ -146,7 +146,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 		fmt.Fprintf(&out, "- <%s>\n", at)
 	}
 
-	// Where it sits, which is the question the inquiry actually asks.
+	// Its places, which are what the inquiry actually asks for.
 	fmt.Fprintf(&out, "\n## Where it is\n\n%s\n\n", howManyCarry(total, len(rows)))
 	for _, row := range rows {
 		fmt.Fprintf(&out, "- %s %s (%s) — %s %s",

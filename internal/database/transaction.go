@@ -353,7 +353,7 @@ func FromEngine(err error) bool {
 // 404 for a delete that committed. Discarding the error spells every one of
 // those as a confident sentence about rows nobody counted.
 //
-// What the count means is settled elsewhere and is the same on all four
+// The count's meaning is settled elsewhere and is the same on all four
 // engines: rows *matched*, not rows changed — see the connection settings in
 // this package, and `DESIGN-database.md`.
 //

@@ -217,7 +217,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 				// half-written decision at submit and the only clue is
 				// "not authorized".
 				//
-				// What is logged is what the browser said and what this
+				// The log carries what the browser said and what this
 				// deployment answers to. Both are already known to whoever
 				// can read the log.
 				{

@@ -86,7 +86,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 // HandOverWithin gives several pieces of work to one party inside a
 // transaction somebody else opened, under the rule Assign holds.
 //
-// What it exists for: planning an upgrade is one act that answers a whole
+// It exists for this: planning an upgrade is one act that answers a whole
 // component, and saying who is carrying it is part of that act rather than a
 // second one somebody might forget. Recorded in the same transaction, so a
 // promise nobody is carrying and a holder with no promise are both impossible.
@@ -157,7 +157,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	// it stops somebody assigning what they cannot see, not somebody
 	// assigning.
 	//
-	// Which right depends on who it lands on. Taking work nobody owns, and
+	// The right needed depends on who it lands on. Taking work nobody owns, and
 	// handing back your own, are part of triaging: the constant stream of
 	// unowned findings assigning what is there now produces would
 	// otherwise need somebody's attention before anybody could start.
@@ -167,7 +167,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	if !triages {
 		return 0, false, access.Denied(fmt.Sprintf("decide who deals with findings in product %d", productID))
 	}
-	// Whether this caller may put work on somebody else, or take what
+	// This caller's right to put work on somebody else, or to take what
 	// somebody else holds. Where they may not, the rule is carried into the
 	// write below rather than checked before it: a check and a write that are
 	// two statements are two moments, and a colleague's assignment landing
@@ -217,7 +217,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 		return 0, false, nil
 	}
 
-	// Whether what was just handed over is a finding nobody has announced.
+	// The disclosure of what was just handed over.
 	//
 	// Answered here because the caller has to know it to decide what may
 	// be said about it outside the application and cannot see the rows

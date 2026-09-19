@@ -377,7 +377,7 @@ func registerNotes(api huma.API, in Ingest) {
 			From: describing(ctx, names, from, input.From, input.FromVariant),
 			To:   describing(ctx, names, to, input.To, input.ToVariant),
 		}
-		// What the later build was last measured with, and when. A note
+		// The tooling the later build was last measured with, and when. A note
 		// somebody kept for a year is re-checkable only if it says what
 		// produced it — a vulnerability database ships bad data and is
 		// corrected, and "which data said so" is then the question. A run that

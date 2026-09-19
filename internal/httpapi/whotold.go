@@ -131,7 +131,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 			return nil, err
 		}
 		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
-			// What the issue is filed under, read before the name is added.
+			// The name the issue is filed under, read before the new one is added.
 			//
 			// By the stored name rather than the one typed: a path segment
 			// carries no length, and the lookup keeps only the first 191

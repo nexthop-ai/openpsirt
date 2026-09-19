@@ -218,7 +218,7 @@ func (s *Store) climb(ctx context.Context, targetID int64, componentIDs []int64)
 // cheap direction: a component has few parents and the routes are a handful of
 // rows, so the statement returns what is on the way and nothing else.
 //
-// Where a component is reached several ways, the shortest way down is the one
+// With a component reached several ways, the shortest way down is the one
 // returned. A path is being shown to explain a position rather than to
 // enumerate the graph, and the shortest is the one somebody can hold in mind.
 // A component the inventory placed nowhere, or one whose every way up runs

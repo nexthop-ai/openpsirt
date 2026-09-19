@@ -10,7 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// What would make an approver disagree.
+// The case against agreeing.
 //
 // An approver is shown the claim and the reasoning and nothing that argues
 // against them, which is the rubber stamp the queue's whole shape was

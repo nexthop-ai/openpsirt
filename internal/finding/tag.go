@@ -114,7 +114,7 @@ func (s *Store) TagsOn(ctx context.Context, productID, vulnerabilityID,
 
 // TagsInUse is every tag used in a product, most-used first.
 //
-// What a filter offers rather than a vocabulary: the list is what people have
+// A filter's own offer rather than a vocabulary: the list is what people have
 // actually written, which is also the evidence for promoting one to a real
 // concept.
 func (s *Store) TagsInUse(ctx context.Context, subject access.Subject,

@@ -422,7 +422,7 @@ type Neighbor struct {
 	// Purl is the package identifier, which is where the kind of package it is
 	// comes from.
 	//
-	// What tells two components of one name and one version apart. A build
+	// The field that tells two components of one name and one version apart. A build
 	// ships `opennsl-modules` twice at 15.2.0.0.0.0.0.0, and asking about
 	// either by name is refused — rightly, since they are two components — so
 	// a screen listing them without this could name neither. The refusal even
@@ -488,7 +488,7 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 // filled writes what is open beneath each of these rows, in one statement
 // for all of them however many lists they arrive in.
 //
-// What is in each of them, not only what is on it. A container holds no
+// The contents of each of them, not only what is on it. A container holds no
 // findings of its own, so without this every one of them reads zero while
 // the packages inside hold thousands — and a tree whose counts cannot tell a
 // full branch from an empty one is not something anybody can descend by.
@@ -661,7 +661,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 			WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
 			GROUP BY f.component_id) AS "open" ON open.cid = c.id`, targetID, bun.List(readable)).
 		ColumnExpr(`COALESCE(open.n, 0) AS "findings"`).
-		// Whether anything is under it, so a node that opens can be told from
+		// Anything under it, so a node that opens can be told from
 		// one that does not before somebody clicks it.
 		//
 		// Counted once for the whole build and joined, rather than asked per
@@ -711,7 +711,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 // so ranking it on that put every container at zero and the list fell back to
 // alphabetical, which is what it looked like.
 //
-// What opens still comes before what does not. A container holds no
+// A node that opens still comes before one that does not. A container holds no
 // findings of its own, and on a real image the root's 5,270 children put the
 // first thing that opens at position 546 when structure was not held above
 // contents. A tree whose first screen contains no branches is a list, and the

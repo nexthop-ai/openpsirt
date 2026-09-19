@@ -11,7 +11,7 @@ import (
 
 // The findings list across every product somebody may see.
 //
-// What it must get right is the narrowing: a page spanning products is exactly
+// The narrowing is what it must get right: a page spanning products is exactly
 // where filtering afterwards gets forgotten, and the total leaks even when no
 // row is shown. Each of those is watched failing.
 func TestTheListAcrossProductsAnswersOnlyForWhatIsHeld(t *testing.T) {
@@ -174,7 +174,7 @@ func TestTheListAcrossProductsKeepsEachProductsLine(t *testing.T) {
 				after[0].Product)
 		}
 
-		// Asking for what is below the line brings it back, so the row is
+		// A request for what is below the line brings it back, so the row is
 		// hidden rather than gone.
 		below, belowTotal, err := f.store.Anywhere(t.Context(), both, 50, 0,
 			finding.Filter{BelowFloor: true})

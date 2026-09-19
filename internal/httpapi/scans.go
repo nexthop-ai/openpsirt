@@ -325,7 +325,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	// one release must never quietly accept a scan of another.
 	//
 	// Refused here rather than answered as not-declared, deliberately.
-	// Telling the two apart lets a key learn which releases and variants
+	// Told apart, the two let a key learn which releases and variants
 	// exist inside the product it already sends to, which is a bounded
 	// thing to give somebody holding a working credential for that product
 	// — and the alternative costs a pipeline the message that says what

@@ -51,7 +51,7 @@ const DefaultTimeout = 30 * time.Minute
 // prevent. The scanner shells out to container and registry tooling, so a
 // helper outliving it is the ordinary case rather than a contrived one.
 //
-// What it costs is that what the scanner said can be cut short at the delay,
+// The cost is that the scanner's own words can be cut short at the delay,
 // which is the trade the field exists for.
 const waitDelay = 10 * time.Second
 
@@ -113,7 +113,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	// What it said while succeeding, bounded the same way the failure is. A
+	// Its own words while succeeding, bounded the same way the failure is. A
 	// scanner writes progress to this stream as well, which it suppresses when
 	// nothing is watching — as nothing is here.
 	result.Caution = tail(strings.TrimSpace(errs.String()))
@@ -361,7 +361,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	}
 	published := rating(match.Vulnerability.CVSS)
 	aliases := make([]string, 0, len(match.RelatedVulnerabilities))
-	// Where else this issue is written up, from every identifier it
+	// The other places this issue is written up, from every identifier it
 	// answers to. Deduplicated by `references`, which the matched
 	// record's own addresses go through as well.
 	related := make([]string, 0, len(match.RelatedVulnerabilities))
@@ -409,7 +409,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 		FixedIn:  strings.Join(match.Vulnerability.Fix.Versions, ", "),
 		FixedAt:  firstFixDate(match.Vulnerability.Fix.Available),
 		Matched:  matched(match.MatchDetails),
-		// Where *this* match came from, which is not always where the
+		// The source of *this* match, which is not always where the
 		// issue is written up. One issue reached through two ecosystems
 		// has two answers, and the issue can only hold one.
 		MatchedFrom:  strings.TrimSpace(match.Vulnerability.DataSource),
@@ -452,7 +452,7 @@ func matchedRange(details []matchDetail) string {
 // findings. Ordering it makes the stored value the same for the same report,
 // which is what keeps a re-scan from writing.
 //
-// Which one the data calls the root cause is carried separately. A
+// The root cause the data names is carried separately. A
 // published advisory states one weakness and a report commonly carries several,
 // so something has to say which — and taking whichever sorts first is an answer
 // with nothing behind it. The feeds say it, in the word beside each entry, and
@@ -462,7 +462,7 @@ func matchedRange(details []matchDetail) string {
 // a list cannot say "nobody said". A report that marks none is the ordinary
 // case and it has to stay distinguishable from one that marks the first.
 //
-// Where two entries are marked, the first stands: a report naming two root
+// With two entries marked, the first stands: a report naming two root
 // causes disagrees with itself, and one weakness is what gets stated.
 func weaknesses(cwes []struct {
 	CWE  string `json:"cwe"`
@@ -493,7 +493,7 @@ func weaknesses(cwes []struct {
 
 // databaseVersion says which vulnerability data a run matched against.
 //
-// When it was built identifies the data; the schema version only identifies
+// The build time identifies the data; the schema version only identifies
 // its shape, so it stands in only when there is nothing better. Without either,
 // a finding that appeared or vanished because the data moved is unexplainable.
 func databaseVersion(descriptor grypeDescriptor) string {

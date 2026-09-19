@@ -212,7 +212,7 @@ func TestWhatCannotBeOrderedIsRefusedRatherThanGuessedAt(t *testing.T) {
 }
 
 func TestReachingAVersionReachesEveryEarlierOne(t *testing.T) {
-	// What a picker asks. An issue fixed in an earlier release is closed by a
+	// A picker's own question. An issue fixed in an earlier release is closed by a
 	// later one, and the kernel is the case that makes it matter: the newest
 	// release names two of its own and carries every fix before it.
 	if !vercmp.Reaches(vercmp.Debian, "6.12.107-1", "6.12.100-1") {
@@ -254,7 +254,7 @@ func TestTheSchemeFollowsThePackageIdentifierARealScanCarries(t *testing.T) {
 }
 
 func TestADistributionUpgradeReachesWhatItLeavesBehind(t *testing.T) {
-	// What the planner asks, through the two new schemes: moving to this
+	// The planner's own question, through the two new schemes: moving to this
 	// version also closes what these earlier ones fixed.
 	for _, each := range []struct {
 		scheme            vercmp.Scheme
@@ -371,7 +371,7 @@ func TestRPMVersionsOrderTheWayRpmvercmpOrdersThem(t *testing.T) {
 
 		// A numeric run outranks an alphabetic one at the same position.
 		{"a number outranks a letter", "1.2", "1.a", 1},
-		// Which is why a release candidate spelled as a further segment is
+		// That is why a release candidate spelled as a further segment is
 		// *newer* than the release: the letters are extra, not a pre-release
 		// marker. rpm has a character for that and this is not it.
 		{"a trailing segment of letters is more, not less", "6.0.rc1", "6.0", 1},
@@ -387,7 +387,7 @@ func TestRPMVersionsOrderTheWayRpmvercmpOrdersThem(t *testing.T) {
 		{"a caret follows the release it came after", "1.0^", "1.0", 1},
 		{"a caret follows with content too", "1.0^git1", "1.0", 1},
 		{"and precedes the next version", "1.0^20160101", "1.0.1", -1},
-		// Which is not the same as preceding a longer number in the same
+		// That is not the same as preceding a longer number in the same
 		// segment: 0 against 01 is a number against a number.
 		{"a caret does not outrank a larger segment", "1.0^git1", "1.01", -1},
 

@@ -122,7 +122,7 @@ func registerKeys(api huma.API, a Administering) {
 				return wentWrong(a.Logger, "cannot issue a credential", err)
 			}
 			name, secret = key.Name, minted
-			// What it may send, never the secret or its digest: the trail is
+			// Its reach, never the secret or its digest: the trail is
 			// read by whoever may administer, and a credential store that
 			// hands back what it holds is what storing a digest exists to
 			// avoid.

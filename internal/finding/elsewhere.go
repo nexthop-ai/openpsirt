@@ -72,7 +72,7 @@ type Match struct {
 // nothing about this build's, which reads as a question about variants when
 // every question here is about a version.
 //
-// What is skipped is the decision itself: the rows in this build at the very
+// The decision itself is skipped: the rows in this build at the very
 // versions being decided are what `at.Places` already counts.
 //
 // One place, answered by the read that takes many. The two were the same
@@ -210,7 +210,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 			Version:           row.Version,
 			ComponentUpstream: row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
 			Places: row.Places,
-			// Whether it is somewhere else or right here. A screen leads with
+			// Its place, elsewhere or right here. A screen leads with
 			// the version, because that is what differs, and says where as an
 			// aside — but it still has to be able to say "here".
 			Here: row.TargetID == hereTargetID,

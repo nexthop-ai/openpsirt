@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
-// What a value is, said once.
+// A value's type, stated once.
 //
 // Five tables keyed on setting names — the server's own, and three in
 // `Settings.tsx` — render a setting added to one and not the others as a raw

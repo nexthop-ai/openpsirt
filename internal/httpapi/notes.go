@@ -300,7 +300,7 @@ func refusedNote(logger *slog.Logger, err error) error {
 	if errors.As(err, &faults) {
 		return refusedText(faults)
 	}
-	// What is left is a sentence the store wrote for a person to read: a note
+	// The remainder is a sentence the store wrote for a person to read: a note
 	// that says nothing, an edit by somebody who did not write it. Those are
 	// the caller's to fix, and the message is the answer.
 	return asked(logger, err)

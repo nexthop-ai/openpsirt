@@ -88,7 +88,7 @@ func registerUpstream(api huma.API, in Ingest) {
 		// is the name a product is published under, so the whole list tells a
 		// reader the scope of a product nobody has announced to them —
 		// the exact name this exists to keep out of an index's logs (REQ-42).
-		// What the deployment configured is not product data and stays.
+		// The deployment's own configuration is not product data and stays.
 		readable, err := currency.RootOwnersFor(ctx, in.DB.DB, subject)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "cannot read who publishes what was scanned", err)

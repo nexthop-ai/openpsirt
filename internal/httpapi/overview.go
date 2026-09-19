@@ -100,7 +100,7 @@ func registerOverview(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refused(in.Logger, err, "cannot read how this product is doing")
 		}
-		// When each build was last scanned, from the same answer the coverage
+		// The last scan of each build, from the same answer the coverage
 		// screen reads rather than a second query that could disagree with it
 		// about which build counts.
 		seen, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject,
@@ -172,7 +172,7 @@ func registerOverview(api huma.API, in Ingest) {
 		out.Body.Overdue = whole.Overdue
 		out.Body.Undecided = whole.Undecided
 
-		// What is waiting for a second person here. Read through the same
+		// The claims waiting for a second person here. Read through the same
 		// queue the review screen reads, narrowed to this product, so the
 		// number and the screen it links to are the same answer.
 		waiting, err := triage.NewStore(in.DB.DB).WaitingIn(ctx, subject, named.ID)

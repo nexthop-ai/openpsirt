@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// Where else a judgment made here would reach.
+// The reach of a judgment made here, beyond this build.
 //
 // Two operations and the shape they answer with. A judgment is keyed on
 // content rather than on a location, so what it covers beyond the build
@@ -48,7 +48,7 @@ type MatchBody struct {
 	Variant string `json:"variant"`
 	// Version is what that build ships, and the reason this is a separate
 	// question.
-	// Where it matched, the decision already reaches there and nobody is
+	// With a match, the decision already reaches there and nobody is
 	// asked. It is the version the decision route resolves a name by, so a
 	// caller applying the decision there passes it back as ?version=.
 	Version string `json:"version,omitempty" doc:"The version that build ships under this name — pass it as ?version= when applying a decision there"`

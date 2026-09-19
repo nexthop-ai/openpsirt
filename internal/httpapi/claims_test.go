@@ -855,7 +855,7 @@ func TestAProposerHoldsPartOfTheirOwnClaimBack(t *testing.T) {
 }
 
 func TestOneActionRestoresEverythingOneActionClaimed(t *testing.T) {
-	// Deciding is bulk-capable at three grains and re-deciding was capable at
+	// A decision is bulk-capable at three grains and a re-decision at
 	// none. A team answering one kernel issue writes a decision at each of its
 	// places in one action; when the kernel moves those lapse, and restoring
 	// them was one request each with a separately typed justification — on a

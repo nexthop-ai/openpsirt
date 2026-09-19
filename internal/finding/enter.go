@@ -142,7 +142,7 @@ var ErrNothingScanned = errors.New(
 // `SONIC-2026-481907` — which is the shape a vendor advisory already takes.
 // The number is drawn rather than counted, so it is not a running total of
 // what this product has kept quiet.
-// When a CVE is assigned later it is recorded as another name for the same
+// A CVE assigned later is recorded as another name for the same
 // issue, and the issue is then filed under the CVE; nothing about the finding,
 // the decisions or the approvals moves, because they are keyed on the issue
 // rather than on what it is called.

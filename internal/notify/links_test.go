@@ -39,7 +39,7 @@ func TestAConditionAsksForAWindowItsReportOffers(t *testing.T) {
 		values[found[1]] = found[2]
 	}
 
-	// Which sheet each report slug is, by the address the catalog gives it.
+	// The sheet each report slug names, by the address the catalog gives it.
 	sheets := map[string]string{"rubber-stamp": "../../web/src/screens/reports/Scrutiny.tsx"}
 	offers := regexp.MustCompile(`const WINDOWS = \[([0-9, ]+)\]`)
 

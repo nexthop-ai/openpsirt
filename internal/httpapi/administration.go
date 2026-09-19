@@ -763,7 +763,7 @@ func registerAdministration(api huma.API, a Administering) {
 			// it. An estate role is the last role in every product at once, so
 			// this asks for each.
 			//
-			// Which products those are is read here, in the view the
+			// The products themselves are read here, in the view the
 			// withdrawal left. Handing the work back is done afterwards: it is
 			// bounded by how much they were holding rather than by the
 			// request, and it is a consequence of the withdrawal rather than

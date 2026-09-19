@@ -512,7 +512,7 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 			}
 		}
 
-		// What it held before is kept, because "who raised the floor to
+		// The prior value is kept, because "who raised the floor to
 		// critical" is half the question and the other half is what it was.
 		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
 			`{"value":"critical"}`); got.Code >= 300 {

@@ -653,7 +653,7 @@ func TestWhatSomebodyCannotSeeLooksExactlyLikeWhatIsNotThere(t *testing.T) {
 
 func TestEveryRefusalOfAStrangerReadsTheSame(t *testing.T) {
 	// Unknown, known but granted nothing, and holding a revoked credential.
-	// Telling them apart says whether a name or a key is real.
+	// Told apart, they say whether a name or a key is real.
 	twoReach(t, func(t *testing.T, r *reach) {
 		unknown := r.body(t, "ghost", http.MethodGet, "/v1/products")
 		ungranted := r.body(t, "nothing", http.MethodGet, "/v1/products")

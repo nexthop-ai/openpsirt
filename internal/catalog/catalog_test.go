@@ -321,7 +321,7 @@ func TestATagCanBeToldWhatItWasCutFromAfterwards(t *testing.T) {
 	// the parent was refused as a contradiction, which it is not — nothing had
 	// been said for it to contradict.
 	//
-	// Saying it came from a *different* branch stays refused, because a tag is
+	// A claim that it came from a *different* branch stays refused, because a tag is
 	// one frozen point and it came from wherever it came from.
 	each(t, func(t *testing.T, _ *database.DB, store *catalog.Store) {
 		ctx := t.Context()
@@ -422,7 +422,7 @@ func TestRedeclaringSomethingDifferentlyIsRefusedAndChangesNothing(t *testing.T)
 			t.Errorf("the refused call made it a %s", stream.Kind)
 		}
 
-		// Whether something reaches customers feeds how its findings rank, so
+		// A thing's reach to customers feeds how its findings rank, so
 		// a change here changes what people are told to work on first.
 		if _, _, err := s.EnsureVariant(ctx, product.ID, "lab-only", false); err != nil {
 			t.Fatal(err)

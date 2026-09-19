@@ -447,10 +447,10 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 // force, so an issue reassessed here read one way on one list and another way
 // on the other — which is the whole point of reassessing it.
 //
-// What each list adds afterwards is what differs between them: the way down,
+// Each list's own additions are what differ between them: the way down,
 // for a list of one build; the product and the build to link to, for a list
 // that spans them.
-// Which product's rating a row reads is the line's, because the two are one
+// The rating a row reads is the line's product's, because the two are one
 // product's: the word the line states and the word it is compared against are
 // both decisions that team made.
 func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]string,
@@ -498,7 +498,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 	// take is one about this finding, and anything else without a deadline is
 	// in a release nothing is going to be fixed in.
 	//
-	// Which line that is belongs to the caller: per product it is the
+	// The line itself belongs to the caller: per product it is the
 	// product's own, and across products it is the deployment's, because one
 	// word chosen for a page that spans them would answer for none of them.
 	if group.DueAt == nil {
@@ -570,7 +570,7 @@ type groupHead struct {
 	// Places is the number of findings under the row: the unit the cap is
 	// measured in and the unit the disposition register expands to.
 	//
-	// How many packages and how many consumers — the numbers a reader is
+	// The packages and the consumers — the numbers a reader is
 	// shown — are counted in the second statement rather than here. They are
 	// COUNT(DISTINCT), and MariaDB answers a query with no rows at all when a
 	// COUNT(DISTINCT) sits beside a window function, silently: no error,
@@ -787,7 +787,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		ColumnExpr(`MIN(f.component_id) AS "component_id"`).
 		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
-		// Whether any of the issues folded here carries a score at all.
+		// Any of the issues folded here carrying a score at all.
 		// Written as a number rather than as a boolean, because the four
 		// engines do not agree about what a boolean out of an aggregate is.
 		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
@@ -797,7 +797,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// the year in the identifier.
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
-		// Whether anything here is undisclosed, and when the earliest embargo
+		// Anything here undisclosed, and the earliest embargo
 		// ends. One undisclosed place among fifty makes the group
 		// undisclosed, which is what it is for anybody deciding what may be
 		// said about it.

@@ -29,7 +29,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	})
 }
 
-// How long a prepared deferral defers for, at the store.
+// The length a prepared deferral defers for, at the store.
 //
 // A deferral is the one outcome that needs a date, and what is kept is the
 // length rather than the date: the date is worked out from it whenever
@@ -80,7 +80,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 	})
 }
 
-// What a saved filter prepares, at the store.
+// The claim a saved filter prepares, at the store.
 //
 // The endpoint's own schema refuses a prefill with no reasoning before the
 // store sees it, which is where a caller meets the rule. It is checked here as

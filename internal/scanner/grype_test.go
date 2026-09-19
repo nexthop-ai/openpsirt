@@ -39,7 +39,7 @@ func TestWhatRanAndAgainstWhatIsRecorded(t *testing.T) {
 }
 
 func TestTheDatabaseVersionIsFoundWhereverItSits(t *testing.T) {
-	// Where the database describes itself moved between versions of the
+	// The place the database describes itself moved between versions of the
 	// scanner. An operator running an older build should not silently lose the
 	// record of what their findings were matched against.
 	older := `{"matches": [], "descriptor": {"name": "grype", "version": "0.90.0",

@@ -45,7 +45,7 @@ func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 			t.Fatalf("read: %v", err)
 		}
 
-		// What the scan was filed against, which stands in as the root for a
+		// The build the scan was filed against, which stands in as the root for a
 		// document that names no component of its own.
 		target := graph.Described{Name: "sonic", Version: "master"}
 

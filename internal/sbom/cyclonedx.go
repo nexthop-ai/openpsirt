@@ -176,12 +176,12 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		ref       string
 		nested    []graph.Described
 		carried   []Suppression
-		// Who supplied it, stated two ways. Resolved after the object rather
+		// The supplier, stated two ways. Resolved after the object rather
 		// than during it, because a producer chooses the order of its own keys
 		// and which field wins must not.
 		supplier  string
 		publisher string
-		// What the producer said the component's scope is, read like the two
+		// The producer's own scope for the component, read like the two
 		// above rather than acted on during the object: key order is the
 		// producer's choice.
 		scope string
@@ -218,7 +218,7 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			// the producer's choice.
 			return c.into(&publisher)
 		case "scope":
-			// What the producer said about the component, which is where this
+			// The producer's own words about the component, which is where this
 			// format states it: "required", "optional", or "excluded", which
 			// the specification defines as not distributed. Recorded against
 			// the component and carried to the edges arriving at it, because

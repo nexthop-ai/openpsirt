@@ -278,7 +278,7 @@ func TestWithdrawingAndDeferringAgainDoesNotResetTheThreshold(t *testing.T) {
 	})
 }
 
-// Whether a claim needs a second person is worked out where it is written.
+// A claim's need for a second person is worked out where it is written.
 //
 // A field on the proposal, answered before the transaction opens and taken on
 // trust, stores a claim as needing nobody under a policy that says it does

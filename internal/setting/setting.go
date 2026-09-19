@@ -132,7 +132,7 @@ const (
 	// danger. Nothing fails, no scan is refused, and every finding on every
 	// screen is as old as the data behind it without saying so.
 	//
-	// How long is a judgment about how a deployment gets its data: one that
+	// The length is a judgment about how a deployment gets its data: one that
 	// downloads nightly expects it to move most days, and one that carries a
 	// bundle across an air gap on a schedule expects otherwise. So it is tuned
 	// here rather than compiled in.
@@ -159,7 +159,7 @@ const (
 	// index, and a deployment that cannot reach out loses this answer and
 	// nothing else.
 	//
-	// What goes out is a component's name. One request per component to
+	// A component's name goes out. One request per component to
 	// that ecosystem's public index, carrying the name and nothing else — no
 	// version, no build, no product, nothing about who is asking beyond the
 	// request itself. For an open-source dependency that is public knowledge.
@@ -550,7 +550,7 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 		before, had = "", false
 		now := s.now().Truncate(time.Microsecond)
 
-		// What it holds, in the same view as the write that replaces it.
+		// The stored value, in the same view as the write that replaces it.
 		held := new(Setting)
 		switch err := tx.NewSelect().Model(held).Where("name = ?", name).Scan(ctx); {
 		case database.IsNoRows(err):
@@ -590,7 +590,7 @@ func (s *Store) change(ctx context.Context, name, value string) (before string, 
 			return fmt.Errorf("record the %q setting: %w", name, err)
 		}
 
-		// How many rows the update matched, which is the question being asked
+		// The rows the update matched, which is the question being asked
 		// — whether the row still holds what the read answered with. This
 		// counted the rows in a second statement instead, on the ground that
 		// two of the four engines report nothing touched when an update writes

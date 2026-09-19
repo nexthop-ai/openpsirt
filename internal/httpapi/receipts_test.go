@@ -404,7 +404,7 @@ func TestCountsAreReportedOnceAndAZeroIsStillAnAnswer(t *testing.T) {
 			if err := findings.Finish(ctx, run.ID, "0.112.0", "2026-08-28", "", nil); err != nil {
 				t.Fatal(err)
 			}
-			// When it ran, which is what decides the upload it answers and
+			// The moment it ran, which decides the upload it answers and
 			// the one its numbers are reported against.
 			if _, err := r.db.DB.NewUpdate().Model((*finding.Run)(nil)).
 				Set("started_at = ?", at.Add(-time.Minute)).Set("finished_at = ?", at).

@@ -78,7 +78,7 @@ func begin(w http.ResponseWriter, r *http.Request, in Ingest) {
 
 	encoded, err := json.Marshal(inProgress{
 		Pending: pending,
-		// Where to land afterwards, carried in our own cookie rather than
+		// The landing place afterwards, carried in our own cookie rather than
 		// through the provider. It never leaves this browser, so nothing a
 		// provider echoes back can decide where somebody ends up.
 		Return: aLocalPath(r.URL.Query().Get("return")),
@@ -96,7 +96,7 @@ func begin(w http.ResponseWriter, r *http.Request, in Ingest) {
 	cookie := browserCookie(pendingCookie, sealed, false, in.PlainHTTP,
 		int(pendingLife.Seconds()))
 	http.SetCookie(w, &cookie)
-	// Where this goes is the provider's authorization endpoint, and an adapter
+	// This goes to the provider's authorization endpoint, and an adapter
 	// refuses at startup to be built around one that is not on the configured
 	// provider's own host. That check is there rather than here because a
 	// provider that would misdirect people should stop the process, not

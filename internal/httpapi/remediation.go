@@ -163,7 +163,7 @@ func registerRemediation(api huma.API, in Ingest) {
 			return nil, refused(in.Logger, err, "cannot read what keeps being put off")
 		}
 		out := &listOutput[RepeatBody]{}
-		// How many there are in all, so a caller holding a full page can tell
+		// The total, so a caller holding a full page can tell
 		// a clipped page from the whole list.
 		out.Body.Total = total
 		out.Body.Items = repeatBodies(rows)

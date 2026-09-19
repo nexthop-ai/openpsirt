@@ -237,7 +237,7 @@ type Issued struct {
 // never shipped the thing at all — and those are opposite answers, one of them
 // the one a reader is hoping for.
 //
-// What a person decided about a release — not affected, and the reason why —
+// A person's own decision about a release — not affected, and the reason why —
 // is the VEX half, and is not assembled here.
 type Status struct {
 	KnownAffected []string `json:"known_affected,omitempty"`
@@ -514,7 +514,7 @@ func (s *Store) ours(ctx context.Context, subject access.Subject, productID int6
 		return nil, nil, fmt.Errorf("look up what we recorded about %q: %w", identifier, err)
 	}
 	if err != nil {
-		// Whether the issue is here at all and whether it is ours are told
+		// The issue's presence here and its ownership are told
 		// apart deliberately: the first is a typo and the second is a scope
 		// rule somebody has to understand.
 		held, here := s.here(ctx, subject, productID, issue.ID)

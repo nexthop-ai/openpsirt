@@ -32,7 +32,7 @@ func init() {
 // claim. That matters where an approval points at one revision of a
 // justification and editing the text withdraws it.
 //
-// What it said before is kept, the way a claim comment's is: a note is
+// The earlier wording is kept, the way a claim comment's is: a note is
 // part of the record that goes public at disclosure, and a record whose
 // earlier text is unrecoverable is readable rather than checkable.
 func upIssueNote(ctx context.Context, tx *sql.Tx) error {

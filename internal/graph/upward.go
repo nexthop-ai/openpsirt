@@ -19,7 +19,7 @@ import (
 // with rows hidden: a container's count would still say how much sits under it,
 // and opening one asks a question they may not ask.
 //
-// What they get instead is the chains their own findings sit on, from each
+// They get instead the chains their own findings sit on, from each
 // finding's component up to the build's root. The chain upward is what makes a
 // finding judgeable, because it says what pulled the thing in — and every node
 // on it sits above something they were already given, so nothing on it is new.

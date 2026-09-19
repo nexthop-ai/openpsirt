@@ -687,7 +687,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			  AND ft.component_id = f.component_id
 			  AND ft.tag IN (?))`, append(args, bun.List(words))...)
 	}
-	// What a promised upgrade covers, or what none does. A condition over the
+	// The places a promised upgrade covers, or the ones none does. A condition over the
 	// group rather than over a place, like every other decision predicate
 	// here: a group is planned when a promise reaches it, and unplanned when
 	// none reaches any of it.
@@ -740,7 +740,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 // is: a state known at one place and not another would drop the places that
 // lack it and report a group smaller than it is.
 //
-// Which leaves the group whose places genuinely disagree, and it has its own
+// That leaves the group whose places genuinely disagree, and it has its own
 // word. Asked for one state, unanimity is the question; asked for "mixed",
 // the question is the opposite one — and a group that answered neither was a
 // row no value of this filter could list, which is what a filter presented as
@@ -1044,7 +1044,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 	if len(states) == 0 && len(outcomes) == 0 && f.Planned == PlannedEither {
 		return q
 	}
-	// Whether one was asked for, kept before the list is padded: an empty IN
+	// A request for one, kept before the list is padded: an empty IN
 	// list is a syntax error on two of the engines, so the column binds a
 	// word no outcome equals — and reading the padded list as a request
 	// would narrow every group to those answered "" everywhere, which is
@@ -1097,7 +1097,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		ColumnExpr(`MAX(CASE WHEN de.state = ? AND de.live_key IS NOT NULL THEN 1 ELSE 0 END) AS "approved"`,
 			approved).
 		ColumnExpr(`MAX(CASE WHEN de.state = ? THEN 1 ELSE 0 END) AS "lapsed"`, lapsed).
-		// Whether a promise to upgrade stands over this place. Counted
+		// A promise to upgrade standing over this place. Counted
 		// only for the claim that currently stands, like "approved"
 		// above: a promise that was withdrawn is not one, and a finding
 		// it covered is unplanned again with nothing to clean up. That

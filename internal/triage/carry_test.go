@@ -42,7 +42,7 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 			t.Fatalf("carried %d, want 1", carried)
 		}
 
-		// What landed is a claim waiting for somebody, carrying the old words.
+		// A claim waiting for somebody lands, carrying the old words.
 		rows, _, err := f.store.Queue(ctx, f.reviewer, false, 0, 50, 0)
 		if err != nil {
 			t.Fatal(err)

@@ -155,7 +155,7 @@ type Store struct {
 // DerivingWithin returns a store where a grant a group derived stays in force
 // for the window the given function reports, asked each time it is needed.
 //
-// What this bounds is staleness, not authentication. Membership is read
+// It bounds staleness, not authentication. Membership is read
 // when somebody signs in, and every sign-in replaces their derived grants
 // whole, so a browser's are never older than its session. A personal token
 // never signs in — it resolves through its owner and reads whatever their last
@@ -416,7 +416,7 @@ func (s *Store) SetDigest(ctx context.Context, personID int64, wanted, unowned b
 	if personID == 0 {
 		return errors.New("a preference needs somebody to belong to")
 	}
-	// Asking for what nobody owns without asking for a digest at all is a
+	// A request for what nobody owns, without a digest at all, is a
 	// setting that changes nothing, which is worse than not offering it.
 	if unowned && !wanted {
 		return errors.New("a digest listing what nobody owns is still a digest: ask for one")
@@ -622,7 +622,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 // one part that genuinely differs: a grant asks whether it is in force, a
 // binding asks whether the row exists, and each says why beside itself.
 //
-// Where the row is there and the predicate says no, the caller hears what
+// With the row there and the predicate saying no, the caller hears what
 // happened rather than the driver's constraint message — which is what an
 // administrator was shown for an operation the endpoint documents as
 // idempotent.
@@ -880,7 +880,7 @@ func (s *Store) Keys(ctx context.Context) ([]Key, error) {
 // places this is needed — a review queue, a list of what was dismissed — are
 // exactly the ones that are long.
 //
-// What this answers is never sent back to a lookup. A display name is a
+// Its answer is never sent back to a lookup. A display name is a
 // label somebody chose and resolves to nobody; Handles is what a route naming
 // a person in its path matches.
 func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error) {
@@ -967,7 +967,7 @@ type Mentionable struct {
 func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64,
 	visibility Visibility, term string, limit int) ([]Mentionable, error) {
 
-	// Asking who may read something undisclosed is itself a question about
+	// A request for who may read something undisclosed is itself about
 	// undisclosed work, and the answer is the one every other read gives:
 	// nothing. Asked here rather than only at the two handlers that call it,
 	// because a third endpoint over this query would answer for everybody —

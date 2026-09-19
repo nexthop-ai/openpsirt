@@ -127,7 +127,7 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 	// and nothing has been decided, and it clears when somebody moves the
 	// date or discloses, because both of those are answering it.
 	//
-	// Who hears about it is the careful part. Every one of these is a
+	// The people who hear about it are the careful part. Every one of these is a
 	// finding nobody has announced, so the alert is a disclosure in its
 	// own right.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {

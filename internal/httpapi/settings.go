@@ -296,7 +296,7 @@ func registerSettings(api huma.API, in Ingest) {
 						"withdrew can still be held", access.MaxSessionLifetime))
 			}
 		}
-		// What it held, answered by the write that replaced it: it is not
+		// The prior value, answered by the write that replaced it: it is not
 		// derivable afterwards, and the person who raised the floor to
 		// critical is half of what somebody asks. Read in a statement of its
 		// own it is the value at some earlier moment — two administrators

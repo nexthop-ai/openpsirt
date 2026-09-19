@@ -790,7 +790,7 @@ func TestEachOpeningKeepsItsOwnDeadlineWhenThePolicyMoves(t *testing.T) {
 	// note promising a handful — and almost all of them matched nothing,
 	// because one opening lives in one slice.
 	//
-	// What that shape has to get right, and one opening cannot show, is that
+	// The part that shape has to get right, and one opening cannot show, is that
 	// each row lands on *its own* opening plus its own window.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

@@ -39,7 +39,7 @@ type Record struct {
 // is not the signal. Enforced here, where the rest of this store's rules are
 // (REQ-42).
 //
-// Which is why the audit permission does not reach it, though it reads the
+// That is why the audit permission does not reach it, though it reads the
 // page this sits on: that grant is declared to reach no product's decisions,
 // and a count taken over every product's decisions is taken over decisions.
 // The page leaves the block out rather than refusing.

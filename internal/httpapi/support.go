@@ -197,7 +197,7 @@ func outOfSupport(ctx context.Context, in Ingest, asked ScopeQuery,
 		return nil, err
 	}
 	now := time.Now().UTC()
-	// How far ahead to look. Nothing by default, which is the past-only
+	// The distance ahead to look. Nothing by default, which is the past-only
 	// report: a second population appearing in it unasked would change what
 	// every figure on the screen counts.
 	ended, err := catalog.NewStore(in.DB.DB).OutOfSupport(ctx, subject, now,

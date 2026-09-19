@@ -70,7 +70,7 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, req)
 
-			// What the answer must not be is "that does not exist", because
+			// The answer must not be "that does not exist", because
 			// nothing here established that.
 			if rec.Code == http.StatusNotFound {
 				t.Errorf("%s: a database nobody can reach answered 404 for %s: %s",

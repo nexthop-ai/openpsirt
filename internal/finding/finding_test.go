@@ -3,7 +3,7 @@ package finding_test
 // The fixture every test file in this package builds on: one migrated
 // database, a variant, a stored graph, and a way to mint scan runs in order.
 //
-// What was here besides it went to files named for the invariant each block
+// Everything else here went to files named for the invariant each block
 // pins — what a scan opens and closes, one issue under many names, what the
 // build already argued, who may read what, and what a run says about itself.
 // This file is what they all share, and nothing else.

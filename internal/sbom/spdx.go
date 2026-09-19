@@ -213,7 +213,7 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 	var (
 		described graph.Described
 		ref       string
-		// Who supplied it, stated two ways. Resolved after the object rather
+		// The supplier, stated two ways. Resolved after the object rather
 		// than during it, because a producer chooses the order of its own
 		// keys and which field wins must not.
 		supplier   string

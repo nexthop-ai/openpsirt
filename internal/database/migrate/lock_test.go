@@ -16,7 +16,7 @@ import (
 // applied through this package, and Go allows no such cycle in a test. So
 // the two helpers it needs are here, in the smallest form that works.
 //
-// What is *not* copied here is which engines a run may touch. That rule lives
+// The engines a run may touch are *not* copied here. That rule lives
 // in dbtest/engines, which imports neither this package nor dbtest, precisely
 // so the copy in this file does not have to exist — it is the rule the quick
 // loop and the race run set, and this test used to ignore it and open three

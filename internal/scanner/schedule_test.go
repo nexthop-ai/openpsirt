@@ -314,7 +314,7 @@ func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
 }
 
 func TestAFullQueueStopsTheAskingRatherThanFailing(t *testing.T) {
-	// What is due stays due. Pressing on would push a producer's arriving
+	// Work due stays due. Pressing on would push a producer's arriving
 	// inventories behind a re-scan of something last measured yesterday, and
 	// failing would turn a full queue into an error nobody can act on.
 	eachRun(t, func(t *testing.T, f *runFixture) {

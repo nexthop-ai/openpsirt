@@ -176,7 +176,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		// Then a year of them. A component whose version moves closes every
 		// finding at it and opens the same number again, which is the whole of
 		// what a quiet night costs.
-		// What each component is at, carried forward. A bump is permanent: a
+		// Each component's version, carried forward. A bump is permanent: a
 		// package that moved to 1.5 does not go back to 1.0 tomorrow.
 		//
 		// The first version of this slid a window and left everything outside

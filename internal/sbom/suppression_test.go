@@ -168,7 +168,7 @@ func TestAClaimReachesEveryVersionOfWhatItNames(t *testing.T) {
 }
 
 func TestTheOtherIdentifiersForAnIssueAreKept(t *testing.T) {
-	// Which identifier a producer chose is a preference of whichever database
+	// The identifier a producer chose is a preference of whichever database
 	// it consulted. A decision keyed on that one would lapse the day a scanner
 	// changed its mind.
 	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1", "aliases": ["GHSA-aaaa-bbbb-cccc"]},

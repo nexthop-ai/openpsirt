@@ -166,7 +166,7 @@ func registerVexImport(api huma.API, in Ingest) {
 				"that document is larger than the %d bytes this deployment reads", most))
 		}
 
-		// Who published it is the key a later upload supersedes on, and it is
+		// The publisher is the key a later upload supersedes on, and it is
 		// an indexed column of a fixed width. Refused rather than shortened:
 		// two publishers agreeing for the width of the column would collapse
 		// into one, and the later upload would set aside statements it has

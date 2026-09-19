@@ -44,7 +44,7 @@ var vocabularies = []vocabulary{
 // what it walks. The bounds hold on this pass either way, because what they
 // stop is the walk.
 //
-// What none of them answers is which component the document is about, where
+// None of them answers which component the document is about, where
 // the format states that by pointing at one of the contents. Nothing asks: the
 // arrival decision turns on the document's identity and its build time, and
 // the root is settled by the read that applies the scan.
@@ -79,7 +79,7 @@ func Read(r io.Reader, lim Limits) (*Document, error) {
 // all. Requiring the declaration first would refuse documents that are
 // perfectly well formed.
 //
-// Which vocabulary each key was routed to is recorded, and that rather than
+// The vocabulary each key was routed to is recorded, and that rather than
 // the keys being disjoint is what makes the arrangement safe. A handler writes
 // to the document before anything has checked what the document is, and both
 // formats state an identity — so a file carrying both keys would be stored
@@ -116,7 +116,7 @@ func (c *reader) read() error {
 // checkFormat refuses a document that did not say what it is, said it was two
 // things, or said only half of what one of them is.
 //
-// What it does not check is that the document named a component of its own. No
+// It does not check that the document named a component of its own. No
 // format requires one, and the scan was filed against something that says what
 // it is about.
 func (c *reader) checkFormat() error {

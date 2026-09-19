@@ -25,7 +25,7 @@ func init() {
 // because re-scanning it years later needs both what it contained and what the
 // build had already argued about its own patches.
 //
-// What is deleted is the contents. The row describing the document stays, with
+// The contents are deleted. The row describing the document stays, with
 // the hash of the bytes that arrived and when they were let go — so a build
 // asked to send a file again can be told whether what it sent is what we read,
 // and so a scan whose contents are gone still says what it was made of rather

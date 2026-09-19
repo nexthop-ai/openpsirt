@@ -232,7 +232,7 @@ func TestPlanningAnUpgradeAnswersEveryBinaryOfTheSourcePackage(t *testing.T) {
 		r.scannedSiblings(t)
 
 		const at = "/v1/products/mine/components/libcurl4t64/upgrade"
-		// Saying nothing about why is refused like every other judgment.
+		// A judgment with no reasoning is refused like every other.
 		if got := asPerson(t, r, "triager", http.MethodPost, at,
 			`{"to":"8.5.0-1","by":"`+aheadOfUs+`"}`); got.Code < 400 {
 			t.Errorf("a bump with no reasoning answered %d", got.Code)

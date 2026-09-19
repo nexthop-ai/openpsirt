@@ -24,7 +24,7 @@ import (
 // Each clears by the thing happening: a condition clears itself where an event
 // is acknowledged, so nobody dismisses these — the world does.
 //
-// Who hears follows who may read and act, and it differs by
+// The people who hear follow who may read and act, and they differ by
 // condition rather than being one rule. A claim waiting is the approver's to
 // answer, so it goes to whoever may approve it and never to its proposer, who
 // cannot approve their own. A claim sent back and a deferral ending

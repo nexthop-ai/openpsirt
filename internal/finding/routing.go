@@ -318,7 +318,7 @@ func bySource(query *bun.SelectQuery, pattern string) *bun.SelectQuery {
 // a metacharacter — a package name is full of dots and plus signs and dashes,
 // and a syntax where those mean something is a syntax that surprises.
 //
-// What SQL treats as special is escaped. `%` and `_` are wildcards to
+// Everything SQL treats as special is escaped. `%` and `_` are wildcards to
 // LIKE and appear in real package names (`libssl_1_1`), so a pattern that let
 // them through would silently match more than it said. The escape character is
 // `#` rather than a backslash, because a backslash inside a string literal is

@@ -242,7 +242,7 @@ func section(out *strings.Builder, rows []Changed) {
 
 // said is what is known about one issue, in the parenthesis after its name.
 //
-// What a reader acts on, and not the description. One upgrade closes
+// The part a reader acts on, and not the description. One upgrade closes
 // hundreds of issues and they are listed under it, so a sentence apiece is a
 // document nobody reads to the end — while the number, the word and whether
 // somebody is known to be exploiting it are what decides whether this upgrade

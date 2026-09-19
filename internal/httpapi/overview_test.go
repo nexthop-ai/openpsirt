@@ -94,7 +94,7 @@ func TestAProductSaysHowItIsDoing(t *testing.T) {
 			t.Errorf("somebody who may read one of the two was told %+v", public)
 		}
 
-		// What is waiting for a second person here, counted through the same
+		// The claims waiting for a second person here, counted through the same
 		// population the review queue lists — and not their own claim, which
 		// nobody can approve.
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
@@ -134,7 +134,7 @@ func TestAProductSaysHowItIsDoing(t *testing.T) {
 	})
 }
 
-// What one run of the scanner did.
+// One run of the scanner, and the change it made.
 func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)

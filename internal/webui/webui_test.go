@@ -13,7 +13,7 @@ import (
 // the server: answering both with nothing makes a build whose interface cannot
 // be read indistinguishable from an API-only build, and both silent.
 //
-// Which of the two this binary is depends on whether the frontend was built
+// The binary is one of the two, depending on whether the frontend was built
 // before the tests ran, so the test asserts the pair rather than one of them:
 // either there is a filesystem and no error, or there is an error naming the
 // state and no filesystem.

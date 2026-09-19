@@ -136,7 +136,7 @@ func debianOrder(a, b string) (int, bool) {
 // The revision is whatever follows the *last* hyphen, because an upstream
 // version may contain one and a revision may not.
 //
-// What makes a string not a version is Debian policy's own rule: the upstream
+// A string fails to be a version by Debian policy's own rule: the upstream
 // part begins with a digit, and every part is drawn from a small set of
 // characters. A word an advisory wrote where a version belongs — "unfixed",
 // "TBD", a sentence — fails both.

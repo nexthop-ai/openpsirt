@@ -561,7 +561,7 @@ func registerChangeExport(api huma.API, in Ingest) {
 				if err != nil {
 					return nil, err
 				}
-				// Who, by the identity they sign in under, read a page at a
+				// The person, by the identity they sign in under, read a page at a
 				// time like every other name this file carries.
 				who := make([]int64, 0, len(changes))
 				for _, change := range changes {

@@ -54,7 +54,7 @@ func types(ctx context.Context) (*columnTypes, error) {
 // whose object it cannot identify is run rather than guessed at, failing the
 // way it always did.
 //
-// What it cannot tell apart is a half-applied run of this migration from an
+// It cannot tell a half-applied run of this migration from an
 // earlier migration that made the same name. On these two engines a duplicate
 // name is stepped over and warned about rather than refused, so it is caught
 // by the two engines with transactional data definition — and by the warning,

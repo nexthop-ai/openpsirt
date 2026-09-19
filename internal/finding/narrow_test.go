@@ -810,7 +810,7 @@ func TestSeveralStatesAreAskedForTogether(t *testing.T) {
 		if undecided != 2 {
 			t.Fatalf("%d undecided, want both", undecided)
 		}
-		// Asking for a state nothing is in adds nothing, and asking for it
+		// A request for a state nothing is in adds nothing, and asking for it
 		// beside one that matches keeps what that one matched — an OR, not an
 		// AND.
 		if both := count(t, "undecided", "agreed"); both != undecided {

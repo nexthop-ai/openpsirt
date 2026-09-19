@@ -16,7 +16,7 @@ func init() {
 
 // Changes somebody made to how this deployment works.
 //
-// Who, what, before, after and when. Three administrative levers
+// The person, the subject, the values before and after, and the moment. Three administrative levers
 // silently rewrite what this tool reports: changing the deadline policy
 // recomputes every open finding's deadline, raising the triage floor takes the
 // deadline off everything below it, and an end-of-life date takes it off

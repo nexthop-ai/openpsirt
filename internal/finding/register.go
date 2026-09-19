@@ -455,7 +455,7 @@ func disposedFrom(row registerRow) Disposed {
 	default:
 		one.State = "waiting"
 	}
-	// Whether the deadline was met, which is answerable only for
+	// A deadline met, which is answerable only for
 	// something that closed: an open row has not missed its deadline, it
 	// has not reached the end of the question.
 	//

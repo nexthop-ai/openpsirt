@@ -420,7 +420,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 // already names as how long a role a group withdrew can still be held. It was
 // true of a browser and false of a token.
 //
-// What an administrator assigned is untouched. That is a standing decision
+// A grant an administrator assigned is untouched. That is a standing decision
 // rather than a reading of somebody's membership, and it does not go off.
 func TestATokenStopsCarryingARoleAGroupStoppedDeriving(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {

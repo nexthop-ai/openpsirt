@@ -93,7 +93,7 @@ func (s *Store) Say(ctx context.Context, subject access.Subject, claimID int64, 
 // change somebody's words — an edit that could be made by another person is
 // not a correction, it is a forgery with a timestamp.
 //
-// Whether the asker may reach the claim is settled before anything about the
+// The asker's reach to the claim is settled before anything about the
 // comment is said back. The row is read first, because the claim it hangs off
 // is not knowable otherwise, but no answer turns on what was in it until the
 // asker has been let in: refusing on authorship first told anybody holding
@@ -129,7 +129,7 @@ func (s *Store) Reword(ctx context.Context, subject access.Subject, commentID in
 	}
 
 	edited := s.now().Truncate(time.Microsecond)
-	// What it said before, kept, and both writes together. Written apart,
+	// The earlier wording, kept, and both writes together. Written apart,
 	// an edit that succeeded and a history write that did not would leave
 	// the record saying a comment was changed and nothing saying from what
 	// — which is worse than the state this replaces, because it looks like

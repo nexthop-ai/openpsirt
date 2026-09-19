@@ -177,7 +177,7 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 	}
 	findings := finding.NewStore(db)
 
-	// What became theirs without a message. Everything they hold, less the
+	// The work that became theirs without a message. Everything they hold, less the
 	// things a notification already told them about — which is the whole
 	// of "carries what nothing else told you".
 	//
@@ -224,7 +224,7 @@ func Assemble(ctx context.Context, db *bun.DB, person *access.Account, most int)
 		}
 	}
 
-	// What arrived since the last one and nobody has picked up, for whoever
+	// The work that arrived since the last one and nobody has picked up, for whoever
 	// asked for it. A first digest has no "since", and reports nothing here
 	// rather than everything ever opened: arriving to a list of eight
 	// thousand is the same as arriving to no channel at all.

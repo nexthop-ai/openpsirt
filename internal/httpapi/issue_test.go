@@ -42,7 +42,7 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 			t.Errorf("a finding nobody has decided reads as %q", one.State)
 		}
 
-		// Deciding it moves the state on this page too: it is the same
+		// A decision moves the state on this page too: it is the same
 		// definition the findings list uses rather than a second one.
 		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
 		read(t, r, "triager", "/v1/issues/CVE-2026-9999", &out)
@@ -144,7 +144,7 @@ func TestAFailedReadIsNotAnAnswerAboutWhatYouAreAffectedBy(t *testing.T) {
 // TestEverythingKnownAboutOneIssueIsADocument is the form a customer inquiry
 // is answered in.
 //
-// What the issue is, which of our builds carry it, what was decided about each
+// The issue itself, the builds of ours carrying it, the decision about each
 // and the argument behind it, were four screens and a copy-paste — so the
 // answer was assembled differently every time and the half somebody forgot was
 // the half that mattered.

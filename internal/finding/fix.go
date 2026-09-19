@@ -116,7 +116,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 				"declare a fix in build %d, which is out of support", id))
 		}
 		// Committing what is already committed keeps the first commitment.
-		// When somebody said they would do this is a fact about a moment, and
+		// The moment somebody said they would do this is a fact, and
 		// rewriting the set to add one release would move every date in it to
 		// today.
 		if have[id] {

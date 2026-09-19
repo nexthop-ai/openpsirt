@@ -74,7 +74,7 @@ type Changed struct {
 
 // Comparison is what changed between two builds.
 //
-// What left the affected list is two sets, not one. An upgrade, a carried
+// Two sets leave the affected list, not one. An upgrade, a carried
 // patch, a component no longer shipped and a flaw declared fixed are fixes. A
 // bump that carried the issue with it, a record taken back, and a closure
 // nothing explains are not — the last of those means the scanner stopped

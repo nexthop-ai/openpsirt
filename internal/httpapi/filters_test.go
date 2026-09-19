@@ -194,7 +194,7 @@ func TestAssignedToMeMeansMineOrMyTeams(t *testing.T) {
 }
 
 func TestTheOutcomeFilterAnswersForWhatStandsNotWhatWasProposed(t *testing.T) {
-	// Asking what has been dismissed is asking what this deployment's answer
+	// A request for what has been dismissed is a request for this deployment's answer
 	// is. A claim still waiting for a second person is not an answer yet, and
 	// counting it as one lets a single person put their own proposal into the
 	// number the question was asked about.

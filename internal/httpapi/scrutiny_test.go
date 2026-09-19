@@ -155,7 +155,7 @@ func TestAClaimCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 			t.Fatalf("something already covers more than it was agreed to cover: %+v", out.Grew)
 		}
 
-		// What the approver actually agreed to, made smaller than what the
+		// The reach the approver actually agreed to, made smaller than what the
 		// claim reaches. A second build would do this the way a deployment
 		// does, and what is being pinned is the comparison rather than the
 		// route by which the two came apart.

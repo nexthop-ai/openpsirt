@@ -117,7 +117,7 @@ const (
 	//
 	// The decision stands: a third party's claim never becomes ours, and a
 	// publisher changing their mind does not withdraw somebody's judgment.
-	// What this says is that the ground moved under a dismissal approved
+	// It says the ground moved under a dismissal approved
 	// on the strength of it, which is a condition about evidence rather
 	// than an event about a person — the same shape as a build that
 	// stopped being scanned, and it clears the same way, when the decision
@@ -680,7 +680,7 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject, id int6
 	// so zero here means it is not theirs or does not exist — which are
 	// the same answer on purpose.
 	//
-	// Which is only true because the update does not also require it to be
+	// That holds only because the update does not also require it to be
 	// unread. With that condition, acknowledging something twice reported
 	// zero and was refused — so a second click, or a click racing the
 	// button that clears everything, answered "no notification of yours by

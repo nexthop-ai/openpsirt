@@ -22,7 +22,7 @@ import (
 // run and nothing tells the two apart; sent always, fifty-one messages saying
 // nothing teach somebody to filter the fifty-second.
 //
-// What goes out is the fact and a link, never the rows. The same rule an
+// The fact and a link go out, never the rows. The same rule an
 // outbound notification already holds to, for a stronger reason here: one of
 // these is a list of places a security control failed, and a condition that
 // carried it would put that list wherever the channel goes.

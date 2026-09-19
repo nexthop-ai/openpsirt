@@ -312,7 +312,7 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		return nil, fmt.Errorf("read what is critical on a release: %w", err)
 	}
 
-	// Who may act on each product, at each visibility. Read once rather than
+	// The people who may act on each product, at each visibility. Read once rather than
 	// per row: a release with a thousand criticals would otherwise ask the
 	// same question a thousand times. This one goes to whoever may triage,
 	// because reading alone is not enough — interrupting somebody who cannot

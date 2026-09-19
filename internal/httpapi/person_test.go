@@ -36,7 +36,7 @@ func TestOnlyAnAdministratorReadsAPersonWhole(t *testing.T) {
 	})
 }
 
-// What somebody was told is not narrowed by what they may read now — that is
+// The record of what somebody was told is not narrowed by what they may read now — that is
 // the whole point of asking — but it is still only an administrator who may
 // ask. The narrowing that does apply is on the area they read themselves,
 // which is pinned in the notify package.

@@ -226,7 +226,7 @@ func TestTheWriterThatLosesTheRowReportsWhatItActuallyReplaced(t *testing.T) {
 				lost.attempts)
 		}
 
-		// What is stored is the loser's value: it wrote last, and it wrote
+		// The stored value is the loser's: it wrote last, and it wrote
 		// knowing what it was replacing.
 		stored, found, err := stores[0].Get(ctx, TriageFloor)
 		if err != nil || !found {

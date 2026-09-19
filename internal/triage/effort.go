@@ -13,7 +13,7 @@ import (
 
 // Spent is what the work went into, for one component in one product.
 //
-// Where the effort went, not how much there is. Every other figure here
+// The destination of the effort, not the amount of it. Every other figure here
 // counts the backlog — what is open, what is overdue, how long things wait.
 // None of them answers the question a manager asks at a planning meeting:
 // what did the last quarter actually go into. Read from the record, because
@@ -70,7 +70,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		Join(`JOIN "product" AS "p" ON p.id = de.product_id`).
 		// The argument, which is where an outcome lives.
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		// What the judgment was about, reached through the findings at the
+		// The judgment's subject, reached through the findings at the
 		// place — the same correlation the record's own component filter
 		// makes. A judgment about something since removed matches nothing and
 		// keeps its row, which is what a report about where the time went has
@@ -94,7 +94,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
 		ColumnExpr(`COUNT(DISTINCT de.id) AS "decisions"`).
 		ColumnExpr(`COUNT(DISTINCT de.proposed_by) AS "people"`).
-		// What came out of them, each counted as claims: the outcome is the
+		// The upgrades that came out of them, each counted as claims: the outcome is the
 		// claim's, and counting its rows would weigh a judgment by how far
 		// its component happens to fan out.
 		ColumnExpr(`COUNT(DISTINCT CASE WHEN cl.outcome IN (?) THEN de.claim_id END)`+

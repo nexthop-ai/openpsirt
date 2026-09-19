@@ -177,7 +177,7 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 // and the whole point of it is that the contents cost a walk rather than a
 // structure per component.
 //
-// What it costs is the duplicate-identifier refusal, which a header read no
+// The cost is the duplicate-identifier refusal, which a header read no
 // longer makes: a document carrying one is answered 202 and fails later in the
 // background reader. That is already how the other two formats behave, and a
 // fault reported at two different times depending on which format a build
@@ -507,7 +507,7 @@ func (c *reader) resolveUpstream() {
 		if !seen {
 			continue
 		}
-		// What is already there may be a qualifier rather than a
+		// The value already there may be a qualifier rather than a
 		// description. Where no pedigree is stated the upstream name is
 		// taken from the package identifier, which carries a name and no
 		// version in 459 of 535 cases — and the version is what expiry

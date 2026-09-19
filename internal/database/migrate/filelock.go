@@ -23,7 +23,7 @@ import (
 // remove, and every start afterwards refuses for a reason that is no longer
 // true.
 //
-// What this buys is not integrity. Four processes migrating one file with
+// This buys ordering rather than integrity. Four processes migrating one file with
 // no lock were run: one applied the schema and three failed, with "no such
 // table: goose_db_version; table goose_db_version already exists". Nothing was
 // corrupted and the schema ended correct. What the lock changes is that the

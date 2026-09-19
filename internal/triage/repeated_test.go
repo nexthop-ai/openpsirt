@@ -50,7 +50,7 @@ func (f *fixture) putOffAt(t *testing.T, product int64, place string, from, unti
 	t.Helper()
 	// Every decision belongs to a claim, even one covering a single place, so
 	// the report reads the same rows a real deferral produces.
-	// What it says is the claim's; where it lands is the row's.
+	// The words are the claim's; the landing place is the row's.
 	claim := &triage.Claim{
 		Kind: triage.FindingClaim, ProposedBy: f.proposer, ProposedAt: from,
 		Outcome: triage.Deferred, DeferredUntil: &until,

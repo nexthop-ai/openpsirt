@@ -85,14 +85,14 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 	existing, err := s.StreamByName(ctx, productID, name)
 	switch {
 	case err == nil:
-		// Whether a line moves is not something that can quietly change. A tag
+		// A line's movement is not something that can quietly change. A tag
 		// that became a branch would make everything filed against it as a
 		// frozen point into something that is rebuilt nightly.
 		if existing.Kind != kind {
 			return nil, false, fmt.Errorf("%q: %w: it was declared as a %s, not a %s",
 				name, ErrDiffers, existing.Kind, kind)
 		}
-		// Saying it was cut from a *different* branch is a change, and a
+		// A claim that it was cut from a *different* branch is a change, and a
 		// contradiction: a tag is one frozen point and it came from wherever
 		// it came from.
 		if parentID != nil && existing.ParentID != nil && *existing.ParentID != *parentID {
@@ -143,7 +143,7 @@ func (s *Store) ensureVariant(ctx context.Context, productID int64, name string,
 	existing, err := s.VariantByName(ctx, productID, name)
 	switch {
 	case err == nil:
-		// Whether something reaches customers feeds how its findings rank, so
+		// A thing's reach to customers feeds how its findings rank, so
 		// a change here changes what people are told to work on first. It is a
 		// decision somebody should make deliberately rather than a field a
 		// pipeline overwrites on its next run.
@@ -232,7 +232,7 @@ func (s *Store) Variants(ctx context.Context, subject access.Subject, productID 
 // BuiltAs lists the variants a release has actually been built as, which is a
 // subset of what the product builds: a release predating a variant has no row
 // for it, and one that stopped being built as something keeps its history.
-// Which product the release belongs to is read here rather than accepted, for
+// The product the release belongs to is read here rather than accepted, for
 // the reason its counterpart over findings gives: a caller that can name the
 // product can name a different one, and then the check is answering a question
 // nobody asked. It is correct at every call site today, which is exactly the

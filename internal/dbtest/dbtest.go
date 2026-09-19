@@ -109,7 +109,7 @@ func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
-// What qualifies is a test that changes something the whole process shares —
+// A test qualifies where it changes something the whole process shares —
 // an environment variable, the working directory — rather than one that is
 // merely delicate. Everything else uses Each: the databases are already
 // separate, and a test that needs the rest of the package held still usually

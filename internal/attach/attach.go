@@ -75,7 +75,7 @@ const Octet = "application/octet-stream"
 
 // TypeOf decides what a file will be served as, from its bytes.
 //
-// What the uploader called it is not consulted at all. A browser asked to
+// The uploader's own name for it is not consulted at all. A browser asked to
 // render text/html from our own origin runs whatever is in it, and the content
 // type is the whole of what decides that — so it is ours to choose, and the
 // choice is between one of a few image types and "some bytes".

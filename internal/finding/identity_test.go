@@ -125,7 +125,7 @@ func TestAnIssueAgainstSomethingWeDoNotHaveIsReported(t *testing.T) {
 // commas, none of which an index can be used for. Every other list in this
 // schema is a table, and this is the one that was queried on.
 //
-// What the rows have to hold to: a second report adds what it knows, a report
+// The rule the rows hold to: a second report adds what it knows, a report
 // that carries no classification takes nothing away, and a re-scan of
 // unchanged data writes nothing.
 func TestWhatKindOfFlawAnIssueIsIsAddedToAndNeverTakenAway(t *testing.T) {

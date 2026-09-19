@@ -201,7 +201,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		writes := make([]int, len(asked))
 		holds := make([]int, len(asked))
 		sits := 0
-		// How many places the act has reached so far, charged as each build
+		// The places the act has reached so far, charged as each build
 		// resolves.
 		seen := 0
 		reached := make([][]finding.Deciding, len(asked))

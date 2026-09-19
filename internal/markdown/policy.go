@@ -70,7 +70,7 @@ const Issue = "issue"
 //   - And `<https://example.com>` — the standard way to write a bare link —
 //     looks exactly like a markup tag to a pattern, so honest text is refused.
 //
-// Asking the parser removes the whole class. What is checked here is what will
+// Asking the parser removes the whole class. The check here is over what will
 // be rendered, because it is the same parse.
 func inspect(source string) []Fault {
 	document := parser.Parser().Parse(text.NewReader([]byte(source)))
@@ -400,7 +400,7 @@ func referenced(source, scheme string, shaped func(string) bool) []string {
 // all of this shape, and a list of the ones we have heard of would refuse a
 // reference to an issue this deployment already holds.
 //
-// What it exists to refuse is a destination that is not an identifier at all:
+// It exists to refuse a destination that is not an identifier at all:
 // a path, an authority, anything carrying a slash or a colon. Bounded, because
 // an identifier is a name rather than a document.
 func namedIssue(value string) bool {
@@ -459,7 +459,7 @@ var mention = regexp.MustCompile(`(^|[^\w@.:-])@([A-Za-z0-9][A-Za-z0-9._:@-]{0,1
 // written — is not one. Somebody pasting a log line that happens to contain an
 // @ has not called for anybody.
 //
-// What comes back is what was typed, not who it is. Whether a name is
+// It answers with what was typed, not with who it is. Whether a name is
 // somebody, and whether the reader may know that, is a question for the data
 // layer; this only says what the text says.
 func Mentions(source string) []string {

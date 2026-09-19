@@ -17,11 +17,11 @@ import (
 // Measures are the numbers about how this deployment is working, as opposed to
 // what it holds.
 //
-// Every one of them is already in the record and none was ever added up.
-// How long a finding waits before anybody says anything, how long a claim waits
-// for a second person, and how much each person actually got through: three
-// questions a manager asks constantly, and the answer to all three was a screen
-// somebody counted rows on.
+// Every one of them is in the record already and none of them is added up
+// anywhere else. The wait before anybody says anything, the wait for a second
+// person, and each person's own throughput: three questions a manager asks
+// constantly, and without this the answer to all three is a screen somebody
+// counts rows on.
 //
 // The arithmetic happens here rather than in SQL. Subtracting two moments
 // is spelled four ways across the engines this runs on — `julianday`, `EXTRACT
@@ -257,7 +257,7 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	}
 	out.Throughput = worked
 
-	// How much came back. Sending a claim back is the approver's other answer
+	// The claims that came back. Sending a claim back is the approver's other answer
 	// and nothing counted it, so a queue that is moving because claims are
 	// good and one that is moving because nobody reads them looked alike.
 	back := s.db.NewSelect().TableExpr(`"decision" AS "de"`).

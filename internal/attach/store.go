@@ -98,7 +98,7 @@ func visibilityOf(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 	if err != nil {
 		return access.Private, false, fmt.Errorf("read how disclosed an issue is: %w", err)
 	}
-	// Whether the issue is here at all, answered separately from how disclosed
+	// The issue's presence here at all, answered separately from how disclosed
 	// it is. Without it, "no undisclosed findings" and "no findings" were the
 	// same answer — so an issue that is not in this product read as public
 	// here and any reader of any product could confirm, one request at a time,

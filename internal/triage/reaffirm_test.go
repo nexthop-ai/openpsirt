@@ -57,7 +57,7 @@ func TestReAffirmingAfterABumpNeedsNoSecondPerson(t *testing.T) {
 }
 
 func TestSeverityRisingSendsItBackForFullApproval(t *testing.T) {
-	// What was agreed to was that this did not matter much. That is not an
+	// The agreement was that this did not matter much. That is not an
 	// agreement about what it has become.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -162,7 +162,7 @@ func TestALapsedClaimNobodyAgreedToIsNotPreAgreed(t *testing.T) {
 		// first: what this test is named for is that a lapse is not an
 		// agreement, and at 700 it was the severity arm that refused.
 		neverAgreed := f.judged(t, f.at(), finding.SeverityScore("high"))
-		// What Lapse does to it when the versions move, without standing up a
+		// Lapse's own effect when the versions move, without standing up a
 		// scan to move them.
 		if _, err := f.db.DB.NewUpdate().Model((*triage.Decision)(nil)).
 			Set("state = ?", triage.LapsedState).

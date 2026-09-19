@@ -98,7 +98,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			return err
 		}
 
-		// Whether this build reaches customers, read once. A critical in
+		// This build's reach to customers, read once. A critical in
 		// something only the build system runs matters less than a medium in
 		// what people install, and that is a property of the build rather than
 		// of any finding in it.
@@ -380,7 +380,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		}
 
 		var closing []Finding
-		// Where the same issue is still wanted at the same place, this row is
+		// With the same issue still wanted at the same place, this row is
 		// being superseded by one against a new version rather than resolved.
 		wantedAt := map[at]bool{}
 		for _, f := range wanted {

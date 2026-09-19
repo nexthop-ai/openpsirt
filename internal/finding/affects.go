@@ -17,7 +17,7 @@ import (
 
 // ErrNotOursToSay is what an issue a scanner reported answers.
 //
-// Which builds hold one of those is a fact the scans establish, and editing it
+// The builds holding one of those is a fact the scans establish, and editing it
 // here would be overwriting what was found with what somebody thinks. A flaw
 // recorded by hand has no scan behind it, which is exactly why its build set
 // is ours to correct.

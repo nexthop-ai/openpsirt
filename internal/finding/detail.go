@@ -294,7 +294,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	}
 	evidence.FixState = agreedFixState(least, most)
 	evidence.FixedIn = agreedFixedIn(least, most, rows[0].FixedIn)
-	// Whether anything upstream would close any of these places. Asked of both
+	// An upstream release that closes any of these places. Asked of both
 	// ends here rather than of the word above, because that word is "mixed"
 	// wherever the places disagree — which is not a state upstream is ever in,
 	// and reading it as one says a supported release is past its end of life.

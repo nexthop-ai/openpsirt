@@ -203,7 +203,7 @@ func TestAnUnscoredFindingExportsWithNoScoreRatherThanAZero(t *testing.T) {
 // what a manager reports a backlog from, and the by-component view is what a
 // release meeting argues over — all three were copied out by hand.
 //
-// What each has to get right is the same thing the findings export does: the
+// Each has to get right the same thing the findings export does: the
 // subject travels through the stream, so a file never holds more than the
 // screen it came from.
 func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {

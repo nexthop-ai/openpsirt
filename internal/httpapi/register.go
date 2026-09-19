@@ -90,7 +90,7 @@ func measuredWith(ctx context.Context, in Ingest, subject access.Subject,
 			measured.RanAt = last.FinishedAt.UTC().Format(time.RFC3339)
 		}
 	}
-	// What arrived rather than what is still held, so a build whose contents
+	// The documents that arrived rather than the ones still held, so a build whose contents
 	// were let go still names the inventory it was read from.
 	sent, err := ingest.NewDocuments(in.DB.DB).Sent(ctx, []int64{scan.ID})
 	if err != nil {

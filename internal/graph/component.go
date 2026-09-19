@@ -244,7 +244,7 @@ func decoded(s string) string {
 // write thousands of rows, which is the one thing the interval shape exists to
 // prevent.
 //
-// Which build this was is not lost by dropping it. That is what the scan
+// The build this belongs to is not lost by dropping it. That is what the scan
 // record holds: when it was built, what it hashed to, and who sent it.
 func (d Described) AsRoot() Described { return Described{Name: d.Name} }
 
@@ -255,7 +255,7 @@ func (d Described) AsRoot() Described { return Described{Name: d.Name} }
 // a broken file, and refusing it would throw away every other component in the
 // document alongside it.
 //
-// What a component with no version costs is matching — nothing can say whether
+// A component with no version costs matching — nothing can say whether
 // a vulnerability applies to a version nobody stated. It still ships, so it is
 // better held and visible than dropped.
 func (d Described) Valid() error {
@@ -494,7 +494,7 @@ func PartsOfPurl(purl string) Parts {
 
 // FoldKey is the key the binary packages of one source package share.
 //
-// What it groups. A distribution cuts many binary packages from one source
+// The grouping it makes. A distribution cuts many binary packages from one source
 // package and they move together: curl, libcurl4t64 and libcurl3t64 are one
 // bump, and treating them as three is three acts that can disagree with each
 // other. The key is what makes them one row, one judgment and one upgrade.

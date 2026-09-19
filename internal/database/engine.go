@@ -170,7 +170,7 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// deduplicated, so naming a mode the server already holds changes
 		// nothing.
 		//
-		// How many rows an update touched has to mean the same thing on
+		// The rows an update touched have to mean the same thing on
 		// every engine. By default these two report how many rows the update
 		// *changed*, where the other two report how many it *matched*. Several
 		// writes here are conditional — set this state, but only if the row is
@@ -178,7 +178,7 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		// out whether the condition held. Under the default a write whose
 		// condition held but whose values happened to already be correct
 		// reports zero, and the caller reports a conflict that did not happen.
-		// Asking for matched rows makes the count answer the question that is
+		// A request for matched rows makes the count answer the question that is
 		// actually being asked, identically everywhere.
 		//
 		// The transport is negotiated rather than left off. This driver

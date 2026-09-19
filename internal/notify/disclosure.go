@@ -165,7 +165,7 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		Where("f.closed_at IS NULL").
 		Where("f.disclose_at IS NOT NULL").
 		Where("f.disclose_at <= ?", time.Now().UTC().Add(lead)).
-		// Where a lead time is given this is the *coming* ones only: what has
+		// With a lead time given this is the *coming* ones only: what has
 		// already arrived is the other condition, and one row raising both
 		// would be told twice about one thing.
 		Where(func() string {
@@ -190,7 +190,7 @@ func (w *Watch) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		return nil, fmt.Errorf("read who may hear about this: %w", err)
 	}
 	private := map[int64]map[int64]bool{}
-	// Who a party is. The assignment column holds a party rather than a
+	// The party itself. The assignment column holds a party rather than a
 	// person , and a notification goes to somebody, so the two are mapped
 	// in one place rather than at each use.
 	whose := make(map[int64]int64, len(people))

@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// What became of what somebody proposed.
+// The fate of what somebody proposed.
 //
 // Approval stays silent, and the reasoning for that survives: an approval is
 // the expected outcome and a message per approval is a channel people stop

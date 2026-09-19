@@ -491,7 +491,7 @@ func TestAssigningCoversEveryBuildOfTheProductHoldingIt(t *testing.T) {
 }
 
 func TestTakingUnownedWorkIsTriageAndGivingItAwayIsNot(t *testing.T) {
-	// Deciding who deals with something is a different act from deciding
+	// Handing work to somebody is a different act from deciding
 	// what it is, so it asks for a different right — with the exception
 	// that keeps the common case unblocked: findings arriving under an
 	// already-assigned component start unowned, so there is a constant

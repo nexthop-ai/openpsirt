@@ -25,7 +25,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64, wan
 	}
 
 	nodeIDs := make(map[int64]int64, len(wanted))
-	// Whether each kept node is the build's root, which the scan just said and
+	// Each kept node's root flag, which the scan just said and
 	// the row may disagree with. Only ever written on an insert, a component
 	// promoted to the top of a graph it was already in kept its old answer —
 	// and the build then reported no root of its own.

@@ -15,7 +15,7 @@ import (
 // document meant to be pasted into a customer release note, one deliberately
 // bypasses the visibility check, and one stores a shared signing secret.
 //
-// What each needs is the same pair — the success shape, and a subject holding
+// Each needs the same pair — the success shape, and a subject holding
 // none of the declared roles refused with the exact status — so they are one
 // table, with the cases that are particular to a route written out beneath it.
 

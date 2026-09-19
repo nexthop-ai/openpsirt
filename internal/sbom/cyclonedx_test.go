@@ -492,7 +492,7 @@ func TestMoreEdgesThanAllowedAreRefused(t *testing.T) {
 }
 
 func TestTheHeaderReadsWithoutTheContents(t *testing.T) {
-	// What an arriving scan is judged on — when it was built, what it is, and
+	// The fields an arriving scan is judged on — when it was built, what it is, and
 	// the identity that joins it to anything produced from it — is answered
 	// without parsing components, whatever order the producer wrote its keys
 	// in.

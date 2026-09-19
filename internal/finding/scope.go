@@ -23,7 +23,7 @@ import (
 // The levels are independent. A variant belongs to the product rather than to
 // one branch of it, so "this product, every branch, this variant" is a real
 // question — what a product is built as, across everything still being built.
-// What cannot happen is a branch or variant without a product, which the
+// A branch or variant without a product cannot happen, which the
 // interface prevents by leaving those unselectable and the caller refuses
 // rather than guessing which product was meant.
 type Scope struct {

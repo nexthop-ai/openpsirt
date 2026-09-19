@@ -50,7 +50,7 @@ func (f *fixture) claims(t *testing.T, at triage.Place) *triage.Decision {
 		Justification: triage.CodeNotInExecutePath,
 		Reasoning:     "The parser is never reached: we only call the encoder.",
 		By:            f.proposer,
-		// What a caller works out through NeedsApproval and passes in.
+		// The value a caller works out through NeedsApproval and passes in.
 		// Dismissing something as not applicable hides risk, so it waits.
 		NeedsApproval: true,
 	})
@@ -925,7 +925,7 @@ func TestNobodySendsTheirOwnWordsBack(t *testing.T) {
 func TestAnApprovalKeepsWhatItCoveredAtTheTime(t *testing.T) {
 	// A decision reaches by matching, so it covers more as builds appear —
 	// with nobody acting, and nobody having agreed to the larger number.
-	// Asking later what it covers answers a different question from what
+	// Its reach asked later answers a different question from what
 	// somebody consented to, and only one of the two survives if it is not
 	// written down when it happens.
 	each(t, func(t *testing.T, f *fixture) {

@@ -102,16 +102,16 @@ type spdx3Element struct {
 	purl    string
 	cpe     string
 
-	// What a creation-information element states.
+	// A creation-information element's own fields.
 	created     string
 	specVersion string
 
-	// What a document or an inventory element points at, and which creation
+	// The elements a document or an inventory element points at, and the creation
 	// information it was made under.
 	rootElements []string
 	creationInfo string
 
-	// What a relationship states.
+	// A relationship's own fields.
 	from  string
 	to    []string
 	kinds string

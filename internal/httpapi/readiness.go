@@ -139,7 +139,7 @@ func registerReadiness(api huma.API, in Ingest) {
 			out.Body.Shipped = &shipped
 		}
 
-		// What the count is made of. The same reader the findings list uses,
+		// The work behind the count. The same reader the findings list uses,
 		// with the same line and the same narrowing, so the list this opens
 		// is the list this counts.
 		scope := finding.Scope{

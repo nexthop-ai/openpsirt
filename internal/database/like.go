@@ -29,7 +29,7 @@ const LikeClause = ` ESCAPE '` + LikeEscape + `'`
 // "50%", not every name containing "50" — and "a_b" means what it says rather
 // than "a, anything, b".
 //
-// What it cost where it was missing: the picker that decides who may be named
+// The cost of its absence: the picker that decides who may be named
 // on an embargoed case answered a term of "%" with every eligible person in
 // the deployment, in one request.
 func LikeEscaped(value string) string {

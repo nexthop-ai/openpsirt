@@ -194,7 +194,7 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 // every name beginning with it followed by " on ". That covers a role, which is
 // per product, and a change recorded against the bare name.
 //
-// What LIKE treats as special is escaped. An identity is an email address
+// Everything LIKE treats as special is escaped. An identity is an email address
 // and "_" is a wildcard, so `a_b@example.com` would otherwise match
 // `axb@example.com` and report somebody else's history as this person's. The
 // escape character is "#" rather than a backslash, because a backslash inside a

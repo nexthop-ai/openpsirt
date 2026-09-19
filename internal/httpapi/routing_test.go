@@ -209,7 +209,7 @@ func TestARuleSaysWhatItWouldCatchBeforeItIsSaved(t *testing.T) {
 				starred.Total, starred.Components)
 		}
 
-		// What SQL treats as special does not leak through. A pattern with no
+		// Nothing SQL treats as special leaks through. A pattern with no
 		// star is matched exactly, so an underscore is an underscore.
 		if literal := r.preview(t, "beneath=libcurl_t64"); literal.Total != 0 {
 			t.Errorf("an underscore matched as a wildcard: %+v", literal.Components)

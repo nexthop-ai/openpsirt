@@ -21,7 +21,7 @@ func init() {
 // number we quote, which is exactly what keeping the layers apart exists to
 // prevent.
 //
-// What it adds over the scan is the reasoning. The status is in the fix
+// It adds the reasoning over the scan. The status is in the fix
 // state already; what a triager otherwise types from memory, and an approver
 // has no way to check, is *why* a distribution reached its answer.
 //

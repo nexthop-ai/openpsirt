@@ -220,7 +220,7 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
 	if err != nil {
 		return nil, 0, err
 	}
-	// What would make an approver disagree. Read for the whole page in two
+	// The case against agreeing. Read for the whole page in two
 	// statements, because a card that costs two round trips is a card that
 	// ends up carrying less than it should.
 	against, err := s.counters(ctx, subject, representatives)

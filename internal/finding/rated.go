@@ -73,7 +73,7 @@ func RatingIn(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64)
 
 // productsHolding is every product with an open finding of this issue.
 //
-// What "wherever this ranks" means once a rating belongs to a product: a
+// The meaning of "wherever this ranks" once a rating belongs to a product: a
 // signal that moved for the issue moves the order in each of them, and each
 // reads its own rating to work out what the order now is.
 func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]int64, error) {

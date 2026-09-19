@@ -222,7 +222,7 @@ func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
 	// release fixed, the version that closes everything sorts near the bottom
 	// and the picker recommends against itself.
 	//
-	// What each release fixed and what reaching it closes are two counts. The
+	// Each release's own fixes and what reaching it closes are two counts. The
 	// second needs the ecosystem's ordering, which is why it is answered here
 	// rather than left for somebody to work out from a list.
 	each(t, func(t *testing.T, f *fixture) {

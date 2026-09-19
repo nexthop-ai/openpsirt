@@ -9,7 +9,7 @@ import (
 )
 
 func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
-	// Whether a publisher's judgment reaches a finding is an equality test
+	// A publisher's judgment reaching a finding is an equality test
 	// on three columns. Spelled as a LOWER() the engine performs, the four do
 	// not agree: SQLite folds ASCII and nothing else, so a component named
 	// with any letter outside it matches on three engines and not on the

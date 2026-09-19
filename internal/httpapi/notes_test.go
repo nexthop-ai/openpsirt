@@ -268,7 +268,7 @@ func TestTheQueueAndHoldingsNarrowToOneProduct(t *testing.T) {
 		// than reading: an estate reader has nothing waiting on them however it
 		// is narrowed, so asserting through one proves nothing.
 		//
-		// What this half shows is that narrowing to the product holding the
+		// This half shows that narrowing to the product holding the
 		// claim keeps it, and that a product the approver cannot act in is
 		// refused. It cannot show a claim being *excluded*, because the only
 		// approver here holds one product — that half is shown by the holdings

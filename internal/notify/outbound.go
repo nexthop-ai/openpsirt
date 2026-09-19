@@ -192,7 +192,7 @@ func (s *Signal) Once(ctx context.Context) (sent, failed int, err error) {
 func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error) {
 	var rows []Notification
 	q := s.db.NewSelect().Model(&rows).
-		// What is worth saying is what is still true or still unread. A
+		// Only what is still true or still unread is worth saying. A
 		// cleared condition is not news, and an event nobody has yet been
 		// told about outside is.
 		Where("nt.cleared_at IS NULL").

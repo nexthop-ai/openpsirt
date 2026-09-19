@@ -1,6 +1,6 @@
 //go:build measure
 
-// What an unbounded bulk promise costs, measured rather than assumed.
+// The cost of an unbounded bulk promise, measured rather than assumed.
 //
 // A bulk judgment is bounded and a promise to upgrade is not, because the next
 // scan re-checks every row a promise names. Removing the bound moves the

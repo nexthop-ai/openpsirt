@@ -254,7 +254,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// Safe as an aggregate, because the grouping below refuses a component
 		// whose places disagree about the outcome.
 		ColumnExpr(`MIN(cl.outcome) AS "outcome"`).
-		// Which decision the words come from, rather than the words.
+		// The decision the words come from, rather than the words.
 		//
 		// The earliest of them, which is the claim that has stood longest
 		// about this component: where several places were decided separately
@@ -344,7 +344,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		Timestamp: moment, Version: 1,
 		Statements: make([]Statement, 0, len(rows)),
 	}
-	// What else each issue is called. The whole point of the field is that
+	// The other names each issue goes by. The whole point of the field is that
 	// a customer's scanner matched under the name *its* database uses,
 	// which is often not the one we filed under — a later CVE for a flaw
 	// first reported under a vendor identifier, or the reverse. A document

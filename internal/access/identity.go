@@ -215,7 +215,7 @@ func (s *Store) MatchProvider(ctx context.Context, provider, subject, username s
 		if err != nil {
 			return nil, fmt.Errorf("pin %q: %w", username, err)
 		}
-		// Whether this pinned it is the whole question. Two arrivals can reach
+		// The pinning is the whole question. Two arrivals can reach
 		// here at once holding different identifiers, and exactly one may
 		// redeem the authorization — so the one whose update matched nothing
 		// is somebody else, and is refused rather than admitted on the
