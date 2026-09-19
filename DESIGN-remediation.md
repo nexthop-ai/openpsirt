@@ -127,24 +127,68 @@ There are no per-item due dates. A deadline comes from how urgent the finding is
 threshold, and the deferral date becomes the effective target. Deferred items are
 reported apart from plainly overdue ones. **A plan says where, not when.**
 
-A finding with no deadline states which of exactly three reasons applies:
+**The clock starts at the latest of three moments, never the earliest and never
+now**: when the finding was first seen here, when exploitation was learned, and
+when the fix became available. All three have passed, so recounting reaches the
+same answer every time — which is what keeps a deadline from restarting nightly
+and never arriving.
 
-| Reason | Precedence |
+| Case | Counted from |
 |---|---|
-| Below the line its product triages at | The narrowest statement about this finding, so it is the one stated |
-| **Its release is a tag, so it cannot change** | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
-| Its release is past end-of-life (REQ-15) | |
+| The fix already existed when the finding opened | The sighting. The ordinary case, and the response time genuinely is from when it was learned |
+| The flaw was seen before upstream released anything | **The fix.** Counting from the sighting sets a deadline against a version that did not exist, which is the common case for an inventory made of distribution packages |
+| The issue became exploited later | The learning. Counted from the opening, an issue exploited after six months lands three days before anybody knew |
 
-There is no fourth reason, because a deadline is worked out at ingest for
+A finding with no deadline states which reason applies:
+
+| Reason | Reported as | Precedence |
+|---|---|---|
+| Below the line its product triages at | `below-the-line` | The narrowest statement about this finding, so it is the one stated |
+| **Upstream has released no fix, or has declined to** | `nothing-to-take` | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
+| **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
+| Its release is past end-of-life (REQ-15) | `out-of-support` | |
+
+**Four reasons and three words.** A tag reports as out of support, which is not
+what it is — a supported tag carries no deadline for a more fundamental reason
+than a retired one does. Stated here rather than left as a difference between
+this table and the wire, and a word of its own is worth adding the day somebody
+needs to tell the two apart.
+
+There is no further reason, because a deadline is worked out at ingest for
 everything else. Left blank, the column reads as missing data on the one screen
 whose purpose is noticing what is running out.
 
+**A deadline nobody can meet is not a deadline**, which is the one statement all
+four make. Where upstream has released nothing there is no version to take, and
+the only act that stops the clock is a person recording a judgment — which is
+the act the deadline exists to ask for and cannot be the answer to. An overdue
+list carrying rows no upgrade would answer is one people stop reading, and what
+they stop reading is the rest of it.
+
+How much of a real overdue list that is has not been measured here. The
+proportion belongs beside this rule once somebody has it from a deployment, and
+it is left out rather than estimated: a figure nobody can re-run is one a reader
+has to take on trust, which is the opposite of what a number is for.
+
+**A scanner that did not answer is not upstream saying no.** Reading silence as
+"no fix exists" is a claim about the world made out of a gap in a report, and it
+is the direction that loses a deadline somebody could have met. So an unstated
+fix state stays on the clock.
+
+**This cuts overdue counts, and that is a correction rather than an
+improvement.** Anyone tracking the figure should be told why it moved. What it
+does not do is flatter a response time: if a two-year-old issue was genuinely
+learned of today, the response time is from today, and the accusation hiding in
+the objection — that we should have known sooner — is a question about scanning
+coverage rather than about where a clock starts.
+
 What has no deadline is absent from every figure built on one, which is the
 point and also the gap: nothing overdue, nothing due soon, and nothing in the
-compliance rate. Two of the three reasons already have somewhere to be seen —
-the line is stated wherever a list hides something, and a tag's findings are
-read at the release. The third does not, so releases out of support are a report
-of their own; `DESIGN-reporting.md` holds it.
+compliance rate. Three of the reasons already have somewhere to be seen — the
+line is stated wherever a list hides something, a tag's findings are read at the
+release, and what upstream has done is a column of the findings list and a
+filter over it. End-of-life does not, so releases out of support are a report of
+their own; `DESIGN-reporting.md` holds it.
 
 A tag was built once and is what somebody received. No work will land in it
 whatever a date says, so a deadline on one was unmeetable the moment it was
@@ -154,7 +198,11 @@ deployments accumulate tags while branches do not, so that side grows — and it
 inflates every overdue count, the compliance rate among them.
 
 The reason is derived rather than stored, and derived where the triage line is
-applied, so the two cannot disagree.
+applied, so the two cannot disagree. The deadline itself is stored, because
+deriving it costs a pass over every open finding per urgency band — and it is
+rewritten whenever the answer moves rather than only when the ranking does, so
+a fix appearing upstream starts a clock that was not running and a fix withdrawn
+stops one.
 
 ## Pending upgrades
 

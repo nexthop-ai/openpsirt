@@ -67,6 +67,24 @@ type Similar = Body<"SimilarBody">;
 // not carry is which place each was at, and reaffirming one needs the place.
 const SAMPLE = 8;
 
+// Why a finding carries no deadline, in words a reader can act on.
+//
+// Each says what to do with the row rather than naming the rule: somebody
+// reading this is deciding whether to look further, and "below the line" on
+// its own is a term they would have to go and learn.
+function whyNone(reason: string | undefined): string {
+  switch (reason) {
+    case "below-the-line":
+      return "below what this product triages at. Recorded and counted; nothing is late.";
+    case "nothing-to-take":
+      return "upstream has released no fix, or has declined to, so there is no version that would close it.";
+    case "out-of-support":
+      return "the release is past its end of life, so nothing here will be fixed.";
+    default:
+      return "nothing here is late.";
+  }
+}
+
 export function Finding() {
   const {
     product = "",
@@ -458,15 +476,10 @@ export function Finding() {
               )}
             </>
           ) : (
-            // Said rather than left blank: there are exactly two reasons and
-            // both are deliberate, so an empty cell would read as missing data
-            // on the row somebody is deciding about.
-            <>
-              No deadline —{" "}
-              {it.no_deadline === "below-the-line"
-                ? "below what this product triages at. Recorded and counted; nothing is late."
-                : "the release is past its end of life, so nothing here will be fixed."}
-            </>
+            // Said rather than left blank: every reason is deliberate, so an
+            // empty cell would read as missing data on the row somebody is
+            // deciding about.
+            <>No deadline — {whyNone(it.no_deadline)}</>
           )}
           {it.opened && (
             <>

@@ -156,13 +156,13 @@ export function Compliance() {
           </section>
 
           {/* What a rate about deadlines cannot be about, said here rather
-              than left to be discovered. Three populations carry no deadline
-              by design, so none of them is in any figure above — and one of
-              them has a report of its own. */}
+              than left to be discovered. Each of these carries no deadline by
+              design, so none of them is in any figure above — and one of them
+              has a report of its own. */}
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>What is not in these figures</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              Three populations carry no deadline, so nothing about them can be late.
+              These carry no deadline, so nothing about them can be late.
             </p>
             <ul className="files">
               <li>
@@ -171,6 +171,11 @@ export function Compliance() {
               </li>
               <li>
                 <b>Findings in a tag.</b> Tags are built once, so no work lands in them.
+              </li>
+              <li>
+                <b>Findings upstream has released no fix for, or has declined to fix.</b> There is
+                no version that would close them, so the only thing that could stop the clock is
+                somebody recording a judgment — which is the act a deadline exists to ask for.
               </li>
               <li>
                 <b>Findings in a release out of support.</b> That pile has a report of its own —{" "}

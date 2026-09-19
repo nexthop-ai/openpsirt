@@ -500,3 +500,123 @@ func TestMeasureAFixBundlePage(t *testing.T) {
 		t.Logf("%d open, %d fixable, %d bumps", open, fixable, bundles)
 	})
 }
+
+// What the first scan after the deadline rule changed costs.
+//
+// The rule moved the recount from "the ranking moved" to "the answer moved",
+// and a fix arriving upstream moves the answer without touching any ranking
+// signal. So the first night after it lands re-clocks every open finding whose
+// fix landed after it opened — which the design document calls the common case
+// for an inventory made of distribution packages.
+//
+// The per-row update is not new; only the number of rows taking it is. What
+// this answers is whether that number is a cost worth batching for, measured
+// rather than assumed.
+func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		branch, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, branch.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		store := finding.NewStore(db.DB)
+		graphs := graph.NewStore(db.DB)
+		scans := ingest.NewStore(db.DB)
+		statements := &counting{}
+		db.AddQueryHook(statements)
+
+		steady := func(int) string { return "1.0" }
+		built := time.Now().UTC().Add(-96 * time.Hour)
+		// Truncated the way a stored timestamp is, so that a date arriving
+		// unchanged compares unchanged. Left at the wall clock's precision it
+		// differs from what came back out of the database every night, and
+		// every night then looks like the first one.
+		fixArrived := built.Add(36 * time.Hour).Truncate(time.Microsecond)
+		seq := 0
+		night := func(withFixDate bool) (finding.Applied, time.Duration, int64) {
+			seq++
+			built = built.Add(24 * time.Hour)
+			scan, _, err := scans.Record(ctx, ingest.Arriving{
+				TargetID: target.ID, ContentHash: fmt.Sprintf("clock-%d", seq),
+				BuiltAt: built, ParserVersion: "measure",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := graphs.Apply(ctx, target.ID, scan.ID, shape(steady)); err != nil {
+				t.Fatal(err)
+			}
+			run, err := store.Begin(ctx, finding.Run{
+				TargetID: target.ID, Scanner: "measure",
+				ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			reported := reports(steady, 0)
+			if withFixDate {
+				// The fix arrives, dated after the finding opened. One date
+				// for every night that carries it, because a feed reports when
+				// a fix landed rather than a moving offset from today — and a
+				// date that moved nightly would make every night look like the
+				// first one.
+				for i := range reported {
+					if reported[i].FixState == finding.FixedUpstream {
+						at := fixArrived
+						reported[i].FixedAt = &at
+					}
+				}
+			}
+			before := statements.n.Load()
+			start := time.Now()
+			applied, err := store.Apply(ctx, target.ID, run.ID, reported)
+			if err != nil {
+				t.Fatal(err)
+			}
+			took := time.Since(start)
+			issued := statements.n.Load() - before
+			if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
+				t.Fatal(err)
+			}
+			return applied, took, issued
+		}
+
+		opened, _, _ := night(false)
+		t.Logf("opening night: %d findings opened", opened.Opened)
+
+		applied, took, issued := night(true)
+		t.Logf("the night the fix dates arrive: %d updated, %d statements, %s, %s per statement",
+			applied.Updated, issued, took.Round(time.Millisecond),
+			per(took, issued).Round(time.Microsecond))
+
+		// The night after, where nothing has moved at all. The difference
+		// between the two is what the rule change costs once, rather than what
+		// a night costs for ever.
+		//
+		// **It is not zero on every engine, and that is not this rule's
+		// doing.** SQLite writes nothing; PostgreSQL and MySQL rewrite every
+		// fixable row again, and the same measurement taken before this rule
+		// existed says the same thing. What a re-scan of unchanged data writes
+		// is a question about how a timestamp survives a round trip on each
+		// engine, and it is open.
+		steadyApplied, steadyTook, steadyIssued := night(true)
+		t.Logf("the night after: %d updated, %d statements, %s",
+			steadyApplied.Updated, steadyIssued, steadyTook.Round(time.Millisecond))
+	})
+}

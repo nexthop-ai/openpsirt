@@ -128,6 +128,11 @@ type Evidence struct {
 	// data on the one row somebody is deciding about.
 	DueAt      *time.Time
 	NoDeadline NoDeadline
+	// nothingToTake is whether upstream would close any of these places,
+	// worked out where both ends of the group are in hand. Unexported: it
+	// answers one question on the way to NoDeadline above and is not part of
+	// what a detail read reports.
+	nothingToTake bool
 	// OpenedAt is when the earliest of these places first appeared here,
 	// and FoundBy what produced it: which scanner, at which version,
 	// against which vulnerability database.
@@ -286,6 +291,11 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	}
 	evidence.FixState = agreedFixState(least, most)
 	evidence.FixedIn = agreedFixedIn(least, most, rows[0].FixedIn)
+	// Whether anything upstream would close any of these places. Asked of both
+	// ends here rather than of the word above, because that word is "mixed"
+	// wherever the places disagree — which is not a state upstream is ever in,
+	// and reading it as one says a supported release is past its end of life.
+	evidence.nothingToTake = !Closable(FixState(least)) && !Closable(FixState(most))
 	// Any place answers. They all come from one line of a scanner's report,
 	// which the applier writes to every place of the group.
 	evidence.Matched = Matched(rows[0].Matched)
@@ -612,19 +622,24 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		}
 	}
 	// Why there is none, where there is none — derived the way the list
-	// derives it, because the two reasons are exhaustive: the line is a
-	// statement about the rating, and everything else without a deadline
-	// is in a release nothing is going to be fixed in. Where both hold it
-	// says the line, being the narrower statement about this finding
-	// rather than about its release.
+	// derives it, narrowest first: the line is a statement about this
+	// issue's rating, upstream having nothing to take is one about this
+	// finding, and anything else without a deadline is in a release nothing
+	// is going to be fixed in. Where more than one holds it says the
+	// narrower, because a reader told the release is retired learns nothing
+	// they could act on if the rating is what actually put it off the clock.
 	if evidence.DueAt == nil {
 		line, err := FloorFor(ctx, s.db, productID)
 		if err != nil {
 			return nil, err
 		}
-		evidence.NoDeadline = OutOfSupport
-		if !line.Admits(evidence.Exploited, evidence.Severity) {
+		switch {
+		case !line.Admits(evidence.Exploited, evidence.Severity):
 			evidence.NoDeadline = BelowTheLine
+		case evidence.nothingToTake:
+			evidence.NoDeadline = NothingToTake
+		default:
+			evidence.NoDeadline = OutOfSupport
 		}
 	}
 	if opened != nil {

@@ -540,6 +540,25 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 						Set("exploited_learned_at = ?", learnedAt).
 						Set("due_at = ?", learnedAt.Add(windows.Exploited)).
 						Where("id IN (?)", bun.List(batch)).Exec(ctx)
+					if err != nil {
+						return err
+					}
+					// And off again where there is nothing to take. An issue
+					// becoming exploited says how long there is; it does not
+					// say there is a version to take, so the clock the scan
+					// path took off would otherwise be handed straight back —
+					// and on a tag, scanned once and never again, it stays
+					// handed back.
+					//
+					// A second statement rather than a condition inside the
+					// first: a CASE choosing between NULL and a parameter
+					// leaves one engine with nothing to infer the column's
+					// type from, which it refuses and another accepts.
+					_, err = tx.NewUpdate().Model((*Finding)(nil)).
+						Set("due_at = NULL").
+						Where("id IN (?)", bun.List(batch)).
+						Where("fix_state IN (?)", bun.List([]FixState{NoFix, WontFix})).
+						Exec(ctx)
 					return err
 				}); err != nil {
 				return fmt.Errorf("mark what is being exploited: %w", err)
@@ -590,6 +609,10 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 // a fixed number of days, so every finding of one issue opened by one run,
 // rated the same way, in this product, lands on the same instant.
 func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) error {
+	// What "now" means to this recount, taken once so that every group it
+	// writes is reasoned at one moment rather than at as many moments as
+	// there are groups.
+	recountedAt := time.Now().UTC()
 	windows, err := LoadWindows(ctx, tx)
 	if err != nil {
 		return err
@@ -608,6 +631,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		OpenedAt  time.Time  `bun:"opened_at"`
 		LearnedAt *time.Time `bun:"learned_at"`
 		Severity  string     `bun:"severity"`
+		FixState  FixState   `bun:"fix_state"`
+		FixedAt   *time.Time `bun:"fixed_at"`
 	}
 	err = tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -623,11 +648,18 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		// deadline back to a date that was already in the past.
 		ColumnExpr(`f.exploited_learned_at AS "learned_at"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
+		// And on what upstream has done, which is the other half of what a
+		// deadline is worked out from: whether there is a version to take at
+		// all, and when it arrived. Grouped without them, a recount answers
+		// from the rating alone and hands back a clock the scan path had
+		// taken off — on the very act the deadline exists to ask for.
+		ColumnExpr(`f.fix_state AS "fix_state"`).
+		ColumnExpr(`f.fixed_at AS "fixed_at"`).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
 		GroupExpr("f.urgency_exploited, f.opened_at, f.exploited_learned_at, "+
-			rating.EffectiveExpr).
+			"f.fix_state, f.fixed_at, "+rating.EffectiveExpr).
 		Scan(ctx, &groups)
 	if err != nil {
 		return fmt.Errorf("read what this issue is open against: %w", err)
@@ -646,32 +678,28 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		} else {
 			q = q.Where("exploited_learned_at IS NULL")
 		}
-		if floor.Admits(group.Exploited, group.Severity) {
-			q = q.Set("due_at = ?", clockedFrom(group.Exploited, group.OpenedAt, group.LearnedAt).
-				Add(windows.For(group.Exploited, group.Severity)))
+		if group.FixedAt != nil {
+			q = q.Where("fixed_at = ?", *group.FixedAt)
 		} else {
+			q = q.Where("fixed_at IS NULL")
+		}
+		q = q.Where("fix_state = ?", group.FixState)
+		// The one rule, asked here rather than restated. A recount that worked
+		// the deadline out its own way is a second policy nobody chose, and
+		// the two agreed only until one of them moved.
+		due := Deadline(group.FixState, group.OpenedAt, recountedAt,
+			group.LearnedAt, group.FixedAt,
+			windows.For(group.Exploited, group.Severity))
+		if due == nil || !floor.Admits(group.Exploited, group.Severity) {
 			q = q.Set("due_at = NULL")
+		} else {
+			q = q.Set("due_at = ?", *due)
 		}
 		if _, err := q.Exec(ctx); err != nil {
 			return fmt.Errorf("move this issue's deadline: %w", err)
 		}
 	}
 	return nil
-}
-
-// clockedFrom is the moment a deadline is counted from.
-//
-// The opening for everything but an exploited finding, and the moment
-// exploitation was learned for one of those: an issue that becomes exploited
-// six months in has a few days from the learning, and counting those days from
-// the opening lands the deadline before the day it was written. A row marked
-// exploited with no moment recorded falls back to the opening, because there
-// is nothing better to count from.
-func clockedFrom(exploited bool, openedAt time.Time, learnedAt *time.Time) time.Time {
-	if exploited && learnedAt != nil {
-		return *learnedAt
-	}
-	return openedAt
 }
 
 // Assessments lists what has been said about issues, newest first.

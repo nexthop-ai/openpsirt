@@ -5952,10 +5952,10 @@ export interface components {
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, out-of-support when its release is past end of life. Those are the only two, and both are deliberate. Blank would read as missing data on the row somebody is deciding about
+             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
-            no_deadline?: "below-the-line" | "out-of-support";
+            no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
             /** @description Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned */
             nothing_since?: boolean;
             /** @description When the earliest of these places first appeared here, as a date */
@@ -6095,10 +6095,10 @@ export interface components {
              */
             middle?: number;
             /**
-             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, out-of-support when its release is past end of life. Those are the only two, and both are deliberate
+             * @description Why there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
-            no_deadline?: "below-the-line" | "out-of-support";
+            no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
             /** @description When the earliest of these places opened here, as a date. The age a deadline relates to */
             opened?: string;
             /** @description The part of the product this belongs to. Absent where the inventory placed the component nowhere */

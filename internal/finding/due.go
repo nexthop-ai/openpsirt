@@ -91,6 +91,78 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 	}
 }
 
+// Closable reports whether anything upstream would close a finding in this
+// state, which is what makes a deadline on it meetable.
+//
+// **A deadline nobody can meet is not a deadline.** Where upstream has released
+// nothing, and where upstream has declined, there is no version to take: the
+// clock runs and the only thing that can stop it is a person recording a
+// judgment, which is the one act the deadline exists to ask for and cannot be
+// the answer to. It is the statement three other rules here already make from
+// other directions — a tag that cannot change, a build past its end of life,
+// and an issue below the triage line all carry no deadline for the same reason.
+//
+// **A scanner that did not answer is not upstream saying no.** Reading silence
+// as "no fix exists" is a claim about the world made out of a gap in a report,
+// and it is the direction that loses a deadline somebody could have met. So an
+// unstated state stays on the clock.
+func Closable(state FixState) bool {
+	switch state {
+	case NoFix, WontFix:
+		return false
+	default:
+		return true
+	}
+}
+
+// Deadline is when a finding in this state has to be answered by, or nothing
+// where nothing upstream would close it.
+//
+// **Counted from the latest of the three moments that start the clock**, never
+// from the earliest and never from now:
+//
+//   - When we first saw it. A fix that already existed when the finding opened
+//     leaves this the only answer, which is the ordinary case.
+//   - When exploitation was learned. An issue that becomes exploited after six
+//     months would otherwise land three days before anybody knew.
+//   - When the fix became available. Seeing a flaw before upstream has released
+//     anything and counting from the sighting sets a deadline against a version
+//     that did not exist, which is the common case for a distribution-heavy
+//     inventory and the one this was wrong about. Bounded by observedAt, the
+//     moment the caller is reasoning at, because that one is a feed's and the
+//     other two are ours.
+//
+// All three are facts about moments that have passed, so recounting this
+// answers the same thing every time — which is what keeps a deadline from
+// restarting nightly and never arriving.
+func Deadline(state FixState, openedAt, observedAt time.Time, exploitedLearnedAt,
+	fixedAt *time.Time, window time.Duration) *time.Time {
+
+	if !Closable(state) {
+		return nil
+	}
+	from := openedAt
+	// A fix cannot have arrived after the moment we saw that it had, and a
+	// date saying otherwise is a feed's, parsed and never checked. One entry
+	// dated two centuries out would carry the deadline with it, and the
+	// finding would leave the overdue list and the compliance rate for as long
+	// as it stayed open — which is the silent disappearance this rule exists
+	// to stop, arriving through the field that implements it.
+	//
+	// Taken as an argument rather than read from a clock, so that this answers
+	// the same thing every time it is asked about the same finding.
+	if fixedAt != nil && fixedAt.After(observedAt) {
+		fixedAt = nil
+	}
+	for _, later := range []*time.Time{exploitedLearnedAt, fixedAt} {
+		if later != nil && later.After(from) {
+			from = *later
+		}
+	}
+	due := from.Add(window)
+	return &due
+}
+
 // Late is a finding whose time is running out with nobody having decided about
 // it.
 type Late struct {
@@ -590,7 +662,47 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	if err != nil {
 		return changed + cleared + retired, err
 	}
-	return changed + cleared + retired + fixed, nil
+
+	// And from everything upstream has released no fix for, or has declined
+	// to fix.
+	//
+	// A fourth pass, for the reason there are three already: each says some
+	// things are not on a clock, and each says it about something different —
+	// the rating, the release's support, the release's nature, and this one
+	// about what there is to take. Without it, an administrator saving a
+	// remediation window hands back every deadline the scan path took off,
+	// and the recount that exists to keep the policy and the rows agreeing is
+	// what puts them back out of step.
+	nothing, err := s.clearNothingToTake(ctx)
+	if err != nil {
+		return changed + cleared + retired + fixed, err
+	}
+	return changed + cleared + retired + fixed + nothing, nil
+}
+
+// clearNothingToTake removes the deadline from open findings upstream has
+// released no fix for, or has declined to fix.
+//
+// Like a tag and unlike the line, this reaches a known-exploited finding too.
+// Being exploited says how long there is; it says nothing about there being a
+// version to take, and a deadline that no upgrade could meet is not made
+// meetable by the flaw being urgent.
+func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
+	result, err := s.db.NewUpdate().
+		Model((*Finding)(nil)).
+		Set("due_at = NULL").
+		Where("closed_at IS NULL").
+		Where("due_at IS NOT NULL").
+		Where("fix_state IN (?)", bun.List([]FixState{NoFix, WontFix})).
+		Exec(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("take the deadline off what has nothing to take: %w", err)
+	}
+	gone, err := database.Affected(result)
+	if err != nil {
+		return 0, fmt.Errorf("take the deadline off what has nothing to take: %w", err)
+	}
+	return int(gone), nil
 }
 
 // clearOnTags removes the deadline from open findings in releases that were
