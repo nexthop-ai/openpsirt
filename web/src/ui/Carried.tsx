@@ -81,7 +81,10 @@ export function Carried({ at }: { at: { product: string; stream: string; variant
       </div>
 
       {preview.isError && (
-        <Failed error={preview.error} what="The claims this line would inherit could not be read." />
+        <Failed
+          error={preview.error}
+          what="The claims this line would inherit could not be read."
+        />
       )}
 
       {from !== "" && preview.data && (

@@ -68,7 +68,12 @@ function WhatUpstreamCouldNotAnswer() {
 
   if (asked.isPending) return <Loading />;
   if (asked.isError) {
-    return <Failed error={asked.error} what="The components upstream could not answer for could not be read." />;
+    return (
+      <Failed
+        error={asked.error}
+        what="The components upstream could not answer for could not be read."
+      />
+    );
   }
   const rows = asked.data?.items ?? [];
   const total = asked.data?.total ?? 0;
@@ -157,7 +162,10 @@ function VulnerabilityData() {
   if (data.isPending) return <Loading />;
   if (data.isError) {
     return (
-      <Failed error={data.error} what="The vulnerability data the scans answer against could not be read." />
+      <Failed
+        error={data.error}
+        what="The vulnerability data the scans answer against could not be read."
+      />
     );
   }
   const version = data.data?.version ?? "";

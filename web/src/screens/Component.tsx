@@ -838,7 +838,11 @@ function Upgrade({
         </p>
       </div>
 
-      <Editor value={because} onChange={setBecause} placeholder="The reason this is the answer here." />
+      <Editor
+        value={because}
+        onChange={setBecause}
+        placeholder="The reason this is the answer here."
+      />
 
       <div className="actions" style={{ marginTop: 10 }}>
         <button

@@ -143,7 +143,9 @@ export function ByComponent({
 
   if (grouped.isPending) return <Loading />;
   if (grouped.isError) {
-    return <Failed error={grouped.error} what="The open findings could not be read by component." />;
+    return (
+      <Failed error={grouped.error} what="The open findings could not be read by component." />
+    );
   }
 
   const rows = grouped.data?.items ?? [];

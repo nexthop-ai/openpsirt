@@ -73,7 +73,9 @@ export function Disclosing() {
 
   if (rows.isPending) return <Loading />;
   if (rows.isError) {
-    return <Failed error={rows.error} what="The findings approaching disclosure could not be read." />;
+    return (
+      <Failed error={rows.error} what="The findings approaching disclosure could not be read." />
+    );
   }
   const items = rows.data?.items ?? [];
   const total = rows.data?.total;

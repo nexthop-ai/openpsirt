@@ -593,7 +593,12 @@ function HoldBack({ claim, mine, onHeld }: { claim: Claimed; mine: boolean; onHe
           {split.error != null && (
             <Failed error={split.error} what="Those rows could not be held back." />
           )}
-          <Editor value={because} onChange={setBecause} label="The reason these are different" rows={2} />
+          <Editor
+            value={because}
+            onChange={setBecause}
+            label="The reason these are different"
+            rows={2}
+          />
           <div className="actions" style={{ marginTop: 8 }}>
             <button
               type="button"
