@@ -525,9 +525,9 @@ author revises. A reason is required and travels as a comment.
 | Nobody sends back a claim whose current words are their own | That is theirs to revise |
 | Everybody whose words went back is told | A claim revised row by row can rest on several people's words. The notice sends them to the finding — the build, the issue and the component, at the version — because that is where the words are revised. Where no open finding the sender may read still describes the claim, it sends them to the decision itself |
 
-Approve and withdraw were the only two, and withdrawing throws away somebody's
-work over a missing sentence. What actually happened was a comment, and the claim
-sat in the queue looking untouched.
+With approve and withdraw as the only two, withdrawing throws away somebody's
+work over a missing sentence — so what happens instead is a comment, and the
+claim sits in the queue looking untouched.
 
 ## The deferral threshold
 
@@ -550,12 +550,12 @@ date.
 | One taken back **before it held** counts for nothing | Correcting a mistake is not avoiding the work, and counting it would make the two read alike |
 | A deferral asking for a date **already past** counts for nothing | It asks for nothing, and it is refused at submission besides. Counting it as a negative would let a back-dated request subtract from what a finding has already been put off for |
 
-Whether a claim needs a second person is worked out where it is written. It was
-a field on the proposal, answered before the transaction opened and taken on
-trust — so a threshold somebody lowered between the answer and the write stored
-a claim as needing nobody under a policy that says it does, and the answer
-telling the caller it was waiting was the only trace of a control that had not
-run. The threshold itself is read inside that transaction too, for the same
+Whether a claim needs a second person is worked out where it is written. As a
+field on the proposal, answered before the transaction opens and taken on
+trust, a threshold somebody lowers between the answer and the write stores a
+claim as needing nobody under a policy that says it does — and the answer
+telling the caller it is waiting is the only trace of a control that never ran.
+The threshold itself is read inside that transaction too, for the same
 reason.
 
 The report that shows the pattern counts them the same way, and groups on the
@@ -578,12 +578,12 @@ record a second beside it.
 | The same holds for a rating of an issue | Keyed on the issue, held from the moment a claim is proposed, released when it is withdrawn. Six proposals at once leave one claim standing; removing the constraint lets all six through |
 
 Revising keeps the old words readable, takes back the approval given for them,
-returns the claim to the queue and records who wrote the new version. Two people
-disagreeing then produces one legible argument rather than two rows neither can
-see at once. Before this, nothing prevented two contradictory claims and nothing
-marked them as contradictory: what applies is chosen by agreed-beats-waiting and
-then newest-wins, so approving both left one silently governing while the other
-stayed on the record as agreed.
+returns the claim to the queue and records who wrote the new version. Two
+people disagreeing then produces one legible argument rather than two rows
+neither can see at once. Unprevented, two contradictory claims are also
+unmarked as contradictory: what applies is chosen by agreed-beats-waiting and
+then newest-wins, so approving both leaves one silently governing while the
+other stands on the record as agreed.
 
 ## The triage line
 
@@ -618,9 +618,9 @@ configuration it does not ship, or the world has not rated it and it is being
 treated as a medium by default.
 
 The claim is about the issue, not about a place, and it belongs to one product
-(REQ-29). Keyed to a place it would be repeated at each one and would lapse on
-a version change that had nothing to do with it. Keyed to nothing at all it was
-one statement for the whole deployment, which is the shape this replaced.
+(REQ-29). Keyed to a place it is repeated at each one and lapses on a version
+change that had nothing to do with it; keyed to nothing at all it is one
+statement for the whole deployment.
 
 | Rule | |
 |---|---|
@@ -711,7 +711,7 @@ version.
 | Offered one at a time rather than as one answer | A component may be used in a later release and not an earlier one. All-or-nothing would be a single click making a claim about builds nobody looked at |
 | Builds already covered are counted and never offered | A judgment reaching eleven other builds is worth knowing; a tick box beside them asks somebody to agree to something that has already happened |
 | Only the places nothing already stands at are written | A build wholly reached by lookup records nothing, and that is not an error |
-| One request, one transaction, one claim | A failure part-way used to leave it recorded against some builds and not others — an act nobody performed |
+| One request, one transaction, one claim | A failure part-way otherwise leaves it recorded against some builds and not others — an act nobody performed |
 | Bounded on the places it resolves to, not the builds named (REQ-27) | One name expands into as many places as the issue sits at there |
 
 ## Bulk claims
@@ -793,11 +793,11 @@ feature.
 | Everything it decides from is read inside the transaction | The builds the request names, which are past end-of-life, and the places the bump reaches are all reads, and a retry re-runs the closure against a database that has moved |
 | One request, one transaction, one claim | Half of it written would be a pending upgrade that says a bump is declared for a release it is not, so the judgments and the fix targets are written together |
 
-Proposing per row instead wrote the same key twice, and the second collided with
-the index that keeps one claim standing per place, taking the whole transaction
-with it: every product with more than one build refused every bundle it was
-ever asked to declare, with a message naming a decision it had just written
-itself.
+Proposing per row instead writes the same key twice, and the second collides
+with the index that keeps one claim standing per place, taking the whole
+transaction with it: every product with more than one build then refuses every
+bundle it is asked to declare, with a message naming a decision it has just
+written itself.
 
 It is safe at that size because of what it carries. The outcome hides nothing and
 needs no second person, and a fix target is intent the next scan answers, so a
@@ -810,9 +810,9 @@ bundle that never lands is reported rather than quietly wrong.
 | **`upgrade-needed` is about a component** | Carries the version it moves to and the date the work will be done, and is written in bulk for everything open on that component in the declared builds |
 | **`patch-needed` is about one issue**, and the version does not move | The build's next inventory declares the patch it carries and says what that patch resolves, so the finding goes while the version stays. No version comparison could have found that |
 
-Before these, the most common answer to a fixable finding — the package is being
-upgraded — went in as `affected` with the plan in a separate record, so what
-somebody decided and what a release was waiting on could come to disagree.
+Without them the most common answer to a fixable finding — the package is being
+upgraded — goes in as `affected` with the plan in a separate record, so what
+somebody decided and what a release is waiting on come to disagree.
 
 | Rule | |
 |---|---|
@@ -977,7 +977,7 @@ above.
 | What is kept is the rating in force here, never the published score | A product that assessed an issue down held a baseline nobody was working to, so the comparison asked whether the severity had risen past a figure that was never the one in force — and a dismissal carried, with nobody else reading it, after the rating here rose |
 | A count of re-affirmations deliberately does not trigger it | That would fire on nothing having changed |
 | What may be carried is read from the row, not from what a caller supplied | A caller holding a stale copy would carry an agreement since withdrawn; a caller inventing one would carry an agreement that never existed. A withdrawn decision keeps its approval rows, so without this a version bump would undo a withdrawal |
-| All of it is one transaction | Written as three steps, a process stopping in the middle left a claim standing that nobody had agreed to and that no review queue would show |
+| All of it is one transaction | Written as three steps, a process stopping in the middle leaves a claim standing that nobody agreed to and that no review queue shows |
 | The carried agreement is guarded on the revision | An agreement is an agreement to particular words |
 
 ## Comments and reasoning
