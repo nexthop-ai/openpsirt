@@ -387,24 +387,41 @@ somebody deciding whether to act.
 | References | The issue's write-up and everywhere else a report points, each address once | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's |
 | Scores | The CVSS base vector, scored here | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. A vector under a scheme this deployment does not score yields nothing rather than a number under the wrong formula |
 | Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gave it so somebody could reply, not so it could be published, and "anonymous" is a real answer to the question the credit field asks |
-| Remediations | Stated for the releases that still carry the flaw | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. Which release to move to is what the details say. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
+| Remediations | Stated for the releases that still carry the flaw, and the details name the releases that do not | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
 | Distribution | The same fact the tracking status reads — a draft is RED, a disclosed document is WHITE | Handing a draft to somebody who may pass it on is the disclosure the embargo exists to hold. The labels are the standard's four, which is why a final document is WHITE rather than the word the protocol renamed it to |
 
 An address a report supplied goes through the rule an address stored beside a
 claim goes through, and a custom application scheme is dropped rather than
 published. It is leaving the deployment, into tooling that follows it.
 
-**Two fields the standard defines are not carried.** The weakness
-classification needs the name that goes with the identifier, and what is held
-is the identifier alone — a name invented to fill the field is the one thing a
-validator checks it against. The product identification helper names a package,
-and this tree names releases rather than components, which is what an advisory
-aggregates to.
+**The weakness is stated in the catalog's own words.** The standard carries a
+weakness as the identifier and the name assigned to it, and a consumer's
+validator compares the pair — so the name is read from the authority that
+assigns it, never from anything held here.
+
+| Rule | Reason |
+|---|---|
+| The names come from the published catalog, fetched and committed | A thousand names nobody can check by eye is a file that goes wrong quietly: one transcription error is a document refused at a customer, months later, over a weakness nobody was looking at. The same reason the reserved-word list is asked rather than typed |
+| Not the names the interface uses | A screen names a weakness in a few words somebody scans — "Buffer overflow" — and the catalog calls that one "Improper Restriction of Operations within the Bounds of a Memory Buffer". Both are right for their reader and only one passes a validator, so they are two lists rather than one used twice |
+| One weakness, the one the data calls the root cause | The standard carries one and an issue is commonly classified as several. Taking whichever sorts first is an answer with nothing behind it. A feed says which it calls primary and a person recording a flaw names theirs first, so the answer is carried from where it was stated |
+| An identifier the catalog does not assign states nothing | Categories and views carry identifiers of the same shape and are not what a vulnerability is classified as, and a newer catalog assigns numbers an older one predates. The name is the half that cannot be invented |
+| The catalog version is recorded and is not gated against what it publishes today | The engines the reserved-word list asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes, for a reason no change here caused |
+
+**Each release is named by what its own inventory called it.** The product
+identification helper carries the package identifier the build declared for the
+component the document is about, where it declared one.
+
+| Rule | Reason |
+|---|---|
+| The identifier the build declared, never one minted here | An identifier only helps if it appears on both sides of the comparison. A reader holding the image has whatever the build wrote into its inventory, which is this exact string if they ingested that document. A plausible identifier nothing outside this deployment has seen is worse than none, because a reader matches on it and misses |
+| Read from the scan rather than from the root component | The root is stored by name alone, deliberately: a package identifier carries the version, the root's version moves every build, and the root's identity moving takes every edge hanging off it. What the document declared is a fact about that document, so it is kept beside the serial and what the inventory was made of |
+| Absent where the document named no component of its own | The tracked unit stands in for the root there, and what stands in is ours rather than the producer's. A release with a declared root carrying no package identifier is the same answer for the same reason |
 
 ## The VEX document
 
-Assembled from approved `not-applicable` and `already-fixed` claims (REQ-39), for
-one product, stream and variant.
+Assembled from approved `not-applicable` and `already-fixed` claims (REQ-39),
+and from `wont-fix` claims that say what a holder can do instead, for one
+product, stream and variant.
 
 A customer running their own scanner against a shipped image asks "which of these
 are you not affected by" more often than they ask for an advisory. Generating it
@@ -415,7 +432,11 @@ customer — which is the reason the two-person approval on those claims exists.
 |---|---|
 | OpenVEX rather than the CSAF profile | It is the format this deployment already reads. One document shape to get right, and one deployment's output can be another's input |
 | Approved claims only | A proposal is one person's opinion and this document is the deployment's word to a customer |
+| The impact statement carries what stops the flaw, never the reasoning | The reasoning is the argument a triager put to a second person here, addressed to a reader who can see the record it argues against. Published it is this deployment's review of itself, machine-readable, in front of every customer running a scanner. The mitigation is the half somebody holding the build can act on |
+| Where no mitigation was named the field is absent | Only one recognized reason asks for a mitigation, so most statements carry none. The justification beside it is what the format asks for, and silence says less wrongly than the wrong text |
 | A deferral is absent rather than exported as anything | Publishing it as not-affected would assert we assessed something as harmless when we had only postponed it. Silence already reads as affected in this format |
+| A claim that will not be fixed is published as affected, and only where it names what to do instead | It is the truth about such a flaw: it is there and it is staying. Nothing else ever says so — no scan closes a standing property of a shipped feature and no advisory is issued about one — so under silence it reaches a customer never. The format requires an action on an affected statement, so a claim with nothing to offer has nothing to publish, and left out it falls through to the silence that already reads as affected |
+| The mitigation goes in a different field depending on the status | On a claim that something does not apply it is why, beside the category a machine reads. On one that will not be fixed it is what to do instead. An affected statement carrying a not-affected justification says both things at once |
 | Public findings only | Asking for the undisclosed ones is a preview for somebody who may read them, and refused for anybody who may not |
 | The statement is about the build, with the component underneath | A VEX statement is about a thing somebody has, and what they have is the image |
 | A component with no package identifier is named by the name the build calls it | Less use to a machine, and better than a silent omission, which in this format reads as "no claim" |
@@ -440,12 +461,12 @@ twice.
 
 **The earliest decision is picked first, and then read.** Each column had its own
 minimum over the group, and nothing tied them to one row: with two claims
-standing at a component — "component_not_present / we removed it in the patch"
-and "vulnerable_code_not_in_execute_path / the path is unreachable" — the
-machine-readable category came from one and the prose from the other, and the
-published statement said the component was not present with reasoning explaining
-that a code path is unreachable. That is a composite no record ever held, going
-to every customer running a scanner. The group answers with the earliest
+standing at a component — "component_not_present" and
+"inline_mitigations_already_exist / bound to the management VLAN" — the
+machine-readable category came from one and the impact statement from the other,
+and the published statement said the component was not present while describing
+the network control that protects it. That is a composite no record ever held,
+going to every customer running a scanner. The group answers with the earliest
 decision's identifier and its words are read by that identifier.
 
 ## Issuance records

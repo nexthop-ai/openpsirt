@@ -541,3 +541,66 @@ func TestMoreSuppressionDocumentsThanAllowedAreRefused(t *testing.T) {
 		}
 	})
 }
+
+// anInventoryNamingItself is the same document with a package identifier on the
+// component it is about, which is what a producer emits for a released image.
+const anInventoryNamingItself = `{
+  "bomFormat": "CycloneDX", "specVersion": "1.6",
+  "metadata": {"timestamp": "2026-08-01T00:00:00Z",
+    "component": {"bom-ref": "root", "name": "sonic-broadcom.bin", "version": "1.0",
+      "purl": "pkg:generic/sonic-broadcom.bin@1.0"}},
+  "components": [
+    {"bom-ref": "a", "name": "libc6", "version": "2.41", "purl": "pkg:deb/debian/libc6@2.41"}],
+  "dependencies": [{"ref": "root", "dependsOn": ["a"]}]
+}`
+
+// anInventoryNamingNothing declares no component of its own, which the format
+// permits and which leaves the tracked unit standing in for the root.
+const anInventoryNamingNothing = `{
+  "bomFormat": "CycloneDX", "specVersion": "1.6",
+  "metadata": {"timestamp": "2026-08-01T00:00:00Z"},
+  "components": [
+    {"bom-ref": "a", "name": "libc6", "version": "2.41", "purl": "pkg:deb/debian/libc6@2.41"}],
+  "dependencies": []
+}`
+
+func TestAScanKeepsWhatItsDocumentCalledTheThingItIsAbout(t *testing.T) {
+	// A published advisory offers a reader an identifier to match a release
+	// against, and the only one that helps is the one their own copy of the
+	// inventory carries. The root component cannot hold it — it is stored by
+	// name alone, because a package identifier carries the version and the
+	// root's version moves every build — so the scan keeps what the document
+	// said, beside the serial and what the inventory was made of.
+	for _, one := range []struct {
+		what      string
+		inventory string
+		want      string
+	}{
+		{"a document naming itself", anInventoryNamingItself,
+			"pkg:generic/sonic-broadcom.bin@1.0"},
+		// Declared, and with no package identifier on it. There is nothing to
+		// match against and nothing is kept.
+		{"a root with no identifier", anInventory, ""},
+		// Nothing declared at all. What stands in for the root is ours rather
+		// than the producer's, and offering it would send a reader looking for
+		// a name their inventory does not carry.
+		{"a document naming nothing", anInventoryNamingNothing, ""},
+	} {
+		t.Run(one.what, func(t *testing.T) {
+			eachReader(t, func(t *testing.T, f *readerFixture) {
+				scanID := f.accept(t, f.branch, time.Now().UTC().Add(-time.Hour), one.inventory)
+				if _, err := f.reader.Once(t.Context()); err != nil {
+					t.Fatalf("read: %v", err)
+				}
+				var got ingest.Scan
+				if err := f.db.DB.NewSelect().Model(&got).
+					Where("id = ?", scanID).Scan(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				if got.RootIdentifier != one.want {
+					t.Errorf("the scan kept %q, want %q", got.RootIdentifier, one.want)
+				}
+			})
+		})
+	}
+}

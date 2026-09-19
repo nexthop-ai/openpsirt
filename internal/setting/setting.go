@@ -138,10 +138,13 @@ const (
 	// indexes what the newest version of a component is.
 	//
 	// Off unless somebody turns it on, and the only setting here that
-	// decides whether we talk to anyone. Every other outside answer
-	// arrives as a file somebody imported deliberately, so that a
-	// deployment can run somewhere sealed off; a deployment that cannot
-	// reach out loses this answer and nothing else.
+	// decides whether we talk to anyone while answering a question about a
+	// build. Everything a scan needs arrives as a file somebody imported
+	// deliberately, so that a scan answers the same way twice and nothing a
+	// scan depends on is somebody else's server being up (REQ-12). This
+	// stands outside that: it is not part of a scan, it is asked of a public
+	// index, and a deployment that cannot reach out loses this answer and
+	// nothing else.
 	UpstreamCurrency = "upstream.currency"
 	// AttachmentMaxSize is the largest single file this deployment
 	// accepts, in bytes, and AttachmentQuota is how much it will hold in

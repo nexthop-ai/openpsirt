@@ -30,6 +30,27 @@ export type At = {
   version: string;
 };
 
+// Which outcomes may say what a holder can do about it, and which must.
+//
+// Two of them carry a mitigation and they ask for it differently. A claim that
+// something already stops it *is* the mitigation, so it is required there. A
+// claim that something will not be fixed is a standing property of a shipped
+// feature — a protocol that cannot change without breaking what it is
+// compatible with — and there is often a real answer and often none, so it is
+// offered and optional.
+//
+// The second is what puts an affected statement in the published document,
+// which is the only way such a flaw ever reaches a customer: no scan closes one
+// and no advisory is issued about one. Without it the field was reachable by
+// posting to the API by hand and by nothing on any screen.
+export function mustMitigate(outcome: string, justification: string): boolean {
+  return outcome === "not-applicable" && justification === "inline_mitigations_already_exist";
+}
+
+export function mayMitigate(outcome: string, justification: string): boolean {
+  return mustMitigate(outcome, justification) || outcome === "wont-fix";
+}
+
 // Where the reasoning typed about one thing is kept.
 //
 // Every part of what is being decided, the version included. A build ships one
@@ -287,8 +308,8 @@ export function Decide({
     return () => document.removeEventListener("keydown", pressed);
   }, []);
 
-  const needsMitigation =
-    needsJustification && justification === "inline_mitigations_already_exist";
+  const needsMitigation = mustMitigate(outcome, justification);
+  const offerMitigation = mayMitigate(outcome, justification);
 
   // Where a judgment here lands beyond this build, answered whole by the
   // server rather than sampled here.
@@ -395,7 +416,7 @@ export function Decide({
       // Narrowed rather than asserted: submit is disabled until one is
       // chosen, so the empty case cannot reach here.
       ...(needsJustification && justification !== "" ? { justification } : {}),
-      ...(needsMitigation ? { mitigation } : {}),
+      ...(offerMitigation && mitigation.trim() !== "" ? { mitigation } : {}),
       ...(needsDate ? { deferred_until: until } : {}),
       ...(needsFixedVersion ? { fixed_version: fixedVersion.trim() } : {}),
       ...(needsLanding ? { committed_to: lands } : {}),
@@ -572,19 +593,26 @@ export function Decide({
         </div>
       )}
 
-      {needsMitigation && (
+      {offerMitigation && (
         <div className="field">
-          <label htmlFor={`${draftKey}-mit`}>What stops it</label>
+          <label htmlFor={`${draftKey}-mit`}>
+            {needsMitigation ? "What stops it" : "What to do instead"}
+          </label>
           <input
             id={`${draftKey}-mit`}
             type="text"
             value={mitigation}
-            placeholder="the firewall rule, the setting, the service that is not exposed"
+            placeholder={
+              needsMitigation
+                ? "the firewall rule, the setting, the service that is not exposed"
+                : "use SSH, or reach it from the management VLAN only"
+            }
             onChange={(event) => setMitigation(event.target.value)}
           />
           <span className="hint">
-            Nothing watches configuration, so this will not lapse if the mitigation is removed. Say
-            what to check.
+            {needsMitigation
+              ? "Nothing watches configuration, so this will not lapse if the mitigation is removed. Say what to check."
+              : "Optional. Where you say one, customers are told this is present and staying and what they can do about it. Where you do not, they are told nothing."}
           </span>
         </div>
       )}

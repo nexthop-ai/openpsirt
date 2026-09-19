@@ -68,7 +68,9 @@ behind every line of it.
  discover
 - **A build's own suppressions are applied and never re-decided**
 - **The scanner, its vulnerability database and the exploitation feeds all work
- with no network**, so an air-gapped install uses the same path as any other
+ with no network**, so a scan answers the same way twice and no content network
+ sits in the path it is available through. An air-gapped install uses the same
+ path as any other
 - **Every finding records what produced it** — which scanner, which version,
  which database, and how the match was made
 - **OpenPSIRT publishes an inventory of itself**, of the binary and of the

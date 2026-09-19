@@ -46,6 +46,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [VEX statements as evidence](#vex-statements-as-evidence)
 - [Dates still to come](#dates-still-to-come)
 - [Mitigation-based dismissals](#mitigation-based-dismissals)
+- [What a holder can do instead](#what-a-holder-can-do-instead)
 - [Outcomes on a tag](#outcomes-on-a-tag)
 - [Tags](#tags)
 - [Rule-prepared claims](#rule-prepared-claims)
@@ -1104,6 +1105,25 @@ Naming the control does not close that gap. It is the difference between a claim
 somebody can go and check and one nobody can, and it is the justification an
 auditor asks about first, because the protection lives outside this software
 entirely.
+
+## What a holder can do instead
+
+Two outcomes carry a mitigation and they ask for it differently.
+
+| Outcome | |
+|---|---|
+| Not applicable, because mitigations already exist | **Required.** The mitigation *is* the claim, and a claim with nowhere to say what stops it is not that claim |
+| Will not be fixed | **Optional.** A standing property of a shipped feature — a protocol that cannot change without breaking what it is compatible with — often has a real answer, and often has none. Saying there is one falsely is worse than saying nothing |
+
+No other outcome may carry one. A claim about priority is not a claim that
+something is handled.
+
+The second exists because of where such a flaw ends up. Nothing closes it: no
+scan, because the code is not moving, and no advisory, because it is a property
+of the product rather than an event. Under silence it reaches a customer never.
+The published document has a status that says the flaw is there and staying, and
+a field for what to do about it, and the second is what makes the first worth
+publishing — which is why only a claim that fills it is published at all.
 
 ## Outcomes on a tag
 

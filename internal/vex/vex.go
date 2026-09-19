@@ -79,8 +79,20 @@ type Statement struct {
 	// Justification is the standard category, present only for
 	// not_affected. It is the same vocabulary a dismissal already records.
 	Justification string `json:"justification,omitempty"`
-	// ImpactStatement is the reasoning somebody wrote, which is the part that
-	// is worth reading and the part a second person agreed to.
+	// ActionStatement is what a holder can do about a flaw that is not going
+	// to be fixed. The format requires one on an affected statement, which is
+	// why silence is not an option there and why only a claim carrying a
+	// mitigation is published as one.
+	ActionStatement string `json:"action_statement,omitempty"`
+	// ImpactStatement is what stops the flaw, where somebody named it.
+	//
+	// The mitigation rather than the reasoning. The reasoning is what a
+	// triager wrote for a second person to check, addressed to a reader who
+	// can see the record it argues against; published it becomes this
+	// deployment's review of itself, machine-readable, in front of every
+	// customer running a scanner. Where no mitigation was named the field is
+	// absent, because the justification beside it is what the format asks for
+	// and silence says less wrongly than the wrong text.
 	ImpactStatement string `json:"impact_statement,omitempty"`
 }
 
@@ -200,7 +212,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		Outcome         string    `bun:"outcome"`
 		DecidedBy       int64     `bun:"decided_by"`
 		Justification   string    `bun:"-"`
-		Reasoning       string    `bun:"-"`
+		Mitigation      string    `bun:"-"`
 		DecidedAt       time.Time `bun:"-"`
 	}
 	// One statement per issue and component, from the claims that stand and
@@ -227,9 +239,14 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// part of the join rather than a filter, as it was on the decision:
 		// what the counting below asks is whether *every* open place is
 		// dismissed, and a filter would drop the places that are not.
+		// A claim that will not be fixed joins only where it says what a
+		// holder can do instead. The format requires an action on an affected
+		// statement, so one without a mitigation has nothing to publish — and
+		// left out it falls through to silence, which already reads as
+		// affected and is the honest answer.
 		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			AND cl.outcome IN ('not-applicable', 'already-fixed')`).
-		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
+			AND (cl.outcome IN ('not-applicable', 'already-fixed')
+				OR (cl.outcome = 'wont-fix' AND COALESCE(cl.mitigation, '') <> ''))`).
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
 		ColumnExpr(`c.name AS "component"`).
@@ -295,7 +312,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	// what the limit is went to the log instead of to the person who can act
 	// on it.
 	if len(rows) > s.carrying() {
-		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed dismissals: a "+
+		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed claims: a "+
 			"document that stopped at the limit would say nothing is claimed about "+
 			"everything past it",
 			ErrTooLarge, product, stream, variant, s.carrying())
@@ -314,7 +331,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	}
 	for i := range rows {
 		rows[i].Justification = said[rows[i].DecidedBy].justification
-		rows[i].Reasoning = said[rows[i].DecidedBy].body
+		rows[i].Mitigation = said[rows[i].DecidedBy].mitigation
 		rows[i].DecidedAt = said[rows[i].DecidedBy].proposedAt
 	}
 
@@ -360,11 +377,19 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 			Products: []Shipped{{
 				ID: shipped, Subcomponents: []Inside{{ID: about}},
 			}},
-			Status:          statusOf(row.Outcome),
-			ImpactStatement: row.Reasoning,
+			Status: statusOf(row.Outcome),
 		}
-		if statement.Status == "not_affected" {
+		// The same sentence goes in a different field depending on what is
+		// being said about it. On a claim that something does not apply it is
+		// why, beside the category a machine reads; on one that will not be
+		// fixed it is what to do instead, which is the field the format asks
+		// for and the reason such a claim is published at all.
+		switch statement.Status {
+		case "not_affected":
 			statement.Justification = row.Justification
+			statement.ImpactStatement = row.Mitigation
+		case "affected":
+			statement.ActionStatement = row.Mitigation
 		}
 		doc.Statements = append(doc.Statements, statement)
 	}
@@ -384,15 +409,25 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 
 // statusOf turns an outcome into what the format calls it.
 //
-// Only the two a VEX document per build names arrive here. A deferral never
+// Only the three a VEX document per build names arrive here. A deferral never
 // does: publishing it as not-affected would tell the world we assessed
 // something as harmless when we had only postponed it, and silence already
 // reads as affected.
+//
+// A claim that will not be fixed is affected rather than dismissed, which is
+// what it says: the flaw is there and is staying. It reaches a customer only
+// this way — it is a standing property of a shipped feature, so no scan closes
+// it and no advisory is issued about it, and under silence it would never be
+// said at all.
 func statusOf(outcome string) string {
-	if outcome == "already-fixed" {
+	switch outcome {
+	case "already-fixed":
 		return "fixed"
+	case "wont-fix":
+		return "affected"
+	default:
+		return "not_affected"
 	}
-	return "not_affected"
 }
 
 // namesOf is what each of these issues is also called, keyed by issue.
@@ -438,16 +473,20 @@ func (s *Store) namesOf(ctx context.Context, issues []int64) (map[int64][]string
 // words are what one decision claimed, as a statement repeats it.
 type words struct {
 	justification string
-	body          string
+	mitigation    string
 	proposedAt    time.Time
 }
 
-// wordsOf reads the argument each of these decisions rests on.
+// wordsOf reads what each of these decisions states for publication.
 //
 // One statement for the document rather than one per component, and one row per
-// decision rather than a column at a time: the category, the prose and the
+// decision rather than a column at a time: the category, the mitigation and the
 // moment have to come from the same claim, or the document says one thing in
 // the field a machine reads and another in the field a person does.
+//
+// **The reasoning is not read here at all.** It is written for a second person
+// inside this deployment, and the surest way for it not to be published is for
+// the query that builds the document never to fetch it.
 func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words, error) {
 	out := map[int64]words{}
 	if len(decisions) == 0 {
@@ -456,17 +495,16 @@ func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words
 	var rows []struct {
 		ID            int64     `bun:"id"`
 		Justification string    `bun:"justification"`
-		Body          string    `bun:"body"`
+		Mitigation    string    `bun:"mitigation"`
 		ProposedAt    time.Time `bun:"proposed_at"`
 	}
 	where, args := database.InAnyOf("de.id", decisions)
 	if err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
-		Join(`LEFT JOIN "claim_revision" AS "dr" ON dr.id = cl.revision_id`).
 		ColumnExpr(`de.id AS "id"`).
 		ColumnExpr(`COALESCE(cl.justification, '') AS "justification"`).
-		ColumnExpr(`COALESCE(dr.body, '') AS "body"`).
+		ColumnExpr(`COALESCE(cl.mitigation, '') AS "mitigation"`).
 		ColumnExpr(`de.proposed_at AS "proposed_at"`).
 		Where(where, args...).
 		Scan(ctx, &rows); err != nil {
@@ -474,7 +512,8 @@ func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words
 	}
 	for _, row := range rows {
 		out[row.ID] = words{
-			justification: row.Justification, body: row.Body, proposedAt: row.ProposedAt,
+			justification: row.Justification, mitigation: row.Mitigation,
+			proposedAt: row.ProposedAt,
 		}
 	}
 	return out, nil
