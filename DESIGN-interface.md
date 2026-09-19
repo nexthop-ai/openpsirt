@@ -110,7 +110,7 @@ The session is a cookie the browser holds and nothing in the application ever
 sees. The application holds the cross-site-request token, deliberately readable
 by script where the session cookie is not: echoing it distinguishes a request our
 page made from one somebody else's page caused. Every unsafe request carries it,
-**attached once as middleware rather than per call** — the one call somebody
+attached once as middleware rather than per call — the one call somebody
 forgets is the one that breaks in production and not in review.
 
 ## Capabilities before drawing
@@ -249,7 +249,7 @@ waiting for review, what is being worked on, what stopped applying, then the
 trends, and the operational state at the foot. The trends answer a question
 asked occasionally, and they are also the slowest part of the page.
 
-**The reader's own work leads, then the shape of the estate.** Assigned to
+The reader's own work leads, then the shape of the estate. Assigned to
 them, and claims of theirs an approver sent back; then open at or above the
 floor, known exploited, pending their approval, and overdue. Home answered "how
 much is there" and never "what do I do next" — the largest number on the screen
@@ -261,7 +261,7 @@ Open is the trend's latest point at every scope, which counts distinct issues �
 the findings list counts one row per issue and component, and a tile switching
 between the two as the picker moved would quote two figures for one word.
 
-**What became of a claim is derived rather than stored**, so there is no count
+What became of a claim is derived rather than stored, so there is no count
 to ask the server for: a page is read and what is on it is counted, and the
 tile says so where the page was cut. That is the treatment the deadline tiles
 beside it already get.
@@ -515,7 +515,7 @@ it prepares is kept as a number of days and turned into a date when somebody
 opens the form. Kept as a date and never read, the prefill opened the form with
 the outcome chosen and no date, which cannot be submitted.
 
-**What the list is narrowed by is what prepares a claim**, read off the address
+What the list is narrowed by is what prepares a claim, read off the address
 rather than remembered from the act of picking. Narrowing further asks a
 different question and drops it; coming back to the list finds it again. A rule
 that outlived the narrowing it was picked for would fill a form on a finding it
@@ -580,7 +580,7 @@ ships, what is open against it there, where it could go, the earliest deadline
 among what is open, and what has already been promised. The issue count is the
 way through to the findings list.
 
-**The screen is arranged on where the package sits**, because that is what
+The screen is arranged on where the package sits, because that is what
 decides what can be done about it. A leaf carries its own risk and is upgraded; a
 package vendored in pre-built carries everything beneath it and moves only when
 it does. So the graph leads — what pulls it in, the package, what it carries —
@@ -632,12 +632,12 @@ anything, which is why it is not gated on a claim. Nothing about writing one
 changes what ranks, a deadline, or what the product triages, and it says so
 beside the button.
 
-**The identifier in the heading opens the issue screen.** That screen answers
+The identifier in the heading opens the issue screen. That screen answers
 "everywhere this issue sits", and the doors into it were an exact-match search,
 one report and one queue link — so the reader most likely to want it, somebody
 already looking at one place the issue sits, had none.
 
-**The issue screen carries the same thread, a product at a time.** That screen
+The issue screen carries the same thread, a product at a time. That screen
 shows an issue wherever it sits, and a note belongs to one product — so one
 thread merging what several teams wrote would be the deployment-wide record a
 per-product note exists to avoid, and a reader could not tell which product any
@@ -909,7 +909,7 @@ Assignments is two tabs: what is due soon and undecided, and who holds what.
 A row nobody holds says "unassigned" in muted text rather than drawing nobody
 as a person with an avatar.
 
-**Work nobody holds is the findings list under two filters**, not a screen of
+Work nobody holds is the findings list under two filters, not a screen of
 its own: nobody assigned, and nothing decided. The rail entry keeps its label,
 its icon and its place, and its address carries those two filters. The badge
 beside it is counted from that same address, through the list's own query, so
@@ -1120,7 +1120,7 @@ application never makes one.
 
 ### Where an answer appears
 
-**A confirmation belongs where the button that produced it was pressed.** The
+A confirmation belongs where the button that produced it was pressed. The
 decision form's submit sits at the foot of a long form and the confirmation is
 drawn at the head of the screen, so somebody pressing it was left looking at
 the form they had just sent, with the answer a page and a half above them and
@@ -1374,7 +1374,7 @@ What this deployment is doing, rather than what it has found.
 ## The administration screens
 
 Who may sign in, what they hold, and the credentials that carry it. Called
-**Access**, because all three are one subject and two of the three are not users
+Access, because all three are one subject and two of the three are not users
 or roles: a pipeline key belongs to no person, and a personal token is listed
 against the person whose reach it carries. Naming the screen after the first of
 the three left the credentials on a screen that did not mention them.
@@ -1491,7 +1491,7 @@ Measured before the sweep that applied this: **262 standing strings, about
 somebody opens every day. The copy had drifted into explaining the design to
 the reader, which is what a design document is for.
 
-**Contractions.** The rule against them covers the durable documents, which are
+Contractions. The rule against them covers the durable documents, which are
 read years later by somebody deciding whether a decision still holds. Screen
 copy is not one of those and is written as spoken. In practice it rarely needs
 one: plain and short gets there without.

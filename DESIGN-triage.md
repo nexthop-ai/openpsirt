@@ -188,7 +188,7 @@ a comment or a decision would read as a tightening and would defeat it
 silently, which is why it is written here rather than left to be inferred from
 the read rule above.
 
-**The step itself is not built.** What is enforced today is the rule above,
+The step itself is not built. What is enforced today is the rule above,
 which is a statement about what a disclosure would carry rather than an act
 somebody can perform: reaching a disclosure date escalates and publishes
 nothing (REQ-37), and no path anywhere makes a finding public. So the record is
@@ -239,7 +239,7 @@ what became of it, what it wrote, and what it covers now.
 A judgment about a finding writes one decision per place; a judgment about many
 issues writes one per issue and per place. Rows stay that fine because each is
 keyed and lapses on its own. The thing a second person reads and agrees to is the
-**claim** — one argument with its reach. The review queue, approval, sending back
+claim — one argument with its reach. The review queue, approval, sending back
 and undoing all work on claims.
 
 | Kind | What it is |
@@ -758,7 +758,7 @@ How the set was narrowed is recorded with every claim in it, separately from the
 reasoning. Narrowing is how a candidate was found; the reasoning is why the
 claim is true. "These matched a word" is not a defense anybody would accept.
 
-**Prose alone cannot be checked**, so the narrowing is recorded twice: in the
+Prose alone cannot be checked, so the narrowing is recorded twice: in the
 claimant's words, and as something an approver can re-run.
 
 | Rule | Reason |
@@ -1003,7 +1003,7 @@ A note is what somebody wants whoever decides to know, written without
 recording a judgment (REQ-29). It changes nothing: not what ranks, not a
 deadline, not what the product triages.
 
-**There was nowhere to put one.** A comment hangs off a claim and the box for
+There was nowhere to put one. A comment hangs off a claim and the box for
 one appears only where a claim already exists, so the first person to say
 anything had to record a judgment in order to say it. Assignment carries no
 message either: it takes a person or a team and nothing else.
@@ -1031,7 +1031,7 @@ what people wrote about the claim, which is what lets an approval point at one
 revision of a justification (REQ-28). Two threads are rendered near each other
 instead.
 
-**Something true of one copy and not another is a comment, not a note.** "We do
+Something true of one copy and not another is a comment, not a note. "We do
 not call that function in the vendored build" is about a judgment at a place,
 and it has a home there already.
 
@@ -1098,7 +1098,7 @@ it — the rule, the setting, the service that is not exposed.
 
 Every other recognized reason for something not applying is a claim about code,
 and code is what makes a decision lapse. This one is a claim about
-**configuration**, which can be removed with no version moving at all. **Nothing
+configuration, which can be removed with no version moving at all. **Nothing
 here watches configuration, and nothing expires this claim.**
 
 Naming the control does not close that gap. It is the difference between a claim

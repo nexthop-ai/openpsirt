@@ -169,8 +169,8 @@ artifact and an upgrade is deploying it. Automatic application can be disabled,
 and `openpsirt migrate up|down|status` runs them separately for an operator who
 would rather use different credentials at a time they choose.
 
-**With automatic application off, the schema is compared before anything is
-served.** The binary and the schema then move independently, and nothing
+With automatic application off, the schema is compared before anything is
+served. The binary and the schema then move independently, and nothing
 compared them: a build carrying a new migration started, granted
 administrators, answered the readiness probe — which is a ping — and failed
 every request touching the new table. In a rolling deployment the probe passing
@@ -186,7 +186,7 @@ What the binary carries is the highest version among the embedded migration
 sources, read from their file names, which is the same rule the migration
 library applies to them.
 
-**Version zero means nothing is applied, and nothing else.** The bookkeeping
+Version zero means nothing is applied, and nothing else. The bookkeeping
 table is looked for before the version is read, so a read-only inspection does
 not create it. Selecting from the table to find out answers three questions at
 once and cannot tell them apart — it is not there, this credential may not read
@@ -228,7 +228,7 @@ engine-specific rollback that existed only because a column was added later,
 four files to read to know what one table holds, and ten more migrations for
 the collapse to unpick. Every migration now creates something.
 
-**A migration is its statements and nothing else.** What every one of them does
+A migration is its statements and nothing else. What every one of them does
 around those statements — asking which engine this is, refusing an engine there
 are no spellings for, running each statement, naming the one that failed — is
 one place. Thirty-three copies of it had already become four spellings of one
@@ -241,7 +241,7 @@ third time with one arm missing.
 
 ### Migrations that stop half way
 
-**On MySQL and MariaDB a migration cannot be rolled back.** Both commit
+On MySQL and MariaDB a migration cannot be rolled back. Both commit
 implicitly before and after every data-definition statement, so the transaction
 each migration is given is decorative there. A failure at statement N leaves 1
 to N-1 committed, the rollback removes nothing, and no version is recorded — so
@@ -277,8 +277,8 @@ keeps its dialect in package-level state, so two goroutines migrating at once
 race on it regardless of any database lock. The advisory lock exists because a
 rolling deployment starts several instances at once.
 
-**SQLite takes its lock outside the database, because it cannot take one
-inside.** The handle is capped at a single connection — the file has one writer
+SQLite takes its lock outside the database, because it cannot take one
+inside. The handle is capped at a single connection — the file has one writer
 — so a lock held on a pinned connection would be holding the only connection
 the migration needs. What stood instead was the assumption that SQLite is only
 ever used by one process, enforced by one chart template while the binary
@@ -360,7 +360,7 @@ in `AS groups`, and `GROUPS` is a reserved word in MySQL 8, where it names a
 window frame type. Three engines parsed it and one returned a syntax error,
 which the handler above turned into a 500 with the driver's message discarded.
 
-**A name a query invents is checked for being bare, not for being reserved.**
+A name a query invents is checked for being bare, not for being reserved.
 The check compared each one against a list of 321 words the four engines
 reserve, which is a strictly weaker property than the rule it was the
 enforcement of: a name nobody has reserved *yet* passed, and MySQL 8.0 reserved
@@ -382,7 +382,7 @@ that looks like a statement is read now, and `FROM "` or `JOIN "` is what
 marks one: every table here is quoted, so that appears in SQL and not in
 prose, where matching the bare keywords reported sixty-odd English sentences.
 
-**A table a query names is quoted too, and is checked outside the migrations.**
+A table a query names is quoted too, and is checked outside the migrations.
 A table is declared rather than invented, so the alias pattern cannot see one
 at all, and nothing looked: they were bare in four hundred and eighty-eight
 places and quoted in a handful, in the same clauses whose aliases were quoted.
@@ -390,7 +390,7 @@ What the migrations made is read first, and a word this schema has no table of
 is not a table — which is how a clause keyword is told from a name without a
 list of keywords that would go stale the same way the reserved list does.
 
-**The two halves are admitted differently, and for a reason.** The alias half
+The two halves are admitted differently, and for a reason. The alias half
 reads only a literal recognizable as a query, because "as" is a word in nearly
 every English sentence here. The table half reads every literal, because what
 admits one is this schema's own table names — and a query whose tables are all
@@ -400,11 +400,11 @@ else is admitted where a method that names a table is being called, since no
 pattern over the text alone tells `"person"` the table from `"person"` the kind
 of subject.
 
-**Test queries are held to it too.** They run against the same four engines,
+Test queries are held to it too. They run against the same four engines,
 and twenty-two of them named a table bare. The checker's own package is the one
 exemption: a bare table in its fixtures is the input, not a defect.
 
-**A clause assembled in a variable is read where it is handed over.** Three of
+A clause assembled in a variable is read where it is handed over. Three of
 them reached the builder through a local built from literals a line earlier,
 and a check that reads only what is written at the call read none of it — which
 is the fragment nobody else has read either. Every literal a function puts in a
@@ -546,7 +546,7 @@ transaction began, or carried over from the attempt that failed, describes a
 world that no longer exists. Anything a closure uses but does not fetch is a
 defect.
 
-**A statement that fails inside a transaction is not always recoverable.** On
+A statement that fails inside a transaction is not always recoverable. On
 PostgreSQL a failed statement aborts the whole transaction: every command after
 it is refused until the block ends, whatever the caller made of the failure. So
 a statement whose failure is the ordinary answer — an insert refused by a
@@ -556,7 +556,7 @@ It runs on its own, and what needs the retry goes in the transaction. Three of
 the four engines carry on after a failed statement, so the quick loop never
 sees this.
 
-**An act is one transaction, and an act is what a person asked for.** Recording
+An act is one transaction, and an act is what a person asked for. Recording
 somebody and granting them the roles named, declaring a team and putting people
 on it, filling in a stream's parent and recording when it went out, storing a
 graph with what the build argued about its own patches: each is one request, and
@@ -564,7 +564,7 @@ written as a statement per part a refusal partway through answers "nothing
 happened" over a database where half of it did. The caller then corrects the
 request and sends it again, and the half that landed lands twice.
 
-**The record of an administrative act is inside it.** The act and the row saying
+The record of an administrative act is inside it. The act and the row saying
 who made it are one change: a setting moved with nobody recorded as having moved
 it is the state the record exists to prevent, and a write that succeeded beside
 a record that failed produced exactly that. A failure to record fails the act,
@@ -597,7 +597,7 @@ because written by hand it reads as a fallback to writing outside a transaction.
 The reads rule reaches further in that case, not less far: the closure may be
 re-run by a retry it cannot see.
 
-**The helper names every handle it accepts, and refuses the rest.** A test for
+The helper names every handle it accepts, and refuses the rest. A test for
 one handle type is failed by a handle that merely embeds it, and the arm that
 answered the failure ran each statement as its own autocommit — no transaction,
 no retry, nothing said, and the two spellings differ by four characters. A
@@ -620,8 +620,8 @@ whatever the row holds when it runs.
 | Both write | The second waits for the first to commit, then writes over what it never saw |
 | Both report what they replaced | Both name the value they read, and only one of them replaced it |
 
-**A value read inside the transaction and reported to the caller is carried in
-the write or it is a guess.** The update matches on the key *and* on what the
+A value read inside the transaction and reported to the caller is carried in
+the write or it is a guess. The update matches on the key *and* on what the
 read answered with; a match of no rows means the row moved, and the attempt is
 taken again in a new transaction. Reading again inside the failed one does not
 work — MySQL and MariaDB fix the snapshot at the opening select, so the second
@@ -650,7 +650,7 @@ gives up: roughly fifteen minutes on common defaults, with nothing logged.
 
 Go's pool cannot detect this. It never validates a connection before handing it
 out, and the two driver hooks it calls before reuse inspect only local state.
-**The defense is to ensure a connection is never idle long enough to be killed.**
+The defense is to ensure a connection is never idle long enough to be killed.
 
 | Setting | Default | Reason |
 |---|---|---|
@@ -760,7 +760,7 @@ beside it without one.
 
 The harness runs a test against every database available to it. SQLite always
 runs; the production engines run when the environment points at them and are
-**skipped loudly** otherwise.
+skipped loudly otherwise.
 
 The schema is built once per test binary, not once per test. On SQLite a file is
 migrated on first use and copied per test; on each server the binary gets a

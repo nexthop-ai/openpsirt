@@ -14,7 +14,7 @@ taken.
 
 ## Upgrading
 
-**`OPENPSIRT_BASE_URL` is checked at startup**, and a value with no scheme is
+`OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is
 now refused where it used to be accepted. `psirt.example.com` has to become
 `https://psirt.example.com`.
 
@@ -74,7 +74,7 @@ nobody checked. Ask for certainty in the URL.
 Anything the URL says about the transport is left alone, so `tls=skip-verify`
 or a `sslmode` of your own reaches the driver as written.
 
-**Say so where it is required.** With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set,
+Say so where it is required. With `OPENPSIRT_DB_REQUIRE_ENCRYPTION` set,
 the process asks the connection what it negotiated and refuses to start where
 that is cleartext — naming the URL, without its password, and what to put in
 it. Asking for encryption in the URL and being given none is a deployment that
@@ -112,7 +112,7 @@ make scanner-db
 ```
 
 It produces `dist/openpsirt-scanner-db-<date>.tar.gz` and its checksum, using
-**the scanner the image carries** — the format is the scanner's, and a bundle
+the scanner the image carries — the format is the scanner's, and a bundle
 built by a different version is one that may not load. Before it says it
 succeeded it runs that same scanner against the bundle **with the network off
 and auto-update refused**, which is the configuration on the far side of the
@@ -183,7 +183,7 @@ here that reaches the network: everything a scan needs arrives as a file
 somebody imported, and a deployment that cannot reach out loses this answer and
 nothing else.
 
-**What goes out is a component's name.** One request per component to that
+What goes out is a component's name. One request per component to that
 ecosystem's public index, carrying the name and nothing else — no version, no
 build, no product. For an open-source dependency that is public knowledge. For
 something built here it is the name of a project, a team, or a product nobody
@@ -214,19 +214,19 @@ deployment publishing under `example.test` holds back:
 
 `pkg:npm/exampler` is left alone. Case does not decide.
 
-**This is a better default, not a control.** A deployment that needs certainty
+This is a better default, not a control. A deployment that needs certainty
 about what leaves it leaves the whole feature off, which is where it ships. It
 is biased toward holding back: over-excluding loses an answer, which is visible
 on the screen that would have shown it, and under-excluding sends a name to
 somebody else's service, which is visible nowhere.
 
-**Turning it off again drops what was fetched.** On a deployment that had
+Turning it off again drops what was fetched. On a deployment that had
 asking on before a name was held back, the version an index gave for that name
 is removed the next time the pass reaches it, along with the summary and the
 project address. All of it came from sending the name. Nothing else is
 affected and no upgrade step is needed.
 
-**Read what it held back, and what no index knew.** The report is at
+Read what it held back, and what no index knew. The report is at
 `/v1/upstream/unanswered` and on the System screen. Held-back names say what
 the default is costing; names no public index has heard of are private modules
 and vendored forks, and they are the candidates to promote into
@@ -238,8 +238,8 @@ The process refuses to start until somebody can administer it, and naming
 somebody grants a role — it does not let anybody in without signing in.
 
 Configure at least one of the sign-in methods below, or nobody can reach it.
-**The Helm chart refuses to render an install with none; the binary does not
-check**, because a deployment being brought up in pieces is an ordinary state
+The Helm chart refuses to render an install with none; the binary does not
+check, because a deployment being brought up in pieces is an ordinary state
 for a process and not for an install.
 
 | Variable | Meaning | Default |
@@ -304,7 +304,7 @@ The trusted header below is the way in that does not depend on the provider,
 and it is what a provider change goes through. A pinned identifier does not
 refuse a proxy arrival, so everybody reaches what they already hold.
 
-**The provider is down and people must sign in.**
+The provider is down and people must sign in.
 
 1. Unset `OPENPSIRT_OIDC_ISSUER`. A provider that cannot be discovered stops
    the process at startup, so leaving it set means nothing starts at all.
@@ -312,7 +312,7 @@ refuse a proxy arrival, so everybody reaches what they already hold.
    needed; half a configuration stops the process.
 3. Restart. Sign-in is by the name the proxy asserts.
 
-**The provider publishes an endpoint on another host.** The process refuses to
+The provider publishes an endpoint on another host. The process refuses to
 start, naming the endpoint and the host. Pinning the fetch to the issuer does
 not stop the document naming somewhere else inside itself, and an issuer naming
 an authorization endpoint elsewhere turns every sign-in into a redirect of its
@@ -320,7 +320,7 @@ choosing. There is no way to allow it: the deployment reaches this provider
 through a proxy that serves the whole of it from one host, or it signs in
 through the trusted header instead.
 
-**The provider is changing.** An identifier belongs to the provider that
+The provider is changing. An identifier belongs to the provider that
 issued it, and the same string names somebody else at another one, so a
 deployment configured for a provider its bound identities do not name refuses
 to start.

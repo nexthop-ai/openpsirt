@@ -29,7 +29,7 @@ encoded here is one every deployment inherits and none of them chose, and it is
 wrong for most of them the day a rule is amended. The facts are the same for all
 of them.
 
-**Nothing here decides anything.** No screen says an obligation applies, none
+Nothing here decides anything. No screen says an obligation applies, none
 reports one was met, and no default encodes a jurisdiction's window. A
 deployment that must report something reads the record and answers; a deployment
 under no such duty sees a record it does not use.
@@ -101,16 +101,16 @@ correct and needs no hardening.
 
 ## Limits
 
-**Nothing here is a compliance feature and none of it should be sold as one.**
+Nothing here is a compliance feature and none of it should be sold as one.
 The record is a record. Two deployments with identical records can owe entirely
 different things, and the difference lives outside this software.
 
-**The exploited-here record cannot be verified by anything.** It is somebody's
+The exploited-here record cannot be verified by anything. It is somebody's
 statement that an incident happened, which is what makes it append-only and what
 makes clearing it a deliberate act with a name attached. Nothing re-checks it,
 because nothing could.
 
-**A regulation is named nowhere in the code, the configuration or the screens.**
+A regulation is named nowhere in the code, the configuration or the screens.
 Naming one makes the record look like an answer to that regulation, which is the
 claim this area refuses to make. The reasoning that a particular rule prompted
 this work belongs in a commit message and in this paragraph, and nowhere a

@@ -97,7 +97,7 @@ These are the only places these claims are tested rather than asserted.
 | It serves the interface | An image built with no interface, which answers the page's path with a credential refusal rather than a page |
 | The archive's binary serves the interface | The same build with no interface in it, in the form somebody runs by hand |
 
-**They run against a release as well as against a change.** The image a
+They run against a release as well as against a change. The image a
 release publishes is built from a fresh checkout with its base upgraded as it
 builds, so it is a different set of bytes from the one a merge was gated on,
 and the scanner it bundles can stop working in between. A deployment that
@@ -197,7 +197,7 @@ Secret the chart created holds the value under the chart's key, and asking for
 the operator's key name there asks for a key that is not there — which renders
 perfectly and produces a pod that never starts.
 
-**A Secret is written only while the thing that reads it is configured.**
+A Secret is written only while the thing that reads it is configured.
 Turning a provider off by clearing its issuer used to leave the Secret behind,
 holding a live credential nothing reads.
 
@@ -357,7 +357,7 @@ the inventories and `openpsirt -version` cannot disagree about one build.
 | Build provenance | An attestation naming the repository, the workflow file and the tag that produced the asset |
 | What it proves | That an asset came out of this repository at that tag. Not that what is inside it is correct — that is what the inventories and the scan are for |
 
-**Every signature is verified in the workflow that makes it**, with the
+Every signature is verified in the workflow that makes it, with the
 command and the identity a third party would use. A signature nobody has
 verified is a signature nobody has tested, and the first person to find out is
 otherwise somebody who downloaded it.

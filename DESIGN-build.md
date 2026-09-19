@@ -167,7 +167,7 @@ Three steps pass only on a commit — `openapi-current`, `web-api` and
 `reserved-current` each diff a regenerated file against the last commit, so on
 an uncommitted tree they report the file as stale.
 
-**Test code a tag or an environment variable guards is compiled by the gate.**
+Test code a tag or an environment variable guards is compiled by the gate.
 A file behind a build tag is loaded by nothing an ordinary run compiles, so a
 rename anywhere it reaches leaves it silently broken while the build, the vet,
 the linter and CI all pass — and the one target that does pass the tag refuses

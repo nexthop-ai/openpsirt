@@ -23,7 +23,7 @@ Declaring is three requests, and you make them once rather than per build.
 Each is administration, so each needs an administrator — a pipeline's key
 cannot declare anything.
 
-**Scripting these needs an `Origin` header.** A write arriving with no session
+Scripting these needs an `Origin` header. A write arriving with no session
 of ours behind it is guarded against forgery by the origin it states, so a
 request made from a shell through a trusted-header proxy is refused as "not
 from a page this deployment served" until it says where it came from. Add
@@ -64,7 +64,7 @@ curl -X POST "$OPENPSIRT/v1/keys" \
   -d '{"name": "sonic-ci", "product": "sonic"}'
 ```
 
-**A key is scoped to one product**, which is required rather than optional, and
+A key is scoped to one product, which is required rather than optional, and
 may be narrowed further to one stream and one variant. So a deployment shipping
 three products has three keys, and a key that leaks reaches one of them.
 
@@ -97,7 +97,7 @@ curl -X POST \
 | `inventory` | The SBOM. CycloneDX 1.x, SPDX 2.x or SPDX 3.x — the format is read from the document, not declared |
 | `suppressions` | Optional, repeatable. OpenVEX documents stating what this build has already dealt with |
 
-**A 202 means accepted, not valid.** The documents are parsed afterwards, so the
+A 202 means accepted, not valid. The documents are parsed afterwards, so the
 response says the upload arrived and nothing about whether it could be read.
 That is the one thing to get right in a pipeline: a green step here is not a
 green scan.

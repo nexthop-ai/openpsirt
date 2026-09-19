@@ -160,7 +160,7 @@ Nobody learns which issues exist either. Every route shaped "this issue, at this
 place" resolved the name first and checked what it reached second. On two of
 them the second check was not a refusal at all: a fix target answered an empty
 list and an assignment answered "done" while writing nothing, so those two
-**disclosed by succeeding**.
+disclosed by succeeding.
 
 One resolver does both steps, and every such route goes through it: resolve the
 name, then ask whether this person may read a finding of it in this product, and
@@ -277,14 +277,14 @@ able to move them.
 | Read, never write | Every write over the same records asks for administration. An administrator is not asked to hold this as well: they can grant themselves anything, so requiring it would be a checkbox rather than a control |
 | The records are shown whole | Not narrowed by which products the holder reaches |
 
-**Holding it means knowing which products exist.** The change log names them —
+Holding it means knowing which products exist. The change log names them —
 a role granted on one, a release whose support date moved — and the list of
 people names each person's products. That is a property of the grant rather
 than a leak, because granting it is a deliberate administrative act, and it is
 written down here so that granting it is an informed one. The alternative is an
 audit record with holes in it that nothing marks, which is worse than no record.
 
-**What somebody was told is narrowed, and this is not a way to see more.** The
+What somebody was told is narrowed, and this is not a way to see more. The
 rows come back as the asker could have read them on their own account, which is
 the rule the administrator flag already follows — so an auditor who reaches no
 product is answered with nothing.
@@ -798,14 +798,14 @@ database by hand.
 | Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
 | A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
 
-**The session lifetime has a ceiling of thirty days.** It is the window in which
+The session lifetime has a ceiling of thirty days. It is the window in which
 a role a group withdrew can still be held, and it was whatever an administrator
 typed: a lifetime of a year made every browser sign-in last a year. Refused
 rather than quietly shortened, at the settings write and at startup, so that
 somebody who asks for more hears the limit rather than discovering it later.
 
-**A grant a group derived grants through a token only while it is younger than
-this window.** Membership is read at sign-in and a sign-in replaces somebody's
+A grant a group derived grants through a token only while it is younger than
+this window. Membership is read at sign-in and a sign-in replaces somebody's
 derived grants whole, so a browser's are never older than its session. A token never signs in: it resolves
 through its owner and reads whatever their last sign-in wrote. So a derived
 grant is in force for a token only while it is younger than this window, and a
@@ -900,7 +900,7 @@ A pipeline is refused a read rather than shown an empty one, receipts for its
 own uploads excepted. "Here is nothing" and "you cannot ask" are different
 statements, and the first invites a caller to believe the list is empty.
 
-**Refused where the read is, not only at the edge.** Roughly twenty store reads
+Refused where the read is, not only at the edge. Roughly twenty store reads
 answered a credential that is not a person with an empty result, so the
 invariant the design places in the data layer was in fact enforced by one
 function in a handler — and a check in a handler is the one somebody forgets.
@@ -999,7 +999,7 @@ absorbing a route that should leave a row is the failure the walk exists to
 make visible — and the way that happens is somebody adding a line to the list
 instead of a call to the recorder.
 
-**The walk is what makes this true rather than intended.** It reads the
+The walk is what makes this true rather than intended. It reads the
 operations the server registered, so a route in neither list fails it; the
 driving half then exercises each trailed route and reads the row back. What it
 replaced was a literal of twelve acts beside a comment claiming a route walk,
@@ -1132,7 +1132,7 @@ between the two mints.
 | Minted only where nothing holds one, and the answer is what is stored | Two replicas starting together both find nothing and both mint. Written as a plain set, the second overwrites the first — and every sign-in already in flight, sealed with the losing key, is refused when the callback lands |
 | The caller takes whichever key won | It wants a key everybody agrees on, not the one it generated |
 
-**What a setting held is answered by the write that replaced it.** Read in a
+What a setting held is answered by the write that replaced it. Read in a
 statement of its own beforehand it is the value at some earlier moment: two
 administrators moving the same setting at once both read the original, and the
 second writes a prior value into the append-only trail that nothing ever held

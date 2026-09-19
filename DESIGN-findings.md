@@ -157,13 +157,13 @@ would depend on which scan ran last.
 
 A test puts the same two reports through in both orders and asserts they agree.
 
-**The score carries where it came from.** Which scoring system it is on, who
+The score carries where it came from. Which scoring system it is on, who
 published it and whether it is the primary rating or a secondary one, filled
 where a report knows and never overwritten. Everything else a scan says is
 recorded with its provenance — what found it, what it was matched from, what it
 was matched in — and the one number a deadline is set from had none.
 
-**The estimate carries what it means and when.** Where it stands among all
+The estimate carries what it means and when. Where it stands among all
 published ones, and the day it was computed for. The probability alone is
 unreadable — nobody acts on 0.00042 — and the percentile is the same fact a
 reader can use.
@@ -183,7 +183,7 @@ Derived at read time and stored nowhere. An address worked out from two names
 cannot go stale while the names are right, and storing it would put a second copy
 of the templates somewhere to fall behind the first.
 
-**One table, and the interface reads its answer.** The component screen had a
+One table, and the interface reads its answer. The component screen had a
 second table of its own, in a second language, with a different membership —
 neither a superset of the other — and different answers for the same
 identifier: it sent every Debian-family package to Debian's tracker, so an
@@ -236,7 +236,7 @@ Asking is the same pass that asks for the newest version, so it costs no extra
 request: this is reading more of an answer already fetched. It is off unless a
 deployment turns it on, like everything else that reaches the network.
 
-**What no index gives is a distribution package's description.** Those live in a
+What no index gives is a distribution package's description. Those live in a
 distribution's own package index, which is one file per release rather than one
 request per package — a different shape from the per-package asks here, and not
 built.
@@ -292,14 +292,14 @@ distributed, produced findings identical to one that ships.
 | The scope is part of what identifies the edge | A producer that starts describing the same pair differently has said something different. The earlier edge closes and the new one opens, which is what every other change to a graph does here and what keeps a scan's reported counts true |
 | A pair declared twice takes the stated scope | A document naming a dependency plainly and again with a scope has said the scope. Where two differ, the first is kept: the producer said two things and one is recorded |
 
-**A test dependency places nothing, and carries no word.** Both readers drop
+A test dependency places nothing, and carries no word. Both readers drop
 that edge — SPDX 2's `TEST_DEPENDENCY_OF` and SPDX 3's `test` scope — because a
 test dependency is not part of what ships. The component is still held, stored
 and scanned, which is what a component the producer could not place gets too.
 So there is no edge for a word to sit on, and the one scope with the strongest
 case for deferral is the one not recorded.
 
-**Dropping that edge is not acting on a finding.** What it changes is where the
+Dropping that edge is not acting on a finding. What it changes is where the
 component sits, not whether it is tracked, which is why the rule above and this
 exception agree rather than contradict.
 
@@ -310,7 +310,7 @@ exception agree rather than contradict.
 | A filter on the findings list | The only way to ask about the deferral class at all. Asked of the component's incoming edges in the build, so one reached from two consumers scoped differently answers to both words — a place is a pair of columns, and no engine here compares a pair against a set the same way |
 | An evidence line on the finding's dependency path | Beside the place it is about, in the producer's word, next to what the build's own VEX said. Which is where somebody deciding reads it |
 
-**Nowhere else.** Not in the urgency ranking, not as a prefilled outcome on a
+Nowhere else. Not in the urgency ranking, not as a prefilled outcome on a
 claim, and not as a default narrowing on any list. A person deciding that a
 build-time dependency does not ship is making a judgment, and the judgment stays
 theirs.
@@ -661,7 +661,7 @@ issue holds is the worst anybody has claimed for the two that are claims, and
 for the likelihood the newest anybody has published — see the table above for
 why those differ.
 
-**The fourth signal, the rating, belongs to a product** (REQ-29). Three of the
+The fourth signal, the rating, belongs to a product (REQ-29). Three of the
 four are properties of the issue and reach every product holding it; the rating
 is the product's own where somebody there has made one and the published word
 otherwise, so the same issue can sit at two different places in two products'
@@ -856,7 +856,7 @@ the run is for is the *growth*, which is stable across both samples.
 | MySQL writes seven times slower than PostgreSQL and fifteen times slower than MariaDB | A nightly scan taking thirteen seconds is not an operational problem; the same code being fifteen times more expensive on one supported engine than on its own sibling is a fact to have before somebody chooses one |
 | The cost is per statement, not per row | A night issues **1,699 statements on every engine**. What differs is what one costs: **203 µs on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL**. The lever for making MySQL faster is issuing fewer statements |
 
-**Rewriting every deadline walks the identifier range once.** The moments a
+Rewriting every deadline walks the identifier range once. The moments a
 product's findings opened at ride inside the statement as a case over a batch of
 them, rather than one statement per moment. The other way round the count was
 moments × bands × identifier slices: a product scanned nightly for a year holds

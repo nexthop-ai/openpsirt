@@ -95,7 +95,7 @@ fix target — and the summary of a recorded flaw. A field that skips the policy
 loses all three of its parts at once: the scheme check, the refusal of raw
 markup, and the length bound.
 
-**The check runs in the store, at the point the value is trimmed**, rather than
+The check runs in the store, at the point the value is trimmed, rather than
 in the handler that happens to be the first caller. That is what makes the
 policy hold for every path into the column, and a column written by two paths
 is only as bounded as the laxer of the two.

@@ -145,7 +145,7 @@ stream name would then produce a stream that looks genuine, with its own
 findings, counts and place in every report, while the real stream appears to have
 stopped being scanned.
 
-**Declaring is idempotent, including against another writer.** Declaring what
+Declaring is idempotent, including against another writer. Declaring what
 is already there succeeds and changes nothing, because a pipeline that has to
 know whether it is the first one is not usable from CI — and nothing
 coordinates CI pipelines, so two arriving together is the ordinary case rather
@@ -288,7 +288,7 @@ it is the half that matching a claim needs.
 The binary packages one source package was built at one version are one thing to
 a person. curl, libcurl4t64 and libcurl3t64 are one bump; treating them as three
 is three acts that can disagree with each other. Every component carries a
-**fold key**, written as the scan is applied.
+fold key, written as the scan is applied.
 
 | Part of the key | Separates |
 |---|---|

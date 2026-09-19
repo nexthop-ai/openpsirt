@@ -36,7 +36,7 @@ tell it, and the command above uses the second.
 | A sign-in provider | One OpenID Connect provider, or GitHub. Configured at startup, and needed for anybody to sign in through a browser normally |
 | A trusted header | A reverse proxy authenticates and passes the username on. Honored only from addresses you name, because reaching the container directly bypasses the proxy |
 
-**A browser cannot set a header**, so the command above gives you an API to
+A browser cannot set a header, so the command above gives you an API to
 drive with `curl` rather than an interface to click:
 
 ```

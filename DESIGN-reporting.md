@@ -457,14 +457,14 @@ What it is for is showing that no dismissal sits in that population.
 Not-applicable, will-not-fix and already-fixed all require approval, so that
 query should return nothing, and a row in it is a control that failed.
 
-**Which is why nobody has to open it to find out.** The same question is asked
+Which is why nobody has to open it to find out. The same question is asked
 as a condition and told to administrators when it stops answering nothing —
 because a report that is empty every time is one nobody opens, and it is then
 read only after something has already gone wrong. `DESIGN-notifications.md`
 § Reports that must come back empty holds the rest, including why the
 condition carries a count and a link and never these rows.
 
-**The rubber-stamp report is not the same shape**, despite asking the same
+The rubber-stamp report is not the same shape, despite asking the same
 question in one of its sections. Only what stands with nobody agreeing has to
 be empty; bulk agreement is the control working at the grain somebody acted at,
 an approval from a role since withdrawn is correct behavior, and the same two
@@ -629,7 +629,7 @@ three to eight times as long, because two of the columns it reads are not in
 any index it can use: the version that fixes a finding, and the fold key, which
 is on the component rather than on the finding.
 
-**Nothing is built on that yet.** Grouping on the component instead of the fold
+Nothing is built on that yet. Grouping on the component instead of the fold
 saves six percent, so the fold is not where the time goes, and the remaining
 candidates are a stored fold key on the finding and an index that covers the
 fix version. The first is a derived value stored for speed, which has to be

@@ -39,7 +39,7 @@ The stored row is the declaration and nothing else: which build, which fold, who
 said so, and when. There is no state column, no completed-at, and nothing to
 move along.
 
-**A declaration arrives with the judgment that argued for it**, from the two
+A declaration arrives with the judgment that argued for it, from the two
 outcomes that promise work — a bump, recorded against the component, and a
 backport, recorded against the issue. There is no way to record where a fix will
 land without saying what was decided: bare intent carried no version, no date
@@ -113,7 +113,7 @@ anybody marking it done (REQ-35). Each stands at landed, lapsed or planned, and
 those three are worked out on every read — nothing stores them, nothing refreshes
 them, and nothing has to be invalidated when a scan closes a finding.
 
-**A roll-up across the builds one issue was promised in is not built.** There was
+A roll-up across the builds one issue was promised in is not built. There was
 one, reading "two of three chosen releases are clear", and it was the only reader
 of a screen that offered a set of builds to tick with no version, no date and no
 reasoning attached; both went together. What remains answers per build, which is
@@ -127,8 +127,8 @@ There are no per-item due dates. A deadline comes from how urgent the finding is
 threshold, and the deferral date becomes the effective target. Deferred items are
 reported apart from plainly overdue ones. **A plan says where, not when.**
 
-**The clock starts at the latest of three moments, never the earliest and never
-now**: when the finding was first seen here, when exploitation was learned, and
+The clock starts at the latest of three moments, never the earliest and never
+now: when the finding was first seen here, when exploitation was learned, and
 when the fix became available. All three have passed, so recounting reaches the
 same answer every time — which is what keeps a deadline from restarting nightly
 and never arriving.
@@ -148,7 +148,7 @@ A finding with no deadline states which reason applies:
 | **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
 | Its release is past end-of-life (REQ-15) | `out-of-support` | |
 
-**Four reasons and three words.** A tag reports as out of support, which is not
+Four reasons and three words. A tag reports as out of support, which is not
 what it is — a supported tag carries no deadline for a more fundamental reason
 than a retired one does. Stated here rather than left as a difference between
 this table and the wire, and a word of its own is worth adding the day somebody
@@ -158,7 +158,7 @@ There is no further reason, because a deadline is worked out at ingest for
 everything else. Left blank, the column reads as missing data on the one screen
 whose purpose is noticing what is running out.
 
-**A deadline nobody can meet is not a deadline**, which is the one statement all
+A deadline nobody can meet is not a deadline, which is the one statement all
 four make. Where upstream has released nothing there is no version to take, and
 the only act that stops the clock is a person recording a judgment — which is
 the act the deadline exists to ask for and cannot be the answer to. An overdue
@@ -170,13 +170,13 @@ proportion belongs beside this rule once somebody has it from a deployment, and
 it is left out rather than estimated: a figure nobody can re-run is one a reader
 has to take on trust, which is the opposite of what a number is for.
 
-**A scanner that did not answer is not upstream saying no.** Reading silence as
+A scanner that did not answer is not upstream saying no. Reading silence as
 "no fix exists" is a claim about the world made out of a gap in a report, and it
 is the direction that loses a deadline somebody could have met. So an unstated
 fix state stays on the clock.
 
-**This cuts overdue counts, and that is a correction rather than an
-improvement.** Anyone tracking the figure should be told why it moved. What it
+This cuts overdue counts, and that is a correction rather than an
+improvement. Anyone tracking the figure should be told why it moved. What it
 does not do is flatter a response time: if a two-year-old issue was genuinely
 learned of today, the response time is from today, and the accusation hiding in
 the objection — that we should have known sooner — is a question about scanning
@@ -248,7 +248,7 @@ What comes back is classified, because the classes want opposite treatment.
 | A refusal the index will repeat | Asked, with no version | A package withdrawn, a region blocked, a name that cannot be turned into a request, a document nothing can read. An answer we will never get is still an answer about this component |
 | A bad day — too many requests, or the index itself unwell | Nothing | The one class worth coming back to: it stays due and the next pass asks again |
 
-**Everything that is not a bad day is recorded.** Read as one, a refusal the
+Everything that is not a bad day is recorded. Read as one, a refusal the
 index repeats every time left the component unrecorded — and the window takes
 the never-asked first, so it held the head of every pass afterwards for ever,
 with the components behind it never reached.
@@ -260,7 +260,7 @@ month.
 
 ### What leaves, and what does not
 
-**What a request carries is a component's name.** One per component, the name
+What a request carries is a component's name. One per component, the name
 and nothing else — no version, no build, no product. For an open-source
 dependency that is public knowledge. For something built here it is the name of
 a project, a team, or a product nobody has announced, and a public index
@@ -302,13 +302,13 @@ somebody knows the promotion worked.
 | No index knows it | Sent, and nothing had heard of it. A private module and a vendored fork both look like this, and neither is a fault |
 | The identifier cannot be read | Nothing can turn it into a request. Kept apart from the one above because it is a fault in a document this deployment accepted rather than a fact about the world, and reading it as "no index knows this" would put it on the list of names somebody is about to hold back, where it means nothing |
 
-**Derived rather than stored.** A held-back name and one no index knows are
+Derived rather than stored. A held-back name and one no index knows are
 recorded identically, because the pass must record both. What tells them apart
 is the same list applied again at read time, which also means the report
 follows a change to the list immediately instead of waiting for a month of
 backoff to expire.
 
-**A component the pass has not reached is not on it.** It is waiting rather
+A component the pass has not reached is not on it. It is waiting rather
 than unanswered, and reporting a first day's backlog as though the indexes had
 failed would make the list useless on the day somebody reads it.
 
@@ -345,7 +345,7 @@ closes everything near the bottom.
 | Which scheme applies is read from the package identifier | Two ecosystems spell some versions identically and order them differently, so reading the shape of the string would order a package by whichever scheme its version happened to resemble |
 | The scanner already compared versions to match the finding | So refusing to compare does not make the tool comparison-free — it leaves it unable to rank what it has already been told. What is new here is saying which of the answers is furthest along, not deciding which findings apply |
 
-**A wrong order is worse than none**, which is why the refusal is part of the
+A wrong order is worse than none, which is why the refusal is part of the
 mechanism rather than a gap in it: the answer arrives as a recommendation
 somebody schedules a release around, and the scan that would catch it runs after
 the release.
@@ -409,7 +409,7 @@ on them. Saying which releases the work is meant to reach is done to the work.
 
 ## Publication
 
-**Not built, apart from the document.** A CSAF document is generated and
+Not built, apart from the document. A CSAF document is generated and
 reachable at the advisory routes; nothing sends it anywhere. The rules below are
 what publication would be, kept here because the document they are about exists
 and the shape it would be published in is what makes its content right.
@@ -462,7 +462,7 @@ An address a report supplied goes through the rule an address stored beside a
 claim goes through, and a custom application scheme is dropped rather than
 published. It is leaving the deployment, into tooling that follows it.
 
-**The weakness is stated in the catalog's own words.** The standard carries a
+The weakness is stated in the catalog's own words. The standard carries a
 weakness as the identifier and the name assigned to it, and a consumer's
 validator compares the pair — so the name is read from the authority that
 assigns it, never from anything held here.
@@ -475,7 +475,7 @@ assigns it, never from anything held here.
 | An identifier the catalog does not assign states nothing | Categories and views carry identifiers of the same shape and are not what a vulnerability is classified as, and a newer catalog assigns numbers an older one predates. The name is the half that cannot be invented |
 | The catalog version is recorded and is not gated against what it publishes today | The engines the reserved-word list asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes, for a reason no change here caused |
 
-**Each release is named by what its own inventory called it.** The product
+Each release is named by what its own inventory called it. The product
 identification helper carries the package identifier the build declared for the
 component the document is about, where it declared one.
 
@@ -523,11 +523,11 @@ Places dismissed for different reasons — one not applicable, one already fixed
 produced two contradictory statements and now produce none.
 
 Where several places were decided in separate sittings the document states the
-**earliest**: the claim that has stood longest and the one a reader can check
+earliest: the claim that has stood longest and the one a reader can check
 against the record. Grouping on the words and the moment emitted the same claim
 twice.
 
-**The earliest decision is picked first, and then read.** Each column had its own
+The earliest decision is picked first, and then read. Each column had its own
 minimum over the group, and nothing tied them to one row: with two claims
 standing at a component — "component_not_present" and
 "inline_mitigations_already_exist / bound to the management VLAN" — the

@@ -103,7 +103,7 @@ differ, somebody holding one product learns the name of every other by guessing.
 The sentences are kept in one place. There were six spellings, two of which
 described the wrong thing.
 
-**A store's refusal that no handler has an arm for is an oracle too.** It falls
+A store's refusal that no handler has an arm for is an oracle too. It falls
 through to the fault answer, so the route says 500 where a stranger is told
 404, and the pair says the build is there — one name at a time, and the fault's
 own text named which of product, stream and variant was undeclared. Every store
@@ -123,7 +123,7 @@ The second is the one that was answered both ways: handing work to somebody
 else needs a right, and one route said 404 while the other said 422 about the
 identical condition.
 
-**A streamed answer is refused before its first byte.** Once the status has
+A streamed answer is refused before its first byte. Once the status has
 gone the only place left to say anything is the file, and what it said was that
 the export stopped early — behind a 200.
 
@@ -147,7 +147,7 @@ reached the caller as a bad request carrying the statement text and, for a
 connection failure, the address and user it tried. Where the type cannot decide,
 the error is treated as a refusal.
 
-**A 404 is never built from an error's own text.** It asserts that a name
+A 404 is never built from an error's own text. It asserts that a name
 reaches nothing, and the body then publishes whatever the error carried — for a
 store read, the driver's message. Thirty handlers wrote one, over readers that
 returned the driver's error unwrapped, so a connection failure reached an
@@ -221,7 +221,7 @@ Ceilings vary by list. Which list allows what is a judgment about each list.
 
 Filters are named fields with fixed meanings, bound as parameters.
 
-**A filter over an open set says so.** The kind of package is read out of the
+A filter over an open set says so. The kind of package is read out of the
 identifier a producer wrote, so the set is whatever producers emit and the
 parameter carries any string: one nothing carries matches nothing. Two
 descriptions named eight kinds as though that were the vocabulary, and the
@@ -314,8 +314,8 @@ gated operation as somebody holding none of its roles; a 2xx fails it.
 A gate refuses an operation declaring neither scope nor roles. An endpoint added
 without one is not broken, it is undocumented.
 
-**"Any signed-in person" and "any recognized credential" are two scopes, because
-a pipeline's key is not somebody.** Seventy-four operations declared the second
+"Any signed-in person" and "any recognized credential" are two scopes, because
+a pipeline's key is not somebody. Seventy-four operations declared the second
 and then refused every credential that is not a person, so the reference, the
 extension a client generator reads, and an access review all stated a rule the
 code contradicted. The word could not be redefined instead: two operations
