@@ -40,9 +40,10 @@ type Decision struct {
 	// itself — whose version changes every build and is excluded from expiry.
 	ComponentUpstreamVersion *string `bun:"component_upstream_version"`
 	ConsumerUpstreamVersion  *string `bun:"consumer_upstream_version"`
-	// What the claim says is on the claim: the outcome, the justification, the
-	// mitigation, the dates, the version an upgrade moves to. One act is one
-	// argument, and a copy per place is a copy that can be revised on its own.
+	// SeverityCenti is what the claim says is on the claim: the outcome,
+	// the justification, the mitigation, the dates, the version an upgrade
+	// moves to. One act is one argument, and a copy per place is a copy
+	// that can be revised on its own.
 	//
 	// SeverityCenti is how bad this was judged to be when the claim was made,
 	// in hundredths. Kept with the decision rather than read from the issue

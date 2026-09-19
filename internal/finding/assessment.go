@@ -506,9 +506,10 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 		}
 
 		if issue.Exploited {
-			// Which rows are learning it now, read before the flag is
-			// raised: afterwards there is nothing to tell them from the
-			// ones that already carried it.
+			// learning is which rows are learning it now, read
+			// before the flag is raised: afterwards there is
+			// nothing to tell them from the ones that already
+			// carried it.
 			var learning []int64
 			if err := tx.NewSelect().Model((*Finding)(nil)).
 				ColumnExpr("id").

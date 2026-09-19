@@ -29,11 +29,11 @@ import (
 // one query shape, so a spreadsheet and a screen cannot disagree about what
 // the filter means.
 type Exporting struct {
-	// What the file is, in the words the report it comes from is known by.
-	// Stated on every export, with the moment it was taken, by writeExport
-	// rather than by each caller: an export that cannot say what it is and
-	// when is not evidence, and a fact every file must carry is one no file
-	// can be written without.
+	// What is what the file is, in the words the report it comes from is
+	// known by. Stated on every export, with the moment it was taken, by
+	// writeExport rather than by each caller: an export that cannot say
+	// what it is and when is not evidence, and a fact every file must
+	// carry is one no file can be written without.
 	What string
 	// About is what else the file says about itself above the rows, each a
 	// label and a value, stated because a spreadsheet opened six months

@@ -22,9 +22,9 @@ type AtComponentBody struct {
 	Severity      string `json:"severity,omitempty" doc:"How bad the report rates it"`
 	Places        int    `json:"places" doc:"How many places in this build it sits at"`
 	FixedIn       string `json:"fixed_in,omitempty" doc:"The version the report says fixes it, where it names one"`
-	// What one judgment is being made on. Deciding in bulk on less than
-	// deciding singly is the wrong way round, and this list narrows by the
-	// description while showing none of it.
+	// Summary is what one judgment is being made on. Deciding in bulk on
+	// less than deciding singly is the wrong way round, and this list
+	// narrows by the description while showing none of it.
 	Summary    string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
 	Exploited  bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`

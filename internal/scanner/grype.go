@@ -147,26 +147,30 @@ type grypeMatch struct {
 		ID          string `json:"id"`
 		Severity    string `json:"severity"`
 		Description string `json:"description"`
-		// Where the issue is written up. Every match carries one, and for
-		// the great majority it is the only route to a patch.
+		// DataSource is where the issue is written up. Every match
+		// carries one, and for the great majority it is the only route
+		// to a patch.
 		DataSource string `json:"dataSource"`
-		// Which body of data answered, as the scanner names it
-		// — "nvd:cpe" against "alpine:distro:alpine:3.24".
-		// Finer than the two words a finding records for how
-		// it was reached, and the difference between them is
-		// the whole of what recording the match is for.
+		// Namespace is which body of data answered, as the scanner
+		// names it — "nvd:cpe" against "alpine:distro:alpine:3.24".
+		// Finer than the two words a finding records for how it was
+		// reached, and the difference between them is the whole of
+		// what recording the match is for.
 		Namespace  string   `json:"namespace"`
 		URLs       []string `json:"urls"`
 		Advisories []struct {
 			Link string `json:"link"`
 		} `json:"advisories"`
-		// What the published estimates say about it being used.
+		// EPSS is what the published estimates say about it being
+		// used.
 		EPSS []struct {
 			EPSS float64 `json:"epss"`
-			// Where that estimate stands among all of them, and the day it
-			// was computed for. A reader cannot act on 0.00042 and can act on
-			// "higher than 91% of everything published", and the day is what
-			// says whether this estimate is newer than the stored one.
+			// Percentile is where that estimate stands among all
+			// of them, and the day it was computed for. A reader
+			// cannot act on 0.00042 and can act on "higher than
+			// 91% of everything published", and the day is what
+			// says whether this estimate is newer than the stored
+			// one.
 			Percentile float64 `json:"percentile"`
 			Date       string  `json:"date"`
 		} `json:"epss"`
@@ -177,21 +181,22 @@ type grypeMatch struct {
 		CVSS []struct {
 			Version string `json:"version"`
 			Vector  string `json:"vector"`
-			// Who published this rating and whether it is the primary one.
-			// Provenance is recorded for everything else a scan says — what
-			// found it, what it was matched from, what it was matched in —
-			// and the number a deadline is set from had none, so a reader
-			// asking "who says 5.9" had nowhere to go. Absent in some
-			// reports, which is itself an answer.
+			// Source is who published this rating and whether it
+			// is the primary one. Provenance is recorded for
+			// everything else a scan says — what found it, what it
+			// was matched from, what it was matched in — and the
+			// number a deadline is set from had none, so a reader
+			// asking "who says 5.9" had nowhere to go. Absent in
+			// some reports, which is itself an answer.
 			Source  string `json:"source"`
 			Type    string `json:"type"`
 			Metrics struct {
 				BaseScore float64 `json:"baseScore"`
 			} `json:"metrics"`
 		} `json:"cvss"`
-		// What kind of weakness this is. Several entries usually say the
-		// same thing from different sources, and the interesting part is
-		// the identifier rather than who said it.
+		// CWEs is what kind of weakness this is. Several entries
+		// usually say the same thing from different sources, and the
+		// interesting part is the identifier rather than who said it.
 		CWEs []struct {
 			CWE  string `json:"cwe"`
 			Type string `json:"type"`
@@ -225,11 +230,11 @@ type grypeMatch struct {
 		Version string `json:"version"`
 		Purl    string `json:"purl"`
 	} `json:"artifact"`
-	// How the match was made. A scanner tries the advisory data
-	// for the package's own ecosystem first and falls back to
-	// comparing a published identifier against an upstream version
-	// range, and those two answers mean very different things
-	// about a distribution's package.
+	// MatchDetails is how the match was made. A scanner tries the advisory
+	// data for the package's own ecosystem first and falls back to
+	// comparing a published identifier against an upstream version range,
+	// and those two answers mean very different things about a
+	// distribution's package.
 	MatchDetails []matchDetail `json:"matchDetails"`
 }
 
@@ -237,8 +242,8 @@ type grypeMatch struct {
 type grypeDescriptor struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
-	// Where the database describes itself moved between versions of the
-	// scanner: it used to sit directly under db and now sits under a
+	// DB is where the database describes itself moved between versions of
+	// the scanner: it used to sit directly under db and now sits under a
 	// status within it. Both are read, because an operator running an
 	// older build should not silently lose the record of what their
 	// findings were matched against.

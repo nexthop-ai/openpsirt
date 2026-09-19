@@ -239,9 +239,9 @@ func (s *Store) Extend(ctx context.Context, subject access.Subject,
 
 	var out *Extension
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		// Where it ends now, read inside the transaction: a retry
-		// re-runs this against a database another extension may have
-		// moved.
+		// was is where it ends now, read inside the transaction: a
+		// retry re-runs this against a database another extension may
+		// have moved.
 		var was time.Time
 		err := tx.NewSelect().
 			TableExpr(`"finding" AS "f"`).

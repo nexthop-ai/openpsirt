@@ -95,10 +95,11 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		// Where the closures are, so that a resolution inside one is checked
-		// against the closure that holds it rather than twice: a route's
-		// handler is a closure inside the function that registers it, and the
-		// refusal that covers it stands in the closure.
+		// closures is where the closures are, so that a resolution
+		// inside one is checked against the closure that holds it
+		// rather than twice: a route's handler is a closure inside the
+		// function that registers it, and the refusal that covers it
+		// stands in the closure.
 		var closures []*ast.FuncLit
 		ast.Inspect(file, func(node ast.Node) bool {
 			if lit, ok := node.(*ast.FuncLit); ok {
@@ -306,12 +307,12 @@ func called(call *ast.CallExpr) string {
 // subject covers.
 func unguarded(body *ast.BlockStmt, name string) []token.Pos {
 	var loose []token.Pos
-	// Where the walk currently is. Every node is pushed on the way in and
-	// popped on the way out, which is the only way this stays a stack: the
-	// walk announces the end of a node by handing over nothing, whatever kind
-	// of node it was, so pushing one kind and popping on every ending empties
-	// it immediately — and an empty stack reads here as "used outside a
-	// call", which is the answer that passes.
+	// path is where the walk currently is. Every node is pushed on the way
+	// in and popped on the way out, which is the only way this stays a
+	// stack: the walk announces the end of a node by handing over nothing,
+	// whatever kind of node it was, so pushing one kind and popping on
+	// every ending empties it immediately — and an empty stack reads here
+	// as "used outside a call", which is the answer that passes.
 	var path []ast.Node
 	ast.Inspect(body, func(node ast.Node) bool {
 		if node == nil {

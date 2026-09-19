@@ -86,12 +86,12 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		return 0, fmt.Errorf("withdraw what is no longer committed: %w", err)
 	}
 
-	// What is already committed, read inside the transaction. A retry re-runs
-	// this closure against a database that has moved, so a set read before it
-	// began describes a world that is gone — and reading it here rather than
-	// upserting keeps the statement portable: "on conflict do nothing" is two
-	// different spellings across the four engines, and neither belongs in the
-	// core.
+	// already is what is already committed, read inside the transaction. A
+	// retry re-runs this closure against a database that has moved, so a
+	// set read before it began describes a world that is gone — and
+	// reading it here rather than upserting keeps the statement portable:
+	// "on conflict do nothing" is two different spellings across the four
+	// engines, and neither belongs in the core.
 	var already []int64
 	if err := db.NewSelect().
 		TableExpr(`"upgrade" AS "ug"`).
@@ -259,11 +259,11 @@ func (s *Store) PendingUpgrades(ctx context.Context, subject access.Subject,
 		folds = append(folds, row.FoldKey)
 	}
 
-	// What is still open under each of them, and which packages those are.
-	// Joined from the finding rather than from the commitment, because
-	// coverage is a match on the fold rather than a row somebody wrote: a
-	// vulnerability published tonight against the same package is covered by
-	// this morning's commitment with nobody acting.
+	// open is what is still open under each of them, and which packages
+	// those are. Joined from the finding rather than from the commitment,
+	// because coverage is a match on the fold rather than a row somebody
+	// wrote: a vulnerability published tonight against the same package is
+	// covered by this morning's commitment with nobody acting.
 	var open []struct {
 		Fold   string `bun:"fold"`
 		Issues int    `bun:"issues"`

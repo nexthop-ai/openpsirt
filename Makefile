@@ -972,7 +972,7 @@ docs-site:
 .PHONY: pins-check
 pins-check:
 	@fail=0; \
-	block() { sed -n '/^## What it does$$/,/^- Build or deploy fixes$$/p' "$$1"; }; \
+	block() { sed -n '/^## Scope$$/,/^- Build or deploy fixes$$/p' "$$1"; }; \
 	[ "$$(block README.md)" = "$$(block docs/index.md)" ] || { \
 	  echo "README.md and docs/index.md describe what this does in different words."; \
 	  echo "They are the same list maintained twice; make them the same words."; fail=1; }; \

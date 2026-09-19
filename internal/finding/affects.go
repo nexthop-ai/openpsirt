@@ -112,14 +112,14 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		out.Added, out.Closed = 0, 0
 
-		// What is open now, read inside the transaction: a retry
-		// re-runs this against a database somebody else may have
-		// moved.
-		// Ordered, because the first row is what a filing against another
-		// build is copied from. Unordered, which row that is depends on the
-		// plan an engine happened to pick, so the same request could produce
-		// a different row on a different engine or after an index changed.
-		// The earliest filing is the one to copy: it is the record of what was
+		// rows is what is open now, read inside the transaction: a
+		// retry re-runs this against a database somebody else may have
+		// moved. Ordered, because the first row is what a filing
+		// against another build is copied from. Unordered, which row
+		// that is depends on the plan an engine happened to pick, so
+		// the same request could produce a different row on a
+		// different engine or after an index changed. The earliest
+		// filing is the one to copy: it is the record of what was
 		// first known about this issue here.
 		var rows []Finding
 		err := tx.NewSelect().Model(&rows).

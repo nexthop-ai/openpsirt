@@ -20,7 +20,8 @@ type SpentBody struct {
 	Claims    int `json:"claims" doc:"Arguments made about it in the period"`
 	Decisions int `json:"decisions" doc:"Places those reached"`
 	People    int `json:"people" doc:"How many different people argued about it"`
-	// What came out of them, counted as claims for the same reason.
+	// Promised is what came out of them, counted as claims for the same
+	// reason.
 	Promised  int `json:"promised" doc:"Claims that promised work: an upgrade or a backport"`
 	Dismissed int `json:"dismissed" doc:"Claims that argued it away"`
 	Deferred  int `json:"deferred" doc:"Claims that put it off"`

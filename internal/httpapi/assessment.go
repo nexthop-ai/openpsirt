@@ -31,10 +31,11 @@ type AssessmentBody struct {
 	Reasoning     string `json:"reasoning" minLength:"1" maxLength:"65536" doc:"Why. It outlives the version it was made about, so the next person needs the argument"`
 	State         string `json:"state,omitempty" enum:"proposed,live,withdrawn"`
 	NeedsApproval bool   `json:"needs_approval,omitempty" doc:"Whether a second person has to agree before it takes effect"`
-	// What agreeing would do beyond moving things down a list, on the claims
-	// that are waiting for somebody to agree. Absent on the rest: it is a
-	// question about a decision nobody has taken yet, and answering it for
-	// every historical claim would cost a query each to say nothing.
+	// Open is what agreeing would do beyond moving things down a list, on
+	// the claims that are waiting for somebody to agree. Absent on the
+	// rest: it is a question about a decision nobody has taken yet, and
+	// answering it for every historical claim would cost a query each to
+	// say nothing.
 	//
 	// Counted inside the rating's own product, because that is everywhere the
 	// rating reaches.

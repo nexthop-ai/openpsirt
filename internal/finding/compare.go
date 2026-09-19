@@ -41,9 +41,9 @@ type Changed struct {
 	// given nowhere to look. Zero where a person closed it, which is the other
 	// way a finding closes.
 	ClosedRun int64 `bun:"closed_run"`
-	// What a reader of a release note acts on, beyond the identifier and the
-	// word: the number, whether somebody is known to be exploiting it, and
-	// where it is written up.
+	// ScoreCenti is what a reader of a release note acts on, beyond the
+	// identifier and the word: the number, whether somebody is known to be
+	// exploiting it, and where it is written up.
 	//
 	// **Not the description.** One upgrade closes hundreds of issues and the
 	// note lists them under it, so a sentence apiece is a document nobody
@@ -52,11 +52,11 @@ type Changed struct {
 	ScoreCenti int    `bun:"score_centi"`
 	Exploited  bool   `bun:"exploited"`
 	Advisory   string `bun:"advisory"`
-	// What stands about it in the later build, on a still-present entry and
-	// nowhere else. **This is the sign-off half**: shipping with a known
-	// issue is a decision somebody made, and a list of what is still there
-	// with no way to tell an approved not-applicable from something nobody
-	// has looked at is not a list anybody can sign.
+	// State is what stands about it in the later build, on a still-present
+	// entry and nowhere else. **This is the sign-off half**: shipping with
+	// a known issue is a decision somebody made, and a list of what is
+	// still there with no way to tell an approved not-applicable from
+	// something nobody has looked at is not a list anybody can sign.
 	//
 	// The outcome and its reason are stated only where every standing
 	// decision over the row's places says the same thing, which is the rule

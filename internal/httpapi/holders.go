@@ -17,7 +17,7 @@ type HolderBody struct {
 	Name     string `json:"name" doc:"What to show, which is the spelling somebody typed where there is one"`
 }
 
-// How much of the picker teams may take.
+// teamShare is how much of the picker teams may take.
 //
 // A few, because there are few of them and a team buried under twenty-five
 // names is one nobody finds — and no more, because the bound covers the merged

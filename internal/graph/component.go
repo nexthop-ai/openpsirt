@@ -64,10 +64,11 @@ type Component struct {
 	UpstreamName    string    `bun:"upstream_name"`
 	UpstreamVersion string    `bun:"upstream_version"`
 	FirstSeenAt     time.Time `bun:"first_seen_at,notnull"`
-	// What the ecosystem's own index says is newest, and when it shipped .
-	// Null where nothing has asked, where asking is turned off, and where
-	// the index has never heard of the component — a private module and a
-	// vendored fork both look like that, and none of the three is a fault.
+	// LatestVersion is what the ecosystem's own index says is newest, and
+	// when it shipped . Null where nothing has asked, where asking is
+	// turned off, and where the index has never heard of the component — a
+	// private module and a vendored fork both look like that, and none of
+	// the three is a fault.
 	//
 	// LatestCheckedAt is when we last asked, whatever came back, so that
 	// "we asked and there is nothing" is distinguishable from "we have not

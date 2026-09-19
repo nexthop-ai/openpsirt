@@ -144,10 +144,10 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 
 	standing, held := finding.InForce()
 
-	// What stands with one signature on it, by what was claimed. Grouped by
-	// outcome because the answer is different for each: a short deferral
-	// standing alone is the exception working, and a dismissal standing alone
-	// is a control that failed.
+	// alone is what stands with one signature on it, by what was claimed.
+	// Grouped by outcome because the answer is different for each: a short
+	// deferral standing alone is the exception working, and a dismissal
+	// standing alone is a control that failed.
 	var alone []struct {
 		Outcome string `bun:"outcome"`
 		Claims  int    `bun:"claims"`
@@ -213,8 +213,9 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		})
 	}
 
-	// Who agrees with whom. Concentration is the signal: two people covering
-	// everything between them is a control that exists on paper.
+	// pairs is who agrees with whom. Concentration is the signal: two
+	// people covering everything between them is a control that exists on
+	// paper.
 	var pairs []struct {
 		Proposer string `bun:"proposer"`
 		Approver string `bun:"approver"`
@@ -307,9 +308,10 @@ func (s *Store) Scrutinize(ctx context.Context, subject access.Subject,
 		})
 	}
 
-	// What somebody agreed to, against what the same claim reaches now. A
-	// claim reaches by matching, so a build appearing afterwards is covered
-	// with nobody acting — and nobody having agreed to the larger number.
+	// grew is what somebody agreed to, against what the same claim reaches
+	// now. A claim reaches by matching, so a build appearing afterwards is
+	// covered with nobody acting — and nobody having agreed to the larger
+	// number.
 	var grew []struct {
 		ClaimID    int64     `bun:"claim_id"`
 		Identity   string    `bun:"identity"`

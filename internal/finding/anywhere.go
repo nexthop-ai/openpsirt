@@ -100,10 +100,10 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		}
 	}
 
-	// Which releases are past their date, read once for the page. This list
-	// spans products and resolves no build identifiers, so the two questions
-	// are conditions here rather than a narrowing of a target list — the same
-	// rule, applied where this query can reach it.
+	// pastEOL is which releases are past their date, read once for the
+	// page. This list spans products and resolves no build identifiers, so
+	// the two questions are conditions here rather than a narrowing of a
+	// target list — the same rule, applied where this query can reach it.
 	var pastEOL []int64
 	if filter.Workable.asks() && len(filter.Workable.Support) == 1 {
 		var err error
@@ -209,11 +209,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		within = append(within, head.ProductID)
 	}
 
-	// What the page shows about each row, in one statement over the page's
-	// products, issues and folds as three lists. That admits combinations
-	// no row asked for, which are read and dropped on the way into the map;
-	// what it buys is the index, which is the same trade the per-product page
-	// makes.
+	// rows is what the page shows about each row, in one statement over
+	// the page's products, issues and folds as three lists. That admits
+	// combinations no row asked for, which are read and dropped on the way
+	// into the map; what it buys is the index, which is the same trade the
+	// per-product page makes.
 	var rows []struct {
 		ProductID       int64  `bun:"product_id"`
 		Product         string `bun:"product"`

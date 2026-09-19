@@ -326,7 +326,7 @@ type StandingClaimBody struct {
 	// only where every live row here is.
 	State string           `json:"state" enum:"proposed,approved" doc:"The claim's state as a whole: approved only when every live row here is approved, otherwise proposed"`
 	Rows  RowsStandingBody `json:"rows" doc:"How the claim's rows here stand"`
-	// What an approver asked for, where rows were sent back.
+	// SentBackAt is what an approver asked for, where rows were sent back.
 	SentBackAt      string        `json:"sent_back_at,omitempty" doc:"When rows were last sent back to the author"`
 	SentBackBecause string        `json:"sent_back_because,omitempty" doc:"The reason given when they were, in markdown"`
 	Outcome         outcome       `json:"outcome"`

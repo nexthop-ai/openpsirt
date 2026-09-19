@@ -56,8 +56,8 @@ const (
 	everything
 )
 
-// What each tier runs, in the order a person wants to see a failure: the fast
-// and specific before the slow and broad.
+// runs is what each tier runs, in the order a person wants to see a failure:
+// the fast and specific before the slow and broad.
 var runs = map[tier][]string{
 	documents: {"docs-check", "unclaimed"},
 	web:       {"web-check"},
@@ -172,8 +172,9 @@ func name(t tier) string {
 	return [...]string{"documents", "web", "code", "api", "engines", "everything"}[t]
 }
 
-// Where the queries, the schema and the harness the tests share live. A change
-// under any of these is portability work whatever it looks like.
+// storage is where the queries, the schema and the harness the tests share
+// live. A change under any of these is portability work whatever it looks
+// like.
 var storage = []string{
 	"internal/database/",
 	"internal/dbtest/",

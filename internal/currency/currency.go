@@ -274,10 +274,11 @@ func (g goProxy) Latest(ctx context.Context, name string) (Latest, error) {
 	var answer struct {
 		Version string    `json:"Version"`
 		Time    time.Time `json:"Time"`
-		// Where the module is developed, which the proxy states and nothing
-		// else here has to work out. There is no description anywhere in the
-		// protocol — not in this answer and not in a go.mod — so a Go module
-		// carries an address and no summary.
+		// Origin is where the module is developed, which the proxy
+		// states and nothing else here has to work out. There is no
+		// description anywhere in the protocol — not in this answer
+		// and not in a go.mod — so a Go module carries an address and
+		// no summary.
 		Origin struct {
 			URL string `json:"URL"`
 		} `json:"Origin"`

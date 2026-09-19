@@ -43,9 +43,9 @@ type WhoBody struct {
 	Audits   bool      `json:"audits,omitempty" doc:"May read this deployment's own records — the settings, who holds what, and the administrative change log — and write none of them"`
 	Kind     string    `json:"kind" enum:"person,key" doc:"A person who signed in, or a credential"`
 	Reach    []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
-	// What they asked to be sent. Answered here because a screen offering the
-	// switches has to know their state, and because a person is the only one
-	// who decides them.
+	// Digest is what they asked to be sent. Answered here because a screen
+	// offering the switches has to know their state, and because a person
+	// is the only one who decides them.
 	Digest           bool `json:"digest,omitempty" doc:"They asked for a daily digest"`
 	DigestUnassigned bool `json:"digest_unassigned,omitempty" doc:"Their digest lists findings nobody owns as well as their own outstanding work"`
 	// Reachable says there is somewhere to send it. Without an address a

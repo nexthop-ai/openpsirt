@@ -258,12 +258,13 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 		}
 
-		// What is already open **that a scan governs**. A run is the authority
-		// on what it found, and everything it no longer reports is closed
-		// below — so without this narrowing, the first nightly scan after
-		// somebody records a finding by hand closes it, with a reason that
-		// reads like the issue went away. Nothing would report that: the row
-		// looks exactly like a component that stopped shipping.
+		// open is what is already open **that a scan governs**. A run
+		// is the authority on what it found, and everything it no
+		// longer reports is closed below — so without this narrowing,
+		// the first nightly scan after somebody records a finding by
+		// hand closes it, with a reason that reads like the issue went
+		// away. Nothing would report that: the row looks exactly like
+		// a component that stopped shipping.
 		var open []Finding
 		err = tx.NewSelect().Model(&open).
 			Where("target_id = ?", targetID).

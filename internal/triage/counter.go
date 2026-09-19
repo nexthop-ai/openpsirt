@@ -59,10 +59,10 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		products = append(products, row.ProductID)
 	}
 
-	// What has been agreed about the same issue somewhere else. Approved
-	// only: a proposal is one person's opinion, and counting proposals here
-	// would let two people in a queue agree with each other by being counted
-	// at each other.
+	// agreed is what has been agreed about the same issue somewhere else.
+	// Approved only: a proposal is one person's opinion, and counting
+	// proposals here would let two people in a queue agree with each other
+	// by being counted at each other.
 	//
 	// The claim's own place is not excluded, and that is deliberate. A
 	// place identity is a pair of names with no product in it, so
@@ -97,9 +97,9 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		byIssue[row.VulnerabilityID][row.Outcome] += row.Places
 	}
 
-	// How much else at the same place nobody has answered, by the same test
-	// every screen uses for "undecided": no live claim covering it at the
-	// versions the code holds now.
+	// open is how much else at the same place nobody has answered, by the
+	// same test every screen uses for "undecided": no live claim covering
+	// it at the versions the code holds now.
 	var open []struct {
 		ProductID int64  `bun:"product_id"`
 		Place     string `bun:"place_identity"`

@@ -154,9 +154,9 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 			t.Errorf("the product tree does not name %q, which a status refers to", affected)
 		}
 
-		// What has gone out, readable without generating a document. Nothing
-		// yet, which is the honest answer rather than an empty list meaning
-		// "cannot say".
+		// gone is what has gone out, readable without generating a
+		// document. Nothing yet, which is the honest answer rather
+		// than an empty list meaning "cannot say".
 		var gone struct {
 			Items []struct {
 				Version int    `json:"version"`

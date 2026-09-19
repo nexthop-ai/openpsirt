@@ -45,7 +45,8 @@ type Claim struct {
 	SelectedWhere   *string `bun:"selected_where"`
 	SelectedMatched *int    `bun:"selected_matched"`
 	SelectedNamed   *int    `bun:"selected_named"`
-	// What the claim says, held once because one act is one argument.
+	// Outcome is what the claim says, held once because one act is one
+	// argument.
 	//
 	// These were on the row. A judgment reaching forty-four places was
 	// forty-four copies of one sentence, each revisable on its own — so

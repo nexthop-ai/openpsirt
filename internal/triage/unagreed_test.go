@@ -136,10 +136,11 @@ func (f *fixture) unagreed(t *testing.T, outcome triage.Outcome, behind agreemen
 	if err != nil {
 		t.Fatalf("propose %s: %v", outcome, err)
 	}
-	// What the gate decided, not what this asked for. Propose re-works it
-	// against the policy in force when the write lands, so passing it in says
-	// nothing — and the whole widening turns on the gate's own verdict, which
-	// would be worth nothing if a caller could assert it.
+	// gated is what the gate decided, not what this asked for. Propose
+	// re-works it against the policy in force when the write lands, so
+	// passing it in says nothing — and the whole widening turns on the
+	// gate's own verdict, which would be worth nothing if a caller could
+	// assert it.
 	var gated bool
 	if err := f.db.DB.NewSelect().TableExpr(`"decision"`).
 		ColumnExpr("needs_approval").Where("claim_id = ?", decision.ClaimID).

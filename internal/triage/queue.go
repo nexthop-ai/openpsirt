@@ -77,7 +77,7 @@ type Outlier struct {
 	Exploited     bool
 	FixedIn       string
 	Description   string
-	// Why says which of the four things made it stand out.
+	// Why is why says which of the four things made it stand out.
 	Why []string
 }
 
@@ -320,9 +320,10 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		ClaimID         int64 `bun:"claim_id"`
 		VulnerabilityID int64 `bun:"vulnerability_id"`
 		DecisionID      int64 `bun:"decision_id"`
-		// Which product the claim was made in. A rating belongs to a product,
-		// so an outlier is picked out against what *this* product rates these
-		// issues rather than against a word somebody in another one chose.
+		// ProductID is which product the claim was made in. A rating
+		// belongs to a product, so an outlier is picked out against
+		// what *this* product rates these issues rather than against a
+		// word somebody in another one chose.
 		ProductID int64 `bun:"product_id"`
 	}
 	if err := s.db.NewSelect().
@@ -367,12 +368,13 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		return nil, err
 	}
 
-	// Where a fix is known, from the open findings the claim's rows are
-	// about: the same match a row makes when a finding asks whether it
-	// applies — the product, the place and both versions — and only the
-	// findings the reader may see, since a fix version is read off the
-	// finding. A claim covers one component, so one answer per issue is the
-	// ordinary case and the smallest stated version stands in otherwise.
+	// fixes is where a fix is known, from the open findings the claim's
+	// rows are about: the same match a row makes when a finding asks
+	// whether it applies — the product, the place and both versions — and
+	// only the findings the reader may see, since a fix version is read
+	// off the finding. A claim covers one component, so one answer per
+	// issue is the ordinary case and the smallest stated version stands in
+	// otherwise.
 	var fixes []struct {
 		ClaimID         int64  `bun:"claim_id"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`

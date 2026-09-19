@@ -114,9 +114,10 @@ type Config struct {
 	MailServer   string
 	MailUsername string
 	MailPassword string
-	// Where files hanging off an issue are kept, and absent is ordinary:
-	// with none of this set, attachments are off and everything else works
-	// . An operator who wants none should not have to run a bucket.
+	// AttachmentBucket is where files hanging off an issue are kept, and
+	// absent is ordinary: with none of this set, attachments are off and
+	// everything else works . An operator who wants none should not have
+	// to run a bucket.
 	//
 	// AttachmentBucket is what turns the object store on. Endpoint is what
 	// a self-hosted store needs and a cloud one does not; credentials are

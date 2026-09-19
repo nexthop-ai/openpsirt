@@ -53,10 +53,11 @@ type ChangedBody struct {
 	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
 	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
 	ClosedRun     int64  `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
-	// What stands about it, on a still-present entry and nowhere else. This
-	// is what turns a list of what is still there into something somebody
-	// can sign a release off against: an approved not-applicable and a row
-	// nobody has looked at are opposite answers and read alike without it.
+	// State is what stands about it, on a still-present entry and nowhere
+	// else. This is what turns a list of what is still there into
+	// something somebody can sign a release off against: an approved
+	// not-applicable and a row nobody has looked at are opposite answers
+	// and read alike without it.
 	State         string        `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"How far this build has decided it. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
 	Outcome       outcome       `json:"outcome,omitempty" doc:"What was decided, where every standing decision over its places says the same thing"`
 	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, on a dismissal"`

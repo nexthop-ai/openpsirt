@@ -46,10 +46,10 @@ type Result struct {
 	Applied      graph.Applied
 	Components   int
 	Suppressions int
-	// What the document stated that we tolerated rather than refused. Each is
-	// a number that should be stable build to build, so a change in one says
-	// the producer changed — which is the thing that would otherwise be
-	// silent.
+	// Unrooted is what the document stated that we tolerated rather than
+	// refused. Each is a number that should be stable build to build, so a
+	// change in one says the producer changed — which is the thing that
+	// would otherwise be silent.
 	Unrooted       int
 	Unversioned    int
 	DanglingEdges  int

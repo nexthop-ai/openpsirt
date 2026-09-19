@@ -54,9 +54,10 @@ type Evidence struct {
 	// different judgment from local-and-privileged at the same score.
 	ScoreCenti int
 	Vector     string
-	// Who published that score, which scoring system it is, and whether it is
-	// the primary rating or a secondary one. A reader asking "who says 5.9"
-	// had nowhere to go, on the one number a deadline is set from.
+	// ScoreVersion is who published that score, which scoring system it
+	// is, and whether it is the primary rating or a secondary one. A
+	// reader asking "who says 5.9" had nowhere to go, on the one number a
+	// deadline is set from.
 	ScoreVersion string
 	ScoreSource  string
 	ScoreKind    string
@@ -64,9 +65,10 @@ type Evidence struct {
 	// from the thousands that can wait.
 	Exploited     bool
 	LikelihoodPPM int
-	// Where that estimate stands among all of them, and the day it is about.
-	// The number alone is unreadable — 0.00042 is not something anybody acts
-	// on — and the day is what says whether it is current.
+	// LikelihoodPercentilePPM is where that estimate stands among all of
+	// them, and the day it is about. The number alone is unreadable —
+	// 0.00042 is not something anybody acts on — and the day is what says
+	// whether it is current.
 	LikelihoodPercentilePPM int
 	LikelihoodOn            *time.Time
 	Weaknesses              []string
@@ -147,9 +149,9 @@ type Evidence struct {
 	OpenedAt time.Time
 	FoundBy  *Measured
 
-	// What the ecosystem's own index says is newest, and when it shipped .
-	// Empty where asking is turned off, where nothing has asked yet, and
-	// where the index has never heard of the component.
+	// LatestVersion is what the ecosystem's own index says is newest, and
+	// when it shipped . Empty where asking is turned off, where nothing
+	// has asked yet, and where the index has never heard of the component.
 	LatestVersion    string
 	LatestReleasedAt *time.Time
 	// NothingSince says upstream has shipped nothing since the year this issue
@@ -237,8 +239,9 @@ func placesOf(rows []evidenceRow, chains map[int64][]graph.Step,
 			}
 			continue
 		}
-		// What the producer called the edge into here. A place under the
-		// build itself is pulled in by nothing, which is the zero key.
+		// puller is what the producer called the edge into here. A
+		// place under the build itself is pulled in by nothing, which
+		// is the zero key.
 		var puller int64
 		if row.ConsumerID != nil {
 			puller = *row.ConsumerID
@@ -605,9 +608,9 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 
 	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
 
-	// When this first appeared here and what produced it. The earliest
-	// place, because that is the age the deadline relates to, and the run
-	// that opened *that* place is the one that first said this.
+	// opened is when this first appeared here and what produced it. The
+	// earliest place, because that is the age the deadline relates to, and
+	// the run that opened *that* place is the one that first said this.
 	var opened *int64
 	for _, row := range rows {
 		if evidence.OpenedAt.IsZero() || row.OpenedAt.Before(evidence.OpenedAt) {

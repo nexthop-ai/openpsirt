@@ -200,9 +200,9 @@ type Vulnerability struct {
 	Status Status `json:"product_status"`
 	// CWE is what kind of flaw this is, where the catalog knows the name.
 	CWE *Weakness `json:"cwe,omitempty"`
-	// What is held about the flaw beyond which releases carry it: what it
-	// scored, what a holder of an affected release can do, and whoever asked
-	// to be credited for telling us.
+	// Scores is what is held about the flaw beyond which releases carry
+	// it: what it scored, what a holder of an affected release can do, and
+	// whoever asked to be credited for telling us.
 	Scores          []Score          `json:"scores,omitempty"`
 	Remediations    []Remediation    `json:"remediations,omitempty"`
 	Acknowledgments []Acknowledgment `json:"acknowledgments,omitempty"`

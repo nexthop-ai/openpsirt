@@ -97,8 +97,9 @@ type FindingBody struct {
 	Parent string `json:"parent,omitempty" doc:"What directly pulls it in, which is what a decision is about"`
 	Middle int    `json:"middle,omitempty" doc:"How many steps sit between those two"`
 	Chains int    `json:"chains,omitempty" doc:"How many distinct ways down there are. More than one means the pair above is one of them"`
-	// Where the selection is more than one build, the four above are absent —
-	// a chain belongs to one build's graph — and these three take their place.
+	// Builds is where the selection is more than one build, the four above
+	// are absent — a chain belongs to one build's graph — and these three
+	// take their place.
 	Builds  int    `json:"builds,omitempty" doc:"How many builds in the selection hold this. Absent where the selection is one build"`
 	Stream  string `json:"stream,omitempty" doc:"A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"`
 	Variant string `json:"variant,omitempty" doc:"The variant of that build"`
@@ -200,8 +201,8 @@ type ComponentFindingBody struct {
 	// criticals, and the count says nothing about which.
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Those issues by how they were rated. 'unrated' is what nobody scored"`
 	Worst      string         `json:"worst,omitempty" enum:"critical,high,medium,low" doc:"The highest band among them. Absent where nothing here was rated"`
-	// Where this could go, which is what somebody reading a package is
-	// deciding about.
+	// Upgrades is where this could go, which is what somebody reading a
+	// package is deciding about.
 	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, furthest along first where the ecosystem defines an ordering and unranked where it does not"`
 }
 
@@ -652,16 +653,18 @@ type EvidenceBody struct {
 	Assessed string  `json:"assessed,omitempty" doc:"What we rate it, where we have said something. This is what ranks; severity is what was published"`
 	Score    float64 `json:"score,omitempty" doc:"The same judgment as a number, where one is published"`
 	Vector   string  `json:"vector,omitempty" doc:"What the score assumes — reachability, privilege, interaction"`
-	// Where the number came from. Everything else a scan says carries its
-	// provenance; the one number a deadline is set from carried none.
+	// ScoreVersion is where the number came from. Everything else a scan
+	// says carries its provenance; the one number a deadline is set from
+	// carried none.
 	ScoreVersion string  `json:"score_version,omitempty" doc:"Which scoring system the number is on, as the report states it"`
 	ScoreSource  string  `json:"score_source,omitempty" doc:"Who published it, where the report names them"`
 	ScoreKind    string  `json:"score_kind,omitempty" doc:"Whether it is the primary rating or a secondary one"`
 	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
-	// What the estimate means and whether it is current. The probability
-	// alone is unreadable — nobody acts on 0.00042 — and it is a thirty-day
-	// forecast recomputed daily, so the day it is about is part of it.
+	// LikelihoodPercentile is what the estimate means and whether it is
+	// current. The probability alone is unreadable — nobody acts on
+	// 0.00042 — and it is a thirty-day forecast recomputed daily, so the
+	// day it is about is part of it.
 	LikelihoodPercentile float64  `json:"likelihood_percentile,omitempty" doc:"Where that estimate stands among all published ones, 0 to 1"`
 	LikelihoodOn         string   `json:"likelihood_on,omitempty" doc:"The day the estimate was computed for, as a date"`
 	Weaknesses           []string `json:"weaknesses,omitempty" doc:"What kind of flaw this is, as CWE identifiers"`
@@ -732,9 +735,9 @@ type EvidenceBody struct {
 	Undisclosed bool   `json:"undisclosed,omitempty" doc:"This has not been announced. Anything said about it outside this deployment discloses it"`
 	DiscloseAt  string `json:"disclose_at,omitempty" doc:"When the embargo ends, as a date. Reaching it discloses nothing by itself"`
 
-	// What upstream has released. Absent unless this deployment has turned
-	// asking on, which is off by default because it is the only thing here
-	// that reaches the network.
+	// LatestVersion is what upstream has released. Absent unless this
+	// deployment has turned asking on, which is off by default because it
+	// is the only thing here that reaches the network.
 	LatestVersion    string `json:"latest_version,omitempty" doc:"The newest version the ecosystem's own index knows of"`
 	LatestReleasedAt string `json:"latest_released_at,omitempty" doc:"When that version shipped"`
 	NothingSince     bool   `json:"nothing_since,omitempty" doc:"Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned"`
@@ -756,11 +759,11 @@ type EvidenceBody struct {
 	// can correct.
 	RoutedBy string `json:"routed_by,omitempty" doc:"The standing rule that placed this, where one did. Empty means a person did, or nobody has"`
 
-	// What has been decided here, so the finding is the working screen
-	// after a decision as well as before it: the live claims covering any
-	// of its places, the decisions that stopped applying with their
-	// reasoning offered back, and approved claims about other issues at
-	// the same places that may reach this one.
+	// Standing is what has been decided here, so the finding is the
+	// working screen after a decision as well as before it: the live
+	// claims covering any of its places, the decisions that stopped
+	// applying with their reasoning offered back, and approved claims
+	// about other issues at the same places that may reach this one.
 	Standing []StandingClaimBody `json:"standing" doc:"Live claims covering any of this finding's places, newest first. A proposed one is waiting for a second person"`
 	Previous []EarlierBody       `json:"previous" doc:"Decisions made at these places that lapsed or were withdrawn, newest first, with their reasoning"`
 	Similar  []SimilarBody       `json:"similar" doc:"Approved not-applicable claims about other issues at the same component and consumer, which extends can carry to this one. At most five"`

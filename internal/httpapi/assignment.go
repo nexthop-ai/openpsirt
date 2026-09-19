@@ -125,10 +125,10 @@ func registerAssigning(api huma.API, in Ingest) {
 		}
 
 		var to *int64
-		// Who to tell, which is a person. The column holds the party
-		// they are assignable as, and a notification goes to somebody.
-		// A team tells nobody: a queue filling up is digest content
-		// rather than an interruption.
+		// whoToTell is who to tell, which is a person. The column
+		// holds the party they are assignable as, and a notification
+		// goes to somebody. A team tells nobody: a queue filling up is
+		// digest content rather than an interruption.
 		var whoToTell int64
 		rights := access.NewStore(in.DB.DB)
 		switch {

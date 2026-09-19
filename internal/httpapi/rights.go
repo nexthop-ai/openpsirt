@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// What an operation asks of whoever calls it.
+// requiresExtension is what an operation asks of whoever calls it.
 //
 // Structured on the document and rendered into the description from the same
 // value, so the two cannot disagree. The structure is what a client generator

@@ -73,10 +73,12 @@ func registerEntry(api huma.API, in Ingest) {
 	}, perProduct, "private-triage where the finding is undisclosed.", triageRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Body    struct {
-			// Which builds ship it, rather than one in the path. The same code
-			// goes out on several lines and as several variants at once, and
-			// the identifier is minted per product — so the product is the
-			// level this is recorded at and the builds are what it names.
+			// Builds is which builds ship it, rather than one in
+			// the path. The same code goes out on several lines
+			// and as several variants at once, and the identifier
+			// is minted per product — so the product is the level
+			// this is recorded at and the builds are what it
+			// names.
 			Builds []struct {
 				Stream  string `json:"stream" minLength:"1" doc:"A branch or a tag"`
 				Variant string `json:"variant" minLength:"1" doc:"How that line is built"`
@@ -91,9 +93,10 @@ func registerEntry(api huma.API, in Ingest) {
 			Version    string   `json:"version,omitempty" doc:"Which one, where the build holds that name at several versions"`
 			Ecosystem  string   `json:"ecosystem,omitempty" doc:"Which one, where two share a name and a version"`
 			Disclosed  bool     `json:"disclosed,omitempty" doc:"Whether this is already public. Undisclosed by default"`
-			// Who told us, where somebody did. Every field is
-			// optional: a flaw found by whoever is typing has no reporter, and
-			// a form demanding one asks them to invent an answer.
+			// ReportedBy is who told us, where somebody did. Every
+			// field is optional: a flaw found by whoever is typing
+			// has no reporter, and a form demanding one asks them
+			// to invent an answer.
 			ReportedBy string `json:"reported_by,omitempty" maxLength:"191" doc:"Who found it, as they gave their name"`
 			Contact    string `json:"contact,omitempty" maxLength:"191" doc:"How to reach them. A researcher has no account here, which is the shape of the thing"`
 			Credit     string `json:"credit,omitempty" maxLength:"191" doc:"How they wish to be credited in an advisory, where that is not the name they reported under. \"anonymous\" is a real answer"`

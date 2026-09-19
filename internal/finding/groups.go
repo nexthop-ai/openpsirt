@@ -764,11 +764,11 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		folds = append(folds, head.Fold)
 	}
 
-	// How far each group has been decided, counted the way the state filter
-	// counts it, so the row and the filter cannot disagree. Four correlated
-	// counts over our decisions in this product at each place and at the
-	// versions the place holds, plus whether any live claim is with its
-	// author.
+	// rows is how far each group has been decided, counted the way the
+	// state filter counts it, so the row and the filter cannot disagree.
+	// Four correlated counts over our decisions in this product at each
+	// place and at the versions the place holds, plus whether any live
+	// claim is with its author.
 	var rows []decorated
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).

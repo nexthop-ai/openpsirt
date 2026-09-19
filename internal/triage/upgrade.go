@@ -112,9 +112,10 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 				ErrNothingOpen)
 		}
 
-		// What the promise is measured against: the earliest deadline among
-		// what it covers. One act covering a critical and a medium is gated by
-		// the critical, however many mediums are in it.
+		// binding is what the promise is measured against: the
+		// earliest deadline among what it covers. One act covering a
+		// critical and a medium is gated by the critical, however many
+		// mediums are in it.
 		var binding *time.Time
 		for _, at := range reaching {
 			for _, place := range at.Places {

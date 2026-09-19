@@ -53,13 +53,13 @@ type ClaimDetail struct {
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
-	// What the claim wrote.
+	// Rows is what the claim wrote.
 	Rows   int `json:"rows" doc:"How many decisions the claim wrote"`
 	Issues int `json:"issues" doc:"How many distinct issues it covers"`
 	Places int `json:"places" doc:"How many distinct places it wrote at. What the bulk cap is measured against"`
-	// What it covers now. A claim reaches by matching, so this grows as
-	// builds appear with nobody acting; what somebody agreed to covering is
-	// on the approval.
+	// Folds is what it covers now. A claim reaches by matching, so this
+	// grows as builds appear with nobody acting; what somebody agreed to
+	// covering is on the approval.
 	Folds     int      `json:"folds" doc:"How many things there are to decide about"`
 	Packages  int      `json:"packages" doc:"How many binaries those fold together"`
 	Consumers int      `json:"consumers" doc:"How many things pull them in"`

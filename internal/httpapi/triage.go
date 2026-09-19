@@ -216,8 +216,8 @@ type BecameBody struct {
 	// bulk set and setting some aside, or half of it lapsing as one build
 	// moved — and is said rather than picked between.
 	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"What became of the claim"`
-	// When it became that, and who did it where a person did. Both absent
-	// while it is waiting: nothing has happened to it yet.
+	// When is when it became that, and who did it where a person did. Both
+	// absent while it is waiting: nothing has happened to it yet.
 	When      string          `json:"when,omitempty" doc:"When it became that, as a date and time"`
 	By        string          `json:"by,omitempty" doc:"Who did it, where a person did"`
 	Reasoning string          `json:"reasoning"`

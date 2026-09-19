@@ -81,13 +81,15 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 					narrowed++
 					continue
 				}
-				// Who is a stranger to this operation depends on what it
-				// asks for. The scope was read as "a scope alone is
-				// satisfied by anybody holding anything", which is true of
-				// the credential scopes and false of the ones that name a
-				// standing nobody holds by default — so every
-				// administrator-only operation went unswept, which is most
-				// of the ones a mistake would be worst on.
+				// who is who is a stranger to this operation
+				// depends on what it asks for. The scope was
+				// read as "a scope alone is satisfied by
+				// anybody holding anything", which is true of
+				// the credential scopes and false of the ones
+				// that name a standing nobody holds by default
+				// — so every administrator-only operation went
+				// unswept, which is most of the ones a mistake
+				// would be worst on.
 				var who string
 				switch {
 				case needs.Scope == "product" && len(needs.AnyOf) > 0:

@@ -634,10 +634,11 @@ type ReceiptBody struct {
 	// Caution qualifies the answer rather than saying there is none, so it is
 	// reported beside a scan that succeeded rather than instead of one.
 	Caution string `json:"caution,omitempty" doc:"What the scanner said while still succeeding — a qualification on what it found rather than a failure. Usually empty: the scan runs over an inventory written from what is held here, so most of what a scanner would warn about a producer's document it has no grounds to say about ours"`
-	// What the run covering this upload changed, counted as issues at
-	// components rather than as places. Absent where no run has covered it
-	// yet, and absent on an upload whose run was already reported against a
-	// newer one: a run covers a build rather than an upload.
+	// Opened is what the run covering this upload changed, counted as
+	// issues at components rather than as places. Absent where no run has
+	// covered it yet, and absent on an upload whose run was already
+	// reported against a newer one: a run covers a build rather than an
+	// upload.
 	//
 	// Pointers, because a run that changed nothing and an upload whose
 	// numbers are reported on another receipt are different answers and zero

@@ -623,12 +623,12 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		return nil, ErrNotTheirs
 	}
 
-	// Which product this is about, read from the build rather than taken from
-	// the caller. The first version selected decisions by live key and a
-	// matching place alone — and a place is a hash of component names carrying
-	// no product, so a shared distribution package matched across products and
-	// the reasoning of undisclosed claims came back to anybody who could read
-	// one product.
+	// productID is which product this is about, read from the build rather
+	// than taken from the caller. The first version selected decisions by
+	// live key and a matching place alone — and a place is a hash of
+	// component names carrying no product, so a shared distribution
+	// package matched across products and the reasoning of undisclosed
+	// claims came back to anybody who could read one product.
 	var productID int64
 	if err := s.db.NewSelect().
 		TableExpr(`"target" AS "tg"`).

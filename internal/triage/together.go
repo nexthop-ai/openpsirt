@@ -134,9 +134,10 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		return 0, nil, fmt.Errorf("a decision is recorded as made by whoever made it")
 	}
 
-	// What the write was about, kept so a refusal can be read back after the
-	// transaction has unwound. Inside it the row that collided is the row this
-	// attempt cannot see, so the sentence naming it is built afterwards.
+	// attempted is what the write was about, kept so a refusal can be read
+	// back after the transaction has unwound. Inside it the row that
+	// collided is the row this attempt cannot see, so the sentence naming
+	// it is built afterwards.
 	var attempted []Proposal
 
 	err = s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {

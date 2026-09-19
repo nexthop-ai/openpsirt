@@ -134,11 +134,12 @@ type PersonBody struct {
 	// is a question about the list — and a list that answers it only one row
 	// at a time is one nobody asks it of.
 	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"When they left. Absent means they may still sign in"`
-	// How somebody signs in is SignsInBy below, which carries the username
-	// and whether the provider's own identifier has been pinned to it. Two
-	// fields here said the same thing, were documented as though a request
-	// set them, and were assigned on no path at all — so every client written
-	// against the published document read them as absent for everybody.
+	// Email is how somebody signs in is SignsInBy below, which carries the
+	// username and whether the provider's own identifier has been pinned
+	// to it. Two fields here said the same thing, were documented as
+	// though a request set them, and were assigned on no path at all — so
+	// every client written against the published document read them as
+	// absent for everybody.
 	//
 	// Email, and whether a provider gave it. The second is worth answering:
 	// an address a provider supplied is one a later sign-in may change, and

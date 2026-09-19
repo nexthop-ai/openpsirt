@@ -240,7 +240,7 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
 		}
 
-		// Which statement to cite, as the finding offers it.
+		// detail is which statement to cite, as the finding offers it.
 		var detail struct {
 			Vex []struct {
 				ID int64 `json:"id"`

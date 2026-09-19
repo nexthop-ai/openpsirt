@@ -30,9 +30,10 @@ type JudgedBody struct {
 	ID      int64  `json:"id"`
 	Issue   string `json:"issue" doc:"The vulnerability, under the name it is filed here"`
 	Product string `json:"product"`
-	// What it was about. Named from a finding at the place, in any state — a
-	// judgment about something since fixed or removed is exactly what an audit
-	// asks for, so it is named rather than left blank.
+	// Component is what it was about. Named from a finding at the place,
+	// in any state — a judgment about something since fixed or removed is
+	// exactly what an audit asks for, so it is named rather than left
+	// blank.
 	Component string `json:"component"`
 	Version   string `json:"version,omitempty"`
 	Consumer  string `json:"consumer,omitempty" doc:"What pulls the component in. Absent where the build holds it directly"`

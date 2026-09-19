@@ -185,7 +185,7 @@ func Only(t *testing.T, engine database.Engine, fn func(t *testing.T, db *databa
 	run(t, fn, map[database.Engine]bool{engine: true}, beside)
 }
 
-// Whether a test may run beside the others in its package.
+// company is whether a test may run beside the others in its package.
 type company bool
 
 const (

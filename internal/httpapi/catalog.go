@@ -64,10 +64,11 @@ func (d Declaring) handle() bun.IDB {
 type ProductBody struct {
 	Name        string `json:"name" minLength:"1" maxLength:"191" doc:"How scans name this product"`
 	DisplayName string `json:"display_name,omitempty" maxLength:"191" doc:"What people see. Defaults to the name"`
-	// What the product holds, so a catalog answers what exists rather than
-	// making somebody open each row to find out. Counts of what is open are
-	// issues at components, the way the findings list counts, so the two
-	// agree; a declaration returns them as zero because it has just been made.
+	// Branches is what the product holds, so a catalog answers what exists
+	// rather than making somebody open each row to find out. Counts of
+	// what is open are issues at components, the way the findings list
+	// counts, so the two agree; a declaration returns them as zero because
+	// it has just been made.
 	Branches int `json:"branches,omitempty" doc:"How many branches are declared"`
 	Tags     int `json:"tags,omitempty" doc:"How many tags are declared"`
 	Variants int `json:"variants,omitempty" doc:"How many variants are declared"`

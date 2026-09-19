@@ -190,8 +190,8 @@ func TestSigningInSendsTheBrowserToTheProvider(t *testing.T) {
 		if where := rec.Header().Get("Location"); !strings.HasPrefix(where, "https://provider.example/") {
 			t.Errorf("sent the browser to %q", where)
 		}
-		// What has to survive the round trip is left with the browser, and
-		// left where a script cannot read it.
+		// held is what has to survive the round trip is left with the
+		// browser, and left where a script cannot read it.
 		var held *http.Cookie
 		for _, cookie := range rec.Result().Cookies() {
 			if cookie.Name == "openpsirt_pending" {
