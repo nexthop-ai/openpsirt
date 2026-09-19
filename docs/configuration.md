@@ -15,11 +15,10 @@ taken.
 ## Upgrading
 
 `OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is
-now refused where it used to be accepted. `psirt.example.com` has to become
-`https://psirt.example.com`.
+refused. `psirt.example.com` has to become `https://psirt.example.com`.
 
-It was accepted and did nothing useful: with no scheme there is no host to
-read, so the same-origin check on every state-changing browser request fell
+Accepted, it does nothing useful: with no scheme there is no host to read, so
+the same-origin check on every state-changing browser request falls
 back to the address the request itself claimed — the guard ran and guarded
 nothing — and the address a sign-in provider is sent back to was not absolute,
 which the provider refuses. A deployment reaching this has not been protected

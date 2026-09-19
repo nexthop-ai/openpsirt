@@ -989,7 +989,7 @@ above.
 
 | Rule | |
 |---|---|
-| What is kept is the text it stopped saying | Written at the moment it is replaced. The comment row holds what it says now; the history holds what was being lost |
+| The kept text is the wording it stopped saying | Written at the moment it is replaced. The comment row holds what it says now; the history holds what the replacement takes away |
 | Both writes go together | An edit that succeeded beside a history write that did not would leave a record saying a comment was changed and nothing saying from what — worse than the state it replaces, because it looks like a history and is not |
 | The history is read only when somebody asks | The current text is what a reader is reading |
 | Who may read it is asked of the claim, not of the comment | Asking twice is one question with two answers waiting to disagree |
@@ -1038,10 +1038,10 @@ and it has a home there already.
 ## VEX statements as evidence
 
 It is called VEX rather than "supplier" (REQ-31), everywhere: the publisher, the
-status, the import, the filters. The old word described who tends to publish
-rather than what the thing is, so an empty panel read as "nobody has an opinion
-about this" when it meant no document had been uploaded. The emptiness is
-stated: the panel says there is nothing and says why.
+status, the import, the filters. "Supplier" describes who tends to publish
+rather than what the thing is, so an empty panel reads as "nobody has an
+opinion about this" where it means no document has been uploaded. The emptiness
+is stated: the panel says there is nothing and says why.
 
 It is a third layer, beside the claims a build supplies with its inventory and
 the decisions made here. The screen says what the build claims, what the

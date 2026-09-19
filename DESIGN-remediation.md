@@ -191,9 +191,9 @@ filter over it. End-of-life does not, so releases out of support are a report of
 their own; `DESIGN-reporting.md` holds it.
 
 A tag was built once and is what somebody received. No work will land in it
-whatever a date says, so a deadline on one was unmeetable the moment it was
-written. Measured on the demo before this rule: all 26 open findings on its one
-tag carried a deadline, every one of them unmeetable by construction. Real
+whatever a date says, so a deadline on one is unmeetable the moment it is
+written. Measured on the demo without this rule: all 26 open findings on its
+one tag carry a deadline, every one of them unmeetable by construction. Real
 deployments accumulate tags while branches do not, so that side grows — and it
 inflates every overdue count, the compliance rate among them.
 
@@ -282,7 +282,7 @@ So a name this deployment calls its own is never sent. Three sources, unioned:
 | A label that names a kind of registration rather than an organization is dropped | Where a deployment publishes under a second-level registration, the generic part is nobody's name. It is a closed handful rather than a list of where each country's registrations begin, which is a file this does not have |
 | It is a better default, not a control | A deployment needing certainty about what leaves it leaves the whole feature off, which is where it ships. This is what stops an ordinary deployment leaking its own names by turning on something that reads as harmless |
 | Biased toward holding back, and it says what it held | Over-excluding loses an answer, which is visible on the screen that would have shown it and in the report beside it. Under-excluding sends a name to somebody else's service, which is visible nowhere and cannot be taken back |
-| A held-back component is recorded as though it had been asked about | The window takes the never-asked first. Left unrecorded it would hold the head of every pass afterwards for ever, with the components behind it never reached — the same failure the classification above exists for |
+| A held-back component is recorded as though it had been asked about | The window takes the never-asked first. Left unrecorded it holds the head of every pass afterwards for ever, with the components behind it never reached — the same failure the classification above exists for |
 | Anything an index said about a held-back name is dropped | All of it was obtained by sending that name. Kept, the version stands on a screen with nothing that will refresh it, the component never reaches the report of what was held back, and the row goes stale in a day rather than in thirty — one of the pass's slots every day, sending nothing |
 | A name a reader may not be told is not in the list the report carries | A label derived from a root is the name a product is published under, so the whole list states the scope of a product nobody announced to that reader (REQ-42). The classification still runs against every root, because a name the pass never sent must not read as sent |
 | Identifiers are taken newest first | What a build declares itself to be carries its version, so a product built nightly states a new one every night and the bound falls on builds rather than products. Unordered, two callers deriving this separately get different sets and a name held back yesterday goes out today |

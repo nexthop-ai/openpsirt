@@ -710,9 +710,8 @@ that turned a rank back into a list of reasons existed, exported and called by
 nothing but its own test. What makes a position explainable is that the rule is
 statable, and the interface says it from the signals a finding already carries.
 
-A signal reported out of range is clamped. A source sending something impossible
-would otherwise carry into the band above and rank as though it were being
-exploited.
+A signal reported out of range is clamped. A source sending something
+impossible otherwise carries into the band above and ranks as exploited.
 
 Where a report rates an issue only in words, the word stands in for a number, so
 a finding rated in words does not sort below everything rated at all. A group
@@ -911,7 +910,7 @@ the list itself pages through.
 | Rule | |
 |---|---|
 | It rides on the page | Counted after the grouping and before the limit, in the statement that groups, so the number and the rows cannot describe different sets |
-| The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source counted as two where the page draws one, and the figure changed depending on which page was being looked at |
+| The empty page counts the same way | A page past the end, a deep link somebody kept, or the last page has no row to carry it, so a second statement answers — **grouped exactly as the page groups**. Grouped one step finer, two binaries of one source count as two where the page draws one, and the figure changes with the page being read |
 | A separate count is grouped the same way | Where the total genuinely cannot ride on the page, the second statement's key is the page's key spelled again. Where this issue sits counted one row per component and drew one row per component *name*, so a build shipping a name at two versions — which is ordinary — listed nine and said ten. It is also the wrong row to draw: the row carries one version and one fix version, and two versions of a name are two different pieces of work |
 | Two overlapping lists are one question | The lapsed queue asked for lapsed decisions and for expired deferrals and added the totals. A deferral that ran out on code that then moved is both, so the figure was larger than the list beneath it and the list itself had to be deduplicated to draw at all. One filter answers both, and the number it comes back with is the number of rows |
 

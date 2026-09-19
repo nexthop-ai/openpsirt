@@ -142,8 +142,8 @@ that holds it. Four different Go runtimes appear here; described any other way
 all four are children of a container or of the host, with nothing saying which
 program each belongs to.
 
-All twenty-one survive as components. The build before this one described
-thirteen programs under nine names: `/usr/bin/dockerd`, `/usr/bin/containerd`,
+All twenty-one survive as components. An earlier build described thirteen
+programs under nine names: `/usr/bin/dockerd`, `/usr/bin/containerd`,
 `/usr/bin/runc` and `/usr/sbin/dialout_client_cli` each appeared in two images
 and merged into one component apiece, because a program arrives with no version
 and no package identifier and identity is a name and a version. They appeared

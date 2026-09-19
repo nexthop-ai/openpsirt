@@ -455,7 +455,7 @@ Two engines report rows *changed* by default; the other two report rows
 *matched*. Under the first reading, a write whose condition held but whose
 values were already correct reports zero, and the caller announces a conflict
 that never happened — an approval refused with "the reasoning changed while
-this was being agreed to", for a decision nobody has touched.
+this was agreed to", for a decision nobody has touched.
 
 The connection asks for matched rows on the engines that need it. The alternative
 — writing every conditional update so its values are guaranteed to differ —

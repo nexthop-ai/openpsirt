@@ -348,7 +348,7 @@ wherever a display name is more than a recapitalization.
 
 | Rule | Reason |
 |---|---|
-| A field a write resolves carries the address | It is what the lookup matches. A listing that published the label there could not be used to undo what it listed |
+| A field a write resolves carries the address | It is what the lookup matches. A listing publishing the label there cannot undo what it listed |
 | The label goes beside it, never in place of it | A screen still shows what a person reads. Two fields is the only arrangement where both are true |
 | The label is absent where it repeats the address | So that "no display name" and "the same again" do not read alike |
 | A name in a path is the address | Folding only lowercases and trims, so a label matches no row |

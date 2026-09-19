@@ -71,13 +71,14 @@ should be here.
 |---|---|
 | Triage implies reading at the same visibility | Nobody decides about what they cannot see, and a deployment forced to grant both would eventually grant one and wonder why nothing worked |
 | A capability grants no visibility, and a capability has to grant something | What an approver reaches is bounded by what they may read. The converse held the other way too: approving asked for the triage role, which made the approver capability do nothing at all — somebody granted exactly the right to approve could approve nothing |
-| An administrator is not every role (REQ-42) | Administration is people, roles, credentials, settings and the catalog. Reading and triaging a product are granted per product like anybody else's, and an administrator who wants them grants them to themselves, so the grant sits in the same record as everybody else's. It read the other way and nothing said so, and the cost was separation of duties: one account proposed a decision and approved it, re-rated severities and read every embargo, so the second person a dismissal asks for was optional for whoever held admin. It also made a read-only auditor impossible to express |
+| An administrator is not every role (REQ-42) | Administration is people, roles, credentials, settings and the catalog. Reading and triaging a product are granted per product like anybody else's, and an administrator who wants them grants them to themselves, so the grant sits in the same record as everybody else's. Read the other way, it costs separation of duties: one account proposes a decision and approves it, re-rates severities and reads every embargo, so the second person a dismissal asks for is optional for whoever holds admin. It also makes a read-only auditor impossible to express |
 | Knowing a product exists is administration; what is open against it is not | An administrator holding no role sees the products they administer with nothing open against them, which is what a first sign-in looks like |
 
-Two things had been leaning on "an administrator sees everything": the background
-passes that report on the tool ask as **the deployment itself**, a subject
-nothing resolves a credential to and which holds no role; and the demo's
-administrator grants itself roles as part of seeding.
+Two things lean on "an administrator sees everything", and each is answered
+its own way: the background passes that report on the tool ask as **the
+deployment itself**, a subject nothing resolves a credential to and which holds
+no role; and the demo's administrator grants itself roles as part of
+seeding.
 
 | Rule | Reason |
 |---|---|
@@ -312,7 +313,7 @@ Recorded by an administrator, as a date on the person.
 | Rule | Reason |
 |---|---|
 | A date, not a flag | "When" is the whole of what an audit asks after a departure, and a boolean cannot answer it |
-| Never a deletion | The record names them as the proposer of judgments and the approver of others, and an assignment used to point at them. Deleting the row would either break those or rewrite what happened |
+| Never a deletion | The record names them as the proposer of judgments and the approver of others, and an assignment may point at them. Deleting the row would either break those or rewrite what happened |
 | Their roles are left where they are | What somebody held is part of why the record reads as it does, and bringing them back should not mean reconstructing it from memory. What stops them is the date |
 | Read once, where every way in already passes | A session, a personal token and a group-bound sign-in all resolve by identity. A second spelling of the check is a second rule to keep in step with the first |
 | **Every question of the form "may this person do this" excludes them** | The grants are left in place on purpose, so a query reading only grants answers that somebody who has left is still cleared. Three did: two of them decide whether an undisclosed finding may be handed to a person or a team, where the assignment itself is the disclosure, and the third decides whether their work is released |
@@ -793,7 +794,7 @@ database by hand.
 
 | Rule | Reason |
 |---|---|
-| Unbinding the last group granting administration is refused inside the write | The count has to see the delete, so both are one transaction and a refusal rolls it back. Written as a delete, a count and a compensating re-insert, a re-insert that failed left the binding gone and nobody able to administer — and a restored row carried a fresh timestamp, so it was not the row that had been there |
+| Unbinding the last group granting administration is refused inside the write | The count has to see the delete, so both are one transaction and a refusal rolls it back. Written as a delete, a count and a compensating re-insert, a re-insert that fails leaves the binding gone and nobody able to administer — and a restored row carries a fresh timestamp, so it is not the row that was there |
 | Switching to group-bound needs something that can report a group | A provider with no source of groups reports every arrival as belonging to nothing, so nobody derives any role and the deployment locks out whoever made the change — the same state the check above prevents, arriving by the other door and looking like a working deployment that admits nobody |
 | A source is a provider configured to hand over membership, or a trusted proxy that reports it | The OIDC adapter names no groups claim by default and the GitHub adapter no organization, so the deployment that hits this is the default one rather than an exotic one |
 
@@ -868,7 +869,7 @@ for work it was never scoped for.
 | A live reference to its owner, never a snapshot | What it reaches is read from what they hold at the moment it is used, so a role withdrawn cuts the token at the same instant — including one withdrawn because a group membership went away, which is the case with nothing else to notice it |
 | It may not mint or withdraw another | Minting resolves through the owner, so a token that could mint would ask for a wider one and be given it, making every limit exactly one request deep |
 | Narrowing intersects | A token pinned to a product its owner cannot read reaches nothing rather than being granted it. Administration is dropped by narrowing entirely, because a token narrowed to one product that still administered everything would not be narrowed |
-| A token narrows by what it may do as well as where | A credential a script reads with should not also be able to triage, and the only way to get one used to be to hold nothing else yourself. The roles it names intersect with its owner's the same way the product does, so naming one they do not hold reaches nothing. Naming none carries all of them. A case is untouched: being brought into one is a grant on a product and an issue rather than a role, so a read-only token still reads the case it was minted for |
+| A token narrows by what it may do as well as where | A credential a script reads with should not also be able to triage, and without this the only way to get one is to hold nothing else yourself. The roles it names intersect with its owner's the same way the product does, so naming one they do not hold reaches nothing. Naming none carries all of them. A case is untouched: being brought into one is a grant on a product and an issue rather than a role, so a read-only token still reads the case it was minted for |
 | Expiry is not optional, with a maximum an administrator sets | A credential that never runs out is one nobody ever revokes. Revoking marks rather than deletes, so what used it stays answerable |
 
 Every credential says which kind it is. Pipeline keys and personal tokens carry
@@ -974,7 +975,7 @@ record, because it is the same question one layer up.
 | A failure to record fails the change | Nothing was committed, so the retry a caller makes changes nothing twice. The refusal says the change was not made, because a caller told only that recording failed cannot tell which of the two stands |
 | What follows the change is outside it | Deactivating somebody also ends their sessions and hands their work back. The sessions end inside, because they are what deactivation means; the work is handed back afterwards, bounded by how much they held rather than by the request |
 | A grant and its withdrawal are recorded alike | A trail holding only removals cannot answer what an access review asks. Credentials were the case: withdrawing one was recorded and minting one was not |
-| A revocation that matched nothing leaves no row | The writes that take access away bound only the error from the statement and never read how many rows it matched, so withdrawing a role somebody does not hold answered as though it had been withdrawn. The caller then recorded the act and asked whether the person still held anything on that product: for a role they never had the answer was no, and everything they were dealing with there went back to the unassigned list. A grant, an estate grant, a group binding, a group's administration and a team membership all take access away, and all of them read what they matched |
+| A revocation that matched nothing leaves no row | A write binding only the error from the statement, and never reading how many rows it matched, answers the withdrawal of a role nobody holds as though it had been withdrawn. The caller then records the act and asks whether the person still holds anything on that product: for a role they never had the answer is no, and everything they are dealing with there goes back to the unassigned list. A grant, an estate grant, a group binding, a group's administration and a team membership all take access away, and all of them read what they matched |
 | Never the secret, and never the whole address | What a credential may send, and a destination's host. A record that is deliberately permanent is the wrong place for a bearer token, and for Slack and Teams the address is the credential |
 | **What a change is about is composed from the names it resolved to** | A path segment carries no length, and an issue is looked up through a normalization that keeps its first 191 runes — so what was typed and what resolved are not the same string, and a record composed from the typed form is unbounded. The row it resolved to is what the record is about anyway |
 | The recorder bounds what it writes to the column | A backstop under every caller, not a rule any of them relies on: "every caller composes from stored values" is not a property anything checks, and with the record inside the act the failure it would otherwise take is the act refused |

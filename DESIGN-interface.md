@@ -96,7 +96,7 @@ reload while working when navigated to.
 | The rule is "the router has no route for this", asked of the router | Not "the path is outside `/v1`". The framework registers routes of its own — the API document and the schemas it references — and a prefix rule hands those to anybody who asks |
 | Names the server owns are reserved even when nothing is routed there | The framework's documentation route is disabled by configuration, and unrouted is exactly what marks a path as the page's. Without a reserved list the interface would have claimed `/docs`. A test asserts that mounting the interface opens nothing |
 | The page loads without a credential and nothing else changes | The sign-in screen *is* the page. What is served is a compiled application and its assets, carrying no data |
-| An address the page does not know says so, and keeps the address | It used to redirect to the home screen, which threw away the one piece of evidence a link built wrong leaves behind. A component link composed with no product selected was reported as "it brings you back to the homepage" — the reporter could not say what address they had been on, because it was gone from the bar |
+| An address the page does not know says so, and keeps the address | A redirect to the home screen throws away the one piece of evidence a link built wrong leaves behind: a component link composed with no product selected is reported as "it brings you back to the homepage", and the reporter cannot say what address they were on, because it is gone from the bar |
 
 ## The generated client
 
@@ -377,8 +377,8 @@ bound — is a narrowing only somebody editing the address can use.
 | Rule | |
 |---|---|
 | Every filter is labeled with the question it asks, grouped by what they are about | Severity and risk, what upstream did, where triage has got to, where the row came from, the component, and time. A value says what it is rather than completing a sentence begun by a label nobody can see |
-| What is narrowing the list is above the list | One chip per filter naming both the filter and its value, removable by clicking, whether or not the panel is open. The control used to carry a count and nothing else, and the count was a hand-maintained list of variables that had already fallen behind |
-| **The selection is a chip too, and the first of them** | It rides on the path rather than in the parameters, so it drew nothing — and a list scoped to one product sat under filters identical to the list across every product, counting fewer rows, with nothing on screen to explain the difference. The rail's own unassigned count is across every product a reader may see, so the two disagreed by exactly what the other products held. A chip per level, product first, because each is narrowing what the one before it chose |
+| The filters narrowing the list are above the list | One chip per filter naming both the filter and its value, removable by clicking, whether or not the panel is open. A control carrying a count and nothing else keeps that count as a hand-maintained list of variables, which falls behind the filters it counts |
+| **The selection is a chip too, and the first of them** | It rides on the path rather than in the parameters, so it draws nothing of its own — and a list scoped to one product then sits under filters identical to the list across every product, counting fewer rows, with nothing on screen to explain the difference. The rail's own unassigned count is across every product a reader may see, so the two disagree by exactly what the other products hold. A chip per level, product first, because each is narrowing what the one before it chose |
 | Removing a selection chip widens by a level and carries the filters | Widening is a move rather than a parameter change, and dropping what somebody actually narrowed by on the way would be a second surprise on top of the one the chip ends. The branch and the variant are the new address's to put back, so they are not carried |
 | **A filter cleared drops its key; it does not write out its own default** | The three narrowings the list applies when the address is silent are applied only where the key is absent. Two controls wrote both of their values to mean "not narrowed", which made the address say something, suppressed the default and widened the list — and left no way to express from the panel what the rail's address says |
 | The count is read from the address | The one place that knows what every filter is called |
@@ -434,11 +434,11 @@ list exists to prevent.
 | Drawn as checkboxes behind a control that says what is ticked | A closed control reading "Any" over three ticked boxes is how a narrowed list comes to look unnarrowed. The chips above name each separately, so removing one leaves the rest |
 | Carried in the address as the parameter repeated | A server reading only the first word narrows to less than was asked for, which looks like an answer rather than a mistake. Marked exploded on both sides, with a test at the HTTP layer that asks for two states and counts the rows |
 
-The decision state is above the list, beside the severity floor, where the
-exploited and fix-available chips used to sit. Neither earned the place: the
-list is ordered by urgency, so what is being exploited is already at the top,
-and a fix being available is a column on every row. What somebody reaches for
-first is what has not been answered yet.
+The decision state is above the list, beside the severity floor, in the place
+the exploited and fix-available chips would take. Neither earns it: the list is
+ordered by urgency, so what is being exploited is already at the top, and a fix
+being available is a column on every row. The first thing somebody reaches for
+is what has not been answered yet.
 
 | Rule | |
 |---|---|
@@ -468,7 +468,7 @@ back in its own order rather than refusing.
 | **An empty list says what emptied it and offers the way back** | A narrowed list matching nothing is a dead end: the controls that produced it are scrolled off above, and what is left on screen says so and offers nothing. It names how many filters are in force and carries a control that takes all of them off — and says "nothing is open here at all" where none was in force, which is a different answer |
 | **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided lead now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the order control above the list |
 | **A row is decided where it sits** | Opening a row carries the same decision form the finding screen does, over the list rather than instead of it. What a claim requires and what it writes are unchanged — a second person still agrees — and what changes is the two journeys per row, each of which read the list again on the way back. Everything the form cannot show there is one link away |
-| **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. The whole screen used to unmount — the search box, the chips, the count and the controls with it — so changing one filter blanked the thing being narrowed and took the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
+| **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. Unmounting the whole screen — the search box, the chips, the count and the controls with it — blanks the thing being narrowed and takes the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
 | **Each view's button carries what that view would show** | The three answer one narrowing at three grains and the difference is the whole reason to switch: a by-issue list of 7,455 rows is 341 by component and 284 by upgrade. Without the numbers the list opened on its longest view and read as the only one. The by-upgrade figure is a fix-bundle aggregate, measured at 2.2 s against a backlog of 8,376, so it is held for five minutes rather than asked again as somebody pages |
 | **The list opens by issue, whatever the size** | No threshold, and the other two are a click away in the toggle and in the address as a chip that removes itself. A list that jumps to a different grain past a number nobody set is a list that answers a different question on two products |
 | The order in force is named on screen, and every order can be asked for | Four of the six sit under a column header, so the other two could be reached by typing an address and by nothing else — one of them being urgency, which is the order the list opens in and what REQ-32 is for. Sorting by a column and then wanting the ranking back was a dead end |
@@ -1108,7 +1108,7 @@ application never makes one.
 
 | Rule | |
 |---|---|
-| **A list opened by pressing back opens where it was being read** | Going into a finding and coming back rebuilt the list at the top: eighteen rows above where somebody had been, on the screen whose whole use is working down a list one row at a time. The address and the filters survived because they are in the address; the place in the list is the one thing that cannot be re-derived from it |
+| **A list opened by pressing back opens where it was read** | Going into a finding and coming back otherwise rebuilds the list at the top: eighteen rows above where somebody was, on the screen whose whole use is working down a list one row at a time. The address and the filters survive because they are in the address; the place in the list is the one thing that cannot be re-derived from it |
 | A list opened fresh opens at the top | Which is what a fresh list is. The two are told apart by how the arrival happened, and restoring on both would drop somebody into the middle of a list they have not read |
 | Restored after the rows are drawn | Scrolling a page that is a few hundred pixels tall clamps to the bottom, so the restore lands somewhere arbitrary and reads as a fault in the list |
 | Written as somebody scrolls, not as they leave | A route change unmounts the screen, and an unmount is too late to read a position the browser has already moved |
@@ -1238,7 +1238,7 @@ chosen (REQ-64).
 | It matches issue names as well as component names | Labeled "Find a component or an issue", it searched component names only, so the question a PSIRT is asked first when an advisory lands — where is this in what we ship — returned an empty list, which reads as "we do not ship it" |
 | Aliases are matched | An issue is one thing under several names, so the name a reporter used has to reach the row filed under the name a scanner used, or the answer depends on which feed arrived first |
 | Both halves are one box rather than two fields | Somebody typing a name does not classify it first, and an identifier is not mistakable for a package name in practice |
-| It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. It used to return without navigating anywhere when no product was picked, so the box looked live and swallowed what was typed |
+| It asks at whatever the picker has selected, including nothing | A term goes to the list at that scope, which spans every product a reader can see where no product is picked — the same list at its widest address. Returning without navigating anywhere leaves the box looking live and swallowing what was typed |
 | A term that resolves to an issue goes to the issue instead | Decided by asking rather than by the shape of the text: a second copy of the server's name resolution is wrong about every identifier a deployment mints for itself |
 
 ## A person's own page

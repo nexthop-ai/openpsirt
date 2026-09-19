@@ -723,7 +723,7 @@ nothing failed, which is also what running almost nothing looks like.
 unconfigured rather than passing, and — because a grep for a *label* only
 proves a subtest with that label ran — asks each server what it is and compares
 that against the label. Four URLs differing by a port digit is the likeliest
-slip there is, and it used to report fully green.
+slip there is, and it reports fully green to a grep.
 
 `make check` names the engines it did not test, rather than staying silent
 unless all three are missing.
