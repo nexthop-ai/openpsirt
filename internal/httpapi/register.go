@@ -23,14 +23,14 @@ type DisposedBody struct {
 	Severity      string        `json:"severity,omitempty"`
 	Component     string        `json:"component"`
 	Version       string        `json:"version,omitempty"`
-	Place         string        `json:"place" doc:"Which place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
-	Consumer      string        `json:"consumer,omitempty" doc:"What pulls the component in. Absent where the build holds it directly"`
-	State         string        `json:"state" enum:"undecided,waiting,agreed,lapsed" doc:"Where this stands. undecided is the row every other report leaves out and the one an auditor is looking for"`
+	Place         string        `json:"place" doc:"The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half"`
+	Consumer      string        `json:"consumer,omitempty" doc:"The consumer that pulls the component in. Absent where the build holds it directly"`
+	State         string        `json:"state" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state. undecided is the row every other report leaves out and the one an auditor is looking for"`
 	Outcome       outcome       `json:"outcome,omitempty"`
 	Justification justification `json:"justification,omitempty"`
 	ProposedBy    string        `json:"proposed_by,omitempty"`
 	ProposedAt    string        `json:"proposed_at,omitempty"`
-	ApprovedBy    string        `json:"approved_by,omitempty" doc:"Who agreed. Two different people is the whole of the control, so both names are carried rather than a count"`
+	ApprovedBy    string        `json:"approved_by,omitempty" doc:"The people who agreed. Two different people is the whole of the control, so both names are carried rather than a count"`
 	ApprovedAt    string        `json:"approved_at,omitempty"`
 	// AgreementCarried says the agreement was given for an earlier claim and
 	// carried onto this one, which is what a re-affirmation stands on. The
@@ -41,8 +41,8 @@ type DisposedBody struct {
 	// ClosedBecause is the category it closed under and ClosedNote the
 	// sentence whoever closed it typed. A closure a scan performed carries a
 	// category and no note, because nobody typed one.
-	ClosedBecause closure `json:"closed_because,omitempty" doc:"Why it closed, in the tool's terms. Only on a closed row"`
-	ClosedNote    string  `json:"closed_note,omitempty" doc:"Why a person closed it, in their words. Only where a person did"`
+	ClosedBecause closure `json:"closed_because,omitempty" doc:"The reason it closed, in the tool's terms. Only on a closed row"`
+	ClosedNote    string  `json:"closed_note,omitempty" doc:"The person's own reason for closing it. Only where a person did"`
 	Due           string  `json:"due,omitempty"`
 	Met           *bool   `json:"met,omitempty" doc:"Whether the deadline was met. Answerable only for something that closed — an open row has not missed its deadline, it has not reached the end of the question"`
 }
@@ -202,7 +202,7 @@ func registerRegister(api huma.API, in Ingest) {
 		Body struct {
 			Items    []DisposedBody `json:"items"`
 			Total    int            `json:"total"`
-			Measured *MeasuredBody  `json:"measured,omitempty" doc:"What the register was measured with. Absent where nothing has been uploaded to the build"`
+			Measured *MeasuredBody  `json:"measured,omitempty" doc:"The tools the register was measured with. Absent where nothing has been uploaded to the build"`
 		}
 	}, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
@@ -218,7 +218,7 @@ func registerRegister(api huma.API, in Ingest) {
 			Body struct {
 				Items    []DisposedBody `json:"items"`
 				Total    int            `json:"total"`
-				Measured *MeasuredBody  `json:"measured,omitempty" doc:"What the register was measured with. Absent where nothing has been uploaded to the build"`
+				Measured *MeasuredBody  `json:"measured,omitempty" doc:"The tools the register was measured with. Absent where nothing has been uploaded to the build"`
 			}
 		}{}
 		out.Body.Total = total
@@ -342,9 +342,9 @@ func disposedBody(row finding.Disposed) DisposedBody {
 // RateBody is how much of one severity's work met its deadline.
 type RateBody struct {
 	Severity string `json:"severity"`
-	Closed   int    `json:"closed" doc:"How many issue-and-component groups are wholly closed, with a deadline to be judged against"`
-	Met      int    `json:"met" doc:"How many of those closed by it. Closed exactly at the deadline met it, because something still open at that instant is not yet overdue"`
-	Late     int    `json:"late" doc:"How many did not"`
+	Closed   int    `json:"closed" doc:"The number of issue-and-component groups wholly closed, with a deadline to be judged against"`
+	Met      int    `json:"met" doc:"The number of those closed by it. Closed exactly at the deadline met it, because something still open at that instant is not yet overdue"`
+	Late     int    `json:"late" doc:"The number that did not"`
 	// Deferred is its own number rather than a failure. A rate that
 	// counted an approved deferral as one would punish the deliberate act
 	// the deferral mechanism exists to make possible, and within a quarter

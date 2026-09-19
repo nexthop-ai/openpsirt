@@ -28,12 +28,12 @@ type ClaimApprovalBody struct {
 	// Except sets rows aside. What is left is approved as one claim; these go
 	// back to the proposer as a claim of their own, with the reason.
 	Except  []int64 `json:"except,omitempty" maxItems:"2000" doc:"Decisions in this claim to set aside rather than approve. They return to the proposer as a claim of their own, carrying the reason given in because"`
-	Because string  `json:"because,omitempty" doc:"Why the rows in except are set aside, in markdown. Required when any are"`
+	Because string  `json:"because,omitempty" doc:"The reason the rows in except are set aside, in markdown. Required when any are"`
 }
 
 // ClaimApprovedBody is what agreeing to a claim did.
 type ClaimApprovedBody struct {
-	Approved      int   `json:"approved" doc:"How many decisions were agreed to"`
+	Approved      int   `json:"approved" doc:"The number of decisions agreed to"`
 	ReturnedClaim int64 `json:"returned_claim,omitempty" doc:"The claim the rows set aside went into, where any were"`
 }
 
@@ -112,7 +112,7 @@ func registerClaims(api huma.API, in Ingest) {
 	}, perProduct, "The proposer may not approve their own.", approveRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			Because string `json:"because" minLength:"1" doc:"What needs to change, in markdown"`
+			Because string `json:"because" minLength:"1" doc:"The change being asked for, in markdown"`
 		}
 	}) (*struct{}, error) {
 		subject, store, err := triaging(ctx, in)
@@ -184,7 +184,7 @@ func registerClaimLink(api huma.API, in Ingest) {
 	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			Elsewhere string `json:"elsewhere" maxLength:"1000" doc:"Where the work is happening. Empty clears it"`
+			Elsewhere string `json:"elsewhere" maxLength:"1000" doc:"The place the work is happening. Empty clears it"`
 		}
 	}) (*struct{}, error) {
 		subject, store, err := triaging(ctx, in)
@@ -210,7 +210,7 @@ func noSuchClaim() error {
 type ReaffirmedBody struct {
 	ClaimID   int64   `json:"claim_id" doc:"The claim this action made, which is what a second person agrees to where one is needed"`
 	Decisions []int64 `json:"decisions"`
-	Places    int     `json:"places" doc:"How many distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
+	Places    int     `json:"places" doc:"The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
 	Waiting   bool    `json:"waiting" doc:"Whether a second person has to agree"`
 }
 
@@ -244,7 +244,7 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 	}, anyPerson, "", triageRights()...), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
 		Body struct {
-			Reasoning string `json:"reasoning" minLength:"1" doc:"Why every one of them still holds, in markdown"`
+			Reasoning string `json:"reasoning" minLength:"1" doc:"The reason every one of them still holds, in markdown"`
 		}
 	}) (*struct{ Body ReaffirmedBody }, error) {
 		subject, store, err := triaging(ctx, in)
@@ -325,9 +325,9 @@ type StandingClaimBody struct {
 	// State is the claim's as a whole, not a representative row's: approved
 	// only where every live row here is.
 	State string           `json:"state" enum:"proposed,approved" doc:"The claim's state as a whole: approved only when every live row here is approved, otherwise proposed"`
-	Rows  RowsStandingBody `json:"rows" doc:"How the claim's rows here stand"`
+	Rows  RowsStandingBody `json:"rows" doc:"The state of the claim's rows here"`
 	// SentBackAt is what an approver asked for, where rows were sent back.
-	SentBackAt      string        `json:"sent_back_at,omitempty" doc:"When rows were last sent back to the author"`
+	SentBackAt      string        `json:"sent_back_at,omitempty" doc:"The last time rows were sent back to the author"`
 	SentBackBecause string        `json:"sent_back_because,omitempty" doc:"The reason given when they were, in markdown"`
 	Outcome         outcome       `json:"outcome"`
 	Justification   justification `json:"justification,omitempty"`
@@ -339,7 +339,7 @@ type StandingClaimBody struct {
 	NeedsApproval bool     `json:"needs_approval,omitempty"`
 	ProposedBy    string   `json:"proposed_by"`
 	ProposedAt    string   `json:"proposed_at"`
-	Places        int      `json:"places" doc:"How many of this finding's places the claim covers"`
+	Places        int      `json:"places" doc:"The number of this finding's places the claim covers"`
 	Builds        []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
 	ApprovedBy    string   `json:"approved_by,omitempty"`
 	ApprovedAt    string   `json:"approved_at,omitempty"`
@@ -367,11 +367,11 @@ type EarlierBody struct {
 	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
 	ProposedBy   string `json:"proposed_by"`
 	ProposedAt   string `json:"proposed_at"`
-	Ended        string `json:"ended" enum:"lapsed,withdrawn" doc:"Why it stopped applying"`
+	Ended        string `json:"ended" enum:"lapsed,withdrawn" doc:"The reason it stopped applying"`
 	EndedAt      string `json:"ended_at,omitempty"`
 	About        string `json:"about,omitempty" doc:"The component upstream version it was a claim about"`
 	Reasoning    string `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away"`
-	ApprovedBy   string `json:"approved_by,omitempty" doc:"Who last agreed to it, where anybody did"`
+	ApprovedBy   string `json:"approved_by,omitempty" doc:"The person who last agreed to it, where anybody did"`
 }
 
 // SimilarBody is an approved claim at the same places about another issue,
@@ -383,7 +383,7 @@ type SimilarBody struct {
 	Reasoning     string        `json:"reasoning"`
 	ApprovedBy    string        `json:"approved_by,omitempty"`
 	ApprovedAt    string        `json:"approved_at,omitempty"`
-	Issues        int           `json:"issues" doc:"How many distinct issues the claim covers"`
+	Issues        int           `json:"issues" doc:"The number of distinct issues the claim covers"`
 }
 
 // ElsewhereBody is an approved claim about this same issue at this same place,

@@ -18,10 +18,10 @@ import (
 type PerBuildBody struct {
 	Stream  string `json:"stream"`
 	Variant string `json:"variant"`
-	Version string `json:"version" doc:"What this build ships"`
+	Version string `json:"version" doc:"The version this build ships"`
 	// Purl is what an ecosystem and an upstream address are read out of.
 	Purl      string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"Which ecosystem the identifier names, read out of it rather than stored"`
+	Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem the identifier names, read out of it rather than stored"`
 	// PackagePageURL is where the package is published, worked out from
 	// the identifier by the one table that does that. The interface had a
 	// second table of its own, with a different membership and different
@@ -34,35 +34,35 @@ type PerBuildBody struct {
 	// built from. One word for two unrelated senses is the thing this change
 	// is against, and nothing is compatible with anything yet, so the rename
 	// is free now and impossible later.
-	PackagePageURL  string `json:"package_page_url,omitempty" doc:"Where this package is published, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like"`
-	PackagePageName string `json:"package_page_name,omitempty" doc:"What to call that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is"`
+	PackagePageURL  string `json:"package_page_url,omitempty" doc:"The address this package is published at, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like"`
+	PackagePageName string `json:"package_page_name,omitempty" doc:"The name for that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is"`
 	// Summary is what an ecosystem's index says the package is, where one
 	// was asked and answered. Absent is the ordinary case rather than a
 	// gap.
 	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
-	ProjectURL string `json:"project_url,omitempty" doc:"Where the index says the package is developed. Absent where it does not say, in which case an address can still be built from the identifier"`
+	ProjectURL string `json:"project_url,omitempty" doc:"The address the index gives for where the package is developed. Absent where it does not say, in which case an address can still be built from the identifier"`
 	// A count has a shape. Forty issues and three criticals are different
 	// work, and a number with nothing beside it says which is which.
-	BySeverity map[string]int `json:"by_severity,omitempty" doc:"What is open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
+	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Everything open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
 	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited, which outranks everything else about it"`
-	Fixable    int            `json:"fixable" doc:"How many of what is open here any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
-	Supplier   string         `json:"supplier,omitempty" doc:"Who the scan said supplied it — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
+	Fixable    int            `json:"fixable" doc:"The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
+	Supplier   string         `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
 	// Newest is what the ecosystem's index says is current, where one was
 	// asked.
 	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
-	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"When that version shipped, where the index said"`
-	FirstSeen time.Time  `json:"first_seen" doc:"When a scan of this deployment first reported the component"`
+	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
+	FirstSeen time.Time  `json:"first_seen" doc:"The first scan of this deployment to report the component"`
 	Issues    int        `json:"issues" doc:"Distinct vulnerabilities open against it here"`
 	// Consumers is the unit somebody acts in: one judgment covers the whole
 	// fold, and what varies underneath it is what pulls the package in.
-	Consumers int `json:"consumers" doc:"How many things pull it in here"`
-	Places    int `json:"places" doc:"How many times those sit somewhere in this build. What the bulk cap is measured against"`
+	Consumers int `json:"consumers" doc:"The number of things pulling it in here"`
+	Places    int `json:"places" doc:"The number of times those sit somewhere in this build. What the bulk cap is measured against"`
 	// Upgrades are the versions this build could move to.
 	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets"`
 	DueAt    *time.Time    `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees, because that defers the worst thing it covers"`
 	// CommittedTo is what has already been promised for this build, read
 	// off the decisions.
-	CommittedTo *time.Time `json:"committed_to,omitempty" doc:"When the work promised here is due"`
+	CommittedTo *time.Time `json:"committed_to,omitempty" doc:"The date the work promised here is due"`
 	UpgradeTo   string     `json:"upgrade_to,omitempty" doc:"The version somebody has committed to moving this build to"`
 }
 
@@ -154,16 +154,16 @@ func registerComponent(api huma.API, in Ingest) {
 // PlanUpgradeBody is a promise to move a component in the builds named.
 type PlanUpgradeBody struct {
 	To string `json:"to" minLength:"1" maxLength:"191" doc:"The version this moves to, as whoever packages it writes it"`
-	By string `json:"by" doc:"When the work will be done, as 2026-03-31. What a missed target is measured against"`
+	By string `json:"by" doc:"The date the work lands, as 2026-03-31. A missed target is measured against it"`
 	// Builds is which releases this is promised for. The same component
 	// can be promised a different version in another release, which is the
 	// ordinary case.
 	Builds    []BuildName `json:"builds" minItems:"1" doc:"The releases this is promised for. A stream staying on a maintained older line takes its own promise with its own version"`
-	Reasoning string      `json:"reasoning" minLength:"1" doc:"Why this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome"`
+	Reasoning string      `json:"reasoning" minLength:"1" doc:"The reason this is the answer here. Required like every other judgment: what an auditor reads is the reasoning, not the outcome"`
 	// Person is who carries it. A team as readily as a person: moving a
 	// package is work a queue tracks rather than a judgment one person
 	// makes.
-	Person string `json:"person,omitempty" doc:"Who is carrying it, by sign-in identity. Leave both out and it is held by nobody"`
+	Person string `json:"person,omitempty" doc:"The party carrying it, by sign-in identity. Leave both out and it is held by nobody"`
 	Team   string `json:"team,omitempty" doc:"A team carrying it, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 }
 
@@ -173,7 +173,7 @@ type PlannedUpgradeBody struct {
 	Decisions  int   `json:"decisions" doc:"Places answered"`
 	Issues     int   `json:"issues" doc:"Distinct vulnerabilities it covers"`
 	Targets    int   `json:"targets" doc:"Build-level intents recorded, which is what the pending upgrades screen reads"`
-	Components int   `json:"components" doc:"How many packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together"`
+	Components int   `json:"components" doc:"The number of packages of the source it reached. Naming any binary of a source package reaches all of them, because they move together"`
 	// Waiting says a second person has to agree, which happens when the date
 	// is past the earliest deadline among what this covers.
 	Waiting bool `json:"waiting" doc:"Whether this needs a second person. True when the date is past the earliest deadline among what it covers, because that defers the worst thing in it"`

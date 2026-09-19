@@ -120,8 +120,8 @@ func (a Administering) handle() bun.IDB {
 
 // PersonBody is somebody who has been granted access.
 type PersonBody struct {
-	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"What to call them here"`
-	DisplayName string `json:"display_name,omitempty" doc:"What to show instead of the identity"`
+	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"The name for them here"`
+	DisplayName string `json:"display_name,omitempty" doc:"The label shown instead of the identity"`
 	Admin       bool   `json:"admin,omitempty" doc:"Whether they administer this deployment"`
 	// Audits is the read-only half: this deployment's own records, and no
 	// product's findings or decisions.
@@ -133,7 +133,7 @@ type PersonBody struct {
 	// On the list as well as on the person, because "who still has access"
 	// is a question about the list — and a list that answers it only one row
 	// at a time is one nobody asks it of.
-	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"When they left. Absent means they may still sign in"`
+	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"The date they left. Absent means they may still sign in"`
 	// Email is how somebody signs in is SignsInBy below, which carries the
 	// username and whether the provider's own identifier has been pinned
 	// to it. Two fields here said the same thing, were documented as
@@ -144,8 +144,8 @@ type PersonBody struct {
 	// Email, and whether a provider gave it. The second is worth answering:
 	// an address a provider supplied is one a later sign-in may change, and
 	// one recorded here is not.
-	Email       string `json:"email,omitempty" doc:"Where they are reached outside the application"`
-	EmailSource string `json:"email_source,omitempty" enum:"provider,recorded" doc:"Who last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten"`
+	Email       string `json:"email,omitempty" doc:"The address they are reached at outside the application"`
+	EmailSource string `json:"email_source,omitempty" enum:"provider,recorded" doc:"The source that last decided it. A provider's may be refreshed by a later sign-in; one recorded here is never overwritten"`
 	// Holds is what they may do, listed as product and role.
 	Holds []HeldBody `json:"holds,omitempty"`
 	// SeesNothing says every role they hold is a capability, so they reach
@@ -192,8 +192,8 @@ func seesNothing(held []HeldBody) bool {
 // Everything that granted one sent "effective": true to be allowed to, and
 // the reply then echoed that back as though it were the answer.
 type RecordBody struct {
-	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"What to call them here"`
-	DisplayName string `json:"display_name,omitempty" doc:"What to show instead of the identity"`
+	Identity    string `json:"identity" minLength:"1" maxLength:"191" doc:"The name for them here"`
+	DisplayName string `json:"display_name,omitempty" doc:"The label shown instead of the identity"`
 	// Admin is a pointer so that three things stay distinguishable: making
 	// somebody an administrator, taking it away, and saying nothing about it.
 	// A plain bool decodes an absent field as false, so granting a role — a
@@ -210,7 +210,7 @@ type RecordBody struct {
 	// mention at all. Stating it empty clears it, which is how somebody
 	// comes off mail without coming off the tool; omitting it leaves
 	// whatever is stored.
-	Email *string `json:"email,omitempty" doc:"Where to reach them outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was"`
+	Email *string `json:"email,omitempty" doc:"The address to reach them at outside the application. Optional. Send it empty to clear it; omit it to leave it alone. A sign-in provider that verifies an address fills it in where nobody here has recorded one, and never replaces one that was"`
 	// Holds is what to grant them, listed as product and role.
 	Holds []GrantBody `json:"holds,omitempty"`
 }
@@ -219,7 +219,7 @@ type RecordBody struct {
 type GrantBody struct {
 	// Product is the one it is held against, or empty with Everywhere set.
 	Product string `json:"product,omitempty" doc:"The product the role is held against. Omit it and set everywhere instead to hold it across the estate"`
-	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
+	Role    string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"The rights it carries"`
 	// Everywhere holds the role across every product, including products
 	// declared afterwards. Stated rather than implied by an absent product,
 	// so that a caller that forgot the product is refused instead of quietly
@@ -245,13 +245,13 @@ type HeldBody struct {
 	// the withdraw route resolves, so it carries the address and this carries
 	// the label — a screen rendering the label and sending it back is how a
 	// role could be granted and not withdrawn.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
 	// Everywhere says it is held across the estate, covering products
 	// declared afterwards. Reported rather than left to be inferred from an
 	// absent product: an access review asks what somebody holds, and "on
 	// nothing" and "on everything" must not read alike.
 	Everywhere bool   `json:"everywhere,omitempty" doc:"Held across every product, including products declared later"`
-	Role       string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"What they may do with it"`
+	Role       string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage" doc:"The rights it carries"`
 	// Effective says whether this grants anything right now. An assignment set
 	// aside by a change of role-assignment mode is kept so the change can be
 	// undone, and it grants nothing while it sits there — so it is shown, and
@@ -266,12 +266,12 @@ type HeldBody struct {
 
 // KeyBody is a pipeline credential, without its secret.
 type KeyBody struct {
-	Name    string `json:"name" minLength:"1" maxLength:"191" doc:"What this credential is for"`
+	Name    string `json:"name" minLength:"1" maxLength:"191" doc:"The credential's purpose"`
 	Product string `json:"product" minLength:"1" doc:"The product it may send scans for, by the name that addresses it. Always required"`
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: this field is what create-key resolves, and a display
 	// name resolves to nothing.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"What to call that product, where it was declared with a display name"`
+	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
 	// Stream and Variant narrow it further. Either, both or neither may be
 	// given: a key covering a whole product cannot imply which release an
 	// upload is for, which is why an upload always states its own target.
@@ -286,8 +286,8 @@ type KeyBody struct {
 	//
 	// A pipeline key does not expire, which is why the date it was made is
 	// the only thing that bounds it.
-	CreatedAt  string `json:"created_at,omitempty" doc:"When it was issued. A pipeline key does not expire, so this is the only thing that dates it"`
-	LastUsedAt string `json:"last_used_at,omitempty" doc:"When it last sent something"`
+	CreatedAt  string `json:"created_at,omitempty" doc:"The date it was issued. A pipeline key does not expire, so this is the only thing that dates it"`
+	LastUsedAt string `json:"last_used_at,omitempty" doc:"The last time it sent something"`
 	Withdrawn  bool   `json:"withdrawn,omitempty" doc:"Whether it has been withdrawn"`
 }
 

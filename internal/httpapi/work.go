@@ -32,17 +32,17 @@ type SetAsideBody struct {
 	// the thing may have been deleted since, and a list of set-aside work
 	// that fails to render because one row points at nothing is worse than
 	// one that says what the row says.
-	Kind      string `json:"kind" doc:"Which worker the job was for"`
-	Reference string `json:"reference" doc:"What the work was about"`
-	Attempts  int    `json:"attempts" doc:"How many times it was tried"`
+	Kind      string `json:"kind" doc:"The worker the job was for"`
+	Reference string `json:"reference" doc:"The subject of the work"`
+	Attempts  int    `json:"attempts" doc:"The number of attempts"`
 	// LastError is what a worker reported, which is not one of this
 	// deployment's own records: a failed parse quotes the cause it was given,
 	// and that can carry a component name or a package address out of an
 	// SBOM. It is why this route asks for administration rather than for the
 	// grant that reads the records — that grant is declared, three times over,
 	// to reach no product's findings.
-	LastError string    `json:"last_error,omitempty" doc:"Why it stopped, where anything reported one. Worker output, which may quote what the job was about"`
-	StoppedAt time.Time `json:"stopped_at" doc:"When it was set aside"`
+	LastError string    `json:"last_error,omitempty" doc:"The reason it stopped, where anything reported one. Worker output, which may quote what the job was about"`
+	StoppedAt time.Time `json:"stopped_at" doc:"The moment it was set aside"`
 }
 
 // QueuedBody is how much of one kind of work is waiting, against the bound
@@ -52,19 +52,19 @@ type SetAsideBody struct {
 // runaway producer's own backlog is what hides behind everybody else's empty
 // queues, and the one number an operator has says the deployment is idle.
 type QueuedBody struct {
-	Kind    string `json:"kind" doc:"Which worker the work is for"`
-	Waiting int    `json:"waiting" doc:"How much is waiting, including work held by a worker that has stopped reporting"`
-	Limit   int    `json:"limit" doc:"How much of this kind may wait before more is refused"`
+	Kind    string `json:"kind" doc:"The worker the work is for"`
+	Waiting int    `json:"waiting" doc:"The depth waiting, including work held by a worker that has stopped reporting"`
+	Limit   int    `json:"limit" doc:"The depth of this kind allowed before more is refused"`
 }
 
 // VulnerabilityDataBody is what this deployment's scans are answering against.
 type VulnerabilityDataBody struct {
-	Version string `json:"version,omitempty" doc:"What the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said"`
+	Version string `json:"version,omitempty" doc:"The version the newest finished run stated, in the scanner's own spelling. Absent where nothing has finished a scan and said"`
 	// Since is when the data last moved, which is the most recent time any
 	// version was seen for the first time. A version that comes back was not a
 	// change the second time.
-	Since   *time.Time `json:"moved_at,omitempty" doc:"When the data last moved: the most recent time any version was seen for the first time. A version that comes back is not a change"`
-	StaleAt string     `json:"stale_after" doc:"How long without moving counts as stopped, as this deployment has it set"`
+	Since   *time.Time `json:"moved_at,omitempty" doc:"The data's last move: the most recent time any version was seen for the first time. A version that comes back is not a change"`
+	StaleAt string     `json:"stale_after" doc:"The span without moving that counts as stopped, as this deployment has it set"`
 	Stale   bool       `json:"stale" doc:"Whether it has been that long. The same question the condition told to administrators asks"`
 }
 

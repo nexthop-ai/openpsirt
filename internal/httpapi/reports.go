@@ -27,8 +27,8 @@ type PointBody struct {
 	// is the question a backlog is read for: ten in and ten out is a team
 	// keeping pace where both are low, and a team losing ground where what
 	// arrives is critical and what leaves is not.
-	OpenedBySeverity   map[string]int `json:"opened_by_severity" doc:"What appeared, split by severity"`
-	ResolvedBySeverity map[string]int `json:"resolved_by_severity" doc:"What went away, split by the severity it held while it was open"`
+	OpenedBySeverity   map[string]int `json:"opened_by_severity" doc:"Everything that appeared, split by severity"`
+	ResolvedBySeverity map[string]int `json:"resolved_by_severity" doc:"Everything that went away, split by the severity it held while it was open"`
 }
 
 // ComparisonBody is what changed between two builds.
@@ -48,7 +48,7 @@ type ChangedBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Component     string `json:"component"`
 	Severity      string `json:"severity,omitempty"`
-	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,superseded,unexplained" doc:"Why it went. Only on fixed entries"`
+	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,superseded,unexplained" doc:"The reason it went. Only on fixed entries"`
 	ArrivedFrom   string `json:"arrived_from,omitempty" doc:"The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix"`
 	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
 	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
@@ -58,8 +58,8 @@ type ChangedBody struct {
 	// something somebody can sign a release off against: an approved
 	// not-applicable and a row nobody has looked at are opposite answers
 	// and read alike without it.
-	State         string        `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"How far this build has decided it. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
-	Outcome       outcome       `json:"outcome,omitempty" doc:"What was decided, where every standing decision over its places says the same thing"`
+	State         string        `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
+	Outcome       outcome       `json:"outcome,omitempty" doc:"The decision, where every standing one over its places says the same thing"`
 	Justification justification `json:"justification,omitempty" doc:"The recognized reason it does not apply, on a dismissal"`
 	Due           string        `json:"due,omitempty" doc:"The soonest deadline among the places still open, as a date"`
 }
@@ -87,8 +87,8 @@ func registerReports(api huma.API, in Ingest) {
 		Weeks     int    `query:"weeks" default:"12" minimum:"1" maximum:"104"`
 		Component string `query:"component" doc:"Keep only what is open against components of this name, whatever version"`
 		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build"`
-		Version   string `query:"beneath_version" doc:"Which one, where the build holds that name at several versions"`
-		Ecosystem string `query:"beneath_ecosystem" doc:"Which one, for the few names a build holds at one version as two components"`
+		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
+		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
 	}) (*listOutput[PointBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -245,7 +245,7 @@ func registerReports(api huma.API, in Ingest) {
 // ReleasePointBody is what one release shipped with.
 type ReleasePointBody struct {
 	Stream     string         `json:"stream"`
-	Cut        string         `json:"cut" doc:"When the release was declared. It orders them and labels them; the axis is the sequence"`
+	Cut        string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
 	Open       int            `json:"open" doc:"Distinct issues open against it now, against today's vulnerability data rather than the day it was cut"`
 	BySeverity map[string]int `json:"by_severity,omitempty"`
 }
@@ -271,7 +271,7 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		ScopeQuery
-		Limit int `query:"limit" default:"12" minimum:"1" maximum:"50" doc:"How many releases, most recent kept"`
+		Limit int `query:"limit" default:"12" minimum:"1" maximum:"50" doc:"The number of releases, most recent kept"`
 	}) (*struct {
 		Body struct {
 			Items []ReleasePointBody `json:"items"`
@@ -449,9 +449,9 @@ type InheritedBody struct {
 	Component     string  `json:"component"`
 	Outcome       outcome `json:"outcome"`
 	Was           string  `json:"was" doc:"The version the claim was made against"`
-	Now           string  `json:"now" doc:"What the new line has"`
+	Now           string  `json:"now" doc:"The new line's contents"`
 	Reasoning     string  `json:"reasoning" doc:"The old words, to start from rather than start without"`
-	DeferredDays  int     `json:"deferred_days,omitempty" doc:"How long this has already been put off, across every line it has been carried through"`
+	DeferredDays  int     `json:"deferred_days,omitempty" doc:"The total this has already been put off for, across every line it has been carried through"`
 }
 
 // CarriedBody is what a new line would inherit.
@@ -541,11 +541,11 @@ func registerCarrying(api huma.API, in Ingest) {
 		// about which build is being carried from.
 		FromVariant string `query:"from_variant" required:"true" doc:"That line's variant"`
 		Body        struct {
-			Decisions []int64 `json:"decisions" minItems:"1" doc:"Which of the offered judgments to carry"`
+			Decisions []int64 `json:"decisions" minItems:"1" doc:"The offered judgments to carry"`
 		}
 	}) (*struct {
 		Body struct {
-			Carried int `json:"carried" doc:"How many claims were written, each waiting for a second person"`
+			Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
 		}
 	}, error) {
 		subject, err := reading(ctx)
@@ -584,7 +584,7 @@ func registerCarrying(api huma.API, in Ingest) {
 		}
 		out := &struct {
 			Body struct {
-				Carried int `json:"carried" doc:"How many claims were written, each waiting for a second person"`
+				Carried int `json:"carried" doc:"The number of claims written, each waiting for a second person"`
 			}
 		}{}
 		out.Body.Carried = carried

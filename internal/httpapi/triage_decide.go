@@ -29,25 +29,25 @@ import (
 // it covers.
 type FindingDecisionBody struct {
 	Outcome       outcomeOneAtATime `json:"outcome"`
-	Justification justification     `json:"justification,omitempty" doc:"Why it does not apply. Required when it does not"`
-	Mitigation    string            `json:"mitigation,omitempty" maxLength:"65536" doc:"What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
+	Justification justification     `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
+	Mitigation    string            `json:"mitigation,omitempty" maxLength:"65536" doc:"The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
 	DeferredUntil string            `json:"deferred_until,omitempty" doc:"Required when it is deferred. A date, as 2026-03-31"`
 	// CommittedTo is when a promised backport lands. An upgrade is not
 	// recorded here at all: it answers a component rather than one
 	// finding, so it is recorded from the component.
-	CommittedTo string `json:"committed_to,omitempty" doc:"When a promised backport lands, as a date. Required for patch-needed and refused with any other"`
+	CommittedTo string `json:"committed_to,omitempty" doc:"The date a promised backport lands. Required for patch-needed and refused with any other"`
 	// FixedVersion is what makes the already-fixed claim checkable against
 	// whoever packages the component. Offered here because the outcome is
 	// offered here: an enum listing an outcome whose evidence the body
 	// cannot carry refuses every request that picks it.
 	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other"`
-	Reasoning    string `json:"reasoning" minLength:"1" doc:"Why this holds"`
+	Reasoning    string `json:"reasoning" minLength:"1" doc:"The reasoning"`
 	// Places is the deliberate narrowing. Absent means every place, which
 	// is the default naming the places covered asks for.
 	// Bounded like every other array a write path takes. Each entry costs a
 	// map insert and a scan of the finding's places before anything is
 	// refused, so an unbounded one is work a caller chooses the size of.
-	Places []string `json:"places,omitempty" maxItems:"2000" maxLength:"191" doc:"Which places this covers, as the finding names them. Omit for all of them"`
+	Places []string `json:"places,omitempty" maxItems:"2000" maxLength:"191" doc:"The places this covers, as the finding names them. Omit for all of them"`
 	// Extends names an approved claim this one carries to a new issue. The
 	// outcome and justification have to be the source's, and the places have
 	// to be ones the source sits at.
@@ -82,8 +82,8 @@ type AlsoBuild struct {
 // DecidedBody is what one judgment about a finding recorded.
 type DecidedBody struct {
 	ClaimID  int64 `json:"claim_id" doc:"The claim this action made, which is what the review queue lists and what is approved"`
-	Recorded int   `json:"recorded" doc:"How many places it was written against"`
-	Covered  int   `json:"covered" doc:"How many findings those places hold"`
+	Recorded int   `json:"recorded" doc:"The number of places it was written against"`
+	Covered  int   `json:"covered" doc:"The number of findings those places hold"`
 	// Every place this judgment did not reach, whatever kept it from
 	// reaching. "Because they were not named" described one of the two:
 	// with `remaining` it also counts places a decision reached through
@@ -95,7 +95,7 @@ type DecidedBody struct {
 	IDs           []int64 `json:"ids"`
 	// Also is what the same judgment wrote in each other build named, in the
 	// order they were named. Absent where none were.
-	Also []CoveredBuild `json:"also,omitempty" doc:"What this judgment wrote in each other build it was applied to"`
+	Also []CoveredBuild `json:"also,omitempty" doc:"The rows this judgment wrote in each other build it reached"`
 }
 
 // CoveredBuild is what one judgment wrote in one other build.
@@ -106,8 +106,8 @@ type CoveredBuild struct {
 	Stream   string `json:"stream"`
 	Variant  string `json:"variant"`
 	Version  string `json:"version,omitempty"`
-	Recorded int    `json:"recorded" doc:"How many places it was written against there"`
-	Covered  int    `json:"covered" doc:"How many findings those places hold"`
+	Recorded int    `json:"recorded" doc:"The number of places it was written against there"`
+	Covered  int    `json:"covered" doc:"The number of findings those places hold"`
 }
 
 func registerFindingDecision(api huma.API, in Ingest) {
@@ -146,7 +146,7 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component, as the findings list gives it"`
-		Version       string `query:"version" doc:"Which version, where the build ships more than one under that name"`
+		Version       string `query:"version" doc:"The version, where the build ships more than one under that name"`
 		Body          FindingDecisionBody
 	}) (*struct{ Body DecidedBody }, error) {
 		subject, store, err := triaging(ctx, in)
