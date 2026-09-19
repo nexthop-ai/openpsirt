@@ -83,6 +83,10 @@ because a list that mixes those two reads as though none of it is urgent.
 
 ## Measured, recorded, not fixed
 
+| | |
+|---|---|
+| **A re-scan of unchanged data rewrites every fixable finding on two engines** | Measured at the scale `TestMeasureTheFirstNightAfterTheDeadlineRuleChanged` uses — 8,840 findings, 5,882 of them carrying a fix — a night where nothing moved writes nothing on SQLite and 5,882 rows on PostgreSQL (1.3 s) and MySQL (840 ms). The same measurement taken before the deadline rule changed says the same, so it is not that rule's doing. The applier skips a row where what it holds and what was reported are the same, and the comparison includes the date a fix arrived, so what this points at is how that timestamp survives a round trip on each engine. It costs a write per fixable finding per night and nothing else: no answer is wrong |
+
 Nothing is made faster until it is measured slow. These were measured and left.
 
 | | |
