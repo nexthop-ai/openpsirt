@@ -84,13 +84,12 @@ Every check CI runs is a `make` target, so a CI failure reproduces locally with
 the same command and the same pinned tool versions (REQ-75).
 
 The Go package pattern is not `./...`. An npm dependency ships a Go package —
-`web/node_modules/flatted/golang` — and `./...` matched it, so it was compiled,
-vetted, tested and scanned as part of this module. Nothing chose that: a
-JavaScript dependency putting Go source into the build graph is a surface, not a
-curiosity. Every tool written here already skips `node_modules` by name; the
-package pattern was the one place that did not, and it is now the list `go list`
-gives minus that directory, computed rather than written out so a new directory
-of ours needs no edit.
+`web/node_modules/flatted/golang` — and `./...` matches it, so it is compiled,
+vetted, tested and scanned as part of this module. Nobody chooses that: a
+JavaScript dependency putting Go source into the build graph is a surface
+rather than a curiosity. Every tool written here skips `node_modules` by name,
+and the package pattern is the list `go list` gives minus that directory,
+computed rather than written out so a new directory of ours needs no edit.
 
 | Target | Runs |
 |---|---|
@@ -188,13 +187,13 @@ rather than for tidiness.
 | Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
 | Documentation builds | The documentation site built | Python, and nothing else needs it |
 
-Dependency review was a fourth and is not. The action needs GitHub Advanced
+Dependency review is not a fourth job. The action needs GitHub Advanced
 Security on a private repository — a paid add-on, per active committer, that
-nothing else in this organization buys. What it checked is covered by targets
-instead, and covered better: `licenses` reads the npm tree as well as the Go
-one, `web-audit` scans what the interface installs, and `secrets` replaces the
-platform's secret scanning. Each runs locally with one command, which the action
-never did, and that is the half of REQ-75 the action was quietly failing.
+nothing else in this organization buys. Targets cover what it checks, and cover
+it better: `licenses` reads the npm tree as well as the Go one, `web-audit`
+scans what the interface installs, and `secrets` replaces the platform's secret
+scanning. Each runs locally with one command, which an action cannot, and that
+is the half of REQ-75 an action cannot meet.
 
 Two workflows beside this one report no build of their own. `PR` is the
 aggregator that waits for every check here and is the only one the ruleset
@@ -207,25 +206,23 @@ The first job runs one target, not a list of them. `make check` is the
 definition of what CI checks, so a target added to it is run by CI without
 anybody remembering to add a step.
 
-Naming targets individually is how the two drifted. CI was six jobs listing
-their targets by hand, and three targets `make check` runs were in no job:
-`reserved`, `readable` and `pins-check`. So the rule that local and CI run the
-identical command was written down, believed, and false in three places —
-including the one that checks no invented name collides with a word an engine
+Naming targets individually is what makes the two drift. Jobs listing their
+targets by hand leave targets `make check` runs in no job, so the rule that
+local and CI run the identical command is written down, believed and false —
+including for the check that no invented name collides with a word an engine
 reserves, which is a non-negotiable.
 
-Five of the six were a checkout and a Go setup. The interface, static analysis,
-vulnerabilities and licenses, the API document and the bill of materials each
-declared nothing else before running a make target: same runner image, same
-toolchain, same module cache, no services, no conditions. Six clones and six
-toolchain restores did one machine's worth of work. Parallelism was the only
-thing lost by folding them together, and it was not what any of them was for.
+Jobs that declare nothing but a checkout and a Go setup are one job. The
+interface, static analysis, vulnerabilities and licenses, the API document and
+the bill of materials share a runner image, a toolchain and a module cache, and
+declare no services and no conditions: separate, they are that many clones and
+toolchain restores doing one machine's worth of work, and parallelism is all
+that folding them costs.
 
-A composite action was considered and is not needed. The shared setup was going
-to become one, but after the fold there is exactly one Go setup left in the
-workflow, so an action abstracting it would have a single caller. A reusable
-workflow would not have helped at all: it runs on a runner of its own, so it
-re-clones and re-installs, which organizes the file and keeps the cost.
+A composite action is not needed. One Go setup is left in the workflow, so an
+action abstracting it would have a single caller, and a reusable workflow runs
+on a runner of its own — it re-clones and re-installs, which organizes the file
+and keeps the cost.
 
 Publishing documentation is a workflow of its own, not this one's fourth job. It
 runs on `main` alone, writes to the repository, and publishes rather than
@@ -250,10 +247,9 @@ output. What it carries is the hook rules, which catch an impure read during
 render, a dependency list that makes an effect run every time, and a value
 assigned and never used.
 
-One rule reports rather than refuses: writing state from an effect, flagged nine
-times, all the same shape. The fix is to remount with a key, which changes how
-those components mount rather than what they do, so each has to be driven in a
-browser.
+One rule reports rather than refuses: writing state from an effect. The fix is
+to remount with a key, which changes how a component mounts rather than what it
+does, so each has to be driven in a browser.
 
 ## Class-name checks
 
@@ -261,7 +257,7 @@ A class name this project defines that Tailwind also defines. Tailwind is
 imported wholesale, so it emits a utility rule for any class name in the source
 it recognizes. Where that name is also defined here, both rules apply and
 Tailwind's wins for the properties it sets. Nothing fails: a column with
-`class="col fixed"` picked up `position: fixed` and left the grid.
+`class="col fixed"` picks up `position: fixed` and leaves the grid.
 
 The set is derived rather than listed. Every class this stylesheet defines a rule
 for is put to Tailwind's compiler, and anything it answers for is a collision. A
@@ -316,11 +312,11 @@ on each engine, so packages share nothing and run in parallel.
 | SQLite | A copy of a template migrated once per binary | Not needed — each test holds its own file |
 | The three servers | The package's own database on the server | By deleting from the tables that hold rows |
 
-A server database is kept between runs and reused. Applying the migrations was
-nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on MariaDB,
-once per package per engine, which was 475 s of server work in a run that spent
-43 s of processor time — and none of it tests anything the migration tests do
-not.
+A server database is kept between runs and reused. Applying the migrations is
+nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
+MariaDB, once per package per engine, which is 475 s of server work in a run
+spending 43 s of processor time — and none of it tests anything the migration
+tests do not.
 
 What makes reuse safe is the name. Below 1.0 a schema change edits the
 migration that created the thing rather than adding one beside it, so the
@@ -345,19 +341,18 @@ SQLite spends and almost none of what a server engine does.
 The detector is a property of the binary and cannot be turned on for one
 subtest, so `test-all` is two runs: SQLite with it, the three servers without.
 
-It was not true of four tests. `OPENPSIRT_TEST_ENGINES` narrows which engines a
-run touches, and `test` and `test-race` both set it to `sqlite` — but the pool's
-idle reaper, the migration lock and the version floor open connections
-themselves rather than through `dbtest`, and each read its URL without
-consulting the variable. So the quick loop and the race run opened three
-servers, and the measurements above understate what the race run costs. It
-surfaced as five failures the day the servers were stopped, which reads as a
-code regression rather than a stopped container.
+`OPENPSIRT_TEST_ENGINES` narrows which engines a run touches, and `test` and
+`test-race` both set it to `sqlite`. The pool's idle reaper, the migration lock
+and the version floor open connections themselves rather than through `dbtest`,
+so a copy of the rule in each is a copy that reads its URL without consulting
+the variable — and then the quick loop and the race run open three servers,
+failing on the day the servers are stopped in a way that reads as a code
+regression rather than a stopped container.
 
-The rule now lives in `dbtest/engines`, a package below both `dbtest` and
-`migrate`: the migration lock's test is an internal test of `migrate`, which
-`dbtest` depends on, so it could not reach the rule and a second copy of the
-parsing was the alternative.
+The rule lives in `dbtest/engines`, a package below both `dbtest` and
+`migrate`. The migration lock's test is an internal test of `migrate`, which
+`dbtest` depends on, so it cannot reach a rule held in `dbtest` and a second
+copy of the parsing is the alternative.
 
 Tests within a package run beside each other when SQLite is the whole run. That
 is the only run where each test already holds a database nothing else can reach;
@@ -366,8 +361,8 @@ themselves, so two at once would clear each other's rows. A test that changes
 something the whole process shares — an environment variable, the working
 directory — says so and runs alone.
 
-Together: four minutes four seconds became one minute fifteen against warm
-servers, and two minutes forty-five against cold ones.
+Together: one minute fifteen against warm servers and two minutes forty-five
+against cold ones, from four minutes four seconds.
 
 ## Pinned pairs
 
@@ -378,9 +373,9 @@ image against the one the SBOM target invokes, and the Python the documentation
 closure was resolved on against the one the workflows build it with.
 
 A check of its own rather than part of the engine check: that answers what the
-tests run against, this answers what the release is built from. It found drift on
-its first run — the image carried two defaults for the version passed in, so a
-build with none reported `dev` in the binary and `0.0.0` in its own inventory.
+tests run against, this answers what the release is built from. An image
+carrying two defaults for the version passed in is what it catches — a build
+with none then reports `dev` in the binary and `0.0.0` in its own inventory.
 
 The Go patch counts. A floating base image and a comparison truncated to the
 minor cannot tell one patch apart, so a tarball and an image built from the same
@@ -403,10 +398,9 @@ version.
 | The scanner and the cataloger | A version and a per-architecture hash in the image |
 | Actions | A commit, never a tag |
 
-The Python closure was the exception, and it is the one that runs beside a
-token that can write to the repository. Three packages were pinned and the
-thirty or so they pull in were not, so a republished transitive release
-executed on the next push.
+The Python closure is the one that runs beside a token that can write to the
+repository. Pinning the direct packages and not the closure they pull in leaves
+a republished transitive release executing on the next push.
 
 Direct versions are written in `docs/requirements.in` and the lock beside it is
 generated, never edited:
@@ -451,7 +445,7 @@ byte that makes a text tool skip a file is not a Go question.
 
 | Rule | |
 |---|---|
-| A walk that reaches nothing refuses** | An empty result is what "nothing is wrong" looks like and what "I read nothing" looks like. No caller can tell those apart from a count of zero, so the reader answers an error rather than a silence |
+| **A walk that reaches nothing refuses** | An empty result is what "nothing is wrong" looks like and what "I read nothing" looks like. No caller can tell those apart from a count of zero, so the reader answers an error rather than a silence |
 | **What is counted is what the caller kept**, not what it was shown | A count of visits is held above zero by any file at all, so the refusal above could never fire for a gate that reads one kind of file |
 | **Every gate says how much it read** | The count is beside the all-clear, so a run that quietly stopped reading part of the tree does not look like a run that read all of it |
 | **A directory is matched by name at any depth**, not by path prefix | Which is what a caller adding one means, and it is how nested dependency directories are covered |
@@ -474,10 +468,9 @@ Build tooling is exempt. The linter is GPL-licensed; running a tool over the cod
 affects its license no more than the compiler does.
 
 Both ecosystems, one allowlist. The interface is built into the binary, so what
-npm installs ships exactly as a Go module does, and it went unchecked until the
-product that would have caught it turned out to be paid. `make licenses` runs
-both halves against the same `ALLOWED_LICENSES`, passed in rather than repeated,
-and dev dependencies are unrestricted on both sides because a build tool binds
+npm installs ships exactly as a Go module does. `make licenses` runs both
+halves against the same `ALLOWED_LICENSES`, passed in rather than repeated, and
+dev dependencies are unrestricted on both sides because a build tool binds
 whoever builds rather than whoever installs.
 
 | Exception | Why |
@@ -584,6 +577,6 @@ generated address rather than at the organization's.
 | Branch protection is not enforced | The gate runs on every pull request but nothing blocks a merge, which is the state REQ-75 warns about. Deliberate for early development, and it needs revisiting before outside contributions |
 | The documentation workflow publishes one set, `main`, as the default | Publishing a tag under its version and moving a `latest` alias belongs with a release process that does not exist. The versioning machinery is in place |
 | The install and operate guides are not written | Both are about a release — how to get a version, how to move between them, what to back up before an upgrade — and there is no release process, so a guide written now would describe the demo target and the development database |
-| The gate and CI run the same commands | The packaging checks existed twice, neither a superset of the other, so a reviewer running the gate and a merge being blocked were checking different things |
+| The gate and CI run the same commands | Written twice, neither copy a superset of the other, a reviewer running the gate and a merge being blocked check different things |
 | A check needing a running server refuses rather than skips | A skipped test passes, and "the suite is green" and "the suite ran" are two different facts behind one command |
-| `README.md` and `docs/index.md` are compared | Neither can include the other, and they drifted in five of ten lines |
+| `README.md` and `docs/index.md` are compared | Neither can include the other, and the same list maintained twice drifts |
