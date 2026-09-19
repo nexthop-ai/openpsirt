@@ -6,8 +6,8 @@ import { type Scoped } from "../../app/scope";
 // catalog is the list of those names; anything else is built on the findings
 // list and its filters, which is the entry at the foot of the catalog screen.
 //
-// **A report about the thing you are standing on lives on that screen and is
-// listed here. A report that spans things lives only here.** So a comparison
+// A report about the thing you are standing on lives on that screen and is
+// listed here. A report that spans things lives only here. So a comparison
 // of two releases keeps the address it has — it is the screen where the two
 // are picked — and appears in the catalog with the selection already made,
 // rather than being rebuilt as a second copy under a reports address.

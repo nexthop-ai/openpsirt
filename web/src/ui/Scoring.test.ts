@@ -4,9 +4,9 @@ import { read, vectorOf, versionOf } from "./Scoring";
 const WHOLE = { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "H", I: "H", A: "H" };
 
 // Composing a CVSS base vector, which is what gets stored and what every
-// deadline is worked out from. Untested until now, and in a `.tsx` file —
-// which was easy to read as a tooling limit and was not one: a `.tsx` module
-// is importable from a `.ts` test, and six already do it.
+// deadline is worked out from. The module is a `.tsx` file, which is no
+// barrier to a `.ts` test: a `.tsx` module is importable from one, and six
+// already do it.
 describe("what a composed vector says it is", () => {
   it("keeps the version the vector being edited was recorded under", () => {
     // The base formula is the same in 3.0 and 3.1, so the score does not move

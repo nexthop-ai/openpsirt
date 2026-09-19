@@ -25,7 +25,7 @@ import { Wide } from "../../ui/Wide";
 // audit asks about; the others are here because a control question is
 // sometimes about this month and sometimes about the whole record.
 //
-// **Everything is offered because a condition points here.** The notification
+// Everything is offered because a condition points here. The notification
 // saying risk is standing with nobody's agreement counts across the whole
 // record, and with nothing longer than a year offered, an administrator sent
 // here by it could be told a control failed and shown a page that cannot
@@ -45,7 +45,7 @@ const SECTION = 100;
 
 // How much a second pair of eyes actually did.
 //
-// **Not a list of people who broke the rule.** The rule cannot be broken:
+// Not a list of people who broke the rule. The rule cannot be broken:
 // approving refuses the proposer and refuses the author of the revision being
 // agreed to, and the write is conditional on that revision still being
 // current. So the question worth asking is the other one — where did the rule

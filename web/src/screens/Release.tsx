@@ -10,14 +10,14 @@ import { Wide } from "../ui/Wide";
 
 // One release, gathered.
 //
-// **A release is a hand-off, not a fifth summary page.** What belongs here is
+// A release is a hand-off, not a fifth summary page. What belongs here is
 // everything handed over when a tag is cut — what changed since the last one,
 // what was said publicly, what a customer's own scanner reads, and the record
 // somebody audits — which until now sat in four places reached four ways.
 // Navigating to a tag landed on a build's findings list, as though a tag were a
 // branch.
 //
-// **No overdue section.** A tag never changes, so nothing on it has a deadline
+// No overdue section. A tag never changes, so nothing on it has a deadline
 // to miss.
 export function Release({ product, stream }: { product: string; stream: string }) {
   const streams = useQuery({

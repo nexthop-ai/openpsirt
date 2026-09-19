@@ -5,7 +5,7 @@
 // same rule as saved filters: it changes what one person sees and nothing
 // anybody else is shown.
 //
-// **Unset means the operating system decides**, and keeps deciding: somebody
+// Unset means the operating system decides, and keeps deciding: somebody
 // whose machine turns dark at sunset gets a dark interface at sunset without
 // having said anything here. Choosing one pins it, because a person who has
 // said which they want has answered a question the operating system was only

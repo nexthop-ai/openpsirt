@@ -13,7 +13,7 @@ import { Wide } from "../../ui/Wide";
 
 // What is being scanned, and what has gone silent.
 //
-// **Every other number here is worthless if a build stopped being scanned**,
+// Every other number here is worthless if a build stopped being scanned,
 // and silence looks exactly like health: a build nothing arrives for reports
 // no new findings, fails nothing, and sits above one that is still being
 // scanned on every list ordered by what is open. It is the same failure shape

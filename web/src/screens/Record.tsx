@@ -17,7 +17,7 @@ import { Weaknesses } from "../ui/Weaknesses";
 // Recording a flaw in what we ship: a vulnerability no scanner reported,
 // usually because nobody outside knows about it yet.
 //
-// **A screen of its own rather than an action on a list.** What is being
+// A screen of its own rather than an action on a list. What is being
 // recorded is precisely what is *not* in the findings list, so opening it from
 // there asks somebody to start where the answer is absent. It also needs more
 // asked of it than a control beside a table has room for — which build, which

@@ -36,11 +36,11 @@ export const PENDING_PAGE = 50;
 
 // Embargo extensions waiting for a second person.
 //
-// **The reason is the whole of what is being agreed to.** An extension moves a
+// The reason is the whole of what is being agreed to. An extension moves a
 // date somebody outside could hold us to, and the only thing distinguishing a
 // judgment from a habit is why — so the reason leads and the dates follow it.
 //
-// **A request of your own is shown and cannot be agreed to.** The person who
+// A request of your own is shown and cannot be agreed to. The person who
 // asked may not be the one who agrees, which is the control the threshold
 // exists to reach; hiding it would leave somebody hunting for what is holding
 // their case up.
@@ -146,7 +146,7 @@ export function Embargoes({
 // there was nowhere to be that second person, because the route existed and no
 // screen reached it.
 //
-// **What it says beyond "agree or not" is the point.** Rating something milder
+// What it says beyond "agree or not" is the point. Rating something milder
 // pushes its deadline out, which is what the second person is there for. But
 // where a product has said what it considers worth triaging at all, a rating
 // that crosses that line does something different in kind: the findings stop
@@ -154,7 +154,7 @@ export function Embargoes({
 // all. Those are two different things to agree to, and an approver was shown
 // neither.
 //
-// **Each row names its product**, because a rating belongs to one and two
+// Each row names its product, because a rating belongs to one and two
 // products may rate the same issue differently. A row saying only "CVE-… low"
 // is a word an approver cannot act on: what they are agreeing to is a deadline
 // and a triage line in one named place.

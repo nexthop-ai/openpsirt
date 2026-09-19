@@ -12,7 +12,7 @@ import { Failed } from "../ui/Failed";
 // A class because this is the one thing hooks cannot do — `getDerivedStateFromError`
 // and `componentDidCatch` have no function equivalent.
 //
-// **It logs as well as renders.** A boundary that only renders swallows the
+// It logs as well as renders. A boundary that only renders swallows the
 // stack that was going to the console, which takes away the thing a developer
 // needs and leaves the sentence a reader cannot act on.
 export class Boundary extends Component<

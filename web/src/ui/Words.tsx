@@ -3,7 +3,7 @@ import { notACredential } from "./noautofill";
 
 // A filter somebody types into, holding as many words as they type.
 //
-// **One box held one word**, so a family of packages was three reads of the
+// One box held one word, so a family of packages was three reads of the
 // same list, and two of somebody's own tags could not be asked for at all.
 // What is in it is chips, because a box that shows one value while narrowing
 // by three is the thing the summary above the list exists to prevent.

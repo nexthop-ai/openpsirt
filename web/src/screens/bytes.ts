@@ -10,7 +10,7 @@
 // The units offered, in bytes. Binary multiples, because that is what the
 // shipped defaults are written as and what a storage bucket is measured in.
 //
-// **The smallest unit is one byte**, which is what makes both readers below
+// The smallest unit is one byte, which is what makes both readers below
 // total: every positive whole number of bytes divides by it, so the loop
 // always returns and the statement after it was unreachable. The duration
 // composer beside this one genuinely differs — its smallest unit is an hour,

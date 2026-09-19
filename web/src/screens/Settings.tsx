@@ -259,9 +259,9 @@ function Field({
   // can only say whole hours must not offer to edit one of those.
   const composed = timed ? read(setting.value ?? "") : null;
   // A setting nobody has set is composed too. Nothing to read is not a value
-  // the composer refuses, and the text box it used to fall to is the one
-  // control that cannot say which unit a number is in — the embargo periods
-  // arrive unset, so that is the state they are first seen in.
+  // the composer refuses, and the text box it would otherwise fall to is the
+  // one control that cannot say which unit a number is in — the embargo
+  // periods arrive unset, so that is the state they are first seen in.
   const takes = timed && composable(setting.value ?? "");
   // The same composition for a size, and chosen the same way: on what the
   // setting *is* rather than on whether the value in hand happens to parse.
@@ -272,17 +272,17 @@ function Field({
   const measured = sized ? readBytes(setting.value ?? "") : null;
   const sizes = sized && (setting.value ?? "").trim() === "" ? true : measured !== null;
 
-  // **The number and the unit are held as typed, not re-derived.**
+  // The number and the unit are held as typed, not re-derived.
   //
-  // Both composers used to write the canonical value on every keystroke and
-  // read the control back out of it, which is three bugs in one gesture.
-  // Clearing the box made it empty, which is zero, which the writer floors at
-  // one — so the first character could not be deleted. Typing a number that
-  // divides differently flipped the unit underneath the cursor: 7 in days is
-  // 168 hours, and the largest unit that divides that is a week, so the box
-  // said 1 and the select said weeks while somebody was still typing. And a
-  // double-click to replace the number selected a value that changed as soon
-  // as the first digit landed.
+  // Writing the canonical value on every keystroke and reading the control
+  // back out of it is three bugs in one gesture. Clearing the box makes it
+  // empty, which is zero, which the writer floors at one — so the first
+  // character cannot be deleted. Typing a number that divides differently
+  // flips the unit underneath the cursor: 7 in days is 168 hours, and the
+  // largest unit that divides that is a week, so the box says 1 and the select
+  // says weeks while somebody is still typing. And a double-click to replace
+  // the number selects a value that changes as soon as the first digit
+  // lands.
   //
   // So the two controls hold what they were given, empty included, and the
   // canonical form is worked out once, when it is saved.

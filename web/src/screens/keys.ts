@@ -1,7 +1,7 @@
 // Working a list from the keyboard.
 //
-// The list is where a triager spends the day and it answered four keys in the
-// whole application, one of them global. What is here is the smallest set that
+// The list is where a triager spends the day, against four keys in the whole
+// application, one of them global. What is here is the smallest set that
 // makes a page of findings workable without a pointer: move, open in place,
 // close, and go to the finding itself.
 //

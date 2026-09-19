@@ -4,14 +4,14 @@ import { useRef, useState } from "react";
 
 // A name typed against a list the server holds, with what matches shown.
 //
-// The browser's own `datalist` was doing this and nobody could tell: it has no
-// affordance at all — no arrow, no list until two characters are typed, and
-// nothing to say whether anything matched. A name typed from memory against an
+// The browser's own `datalist` does this with no affordance at all — no
+// arrow, no list until two characters are typed, and nothing to say whether
+// anything matched. A name typed from memory against an
 // inventory of thousands is the input in this tool most likely to be wrong, and
 // being refused after typing is a worse way to find that out than being shown
 // what exists while typing.
 //
-// **It does not restrict.** What is offered comes from what the deployment
+// It does not restrict. What is offered comes from what the deployment
 // holds, and the server is still the thing that refuses a name it does not
 // know — a control that would only accept what it had already loaded would be
 // a second, worse copy of that rule, and would refuse a name that arrived

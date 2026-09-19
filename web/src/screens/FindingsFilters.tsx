@@ -5,7 +5,7 @@ import { Choices } from "../ui/Choices";
 import { Words } from "../ui/Words";
 // The findings list's filters, apart from the list itself.
 //
-// **Everything the server can narrow by is here, named for what it asks.**
+// Everything the server can narrow by is here, named for what it asks.
 // The panel this replaced offered a third of them behind a "more" control, in
 // a flat run of unlabeled boxes whose values read as phrases — "whatever it
 // did", "any deadline", "anyone or nobody". Two of the filters people asked
@@ -14,12 +14,12 @@ import { Words } from "../ui/Words";
 // dropdown and the other a chip that said "Recorded here". A filter nobody
 // can find is a filter that is not there.
 //
-// **A label says what it asks; a value says what it is.** "Upstream fix: will
+// A label says what it asks; a value says what it is. "Upstream fix: will
 // not fix" rather than "Upstream: declined to fix". The words are the ones the
 // domain uses, because somebody scanning for theirs has to find it in a
 // second and a paraphrase that avoids naming the thing reads as a riddle.
 //
-// **What is on is visible without opening anything.** Every active filter is a
+// What is on is visible without opening anything. Every active filter is a
 // chip above the list saying which filter and which value, and removing one is
 // clicking it — which is the other half of the discoverability problem: a
 // narrowed list that looks unnarrowed is how two people read the same screen
@@ -140,7 +140,7 @@ export const DEADLINES = [
 // — Rust is cargo and Python is pypi, and somebody looking for one of those
 // searches for the language.
 //
-// **What the server takes is open, and this is what is offered.** The filter
+// What the server takes is open, and this is what is offered. The filter
 // carries whatever string arrives and matches the identifier against it, so
 // this list bounds the picker rather than the question — and a list short of
 // what an image actually holds is a capability that exists and cannot be

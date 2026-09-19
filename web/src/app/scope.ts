@@ -75,11 +75,11 @@ export function onFindings(pathname: string): boolean {
 export const UNNARROWED = "on=branch&on=tag&support=in-support&support=past-eol&planned=either";
 
 export function findingsPath(at: Scoped, unnarrowed = false): string {
-  // Without a product it is the list across every product somebody can read ,
-  // which is the same screen. It used to send people to the catalog instead,
-  // because the cross-product list was a screen of its own reached from its
-  // own rail entry — so one list had two doors and the one in the scope group
-  // was dead whenever no product was picked.
+  // Without a product it is the list across every product somebody can read,
+  // which is the same screen. Sent to the catalog instead — the
+  // cross-product list being a screen of its own, reached from its own rail
+  // entry — one list has two doors, and the one in the scope group is dead
+  // whenever no product is picked.
   const also = unnarrowed ? UNNARROWED : "";
   if (!at.product) return also ? `/findings?${also}` : "/findings";
   const product = `/products/${encodeURIComponent(at.product)}`;

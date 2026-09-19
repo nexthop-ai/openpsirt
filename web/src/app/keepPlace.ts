@@ -4,7 +4,7 @@ import { markPlace, placeOf } from "./place";
 
 // Remember where somebody was on this page, and put them back on the way in.
 //
-// **Restored only on the way back.** A list opened fresh opens at the top,
+// Restored only on the way back. A list opened fresh opens at the top,
 // which is what a fresh list is; one arrived at by pressing back is one
 // somebody was already reading. React Router says which kind of arrival it
 // was, and using it is the difference between restoring a place and jumping

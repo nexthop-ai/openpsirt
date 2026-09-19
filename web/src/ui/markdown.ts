@@ -206,8 +206,8 @@ function anchor(node: Element) {
   const href = node.getAttribute("href") ?? "";
   if (!SCHEMES.test(href)) {
     // A link to somewhere in this deployment keeps its href — a rewritten
-    // attachment reference among them, which is why the early return that
-    // stood above this answered nothing of its own: `/v1/attachments/x` has
+    // attachment reference among them, which is why an early return above
+    // this answers nothing of its own: `/v1/attachments/x` has
     // no scheme, so it arrives here and resolves against this page.
     //
     // One finding referring to another is ordinary, the submission check
@@ -233,7 +233,7 @@ function anchor(node: Element) {
 // Rewrites a reference to a file held here into the path it is fetched from,
 // and removes an image pointing anywhere else.
 //
-// **Before the sanitizer rather than after.** `attachment:` is a scheme
+// Before the sanitizer rather than after. `attachment:` is a scheme
 // nothing recognizes, so an attribute still carrying it when the sanitizer
 // runs is dropped as an unknown scheme — and then the rewrite would have
 // nothing to rewrite. By the time anything is judged, what is there is a
@@ -274,7 +274,7 @@ function resolve(node: Element) {
 
 // Turns bare identifiers in prose into links.
 //
-// **Text nodes only, and never inside a link or a code block.** An identifier
+// Text nodes only, and never inside a link or a code block. An identifier
 // inside somebody's own link would produce a link inside a link, which no
 // browser renders as anything sensible; inside a code span it is being shown
 // rather than referred to.

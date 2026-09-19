@@ -20,17 +20,17 @@ import { Wide } from "../ui/Wide";
 
 // One component, and the one piece of work it is.
 //
-// **Arranged on where it sits.** What can be done about a package is mostly a
+// Arranged on where it sits. What can be done about a package is mostly a
 // function of its position: a leaf carries its own risk and is upgraded, and
 // something vendored in pre-built carries everything beneath it and moves only
 // when it does. So the graph leads — what pulls it in, the package, what it
 // carries — and the act hangs off that.
 //
-// **A build is listed because it ships it**, not because something is open
+// A build is listed because it ships it, not because something is open
 // against it. A package whose risk is all inherited still has a version, a
 // position, and things pulling it in.
 //
-// **One entry per version.** A build shipping a name at two versions holds two
+// One entry per version. A build shipping a name at two versions holds two
 // components, and they are two pieces of code to decide about. The page is
 // about the one asked for and says what the others are.
 type Build = Body<"PerBuildBody">;
@@ -582,7 +582,7 @@ function Landed({ here }: { here: Build }) {
 // Promising an upgrade: the version, the releases it is for, the date, and who
 // carries it.
 //
-// **The releases are chosen here**, ticked to the ones shipping this version,
+// The releases are chosen here, ticked to the ones shipping this version,
 // rather than in a column of the table below. The rest of the promise is written
 // here, and a control that summons a form from somewhere else is one nobody
 // finds.

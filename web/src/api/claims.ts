@@ -79,7 +79,7 @@ export function claimOf(row: QueueRow): Claim {
 // Anything that changes a claim invalidates the same set: the queue it may
 // have left, the decisions it wrote, and the findings they hang off.
 //
-// **One list, because there were two.** A second copy listed four of these
+// One list, because there were two. A second copy listed four of these
 // keys and was used by revising and withdrawing, so a revision — which takes
 // back every standing approval — left the revision history and the approvals
 // beside the editor showing the old approval as standing. Somebody reading

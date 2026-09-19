@@ -7,18 +7,18 @@ import { on } from "../ui/when";
 
 // Generating an advisory, and recording that one went out.
 //
-// **Both endpoints answered and nothing called them.** The document a customer
+// Both endpoints answered and nothing called them. The document a customer
 // receives could be produced by the API and by nothing a person can reach, so
 // the one output of this tool that leaves the company was the one output
 // nobody here could make.
 //
-// **Drafted per product**, because that is the grain of the document: an
+// Drafted per product, because that is the grain of the document: an
 // advisory is a statement by a vendor about a product they ship, and this
 // issue may sit in several. Refused for a flaw in somebody else's component,
 // which is dependency hygiene a consumer reads out of the inventory — the
 // refusal says so, so it is shown rather than swallowed.
 //
-// **Recording that it went out is a separate act**, and deliberately so: what
+// Recording that it went out is a separate act, and deliberately so: what
 // was published on a date cannot be worked out again once a release is added
 // or a decision is revised. It is also what lets a second document be a
 // revision rather than a duplicate, which CSAF validators check.

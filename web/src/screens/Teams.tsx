@@ -18,7 +18,7 @@ import { Wide } from "../ui/Wide";
 // — so a rule could only route to a team somebody had created with a request
 // by hand. That is the gap this closes.
 //
-// **Belonging to a team grants nothing.** It says where work arrives and never
+// Belonging to a team grants nothing. It says where work arrives and never
 // what anybody may read, which is what lets one team carry mixed clearance —
 // and it is why this sits beside users and roles rather than inside it.
 export function Teams() {
@@ -214,7 +214,7 @@ export function Teams() {
 // hundreds of names in no order anybody chose. Typed against the same list, it
 // narrows as somebody types and says when nothing matches.
 //
-// **It still cannot invent anybody.** Add stays disabled until what is typed
+// It still cannot invent anybody. Add stays disabled until what is typed
 // resolves to one of the people offered, which is the guarantee the select
 // gave for free: a team cannot bring anybody into the deployment, and being
 // refused after typing is a worse way to learn that than not being offered it.

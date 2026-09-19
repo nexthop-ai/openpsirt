@@ -10,7 +10,7 @@ import { Wide } from "../ui/Wide";
 
 // Where this deployment posts what it has to say, and whether it is arriving.
 //
-// **Webhooks, not "where things are sent".** One signed request rather than an
+// Webhooks, not "where things are sent". One signed request rather than an
 // adapter each: Slack, Teams, a tracker driven by automation and paging all
 // take an HTTP POST with a JSON body, carrying a timestamp and an HMAC over it
 // and the body. The kind says which notifications go to a destination, never
@@ -18,14 +18,14 @@ import { Wide } from "../ui/Wide";
 // accurate as well as shorter (REQ-60). The signing secret is returned by
 // nothing, so changing one means recording the destination again.
 //
-// **Two panels, because they answer to two readers.** Configuring one is
+// Two panels, because they answer to two readers. Configuring one is
 // administration and belongs beside the other things a deployment is set to.
 // Whether one is arriving is operations, and belongs beside the queues — a
 // destination that has been refusing for a week looks exactly like a
 // destination nothing has been sent to, which is the failure the system screen
 // exists to make visible.
 //
-// **Only the address is a credential.** For two of the services this names, the
+// Only the address is a credential. For two of the services this names, the
 // path authenticates, which is why the summary below draws every column but
 // that one and why a failure is recorded with the address replaced by its host.
 // The configuration panel shows it and is administrator-only for that reason.

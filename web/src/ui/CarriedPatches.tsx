@@ -10,12 +10,12 @@ import { Wide } from "./Wide";
 
 // What a build says it deals with itself, over time.
 //
-// **The one thing a version comparison can never see.** A distribution carries
+// The one thing a version comparison can never see. A distribution carries
 // a fix into a package without moving its version, so the only evidence is the
 // build saying so in its own inventory — which was stored and read by nothing
 // a person could reach.
 //
-// **A history rather than a list of what is true tonight.** Each row says when
+// A history rather than a list of what is true tonight. Each row says when
 // the build first said it and when it stopped, because a claim that stopped is
 // the interesting one: somebody dropped a patch, and the finding it answered
 // is back. A list of what is current would not have that row at all.

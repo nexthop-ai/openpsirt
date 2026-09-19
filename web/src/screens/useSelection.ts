@@ -5,8 +5,8 @@ import { identityOf, type Row } from "./list";
 //
 // A hook rather than five pieces of state inside a thousand-line render
 // function, because one rule holds them together and that rule was written at
-// three of five call sites and missing at two: **a selection is made out of a
-// population, so replacing the population replaces what was selected.** Here
+// three of five call sites and missing at two: a selection is made out of a
+// population, so replacing the population replaces what was selected. Here
 // it is enforced once, where the question changes, and there is no call site
 // left that could bypass it.
 //
@@ -15,7 +15,7 @@ import { identityOf, type Row } from "./list";
 // four rows were listed — and handing them over wrote assignments for
 // twenty-six rows nobody could see.
 //
-// **The rows are held, not only their keys.** The selection survives paging
+// The rows are held, not only their keys. The selection survives paging
 // and a page does not, so an act built from what is on screen reaches part of
 // what was ticked: picking thirty on one page and twenty on the next and
 // pressing "Assign 50" wrote twenty and dropped thirty, silently.
@@ -54,7 +54,7 @@ export function useSelection(asked: URLSearchParams): {
   // The question the selection was made out of, so a change to it clears the
   // selection here rather than at each place that changes it.
   //
-  // **The offset is not part of the question.** Turning the page asks the same
+  // The offset is not part of the question. Turning the page asks the same
   // question from a different row, and the selection is deliberately wider
   // than a page — so counting the offset as a change emptied the selection on
   // every page turn, under a bar still saying "across pages".

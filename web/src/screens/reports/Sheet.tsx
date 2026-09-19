@@ -10,7 +10,7 @@ import { scopeWords } from "./catalog";
 // asked of, and when it was taken. A report that states two of the three is a
 // page somebody cannot compare against anything later.
 //
-// **It prints.** The stylesheet is the record's — the shell, the rail and the
+// It prints. The stylesheet is the record's — the shell, the rail and the
 // controls drop out, a header states the question and the moment, and a row
 // does not break across a page.
 export function Sheet({

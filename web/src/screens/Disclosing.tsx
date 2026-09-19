@@ -15,11 +15,11 @@ import { Wide } from "../ui/Wide";
 // What is approaching disclosure, and where an embargo is moved (a finding
 // saying whether it is disclosed, an extension needing agreement).
 //
-// **Before the date, not on it.** The date arriving is the last moment to act
+// Before the date, not on it. The date arriving is the last moment to act
 // rather than the first useful warning, so this lists what is running out as
 // well as what has run out — and what has run out sits at the top.
 //
-// **The list is itself a disclosure.** Every row on it is undisclosed by
+// The list is itself a disclosure. Every row on it is undisclosed by
 // definition, so a product somebody may not read undisclosed work in
 // contributes nothing to it, not even a count. That narrowing is the server's.
 // How many rows one request carries. The server's own default, named here so

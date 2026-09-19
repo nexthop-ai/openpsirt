@@ -242,12 +242,12 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
 
 // Who told us about a flaw, and what else it is called.
 //
-// **The reporter is the party the timeline is evidenced to.** Received,
+// The reporter is the party the timeline is evidenced to. Received,
 // acknowledged, triaged, fixed, disclosed — and the acknowledgment is the step
 // that costs nothing and is missed by being nobody's job, so it is a button
 // here rather than a field somebody remembers to fill in.
 //
-// **Acknowledging records that it happened rather than doing it.** What
+// Acknowledging records that it happened rather than doing it. What
 // reaches a researcher is a mail somebody sends from an address they already
 // have; recording it turns "somebody probably replied" into a date.
 export function WhoTold({ product, vulnerability }: { product: string; vulnerability: string }) {

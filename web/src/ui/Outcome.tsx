@@ -74,9 +74,9 @@ export function labeled(outcome?: string): string {
 // The same word as a chip, with its color and its meaning.
 //
 // A word this does not know is shown as it arrived, the way the two renderers
-// above do it. Returning nothing instead drew an empty cell in five tables —
+// above do it. Returning nothing instead draws an empty cell in five tables —
 // and in those tables the outcome is the whole of the cell, so a vocabulary
-// the server grew before this did read as a judgment nobody made.
+// the server grew first reads as a judgment nobody made.
 export function Outcome({ outcome }: { outcome?: string }) {
   if (!outcome) return null;
   const it = of(outcome);

@@ -16,7 +16,7 @@ import { Release } from "./Release";
 // answers the question that line poses, rather than a tag being drawn as a
 // branch with the interesting parts missing.
 //
-// **Resolved rather than guessed from the name.** A tag is a tag because the
+// Resolved rather than guessed from the name. A tag is a tag because the
 // catalog says so, and a naming convention is a rule nobody agreed to.
 export function Stream() {
   const { product = "", stream = "" } = useParams();

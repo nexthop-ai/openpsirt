@@ -16,8 +16,8 @@ import { BANDS } from "../../ui/severities";
 
 // Whether the backlog is growing, and what kind of thing is making it grow.
 //
-// **The first question a manager asks, and it was a panel on the home screen
-// at a fixed twelve weeks** — no name, no window, no file, and no way to ask
+// The first question a manager asks, and it was a panel on the home screen
+// at a fixed twelve weeks — no name, no window, no file, and no way to ask
 // it of anything but the selection the shell happened to be on.
 //
 // The two flows are what a backlog is read for. Ten arriving and ten answered

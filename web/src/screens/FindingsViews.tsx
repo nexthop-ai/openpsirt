@@ -371,7 +371,7 @@ export function bumpQuery(
 // reads a bump and the issues it closes. Keyed on the fold, so packages built
 // from one source are one row — curl, libcurl4t64 and libcurl3t64 bump once.
 //
-// **No action column.** The view this replaces put the act in the last column,
+// No action column. The view this replaces put the act in the last column,
 // away from the thing it acts on, which is what it was deleted for. The
 // package name opens the component, where planning the upgrade lives.
 export function ByBump({
@@ -521,9 +521,9 @@ export function ByBump({
 //
 // What the issue says, where it sits, and the decision form — the same form
 // the finding screen carries, in the same place a reader already is. Nothing
-// about what a claim requires changes: only where it is typed. A triager
-// answering a page of findings used to make two journeys per row, and the
-// list was read again on each return.
+// about what a claim requires changes: only where it is typed. Answered from
+// the finding's own screen, a page of findings is two journeys per row, with
+// the list read again on each return.
 export function Peek({
   at,
   vulnerability,

@@ -61,7 +61,7 @@ const STATES = [
 // happened. The findings list answers "what is open"; this answers "what did
 // you decide, and on whose say-so".
 //
-// **Built to be printed.** An auditor takes a copy away, so the page prints as
+// Built to be printed. An auditor takes a copy away, so the page prints as
 // the record rather than as a screenshot of an application: the shell, the
 // controls and the links go, a header states what was asked for and when it was
 // taken, and a judgment does not break across a page.

@@ -14,7 +14,7 @@ import { Wide } from "../ui/Wide";
 // A person's own page: what they can reach, what is sent to them, and the
 // credentials they hold.
 //
-// **Two of these were more than an omission.** A person could not mint a token
+// Two of these were more than an omission. A person could not mint a token
 // for a script anywhere in the interface, and could not turn the daily digest
 // on at all — though the documentation says it is off until asked for, which
 // leaves somebody looking for a switch that exists only in the API.
@@ -113,7 +113,7 @@ function chip(label: string) {
 
 // The daily digest, which is off until asked for.
 //
-// **Nothing is sent without an address recorded**, so where there is none the
+// Nothing is sent without an address recorded, so where there is none the
 // switch says that rather than being offered: a control that changes nothing
 // is worse than a control that is not there, because pressing it looks like it
 // worked.
@@ -182,7 +182,7 @@ function Digest({
 
 // Personal tokens, for scripts.
 //
-// **Shown once, at creation.** What is stored is a digest, so a secret nobody
+// Shown once, at creation. What is stored is a digest, so a secret nobody
 // copied is a token nobody can use — and the screen says so before it is
 // dismissed rather than after.
 function Tokens() {

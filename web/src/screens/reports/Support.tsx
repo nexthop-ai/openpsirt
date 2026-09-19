@@ -11,7 +11,7 @@ import { Wide } from "../../ui/Wide";
 
 // What is still shipped and no longer maintained.
 //
-// **This is the pile that dropped out of every deadline figure by design.**
+// This is the pile that dropped out of every deadline figure by design.
 // Past end-of-life the deadline comes off every open finding on a release, so
 // none of it is overdue, none of it is due soon, and none of it reaches a
 // count built on either. That is the right behavior — no work will land there

@@ -10,7 +10,7 @@ import { WebhookDelivery } from "./Webhooks";
 
 // What the deployment itself is doing, rather than what it has found.
 //
-// **Three things were built and reachable from nothing.** Work the queue gave
+// Three things were built and reachable from nothing. Work the queue gave
 // up on had an endpoint and a retry route and no screen; what is waiting and
 // the bound that refuses more of it were settable and shown nowhere; and where
 // this deployment sends what it has to say was configurable only by calling
@@ -25,7 +25,7 @@ import { WebhookDelivery } from "./Webhooks";
 // looks exactly like a quiet one, and a webhook that has been refusing for a
 // week looks exactly like one nothing has been sent to.
 //
-// **Configuring a webhook is not here.** Adding one is administration and sits
+// Configuring a webhook is not here. Adding one is administration and sits
 // under Settings with the rest of what a deployment is set to; what is here is
 // whether the ones configured are arriving. The address is the credential, so
 // it stays on the screen that configures them.
@@ -50,7 +50,7 @@ const MOST = 100;
 
 // What asking public indexes could not answer, and why of each.
 //
-// **Two questions that are one panel.** What was held back says what the
+// Two questions that are one panel. What was held back says what the
 // derived default is costing; what no index has heard of is the list an
 // operator reads to decide what else should be held back. A name promoted from
 // the second appears in the first afterwards, which is how somebody knows the
@@ -140,7 +140,7 @@ function WhatUpstreamCouldNotAnswer() {
 
 // What the scans are answering against, and when it last moved.
 //
-// **The half of "the fact and a link" that did not work.** Somebody told the
+// The half of "the fact and a link" that did not work. Somebody told the
 // vulnerability data has stopped moving arrived at this screen, which showed
 // the job queue and the webhooks and nothing about the data at all. The
 // version was in the database and on no screen anywhere.

@@ -17,7 +17,7 @@ type Changed = {
 
 // What one run of the scanner did.
 //
-// **A receipt says a run happened; nothing said what it did.** A row reading
+// A receipt says a run happened; nothing said what it did. A row reading
 // "scanned · 7,604 opened" is a number with no shape: opened *what*, and is
 // any of it urgent. Somebody looking at a build that jumped by four thousand
 // overnight is asking which of them matter, and the answer was a findings list

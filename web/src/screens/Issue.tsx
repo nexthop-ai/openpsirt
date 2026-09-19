@@ -14,12 +14,12 @@ import { Wide } from "../ui/Wide";
 
 // One issue, everywhere it sits.
 //
-// **The work starts from an issue as often as from a product.** "A critical
+// The work starts from an issue as often as from a product. "A critical
 // just landed in openssl — which of our products ship an affected version" was
 // a question asked one product at a time, and at a dozen products that is the
 // first thing anybody complains about.
 //
-// **One row per build and component**, not per place: the same component in
+// One row per build and component, not per place: the same component in
 // two builds is two things somebody ships, and sixty places of it in one build
 // is one piece of work with a count.
 export function Issue() {

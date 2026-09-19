@@ -7,7 +7,7 @@ import { useState } from "react";
 // to match. In each of those the state is somebody's to edit afterwards, so it
 // cannot simply be derived — and it is wrong the moment the seed changes.
 //
-// **Seeded while rendering, not after painting.** An effect that writes state
+// Seeded while rendering, not after painting. An effect that writes state
 // runs after the browser has already drawn the old value, so the frame between
 // the two shows a form seeded from the last thing somebody looked at. React
 // re-renders before the paint instead, and the stale frame never exists.

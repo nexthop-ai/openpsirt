@@ -74,7 +74,7 @@ export const BELOW_LOW = ["negligible", "none"] as const;
 // as a low by the badge, given a low's stripe by the card, and given its own
 // band by the tree strip — four answers about one nothing, on one screen.
 //
-// **Rated negligible is not unrated.** The two were folded together here and
+// Rated negligible is not unrated. The two were folded together here and
 // nowhere else: the server ranks both of the words below low inside the low
 // band, and a reader was told nobody had looked at a finding somebody had
 // looked at and dismissed.

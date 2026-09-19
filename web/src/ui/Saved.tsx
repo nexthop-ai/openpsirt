@@ -59,16 +59,16 @@ export function ruleIn(kept: Kept[], params: URLSearchParams): Kept | undefined 
 
 // Filters somebody kept, and what one of them prepares.
 //
-// **Personal. Nothing is shared.** No ownership, no permissions, no arguing
+// Personal. Nothing is shared. No ownership, no permissions, no arguing
 // about whose filter is authoritative — which is also what lets somebody keep
 // one that is half-formed, the state most of them are in most of the time.
 //
-// **What is kept is the list's own address**, so opening one is going back to
+// What is kept is the list's own address, so opening one is going back to
 // exactly the list that was on screen. A filter naming something the list no
 // longer offers simply stops narrowing by it, which is a slightly wider list
 // rather than a refusal to open one.
 //
-// **A rule prepares a claim; a person proposes it**. A saved filter can carry
+// A rule prepares a claim; a person proposes it. A saved filter can carry
 // an outcome, a justification, the reasoning and how long a deferral it means;
 // picking it fills the decision form of every finding opened from the list,
 // and a named person submits the claim as their own for a second person to

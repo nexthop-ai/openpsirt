@@ -22,17 +22,17 @@ const PAGE = 200;
 
 // Every known vulnerability in one build, and what became of it.
 //
-// **The complement of the record, not a variant of it.** The record says what
+// The complement of the record, not a variant of it. The record says what
 // was decided; an auditor's first question is what was *known*, decided or not.
 // So a row nobody has said anything about is in here, and so is a closed one —
 // a register of what is still open answers a different question from the one it
 // would appear to answer.
 //
-// **One row per issue and place**, unfolded. Every other list here groups,
+// One row per issue and place, unfolded. Every other list here groups,
 // because a person reading a list wants the judgment rather than the repetition;
 // a register is read against what shipped, and what shipped is places.
 //
-// **It states no triage line because it applies none.** Everything in the build
+// It states no triage line because it applies none. Everything in the build
 // is here whatever the deployment considers worth triaging, which is the basis
 // on which somebody can rely on it.
 export function Register() {

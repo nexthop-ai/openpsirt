@@ -66,7 +66,7 @@ function openFor(at: Parameters<typeof findingsPath>[0], days: number): string {
 // fixed, what is aging, how long a judgment waits for a second person, what
 // keeps being put off, and what has been argued away.
 //
-// **It is figures rather than a list, so it prints rather than exporting.**
+// It is figures rather than a list, so it prints rather than exporting.
 // There is no stream behind a set of aggregates, and inventing one would
 // publish a file nothing here computed. Every figure links to the list it
 // counts instead, and that list exports — which is also what somebody asking
@@ -94,7 +94,7 @@ export function Overview() {
   });
   // What has been argued away, which is what an auditor asks for first.
   //
-  // **All three dismissals**, read together because what they have in common
+  // All three dismissals, read together because what they have in common
   // is that nothing was changed: "not applicable" claims the code is not
   // reachable, "will not fix" that it is not worth fixing, and "already fixed
   // here" that a packager backported it. Asking only the first is how a

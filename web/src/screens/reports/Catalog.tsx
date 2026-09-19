@@ -14,7 +14,7 @@ import { CATALOG, leadsTo, scopeWords } from "./catalog";
 // else. Each named report is a page of its own, which is what makes it
 // printable, linkable and quotable — a section of a dashboard is none of those.
 //
-// **The third is the findings list, not a panel here.** A screen that offers
+// The third is the findings list, not a panel here. A screen that offers
 // the findings list's filters and the findings list's query is the findings
 // list at a second address, and the copy is always the poorer one: it offered
 // fewer filters than the screen it copied. What it did that the list did not

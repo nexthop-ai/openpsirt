@@ -1,6 +1,6 @@
 // What kind of flaw it is, by the classification the world uses.
 //
-// **Suggested, never restricted.** Anything may be recorded. A picker that
+// Suggested, never restricted. Anything may be recorded. A picker that
 // refused an identifier it had not heard of would refuse next year's, and the
 // point of recording these is to make a set of findings comparable to things
 // outside this deployment — which is served by recording what somebody meant,

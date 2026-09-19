@@ -1,15 +1,15 @@
 // What the decision form is still waiting for.
 //
 // Nothing is chosen for anybody, so an empty form is the ordinary state and
-// the button is refused until each question being asked has an answer. What
-// the form did not do is say which question — so the control was dead, the
-// shortcut it advertises did nothing at all when pressed, and the only way to
-// find out what was missing was to guess.
+// the button is refused until each question being asked has an answer. A form
+// that does not say which question leaves the control dead, the shortcut it
+// advertises doing nothing when pressed, and no way to find out what is
+// missing but to guess.
 //
 // One rule rather than two: the sentence is what the form says, and having a
-// sentence is what makes it not ready. The refusals this replaced sat inside
-// the submit path, behind a button that was disabled whenever any of them
-// would have fired, so none of them could ever be read.
+// sentence is what makes it not ready. Refusals inside the submit path,
+// behind a button disabled whenever any of them would fire, can never be
+// read.
 
 export type Asked = {
   outcome: string;

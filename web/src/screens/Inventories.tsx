@@ -285,12 +285,12 @@ export function Inventories() {
 // be checked against the first — and a column of hexadecimal on every row for
 // that is a table nobody can read.
 //
-// **One that is still here is a link**. Retaining a tag's documents
-// is what makes re-scanning a release later possible, and until now nothing
-// handed one back — so "send me the SBOM you scanned for v2.4" was answered
-// from the build system, which is the copy that may have moved since. One
-// whose contents were let go is not a link, because a link that answered 410
-// is a control that looks like it works.
+// One that is still here is a link. Retaining a tag's documents is what makes
+// re-scanning a release later possible, and without a route that hands one
+// back the inventory a release was scanned against is answered from the build
+// system, which is the copy that may have moved since. One whose contents were
+// let go is not a link, because a link that answers 410 is a control that
+// looks like it works.
 function Sent({
   at,
   scan,

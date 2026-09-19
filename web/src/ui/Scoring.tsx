@@ -6,12 +6,12 @@ import { useReseed } from "./reseed";
 
 // Composing a CVSS base vector, and showing what it scores.
 //
-// **The score is worked out on the server, not here.** The formula lives in
+// The score is worked out on the server, not here. The formula lives in
 // one place and what somebody sees while choosing is what gets stored — a
 // second copy in the browser is one that eventually disagrees with the number
 // in the database, and the disagreement is invisible.
 //
-// **Base metrics only.** Temporal and environmental scores describe a moment
+// Base metrics only. Temporal and environmental scores describe a moment
 // and a deployment, and the deployment reading this is not the one the finding
 // is about.
 

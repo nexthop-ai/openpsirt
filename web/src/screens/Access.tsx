@@ -6,7 +6,7 @@ import { Wide } from "../ui/Wide";
 
 // Who holds what, as a grid of products against capabilities.
 //
-// **It was a list of chips and a three-control form.** Granting meant picking a
+// It was a list of chips and a three-control form. Granting meant picking a
 // product, picking a role, pressing Grant, and reading the result back out of a
 // run of chips shaped "product · role" — so answering "who can approve on
 // sonic" meant reading every chip on every row, and granting the same thing on
@@ -14,14 +14,14 @@ import { Wide } from "../ui/Wide";
 // looked at: a column is a capability across the estate, a row is a product,
 // and a cell is one gesture.
 //
-// **The row across the top is a grant, not a shortcut.** It was a button that
+// The row across the top is a grant, not a shortcut. It was a button that
 // issued one ordinary grant per product that existed at that moment, so a
 // product declared afterwards was silently not covered and the box quietly
 // fell back to partial. It is now one standing grant that covers the estate,
 // including what is declared later — which is why it is offered before any
 // product is declared at all.
 //
-// **A role derived from a group is shown and not editable here.** It comes from
+// A role derived from a group is shown and not editable here. It comes from
 // the identity provider's group and is withdrawn by changing the group; a
 // checkbox that silently did nothing would be worse than one that explains. A
 // product row covered by the estate grant is drawn the same way, for the same

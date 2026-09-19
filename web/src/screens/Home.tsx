@@ -167,7 +167,7 @@ export function Home({ who }: { who: Who }) {
 //
 // Drawn only where the question has an answer. It needs a whole build picked,
 // because a count across products is not a release; and it needs a branch,
-// because a tag is one frozen point and was not cut into anything. Where a
+// because a tag is one frozen point and is not cut into anything. Where a
 // branch has released nothing that has been scanned, the panel says so rather
 // than drawing zeroes — a release that shipped clean and a release nobody
 // scanned are not the same answer.
@@ -379,8 +379,8 @@ function Figures({
         }),
       ),
   });
-  // What this person is holding, and what has come back to them. **Home
-  // answered "how much is there" and never "what do I do next":** the largest
+  // What this person is holding, and what has come back to them. Home
+  // answered "how much is there" and never "what do I do next": the largest
   // number on the screen was the whole estate's open count, and the one panel
   // that could have carried her own work is deliberately everybody else's.
   // Both of these existed as endpoints and as screens one click away.

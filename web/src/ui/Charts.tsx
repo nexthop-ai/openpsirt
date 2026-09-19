@@ -31,12 +31,11 @@ export type Point = {
 // The four bands, folded the way the server folds them.
 //
 // The server ranks, filters and clocks on four bands and reports the trend in
-// the six words a feed uses. Something has to fold, and it was being done
-// twice with two different answers: here, "unknown" was counted as low, and
-// everywhere the server looks at it — the severity filter, the triage floor,
-// the order, the deadline — it is a medium. So Home said 1,415 low where the
-// list agreed on 38, and a thousand findings were one thing on one screen and
-// another thing on the next.
+// the six words a feed uses. Something has to fold, and done twice it has two
+// answers: "unknown" counted as low here, and a medium everywhere the server
+// looks at it — the severity filter, the triage floor, the order, the
+// deadline. Home then says 1,415 low where the list agrees on 38, and a
+// thousand findings are one thing on one screen and another on the next.
 //
 // Folded here to match, because a rating with no word is treated as a medium
 // rather than dismissed as a low, and the screen has no business disagreeing

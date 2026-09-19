@@ -5,22 +5,22 @@
 // each call site, because a control spelled once at six of them is a control
 // that is missing at the seventh.
 //
-// **Every draft is under one prefix**, so "clear them all" is one loop over a
+// Every draft is under one prefix, so "clear them all" is one loop over a
 // namespace rather than a list of key shapes somebody has to keep in step with
 // the screens.
 //
-// **Every draft is under the identity that wrote it**, and somebody else
+// Every draft is under the identity that wrote it, and somebody else
 // signing in on this browser clears what is not theirs. That is what stops the
 // next person opening the same finding and being handed somebody else's
 // reasoning.
 //
-// **And every draft has an age.** Signing out clears them; a session that
+// And every draft has an age. Signing out clears them; a session that
 // quietly expired does not, and browser storage outlives every session and
 // needs no credential to read — so text about an undisclosed finding, written
 // on a shared machine, sat there for anybody who opened the tools. Anything
 // past the age below goes on the first read of a page load.
 //
-// **What that still leaves**, said rather than glossed: a draft written and
+// What that still leaves, said rather than glossed: a draft written and
 // abandoned inside the window is readable by whoever reaches the profile
 // before it lapses. The window is what bounds that, and clearing on sign-out
 // is what ends it for somebody who leaves deliberately.
@@ -114,7 +114,7 @@ function read(key: string): { text: string; at: number } | null {
 // as "do not keep this" — text typed before anybody is recognized has nowhere
 // safe to go.
 //
-// **The identity is encoded, so the separator cannot occur inside it.** An
+// The identity is encoded, so the separator cannot occur inside it. An
 // identity may hold a colon — nothing refuses one — and what a draft is about
 // is colon-rich by construction, so `alice` and `alice:b` produced keys where
 // one was a prefix of the other. The sweep, which is the whole of the control
@@ -163,7 +163,7 @@ export function restore(about: string | undefined): string {
 // Answered is what was chosen beside the reasoning, kept under the same key
 // and the same window.
 //
-// **A draft that keeps the prose and loses the answer is half a draft.** The
+// A draft that keeps the prose and loses the answer is half a draft. The
 // reasoning is the expensive part to retype and the outcome is the part that
 // decides what the prose is about — so an interrupted decision came back with
 // three paragraphs and no statement of what they argued for, and the person
@@ -187,7 +187,7 @@ const ANSWER = ":answer";
 
 // keepAnswer records what was chosen, or takes it away where nothing is.
 //
-// **Restored only into the form it was typed in.** This is not a default and
+// Restored only into the form it was typed in. This is not a default and
 // not a shortcut carried between findings: the rule that the decision form
 // opens on nothing chosen is about what somebody has not answered, and this is
 // their own answer to this exact finding, keyed on every part of it.

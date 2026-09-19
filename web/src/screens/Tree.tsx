@@ -120,7 +120,7 @@ export function Tree() {
 
 // The chains somebody's own findings sit on.
 //
-// **The part that makes a finding judgeable.** The chain upward says what
+// The part that makes a finding judgeable. The chain upward says what
 // pulled the thing in, which is what somebody deciding needs, and every node
 // on it sits above something they were already given. The counts are theirs:
 // a node says how much of their own work hangs beneath it, never how much the

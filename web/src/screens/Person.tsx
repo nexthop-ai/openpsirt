@@ -16,7 +16,7 @@ import { Wide } from "../ui/Wide";
 // told while holding a role that has since been withdrawn, and how much of the
 // record rests on this one person.
 //
-// **What they were told is not narrowed by what they may read now.** That is
+// What they were told is not narrowed by what they may read now. That is
 // the point of asking: a line about an undisclosed finding, sent while they
 // held the role that reached it, is exactly what an investigation is looking
 // for. The area they read themselves is narrowed; this is a different question

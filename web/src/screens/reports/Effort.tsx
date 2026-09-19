@@ -27,12 +27,12 @@ const SHOWN = 50;
 
 // Where the work went.
 //
-// **Every other report here counts the backlog** — what is open, what is
+// Every other report here counts the backlog — what is open, what is
 // overdue, how long things wait. None of them says what the quarter actually
 // went into, which is the question a planning meeting asks and the one a
 // manager has to answer without any of the others.
 //
-// **Counted in claims rather than in the rows they wrote.** A claim is one
+// Counted in claims rather than in the rows they wrote. A claim is one
 // person's act; counting its rows measures how far a component fans out
 // through an image, and the component every image vendors would be the answer
 // every quarter. Both numbers are shown, because ten claims over ten places

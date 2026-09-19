@@ -107,20 +107,19 @@ export function Findings() {
   // so the tree's count and this list agree. Read here because the notice
   // above the list names it; the query it narrows is built elsewhere.
   const beneath = params.get("beneath") ?? "";
-  // Everything else the list narrows by is read where the panel draws it. It
-  // used to be pulled apart here, one variable per filter, and every one of
-  // them had to be threaded through to the control that set it — which is how
-  // the count of what was on came to be a hand-kept list that had already
-  // fallen behind the filters it counted. How many filters are on, counted
-  // where they are named. It was a list of variables kept in step by hand, and
-  // it was already out of step: the count omitted the component name, the
-  // subtree, the exclusions and the text search, so a list narrowed by those
-  // said it was narrowed by nothing. The address as the list actually reads
-  // it, which is not quite what the address says: the by-issue view leaves out
-  // what a promised upgrade already answers unless told otherwise. Everything
-  // downstream — the query, the chips, the panel, what a row hands the finding
-  // it opens — reads this rather than the raw parameters, so the default is
-  // visible, removable and travels with a link like any other filter.
+  // Everything else the list narrows by is read where the panel draws it.
+  // Pulled apart here, one variable per filter, each has to be threaded
+  // through to the control that sets it, and the count of what is on becomes a
+  // hand-kept list that falls behind the filters it counts: a count omitting
+  // the component name, the subtree, the exclusions and the text search says a
+  // list narrowed by those is narrowed by nothing.
+  //
+  // The address as the list actually reads it, which is not quite what the
+  // address says: the by-issue view leaves out what a promised upgrade already
+  // answers unless told otherwise. Everything downstream — the query, the
+  // chips, the panel, what a row hands the finding it opens — reads this
+  // rather than the raw parameters, so the default is visible, removable and
+  // travels with a link like any other filter.
   const asked = useMemo(() => asAsked(params, view), [params, view]);
   const advanced = activeFilters(asked).length;
   // Closed until somebody opens it. The panel is most of a screen, and what is
@@ -368,9 +367,9 @@ export function Findings() {
       ),
   });
 
-  // Where somebody was, restored when they come back. This is the screen the
-  // complaint is about: opening a finding and pressing back rebuilt the list
-  // at the top of it, eighteen rows above where they had been reading.
+  // Where somebody was, restored when they come back. This is the screen it
+  // matters on: opening a finding and pressing back rebuilds the list at the
+  // top of it, eighteen rows above where they were reading.
   useKeepPlace(findings.isSuccess);
 
   // How many rows sit below what this product triages, and where that line is.

@@ -62,7 +62,7 @@ export function Scope() {
   // longer than the read takes, and it stops going blank in front of somebody
   // halfway through choosing.
   //
-  // **The stand-in has to be this list and no other.** Holding the previous
+  // The stand-in has to be this list and no other. Holding the previous
   // branch's answer would fill the same gap with a set that is not a superset
   // of anything — a variant picked from it is a build this release was never
   // built as, which is the selection this panel is not allowed to send. Both

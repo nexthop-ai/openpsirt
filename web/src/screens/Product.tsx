@@ -11,14 +11,14 @@ import { Wide } from "../ui/Wide";
 
 // One product's own page.
 //
-// **There was no page for one product.** "How is SONiC doing" was five
+// There was no page for one product. "How is SONiC doing" was five
 // requests and a spreadsheet — what is open per build, how much is overdue,
 // how much has been decided, when each build was last scanned — every piece of
 // which existed and none of which sat together. The products table is an
 // administration surface: a triage line in a select and an end-of-support date
 // in an input, which is a different job from reading how something is going.
 //
-// **Every number here opens the list that produced it.** A figure somebody
+// Every number here opens the list that produced it. A figure somebody
 // cannot follow is one they stop trusting, and then they go and count it
 // themselves.
 export function Product() {

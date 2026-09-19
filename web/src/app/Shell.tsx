@@ -73,8 +73,8 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   useReseed(pathname, () => setMenu(false));
   useEffect(() => {
     // A new screen starts at its own top. Picking an entry from the foot of
-    // the rail used to leave the document where it was, so the screen that
-    // arrived was already scrolled past its heading and its controls — which
+    // the rail otherwise leaves the document where it was, so the screen that
+    // arrives is already scrolled past its heading and its controls — which
     // reads as the wrong screen rather than as a scroll position.
     window.scrollTo({ top: 0 });
   }, [pathname]);
@@ -466,20 +466,18 @@ function Rail({
 // Finding a component or an issue from anywhere. It is the findings list's own
 // search, reached without going there first.
 //
-// It asks at whatever scope is chosen, which since the list stopped being one
-// build's is the product as readily as a single build. It used to be disabled
-// unless all three were picked, so the most common question a PSIRT is asked —
-// where is this advisory in what we ship — could not be typed at all without
-// first choosing a variant, and answered nothing when it could, because the
-// term was matched against component names alone.
+// It asks at whatever scope is chosen, which is the product as readily as a
+// single build. Disabled unless all three are picked, the most common question
+// a PSIRT is asked — where is this advisory in what we ship — cannot be typed
+// at all without first choosing a variant, and answers nothing when it can,
+// because the term is matched against component names alone.
 //
-// **An issue name goes to the issue, wherever it sits**, and needs no
+// An issue name goes to the issue, wherever it sits, and needs no
 // product picked: "a critical just landed in openssl — which of our products
 // ship an affected version" is the question, and it spans products by
 // construction. Anything else searches what is shipped, at whatever the
 // picker has selected — and across every product a reader can see where it has
-// selected nothing, which is the same list at its widest address. Typing at
-// that scope used to do nothing at all, silently.
+// selected nothing, which is the same list at its widest address.
 //
 // Which of the two it is, is decided by asking: a term that resolves to an
 // issue goes to the issue page, and everything else falls through to the list.
@@ -536,9 +534,9 @@ function Search({ at }: { at: Scoped }) {
               return;
             }
             // Not an issue anybody here carries, so it is a component
-            // search. The list answers that across every product a reader can
-            // see as readily as within one, so with no product picked the
-            // term used to be dropped where the answer was a screen away.
+            // search. The list answers that across every product a reader
+            // can see as readily as within one, so with no product picked the
+            // term still reaches a list rather than being dropped.
             const path = findingsPath(at);
             navigate(`${path}${path.includes("?") ? "&" : "?"}q=${encodeURIComponent(term)}`);
           })

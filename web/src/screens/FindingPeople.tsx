@@ -15,7 +15,7 @@ import { offeredAs, whoIs } from "../ui/whom";
 
 // Who has been brought into one undisclosed case.
 //
-// **Being on a case is not reading the product.** A collaborator sees this
+// Being on a case is not reading the product. A collaborator sees this
 // issue wherever it sits here and nothing else, may argue about it, and may
 // not agree to anybody's claim — which is said on the card rather than
 // discovered when a button refuses, because it is the reason the grant is
@@ -447,16 +447,16 @@ export function Attachments({
 
 // The words people put on a finding.
 //
-// **People mark work regardless.** With nowhere to put it they do it inside
+// People mark work regardless. With nowhere to put it they do it inside
 // the reasoning text, where nothing can filter on it and an approver reads it
 // as part of the argument.
 //
-// **What is offered is what people have written**, not a vocabulary this
+// What is offered is what people have written, not a vocabulary this
 // screen invented: the list comes from the product, so the second person to
 // reach for "waiting on vendor" spells it the way the first one did, and the
 // two are one filter rather than two.
 //
-// **Marking is triage**, so somebody who may only read is shown the marks and
+// Marking is triage, so somebody who may only read is shown the marks and
 // not the control. A control that is offered and then refused teaches people
 // to distrust the ones that work.
 export function Marks({

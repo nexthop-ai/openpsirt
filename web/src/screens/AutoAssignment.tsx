@@ -11,7 +11,7 @@ import { Wide } from "../ui/Wide";
 
 // The standing rules that hand work nobody holds to a team.
 //
-// **First match wins**, and the order is the whole of the precedence, so the
+// First match wins, and the order is the whole of the precedence, so the
 // screen shows it as a numbered list rather than as a set.
 //
 // Called auto-assignment rather than routing, and kept beside the other things
@@ -432,7 +432,7 @@ export function AutoAssignment() {
 
 // One of a rule's two keys: a name, or a pattern for a set of them.
 //
-// **One field, with the list of what exists on focus.** It was a text box
+// One field, with the list of what exists on focus. It was a text box
 // whose lookup waited for two characters, so nothing said a list existed or
 // what was in it; then it was a mode selector, which was worse — the default
 // mode rejected patterns, so typing `linux-image*` into it matched nothing for

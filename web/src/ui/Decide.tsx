@@ -140,7 +140,7 @@ const OFFERED = Object.keys(OFFERS) as OneAtATime[];
 
 // The last pair somebody chose, for the session they are in.
 //
-// **Offered, never applied.** Somebody deciding a hundred findings in a day
+// Offered, never applied. Somebody deciding a hundred findings in a day
 // answers the same way for runs of them, and retyping the pair is the cost the
 // review measured. But a judgment prefilled with the last one made is a record
 // that can say something nobody meant — and this is the one form where that
@@ -228,15 +228,15 @@ export function Decide({
   const draftKey = draftKeyFor(at);
   // What was chosen here and not sent, read once as the form is built.
   //
-  // **A prefill wins over it**, because a prefill is somebody pressing "start
+  // A prefill wins over it, because a prefill is somebody pressing "start
   // from this" and a draft is what they left behind — an explicit choice beats
   // an interrupted one. Read once, like the prefill beside it: a value that
   // changed under somebody mid-decision is not the one they were answering.
   const [kept] = useState(() => (prefill ? {} : restoreAnswer(draftKey)));
-  // Nothing chosen until somebody chooses. The form used to open on
-  // "not applicable" with a justification already selected, which put every
-  // finding one click from a dismissal — the outcome that hides risk and
-  // needs a second person, offered as the default for the ordinary case.
+  // Nothing chosen until somebody chooses. A form opening on "not applicable"
+  // with a justification already selected puts every finding one click from a
+  // dismissal — the outcome that hides risk and needs a second person,
+  // offered as the default for the ordinary case.
   const [outcome, setOutcome] = useState(prefill?.outcome ?? kept.outcome ?? "");
   const [fixedVersion, setFixedVersion] = useState(kept.fixedVersion ?? "");
   // Likewise unchosen. A justification is a claim about our build that a
@@ -314,14 +314,13 @@ export function Decide({
   // Where a judgment here lands beyond this build, answered whole by the
   // server rather than sampled here.
   //
-  // It used to ask per place and take the first few, because a kernel flaw
-  // sits at sixty places and that is sixty requests from one screen. The
-  // trouble is that what comes back is not only shown: the builds at differing
-  // versions become the ones offered to include, and what is offered is what
-  // gets written. So a build reachable only from a place past the sample was
-  // never offered, and the judgment silently did not travel there — a cost
-  // control on the interface that had turned into a rule about what a decision
-  // covers.
+  // Asked per place and sampled — a kernel flaw sits at sixty places, and
+  // that is sixty requests from one screen — the answer is not only shown:
+  // the builds at differing versions become the ones offered to include, and
+  // what is offered is what gets written. A build reachable only from a place
+  // past the sample is then never offered and the judgment silently does not
+  // travel there, which is a cost control on the interface turned into a rule
+  // about what a decision covers.
   const reach = useQuery({
     queryKey: [
       "reach",

@@ -387,7 +387,7 @@ function Elsewhere({ id, where, onSet }: { id: number; where: string; onSet: () 
 // The reasoning as it stands, and the two acts anybody who may argue about it
 // has.
 //
-// **Not the author's alone.** The server asks whether the subject may decide
+// Not the author's alone. The server asks whether the subject may decide
 // about each row of the claim and nothing about who wrote it, which is what
 // the act-and-needs table says: propose, revise and withdraw all ask for
 // triage on the product at the finding's visibility. Gated on authorship

@@ -69,7 +69,7 @@ export type Holding = { role?: string; effective?: boolean; everywhere?: boolean
 // Whether granting a role would give somebody nothing at all: a capability,
 // on a product where they hold no role that reaches anything.
 //
-// **An estate grant counts.** A read held everywhere is a read held here, so a
+// An estate grant counts. A read held everywhere is a read held here, so a
 // capability granted beside one reaches something. The caller narrows to what
 // bears on the product, because it is the thing that knows how a product is
 // spelled in each place: a held role names it as it is shown and a grant names

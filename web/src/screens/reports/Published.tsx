@@ -24,11 +24,11 @@ const WINDOWS = [90, 365, 3650] as const;
 
 // What has been published, and what was published twice.
 //
-// **Answered per flaw until now.** That is the right shape for somebody about
+// Answered per flaw until now. That is the right shape for somebody about
 // to publish a revision — has one gone out, and is what is out still what we
 // would generate — and the wrong shape for the question a period asks.
 //
-// **Advisories are about flaws in our own product**, recorded here by hand.
+// Advisories are about flaws in our own product, recorded here by hand.
 // Known issues in third-party components are tracked and fixed rather than
 // published about; the document for those is a VEX statement per build, which
 // the catalog offers as a file.

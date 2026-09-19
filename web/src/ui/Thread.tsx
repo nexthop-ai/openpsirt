@@ -11,10 +11,9 @@ import { initials } from "./initials";
 // The comments on a claim and the notes on an issue are the same thread: the
 // avatar and the author line, the timestamp, the edited mark, the earlier
 // versions behind it, the editor in place, the draft, and the note about a
-// name that reached nobody. They were written out twice, one tab apart, and
-// the two had already started to diverge — the timestamp was formatted in four
-// places, so a fix to it would have landed in whichever file the author had
-// open.
+// name that reached nobody. Written out twice, one tab apart, the two
+// diverge: the timestamp is formatted in four places, so a fix to it lands in
+// whichever file the author had open.
 //
 // What genuinely differs is the endpoint, and that stays with each caller: the
 // query, the two mutations and the history read arrive as props rather than
