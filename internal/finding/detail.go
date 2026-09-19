@@ -420,8 +420,8 @@ type Sitting struct {
 	// The direct consumer is what a decision is keyed on and it is not
 	// enough to *read*: where a component is reached several ways the
 	// consumer is often the same word twice, and two identical rows do not
-	// distinguish two places. the complete chain on a finding asks for the
-	// whole chain for that reason. It stays display-only — putting it back
+	// distinguish two places. The complete chain is carried on a finding for
+	// that reason. It stays display-only — putting it back
 	// into identity is what the place identity was measured against and
 	// rejected for, at 49,170 paths against 48 consumers.
 	//

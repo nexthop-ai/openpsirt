@@ -124,13 +124,12 @@ const (
 // of packages, and an index that has stopped answering should cost one request
 // rather than the whole pass.
 //
-// Guarded, like every other fetch out of this process. one configured host names this feed
-// as the case it was written for and it was the one client that had none of
-// it: no host pin, no refusal to follow a redirect, and nothing stopping a
-// connection inside this network. A public index answering — or being made to
-// answer — with a redirect to an address on the deployment's own network was
-// followed silently, ten hops deep, downgrading to plain HTTP if it was told
-// to, by a background pass nobody is watching.
+// Guarded, like every other fetch out of this process: the host is pinned, a
+// redirect is refused, and a connection inside this network is stopped.
+// Without them a public index answering — or being made to answer — with a
+// redirect to an address on the deployment's own network is followed silently,
+// ten hops deep, downgrading to plain HTTP if it is told to, by a background
+// pass nobody is watching.
 func New() *Client {
 	return &Client{
 		HTTP: outward.Guarded(

@@ -351,8 +351,8 @@ func (s *Store) Propose(ctx context.Context, subject access.Subject, p Proposal)
 // connection because it has one writer — that is the whole process waiting
 // while somebody presses a button.
 //
-// Atomic for a better reason than speed. grouping as presentation only has one
-// action writing one record per place; half of them written and the rest
+// Atomic for a better reason than speed. One action writes one record per
+// place; half of them written and the rest
 // abandoned is not that, and it leaves a finding that is neither answered nor
 // open with nothing saying which places were which. The same holds across
 // builds, where one judgment covers a place in each of several.
