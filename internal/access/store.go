@@ -716,14 +716,14 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 	}
 
 	// Matched on the whole digest, which is the comparison. A constant-time
-	// compare stood here afterwards, over the row the equality had just
-	// selected — so it could not fail, and the sentence above it said the
-	// lookup was "not by itself a statement that the secrets match" when a SQL
-	// equality on the whole digest is exactly that.
+	// compare afterwards, over the row the equality has just selected, cannot
+	// fail — and calling the lookup "not by itself a statement that the
+	// secrets match" is wrong, because a SQL equality on the whole digest is
+	// exactly that.
 	//
 	// The presented secret is never compared byte by byte: only its digest
-	// reaches the database. What decides the timing of this is the index
-	// lookup, which is not constant time and which nothing here controls —
+	// reaches the database. The timing of this is decided by the index lookup,
+	// which is not constant time and which nothing here controls —
 	// making that a property rather than decoration means replacing the lookup
 	// with a fetch by a non-secret key and a comparison in Go, which is a
 	// different design and would be stated as one.
@@ -768,8 +768,8 @@ func hashSecret(secret string) string {
 //
 // The rows are returned whole rather than filtered, because this is the view
 // an access review reads: a grant that has been set aside has to be visible as
-// set aside, not hidden and not counted. What must never happen is an inactive
-// row reading like a live one, which is what the caller renders.
+// set aside, not hidden and not counted. An inactive row must never read like
+// a live one, which is what the caller renders.
 func (s *Store) People(ctx context.Context) ([]Account, map[int64][]Grant, error) {
 	var people []Account
 	if err := s.db.NewSelect().Model(&people).Order("identity").Scan(ctx); err != nil {
@@ -846,9 +846,9 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 	// Any role at all, asked of the same union every other question uses. In
 	// force, like every question about what somebody holds: a row that grants
 	// nothing must never be counted as access — a grant left inactive by a
-	// switch to group-bound roles answered "they still hold something here",
-	// so their assigned findings stayed with somebody who could no longer open
-	// them and the response said nothing was released. And a role held across
+	// switch to group-bound roles answers "they still hold something here", so
+	// their assigned findings stay with somebody who can no longer open them
+	// and the response says nothing was released. And a role held across
 	// every product is a role held here, so withdrawing their last per-product
 	// grant does not leave their work unreachable.
 	held, err := holdingAny(s.db.NewSelect().
@@ -863,8 +863,8 @@ func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) 
 // Keys lists the pipeline credentials, without their secrets.
 //
 // There is nothing to list them with: what is stored is a digest, and that is
-// the point. What an operator needs is which keys exist, what each reaches,
-// when it was last used, and whether it still works.
+// the point. An operator needs which keys exist, what each reaches, when it
+// was last used, and whether it still works.
 func (s *Store) Keys(ctx context.Context) ([]Key, error) {
 	var keys []Key
 	if err := s.db.NewSelect().Model(&keys).Order("name").Scan(ctx); err != nil {
@@ -1114,12 +1114,12 @@ func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQue
 // Deactivate records that somebody has left, and Reactivate that they are
 // back.
 //
-// **Never a deletion.** The record names them as the proposer of judgments and
-// the approver of others, and an assignment used to point at them; deleting the
-// row would either break those or rewrite what happened. So leaving is a date,
-// and every path in reads it (REQ-45).
+// Never a deletion. The record names them as the proposer of judgments and the
+// approver of others, and an assignment may point at them; deleting the row
+// would either break those or rewrite what happened. So leaving is a date, and
+// every path in reads it (REQ-45).
 //
-// **Their roles are left where they are.** What somebody held is part of why
+// Their roles are left where they are. What somebody held is part of why
 // the record reads as it does, and restoring an account should not mean
 // reconstructing its grants from memory. What stops them is the date, which is
 // read before anything else about them.

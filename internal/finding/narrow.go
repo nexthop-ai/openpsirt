@@ -242,8 +242,8 @@ type Filter struct {
 	// an answer: nothing ranks by it, nothing prefills an outcome from it, and
 	// nothing is hidden by it unless somebody asks for it here.
 	//
-	// **Asked of the component's incoming edges in the build, not of the
-	// place.** A component reached from two consumers scoped differently
+	// Asked of the component's incoming edges in the build, not of the place.
+	// A component reached from two consumers scoped differently
 	// answers to both words, because the pair of columns a place is cannot be
 	// compared against a set the same way on four engines. What it costs is
 	// stated where the filter is: it is a question about a component in a
@@ -273,7 +273,7 @@ type Filter struct {
 	// of the same fact, and a fifth word would be a filter for a number
 	// people can read.
 	//
-	// **A set rather than one word.** "Undecided or waiting on approval" is
+	// A set rather than one word. "Undecided or waiting on approval" is
 	// the working list of a triager who wants everything not yet settled, and
 	// a single value could not ask it.
 	States []string
@@ -570,9 +570,10 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 				Where("ge.closed_scan_id IS NULL").
 				Where("ge.kind IN (?)", bun.List(words)))
 	}
-	// The component holding it. A place records the one that pulls it in, so asking
-	// what is inside a container is asking for places whose consumer is that
-	// container — and what the build holds directly is the places with none.
+	// The component holding it. A place records the one that pulls it in, so
+	// asking what is inside a container is asking for places whose consumer is
+	// that container — and what the build holds directly is the places with
+	// none.
 	if f.UnderTheBuild {
 		q = q.Where("f.consumer_id IS NULL")
 	} else if under := strings.TrimSpace(f.Under); under != "" {
@@ -686,10 +687,6 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			  AND ft.component_id = f.component_id
 			  AND ft.tag IN (?))`, append(args, bun.List(words))...)
 	}
-	// Something a person recorded here rather than a scanner reporting it
-	// . Its own question rather than a shade of another: a recorded
-	// flaw is the only kind a person may close by hand, and the screen that
-	// records one had no way to list what had been recorded before.
 	// What a promised upgrade covers, or what none does. A condition over the
 	// group rather than over a place, like every other decision predicate
 	// here: a group is planned when a promise reaches it, and unplanned when
@@ -701,6 +698,10 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 			q = q.Having("SUM(COALESCE(dd.planned, 0)) = 0")
 		}
 	}
+	// Something a person recorded here rather than a scanner reporting it. Its
+	// own question rather than a shade of another: a recorded flaw is the only
+	// kind a person may close by hand, and a screen that records one has no
+	// other way to list what has been recorded.
 	switch f.Origin {
 	case RecordedByHand:
 		q = q.Where("f.kind = ?", Entered)
@@ -992,8 +993,8 @@ const upgradeNeeded = "upgrade-needed"
 //
 // A live claim covers a place at the versions it was keyed on and no other:
 // matched by place alone, a claim approved against libnl 3.7.0 in one build
-// answered for libnl 3.9.0 at the same place in the next, while everything
-// that asks whether a decision actually applies said it covered nothing there.
+// answers for libnl 3.9.0 at the same place in the next, while everything that
+// asks whether a decision actually applies says it covers nothing there.
 // A claim with no key has lapsed or been withdrawn, and by definition its
 // versions no longer match — what it says about the place is history, and it
 // is matched by place so that "lapsed" can be said at all.
@@ -1005,25 +1006,25 @@ const coversHere = "(de.live_key IS NULL OR (" + KeyMatches + "))"
 // so they are HAVING clauses: a group is undecided when none of its places has
 // a decision, not when one of them does not.
 //
-// **These read the decision table and nothing else.** The first version read
-// `suppressed_by`, which is not a decision of ours at all: it points at a
+// These read the decision table and nothing else. Read from `suppressed_by`
+// instead — which is not a decision of ours at all: it points at a
 // suppression, and a suppression is a claim the *build* made in its own scan
-// file (only internal/sbom ever writes one). So "agreed" meant "the vendor's
+// file (only internal/sbom ever writes one) — "agreed" means "the vendor's
 // SBOM argued this away", a claim by a different author that nobody here
-// reviewed — and a decision actually approved by a second person matched none
+// reviewed, and a decision actually approved by a second person matches none
 // of the four states. What the build argued away is a real number and the row
 // already carries it separately, as how many places are answered; it is not
 // how far *we* have decided.
 //
-// **Read from the decisions outward, not from the findings inward.** What is
+// Read from the decisions outward, not from the findings inward. What is
 // joined is the set of open finding rows that have a decision of ours in this
 // product, with what kind — built once from the decision table, which holds
 // hundreds of rows where finding holds hundreds of thousands, and joined to
-// the grouping by the finding's own identifier. The first version asked the
-// question the other way round, as a correlated lookup per finding row, and
-// that ran once for every open row in the build to say which groups had
-// nothing: 241,479 probes to answer "undecided" on a build with no decisions
-// at all. The counts are the same either way; a place with two decisions is
+// the grouping by the finding's own identifier. Asked the other way round, as
+// a correlated lookup per finding row, it runs once for every open row in the
+// build to say which groups have nothing: 241,479 probes to answer "undecided"
+// on a build with no decisions at all. The counts are the same either way; a
+// place with two decisions is
 // one place, which is what folding to one row per finding keeps true.
 //
 // A decision belongs to a product and the two keys linking one to a finding do
@@ -1229,9 +1230,9 @@ func (f Filter) fixStates() []FixState {
 }
 
 // foldedTags is a set of tags as they are stored, without the ones that fold
-// to nothing. Folded rather than trimmed, because a tag is matched on the folded
-// form everywhere else and a filter that skipped the folding would answer
-// nothing for a word somebody typed with a capital.
+// to nothing. Folded rather than trimmed, because a tag is matched on the
+// folded form everywhere else and a filter that skipped the folding would
+// answer nothing for a word somebody typed with a capital.
 func foldedTags(words []string) []string {
 	kept := make([]string, 0, len(words))
 	for _, word := range words {

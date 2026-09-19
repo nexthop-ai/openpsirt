@@ -7,24 +7,23 @@
 // answer as somebody unknown — telling an outsider which of the two applies is
 // free reconnaissance.
 //
-// **Every question of the form "may this person do this" excludes a
-// deactivated account.** Deactivation leaves the grant rows in place on
-// purpose — it is the recorded act of leaving rather than an undoing of what
-// somebody held — so a query that reads only grants answers that a departed
-// person is still cleared. Three of them did, and one of the three gated
-// handing an undisclosed finding to a person or a team.
+// Every question of the form "may this person do this" excludes a deactivated
+// account. Deactivation leaves the grant rows in place on purpose — it is the
+// recorded act of leaving rather than an undoing of what somebody held — so a
+// query reading only grants answers that a departed person is still cleared,
+// including the one that gates handing an undisclosed finding to a person or a
+// team.
 //
 // Naming somebody in configuration readmits them, because that is the
 // documented way back into a deployment nobody can administer and nothing else
 // clears the date.
 //
-// **A revocation that matched nothing is ErrNothingMatched, never success.**
-// The writes that take access away bound only the error from the statement and
-// never read how many rows it matched, so withdrawing a role somebody does not
-// hold, or a role that does not exist, answered as though it had been
-// withdrawn — and the caller then wrote a trail row saying so and handed back
-// every finding the person was dealing with in that product. A grant, an
-// estate grant, a group binding, a group's administration and a team
+// A revocation that matched nothing is ErrNothingMatched, never success. A
+// write that binds only the error from the statement and never reads how many
+// rows it matched answers the withdrawal of a role nobody holds as though it
+// had been withdrawn — and the caller then writes a trail row saying so and
+// hands back every finding the person was dealing with in that product. A
+// grant, an estate grant, a group binding, a group's administration and a team
 // membership all take access away, and all five read what they matched.
 package access
 
@@ -45,10 +44,9 @@ const (
 	// handing somebody the ability to approve would quietly hand them
 	// everything there is to approve.
 	//
-	// A reporting role stood beside it and granted nothing. What it was
-	// reaching for is breadth of view, and statistics are only what
-	// breadth looks like once aggregated, so saying breadth directly
-	// leaves nothing for it to be.
+	// A reporting role beside it grants nothing. What it reaches for is
+	// breadth of view, and statistics are what breadth looks like once
+	// aggregated, so saying breadth directly leaves nothing for it to be.
 	Approver Role = "approver"
 	// Assigner is deciding who deals with something, which is a different
 	// act from deciding what it is. Taking unowned work, and handing back
@@ -161,7 +159,7 @@ const (
 // it would be answering for everybody.
 var ErrNoSubject = errors.New("no subject: a query was attempted without saying who is asking")
 
-// ErrDenied is what somebody unauthorized is told.
+// ErrDenied is the answer somebody unauthorized is given.
 //
 // Deliberately the same whether they are unknown, known but granted nothing, or
 // granted something that does not cover this. Telling an outsider which of
@@ -259,8 +257,8 @@ func (s Subject) OnCase(productID, vulnerabilityID int64) bool {
 // half.
 //
 // Inverted on purpose. The zero value of a Subject may act, so a subject built
-// anywhere without going through a narrowing behaves as it did before this
-// existed, and the one place that takes the write half away says so.
+// anywhere without going through a narrowing behaves as an unnarrowed one, and
+// the one place that takes the write half away says so.
 func (s Subject) OnCaseToAct(productID, vulnerabilityID int64) bool {
 	return !s.casesReadOnly && s.OnCase(productID, vulnerabilityID)
 }
@@ -362,21 +360,21 @@ func NewPipeline(id int64, name string, scope Scope) Subject {
 // Everything is the deployment looking at itself, for the passes that report
 // on the tool rather than answering a person.
 //
-// **Nothing resolves a credential to this.** It is constructed where it is
+// Nothing resolves a credential to this. It is constructed where it is
 // needed and never handed out, which is what keeps it from being an
 // escalation: no sign-in, no key and no header produces it, so it cannot be
 // reached by presenting anything.
 //
-// It is not confined to background work, and saying that it was described the
-// intention rather than the code. One request path builds one: naming the
+// It is not confined to background work. One request path builds one: naming
+// the
 // products that group bindings already refer to, where the caller has been
 // authorized to administer bindings and the answer is a list of names rather
 // than anything about what those products hold. Every such use carries a
 // sentence saying what it is for, and a use that cannot write one is a use
-// that should be asking a subject instead. An administrator's subject used to
-// stand here, and it stopped meaning "sees everything" when it stopped meaning
-// "holds every role"; the two were always different questions and only one of
-// them was ever about a person.
+// that should be asking a subject instead. An administrator's subject does not
+// stand here: it stopped meaning "sees everything" when it stopped meaning
+// "holds every role", and the two are different questions with only one of
+// them about a person.
 //
 // It holds no role, so it triages, approves and decides nothing. What it may
 // do is read, which is all these passes ask for.
@@ -395,18 +393,18 @@ func (s Subject) Unnarrowed() bool { return s.unnarrowed }
 
 // Holds reports whether this subject holds a role on a product.
 //
-// **An administrator does not hold every role**. Administration is people,
+// An administrator does not hold every role. Administration is people,
 // roles, credentials, settings, the catalog, and the two acts on the record
 // itself — removing an attached file and supplying a third party's evidence
 // about a product; reading and triaging are granted on a product like anybody
 // else's, and an administrator who wants them grants them to themselves —
 // visibly, in the same record everyone else's grants live in.
 //
-// It read the other way, and nothing said so: `privileges.md` says holding
-// every role does not amount to admin and never claimed the reverse. What it
-// cost was separation of duties, since one account proposed and approved its
-// own work, and it made a read-only auditor impossible to express — nobody
-// could see everything without also being able to change everything.
+// Read the other way — `privileges.md` says holding every role does not amount
+// to admin and never claims the reverse — it costs separation of duties, since
+// one account proposes and approves its own work, and it makes a read-only
+// auditor impossible to express: nobody can see everything without also being
+// able to change everything.
 func (s Subject) Holds(role Role, productID int64) bool {
 	if s.Kind != Person {
 		return false
@@ -526,8 +524,8 @@ func (s Subject) Sees(productID int64) bool {
 	if s.Kind != Person {
 		return false
 	}
-	// An administrator administers the catalog, so they know what is in it
-	// . What is open against it is a different question, answered by
+	// An administrator administers the catalog, so they know what is in it.
+	// What is open against it is a different question, answered by
 	// Products.
 	if s.Admin || s.unnarrowed {
 		return true
@@ -542,7 +540,7 @@ func (s Subject) Sees(productID int64) bool {
 // HoldsAnywhere reports whether this subject holds one of these roles on any
 // product at all.
 //
-// **A coarse check made before a name in a request is resolved**, never the
+// A coarse check made before a name in a request is resolved, never the
 // whole of an authorization. Where the thing being acted on is named by an
 // identifier alone — a rating, by its own number — the product it belongs to
 // is not known until the row is read, and reading it first for somebody
@@ -554,7 +552,7 @@ func (s Subject) Sees(productID int64) bool {
 // including a rating (REQ-29), and "holds the role somewhere" is not "may act
 // on this".
 //
-// An administrator holds nothing here they were not granted, as in Holds .
+// An administrator holds nothing here they were not granted, as in Holds.
 func (s Subject) HoldsAnywhere(roles ...Role) bool {
 	if s.Kind != Person {
 		return false
@@ -603,9 +601,8 @@ func (s Subject) Products() (ids []int64, all bool) {
 
 // Knows returns the products this subject may know exist.
 //
-// Distinct from Products, and the two were one thing until an administrator
-// stopped holding every role. **Knowing a product exists is administering it;
-// reading its findings is not**, so an administrator is every product here and
+// Distinct from Products. Knowing a product exists is administering it and
+// reading its findings is not, so an administrator is every product here and
 // only what they were granted there. For everybody else the two answer alike,
 // because a product somebody holds nothing on is invisible rather than merely
 // unreadable.

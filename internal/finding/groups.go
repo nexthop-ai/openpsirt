@@ -75,9 +75,9 @@ type Group struct {
 	// would invite a judgment made about one being applied to sixty unseen.
 	Packages  int
 	Consumers int
-	// Places is how many findings sit under it. What the bulk cap is measured
-	// against and what the disposition register expands to, rather than a
-	// number a reader is asked to reconcile with the two above.
+	// Places is the number of findings under it: the unit the bulk cap is
+	// measured in and the unit the disposition register expands to, rather
+	// than a number a reader is asked to reconcile with the two above.
 	Places int
 	// Answered counts the places the build has already argued about.
 	Answered int
@@ -245,8 +245,8 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// product's decisions, and a caller free to state either would be choosing
 	// whose rating its findings are judged by.
 	filter.Floor.ProductID = productID
-	// The person "mine" means, from the subject rather than from the request, and
-	// their teams with them: the column holds a party.
+	// The person "mine" means, from the subject rather than from the request,
+	// and their teams with them: the column holds a party.
 	filter.HeldBy = subject.Mine()
 	// The store's clock, so the deadline filters compare against the same
 	// moment everything else here does — and so a frozen clock reaches them,
@@ -491,8 +491,9 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 			group.Source = component.UpstreamName
 		}
 	}
-	// The reason there is no deadline, said rather than left as a blank cell. The
-	// reasons are asked narrowest first and the last is what is left: the line
+	// The reason there is no deadline, stated rather than left as a blank
+	// cell. The reasons are asked narrowest first and the last is what is
+	// left: the line
 	// is a statement about this issue's rating, upstream having nothing to
 	// take is one about this finding, and anything else without a deadline is
 	// in a release nothing is going to be fixed in.
@@ -566,13 +567,13 @@ type groupHead struct {
 	// so that everything read per row has a component to hang off. Which one
 	// it is decides nothing a reader sees.
 	ComponentID int64 `bun:"component_id"`
-	// Places is how many findings sit under the row. What the cap is measured
-	// against and what the disposition register expands to.
+	// Places is the number of findings under the row: the unit the cap is
+	// measured in and the unit the disposition register expands to.
 	//
 	// How many packages and how many consumers — the numbers a reader is
 	// shown — are counted in the second statement rather than here. They are
-	// COUNT(DISTINCT), and **MariaDB answers a query with no rows at all when
-	// a COUNT(DISTINCT) sits beside a window function**, silently: no error,
+	// COUNT(DISTINCT), and MariaDB answers a query with no rows at all when a
+	// COUNT(DISTINCT) sits beside a window function, silently: no error,
 	// an empty page, and a total from the other statement that says there was
 	// something. This one carries the window function that counts the whole
 	// filtered set, so the distinct counts go where there is none.
@@ -708,7 +709,7 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// hour needs at the top is what is being exploited.
 		//
 		// The expression comes from the allowlist and never from the
-		// request , and the tie-break is always the same pair so that
+		// request, and the tie-break is always the same pair so that
 		// paging is stable: two rows equal on the sorted column must
 		// not swap between pages, or a page boundary drops one and
 		// repeats another.
@@ -836,8 +837,9 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// with a different word on it.
 		ColumnExpr(`COUNT(DISTINCT f.component_id) AS "packages"`).
 		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
-		// The number of builds in the selection holding this group, and one of them to
-		// name. Both are one where the selection is a single build, which is
+		// The number of builds in the selection holding this group, and one of
+		// them to name. Both are one where the selection is a single build,
+		// which is
 		// why the row says nothing about either there.
 		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
 		ColumnExpr(`MIN(f.target_id) AS "target_id"`)

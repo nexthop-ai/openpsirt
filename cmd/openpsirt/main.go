@@ -95,10 +95,10 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Everything below this line is contacted before the server listens, and
 	// all of it under one deadline.
 	//
-	// **Unbounded, a hang here was silent and total.** An endpoint that
-	// accepts the connection and never answers held PingContext for ever: the
-	// process was up, no port was listening, and not one log line had been
-	// written — from outside, the same thing as a slow image pull. A crash
+	// Unbounded, a hang here is silent and total. An endpoint that accepts the
+	// connection and never answers holds PingContext for ever: the process is
+	// up, no port is listening, and not one log line has been written — from
+	// outside, the same thing as a slow image pull. A crash
 	// loop that names what it could not reach is the failure a supervisor can
 	// act on. Migrating is outside it — both the subcommand above and the
 	// auto-migration below — because a schema change on a large table
@@ -122,7 +122,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Migrating before serving means a request never arrives against a schema
 	// the code does not expect.
 	//
-	// **Outside the startup deadline**, and the deadline is why: a migration
+	// Outside the startup deadline, and the deadline is why: a migration
 	// adding an index to a large finding table takes longer than a deployment
 	// starts in, so bounded at 60s it gives up, restarts, and begins the
 	// migration again — for ever. A second replica waits on the advisory lock
@@ -682,9 +682,9 @@ func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside 
 
 	// And give the workers the same bound, rather than none.
 	//
-	// This wait used to be unbounded, on the reasoning above — a worker
-	// mid-query should not have the database pulled from under it. That
-	// reasoning holds and the wait stays; what it lacked was an end. On SQLite
+	// An unbounded wait follows from the reasoning above — a worker mid-query
+	// should not have the database pulled from under it — and that reasoning
+	// holds; what it lacks is an end. On SQLite
 	// the pool is one connection by design, so an HTTP handler running a slow
 	// statement blocks every worker behind it, and a worker that cannot get a
 	// connection cannot notice it has been asked to stop. Waiting for it then
@@ -694,9 +694,9 @@ func serve(cfg config.Config, logger *slog.Logger, handler http.Handler, beside 
 	// Observed: a query that should have taken milliseconds ran for over an
 	// hour, SIGTERM did nothing, and the process had to be killed. A shutdown
 	// that cannot be completed by the signal meant for it is not a shutdown.
-	// Both halves of the grace answer the same way. An overrun request made
+	// Both halves of the grace answer the same way. An overrun request makes
 	// Shutdown return an error and the process exit 1; an overrun worker
-	// logged a warning and returned nil, so the process exited 0 — and
+	// logging a warning and returning nil exits 0 — and
 	// `docs/configuration.md` describes the two as one setting applied twice.
 	// A supervisor reading the exit code was told that half of a shutdown
 	// that did not finish had finished.

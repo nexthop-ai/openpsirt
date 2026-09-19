@@ -131,11 +131,11 @@ type Approval struct {
 	// where it was carried rather than given.
 	//
 	// A re-affirmation states fresh reasoning and stands on the agreement its
-	// predecessor had. Recorded as an ordinary approval that read as the
+	// predecessor had. Recorded as an ordinary approval it reads as the
 	// earlier approver agreeing, today, to words they have never seen — which
 	// is what an approval naming one revision of the reasoning exists to make
-	// impossible. What is true is that they agreed to the earlier words, and
-	// this is what says so.
+	// impossible. What they agreed to is the earlier words, and this is the
+	// field that says so.
 	CarriedFrom *int64 `bun:"carried_from"`
 }
 
@@ -186,9 +186,9 @@ func NewStore(db bun.IDB) *Store {
 // ErrAlreadyInTransaction is returned when a write entry point is called on a
 // store that is already inside a transaction.
 //
-// One sentence rather than thirteen copies of it: every entry point here
-// asserted the handle and refused in its own words, and the copies had already
-// drifted — two of them said something else.
+// One sentence rather than thirteen copies of it: written out at every entry
+// point, the assertion refuses in its own words and the copies drift — two of
+// them say something else.
 var ErrAlreadyInTransaction = errors.New("this store is already inside a transaction")
 
 // pool is the handle a write opens its transaction on.
@@ -287,10 +287,10 @@ type Proposal struct {
 	FromStatement *int64
 	// NeedsApproval says a second person must agree before this takes effect.
 	//
-	// **Worked out by the store, inside the transaction that writes.** Not
+	// Worked out by the store, inside the transaction that writes. Not
 	// something whoever is proposing states: it turns on the deployment's
 	// threshold and on what this place has already been put off for, and read
-	// before the transaction opened it described a world that a retry — or a
+	// before the transaction opens it describes a world that a retry — or a
 	// policy somebody changed in between — has left behind. The acts that are
 	// gated by construction rather than by arithmetic set it themselves and
 	// say why.
@@ -473,8 +473,8 @@ func (s *Store) row(claim *Claim, p Proposal, now time.Time) Decision {
 // what varies per place — the versions it was made against, whether a second
 // person has to agree, how bad it was judged to be — has to come from the row
 // rather than from whoever pressed the button. What the claim *says* does not
-// vary, and nothing has ever produced a set where it did: in the measured
-// deployment every payload field was constant across every row of every claim.
+// vary, and nothing produces a set where it does: in the measured deployment
+// every payload field is constant across every row of every claim.
 //
 // Refused rather than quietly taking the first, because a set that disagrees is
 // two claims somebody meant to record as one, and recording it as one loses
@@ -785,9 +785,9 @@ func placesOf(proposals []Proposal) []Place {
 // the read — the original refusal stands, because a message naming a decision
 // that is no longer there is worse than one naming none.
 //
-// Written four times, in three files, with the wording drifting by a word at
-// each: the same refusal read "here" from one path and "at one of these
-// places" from another for the same act on one place.
+// Written four times, in three files, the wording drifts by a word at each:
+// the same refusal reads "here" from one path and "at one of these places"
+// from another for the same act on one place.
 func (s *Store) alreadyDecided(ctx context.Context, err error, places []Place) error {
 	if !errors.Is(err, ErrAlreadyDecided) {
 		return err

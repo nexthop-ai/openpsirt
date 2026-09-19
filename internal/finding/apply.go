@@ -335,8 +335,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			// Asked of the answer rather than of what moved. A fix appearing
 			// upstream starts a clock that was not running, and one being
-			// withdrawn stops it — and a row written before this rule was
-			// what it is now carries an answer nothing else would correct.
+			// withdrawn stops it — and a row written under an earlier rule
+			// carries an answer nothing else corrects.
 			clockMoved := !sameDate(already.DueAt, f.DueAt)
 			if same(already, f) && !moved && !clockMoved {
 				continue
@@ -475,8 +475,8 @@ func same(held, found Finding) bool {
 		held.FixedIn == found.FixedIn &&
 		sameDate(held.FixedAt, found.FixedAt) &&
 		// The match method moves for a real reason: a distribution
-		// recording an advisory for something previously reached only by
-		// upstream identifier changes the answer from "somebody has to look"
+		// recording an advisory for something reached only by an upstream
+		// identifier changes the answer from "somebody has to look"
 		// to "the people who package this said so". A night where that is all
 		// that moved is a night worth recording.
 		held.Matched == found.Matched &&

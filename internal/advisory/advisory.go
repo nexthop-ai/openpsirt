@@ -1,16 +1,16 @@
 // Package advisory turns what is held about a flaw in our own product into a
 // document somebody can publish.
 //
-// **We own the triage record; whoever publishes owns the published advisory**
-// . The document is never sent anywhere and nothing here goes out over the
+// We own the triage record; whoever publishes owns the published advisory.
+// The document is never sent anywhere and nothing here goes out over the
 // network: it is assembled from what is held and handed over. What is kept is
 // the record that one went out and the digest of what was generated, which is
 // what makes "is what is published still what we would generate" answerable.
 // That is the question that decides whether an integration works or rots, and
 // keeping both ends as the source of truth is how it rots.
 //
-// **Only a flaw in what we ship**. A known issue in a third-party
-// component is dependency hygiene that a consumer can already read out of the
+// Only a flaw in what we ship. A known issue in a third-party component is
+// dependency hygiene that a consumer can already read out of the
 // inventory, and issuing a vendor advisory for every upstream CVE in a
 // dependency is not what an advisory is. So this refuses an issue this
 // deployment did not record, by name, rather than producing a document that
@@ -343,8 +343,8 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 			ID: identifier, Status: statusOf(entered),
 			// The number of the last entry in the history below, rather than
 			// a second count of the same thing. Counted separately the two
-			// disagreed the moment an advisory had been issued once: the
-			// history numbered this document N+2 and the version said N+1,
+			// disagree the moment an advisory has been issued once: the
+			// history numbers this document N+2 and the version says N+1,
 			// and a validator compares them.
 			Version:            history[len(history)-1].Number,
 			InitialReleaseDate: entered.OpenedAt.UTC(),
@@ -851,9 +851,9 @@ func revisions(opened time.Time, gone []Issuance, now time.Time) []Revision {
 	// published is not a revision of anything: its newest entry is the flaw
 	// being recorded, which is what it describes.
 	//
-	// That is also the one case where counting the version separately agreed
-	// with the history by accident, which is why the disagreement only showed
-	// once an advisory had been issued.
+	// It is also the one case where counting the version separately agrees
+	// with the history by accident, which is why the disagreement shows only
+	// once an advisory has been issued.
 	if len(gone) > 0 {
 		out = append(out, Revision{
 			Number: strconv.Itoa(len(gone) + 2), Date: now,
