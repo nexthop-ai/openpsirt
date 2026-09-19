@@ -177,8 +177,8 @@ on trust. An upload whose contents are gone would otherwise read back as one
 that arrived with nothing.
 
 A document whose contents were released answers 410, not 404. On screen, one
-still held is a link and one released is not: a link that answered 410 is a
-control that looks like it works.
+still held is a link and one released is not: a link answering 410 is a control
+that looks like it works.
 
 ## Scan application
 
@@ -507,18 +507,17 @@ exercises.
 This checks the recorded documents, not what is accepted. The reader itself
 ignores anything it does not recognize.
 
-A minor revision of the format is read, and is now shown to be. The reader
-checks the major version and refuses what it has not been written against;
-anything within that major version parses. That made every revision accepted
-by construction rather than by evidence, and the gap was live: the reference
-producer moved to 1.7 while every fixture stated 1.6, so the inventory this
-deployment's own image carries and the one the demo ingests were both revisions
-nothing had been tested against.
+A minor revision of the format is read, and a fixture shows it. The reader
+checks the major version and refuses what it has not been written against, so
+anything within that major version parses — which accepts every revision by
+construction rather than by evidence. A reference producer that moves while
+every fixture states the older revision leaves the inventory this deployment's
+own image carries untested against the reader that reads it.
 
-A fixture at the newer revision closed it — the document the image ships, read
-through the same reader, asserting the parts a revision could move: the root, the
-component count, the edges, and the package identifiers the graph is keyed on. It
-also brought eight key paths nothing had decided about.
+The fixture is the document the image ships, read through the same reader,
+asserting the parts a revision can move: the root, the component count, the
+edges, and the package identifiers the graph is keyed on. Each key path it
+brings is one more thing to decide about.
 
 ## Build-declared suppressions
 
@@ -609,9 +608,9 @@ interval.
 
 ## Scanner warnings
 
-Warnings were read only when the scanner failed, which discarded the case that
-matters: a run that answers and states that its answer is coarse. They are
-recorded on the run, kept apart from the failure, and travel with the receipt.
+Read only when the scanner fails, warnings discard the case that matters: a run
+that answers and states that its answer is coarse. They are recorded on the
+run, kept apart from the failure, and travel with the receipt.
 
 Today it captures nothing. A scan runs over an inventory written here from the
 components held — name, version, package identifier and CPE — not over the
@@ -693,7 +692,7 @@ queue its work is sitting in.
 Which run answers an upload is a rule rather than a lookup, because a run covers
 a build rather than an upload: the earliest successful run to finish after
 that upload was parsed. A run that failed answers it only while nothing has
-succeeded since. The first version took the earliest run to finish after parsing
+succeeded since. Taking the earliest run to finish after parsing
 whatever became of it, so a scanner that fell over once poisoned every receipt
 already waiting on it, permanently.
 
@@ -721,9 +720,9 @@ individually correct and unable to answer "why is this here".
 
 ## Document retrieval
 
-A tag's documents are retained so a release can be re-scanned later. Nothing
-returned one, so "send me the SBOM you scanned for v2.4" was answered from the
-build system, which is the copy that may have moved since.
+A tag's documents are retained so a release can be re-scanned later. With
+nothing to return one, "send me the SBOM you scanned for v2.4" is answered from
+the build system, which is the copy that may have moved since.
 
 | Rule | Reason |
 |---|---|
@@ -751,11 +750,10 @@ a prefill, never applied (REQ-31).
 
 ## The offline scanner database
 
-Produced by a build target rather than described in a document (REQ-12). What
-stood behind the offline requirement was one configuration variable and a
-paragraph, and a requirement whose only implementation is instructions somebody
-follows by hand is one that gets discovered broken by the operator who most needs
-it.
+Produced by a build target rather than described in a document (REQ-12). A
+requirement whose only implementation is a configuration variable and
+instructions somebody follows by hand is one the operator who most needs it
+discovers broken.
 
 `make scanner-db` writes a bundle and its checksum.
 
@@ -781,33 +779,15 @@ to retrofit were settled early.
 
 ## Limits
 
-- The bounds are set from what reading costs, not from what a document looks
-  like. They were round numbers several times the largest real producer:
-  measured, an edge holds about half a kilobyte of heap while being read and a
-  component about one and a third, so a ceiling of two million edges and a
-  quarter of a million components accepted a document taking about 1.3 GB
-  against the 512 MiB the chart ships as a limit. That file was guaranteed to
-  kill the process, in the background reader that runs *after* the upload was
-  answered 202. The budget is now about half the shipped limit for one
-  document, and a test measures the per-unit cost with a wide bound.
-- The reader's bounds are configuration, not constants. Five existed as a
-  defaults function every deployment ran unchanged.
-- A component's name is folded on the way in, into a column of its own. The
-  four engines do not fold alike outside ASCII: a VEX statement about a
-  component named with any letter outside it matched on three engines and not
-  the fourth, so which engine a deployment ran decided whether the publisher's
-  judgment reached the finding. Folding on write also leaves the index usable.
-- So is an issue's identifier, and every name it goes by. Comparing through
-  `LOWER` put a function on the indexed side, and the plan scanned the whole
-  vulnerability table and the whole alias table once per statement — thirty
-  seconds where the answer should take a fraction of one.
-- Only the first ancestor supplies upstream identity. Anything further back is
-  history, and a scanner matches against the fork point.
-- Fixed-width character columns are not used. They blank-pad on some engines,
-  so a hash read back carries trailing spaces that make an exact-match lookup
-  fail.
-- A component with no distribution context in its identifier is one nothing
-  will match, and that is invisible rather than an error.
+| Limit | Detail |
+|---|---|
+| The bounds are set from what reading costs, not from what a document looks like | An edge holds about half a kilobyte of heap while being read and a component about one and a third, so round numbers several times the largest real producer — two million edges, a quarter of a million components — accept a document taking about 1.3 GB against the 512 MiB the chart ships as a limit. Such a file is guaranteed to kill the process, in the background reader that runs after the upload is answered 202. The budget is about half the shipped limit for one document, and a test measures the per-unit cost with a wide bound |
+| The reader's bounds are configuration, not constants | A defaults function every deployment runs unchanged is a constant with extra steps |
+| A component's name is folded on the way in, into a column of its own | The four engines do not fold alike outside ASCII: a VEX statement about a component named with any letter outside it matches on three engines and not the fourth, so which engine a deployment runs decides whether the publisher's judgment reaches the finding. Folding on write also leaves the index usable |
+| So is an issue's identifier, and every name it goes by | Comparing through `LOWER` puts a function on the indexed side, and the plan scans the whole vulnerability table and the whole alias table once per statement — thirty seconds where the answer should take a fraction of one |
+| Only the first ancestor supplies upstream identity | Anything further back is history, and a scanner matches against the fork point |
+| Fixed-width character columns are not used | They blank-pad on some engines, so a hash read back carries trailing spaces that make an exact-match lookup fail |
+| A component with no distribution context in its identifier is one nothing will match | And that is invisible rather than an error |
 
 A lifecycle scope is read the way that keeps a component, and the
 two errors it sits between are not equal. Keeping too much adds something to
