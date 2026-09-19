@@ -72,36 +72,68 @@ All at the repository root, named `DESIGN-<area>.md`.
 - **Update them in the same change as the code.** A design document that lags is
  worse than none, because it is trusted and wrong.
 
-### The Spec style
+### The Spec register
 
-Every `DESIGN-*.md` is written in one style, called **Spec**. It is not a
-preference. These documents were prose-heavy and unusable, and drifted back
-that way twice; what follows is the shape they were pulled into.
+One register for everything written here, called **Spec**. It is descriptive:
+it states what is. It does not explain, argue, or recount what used to be.
+
+Spec has drifted three times, and each drift looks the same — interrogative
+headings, an argument where a statement belongs, and the history of a defect in
+the file that describes the behavior. Each of the rules below names a form to
+write and a form not to.
+
+| Surface | Register |
+|---|---|
+| `DESIGN-*.md`, `docs/`, code comments, API and schema descriptions | Spec |
+| `REQUIREMENTS.md` rows | Spec, plus the one clause of reason a row carries |
+| Interface strings | Labels and intents, which are skimmed rather than read. `DESIGN-interface.md` holds those rules |
+| Commit messages, pull request descriptions | Why, including what the behavior was and what the change makes of it |
+
+The last row is the only place prior behavior belongs. A document and a comment
+describe the system as it is now; a reader years later needs the constraint, not
+its discovery.
 
 | Rule | |
 |---|---|
-| **A heading is a noun phrase naming the mechanism** | Six words at most, no full stop, no question mark. "Incomplete upgrades", not "A bump that did not reach the fix" — the second withholds its subject to make somebody read on |
+| **A heading names a thing** | A noun phrase. No verb, no question, no wh-word, no gerund, six words at most. "Upstream currency", not "Asking upstream what is current". "Index responses", not "What an index says". "Version ordering", not "Ordering the versions a scanner named" |
+| **A sentence states a fact** | Present tense, indicative. "A held-back name is recorded as asked", not "What tells them apart afterwards is the same list applied again" |
+| **No antithesis as a frame** | Write the thing that is true. "X, not Y" and "not Y but X" are two facts where one was needed, and the false one is the one that gets remembered |
 | **No lead-in sentences** | Open on the fact. "A decision is keyed on the product, the issue and the place", not "Nothing in what identifies a decision names the release it was made in — and that is deliberate" |
-| **State rather than argue** | A design document records what was decided, not the case for it. The reason belongs beside the rule in a second column, one clause long, not woven through three paragraphs |
+| **Reason is one clause, or it is absent** | It sits in the second column beside the rule. A reason needing a paragraph is a rule that has not been found yet |
+| **A table cell is a statement** | Prose moved into a second column is prose. A cell recounting how something used to behave is a commit message in the wrong file |
 | **Bold marks a defined term, not a pressed claim** | Bolding the first half of every sentence is emphasis nobody reads by the third screen |
 | **Enumerations are tables** | Outcomes, refusals, closure reasons, engine differences, settings, states. A two-column `\| rule \| why \|` table is the default shape of a section |
-| **A table, a list or an example before a paragraph** | Prose is the last resort, not the default. If what is being said has parts, it is a table; if it has steps or cases, a list; if it is a shape, an example. A paragraph is for the one thing that is none of those |
-| **Plain words, short sentences** | One clause per point, ordinary vocabulary, no clause piled on a clause. A sentence that has to be read twice fails whatever it was trying to say, and the reader is somebody in a hurry years from now |
+| **A table, a list or an example before a paragraph** | Prose is the last resort. If what is being said has parts, it is a table; if it has steps or cases, a list; if it is a shape, an example. A paragraph is for the one thing that is none of those |
+| **Plain words, short sentences** | One clause per point, ordinary vocabulary, no clause piled on a clause. A sentence that has to be read twice fails whatever it was trying to say |
 | **One fact in one place** | A fact another document owns is pointed at, not restated. Two copies disagree eventually and neither says which is authoritative |
-| **Rationale that is not about one rule goes in `Limits`** | The block at the foot of every document, for the boundaries and the trade-offs the sections above would otherwise argue in line |
+| **Rationale that is not about one rule goes in `Limits`** | The block at the foot of every document, for the boundaries and trade-offs the sections above would otherwise argue in line |
 | **Every document opens with a `Contents` section** | One entry per `##` heading, in order |
 | **Measured numbers stay** | "5,047 fixable rows are 271 distinct bumps" is evidence for a design choice. Cut the sentence introducing it, not the number |
 | **Component selection is design** | Why this scanner, this database, this format is part of the document. Why a variable is named what it is, is not |
 
-Two of those are checked by `internal/docs/style_test.go` — the heading bound
-and the `Contents` list — because they are the two that regress silently. The
-rest is judgment, and this is the whole of it.
+#### Constraints, not their discovery
 
-**A section that has drifted reads a particular way**: paragraphs opening with
-a bolded claim, the reason for a rule three sentences past the rule, and a
-heading that is a sentence. Rewrite it rather than appending to it.
+A defect that produced a rule carries knowledge worth keeping. The knowledge is
+the constraint; the incident is not. Write the constraint in the present tense
+and the reader gets what they need without the archaeology.
 
-## What is left lives in one place
+| Written as history | Written as a constraint |
+|---|---|
+| "Read as the first sighting of whichever version ran last, an air-gapped deployment was told the data had not moved in seven months" | "A version that recurs is not a change. A restored bundle reproduces a version string exactly" |
+| "Maintained as a complement, every other unaskable ecosystem passed this filter, reached the asker, found none and was recorded empty" | "Candidates are built from the list of ecosystems with an index, never from its complement" |
+| "This panicked into the recovery middleware and answered 500, where the route already has words for it" | "A handler reached without a database refuses in words" |
+
+**A section that has drifted reads a particular way**: a heading that asks a
+question, paragraphs opening with a bolded claim, a reason three sentences past
+its rule, and a past tense anywhere at all. Rewrite it rather than appending
+to it.
+
+Two rules are checked by `internal/docs/style_test.go` — the heading bound and
+the `Contents` list — because those regress silently. The heading form joins
+them once the tree satisfies it; a gate that ships red teaches people to read
+past it. The rest is judgment, and this is the whole of it.
+
+## The work list
 
 `TODO.md` holds everything still in scope and not built: the work that has to
 happen before 1.0, what the owner deferred, decisions taken but not
@@ -223,7 +255,7 @@ Documentation is not governed by this. A design document is as long as its
 subject, and splits when it covers two subjects rather than when it reaches a
 length.
 
-## What is a decision, and what is only true
+## Decisions against facts
 
 `REQUIREMENTS.md` records choices somebody made and could have made differently.
 Most of what gets learned while building is not that: it is what a format, an
@@ -529,7 +561,7 @@ rule says to look for.
  cannot be distinguished from one that has not started, so **every workflow
    meant to gate a merge declares `merge_group:` alongside `pull_request:`**.
 
-### What a pull request says
+### Pull request descriptions
 
 A description is read by somebody deciding whether to review now and by
 somebody working out later why the code looks like this. Both are in a hurry.
@@ -652,7 +684,7 @@ the same server, or the same package from two checkouts hashing alike — the
 checkout's directory is in the hash, so that takes a hash collision rather
 than a second worktree.
 
-### Why the second command exists
+### The second command
 
 Tests run against SQLite alone unless pointed at real servers, and **a skipped
 engine passes**. So a green suite does not mean four engines agreed; it means
