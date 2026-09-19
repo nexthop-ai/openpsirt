@@ -8,14 +8,14 @@
 // more often than they ask for an advisory. "We ship openssl 3.5.6, this CVE,
 // not affected, vulnerable code not present" is exactly a VEX statement.
 //
-// **It is mostly formatting over decisions already made and approved.** Every
-// "not applicable" claim already carries the VEX vocabulary, so the
-// justification needs no translation. What makes it safe to publish is the
-// approval that was already required: generating this puts our dismissals in
-// writing, machine-readable, in front of every customer, which is the feature
-// and the risk in one sentence.
+// It is mostly formatting over decisions already made and approved. Every
+// "not applicable" claim carries the VEX vocabulary, so the justification
+// needs no translation. What makes it safe to publish is the approval the
+// claim already required: generating this puts our dismissals in writing,
+// machine-readable, in front of every customer, which is the feature and the
+// risk in one sentence.
 //
-// **OpenVEX rather than CSAF-VEX**, because it is the format this deployment
+// OpenVEX rather than CSAF-VEX, because it is the format this deployment
 // already reads: a document we write and a document we read being the
 // same format is what lets one deployment's output be another's input, and
 // what keeps one shape to get right rather than two.
@@ -46,7 +46,7 @@ const namespace = "https://openvex.dev/ns/v0.2.0"
 //
 // Named rather than answered as a fault, because it is something the caller
 // can act on: narrow to a variant, or ask about a build that argues less. A
-// bare error reached the route as "the document could not be generated" with a
+// bare error reaches the route as "the document could not be generated" with a
 // 500, which reads as the tool being broken.
 var ErrTooLarge = errors.New("more dismissals than one document carries")
 
@@ -287,10 +287,10 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		GroupExpr("v.id, v.identifier, c.name, c.purl").
 		// Every open place agreed, and agreed the same way. The join is left,
 		// so a place nobody has dismissed contributes a row with no decision:
-		// counting them is how "all of them" is asked. One dismissal at one
-		// place used to speak for a component open at forty-four others — a
-		// machine-readable "not affected" about something that is affected,
-		// published to every customer running a scanner.
+		// counting them is how "all of them" is asked. Without it, one
+		// dismissal at one place speaks for a component open at forty-four
+		// others — a machine-readable "not affected" about something that is
+		// affected, published to every customer running a scanner.
 		Having("COUNT(cl.id) = COUNT(*)").
 		Having("COUNT(DISTINCT cl.outcome) = 1").
 		// One more than the ceiling, so that reaching it is distinguishable
@@ -395,8 +395,8 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	}
 
 	// Ordered here rather than by the engine, so the document is byte-for-byte
-	// the same whatever it was generated against — which is what lets somebody
-	// diff two of them and see a real change rather than a reordering.
+	// the same whatever engine generated it, which is what lets somebody diff
+	// two of them and see a real change rather than a reordering.
 	sort.Slice(doc.Statements, func(i, j int) bool {
 		a, b := doc.Statements[i], doc.Statements[j]
 		if a.Vulnerability.Name != b.Vulnerability.Name {

@@ -25,10 +25,9 @@ func each(t *testing.T, fn func(t *testing.T, s *trail.Store, by access.Subject)
 }
 
 func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
-	// This store had no test of its own at all — its only coverage was
-	// through handlers, which run on two engines, so neither its writes
-	// nor the ordering its reader depends on had ever executed on MySQL or
-	// MariaDB.
+	// Covered only through handlers, which run on two engines, neither this
+	// store's writes nor the ordering its reader depends on ever executes on
+	// MySQL or MariaDB.
 	each(t, func(t *testing.T, s *trail.Store, by access.Subject) {
 		ctx := t.Context()
 
