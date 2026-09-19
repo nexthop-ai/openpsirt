@@ -84,7 +84,8 @@ write and a form not to.
 
 | Surface | Register |
 |---|---|
-| `DESIGN-*.md`, `docs/`, code comments, API and schema descriptions | Spec |
+| `DESIGN-*.md`, `docs/`, code comments | Spec |
+| The published API document | Spec, with the divergences below |
 | `REQUIREMENTS.md` rows | Spec, plus the one clause of reason a row carries |
 | Interface strings | Labels and intents, which are skimmed rather than read. `DESIGN-interface.md` holds those rules |
 | Commit messages, pull request descriptions | Why, including what the behavior was and what the change makes of it |
@@ -111,6 +112,25 @@ its discovery.
 | **Measured numbers stay** | "5,047 fixable rows are 271 distinct bumps" is evidence for a design choice. Cut the sentence introducing it, not the number |
 | **Component selection is design** | Why this scanner, this database, this format is part of the document. Why a variable is named what it is, is not |
 
+#### The published API document
+
+`docs/reference/openapi.yaml` is generated. Every string in it is written in Go
+— an operation's `Summary` and `Description`, and the `doc:` tag on a field —
+so that is where it is edited, and a change to the document itself survives
+nothing.
+
+It is the one Spec surface published to people outside this deployment. They
+are deciding how to call an endpoint and how to read its answer, which is the
+whole of what a description carries.
+
+| Rule | |
+|---|---|
+| **An operation summary names the action** | Imperative and verb-first: "List settings", "Withdraw a credential". The one place here that is not a noun phrase, for the reason a control on a screen is a verb — it names what the caller does |
+| **A description says what the value is** | A boolean is legitimately "Whether the deployment holds it". Everything else names the thing: "The name a placement is explained by", not "What to call it" |
+| **No case for the design** | The design document owns the argument and is not published. A description repeating it ships an argument to somebody who wanted to know what a field holds |
+| **Refusals are described, and the reason a caller can act on** | Which request is turned away and what to send instead. Not why the rule exists |
+| **No bold** | It renders wherever the document is read, and a claim pressed at a reader working through a parameter list is noise in the one place a reader is most in a hurry |
+
 #### Constraints, not their discovery
 
 A defect that produced a rule carries knowledge worth keeping. The knowledge is
@@ -129,9 +149,10 @@ its rule, and a past tense anywhere at all. Rewrite it rather than appending
 to it.
 
 Two rules are checked by `internal/docs/style_test.go` — the heading bound and
-the `Contents` list — because those regress silently. The heading form joins
-them once the tree satisfies it; a gate that ships red teaches people to read
-past it. The rest is judgment, and this is the whole of it.
+the `Contents` list — because those regress silently. The heading form and the
+bold in the API document join them once the tree satisfies both; a gate that
+ships red teaches people to read past it. The rest is judgment, and this is the
+whole of it.
 
 ## The work list
 
