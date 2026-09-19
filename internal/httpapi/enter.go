@@ -32,10 +32,10 @@ type EmbargoedBody struct {
 	Places int  `json:"places" doc:"The number of findings this covers"`
 }
 
-// EnteredBody is what came of recording a flaw.
+// EnteredBody is the record of a flaw entered.
 type EnteredBody struct {
-	// Identifier is what it is filed under here, minted because a flaw nobody
-	// has announced has no CVE to file it under.
+	// Identifier is the name it is filed under here, minted because a flaw
+	// nobody has announced has no CVE to file it under.
 	Identifier string `json:"identifier" doc:"The identifier this deployment filed it under, such as SONIC-2026-0001"`
 	Component  string `json:"component" doc:"The component in the build that carries it"`
 	Visibility string `json:"visibility" enum:"public,private" doc:"Whether it has been disclosed"`
@@ -191,7 +191,7 @@ func registerEntry(api huma.API, in Ingest) {
 	})
 }
 
-// ResolvedBody is what came of saying a flaw is fixed.
+// ResolvedBody is the record of a flaw marked fixed.
 type ResolvedBody struct {
 	Closed int    `json:"closed" doc:"The number of locations of the issue in this build that closed"`
 	At     string `json:"at" doc:"The moment it closed"`
@@ -308,8 +308,8 @@ func registerDisclosure(api huma.API, in Ingest) {
 
 		// The distance ahead to look, where the caller has not said: the length
 		// this deployment gives an embargo. A fixed thirty days against the
-		// ninety-day policy that ships drew an empty screen while embargoes
-		// were running, which reads as "nothing is coming".
+		// ninety-day policy that ships draws an empty screen while embargoes
+		// are running, which reads as "nothing is coming".
 		within := time.Duration(input.Within) * 24 * time.Hour
 		if input.Within == 0 {
 			within, err = setting.NewStore(in.DB.DB).Duration(ctx, setting.DiscloseAfter,
@@ -497,8 +497,8 @@ func registerExtensions(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what is waiting could not be read", err)
 		}
 		out := &listOutput[PendingExtensionBody]{}
-		// The number waiting in all, because the screen was printing the
-		// length of its own page as the number.
+		// The number waiting in all: without it a screen prints the length of
+		// its own page as the number.
 		out.Body.Total = total
 		out.Body.Items = make([]PendingExtensionBody, 0, len(rows))
 		for _, row := range rows {
@@ -611,7 +611,7 @@ func extensionBody(ctx context.Context, in Ingest, rows []finding.Extension) ([]
 	return out, nil
 }
 
-// AffectsBody is what setting the builds did.
+// AffectsBody is the record of setting the builds.
 type AffectsBody struct {
 	Added  int `json:"added" doc:"Builds it is now filed against that it was not"`
 	Closed int `json:"closed" doc:"Builds taken back out, closed as invalid because they were never affected"`
@@ -654,7 +654,7 @@ func registerAffects(api huma.API, in Ingest) {
 		}
 		// The rule for a route about one named issue, which is what this is —
 		// and it is the rule the build lookup below applies. Gated on the
-		// narrower one, a single request gave both answers about the same
+		// narrower one, a single request gives both answers about the same
 		// subject and the same product: refused here as though the product did
 		// not exist, and admitted four lines later.
 		product, err := productForIssue(ctx, in, subject, input.Product)

@@ -138,15 +138,16 @@ func stringOrNone(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
 
-// Registering is what narrows the register, for the screen and for the file.
+// Registering is the narrowing the register takes, for the screen and for the
+// file.
 //
 // One struct, because they are one question: an export taking a smaller set of
 // filters than the screen is a file that quietly answers something else.
 //
-// **An auditor's questions, and nothing that would make this a second findings
-// list.** What a register is asked is "show me what nobody decided", "show me
-// the dismissals", "show me this component" — each a way of reading the same
-// complete answer rather than a different question.
+// An auditor's questions, and nothing that would make this a second findings
+// list. A register is asked for the undecided, for the dismissals, for one
+// component — each a way of reading the same complete answer rather than a
+// different question.
 type Registering struct {
 	State     []string  `query:"state,explode" enum:"undecided,waiting,agreed,lapsed" doc:"Keep rows standing in any of these. Repeatable; any of them matches"`
 	Outcome   []outcome `query:"outcome,explode" doc:"Keep rows whose standing judgment is one of these. Repeatable"`
@@ -155,7 +156,7 @@ type Registering struct {
 	Standing  string    `query:"standing" enum:"open,closed" doc:"Keep one side of the build's history. Neither is the whole register, which is what it is for"`
 }
 
-// narrow is what the store reads by, from what was asked for.
+// narrow is the store's own filter, built from the request.
 func (r Registering) narrow() finding.Registering {
 	only := finding.Registering{
 		Component: r.Component, Issue: r.Issue,
@@ -255,14 +256,14 @@ func registerRegister(api huma.API, in Ingest) {
 		// every place in the build with what stands there, which is what makes
 		// it answerable to an auditor — narrowing it by what this deployment
 		// considers worth triaging would be the omission the document exists
-		// to rule out. The header said a line had been applied and none had,
-		// which is the more dangerous of the two: a file that claims to have
+		// to rule out. A header stating a line has been applied where none
+		// has is the more dangerous of the two: a file that claims to have
 		// left things out reads as complete about what remains.
 		store := finding.NewStore(in.DB.DB)
 		// Asked before a byte is written. Once the stream has started the
-		// status is gone, so a refusal reaching it there could only be said
-		// in the file — and what it said was that the export stopped early,
-		// with a 200 in front of it.
+		// status is gone, so a refusal reaching it there can only be stated in
+		// the file, as an export that stopped early with a 200 in front of
+		// it.
 		if err := store.MayReadRegister(ctx, subject, target); err != nil {
 			return nil, refusedFinding(in, err)
 		}
@@ -283,7 +284,7 @@ func registerRegister(api huma.API, in Ingest) {
 			},
 			// Streamed rather than paged, and neither counted. A file has no
 			// column for how many rows there are altogether, and every page
-			// re-sorted the build's quarter of a million rows and skipped past
+			// re-sorts the build's quarter of a million rows and skips past
 			// the ones already written — 52 minutes for a real build, against
 			// 1.9 seconds for one cursor over the same rows in the same order.
 			Stream: func(ctx context.Context, each func([]string) error) error {
@@ -351,7 +352,7 @@ type RateBody struct {
 	// people stop deferring and start letting things run late silently.
 	Deferred int `json:"deferred" doc:"Still open with a standing deferral: somebody moved the date deliberately"`
 	Overdue  int `json:"overdue" doc:"Still open, past the deadline, with no deferral standing — plainly late"`
-	// Open is what the two numbers above are a share of. Without it they were
+	// Open is what the two numbers above are a share of. Without it they are
 	// numerators with no denominator, and a rate is a proportion.
 	Open int `json:"open" doc:"Still open at all, whatever their deadline. The denominator the deferred and overdue counts are read against"`
 }
@@ -400,10 +401,10 @@ func registerCompliance(api huma.API, in Ingest) {
 		// Asked for here rather than left to the store. A selection with no
 		// product is allowed by the scope helper — most lists here answer
 		// across every product somebody may see — and this one cannot, for the
-		// reason its description gives. The store said so with a plain error
-		// nothing recognized, which fell through to the generic answer for a
-		// write that broke: a caller who left out a parameter was told the
-		// server had failed, on a read-only endpoint, in a sentence about
+		// reason its description gives. Stated by the store as a plain error
+		// nothing recognizes, it falls through to the generic answer for a
+		// write that broke: a caller who left out a parameter is told the
+		// server has failed, on a read-only endpoint, in a sentence about
 		// something not being recorded.
 		if scope.ProductID == nil {
 			return nil, huma.Error422UnprocessableEntity(
