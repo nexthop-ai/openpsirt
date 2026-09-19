@@ -33,7 +33,7 @@ type AboutPersonBody struct {
 	// DeactivatedAt is when they stopped being somebody who may sign in.
 	// Absent is the ordinary state. Never a deletion: they are still named
 	// by every judgment they proposed and every one they agreed to.
-	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"When they left. Absent means they are active"`
+	DeactivatedAt string `json:"deactivated_at,omitempty" doc:"The date they left. Absent means they are active"`
 	// Holds is what is in force now.
 	Holds []HeldBody `json:"holds,omitempty"`
 	// SeesNothing says every role they hold is a capability, so none of them
@@ -42,22 +42,22 @@ type AboutPersonBody struct {
 	SeesNothing bool `json:"sees_nothing,omitempty" doc:"Every role they hold is a capability, so they reach no product. A capability is bounded by what its holder may read, so on its own it grants nothing"`
 	// Held is every grant and withdrawal against them, newest first.
 	Held      []HeldChangeBody `json:"held,omitempty"`
-	HeldTotal int              `json:"held_total" doc:"How many role changes there are, of which the list above is a page"`
+	HeldTotal int              `json:"held_total" doc:"The number of role changes, of which the list above is a page"`
 	// Record is their part in the triage record.
 	Record PersonRecordBody `json:"record"`
 	// Told is what was sent to them, newest first, read and cleared
 	// included: what somebody was told is a fact about what was sent.
 	Told      []ToldBody `json:"told,omitempty"`
-	ToldTotal int        `json:"told_total" doc:"How many things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"`
+	ToldTotal int        `json:"told_total" doc:"The number of things they were told that you may read, of which the list above is a page. Narrowed like the list: administering decides who may ask, not what the answer contains"`
 }
 
 // HeldChangeBody is one role granted or withdrawn.
 type HeldChangeBody struct {
 	At    string `json:"at"`
-	By    string `json:"by" doc:"Who made the change"`
-	About string `json:"about" doc:"What it was against, as the trail records it"`
-	Was   string `json:"was,omitempty" doc:"What they held before. Absent means they held nothing"`
-	Now   string `json:"now,omitempty" doc:"What they hold after. Absent means it was withdrawn"`
+	By    string `json:"by" doc:"The person who made the change"`
+	About string `json:"about" doc:"The subject, as the trail records it"`
+	Was   string `json:"was,omitempty" doc:"The roles held before. Absent means nothing"`
+	Now   string `json:"now,omitempty" doc:"The roles held after. Absent means a withdrawal"`
 }
 
 // PersonRecordBody is how much of the triage record rests on one person.
@@ -101,7 +101,7 @@ func registerPerson(api huma.API, in Ingest, a Administering) {
 		Tags: []string{"Administration"},
 	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
 		Identity string `path:"identity" maxLength:"191"`
-		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many of each list to return"`
+		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of each list returned"`
 	}) (*struct{ Body AboutPersonBody }, error) {
 		store, _, err := readable(ctx, a, a.handle())
 		if err != nil {
@@ -254,14 +254,14 @@ func registerDeactivation(api huma.API, a Administering) {
 		Body struct {
 			Released int64  `json:"released" doc:"Findings handed back because they are gone"`
 			Already  bool   `json:"already,omitempty" doc:"They had already left, and the date did not move"`
-			Since    string `json:"since" doc:"When they left"`
+			Since    string `json:"since" doc:"The date they left"`
 		}
 	}, error) {
 		out := &struct {
 			Body struct {
 				Released int64  `json:"released" doc:"Findings handed back because they are gone"`
 				Already  bool   `json:"already,omitempty" doc:"They had already left, and the date did not move"`
-				Since    string `json:"since" doc:"When they left"`
+				Since    string `json:"since" doc:"The date they left"`
 			}
 		}{}
 		var subject access.Subject

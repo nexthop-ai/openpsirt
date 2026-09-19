@@ -24,7 +24,7 @@ type NeighborBody struct {
 	// what somebody deciding where to descend is actually asking. The bands
 	// sum to `beneath`, because an issue has one rating.
 	BeneathBy map[string]int `json:"beneath_by_severity,omitempty" doc:"The same number by how the issues were rated, which is what says whether a branch is worth opening. 'unrated' is what nobody scored, and the bands sum to beneath"`
-	Children  int            `json:"children" doc:"How many components it pulls in. Zero means nothing to open"`
+	Children  int            `json:"children" doc:"The number of components it pulls in. Zero means nothing to open"`
 	// Ecosystem is what tells two components of one name and one version
 	// apart. The endpoint that answers about one refuses a name the build
 	// holds twice and says to send this; a list that did not carry it left
@@ -40,8 +40,8 @@ type RootsBody struct {
 	// before deciding whether to browse or to search. Two numbers rather than
 	// one because they answer different questions: how much was inventoried,
 	// and how much of it was placed.
-	Components int `json:"components" doc:"How many components this build holds"`
-	Edges      int `json:"edges" doc:"How many edges place them"`
+	Components int `json:"components" doc:"The number of components this build holds"`
+	Edges      int `json:"edges" doc:"The number of edges placing them"`
 	// Searching is what somebody does when Items would be thousands long, so
 	// what they searched for comes back with the answer.
 	Term string `json:"term,omitempty" doc:"The search this answers, where one was asked"`
@@ -53,8 +53,8 @@ type rootsOutput struct {
 
 // AroundBody is what sits above and below one component.
 type AroundBody struct {
-	Above []NeighborBody `json:"above" doc:"What pulls this in — usually short, and the direction people use"`
-	Below []NeighborBody `json:"below" doc:"What it pulls in"`
+	Above []NeighborBody `json:"above" doc:"The consumers that pull this in — usually short, and the direction people use"`
+	Below []NeighborBody `json:"below" doc:"The components it pulls in, downward"`
 }
 
 func registerGraph(api huma.API, in Ingest) {
@@ -81,7 +81,7 @@ func registerGraph(api huma.API, in Ingest) {
 		Stream  string `path:"stream"`
 		Variant string `path:"variant"`
 		Term    string `query:"q" maxLength:"200" doc:"Find components anywhere in this build whose name contains this, instead of listing what the build pulls in directly"`
-		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"How many matches to return. Only read when searching"`
+		Limit   int    `query:"limit" default:"50" minimum:"1" maximum:"200" doc:"The number of matches returned. Only read when searching"`
 	}) (*rootsOutput, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
@@ -158,8 +158,8 @@ func registerGraph(api huma.API, in Ingest) {
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`
 		Component string `path:"component" doc:"The component's name, as the findings list gives it"`
-		Version   string `query:"version" doc:"Which version, where the build ships that name at more than one"`
-		Ecosystem string `query:"ecosystem" doc:"Which ecosystem, for the few names one build holds at one version as two components"`
+		Version   string `query:"version" doc:"The version, where the build ships that name at more than one"`
+		Ecosystem string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components"`
 	}) (*struct{ Body AroundBody }, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {

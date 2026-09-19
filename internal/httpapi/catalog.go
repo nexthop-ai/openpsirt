@@ -62,26 +62,26 @@ func (d Declaring) handle() bun.IDB {
 
 // ProductBody is a product as the API states it.
 type ProductBody struct {
-	Name        string `json:"name" minLength:"1" maxLength:"191" doc:"How scans name this product"`
-	DisplayName string `json:"display_name,omitempty" maxLength:"191" doc:"What people see. Defaults to the name"`
+	Name        string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this product"`
+	DisplayName string `json:"display_name,omitempty" maxLength:"191" doc:"The display name. Defaults to the name"`
 	// Branches is what the product holds, so a catalog answers what exists
 	// rather than making somebody open each row to find out. Counts of
 	// what is open are issues at components, the way the findings list
 	// counts, so the two agree; a declaration returns them as zero because
 	// it has just been made.
-	Branches int `json:"branches,omitempty" doc:"How many branches are declared"`
-	Tags     int `json:"tags,omitempty" doc:"How many tags are declared"`
-	Variants int `json:"variants,omitempty" doc:"How many variants are declared"`
+	Branches int `json:"branches,omitempty" doc:"The number of branches declared"`
+	Tags     int `json:"tags,omitempty" doc:"The number of tags declared"`
+	Variants int `json:"variants,omitempty" doc:"The number of variants declared"`
 	// Counting what is open is the expensive half of a catalog read: a list of two products took 0.39s against 1ms for a liveness probe, and it scaled with the findings rather than with the rows. So it is asked for rather than always done, and a pointer so that "nobody asked" and "none open" are different answers — a screen drawing an unasked-for count as zero reports a clean product.
 	Open *int `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for"`
 	// LastScanAt is absent where nothing has ever been filed against any of
 	// this product's builds.
-	LastScanAt string `json:"last_scan_at,omitempty" doc:"When a scan last arrived for any of its builds"`
+	LastScanAt string `json:"last_scan_at,omitempty" doc:"The last scan to arrive for any of its builds"`
 	// TriageFloor is what this product considers worth triaging where it has
 	// said something of its own. Absent means it follows the deployment, which
 	// is a different statement from stating the same word — a product that
 	// stated it would stop following when the deployment changed its mind.
-	TriageFloor string `json:"triage_floor,omitempty" enum:"everything,low,medium,high,critical" doc:"What this product considers worth triaging, where it says something other than the deployment. Absent means it follows the deployment"`
+	TriageFloor string `json:"triage_floor,omitempty" enum:"everything,low,medium,high,critical" doc:"The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment"`
 	// EndOfLife is when support ends for every release that has not stated its
 	// own. Absent means nothing has said one, which reads as supported.
 	EndOfLife string `json:"end_of_life,omitempty" doc:"The date support ends for releases that have not stated their own, as YYYY-MM-DD"`
@@ -104,7 +104,7 @@ type TriageFloorBody struct {
 
 // StreamBody is a branch or a tag.
 type StreamBody struct {
-	Name string `json:"name" minLength:"1" maxLength:"191" doc:"How scans name this branch or tag"`
+	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this branch or tag"`
 	Kind string `json:"kind" enum:"branch,tag" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
 	// Parent is the branch a tag was cut from, which is what lets a branch be
 	// compared against its last release.
@@ -117,7 +117,7 @@ type StreamBody struct {
 	// a line that has stopped being built looks identical to a healthy one
 	// until somebody opens it.
 	Open       *int   `json:"open,omitempty" doc:"Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for"`
-	LastScanAt string `json:"last_scan_at,omitempty" doc:"When a scan last arrived for any build of it"`
+	LastScanAt string `json:"last_scan_at,omitempty" doc:"The last scan to arrive for any build of it"`
 	// EndOfLife is the date support ends and whether this release stated it.
 	// Absent with Inherited set means it follows its product; absent with
 	// neither means nothing has said one anywhere.
@@ -130,7 +130,7 @@ type StreamBody struct {
 
 // VariantBody is one of the ways a stream is built.
 type VariantBody struct {
-	Name string `json:"name" minLength:"1" maxLength:"191" doc:"How scans name this build of the stream"`
+	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this build of the stream"`
 	// CustomerFacing is a pointer so that leaving it out is not the same as
 	// saying no. An unclassified artifact should rank as though it ships,
 	// which means the default is yes and silence must not read as a denial.

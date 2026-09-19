@@ -16,7 +16,7 @@ import (
 // BucketBody is how many issues have been open for a stretch of time.
 type BucketBody struct {
 	Label string `json:"label"`
-	Days  int    `json:"days" doc:"Where the stretch starts, so these can be ordered without reading the label"`
+	Days  int    `json:"days" doc:"The start of the stretch, so these can be ordered without reading the label"`
 	Open  int    `json:"open"`
 	// BySeverity and Undecided are the two cuts worth having. One number says
 	// a hundred things are over three months old and not whether any of them
@@ -24,7 +24,7 @@ type BucketBody struct {
 	// argued and dismissed is a tidy record, and a bucket with four criticals
 	// nobody has read is a backlog.
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"The same count by how the issues were rated. 'unrated' is what nobody scored"`
-	Undecided  int            `json:"undecided" doc:"How many of them nobody has said anything about. A claim waiting for a second person is not an answer"`
+	Undecided  int            `json:"undecided" doc:"The number nobody has said anything about. A claim waiting for a second person is not an answer"`
 }
 
 // RemediationOutput is how fast things are being fixed.
@@ -37,7 +37,7 @@ type RemediationOutput struct {
 		// TimeToFix is by the severity a thing was rated, in hours. Absent for
 		// a rating nothing closed at, because a zero would read as instant.
 		TimeToFix map[string]float64 `json:"time_to_fix,omitempty" doc:"Average hours an issue closed in the window was open for, by severity. A severity nothing closed at is absent rather than zero"`
-		Aging     []BucketBody       `json:"aging" doc:"What is open now, by how long it has been. About now whatever period was asked for"`
+		Aging     []BucketBody       `json:"aging" doc:"Everything open now, by how long it has been. About now whatever period was asked for"`
 		// The period these cover, said back, so a figure is never read apart
 		// from the window it was worked out over.
 		From string `json:"from,omitempty" doc:"The first day of the period. Absent where it runs from the beginning"`
@@ -51,8 +51,8 @@ type RepeatBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Severity      string `json:"severity,omitempty"`
 	Place         string `json:"place" doc:"Names the place rather than describing it: what it is called depends on the build, and this is not about one build"`
-	Times         int    `json:"times" doc:"How often it has been put off"`
-	TotalDays     int    `json:"total_days" doc:"How long it has been put off for, added up"`
+	Times         int    `json:"times" doc:"The number of times it has been put off"`
+	TotalDays     int    `json:"total_days" doc:"The total it has been put off for"`
 	Standing      bool   `json:"standing,omitempty" doc:"A deferral is in force now. Something put off three times and since decided is history; the same thing still being put off is the pattern"`
 	LastUntil     string `json:"last_until,omitempty" doc:"The furthest any of them reached"`
 }
@@ -134,9 +134,9 @@ func registerRemediation(api huma.API, in Ingest) {
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
-		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"How many deferrals make something worth listing. One is an ordinary judgment"`
+		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"The number of deferrals that makes something worth listing. One is an ordinary judgment"`
 		Limit   int    `query:"limit" default:"100" minimum:"1" maximum:"500"`
-		Offset  int    `query:"offset" minimum:"0" doc:"Where in the list to start"`
+		Offset  int    `query:"offset" minimum:"0" doc:"The offset into the list"`
 	}) (*listOutput[RepeatBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -183,7 +183,7 @@ func registerRemediation(api huma.API, in Ingest) {
 	}, anyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format  string `path:"format" enum:"csv,json"`
 		Product string `query:"product" doc:"Limit to one product, by name. Empty means every product you can see"`
-		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"How many deferrals make something worth listing. One is an ordinary judgment"`
+		AtLeast int    `query:"at_least" default:"2" minimum:"2" maximum:"50" doc:"The number of deferrals that makes something worth listing. One is an ordinary judgment"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := reading(ctx)
 		if err != nil {
