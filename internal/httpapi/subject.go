@@ -1,12 +1,12 @@
 package httpapi
 
-// Who a handler is answering, and what that alone lets them do.
+// The subject a handler is answering, and the reach that alone gives.
 //
 // These four are the primitives every operation's declaration is enforced
-// against (see rights.go), and they lived in the catalog file because that is
-// where the first caller was. A declaration in one file and the primitive that
-// enforces it in another with nothing to do with it is what makes the ladder
-// hard to audit.
+// against (see rights.go). Kept here rather than in the catalog file where the
+// first caller is: a declaration in one file and the primitive that enforces
+// it in another with nothing to do with it is what makes the ladder hard to
+// audit.
 
 import (
 	"context"
@@ -16,8 +16,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// reading is who a handler is answering, where the answer is something to
-// read.
+// reading is the subject a handler is answering, where the answer is something
+// to read.
 //
 // A pipeline is refused rather than shown an empty list. A key may send scans
 // and nothing else, and answering "here is nothing" is a different statement
@@ -34,7 +34,8 @@ func reading(ctx context.Context) (access.Subject, error) {
 	return subject, nil
 }
 
-// requester is who a handler is answering, resolved once before it ran.
+// requester is the subject a handler is answering, resolved once before it
+// runs.
 //
 // Nothing here reaches for a request or a header: resolution happens in one
 // place for every route, so a handler cannot answer for everybody by
@@ -73,10 +74,9 @@ func administrating(ctx context.Context) error {
 // administrator can grant themselves anything, so asking them to hold the
 // audit permission as well would be a checkbox rather than a control.
 //
-// **It is not a way into any product.** What it opens is the settings, who
-// holds what, and what has been changed — records about the deployment rather
-// than about anything scanned. An auditor who reads one product goes on
-// reading one product.
+// It is not a way into any product. It opens the settings, the grants and the
+// change record — records about the deployment rather than about anything
+// scanned. An auditor who reads one product goes on reading one product.
 func readingTheDeployment(ctx context.Context) error {
 	subject, err := requester(ctx)
 	if err != nil {
@@ -91,12 +91,11 @@ func readingTheDeployment(ctx context.Context) error {
 // mintingCredentials is administrating, for the two acts that create a
 // credential outliving whoever asked.
 //
-// **A credential may not mint another**. That already
-// held for a personal token issuing a token, and it was got around by what an
-// administrator's token could make instead: recording a person — an
-// administrator, even — and creating a pipeline key. Both outlive the token
-// and neither is bounded by it, so the narrow credential could always ask for
-// a wide one.
+// A credential may not mint another. A personal token issuing a token is
+// refused, and the way round it is what an administrator's token can make
+// instead: recording a person — an administrator, even — and creating a
+// pipeline key. Both outlive the token and neither is bounded by it, so the
+// narrow credential can always ask for a wide one.
 //
 // Only these two. The rest of administration is reversible by another
 // administrator and leaves the record every change here leaves; creating a

@@ -18,8 +18,8 @@ import (
 // TokenBody is somebody's own credential for scripting.
 type TokenBody struct {
 	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The owner's name for it"`
-	// Product narrows it below its owner. What it reaches is the intersection,
-	// so naming something they cannot read reaches nothing.
+	// Product narrows it below its owner. Its reach is the intersection, so
+	// naming something they cannot read reaches nothing.
 	Product string `json:"product,omitempty" doc:"Optionally, the one product it may reach, by the name that addresses it"`
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: minting a token resolves the field above.
@@ -116,10 +116,10 @@ func registerTokens(api huma.API, in Ingest) {
 			}
 		}
 
-		// Absent and empty are different requests and were the same value.
-		// Both arrived as a non-nil, zero-length slice and both stored NULL,
-		// which means every role its owner holds — so a script asking for a
-		// token that carries nothing was handed one that carries everything.
+		// Absent and empty are different requests arriving as one value: a
+		// non-nil, zero-length slice, stored as NULL, which means every role
+		// its owner holds — so a script asking for a token that carries
+		// nothing is handed one that carries everything.
 		var holds []access.Role
 		if input.Body.Holds != nil {
 			if len(input.Body.Holds) == 0 {
@@ -217,7 +217,7 @@ func registerTokens(api huma.API, in Ingest) {
 	})
 }
 
-// narrowedToProduct spells what a personal token may reach, for the trail.
+// narrowedToProduct spells a personal token's reach, for the trail.
 func narrowedTokenSays(product string, holds []access.Role) string {
 	where := product
 	if where == "" {
@@ -267,9 +267,9 @@ func tokenList(ctx context.Context, names *catalog.Store, tokens []access.Token,
 			body.LastUsedAt = stamp(*token.LastUsedAt)
 		}
 		// Absent here means every role its owner holds, so a narrowed token
-		// that did not say so read back as the widest kind there is — and
-		// nothing, not the screen offering the control nor somebody auditing
-		// what is outstanding, could tell which tokens only read.
+		// that does not say so reads back as the widest kind there is, and
+		// nothing — not the screen offering the control, nor somebody
+		// auditing what is outstanding — can tell which tokens only read.
 		if token.Holds != nil {
 			for _, word := range strings.Split(*token.Holds, ",") {
 				body.Holds = append(body.Holds, role(word))

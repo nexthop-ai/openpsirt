@@ -169,13 +169,13 @@ const (
 	//
 	// An event, and the one message that names an undisclosed issue on
 	// purpose: it goes to the person who has just been given that issue, in
-	// the area inside the application where no detail about an undisclosed finding allows one to be named, and
-	// a message saying "you were given access to something" without saying to
-	// what would be unactionable. What leaves this deployment about it still
-	// carries a link and nothing else.
+	// the area inside the application, where an undisclosed finding may be
+	// named, and a message saying "you were given access to something"
+	// without saying to what is unactionable. What leaves this deployment
+	// about it still carries a link and nothing else.
 	BroughtIn Kind = "brought-in"
 
-	// Unanswered is a report somebody sent us and nobody has replied to .
+	// Unanswered is a report somebody sent us and nobody has replied to.
 	//
 	// A condition, for the reason the others here are: what is wrong is
 	// that nothing has happened. Prompt acknowledgment is the part of

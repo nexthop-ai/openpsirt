@@ -16,15 +16,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// PointBody is what was true at one moment.
+// PointBody is the state of the backlog at one moment.
 type PointBody struct {
 	At         string         `json:"at" doc:"The end of this step, as a date"`
 	Open       int            `json:"open"`
 	Opened     int            `json:"opened" doc:"Findings that appeared during this step"`
 	Resolved   int            `json:"resolved" doc:"Findings that went away during this step"`
 	BySeverity map[string]int `json:"by_severity"`
-	// The two flows, split the same way. What arrived and what was answered
-	// is the question a backlog is read for: ten in and ten out is a team
+	// The two flows, split the same way. Arrivals against departures is what
+	// a backlog is read for: ten in and ten out is a team
 	// keeping pace where both are low, and a team losing ground where what
 	// arrives is critical and what leaves is not.
 	OpenedBySeverity   map[string]int `json:"opened_by_severity" doc:"Everything that appeared, split by severity"`
@@ -33,9 +33,9 @@ type PointBody struct {
 
 // ComparisonBody is what changed between two builds.
 //
-// **What left the affected list is two lists, not one.** A bump that carried
-// the issue with it, a record taken back and a closure nothing explains are
-// not fixes, and a caller reading one list quotes scanner faults as work done.
+// Two lists leave the affected list, not one. A bump that carried the issue
+// with it, a record taken back and a closure nothing explains are not fixes,
+// and a caller reading one list quotes scanner faults as work done.
 type ComparisonBody struct {
 	Fixed  []ChangedBody `json:"fixed"`
 	Closed []ChangedBody `json:"closed_not_fixed" doc:"Left the affected list without being fixed"`
@@ -53,9 +53,9 @@ type ChangedBody struct {
 	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
 	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`
 	ClosedRun     int64  `json:"closed_by_run,omitempty" doc:"The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it"`
-	// State is what stands about it, on a still-present entry and nowhere
-	// else. This is what turns a list of what is still there into
-	// something somebody can sign a release off against: an approved
+	// State is the decision standing on it, on a still-present entry and
+	// nowhere else. It turns a list of what is still there into something
+	// somebody can sign a release off against: an approved
 	// not-applicable and a row nobody has looked at are opposite answers
 	// and read alike without it.
 	State         string        `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four"`
@@ -109,9 +109,9 @@ func registerReports(api huma.API, in Ingest) {
 		if err != nil {
 			// A name meaning two components is the caller's question and not a
 			// fault here: every other endpoint that resolves one answers with
-			// the choices, and this one was answering 500 — so the panel that
-			// draws a subtree's history said the trend could not be worked
-			// out, about a component the reader could have picked.
+			// the choices, and a 500 here has the panel that draws a
+			// subtree's history say the trend cannot be worked out, about a
+			// component the reader could have picked.
 			var several *graph.Ambiguous
 			if errors.As(err, &several) {
 				return nil, severalComponents(several,
@@ -154,10 +154,10 @@ func registerReports(api huma.API, in Ingest) {
 		}
 		// The visible lookup, so a product somebody may not see answers the
 		// same way as one that was never declared. Resolving the name first
-		// and authorizing afterwards is how the difference gets out: this
-		// answered 200 with an empty list for a product held by somebody else
-		// and 404 for a name nobody has, which hands anyone holding one
-		// product the name of every other by guessing.
+		// and authorizing afterwards is how the difference gets out: 200 with
+		// an empty list for a product held by somebody else and 404 for a name
+		// nobody has hands anyone holding one product the name of every other
+		// by guessing.
 		named, err := productNamedVisibly(ctx, in, subject, input.Product)
 		if err != nil {
 			return nil, err
@@ -242,7 +242,7 @@ func registerReports(api huma.API, in Ingest) {
 	})
 }
 
-// ReleasePointBody is what one release shipped with.
+// ReleasePointBody is the state one release shipped with.
 type ReleasePointBody struct {
 	Stream     string         `json:"stream"`
 	Cut        string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
@@ -291,10 +291,10 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		points, err := finding.NewStore(in.DB.DB).ReleaseTrend(ctx, subject, scope, input.Limit)
 		switch {
 		case errors.Is(err, finding.ErrNoProductNamed):
-			// The description says a product must be named and the route
-			// answered 200 with an empty list — which is what a product with
-			// no releases looks like, so a dashboard polling it without one
-			// read as a product that had never cut a release.
+			// The description says a product must be named, and answering 200
+			// with an empty list is what a product with no releases looks
+			// like, so a dashboard polling it without one reads as a product
+			// that has never cut a release.
 			return nil, huma.Error422UnprocessableEntity(
 				"a product must be named: two products' tags interleave by date and mean " +
 					"nothing side by side")
@@ -454,7 +454,7 @@ type InheritedBody struct {
 	DeferredDays  int     `json:"deferred_days,omitempty" doc:"The total this has already been put off for, across every line it has been carried through"`
 }
 
-// CarriedBody is what a new line would inherit.
+// CarriedBody is the set a new line inherits.
 type CarriedBody struct {
 	Applying  int             `json:"applying" doc:"Reach it by matching. Nothing to choose"`
 	Moved     []InheritedBody `json:"moved" doc:"The version differs, so each needs a fresh answer"`

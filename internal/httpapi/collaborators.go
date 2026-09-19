@@ -23,15 +23,16 @@ type CollaboratorBody struct {
 	AddedAt  string `json:"added_at"`
 }
 
-// registerCollaborators is who has been brought into one undisclosed case .
+// registerCollaborators is the list of people brought into one undisclosed
+// case.
 //
-// **The grant is on the pair of product and issue.** A collaborator sees that
+// The grant is on the pair of product and issue. A collaborator sees that
 // issue everywhere it sits in that product and nothing else — not the rest of
 // the embargo list, and not a count of it. The case it exists for is the
 // engineer who normally sees only public findings and is needed on one
 // embargoed flaw in their own component.
 //
-// **Anybody holding private triage on the product manages the list**, rather
+// Anybody holding private triage on the product manages the list, rather
 // than an administrator: knowing who needs to be on a case is knowing the case,
 // and routing that through somebody who does not read it would make the
 // administrator the bottleneck on every embargo.
@@ -121,12 +122,12 @@ func registerCollaborators(api huma.API, in Ingest, a Administering) {
 			}); err != nil {
 				return nil, err
 			}
-			// Told at once, and told what it is about. no detail
-			// about an undisclosed finding keeps an issue out of
-			// what leaves this deployment; the area inside it is
-			// where an undisclosed finding may be named, and a
-			// message that said "you were given access to
-			// something" and not to what would be unactionable.
+			// Told at once, and told what it is about. Nothing
+			// leaving this deployment carries detail about an
+			// undisclosed finding; the area inside it is where
+			// one may be named, and a message saying "you were
+			// given access to something" without saying to what
+			// is unactionable.
 			tell(ctx, in, "could not say that somebody was brought into a case", notify.Telling{
 				PersonID: person.ID, Kind: notify.BroughtIn,
 				Body: "You have been brought into " + input.Vulnerability + " in " +
@@ -259,10 +260,10 @@ func caseAt(ctx context.Context, in Ingest, product, vulnerability string) (
 	return caseAtHolding(ctx, in, product, vulnerability, false)
 }
 
-// namedCase is what a case is about, as the record writes it: the names the two
-// identifiers resolve to rather than the ones the caller typed.
+// namedCase is the subject of a case, as the record writes it: the names the
+// two identifiers resolve to rather than the ones the caller typed.
 //
-// **What is typed is not bounded and what is stored is.** A path segment
+// A typed name is unbounded and a stored one is not. A path segment
 // carries no length on any route here, and an issue is looked up through a
 // normalization that keeps the first 191 runes — so a seven-hundred-character
 // name whose head is a real identifier resolves, and composing the record from
@@ -285,10 +286,10 @@ func namedCase(ctx context.Context, in Ingest, productID, issueID int64) (string
 //
 // Named separately because the difference is not cosmetic: what hangs off a
 // recorded flaw includes a reporter's name and the address to reach them at,
-// which is a third party's contact details. Every route carrying it declared
-// triage and enforced a read role, so the annotation on the operation and the
-// check in the handler said different things — and the annotation is what the
-// generated reference tells an operator the rule is.
+// which is a third party's contact details. A route carrying it that declares
+// triage and enforces a read role has the annotation on the operation and the
+// check in the handler saying different things — and the annotation is what
+// the generated reference tells an operator the rule is.
 func caseAtTriaging(ctx context.Context, in Ingest, product, vulnerability string) (
 	access.Subject, *access.Store, int64, int64, error) {
 
@@ -308,8 +309,8 @@ func caseAtHolding(ctx context.Context, in Ingest, product, vulnerability string
 	}
 	// A route about one named issue, so the wider of the two rules: somebody
 	// brought into a case here holds nothing on the product and is still
-	// answering about the one issue they were granted. What they may do with
-	// it is decided below, by the issue rather than by the product.
+	// answering about the one issue they were granted. Their reach over it is
+	// decided below, by the issue rather than by the product.
 	named, err := productForIssue(ctx, in, subject, product)
 	if err != nil {
 		return access.Subject{}, nil, 0, 0, err

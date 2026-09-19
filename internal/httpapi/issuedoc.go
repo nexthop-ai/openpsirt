@@ -25,12 +25,12 @@ const howManyJudgments = 200
 
 // registerIssueDocument renders everything known about one issue.
 //
-// **The question a customer inquiry arrives as**: what the issue is, which of
-// our products carry it, what was decided about each, and the argument behind
-// each judgment — in one document, so that two people answering the same
-// inquiry answer it the same way.
+// The question a customer inquiry arrives as: the issue, the products of ours
+// carrying it, the decision about each, and the argument behind each judgment
+// — in one document, so that two people answering the same inquiry answer it
+// the same way.
 //
-// **An internal document.** It carries the reasoning behind each judgment,
+// An internal document. It carries the reasoning behind each judgment,
 // which is this deployment's argument rather than its word to a customer — the
 // documents that go out are the advisory and the VEX, and both are assembled
 // elsewhere and deliberately say less. The lead line says so, because a
@@ -85,7 +85,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 		// products this reader cannot see, for the reason the issue's own
 		// route answers both the same way.
 		//
-		// **A read that could not be made is neither.** That is what the
+		// A read that could not be made is neither. That is what the
 		// sentinel is for — a name nobody has filed is a 404 and a database
 		// that is down is a fault — and answering a customer inquiry "nothing
 		// of yours is affected" because a query failed is the worst of the
@@ -136,8 +136,8 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	// Where it is written up, each address through the rule an address stored
 	// beside a claim goes through: this is a document somebody forwards.
 	//
-	// Read on its own, because what an issue *is* and where to read about it
-	// are two questions and the screens ask one each.
+	// Read on its own, because the issue itself and the places it is written
+	// up are two questions and the screens ask one each.
 	references, err := issues.PointsAt(ctx, id)
 	if err != nil {
 		return "", wentWrong(in.Logger, "where this is written up could not be read", err)
@@ -178,8 +178,8 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 	}
 	// Said where it is a page of a longer record, the way the places above
 	// say it. An issue at a widely vendored component carries hundreds of
-	// judgments, and a document that stopped at two hundred silently reads as
-	// the whole of it.
+	// judgments, and stopping at two hundred silently reads as the whole of
+	// it.
 	if len(judged) < decided {
 		fmt.Fprintf(&out, "%d judgments stand. The %d most recent are below.\n\n",
 			decided, len(judged))
@@ -223,15 +223,15 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 // unaffected is the whole document where nothing this reader may see carries
 // it.
 //
-// A document rather than a refusal: "are you affected by this" is the question
-// an inquiry arrives as, and it could be answered yes and never no.
+// A document rather than a refusal: an inquiry arrives asking whether we are
+// affected, and yes must not be the only answer this can give.
 func unaffected(name string) string {
 	return fmt.Sprintf("# %s\n\nNothing you can see carries this issue.\n\n"+
 		"Assembled %s.\n", name, time.Now().UTC().Format(time.DateOnly))
 }
 
-// howManyCarry is the line above the list: how many builds carry it, and whether
-// the list below is all of them.
+// howManyCarry is the line above the list: how many builds carry it, and
+// whether the list below is all of them.
 func howManyCarry(total, shown int) string {
 	what := "builds carry it"
 	if total == 1 {

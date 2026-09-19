@@ -9,11 +9,11 @@ import (
 //
 // Composed here rather than by a channel, so that what may be said is decided
 // once for every channel there will ever be. A chat adapter that shaped its
-// own text would be a second place for no detail about an undisclosed finding
-// to be got right, and the second place is the one that is wrong.
+// own text would be a second place to get the embargo rule right, and the
+// second place is the one that is wrong.
 type Message struct {
 	Subject string
-	// Text is markdown, which is what a mail carries as its text part . A
+	// Text is markdown, which is what a mail carries as its text part. A
 	// chat adapter translates rather than forwarding it.
 	Text string
 	// Link is the address a channel may carry. For something undisclosed it
