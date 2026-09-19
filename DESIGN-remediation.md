@@ -41,10 +41,10 @@ move along.
 
 A declaration arrives with the judgment that argued for it, from the two
 outcomes that promise work — a bump, recorded against the component, and a
-backport, recorded against the issue. There is no way to record where a fix will
-land without saying what was decided: bare intent carried no version, no date
-and no reasoning, so nothing could lapse and nobody was asked to agree to it,
-which made it a promise in the shape of a record and not in its effect.
+backport, recorded against the issue. There is no way to record where a fix
+will land without saying what was decided. Bare intent carries no version, no
+date and no reasoning, so nothing can lapse and nobody is asked to agree to it:
+a promise in the shape of a record and not in its effect.
 
 The alternative — planned, in progress, done, moved by a person — is how every
 tracker works, and is wrong here because independent evidence already exists. A
@@ -78,8 +78,8 @@ commitment's build. Nothing is written onto findings.
 
 | Consequence | |
 |---|---|
-| Changing the version a release is moving to is one row | It was keyed per issue *and* per component *and* per target version, so a change meant rewriting every row of it |
-| An issue published tonight is covered by this morning's commitment | With nobody acting. Under the old key it was not covered until somebody declared it too |
+| Changing the version a release is moving to is one row | Keyed per issue and per component and per target version, a change means rewriting every row of it |
+| An issue published tonight is covered by this morning's commitment | With nobody acting. Keyed per issue it is not covered until somebody declares it too |
 | A sibling package moves with its source | curl, libcurl4t64 and libcurl3t64 are one bump, so a commitment recorded against one covers all of them |
 | No version comparison decides coverage | An upgrade covers everything open on the fold rather than only what records this version as its fix. What an ordering is used for is reading a set of candidates, never deciding what a commitment reaches |
 
@@ -113,12 +113,12 @@ anybody marking it done (REQ-35). Each stands at landed, lapsed or planned, and
 those three are worked out on every read — nothing stores them, nothing refreshes
 them, and nothing has to be invalidated when a scan closes a finding.
 
-A roll-up across the builds one issue was promised in is not built. There was
-one, reading "two of three chosen releases are clear", and it was the only reader
-of a screen that offered a set of builds to tick with no version, no date and no
-reasoning attached; both went together. What remains answers per build, which is
-the grain a commitment is made at. Where an issue stands across several is read
-from the findings list, which has a row per build.
+A roll-up across the builds one issue was promised in is not built. "Two of
+three chosen releases are clear" is the reading, and its only source is a
+screen offering a set of builds to tick with no version, no date and no
+reasoning attached — which is the shape this refuses. What is built answers per
+build, the grain a commitment is made at, and where an issue stands across
+several is read from the findings list, which has a row per build.
 
 ## Deadlines
 
@@ -234,7 +234,7 @@ that reaches the network.
 | Rule | Reason |
 |---|---|
 | One replica asks, settled by a lease | These are free services somebody else runs, and the politeness the pass is built around — two hundred at a time, a quarter of a second apart — is a rate per deployment rather than per replica |
-| The lease is taken again as the pass runs | Sized from the interval between cycles it was a guess at how long a pass takes, and the arithmetic beside it said so: two hundred requests with a timeout each is far past several intervals. A slow index handed the pass to a second replica mid-flight and both asked |
+| The lease is taken again as the pass runs | Sized from the interval between cycles it is a guess at how long a pass takes, and the arithmetic says so: two hundred requests with a timeout each is far past several intervals. A slow index then hands the pass to a second replica mid-flight and both ask |
 | A pass that has lost the lease stops | Two replicas asking is what the lease exists to prevent, and it is at somebody else's expense |
 | The candidates are the ecosystems there is an index for | Maintained as the complement of one of them, every other unaskable ecosystem passed the filter, reached the asker, found none and was recorded empty — spending one of the pass's slots. An image with ten thousand distribution packages spent fifty passes writing nothing |
 | A distribution package is not asked about | The distribution is the maintainer, and the date it released says nothing about the age of the software inside |
@@ -248,9 +248,9 @@ What comes back is classified, because the classes want opposite treatment.
 | A refusal the index will repeat | Asked, with no version | A package withdrawn, a region blocked, a name that cannot be turned into a request, a document nothing can read. An answer we will never get is still an answer about this component |
 | A bad day — too many requests, or the index itself unwell | Nothing | The one class worth coming back to: it stays due and the next pass asks again |
 
-Everything that is not a bad day is recorded. Read as one, a refusal the
-index repeats every time left the component unrecorded — and the window takes
-the never-asked first, so it held the head of every pass afterwards for ever,
+Everything that is not a bad day is recorded. Read as one, a refusal the index
+repeats every time leaves the component unrecorded, and the window takes the
+never-asked first — so it holds the head of every pass afterwards for ever,
 with the components behind it never reached.
 
 A previous answer is never overwritten by an empty one. An index returns
@@ -439,7 +439,7 @@ held. Nothing is sent anywhere.
 | A document about an undisclosed flaw is a draft, and says so | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either |
 | Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
-| The document's version is the last number its own revision history states | Counted separately the two disagreed the moment an advisory had been issued once, and a validator compares them. The two agreed by accident only for a document nobody had published, which is why it went unseen |
+| The document's version is the last number its own revision history states | Counted separately the two disagree the moment an advisory has been issued once, and a validator compares them. They agree by accident for a document nobody has published, which is where the disagreement hides |
 | The publisher's category is one of the six the standard names, refused at startup otherwise | The value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them — which is the one use a generated advisory has |
 | The document declares the profile it satisfies, worked out from what it turned out to carry | Declared unconditionally, a document missing a profile-mandatory element fails that profile's own tests and is dropped by the tooling that reads it |
 | The security-advisory profile is the product tree, the vulnerabilities, and notes and a status on each | The standard's own list. Notes and references on the *document* belong to the informational advisory — the profile for a document carrying no vulnerabilities at all — and gating on those declared a base document for every flaw of ours that nobody outside had written up yet, which a customer's tooling filtering for security advisories skips |
@@ -454,7 +454,7 @@ somebody deciding whether to act.
 |---|---|---|
 | References | The issue's write-up and everywhere else a report points, each address once | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's |
 | Scores | The CVSS base vector, scored here | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. A vector under a scheme this deployment does not score yields nothing rather than a number under the wrong formula |
-| Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gave it so somebody could reply, not so it could be published, and "anonymous" is a real answer to the question the credit field asks |
+| Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gives it so somebody can reply, not so it can be published, and "anonymous" is a real answer to the question the credit field asks |
 | Remediations | Stated for the releases that still carry the flaw, and the details name the releases that do not | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
 | Distribution | The same fact the tracking status reads — a draft is RED, a disclosed document is WHITE | Handing a draft to somebody who may pass it on is the disclosure the embargo exists to hold. The labels are the standard's four, which is why a final document is WHITE rather than the word the protocol renamed it to |
 
@@ -512,10 +512,10 @@ customer — which is the reason the two-person approval on those claims exists.
 | Ordered here rather than by the engine | Two documents generated from the same state are byte-for-byte identical |
 | A build with more statements than one document carries is refused, not truncated | There is no second request for the rest, so a document that stopped at a ceiling would say "nothing is claimed about this" by omission about everything past it — to every customer running a scanner, which is the one thing a document of dismissals must never say. The ceiling is well above anything real, and reaching it names the build and the number |
 
-A statement is made only where every open place agrees, and agrees the same way.
-The format says "this product, this component, not affected" and has no finer
-grain. A component commonly sits at several places, so a dismissal agreed at one
-of them is not a claim about the component. Published as one it was a
+A statement is made only where every open place agrees, and agrees the same
+way. The format says "this product, this component, not affected" and has no
+finer grain. A component commonly sits at several places, so a dismissal agreed
+at one of them is not a claim about the component: published as one it is a
 machine-readable "not affected" about something that is affected, sent to every
 customer running a scanner against the image.
 
@@ -527,15 +527,15 @@ earliest: the claim that has stood longest and the one a reader can check
 against the record. Grouping on the words and the moment emitted the same claim
 twice.
 
-The earliest decision is picked first, and then read. Each column had its own
-minimum over the group, and nothing tied them to one row: with two claims
-standing at a component — "component_not_present" and
-"inline_mitigations_already_exist / bound to the management VLAN" — the
-machine-readable category came from one and the impact statement from the other,
-and the published statement said the component was not present while describing
-the network control that protects it. That is a composite no record ever held,
-going to every customer running a scanner. The group answers with the earliest
-decision's identifier and its words are read by that identifier.
+The earliest decision is picked first, and then read. A minimum per column with
+nothing tying the columns to one row composes a statement from two claims: with
+"component_not_present" and "inline_mitigations_already_exist / bound to the
+management VLAN" both standing at a component, the machine-readable category
+comes from one and the impact statement from the other, and the published
+statement says the component is not present while describing the network
+control that protects it. That is a composite no record ever held, going to
+every customer running a scanner. The group answers with the earliest
+decision's identifier, and its words are read by that identifier.
 
 ## Issuance records
 
