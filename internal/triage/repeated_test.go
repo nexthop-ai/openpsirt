@@ -128,8 +128,8 @@ func TestSomethingPutOffOnceIsNotAPattern(t *testing.T) {
 
 func TestTimeTakenBackCountsForAsLongAsItHeld(t *testing.T) {
 	// A withdrawal shortens the time something was put off; it does not erase
-	// it. Erased, the pattern this list exists to show was invisible in it:
-	// withdraw and defer again, each span under the line, forever.
+	// it. Erased, the pattern this list exists to show is invisible in it:
+	// withdraw and defer again, each span under the line, for ever.
 	each(t, func(t *testing.T, f *fixture) {
 		now := time.Now().UTC()
 		f.putOff(t, "place-a", now.Add(-90*24*time.Hour), now.Add(-60*24*time.Hour), triage.Approved)

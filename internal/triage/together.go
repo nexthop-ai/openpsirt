@@ -208,9 +208,9 @@ func (s *Store) Together(ctx context.Context, subject access.Subject, at Togethe
 		// covering something already decided is a selection somebody should
 		// look at again rather than one to write around, and the sentinel is
 		// carried out whole so the refusal outside can name which decision
-		// stands — it used to be replaced here with "something in this
-		// selection is already decided", which tells a reader holding five
-		// hundred rows nothing they can act on.
+		// stands. Replaced here with "something in this selection is already
+		// decided", it tells a reader holding five hundred rows nothing they
+		// can act on.
 		made, err := within.proposeAll(ctx, claim, each)
 		if err != nil {
 			return err

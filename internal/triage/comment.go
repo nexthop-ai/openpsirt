@@ -41,7 +41,7 @@ type Comment struct {
 //
 // The previous text, written when it is replaced, rather than every version
 // including the current one: the comment row holds what it says now, and this
-// holds what it stopped saying, which is the part that was being lost.
+// holds what it stopped saying, which is the part nothing else keeps.
 type WasSaid struct {
 	bun.BaseModel `bun:"table:claim_comment_revision,alias:dcr"`
 

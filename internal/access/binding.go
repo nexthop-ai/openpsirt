@@ -397,11 +397,11 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// what a group granted is taken back by a group, which is what
 	// admin_derived records.
 	effective := admin.administers || person.IsBootstrap || (person.IsAdmin && !person.AdminDerived)
-	// **A group's grant is derived only where it is what made them an
-	// administrator.** Written as "whatever the groups say this time", the
-	// column destroyed the input the line above depends on next time:
-	// somebody promoted in the application who also happened to be in an
-	// admin-bound group was rewritten as derived, and losing the group then
+	// A group's grant is derived only where it is what made them an
+	// administrator. Written as "whatever the groups say this time", the
+	// column destroys the input the line above depends on next time:
+	// somebody promoted in the application who also happens to be in an
+	// admin-bound group is rewritten as derived, and losing the group then
 	// took away administration the group never gave — irrecoverably, since a
 	// switch back to direct roles clears exactly the rows marked derived.
 	derived := person.AdminDerived || (admin.administers && !person.IsAdmin)
@@ -701,10 +701,10 @@ func canAdminister(ctx context.Context, db bun.IDB, mode Mode) (bool, error) {
 // admits nobody who has not authenticated.
 //
 // Each is a plain username, the same one the provider or the trusted proxy
-// reports. It used to be written "provider:username" with a bare name falling
-// back to the proxy path, which granted administration to an account nobody
-// signed in as whenever the two disagreed — silently, at the one moment
-// somebody needs this to work.
+// reports. Written "provider:username" with a bare name falling back to the
+// proxy path, it grants administration to an account nobody signed in as
+// whenever the two disagree — silently, at the one moment somebody needs this
+// to work.
 //
 // Anybody no longer named stops being one. Configuration says who is named, so
 // a deployment that removes somebody and restarts should not still have them
