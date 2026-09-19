@@ -27,17 +27,16 @@ type DecisionBody struct {
 	ClaimID int64   `json:"claim_id,omitempty" doc:"The claim this decision is one row of: the action that wrote it, which is what the review queue lists and what is approved"`
 	Outcome outcome `json:"outcome" doc:"The outcome"`
 	// Justification is required for not-applicable and meaningless elsewhere:
-	// the claim that something does not affect us is which of the recognized
-	// reasons applies.
+	// the claim that something does not affect us names one of the recognized
+	// reasons.
 	Justification justification `json:"justification,omitempty" doc:"The reason it does not apply. Required when it does not"`
 	// Mitigation is the one claim here that rests on configuration rather
 	// than on code, so it is the one thing nothing will notice going away.
 	// Naming it does not fix that; it makes the claim checkable.
 	Mitigation    string `json:"mitigation,omitempty" maxLength:"65536" doc:"The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
 	DeferredUntil string `json:"deferred_until,omitempty" doc:"The date a deferral returns. Required for a deferral"`
-	// FixedVersion is what makes the already-fixed claim checkable against
-	// whoever packages the component, rather than something to be taken on
-	// trust.
+	// FixedVersion makes the already-fixed claim checkable against whoever
+	// packages the component, rather than something taken on trust.
 	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version whoever packages this states the fix arrived in. Required when the outcome is already-fixed, and refused with any other. Recorded and never compared against the version shipping"`
 	// CommittedTo is when the work an outcome promises will be done, for
 	// the two that promise work. Without it there is nothing to gate
@@ -47,9 +46,9 @@ type DecisionBody struct {
 	// screen rather than here: a bump answers a component, not one finding.
 	UpgradeTo string `json:"upgrade_to,omitempty" doc:"The version an upgrade moves to. Carried on an upgrade-needed decision, which is recorded from a component rather than from one finding"`
 	Reasoning string `json:"reasoning" minLength:"1" doc:"The reasoning, in markdown. Somebody else has to agree with this"`
-	// FromStatement cites a VEX statement this was started from. A
-	// citation and never an application: what they said is not this claim,
-	// and recording it is what lets a later revision be noticed .
+	// FromStatement cites a VEX statement this was started from. A citation
+	// and never an application: their statement is not this claim, and the
+	// citation is what lets a later revision be noticed.
 	FromStatement int64  `json:"from_statement,omitempty" doc:"A VEX statement this was started from, by its identifier. Recorded as a citation so a later revision to it raises an alert. It is never what the claim rests on"`
 	State         string `json:"state,omitempty" enum:"proposed,approved,withdrawn,lapsed" doc:"The state it has reached"`
 	// NeedsApproval says whether this is waiting for a second person. A short
@@ -67,14 +66,14 @@ type DecisionBody struct {
 	// and the author's own list cannot tell a claim waiting on somebody else
 	// from one waiting on them.
 	SentBackAt string `json:"sent_back_at,omitempty" doc:"The last time an approver asked for more. Empty means nobody has"`
-	// SelectedBy is how the set was narrowed, where this claim was one of many
-	// recorded in a single action. Reported so that "how were these chosen"
-	// has an answer months later.
+	// SelectedBy is the narrowing behind the set, where this claim was one of
+	// many recorded in a single action. Reported so the choice of set has an
+	// answer months later.
 	SelectedBy string `json:"selected_by,omitempty" doc:"The narrowing behind a claim recorded as one of many. Never part of the claim itself"`
 }
 
-// FindingRefBody is what a decision is about, as the findings list would
-// show it: the build to link to, the issue, the component and where it sits.
+// FindingRefBody is the subject of a decision, as the findings list shows it:
+// the build to link to, the issue, the component and where it sits.
 type FindingRefBody struct {
 	Product       string  `json:"product" doc:"The build to link to, by product, branch or tag, and variant"`
 	Stream        string  `json:"stream"`
@@ -108,7 +107,7 @@ type PlaceBody struct {
 // SelectionBody is the narrowing behind a bulk claim, re-run when the claim was
 // written.
 //
-// **Two counts rather than a sentence.** A claim reading "drivers this image
+// Two counts rather than a sentence. A claim reading "drivers this image
 // does not build" over a set chosen by ticking everything is indistinguishable
 // in the record from an honest one. Equal counts mean the claim is exactly what
 // that narrowing returns; far apart, the sentence does not describe the set.
@@ -127,9 +126,9 @@ type ClaimBody struct {
 	ProposedBy  string `json:"proposed_by"`
 	ProposedAt  string `json:"proposed_at" doc:"The moment the action was taken"`
 	SelectedBy  string `json:"selected_by,omitempty" doc:"The narrowing behind a bulk set. Never part of the claim itself"`
-	// Selection is the same question answered by something an approver can
-	// re-run. Prose alone cannot be checked, and what a decision asks for is
-	// how a set was chosen.
+	// Selection is the same claim in a form an approver can re-run. Prose
+	// alone cannot be checked, and a decision rests on how the set was
+	// chosen.
 	Selection *SelectionBody `json:"selection,omitempty" doc:"The narrowing behind a bulk claim, as something you can re-run. Absent on a claim that was not one"`
 	// Elsewhere is where this is being worked on outside here. Stored and
 	// never fetched.
@@ -157,12 +156,12 @@ type WaitingBody struct {
 	Places             int    `json:"places" doc:"The number of distinct places it covers"`
 	// Builds is every build the claim's rows currently cover, by matching.
 	Builds []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
-	// Outliers is what in a bulk set does not look like the rest. Only for a
-	// claim over many issues.
+	// Outliers is the rows of a bulk set that do not look like the rest. Only
+	// for a claim over many issues.
 	Outliers *OutliersBody `json:"outliers,omitempty" doc:"For a claim over many issues: the rows that do not look like the rest, and how many there are"`
-	// Counter is what would argue against agreeing.
+	// Counter is the case against agreeing.
 	Counter *CounterBody `json:"counter,omitempty" doc:"The context a careful reader looks up: what was decided about this issue elsewhere, and how much else at the same place nobody has answered"`
-	// Finding is what the representative decision is about: the build to
+	// Finding is the subject of the representative decision: the build to
 	// link to, the issue, the component and where it sits. For a claim
 	// over many issues it describes the component and the build, with the
 	// representative issue.
@@ -171,7 +170,7 @@ type WaitingBody struct {
 
 // CounterBody is what would make an approver disagree.
 //
-// **Two counts and no argument.** It does not say a claim is wrong — nothing
+// Two counts and no argument. It does not say a claim is wrong — nothing
 // here can know that — it says what a careful reader would go and look up, so
 // that not looking is a choice rather than an omission.
 type CounterBody struct {
@@ -212,12 +211,12 @@ type BecameBody struct {
 	Decision DecisionBody `json:"decision"`
 	Place    PlaceBody    `json:"place"`
 	// Happened is the word for what became of it. "mixed" is a claim whose
-	// rows did not all end the same way — an approver agreeing to most of a
+	// rows do not all end the same way — an approver agreeing to most of a
 	// bulk set and setting some aside, or half of it lapsing as one build
-	// moved — and is said rather than picked between.
+	// moves — and is stated rather than picked between.
 	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"The claim's outcome"`
-	// The moment it became that, and the person who did it where a person did. Both
-	// absent while it is waiting: nothing has happened to it yet.
+	// The moment it became that, and the person who did it where a person
+	// did. Both absent while it is waiting: nothing has happened to it yet.
 	When      string          `json:"when,omitempty" doc:"The moment it became that"`
 	By        string          `json:"by,omitempty" doc:"The person who did it, where a person did"`
 	Reasoning string          `json:"reasoning"`
@@ -225,10 +224,11 @@ type BecameBody struct {
 	Issues    int             `json:"issues" doc:"The number of distinct issues it covers"`
 	Places    int             `json:"places" doc:"The number of distinct places it covers"`
 	Finding   *FindingRefBody `json:"finding,omitempty" doc:"The representative decision's subject. Absent where no open finding sits at its place"`
-	// Outliers is what in a bulk claim does not look like the rest, for a claim
-	// its author may still hold part of back. The same signals an approver is
-	// shown, because the author faces the same choice — hold some back, or
-	// argue all of it as one — and had nothing to choose with.
+	// Outliers is the rows of a bulk claim that do not look like the rest, for
+	// a claim its author may still hold part of back. The same signals an
+	// approver is shown, because the author faces the same choice — hold some
+	// back, or argue all of it as one — and without them has nothing to choose
+	// with.
 	Outliers *OutliersBody `json:"outliers,omitempty" doc:"The rows in a bulk claim that do not look like the rest. Absent for a claim about one issue and for one nothing can still be held back from"`
 }
 
@@ -288,10 +288,10 @@ func registerTriage(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "the review queue could not be read", err)
 		}
 
-		// The finding each row is about, and the person who made the claim, resolved
-		// here rather than left as identifiers. A queue row saying product 4,
-		// issue 91 is a row an approver has to make two more requests to
-		// understand, fifty times a page.
+		// The finding each row is about, and the person who made the claim,
+		// resolved here rather than left as identifiers. A queue row saying
+		// product 4, issue 91 is a row an approver has to make two more
+		// requests to understand, fifty times a page.
 		decisions := make([]triage.Decision, 0, len(waiting))
 		for _, row := range waiting {
 			decisions = append(decisions, row.Decision)
@@ -447,9 +447,9 @@ func registerTriage(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what you proposed could not be read", err)
 		}
-		// The person who did it, resolved to a name. A row saying "person 7 agreed" is a
-		// row somebody has to look up, and the answer to "what became of my
-		// claim" is half about who answered it.
+		// The person who did it, resolved to a name. A row saying "person 7
+		// agreed" is a row somebody has to look up, and the fate of a claim is
+		// half about who answered it.
 		actors := make([]int64, 0, len(mine))
 		for _, row := range mine {
 			if row.By != 0 {
@@ -675,8 +675,8 @@ func registerProposing(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		// Refused here rather than by the store, because what is wrong with
-		// it is the grain rather than the claim: the same outcome recorded
+		// Refused here rather than by the store, because the fault is in the
+		// grain rather than in the claim: the same outcome recorded
 		// from a component is exactly right, and the sentence has to say
 		// where to go rather than that the word is invalid.
 		if triage.Outcome(input.Body.Outcome) == triage.UpgradeNeeded {
@@ -714,8 +714,8 @@ func registerProposing(api huma.API, in Ingest) {
 			// The deadline itself is read inside the transaction that writes
 			// the claim, because it is a stored value a re-rating or an
 			// arriving scan moves — and never supplied by the caller, since
-			// whether a commitment needs a second person is not a thing the
-			// person making it may state.
+			// the need for a second person is not a thing the person making
+			// the commitment may state.
 			BindingAcross: []int64{target},
 			FromStatement: cited(input.Body.FromStatement),
 		}
@@ -735,12 +735,12 @@ func registerProposing(api huma.API, in Ingest) {
 			proposal.CommittedTo = &by
 		}
 
-		// Whether it is waiting for anybody is worked out by the store, inside
-		// the transaction that records it, and read back off what was
-		// written. Asked here and passed in, the answer described the policy
-		// and the postponement in force when the request arrived rather than
-		// when the claim landed — and the answer telling the caller it was
-		// waiting was the only trace of a control that did not run.
+		// The wait for a second person is worked out by the store, inside the
+		// transaction that records it, and read back off what was written.
+		// Asked here and passed in, the answer describes the policy and the
+		// postponement in force when the request arrived rather than when the
+		// claim landed — and the answer telling the caller it is waiting is
+		// the only trace of a control that never ran.
 		decision, err := store.Propose(ctx, subject, proposal)
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
@@ -782,9 +782,9 @@ func refusedDecision(logger *slog.Logger, err error) error {
 		return huma.Error409Conflict("the person who proposed a decision may not agree to it")
 	}
 	// An authorization refusal is not somebody having asked for the
-	// impossible. Without this arm it fell through to the default below and
-	// answered 422 carrying access.Denied's own sentence — which names the
-	// internal product identifier, so a refusal handed the caller a number
+	// impossible. Without this arm it falls through to the default below and
+	// answers 422 carrying access.Denied's own sentence — which names the
+	// internal product identifier, so a refusal hands the caller a number
 	// nothing else publishes.
 	if errors.Is(err, access.ErrDenied) {
 		return huma.Error403Forbidden("not authorized")
@@ -794,9 +794,9 @@ func refusedDecision(logger *slog.Logger, err error) error {
 		return refusedText(faults)
 	}
 	// A database that broke is not somebody having asked for the impossible.
-	// The default arm answered both as 422 with the message in it, so a lost
-	// connection reached the caller as a bad request carrying the statement
-	// text and the address the driver had tried.
+	// The default arm answers both as 422 with the message in it, so a lost
+	// connection reaches the caller as a bad request carrying the statement
+	// text and the address the driver tried.
 	if database.FromEngine(err) {
 		return wentWrong(logger, "that could not be recorded", err)
 	}
@@ -809,8 +809,8 @@ func refusedDecision(logger *slog.Logger, err error) error {
 // refusedText answers a refused piece of writing with where to look.
 //
 // Each fault travels as its own detail, carrying the line and the text that
-// caused it. Flattening them into one sentence is what this used to do, and it
-// leaves an interface with nothing to point at: "remote images are not
+// caused it. Flattened into one sentence they leave an interface with nothing
+// to point at: "remote images are not
 // allowed" against a forty-line justification means somebody hunting for it by
 // eye, which is the whole reason positions are gathered in the first place.
 func refusedText(faults markdown.Faults) error {
@@ -878,9 +878,9 @@ func deferralThreshold(ctx context.Context, in Ingest) (time.Duration, error) {
 	if in.DB == nil {
 		return triage.DefaultDeferralThreshold, nil
 	}
-	// The same shipped span the store falls back to. Written out here as
-	// well, the two came to disagree about what a deployment that has said
-	// nothing is doing.
+	// The same shipped span the store falls back to. Written out here as well,
+	// the two disagree about what a deployment that has said nothing is
+	// doing.
 	return setting.NewStore(in.DB.DB).Duration(ctx, setting.DeferralThreshold,
 		triage.DefaultDeferralThreshold)
 }

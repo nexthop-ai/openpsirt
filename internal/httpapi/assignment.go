@@ -22,8 +22,8 @@ type UnassignedBody struct {
 	Version       string `json:"version"`
 	Product       string `json:"product"`
 	// Stream and Variant name a build holding this, not the only one: a screen
-	// needs somewhere to link to and an action needs a finding to name. What
-	// says there are several is `builds`.
+	// needs somewhere to link to and an action needs a finding to name. The
+	// field that says there are several is `builds`.
 	Stream  string `json:"stream" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
 	Variant string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
 	Places  int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
@@ -109,23 +109,23 @@ func registerAssigning(api huma.API, in Ingest) {
 		}
 
 		// Every right this needs is checked before any name is looked
-		// up . The triage check above is not enough on its own: giving
+		// up. The triage check above is not enough on its own: giving
 		// work to somebody else asks for more, and resolving the name
 		// first answers "does this person have an account here"
 		// differently depending on whether they do — which is a staff
 		// directory for the price of one request, to anybody who may
 		// triage.
 		//
-		// The same rule the component path states, asked in one place: the
-		// two had already drifted over which status a refused hand-off is,
-		// so one route answered a 404 and the other a 422 about the
+		// The same rule the component path states, asked in one place. Two
+		// spellings drift over which status a refused hand-off is, and
+		// answer a 404 on one route and a 422 on the other about the
 		// identical condition.
 		if err := mayHandOver(subject, product, input.Body.Person, input.Body.Team); err != nil {
 			return nil, err
 		}
 
 		var to *int64
-		// whoToTell is who to tell, which is a person. The column
+		// whoToTell is the person to tell. The column
 		// holds the party they are assignable as, and a notification
 		// goes to somebody. A team tells nobody: a queue filling up is
 		// digest content rather than an interruption.
@@ -138,9 +138,9 @@ func registerAssigning(api huma.API, in Ingest) {
 				return nil, noSuchPerson()
 			}
 			// An assignment carries visibility of what was
-			// assigned, so what is checked is the level rather
-			// than whether they can already see the row — which,
-			// before the assignment, they cannot by construction.
+			// assigned, so the check is against the level rather
+			// than against their present sight of the row — which,
+			// before the assignment, they do not have.
 			// Handing an embargoed finding to somebody cleared for
 			// nothing embargoed would make the assignment the
 			// disclosure.
@@ -198,10 +198,10 @@ func registerAssigning(api huma.API, in Ingest) {
 		}
 
 		// Tell them. Work arriving is the thing a triager most wants
-		// to notice , and it is the one category that deserves
+		// to notice, and it is the one category that deserves
 		// interrupting somebody for.
 		//
-		// **Only if they can see what they are being told about.** A
+		// Only where they can see what they are being told about. A
 		// notification carries the product, the branch, the variant and the
 		// issue, and it is stored as written rather than derived on read — so
 		// there is no visibility filter downstream that could repair it, and
@@ -210,10 +210,10 @@ func registerAssigning(api huma.API, in Ingest) {
 		// its releases and a live vulnerability against it: a product they
 		// hold nothing on is meant to read as one that does not exist.
 		//
-		// The assignment itself is left alone. Whether work may be
-		// handed to somebody who cannot yet see it is a question about
-		// assignment, not about this channel, and quietly refusing it
-		// here would be deciding it in the wrong place.
+		// The assignment itself is left alone. The question of whether
+		// work may be handed to somebody who cannot yet see it belongs
+		// to assignment rather than to this channel, and refusing it
+		// quietly here would decide it in the wrong place.
 		//
 		// Nobody is told they were unassigned: a name being removed is
 		// not an action directed at the person who held it, and a
@@ -413,11 +413,11 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		// Narrowed by what they hold rather than by what they read. A
 		// capability held without a read role reaches no product and
 		// is given content by what has been assigned, and the store
-		// already answers for that — but the scope check refused
-		// first, so somebody looking at the build they hold work in
-		// was told the product does not exist. What keeps that check's
-		// property is below: an empty answer for a product they cannot
-		// see is still "no such product".
+		// already answers for that — while a scope check refusing
+		// first tells somebody looking at the build they hold work in
+		// that the product does not exist. That check's property is
+		// kept below: an empty answer for a product they cannot see is
+		// still "no such product".
 		scope, sees, err := scopedByHolding(ctx, in, subject, input.ScopeQuery)
 		if err != nil {
 			return nil, err
@@ -435,7 +435,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 			if err != nil {
 				// A name nobody holds answers exactly as a
 				// name somebody holds whose work this caller
-				// cannot see: an empty list . Refusing instead
+				// cannot see: an empty list. Refusing instead
 				// would answer "does this person have an
 				// account here" for any credential at all,
 				// including one holding no product — a
@@ -530,7 +530,7 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		// work for the price of one request — and the read below is narrowed
 		// by what the caller may see anyway.
 		//
-		// **A read that could not be made is not that answer.** Told apart by
+		// A read that could not be made is not that answer. Told apart by
 		// the sentinel rather than by "any error at all": read as "no such
 		// team", a database nobody can reach answers that this team is holding
 		// nothing — which is the exact false statement this route was written
@@ -638,13 +638,13 @@ func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
 	if errors.Is(err, graph.ErrAmbiguous) {
 		// The build ships that name at more than one version, and these routes
 		// carry no version to choose with. Answering "no open finding is
-		// recorded there" was wrong twice over: the finding is there, and the
-		// caller had just read it on a screen that resolved the same name.
+		// recorded there" is wrong twice over: the finding is there, and the
+		// caller has just read it on a screen that resolved the same name.
 		//
 		// Narrowed to the versions carrying this issue first, the way the
 		// finding's own route does it, because the lookup raises the ambiguity
 		// before it knows which issue is being asked about — so left alone it
-		// would offer every version of the name, most of which lead nowhere.
+		// offers every version of the name, most of which lead nowhere.
 		carrying, second := finding.NewStore(in.DB.DB).VersionsWithIssue(
 			ctx, subject, target.ID, issue, component)
 		if second != nil {
@@ -675,10 +675,10 @@ func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
 // becomes informative.
 //
 // Only the refusals it recognizes are reported to the caller. Anything else is
-// a database that could not answer, and returning those as 422 told somebody
-// their request was wrong and put a driver's error text — table names,
-// statement fragments — in the response body. What is not a recognized refusal
-// is logged and answered as ours.
+// a database that could not answer, and returning those as 422 tells somebody
+// their request was wrong and puts a driver's error text — table names,
+// statement fragments — in the response body. Anything other than a recognized
+// refusal is logged and answered as ours.
 func refusedFinding(in Ingest, err error) error {
 	switch {
 	case errors.Is(err, access.ErrDenied):
@@ -695,10 +695,10 @@ func refusedFinding(in Ingest, err error) error {
 // nothing about what the recipient can, and it is the recipient who receives
 // the text.
 //
-// **At the visibility of the finding, not merely of the product.** The body
-// names the issue, the component and the build, and is stored as written — so
-// somebody who may read what has been disclosed and no more would be handed
-// the name of a finding nobody has announced, in a product they hold nothing
+// At the visibility of the finding, not merely of the product. The body names
+// the issue, the component and the build, and is stored as written — so
+// somebody who may read what has been disclosed and no more is handed the name
+// of a finding nobody has announced, in a product they hold nothing
 // undisclosed on. Seeing that a product exists is not reading its embargoed
 // work.
 func seenBy(ctx context.Context, in Ingest, identity string, productID int64, undisclosed bool) bool {

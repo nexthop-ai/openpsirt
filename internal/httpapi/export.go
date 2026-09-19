@@ -17,20 +17,20 @@ import (
 
 // Exporting writes a list out as it is read.
 //
-// **The subject travels through the stream**. An export is the
-// easiest place in this codebase to build a list first and narrow it
+// The subject travels through the stream. An export is the easiest place in
+// this codebase to build a list first and narrow it
 // afterwards, which is exactly the failure the narrowing helper's own comment
 // warns about — so this is the same query with the same subject, paged and
 // written as it goes, and there is no point at which a whole unnarrowed list
 // exists.
 //
-// **Paged rather than unbounded.** A year of a real deployment is more rows
+// Paged rather than unbounded. A year of a real deployment is more rows
 // than a process should hold, and the page is the same page the screen reads:
 // one query shape, so a spreadsheet and a screen cannot disagree about what
 // the filter means.
 type Exporting struct {
-	// What names the file, in the words the report it comes from is
-	// known by. Stated on every export, with the moment it was taken, by
+	// The name of the file, in the words the report it comes from is known
+	// by. Stated on every export, with the moment it was taken, by
 	// writeExport rather than by each caller: an export that cannot say
 	// what it is and when is not evidence, and a fact every file must
 	// carry is one no file can be written without.
@@ -39,7 +39,7 @@ type Exporting struct {
 	// label and a value, stated because a spreadsheet opened six months
 	// later has nowhere else to carry it.
 	//
-	// **Whatever narrowed it.** The deployment's severity line is the case
+	// Whatever narrowed it. The deployment's severity line is the case
 	// this exists for — a file that omits a third of the estate lies by
 	// omission — and which two builds a comparison compares, which window a
 	// report covers and the threshold a true/false column was computed
@@ -58,18 +58,18 @@ type Exporting struct {
 	// Stream hands over every row as it arrives, for a reader that can open a
 	// cursor over the whole answer.
 	//
-	// **Paging is what made a large export cost what it did.** Each page
-	// re-ran the statement, which re-sorted everything and then skipped past
-	// what had already been written, so the deeper the file got the more each
-	// page cost: a build's disposition register took 52 minutes and the last
-	// page cost five times the first. Streamed, the same file is 1.9 seconds.
+	// Paging is what a large export cannot afford. Each page re-runs the
+	// statement, which re-sorts everything and then skips past what has
+	// already been written, so the deeper the file gets the more each page
+	// costs: a build's disposition register takes 52 minutes and the last page
+	// costs five times the first. Streamed, the same file is 1.9 seconds.
 	//
-	// It does not cost what paging was avoiding. "No complete list ever exists
-	// in memory" is what a cursor gives — this holds one row — and what paging
-	// added on top of that was the re-sorting.
+	// It gives up nothing paging avoids. "No complete list ever exists in
+	// memory" is what a cursor gives — this holds one row — and paging adds
+	// the re-sorting on top of that.
 	//
-	// What it does cost is a database connection held for as long as the
-	// response takes, where a paged reader gave one back between pages. That
+	// The cost is a database connection held for as long as the response
+	// takes, where a paged reader gives one back between pages. That
 	// is bounded by the write deadline below, which moves with the writing
 	// rather than with the request: a reader that has stopped reading loses
 	// the connection after exportStall, and one that is keeping up holds it
@@ -103,11 +103,11 @@ func preamble(out Exporting, now time.Time, asked string) []Stated {
 	}
 	// The request's own query, which is what narrowed this file.
 	//
-	// **Taken from the request rather than described from the filter.** A
+	// Taken from the request rather than described from the filter. A
 	// description assembled field by field is a list somebody has to keep in
 	// step with the filters, and the one it misses is the one that makes the
-	// file read as complete about rows it left out. What was asked for is
-	// also what reproduces the file.
+	// file read as complete about rows it left out. The request is also what
+	// reproduces the file.
 	if asked != "" {
 		said = append(said, Stated{"narrowed by", asked})
 	}
@@ -123,8 +123,8 @@ const exportPage = 200
 //
 // The server bounds a response by how long the whole of it takes, which is
 // right for a request that answers and wrong for one that streams: a real
-// build's disposition register is a quarter of a million places, and it was
-// arriving cut off in the middle of a row at exactly five minutes, with no
+// build's disposition register is a quarter of a million places, and it
+// arrives cut off in the middle of a row at exactly five minutes, with no
 // marker, because the connection is closed under the handler rather than a
 // write failing. A file that simply stops is a file somebody reads as
 // complete — the very thing the comment on the error path above says.
@@ -137,14 +137,13 @@ const exportStall = 2 * time.Minute
 // writing extends the response's deadline for as long as an export keeps
 // producing.
 //
-// Returns a no-op where the writer underneath cannot take a deadline, which
-// is what a test harness looks like: an export that cannot move the deadline
-// behaves exactly as it did before this existed.
+// Returns a no-op where the writer underneath cannot take a deadline, which is
+// the shape of a test harness: an export that cannot move the deadline behaves
+// as it does without this.
 //
 // Asked of the body writer rather than through the adapter's own unwrap, which
-// panics on a context it did not make — so the sentence above was not true of
-// the one harness that would ever exercise this, and nothing could drive an
-// export but the server itself.
+// panics on a context it did not make — and through the unwrap nothing but the
+// server itself can drive an export.
 func writing(ctx huma.Context) func() {
 	w, ok := ctx.BodyWriter().(http.ResponseWriter)
 	if !ok {
@@ -167,7 +166,7 @@ func writing(ctx huma.Context) func() {
 // declared before the catalog was tightened is still in the database.
 //
 // Anything outside letters, digits, dot, underscore and dash becomes a dash,
-// because what this is for is a file somebody saves and finds again.
+// because this names a file somebody saves and finds again.
 func downloadName(name string) string {
 	kept := make([]rune, 0, len(name))
 	for _, r := range name {
@@ -194,8 +193,8 @@ func downloadName(name string) string {
 //
 // The two formats differ in five places — the content type, the extension,
 // what goes before the rows, how a row is written, and what is said where the
-// file stops early — and in nothing else. Written as two functions they were
-// the same page loop twice, so the incomplete marker had two homes and the
+// file stops early — and in nothing else. Written as two functions they are
+// the same page loop twice, so the incomplete marker has two homes and the
 // stall deadline two ways of being renewed.
 func writeExport(ctx huma.Context, format, name string, out Exporting) {
 	kind := asCSV
@@ -255,8 +254,8 @@ var asCSV = exportFormat{
 		// Padded to the header's width, like every other record that is not a
 		// row. CSV has no comment convention — the `#` is a data character —
 		// so a two-field record above a fifteen-field header is a document a
-		// conformant reader refuses. Every test here had the field-count
-		// check turned off, which is the check that would have said so.
+		// conformant reader refuses, and the field-count check the tests here
+		// run is what catches it.
 		for _, said := range preamble(out, time.Now(), ctx.URL().RawQuery) {
 			_ = w.Write(padded(inert([]string{"# " + said.Label, said.Value}), width))
 		}
@@ -316,12 +315,12 @@ var asJSON = exportFormat{
 
 // eachPage walks an export's rows, a page at a time, until there are none.
 //
-// **Stepping by what came back, and stopping when nothing does.** Stepping by
-// the page size and stopping on a short page reads exportPage as the truth
-// about a store's own page, and it is a guess: a reader whose ceiling is
-// lower returns a short page every time, so the export would end after one of
-// them having written a fraction of the file and said nothing — which is the
-// silent truncation these files exist not to do. Every reader here allows 200
+// Stepping by what came back, and stopping when nothing does. Stepping by the
+// page size and stopping on a short page reads exportPage as the truth about a
+// store's own page, and it is a guess: a reader whose ceiling is lower returns
+// a short page every time, so the export ends after one of them, having
+// written a fraction of the file and said nothing — which is the silent
+// truncation these files exist not to do. Every reader here allows 200
 // or more today. This costs one query at the end and stops that being
 // something anybody has to keep true.
 func eachPage(ctx context.Context, out Exporting,
@@ -389,9 +388,9 @@ func inert(row []string) []string {
 // scoreCell is a severity score as a file states it, and nothing where there
 // is none.
 //
-// Written as a zero, an unscored finding sorted with the genuinely 0.0-rated
+// Written as a zero, an unscored finding sorts with the genuinely 0.0-rated
 // ones at the bottom of a release meeting's spreadsheet, and a filter for
-// "below four" took every one of them. Empty is the only thing a column of
+// "below four" takes every one of them. Empty is the only thing a column of
 // numbers has for "there is no number".
 func scoreCell(scored bool, centi int) string {
 	if !scored {
@@ -413,12 +412,12 @@ func padded(cells []string, width int) []string {
 	return cells
 }
 
-// asKey is what a stated fact is called in JSON: the words it is written in on
+// asKey is the JSON name of a stated fact: the words it is written in on
 // paper, joined the way every other field here is named.
 //
-// Applied to the column names too. Written without it, one document used two
-// conventions: the stated fact's key had underscores and every column name
-// kept the spaces it is read with on paper.
+// Applied to the column names too. Written without it, one document carries
+// two conventions: the stated fact's key has underscores and every column name
+// keeps the spaces it is read with on paper.
 func asKey(label string) string {
 	return strings.ReplaceAll(label, " ", "_")
 }
@@ -514,13 +513,13 @@ func registerExport(api huma.API, in Ingest) {
 
 // registerAnywhereExport is the cross-product findings list as a file.
 //
-// The per-product export existed and this did not, so the one screen that
-// answers "what is open anywhere" was the one screen whose answer could not
-// leave the application — which is the screen somebody reporting to a manager
-// is on. It is the same query the cross-product list reads, paged and written
-// as it goes, with the product as a column because it is the thing that varies.
+// The same query the cross-product list reads, paged and written as it goes,
+// with the product as a column because it is the thing that varies. Without
+// it, the one screen covering the whole estate is the one screen whose answer
+// cannot leave the application — which is the screen somebody reporting to a
+// manager is on.
 //
-// **The triage line is per product here**, so the file cannot name one. It
+// The triage line is per product here, so the file cannot name one. It
 // says so rather than naming a number that would be wrong for every product
 // but one.
 func registerAnywhereExport(api huma.API, in Ingest) {
