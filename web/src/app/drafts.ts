@@ -267,10 +267,10 @@ export function forgetSession() {
   } catch {
     // A browser that refuses storage has nothing to clear.
   }
-  // The place somebody was in each list they were reading. Its own module because
-  // it is written on every scroll and this one is loaded with the frame, and
-  // cleared from here because sign-out is the one place that knows every
-  // session-scoped thing has to go.
+  // The place somebody was in each list they were reading. Its own module
+  // because it is written on every scroll and this one is loaded with the
+  // frame, and cleared from here because sign-out is the one place that knows
+  // every session-scoped thing has to go.
   forgetPlaces();
 }
 

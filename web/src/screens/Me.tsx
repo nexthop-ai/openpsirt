@@ -167,7 +167,7 @@ function Digest({
             <input
               type="checkbox"
               checked={unassigned}
-              // Asking for the second without the first is refused by the
+              // A request for the second without the first is refused by the
               // server, so it is not offered here either.
               disabled={!on || set.isPending}
               onChange={(event) => set.mutate({ digest: on, unassigned: event.target.checked })}
@@ -193,13 +193,13 @@ function Tokens() {
   // minted a token lasting an hour rather than refusing to mint one at all.
   const [count, setCount] = useState("30");
   const [product, setProduct] = useState("");
-  // Whether the token carries only the roles that read. The narrowing the
+  // A token carrying only the roles that read. The narrowing the
   // server takes is a list of roles; this offers the one shape somebody
   // actually asks for, which is a credential for a script that only looks.
   const [readOnly, setReadOnly] = useState(false);
   const [unit, setUnit] = useState<Unit>("days");
   const [minted, setMinted] = useState<{ name: string; secret: string } | null>(null);
-  // How long it lasts, or nothing where the box says something that is not a
+  // Its lifetime, or nothing where the box says something that is not a
   // count of them. An expiry is required, so nothing is a reason to refuse
   // rather than a number to invent.
   const lasts = Number.isInteger(Number(count)) && Number(count) >= 1;
@@ -208,9 +208,9 @@ function Tokens() {
     queryKey: ["tokens"],
     queryFn: async () => unwrap(await api.GET("/v1/tokens", {})),
   });
-  // What this person may narrow a token to. Only what they can already read is
-  // listed, because narrowing intersects: a token pinned to something its
-  // owner cannot reach is a token that reaches nothing.
+  // The products this person may narrow a token to. Only what they can already
+  // read is listed, because narrowing intersects: a token pinned to something
+  // its owner cannot reach is a token that reaches nothing.
   const products = useQuery({
     queryKey: ["products"],
     queryFn: async () => unwrap(await api.GET("/v1/products", {})),

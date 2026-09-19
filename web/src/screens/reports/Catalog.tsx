@@ -124,7 +124,7 @@ export function Catalog() {
   );
 }
 
-// Where a file comes from. Built here rather than by the generated client
+// The address a file comes from. Built here rather than by the generated client
 // because it is a link somebody follows rather than a request this page makes
 // — the browser fetches it with the session it already has.
 function vexAt(product: string, stream: string, variant: string) {

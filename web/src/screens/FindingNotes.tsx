@@ -29,7 +29,7 @@ export function Notes({
   product: string;
   vulnerability: string;
   mine: (who: string) => boolean;
-  // Whether the issue has been announced here, which is what decides who may
+  // The issue's disclosure here, which is what decides who may
   // be offered after an @: naming somebody who cannot read it calls them to
   // something they will be refused, and on an undisclosed issue the mention
   // itself says a finding exists.

@@ -36,7 +36,7 @@ type Claimed = NonNullable<
 // image never builds — has no answer at all without this.
 //
 // The claim is ordinary and needs a second person like any other dismissal.
-// What makes it defensible is that it writes a separate decision per issue and
+// It is defensible because it writes a separate decision per issue and
 // per place, each keyed and expiring on its own, rather than one blanket claim.
 export function Together() {
   const { product = "", stream = "", variant = "", component = "" } = useParams();
@@ -96,7 +96,7 @@ export function Together() {
   const everything = issues.data?.total ?? items.length;
   const cap = issues.data?.cap ?? 0;
 
-  // How far the selection reaches, in rows written rather than issues picked.
+  // The selection's reach, in rows written rather than issues picked.
   //
   // The selection spans pages and a page does not, so this remembers every row
   // it has seen rather than summing the page in hand: a selection made across
@@ -399,8 +399,8 @@ function Claim({
   const [reasoning, setReasoning] = useState("");
 
   const needsJustification = outcome === "not-applicable";
-  // What the two bulk outcomes need beside a reasoning. Asked for here rather
-  // than discovered as a refusal after the reasoning is typed.
+  // The evidence the two bulk outcomes need beside a reasoning. Asked for here
+  // rather than discovered as a refusal after the reasoning is typed.
   const needsDate = outcome === "deferred";
   const needsVersion = outcome === "already-fixed";
   const ready =

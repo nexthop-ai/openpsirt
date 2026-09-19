@@ -225,7 +225,7 @@ function Pick({
   onPick,
 }: {
   people: { identity: string; name: string }[];
-  // Whether the list of people could be read at all. An empty list and a list
+  // A readable list of people at all. An empty list and a list
   // nobody could fetch look alike, and only the first of them means the team
   // already holds everybody.
   unread: boolean;

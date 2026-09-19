@@ -35,7 +35,7 @@ import { fromAt, listQuery, pathTo, where, windowFor } from "./list";
 // timeline, the revision history, the comments, and the decisions made at this
 // place before, whose reasoning is offered back.
 
-// Who published the score and whether it is the primary rating, as a reader
+// The score's publisher and its rank, as a reader
 // can use it.
 //
 // A publisher that is a bare identifier is dropped. Half of what arrives here
@@ -53,7 +53,7 @@ function scoredBy(source: string | undefined, kind: string | undefined): string 
     .join(" · ");
 }
 
-// What a step lands on, said in the hover rather than on the button: the
+// A step's landing place, said in the hover rather than on the button: the
 // button says which direction, and which finding is what somebody checks
 // before taking it.
 function neighborly(step: { row: { vulnerability?: string; component?: string } }): string {
@@ -62,12 +62,12 @@ function neighborly(step: { row: { vulnerability?: string; component?: string } 
 
 type Similar = Body<"SimilarBody">;
 
-// How many of the finding's places are asked which decision stood there
+// The places of the finding asked which decision stood there
 // before. The finding carries the earlier decisions themselves; what it does
 // not carry is which place each was at, and reaffirming one needs the place.
 const SAMPLE = 8;
 
-// Why a finding carries no deadline, in words a reader can act on.
+// The reason a finding carries no deadline, in words a reader can act on.
 //
 // Each says what to do with the row rather than naming the rule: somebody
 // reading this is deciding whether to look further, and "below the line" on
@@ -110,16 +110,16 @@ export function Finding() {
   // somebody: reusing an earlier reasoning fills it in and then has to show
   // them what it filled in.
   const form = useRef<HTMLDivElement>(null);
-  // Where the confirmation is drawn. It sits at the head of the screen, above
-  // everything the finding says, and the button that produces it is at the
-  // foot of the decision form — so somebody pressing submit was left looking
-  // at the form they had just sent, with the answer a page and a half above
-  // them and nothing saying anything had happened.
+  // The place the confirmation is drawn. It sits at the head of the screen,
+  // above everything the finding says, and the button that produces it is at
+  // the foot of the decision form — so somebody pressing submit was left
+  // looking at the form they had just sent, with the answer a page and a half
+  // above them and nothing saying anything had happened.
   const confirmation = useRef<HTMLDivElement>(null);
-  // Which finding the screen is on. A params-only change does not remount it,
+  // The finding the screen is on. A params-only change does not remount it,
   // so anything below that belongs to one finding has to say which.
   const oneFinding = `${vulnerability}|${component}|${version}`;
-  // What the decision form starts from, and how many times it has been given
+  // The decision form's starting point, and how many times it has been given
   // one. Starting from something is a fresh form rather than an edit to the one
   // on screen, so the count is what the form is mounted against — two prefills
   // carrying the same words are still two, and the second has to take.
@@ -133,17 +133,18 @@ export function Finding() {
       outcome?: string;
       justification?: string;
       reasoning?: string;
-      // How long a deferral it offers, which the form turns into a date as it
-      // opens. Only a prepared rule carries one: a length is what a rule means
-      // by "put this off for a quarter", and a date saved months ago is not.
+      // The length of the deferral it offers, which the form turns into a date
+      // as it opens. Only a prepared rule carries one: a length is what a rule
+      // means by "put this off for a quarter", and a date saved months ago is
+      // not.
       deferDays?: number;
       // Cited, never applied: what a VEX document said is not this claim, and
       // this is what lets a later revision to it be noticed.
       fromStatement?: number;
     } | null;
   }>({ at: oneFinding, n: 0, from: null });
-  // What was started from on the finding being read, which is nothing on one
-  // the count was not raised on.
+  // The statement started from on the finding being read, which is nothing on
+  // one the count was not raised on.
   const own = prefill.at === oneFinding ? prefill : { at: oneFinding, n: 0, from: null };
   function startFrom(from: (typeof prefill)["from"]) {
     setPrefill({ at: oneFinding, n: own.n + 1, from });
@@ -157,7 +158,7 @@ export function Finding() {
   // personal and a name they have not kept is a name that is not there.
   const rule = params.get("rule") ?? "";
   const rules = useKept(product, rule !== "");
-  // What that filter prepares, in the words the form takes, and whether it
+  // The claim that filter prepares, in the words the form takes, and whether it
   // prepares something no form can be submitted from. A rule prepares a claim
   // and a person proposes it: this fills the form in and nothing else.
   const offered = useMemo(() => {
@@ -180,10 +181,10 @@ export function Finding() {
     };
   }, [rules.data, rule]);
   const prepared = offered.from;
-  // What the form opens with, and what it is mounted against. Somebody who has
-  // started from something on this finding has said which prefill they want, so
-  // theirs wins and clearing it clears the rule's too — the rule fills a form
-  // nobody has answered yet, not one somebody is working in.
+  // The form's opening values, and the thing it is mounted against. Somebody
+  // who has started from something on this finding has said which prefill they
+  // want, so theirs wins and clearing it clears the rule's too — the rule fills
+  // a form nobody has answered yet, not one somebody is working in.
   const opening = own.n > 0 ? own.from : prepared;
   const opened =
     own.n > 0 ? `own:${oneFinding}:${own.n}` : `rule:${prepared ? rule : ""}:${oneFinding}`;
@@ -285,7 +286,7 @@ export function Finding() {
         unwrap(await api.GET("/v1/decisions/{id}", { params: { path: { id } } })),
     })),
   });
-  // Which place each earlier decision was at, for reaffirming it.
+  // The place each earlier decision was at, for reaffirming it.
   const openPlaces = places.filter((p) => p.decision == null).slice(0, SAMPLE);
   const history = useQueries({
     queries: ((it?.previous ?? []).some((p) => p.ended === "lapsed") ? openPlaces : []).map(
@@ -361,18 +362,18 @@ export function Finding() {
     place: placeOf.get(p.decision_id) ?? "",
   }));
   const similar: Similar[] = it.similar ?? [];
-  // What another product decided about this same issue at this same place.
+  // Another product's decision about this same issue at this same place.
   // Evidence and a prefill, never an outcome: what is shipped around a
   // component differs between products, which is the whole reason a place is a
   // component at a position rather than a component.
   const elsewhere = it.elsewhere ?? [];
-  // Whether anything here is still to answer. One named predicate rather than
+  // Anything here still to answer. One named predicate rather than
   // the same test written at four sites: the fifth was written in a different
   // unit — a count of distinct places against a count of chain rows — and
   // could never be false, which read as a second safety check and was none.
   const undecided = places.some((place) => place.decision == null);
-  // What VEX documents say: a third layer beside what the build claims and
-  // what we decided. Shown, offered as a prefill, never applied.
+  // The VEX documents' own claims: a third layer beside what the build claims
+  // and what we decided. Shown, offered as a prefill, never applied.
   const vex = it.vex ?? [];
 
   // Counted as places, the way the decision counts them, not as chain rows.

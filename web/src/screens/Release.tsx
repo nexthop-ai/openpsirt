@@ -39,7 +39,7 @@ export function Release({ product, stream }: { product: string; stream: string }
   const here = rows.find((row) => row.name === stream);
   const variants = built.data?.items ?? [];
 
-  // What each variant of this release holds, by severity. Asked per variant
+  // Each variant's own counts for this release, by severity. Asked per variant
   // rather than added as an endpoint: a release is built two or three ways,
   // and an answer worked out when it is asked for beats a total kept somewhere
   // that can go stale.

@@ -16,7 +16,7 @@ import { bandOf } from "../ui/severities";
 // It takes what it draws and holds none of it, so a row is the only source of
 // that row's product — which is what stops the path's product being used by
 // accident on the list that spans every product, where there is none.
-// How long this has been open here.
+// The age of this finding here.
 //
 // The finding's own age, not the year in the identifier: an issue assigned in
 // 2019 that first appeared in this product last week has been somebody's
@@ -31,7 +31,7 @@ function openFor(opened: string | undefined): string | null {
   return `open ${Math.floor(days / 365)}y`;
 }
 
-// What to say in the Due column, and how to color it.
+// The words for the Due column, and its color.
 //
 // A blank cell would mean any of several deliberate things at once, on the one
 // screen whose purpose is noticing what is running out, so the reason is said.
@@ -57,7 +57,7 @@ function dueSays(row: { due?: string; days_left?: number; no_deadline?: string }
   return { text: row.due, tone: "fine" };
 }
 
-// What upstream has done, said rather than left to be inferred from a blank.
+// Upstream's own answer, stated rather than left to be inferred from a blank.
 function upstreamSays(state: string | undefined, fixedIn: string | undefined) {
   if (fixedIn) return { text: fixedIn, kind: "id" as const };
   switch (state) {
@@ -102,15 +102,15 @@ export function FindingsTable({
   picked: Map<string, Row>;
   pick: (key: string, row: Row, on: boolean) => void;
   pickAll: (rows: Row[], keys: string[], on: boolean) => void;
-  // Whether the list spans every product, which is what decides the extra
+  // A list spanning every product, which is what decides the extra
   // column — and `columns`, which is how many the preview row has to span.
   spanning: boolean;
   columns: number;
   oneBuild: boolean;
   sortable: (label: keyof typeof SORTS) => React.ReactNode;
-  // Which build a row's actions and links are about.
+  // The build a row's actions and links are about.
   buildOf: (row: Row) => { product: string; stream: string; variant: string };
-  // How many other rows on this page are the same issue at another binary of
+  // The other rows on this page that are the same issue at another binary of
   // one source package.
   siblings: Map<string, number>;
   // The list's own address as a row carries it, so a finding can walk back to
@@ -121,10 +121,10 @@ export function FindingsTable({
   hide: (component: string) => void;
   peeking: string | null;
   setPeeking: (key: string | null) => void;
-  // What to do once a row has been decided where it sits: the list is read
+  // The act once a row has been decided where it sits: the list is read
   // again, because the state the row draws has moved.
   onDecided: () => void;
-  // Which row the keys are about, by its position on the page. Drawn rather
+  // The row the keys are about, by its position on the page. Drawn rather
   // than only acted on: a cursor nobody can see is a key that appears to do
   // nothing.
   cursor: number;
@@ -174,7 +174,7 @@ export function FindingsTable({
             {rows.map((row, i) => {
               const key = `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
               const at = pathTo(buildOf(row), row, carrying, prepared?.name);
-              // How far it is decided comes from the server, defined the
+              // Its decision state comes from the server, defined the
               // way the state filter defines it; a row does not guess from
               // what the build argued away, which is a different claim by
               // a different author.

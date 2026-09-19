@@ -14,7 +14,7 @@ import { Wide } from "../../ui/Wide";
 // build a spreadsheet against.
 import { BANDS } from "../../ui/severities";
 
-// Whether the backlog is growing, and what kind of thing is making it grow.
+// The direction of the backlog, and the kind of thing making it move.
 //
 // The first question a manager asks, and it was a panel on the home screen
 // at a fixed twelve weeks — no name, no window, no file, and no way to ask

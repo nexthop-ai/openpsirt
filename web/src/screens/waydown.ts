@@ -46,7 +46,7 @@ export function wayDown(place: Sitting, version?: string): WayDown {
   return { steps: [here], rootless: true };
 }
 
-// Where the dependency tree should open from a finding: the place the graph
+// The place the dependency tree opens from a finding: the place the graph
 // could be walked to, whichever of them that is, as the query the tree takes.
 //
 // The tree opens along a chain, expanding each step. Handed a place with no

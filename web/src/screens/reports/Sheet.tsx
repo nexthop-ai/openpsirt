@@ -22,11 +22,11 @@ export function Sheet({
 }: {
   name: string;
   answers: string;
-  // What was asked for beyond the scope, where the report has controls of its
+  // The parameters beyond the scope, where the report has controls of its
   // own. The controls themselves do not print, so a sheet whose figures cover
   // ninety days and does not say so is a sheet nobody can check.
   asked?: string;
-  // Whether every figure on it has arrived. A printed sheet is a record, and
+  // Every figure on it arrived. A printed sheet is a record, and
   // this one stamps the moment it was taken on itself — so a sheet printed
   // while its reads are in flight, or after one of them failed, is a dated
   // document stating figures nobody computed.

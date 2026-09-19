@@ -23,7 +23,7 @@ import {
 } from "./Window";
 import { Wide } from "../../ui/Wide";
 
-// How long the figures cover. Thirty days is the window the remediation
+// The window the figures cover. Thirty days is the window the remediation
 // metrics names and the one people quote; the others are here because a month
 // is too short to see a quarter's shape and too long to see this week's.
 const WINDOWS = [7, 30, 90] as const;
@@ -62,7 +62,7 @@ function openFor(at: Parameters<typeof findingsPath>[0], days: number): string {
   return `${findingsPath(at)}?${asked.toString()}`;
 }
 
-// How the work is going, rather than what the work is: how fast things are
+// The state of the work, rather than the work itself: how fast things are
 // fixed, what is aging, how long a judgment waits for a second person, what
 // keeps being put off, and what has been argued away.
 //
@@ -78,9 +78,10 @@ export function Overview() {
   const [params] = useSearchParams();
   const days = daysAsked(params, 30);
   const period = periodAsked(params);
-  // What every figure on this sheet covers, and what the lists it links to
-  // have to be narrowed by. One value, because a heading saying one stretch
-  // over a list showing another is the failure this sheet is easiest to ship.
+  // The window every figure on this sheet covers, and the one the lists it
+  // links to have to be narrowed by. One value, because a heading saying one
+  // stretch over a list showing another is the failure this sheet is easiest to
+  // ship.
   const when = asked(period, days);
   // A period naming only its end still runs from the beginning, so there is
   // no date to narrow a list by — and a list narrowed by an empty one opens
@@ -92,7 +93,7 @@ export function Overview() {
     queryFn: async () =>
       unwrap(await api.GET("/v1/remediation", { params: { query: { ...when, ...scope } } })),
   });
-  // What has been argued away, which is what an auditor asks for first.
+  // The findings argued away, which is what an auditor asks for first.
   //
   // All three dismissals, read together because what they have in common
   // is that nothing was changed: "not applicable" claims the code is not
@@ -550,9 +551,9 @@ export function Overview() {
   );
 }
 
-// Where what keeps being put off comes from as a file. A link somebody
-// follows rather than a request this page makes, narrowed the way the panel
-// above it is.
+// The address the repeatedly-deferred list comes from as a file. A link
+// somebody follows rather than a request this page makes, narrowed the way the
+// panel above it is.
 function repeatsFile(product: string, format: string): string {
   const asked = product ? `?product=${encodeURIComponent(product)}` : "";
   return `/v1/deferrals/repeated.${format}${asked}`;

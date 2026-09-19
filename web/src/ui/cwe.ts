@@ -87,10 +87,10 @@ export function nameOf(id: string): string {
   return NAMES.get(id.trim().toUpperCase()) ?? "";
 }
 
-// The place to read about it, built from the identifier rather than stored — the
-// same way an issue's own record and a package's page are. Nothing is fetched.
-// An identifier that is not a CWE number has nowhere to go, which includes the
-// two words above.
+// The place to read about it, built from the identifier rather than stored —
+// the same way an issue's own record and a package's page are. Nothing is
+// fetched. An identifier that is not a CWE number has nowhere to go, which
+// includes the two words above.
 export function readAbout(id: string): string | null {
   const number = /^CWE-(\d+)$/.exec(id.trim().toUpperCase());
   if (!number) return null;

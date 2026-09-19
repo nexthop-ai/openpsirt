@@ -9,7 +9,7 @@ import { Loading } from "../../ui/Loading";
 import { Sheet } from "./Sheet";
 import { Wide } from "../../ui/Wide";
 
-// What is still shipped and no longer maintained.
+// The releases still shipped and no longer maintained.
 //
 // This is the pile that dropped out of every deadline figure by design.
 // Past end-of-life the deadline comes off every open finding on a release, so
@@ -24,8 +24,8 @@ export function Support() {
   const at = useScope();
   const scope = scopeQuery(at);
   const [params, setParams] = useSearchParams();
-  // How far ahead to warn. Nothing by default, because this report is about
-  // what has already gone and a second population appearing unasked would
+  // The distance ahead to warn. Nothing by default, because this report is
+  // about what has already gone and a second population appearing unasked would
   // change what the figures at the top of it count.
   const within = aheadAsked(params);
   const ended = useQuery({
@@ -212,7 +212,7 @@ export function Support() {
   );
 }
 
-// How far ahead the sheet offers to warn. Nothing, a month, a quarter: the
+// The windows the sheet offers to warn over. Nothing, a month, a quarter: the
 // horizons a release plan is written in.
 const AHEAD = [0, 30, 90] as const;
 
@@ -231,21 +231,22 @@ function aheadAsked(params: URLSearchParams): number {
   return Math.floor(days);
 }
 
-// Where the file comes from. A link somebody follows rather than a request
-// this page makes, so the browser fetches it with the session it already has.
+// The address the file comes from. A link somebody follows rather than a
+// request this page makes, so the browser fetches it with the session it
+// already has.
 function fileAt(format: string, asked: string): string {
   return `/v1/releases/out-of-support.${format}${asked ? `?${asked}` : ""}`;
 }
 
-// What is open on one release, as the findings list would show it.
+// The findings open on one release, as the findings list shows them.
 //
 // The two filters the list applies to itself are stated rather than left to
 // default: it keeps to branches in support unless told otherwise, and every
 // release here is out of support, so the default answers nothing. The kind is
-// the release's own, because a branch can be past end-of-life too.
-// What is open on a release that has not gone yet. The same list, without the
-// past-end-of-life filter: this one is still in support, which is what makes
-// it something somebody can still act on.
+// the release's own, because a branch can be past end-of-life too. The findings
+// open on a release that has not gone yet. The same list, without the
+// past-end-of-life filter: this one is still in support, which is what makes it
+// something somebody can still act on.
 function endingAt(product: string, stream: string, kind: string): string {
   const asked = new URLSearchParams({ stream });
   asked.set("on", kind === "tag" ? "tag" : "branch");

@@ -49,7 +49,7 @@ export function Work() {
   // Whose work is being looked at on the second tab. Empty is the roll-up of
   // everybody; a name is that holder's list.
   //
-  // Which kind of holder, because a team is not a person. Work goes to a
+  // The kind of holder, because a team is not a person. Work goes to a
   // team by standing rule and by an assignment naming one, and the totals list
   // says a team holds it — but the person's route resolves an identity, so a
   // team's name matched nobody and the screen answered "they are not holding
@@ -323,7 +323,7 @@ function ByPerson({
   );
 }
 
-// What one person is dealing with, in the same units as what nobody is: one
+// One person's own work, in the same units as what nobody is dealing with: one
 // row per issue in a component in a product, not one per build. The same code
 // built several ways is one piece of work and was taken on as one.
 function Held({

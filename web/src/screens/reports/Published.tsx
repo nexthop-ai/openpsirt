@@ -18,11 +18,11 @@ import {
 } from "./Window";
 import { Wide } from "../../ui/Wide";
 
-// How far back to look. A year by default, because publishing is rare enough
-// that a month of it is usually nothing and reads as a tool that is not working.
+// The window back. A year by default, because publishing is rare enough that a
+// month of it is usually nothing and reads as a tool that is not working.
 const WINDOWS = [90, 365, 3650] as const;
 
-// What has been published, and what was published twice.
+// The advisories published, and the ones published twice.
 //
 // Answered per flaw until now. That is the right shape for somebody about
 // to publish a revision — has one gone out, and is what is out still what we

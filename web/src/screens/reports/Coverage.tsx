@@ -11,7 +11,7 @@ import { on } from "../../ui/when";
 import { Sheet } from "./Sheet";
 import { Wide } from "../../ui/Wide";
 
-// What is being scanned, and what has gone silent.
+// The builds being scanned, and the ones that have gone silent.
 //
 // Every other number here is worthless if a build stopped being scanned,
 // and silence looks exactly like health: a build nothing arrives for reports
@@ -179,8 +179,9 @@ export function Coverage() {
   );
 }
 
-// Where the file comes from. A link somebody follows rather than a request
-// this page makes, so the browser fetches it with the session it already has.
+// The address the file comes from. A link somebody follows rather than a
+// request this page makes, so the browser fetches it with the session it
+// already has.
 function fileAt(format: string, asked: string): string {
   return `/v1/scanning.${format}${asked ? `?${asked}` : ""}`;
 }

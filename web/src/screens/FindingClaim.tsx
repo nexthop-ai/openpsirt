@@ -1,4 +1,4 @@
-// What has been claimed about this finding, and what happened to it.
+// The claims made about this finding, and their fate.
 //
 // The state the head reads, the timeline, the revisions a claim went through,
 // the comments on it, and the judgments made at this place before — whose
@@ -95,7 +95,7 @@ export function Standing({
   // same number; one call here used the claim's and the rest used the
   // summary's, which is a disagreement waiting for the day the pair is wrong.
   const id = claim.decision?.claim_id ?? summary?.claim_id ?? 0;
-  // Which places this claim covers, named rather than counted. A count says
+  // The places this claim covers, named rather than counted. A count says
   // how big the judgment was and not which code it was about, and on a finding
   // that is only partly decided that is the question somebody has.
   const covers = places
@@ -110,7 +110,7 @@ export function Standing({
     [rows.proposed ?? 0, rows.sent_back ?? 0, rows.approved ?? 0].filter((n) => n > 0).length > 1;
   const sentBackAt = summary?.sent_back_at ?? claim.decision?.sent_back_at;
   const queries = useQueryClient();
-  // Where this claim's work is happening. Stored and never fetched.
+  // The place this claim's work is happening. Stored and never fetched.
   const point = useMutation({
     mutationFn: async (where: string) =>
       unwrap(
@@ -497,7 +497,7 @@ export function Comments({
   // The issue a file would be attached to. Comments are written about one, so
   // the control can say what it is attaching to rather than guessing.
   about: { product: string; vulnerability: string };
-  // Whether what is being discussed has been announced, which is what decides
+  // The disclosure of the thing being discussed, which is what decides
   // who may be offered after an @: naming somebody who cannot open the finding
   // calls them to something they will be refused, and on an undisclosed one
   // the mention itself says a finding exists.

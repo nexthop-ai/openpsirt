@@ -4,7 +4,7 @@ import { unwrap } from "../api/queries";
 import { type Holding, ROLES, wouldReachNothing } from "../ui/roles";
 import { Wide } from "../ui/Wide";
 
-// Who holds what, as a grid of products against capabilities.
+// The grants in force, as a grid of products against capabilities.
 //
 // It was a list of chips and a three-control form. Granting meant picking a
 // product, picking a role, pressing Grant, and reading the result back out of a
@@ -81,7 +81,7 @@ export function Access({
     );
   }
 
-  // What this person holds that bears on a product: a role on the product
+  // The grants that bear on a product: a role on the product
   // itself, or one held across the estate. Narrowed here because this is the
   // thing that knows how a product is spelled in each place — a held role
   // names it as it is shown and a grant names it as the API takes it — and

@@ -35,7 +35,7 @@ import { Wide } from "../ui/Wide";
 // about the one asked for and says what the others are.
 type Build = Body<"PerBuildBody">;
 
-// How many versions to offer before the rest are a count. A kernel names
+// The versions offered before the rest are a count. A kernel names
 // twenty, and the question is which to take rather than what the whole set is.
 const SHOWN = 5;
 
@@ -70,7 +70,7 @@ export function Component() {
   });
   const rows = useMemo(() => builds.data?.items ?? [], [builds.data]);
 
-  // Which of them the page is about. The address names it, so a link from the
+  // The one the page is about. The address names it, so a link from the
   // tree or from a findings list arrives on what somebody was reading.
   const stream = params.get("stream") ?? "";
   const variant = params.get("variant") ?? "";
@@ -123,9 +123,9 @@ export function Component() {
   }
 
   const sameVersion = rows.filter((row) => row.version === here.version);
-  // Where the package is published, as the server worked it out. This screen
-  // had a table of its own in a second language, with a different membership
-  // and different answers for the same identifier — it sent every
+  // The index the package is published on, as the server worked it out. This
+  // screen had a table of its own in a second language, with a different
+  // membership and different answers for the same identifier — it sent every
   // Debian-family package to Debian's tracker, so an Ubuntu package's link
   // landed on a record for different code with a different version history and
   // a different advisory status, while the server's own link for the same
@@ -232,7 +232,7 @@ export function Component() {
                     {here.project_url.replace(/^https?:\/\//, "")}
                   </Outward>
                 ) : link ? (
-                  // What the record is, not what its address spells. Which
+                  // The record itself, not what its address spells. Which
                   // distribution's or which index's page this is decides
                   // whether it answers the question a reader has, and a
                   // hostname makes them work that out — the server names it
@@ -304,7 +304,7 @@ export function Component() {
   );
 }
 
-// Where the package sits, drawn as the chain it sits in.
+// The package's place, drawn as the chain it sits in.
 //
 // Per build, because an edge is a fact about one: the same library is pulled in
 // by different things in different builds. The build comes from the rows rather
@@ -499,7 +499,8 @@ function Sits({
   );
 }
 
-// Where the fixes landed: each release the findings name, and what it fixed.
+// The releases the fixes landed in: each one the findings name, and what it
+// fixed.
 //
 // Two counts, because they answer different questions. What a release fixed is
 // how many name that exact version — its own security content. What reaching it
@@ -583,9 +584,9 @@ function Landed({ here }: { here: Build }) {
 // carries it.
 //
 // The releases are chosen here, ticked to the ones shipping this version,
-// rather than in a column of the table below. The rest of the promise is written
-// here, and a control that summons a form from somewhere else is one nobody
-// finds.
+// rather than in a column of the table below. The rest of the promise is
+// written here, and a control that summons a form from somewhere else is one
+// nobody finds.
 function Upgrade({
   product,
   component,
@@ -853,7 +854,7 @@ function Upgrade({
   );
 }
 
-// What each release ships, and what is open against it there.
+// The version each release ships, and what is open against it there.
 function Ships({
   product,
   component,

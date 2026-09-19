@@ -10,14 +10,14 @@ import { Because } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 
-// What became of what you proposed.
+// The fate of what you proposed.
 //
 // A whole tab of the review queue with its own endpoint, sharing nothing with
 // the claims waiting for a second person but the offset in the address. A
 // different question asked of a different list: the cards next door exist to
 // be judged from, and this exists to be read down.
 
-// What became of each claim this person proposed.
+// The fate of each claim this person proposed.
 //
 // A table rather than cards: the question here is not "should this be agreed
 // to" — it has already been answered — it is "what happened to the things I

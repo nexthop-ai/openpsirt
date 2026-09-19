@@ -26,10 +26,10 @@ export const api = createClient<paths>({
 // csrfCookie is the value a page has to echo on a write.
 //
 // Exported so the preference below can be pinned: it is a control, and a
-// control nobody has watched fail is a control nobody has tested. It is deliberately
-// readable by script, where the session cookie is not — that asymmetry is what
-// makes echoing it evidence the request came from a page rather than from a
-// form somebody else's site submitted.
+// control nobody has watched fail is a control nobody has tested. It is
+// deliberately readable by script, where the session cookie is not — that
+// asymmetry is what makes echoing it evidence the request came from a page
+// rather than from a form somebody else's site submitted.
 //
 // Held under two names: over TLS the server sets it with the `__Host-` prefix,
 // which is what stops a sibling host writing one for this deployment to read,

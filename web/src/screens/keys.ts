@@ -12,7 +12,7 @@
 
 export type Meaning = "next" | "previous" | "open" | "close" | "openFull" | null;
 
-// Whether what has focus takes typing, in which case no key here means
+// A focused control that takes typing, in which case no key here means
 // anything. A contenteditable is the editor's own body, which is where a
 // reasoning is written.
 export function typingIn(element: Element | null): boolean {
@@ -22,7 +22,7 @@ export function typingIn(element: Element | null): boolean {
   return (element as HTMLElement).isContentEditable === true;
 }
 
-// Whether Enter already belongs to whatever has focus.
+// An Enter that already belongs to whatever has focus.
 //
 // A button's activation *is* the default action of the keydown, so taking
 // Enter here and preventing the default takes the button with it: opening a
@@ -36,7 +36,7 @@ export function activates(element: Element | null): boolean {
   return tag === "A" && element.hasAttribute("href");
 }
 
-// What a keypress means over the rows.
+// A keypress's meaning over the rows.
 //
 // A modifier makes it somebody else's: `Meta+K` is the browser's, and
 // `Ctrl+N` is a new window. Only the bare key is ours.
@@ -64,7 +64,7 @@ export function meansFor(
   }
 }
 
-// Where the cursor lands, given where it was and how many rows there are.
+// The cursor's landing place, given where it was and how many rows there are.
 //
 // It stops at each end rather than wrapping: a list is paged, so wrapping from
 // the last row to the first says the page is the whole of it. Nothing selected

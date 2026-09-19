@@ -16,8 +16,8 @@ describe("offering a person in a picker", () => {
   });
 
   it("resolves only what somebody was actually offered", () => {
-    // The reason the button stays disabled. Neither picker can bring anybody into
-    // the deployment, so a name matching nobody is refused by the server —
+    // The reason the button stays disabled. Neither picker can bring anybody
+    // into the deployment, so a name matching nobody is refused by the server —
     // and being refused after typing is a worse way to learn that.
     expect(whoIs("Ana Ruiz (def456)", people)).toBe("def456");
     expect(whoIs("ben", people)).toBe("ben");

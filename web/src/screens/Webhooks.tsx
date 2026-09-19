@@ -8,7 +8,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Wide } from "../ui/Wide";
 
-// Where this deployment posts what it has to say, and whether it is arriving.
+// The destinations this deployment posts to, and whether anything is arriving.
 //
 // Webhooks, not "where things are sent". One signed request rather than an
 // adapter each: Slack, Teams, a tracker driven by automation and paging all
@@ -20,7 +20,7 @@ import { Wide } from "../ui/Wide";
 //
 // Two panels, because they answer to two readers. Configuring one is
 // administration and belongs beside the other things a deployment is set to.
-// Whether one is arriving is operations, and belongs beside the queues — a
+// Delivery is operations, and belongs beside the queues — a
 // destination that has been refusing for a week looks exactly like a
 // destination nothing has been sent to, which is the failure the system screen
 // exists to make visible.
@@ -50,13 +50,13 @@ function useDestinations() {
   });
 }
 
-// What a kind reads as. A destination taking everything says so in a word
+// A kind's own word. A destination taking everything says so in a word
 // rather than in the wildcard the address is stored with.
 function kindOf(kind?: string) {
   return kind === "*" ? "everything" : kind;
 }
 
-// How many are failing, and why the last one did.
+// The number failing, and the reason the last one did.
 function Failing({ row }: { row: Destination }) {
   if ((row.failing ?? 0) === 0) return <span style={{ color: "var(--faint)" }}>none</span>;
   return (

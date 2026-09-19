@@ -22,10 +22,10 @@ import { Wide } from "../../ui/Wide";
 // planning meeting.
 const WINDOWS = [30, 90, 365] as const;
 
-// How many rows the sheet carries. What it is read for is the top of the list.
+// The rows the sheet carries. It is read for the top of the list.
 const SHOWN = 50;
 
-// Where the work went.
+// The work's destination.
 //
 // Every other report here counts the backlog — what is open, what is
 // overdue, how long things wait. None of them says what the quarter actually

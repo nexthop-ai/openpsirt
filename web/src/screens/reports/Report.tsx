@@ -10,7 +10,7 @@ import { Register } from "./Register";
 import { Scrutiny } from "./Scrutiny";
 import { Support } from "./Support";
 
-// Which page a report address draws.
+// The page a report address draws.
 //
 // One route through this map rather than a route per report, so the list
 // somebody reads and the addresses that answer cannot come apart: a name in

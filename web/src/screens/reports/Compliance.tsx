@@ -11,7 +11,7 @@ import { Sheet } from "./Sheet";
 import { PeriodPicker, asked, coveringPeriod, periodAsked, stated } from "./Window";
 import { Wide } from "../../ui/Wide";
 
-// Whether work met the dates policy set for it.
+// The work that met the dates policy set for it, and the work that did not.
 //
 // The question a manager asks first, and it was answered by one figure with
 // nothing behind it. A single percentage cannot be acted on: it does not say

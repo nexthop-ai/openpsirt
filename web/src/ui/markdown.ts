@@ -161,8 +161,8 @@ function issuePath(identifier: string): string {
   return `/issues/${encodeURIComponent(identifier)}`;
 }
 
-// The address one is actually fetched from. Same origin, so the content security
-// policy permits it and the request carries who is asking.
+// The address one is actually fetched from. Same origin, so the content
+// security policy permits it and the request carries who is asking.
 function fetchPath(token: string): string {
   return `/v1/attachments/${token}`;
 }

@@ -38,9 +38,9 @@ export function AutoAssignment() {
     queryFn: async () => unwrap(await api.GET("/v1/teams", {})),
     retry: false,
   });
-  // What the product actually holds, to offer back as somebody types. A rule
-  // keyed on a name nothing is called places nothing, silently — which is the
-  // worst way for a rule to be wrong, because it looks like a rule.
+  // The components the product actually holds, to offer back as somebody types.
+  // A rule keyed on a name nothing is called places nothing, silently — which
+  // is the worst way for a rule to be wrong, because it looks like a rule.
   //
   // One read per field rather than one shared between them. Sharing looked
   // tidier and was wrong: the two fields are filled one after the other, so a
@@ -78,8 +78,8 @@ export function AutoAssignment() {
     }) as const;
   const bySource = useQuery(search(upstream));
   const byName = useQuery(search(beneath));
-  // What a rule can name here: the source package where one is recorded, and
-  // the component's own name where it is not — which is exactly what a
+  // The names a rule can use here: the source package where one is recorded,
+  // and the component's own name where it is not — which is exactly what a
   // source-package rule matches on.
   const sources = [
     ...new Set(
@@ -90,9 +90,9 @@ export function AutoAssignment() {
     Boolean,
   );
 
-  // What the keys as typed would catch, before anything is saved. A rule that
-  // sweeps thousands of findings on a guess is only found out afterwards, by
-  // which time they are on somebody's queue.
+  // The findings the keys as typed would catch, before anything is saved. A
+  // rule that sweeps thousands of findings on a guess is only found out
+  // afterwards, by which time they are on somebody's queue.
   const asked = upstream.trim() !== "" || beneath.trim() !== "";
   const catches = useQuery({
     enabled: product !== "" && asked,
@@ -114,7 +114,7 @@ export function AutoAssignment() {
   // until this, saving it anyway was still allowed, and the resulting rule's
   // only symptom is work quietly never being placed.
   const catchesNothing = asked && catches.isSuccess && (catches.data?.total ?? 0) === 0;
-  // Where a source-package term matches no source package, what it does match
+  // With a source-package term matching no source package, what it does match
   // is often component names — and those name a source package of their own,
   // which is the thing the person meant. Read off the lookup that is already
   // running for the field's own list, so this costs no extra request.

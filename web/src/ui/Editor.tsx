@@ -62,9 +62,9 @@ export function Editor({
 }: {
   value: string;
   onChange: (next: string) => void;
-  // The place an unsent draft is kept. Text somebody typed is theirs, and losing
-  // it to a failed request, an expired session or a closed tab is the thing
-  // that teaches people to write less.
+  // The place an unsent draft is kept. Text somebody typed is theirs, and
+  // losing it to a failed request, an expired session or a closed tab is the
+  // thing that teaches people to write less.
   draftKey?: string;
   rows?: number;
   placeholder?: string;

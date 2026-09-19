@@ -21,7 +21,7 @@ import {
 } from "./Window";
 import { Wide } from "../../ui/Wide";
 
-// How long back to look. Ninety days is a quarter, which is the period an
+// The window back. Ninety days is a quarter, which is the period an
 // audit asks about; the others are here because a control question is
 // sometimes about this month and sometimes about the whole record.
 //
@@ -37,13 +37,13 @@ const WINDOWS = [30, 90, 365, 3650] as const;
 // standing alone, and the table has to say which it is looking at.
 const DISMISSALS = new Set(["not-applicable", "wont-fix", "already-fixed"]);
 
-// How many rows each section carries. Sent rather than left to the server's
+// The rows each section carries. Sent rather than left to the server's
 // default, because the number has to be the one the notice below quotes: a
 // sheet saying "a section reached the limit" without saying what the limit was
 // is a sheet nobody can check, and this is a printed record.
 const SECTION = 100;
 
-// How much a second pair of eyes actually did.
+// The work a second pair of eyes actually did.
 //
 // Not a list of people who broke the rule. The rule cannot be broken:
 // approving refuses the proposer and refuses the author of the revision being

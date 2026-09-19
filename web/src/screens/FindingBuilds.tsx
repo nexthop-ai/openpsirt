@@ -55,7 +55,7 @@ export function AffectedBuilds({
       unwrap(await api.GET("/v1/products/{product}/releases", { params: { path: { product } } })),
     retry: false,
   });
-  // Which of them hold it now. The same request the issue screen makes, under
+  // The builds holding it now. The same request the issue screen makes, under
   // the same key, so opening this after reading that page asks nothing.
   const holds = useQuery({
     enabled: open,
@@ -69,7 +69,7 @@ export function AffectedBuilds({
     retry: false,
   });
 
-  // Whether the page in hand is the whole answer.
+  // A page in hand that is the whole answer.
   //
   // This editor sends the *complete* list of builds, and the server closes
   // every build absent from it as never affected. So a set derived from a

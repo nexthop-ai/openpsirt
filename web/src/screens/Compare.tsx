@@ -12,10 +12,10 @@ import { drawn, said } from "../ui/states";
 import { Severity } from "../ui/Severity";
 import { Across } from "../ui/Charts";
 
-// How many of each column are shown before it says how many more there are.
+// The rows of each column shown before it says how many more there are.
 const SHOWN = 8;
 
-// What changed between two builds of one product.
+// The changes between two builds of one product.
 //
 // Between any two, not only adjacent ones: what a release note has to answer
 // is usually about the last release a customer has, which is rarely the
@@ -44,7 +44,7 @@ export function Compare() {
   // The same comparison as prose, fetched rather than assembled here: what an
   // API caller gets and what this shows have to be the same words, and two
   // implementations of "how a release note reads" is one that drifts.
-  // What the file is asked for, which is what the screen is asking. Built
+  // The request the file is asked for with, which is the screen's own. Built
   // once so that a comparison somebody exports is the comparison in front of
   // them rather than one assembled again from parts.
   const asked = new URLSearchParams({

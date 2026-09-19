@@ -10,9 +10,9 @@ import type { Who } from "../app/session";
 import { composable, humane, read, write, UNITS, type Unit } from "./duration";
 import { humaneBytes, readBytes, writeBytes, SIZES, type Size } from "./bytes";
 
-// What this deployment has decided for everybody in it, grouped the way the
-// mockup groups them. Every setting the server exposes renders; a setting no
-// group names lands under "Other", so nothing offered is hidden.
+// The decisions this deployment has made for everybody in it, grouped the way
+// the mockup groups them. Every setting the server exposes renders; a setting
+// no group names lands under "Other", so nothing offered is hidden.
 export function Settings({ who }: { who: Who }) {
   const queries = useQueryClient();
   // The audit permission reads this screen and writes none of it. A control
@@ -154,7 +154,7 @@ export function Settings({ who }: { who: Who }) {
   );
 }
 
-// What a setting is called. A noun phrase naming the thing, the way a settings
+// A setting's own name. A noun phrase naming the thing, the way a settings
 // screen anywhere else names one — not a description of the situation it
 // governs. What it does and why is the paragraph underneath, which is where a
 // reader looks second.
@@ -227,7 +227,7 @@ function label(name?: string): string {
   }
 }
 
-// What a value is, and what it may be, come from the server.
+// A value's type, and the values it may take, come from the server.
 //
 // They were three tables here keyed on setting names, beside the server's own
 // — five copies of one fact. A setting added to the server and not to these
@@ -295,10 +295,10 @@ function Field({
   const [unit, setUnit] = useState<Unit>(composed ? composed.unit : "days");
   const [size, setSize] = useState<Size>(measured ? measured.unit : SIZES[0].unit);
 
-  // What would be stored, from whatever the controls are showing. A box left
-  // empty is not a value: saving is refused rather than a number invented for
-  // somebody.
-  // The control's id is opaque and generated, never the setting's key.
+  // The value that would be stored, from whatever the controls are showing. A
+  // box left empty is not a value: saving is refused rather than a number
+  // invented for somebody. The control's id is opaque and generated, never the
+  // setting's key.
   //
   // A password manager classifies a field by every word it can reach through
   // it, and the key is one of those: "signin.claim-window" rendered into `id`

@@ -25,9 +25,9 @@ import { useWho } from "../app/session";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
 
-// How a product's two spellings are compared: a name people type is matched
-// without regard to capitals, which is the rule the server applies to the
-// identifier and the displayed name alike.
+// The comparison between a product's two spellings: a name people type is
+// matched without regard to capitals, which is the rule the server applies to
+// the identifier and the displayed name alike.
 function same(name?: string): string {
   return (name ?? "").toLowerCase();
 }
@@ -71,8 +71,8 @@ export function Claim({ who }: { who: Who }) {
   // label anybody can be given — which hid the Agree panel from somebody
   // entitled to approve and showed Hold back to somebody who did not propose.
   const mine = it.claim.proposed_by === who.identity;
-  // What a file is attached to. Both halves have to be known: the issue says
-  // which, and the product says whose, because the same identifier in two
+  // The thing a file is attached to. Both halves have to be known: the issue
+  // says which, and the product says whose, because the same identifier in two
   // products is two pieces of work with two sets of readers.
   const about = { product: it.place.product, vulnerability: it.place.vulnerability };
   const again = () => void queries.invalidateQueries({ queryKey: ["claim", id] });
@@ -124,7 +124,7 @@ export function Claim({ who }: { who: Who }) {
   );
 }
 
-// What the claim says, where it lands, and what it covers now.
+// The claim's argument, its landing place, and its present reach.
 function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChanged: () => void }) {
   const bulk = claim.issues > 1;
   return (
@@ -335,7 +335,7 @@ function Reaffirm({
   );
 }
 
-// Where this is being argued about or worked on outside here.
+// The place this is being argued about or worked on outside here.
 //
 // Anybody who may argue about the claim may set it: a link is a note about
 // where the conversation is rather than a judgment, and needing a second
@@ -425,7 +425,7 @@ function Reasoning({
   );
 }
 
-// What a second person may do about this claim.
+// The acts a second person may perform on this claim.
 //
 // Absent for the proposer, whatever they hold: the control this rests on is
 // that a second person agrees, and offering somebody a button that would

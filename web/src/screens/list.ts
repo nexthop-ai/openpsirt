@@ -76,7 +76,7 @@ export function daysBack(days: number, from = new Date()): string {
 // The order the list is in when the address asks for none.
 export const BY_DEFAULT: SortWord = "urgency";
 
-// Which orders mean "least first" on the first ask.
+// The orders that mean "least first" on the first ask.
 //
 // Most of them are "most first": the worst severity, the highest likelihood,
 // the widest reach. Two are not, and both were opening at the end nobody
@@ -96,7 +96,7 @@ export const LEAST_FIRST: readonly SortWord[] = ["deadline", "age"];
 export const UNOWNED = "assigned=nobody&state=undecided";
 export const UNOWNED_LIST = `/findings?${UNOWNED}`;
 
-// What the by-issue list asks when the address has not said: the work a
+// The by-issue list's own default, where the address has not said: the work a
 // promised upgrade already answers is out of view, because deciding it again
 // one finding at a time is the thing the promise was made instead of.
 //
@@ -125,8 +125,8 @@ export function asAsked(params: URLSearchParams, view: string): URLSearchParams 
 // drops the offset: a filter change lands somebody on page nine of a list with
 // two pages, which draws as an empty list under a filter that matches plenty.
 
-// Where a scope chip goes when it is removed: the same list, one level wider,
-// carrying every filter that was already on.
+// The address a scope chip goes to when it is removed: the same list, one level
+// wider, carrying every filter that was already on.
 //
 // The selection rides on the path rather than in the parameters, so widening is
 // a move rather than a parameter change — and the filters have to be carried
@@ -188,7 +188,7 @@ export function hidden(params: URLSearchParams, component: string): URLSearchPar
   return withParams(params, "hide", [...new Set([...already, component])]);
 }
 
-// Which build the list is looking at. Either may be absent: the list is not
+// The build the list is looking at. Either may be absent: the list is not
 // one of the screens that needs a whole build.
 export function where(params: URLSearchParams) {
   const stream = params.get("stream") ?? "";
@@ -196,7 +196,7 @@ export function where(params: URLSearchParams) {
   return { ...(stream ? { stream } : {}), ...(variant ? { variant } : {}) };
 }
 
-// How many rows a page holds, as the address says, refusing a size that is not
+// The rows a page holds, as the address says, refusing a size that is not
 // offered — the number reaches the server as a limit and the screen as a page.
 export function pageSize(params: URLSearchParams): number {
   const asked = Number(params.get("page"));
@@ -260,7 +260,7 @@ export function listQuery(params: URLSearchParams) {
   const fixStates = params.getAll("fix_state").filter(Boolean);
   const ecosystems = params.getAll("ecosystem").filter(Boolean);
   const declaredAs = params.getAll("declared_as").filter(Boolean);
-  // Which sort of release, and whether it is still in support. Two questions
+  // The sort of release, and its support. Two questions
   // rather than one: a tag can be in support and a branch can be past its
   // date.
   const releases = params.getAll("on").filter(Boolean);
@@ -278,9 +278,9 @@ export function listQuery(params: URLSearchParams) {
   // Both are a count of days the server takes from one upward, so a word, an
   // empty box and a zero are all "do not ask about this" rather than values.
   const openFor = num(params.get("open_for"), 1, Number.MAX_SAFE_INTEGER);
-  // Which run opened it, as the run screen links to. An identifier the address
-  // carries is somebody else's text like any other, so a value that is not a
-  // run number is a parameter to leave off rather than one to send wrong.
+  // The run that opened it, as the run screen links to. An identifier the
+  // address carries is somebody else's text like any other, so a value that is
+  // not a run number is a parameter to leave off rather than one to send wrong.
   const openedBy = num(params.get("opened_by_run"), 1, Number.MAX_SAFE_INTEGER);
   const dueWithin = running === "overdue" ? undefined : num(running, 1, Number.MAX_SAFE_INTEGER);
   return {
@@ -376,24 +376,24 @@ export function acrossProducts(query: ReturnType<typeof listQuery>) {
   return rest;
 }
 
-// What makes a row that row, for finding it again in a list read afresh.
+// A row's own identity, for finding it again in a list read afresh.
 export function identityOf(row: Row): string {
   return `${row.vulnerability} ${row.component} ${row.version} ${row.ecosystem ?? ""}`;
 }
 
-// Where a row opens. The version is part of the address: a component name is
+// The address a row opens. The version is part of it: a component name is
 // not unique within a build. It carries the list it came from so the finding
 // can offer the row before and the row after. The list's address travels as
 // one value rather than as its own parameters, so a filter added to the list
 // needs nothing here and cannot collide with a name the finding screen already
 // uses.
 //
-// Where the list was opened through a saved filter that prepares a claim, the
+// Opened through a saved filter that prepares a claim, the
 // filter's name travels too, and the finding fills its decision form from what
 // that filter prepares. The name rather than the words: the filter is the one
 // place deciding what it says, and a copy in an address is a second one that
 // goes stale the moment somebody saves over the name.
-// Where one build's screens live. The prefix every address under a build
+// The prefix one build's screens live under. Every address under a build
 // shares, written once: four screens spelled it out by hand, and the copies
 // cannot be checked against the router or against each other.
 export function buildPath(at: { product: string; stream: string; variant: string }): string {
@@ -459,7 +459,7 @@ export function fromAt(from: string, absolute: number, limit: number): string {
   return next.toString();
 }
 
-// Where a list is paged to, kept in its address.
+// The page a list is on, kept in its address.
 //
 // The offset lives in the address for the reason every filter does: a page
 // somebody sends is the page they were looking at. Five screens each had

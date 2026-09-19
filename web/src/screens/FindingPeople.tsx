@@ -1,4 +1,4 @@
-// Who is involved with this finding, and what hangs off it.
+// The people involved with this finding, and what hangs off it.
 //
 // Collaborators brought into an undisclosed case, whoever is holding the work,
 // closing a recorded flaw by hand, the files attached to it and the words
@@ -13,7 +13,7 @@ import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
 import { offeredAs, whoIs } from "../ui/whom";
 
-// Who has been brought into one undisclosed case.
+// The people brought into one undisclosed case.
 //
 // Being on a case is not reading the product. A collaborator sees this
 // issue wherever it sits here and nothing else, may argue about it, and may
@@ -45,7 +45,7 @@ export function Collaborators({
     // an answer rather than a fault: the card stays quiet on their screen.
     retry: false,
   });
-  // Who can be offered. The people who already read this product at all —
+  // The people who can be offered: those who already read this product at all —
   // bringing somebody into a case grants access to somebody who has some, and
   // cannot bring anybody into the deployment.
   //
@@ -182,7 +182,7 @@ export function Assignee({
   };
   assigned: string;
   undisclosed: boolean;
-  // Which standing rule placed this, where one did. A placement nobody can
+  // The standing rule that placed this, where one did. A placement nobody can
   // explain is one nobody can correct.
   routedBy: string;
 }) {
@@ -324,7 +324,7 @@ export function Resolve({
   );
 }
 
-// What text about this issue refers to.
+// The attachments text about this issue refers to.
 //
 // Listed as well as rendered inline, because a file referred to from a
 // revision nobody is reading now is still part of the record — and because
@@ -451,7 +451,7 @@ export function Attachments({
 // the reasoning text, where nothing can filter on it and an approver reads it
 // as part of the argument.
 //
-// What is offered is what people have written, not a vocabulary this
+// The offer is what people have written, not a vocabulary this
 // screen invented: the list comes from the product, so the second person to
 // reach for "waiting on vendor" spells it the way the first one did, and the
 // two are one filter rather than two.
@@ -517,7 +517,7 @@ export function Marks({
   });
 
   const busy = mark.isPending || unmark.isPending;
-  // What is already on this is not offered again — the request would succeed
+  // A tag already on this is not offered again — the request would succeed
   // and change nothing, which reads as the control not working.
   const already = new Set(tags.map((each) => each.trim().toLowerCase()));
   const offered = (inUse.data?.items ?? []).filter((each) => !already.has(each.toLowerCase()));

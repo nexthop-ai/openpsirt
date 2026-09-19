@@ -14,7 +14,7 @@ import { Icon } from "../ui/Icons";
 import { UploadDrawer } from "../ui/Upload";
 import { Wide } from "../ui/Wide";
 
-// What each build uploaded, and what the scan of it found. A scan is what the
+// Each build's uploads, and what the scan of them found. A scan is what the
 // deployment does to an inventory after it arrives; what a person uploads, and
 // what this list is of, is inventories.
 //
@@ -42,7 +42,7 @@ export function Inventories() {
     queryFn: async () => unwrap(await api.GET("/v1/scanning", { params: { query: { product } } })),
   });
   const quiet = (scanning.data?.items ?? []).filter((b) => b.quiet);
-  // How many there are, against how many are named. These rows are named
+  // The total, against the number named. These rows are named
   // rather than counted, so the page is what a reader sees — but a page short
   // of the answer named some builds and stayed silent about the rest, which on
   // this screen reads as "those are the quiet ones".
@@ -272,7 +272,7 @@ export function Inventories() {
   );
 }
 
-// What an upload was made of, and whether it is still here.
+// The documents an upload was made of, and whether they are still here.
 //
 // The record outlives the files: a branch build's contents are let go once
 // they have been read, because the next night supersedes them, and a tagged
@@ -361,7 +361,7 @@ function counted(howMany?: number | null) {
   return howMany.toLocaleString();
 }
 
-// How much of an inventory anything placed in the graph.
+// The share of an inventory anything placed in the graph.
 //
 // The pair, not one number. A document that places none of its components
 // produces findings that are each correct and cannot answer "why is this

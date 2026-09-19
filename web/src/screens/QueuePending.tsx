@@ -30,7 +30,7 @@ function said(shown: number, total?: number): string {
   return shown.toLocaleString();
 }
 
-// How many rows one request of either section carries, matching what the queue
+// The rows one request of either section carries, matching what the queue
 // asks for. Named here so the pager and the request cannot disagree.
 export const PENDING_PAGE = 50;
 
@@ -52,11 +52,12 @@ export function Embargoes({
   error,
 }: {
   waiting: Body<"PendingExtensionBody">[];
-  // How many are waiting in all. The page length was printed as the figure,
-  // so the fifty-first request was not in the number and nothing said so.
+  // The number waiting in all. Without it the page length is printed as the
+  // figure, so the fifty-first request was not in the number and nothing said
+  // so.
   total?: number;
-  // Where in the list this page starts, and how to move. Without them the
-  // heading said the real total over fifty rows and the fifty-first was
+  // The offset this page starts at, and the controls that move it. Without them
+  // the heading said the real total over fifty rows and the fifty-first was
   // counted and unreachable.
   offset?: number;
   onGo?: (offset: number) => void;
@@ -146,7 +147,7 @@ export function Embargoes({
 // there was nowhere to be that second person, because the route existed and no
 // screen reached it.
 //
-// What it says beyond "agree or not" is the point. Rating something milder
+// The point is what it says beyond "agree or not". Rating something milder
 // pushes its deadline out, which is what the second person is there for. But
 // where a product has said what it considers worth triaging at all, a rating
 // that crosses that line does something different in kind: the findings stop

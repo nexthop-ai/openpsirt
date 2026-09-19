@@ -15,7 +15,7 @@ type Changed = {
   low?: number;
 };
 
-// What one run of the scanner did.
+// One run of the scanner, and the change it made.
 //
 // A receipt says a run happened; nothing said what it did. A row reading
 // "scanned · 7,604 opened" is a number with no shape: opened *what*, and is
@@ -149,8 +149,8 @@ function Shape({
   title: string;
   changed: Changed | undefined;
   exploited?: number;
-  // Where the rows behind the count are, where they can be listed. What a run
-  // closed has no such list: those findings are closed, and the list is of
+  // The address of the rows behind the count, where they can be listed. What a
+  // run closed has no such list: those findings are closed, and the list is of
   // what is open.
   to?: string;
 }) {

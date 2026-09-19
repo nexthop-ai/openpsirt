@@ -44,7 +44,7 @@ export function IssueAdvisory({
   // console and work nobody wanted done.
   const [open, setOpen] = useState(false);
 
-  // What has already gone out, without generating anything. Somebody deciding
+  // The advisories already out, without generating anything. Somebody deciding
   // whether to publish a revision is asking before they draft one.
   const gone = useQuery({
     enabled: open && product !== "",

@@ -40,7 +40,7 @@ export function Record() {
   const queries = useQueryClient();
 
   const [product, setProduct] = useState(scope.product ?? "");
-  // Which lines and which ways they are built. Both are sets: the same code
+  // The lines, and the ways they are built. Both are sets: the same code
   // goes out on several lines and as several variants at once, and a flaw in
   // it is one issue in every build that ships it. The builds are the product
   // of the two, and the ones that do not exist are simply not offered.
@@ -54,7 +54,7 @@ export function Record() {
   // for a handful of names in a build.
   const [version, setVersion] = useState("");
   const [ecosystem, setEcosystem] = useState("");
-  // Which of the two somebody pressed, and nothing until they press one. The
+  // The button somebody pressed, and nothing until they press one. The
   // value that is read is worked out below, because what is on offer depends
   // on a right that is not known until the session is.
   const [chose, setChose] = useState<boolean | null>(null);
@@ -70,7 +70,7 @@ export function Record() {
   const [received, setReceived] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [refused, setRefused] = useState<string[]>([]);
-  // Where the finding that was just recorded lives, held while somebody reads
+  // The address of the finding just recorded, held while somebody reads
   // which of their files did not attach.
   const [onward, setOnward] = useState("");
   const [weaknesses, setWeaknesses] = useState<string[]>([]);
@@ -109,7 +109,7 @@ export function Record() {
     queryFn: async () =>
       unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
   });
-  // What the product is built as, rather than what one line was. A variant
+  // The variants the product is built as, rather than one line's own. A variant
   // belongs to the product, so with several lines chosen this is the set to
   // pick from — a per-line list would be an arbitrary one of them.
   const builtAs = useQuery({
@@ -119,9 +119,9 @@ export function Record() {
       unwrap(await api.GET("/v1/products/{product}/variants", { params: { path: { product } } })),
   });
 
-  // What the build holds, to offer back as they type. A name typed from memory
-  // is a name the server refuses, and a build holds thousands of components,
-  // so the list is searched rather than loaded.
+  // The components the build holds, to offer back as they type. A name typed
+  // from memory is a name the server refuses, and a build holds thousands of
+  // components, so the list is searched rather than loaded.
   const holding = useQuery({
     queryKey: ["components", product, streams[0], variants[0], component],
     enabled: whole && component.trim().length >= 2,

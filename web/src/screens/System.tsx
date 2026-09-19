@@ -8,7 +8,7 @@ import { Wide } from "../ui/Wide";
 import { since } from "../ui/when";
 import { WebhookDelivery } from "./Webhooks";
 
-// What the deployment itself is doing, rather than what it has found.
+// The deployment's own state, rather than what it has found.
 //
 // Three things were built and reachable from nothing. Work the queue gave
 // up on had an endpoint and a retry route and no screen; what is waiting and
@@ -44,11 +44,11 @@ export function System() {
   );
 }
 
-// How many rows to draw. Past this it is a list nobody reads through, and the
+// The rows drawn. Past this it is a list nobody reads through, and the
 // count beside it says how much there is.
 const MOST = 100;
 
-// What asking public indexes could not answer, and why of each.
+// The components public indexes could not answer for, and the reason for each.
 //
 // Two questions that are one panel. What was held back says what the
 // derived default is costing; what no index has heard of is the list an
@@ -138,7 +138,7 @@ function WhatUpstreamCouldNotAnswer() {
   );
 }
 
-// What the scans are answering against, and when it last moved.
+// The vulnerability data the scans answer against, and when it last moved.
 //
 // The half of "the fact and a link" that did not work. Somebody told the
 // vulnerability data has stopped moving arrived at this screen, which showed
@@ -205,7 +205,7 @@ function VulnerabilityData() {
   );
 }
 
-// What each reason means, in words rather than in the vocabulary the API uses.
+// Each reason's meaning, in words rather than in the vocabulary the API uses.
 //
 // The three are different things and only one of them is anybody's to act on:
 // an unrecognized name is the candidate to hold back, a held-back name is the
@@ -222,7 +222,7 @@ function because(why?: string) {
   }
 }
 
-// What is waiting, and what stopped being retried.
+// The work waiting, and the work that stopped being retried.
 function TheQueue() {
   const queries = useQueryClient();
   const work = useQuery({

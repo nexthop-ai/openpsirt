@@ -71,7 +71,7 @@ export function Issue() {
   // The products carrying it, once each and in the order they appear. The
   // advisory is a statement about one product, and this issue may sit in
   // several.
-  // Whether anything of it is still undisclosed there is folded in per
+  // Anything of it still undisclosed there is folded in per
   // product, because one undisclosed place makes the whole of it undisclosed
   // for anybody deciding what may be said about it.
   const products = Array.from(
