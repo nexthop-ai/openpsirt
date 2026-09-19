@@ -255,7 +255,7 @@ type Filter struct {
 	Component string
 	// TargetID keeps judgments about places one build holds.
 	//
-	// **A decision names no build, deliberately** — it is keyed on the
+	// A decision names no build, deliberately — it is keyed on the
 	// product, the issue and the place, so that it carries across the
 	// releases that share the code. What a release sign-off asks is the other
 	// question: which of these judgments is about something this build

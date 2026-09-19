@@ -527,7 +527,7 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 // words once and agrees to them once, and a row per place was a copy of that
 // agreement that could go on standing after the words changed.
 //
-// **The revision-bound control is the condition on the update.** The approval
+// The revision-bound control is the condition on the update. The approval
 // names the revision it was given for, and the rows move only while that is
 // still the reasoning the claim rests on. A revision landing in between leaves
 // them unmoved, the matched count falls short, and the whole claim is refused
@@ -606,7 +606,7 @@ func (s *Store) reasoningOn(ctx context.Context, claim Claim) (string, error) {
 
 // Split holds back part of a claim the proposer no longer wants to argue as one.
 //
-// **The approver's side of this already existed and the proposer's did not.**
+// The approver's side of this already existed and the proposer's did not.
 // An approver reading a bulk claim may agree to most of it and set some rows
 // aside; whoever wrote it could only withdraw the whole thing and start again,
 // so "this holds for most of them but not those four" was unavailable to the
@@ -619,7 +619,7 @@ func (s *Store) reasoningOn(ctx context.Context, claim Claim) (string, error) {
 // with their author. What happens next is a revision, which is the act that
 // gives them an argument of their own.
 //
-// **A proposer's act, as setting rows aside is an approver's.** Each is refused
+// A proposer's act, as setting rows aside is an approver's. Each is refused
 // to the other: an approver holding some of a claim back is agreeing to the
 // rest in the same action, and a proposer doing that would be approving their
 // own claim.

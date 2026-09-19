@@ -13,7 +13,7 @@ import (
 // account was disabled, and somebody who left never signs in again — so their
 // account stays live, holding whatever it held, being served everything.
 //
-// **Every way in is one way in.** A session, a personal token and a
+// Every way in is one way in. A session, a personal token and a
 // group-bound sign-in all resolve by identity, so the date is read there once
 // rather than in three places that can disagree.
 func TestSomebodyWhoHasLeftIsRefusedAtEveryWayIn(t *testing.T) {

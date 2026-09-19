@@ -262,17 +262,17 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 // criticalOnReleases is every critical or actively-exploited issue open and
 // undecided against a tag, against the people who should hear about it.
 //
-// **Tags only.** A critical on a branch is ordinary work in progress; the same
+// Tags only. A critical on a branch is ordinary work in progress; the same
 // issue against something customers are running is the case a new critical as an alert exists for,
 // and the difference between them is the whole signal. Sending both would make
 // the alert as common as the findings list and therefore ignorable.
 //
-// **Undecided only**, and derived rather than remembered, so it leaves the
+// Undecided only, and derived rather than remembered, so it leaves the
 // list when the finding closes or when somebody answers it — neither of which
 // is a thing to be dismissed. That is the conditions clearing, events acknowledged shape: nobody clears this,
 // the world does.
 //
-// **Whoever may read it and may act on it**. Every other operational
+// Whoever may read it and may act on it. Every other operational
 // alert goes to administrators because it is about the tool rather than about
 // a finding; this one names an issue, a component and a build, which is
 // finding content. Since an administrator no longer reads a product by
@@ -497,12 +497,12 @@ func (w *Watch) beingTold(ctx context.Context, kind Kind) ([]int64, error) {
 // holdingAbsent is everybody who has not signed in for a while and is still
 // holding work.
 //
-// **Both halves, and the second is what makes it worth saying.** An account
+// Both halves, and the second is what makes it worth saying. An account
 // nobody has used in a month is harmless if it holds nothing; work stuck behind
 // somebody who is not here is the problem, and this is the prompt that makes an
 // administrator realize they have gone.
 //
-// **It asks rather than acts.** Long leave and having left look identical from
+// It asks rather than acts. Long leave and having left look identical from
 // here, and nothing detects somebody leaving — so this opens a
 // condition an administrator reads and clears by doing something, rather than
 // handing the work back on its own. Withdrawing a role does hand work back
@@ -552,7 +552,7 @@ func (w *Watch) holdingAbsent(ctx context.Context) ([]Holds, error) {
 		ColumnExpr(`COUNT(*) AS "holding"`).
 		// Never signed in counts too — somebody granted a role and given work
 		// who has not arrived is exactly the case worth raising — but it is
-		// measured from when they were **added**, not from the beginning of
+		// measured from when they were added, not from the beginning of
 		// time. Compared against the moment alone, an administrator adding a
 		// colleague and assigning them something raises an alert about them in
 		// the same breath.

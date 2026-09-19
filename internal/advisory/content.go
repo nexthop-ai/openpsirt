@@ -18,7 +18,7 @@ import (
 // what identifies the document: where a reader can go, what the flaw scored,
 // what an affected release can do about it, and who is credited.
 //
-// **Only what is held.** Nothing here derives a fact the record does not carry.
+// Only what is held. Nothing here derives a fact the record does not carry.
 // A field the standard defines and this deployment has no data for is left out,
 // because an advisory is read by somebody deciding whether to act.
 
@@ -85,7 +85,7 @@ type Acknowledgment struct {
 
 // referencesTo is every address this deployment holds about the flaw.
 //
-// **On the document rather than on the vulnerability.** The document is about
+// On the document rather than on the vulnerability. The document is about
 // one flaw, so the two lists would hold the same addresses, and the standard's
 // security-advisory profile requires the document's. One list, in the place
 // that is asked for.
@@ -152,7 +152,7 @@ func summaryOfKind(kind finding.ReferenceKind) string {
 
 // creditedFor is whoever reported the flaw, where they said how to name them.
 //
-// **The credit and nothing else.** Somebody reporting a flaw under a name gave
+// The credit and nothing else. Somebody reporting a flaw under a name gave
 // it so we could reply, not so it could be published; the credit field is the
 // one they answered the publication question with, and "anonymous" is a real
 // answer to it. So a report with a reporter and no credit is acknowledged as
@@ -222,7 +222,7 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 
 // remediationsFor is what a reader can do, from what is true now.
 //
-// **It names the releases.** "Update to a release in which this flaw is fixed"
+// It names the releases. "Update to a release in which this flaw is fixed"
 // is the instruction with the answer left out, and the answer is three lines
 // away in the same function. A reader then has to find the fixed set in the
 // product status and match identifiers by hand — which is the work a document
@@ -233,7 +233,7 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 // that answers confidently for a pair it cannot order is worse than none. All
 // of them, in the order the tree names them, and the reader picks.
 //
-// **Stated for the releases that carry the flaw**, which is who a remediation
+// Stated for the releases that carry the flaw, which is who a remediation
 // is for: CSAF § 3.2.3.12.6 defines the product identifiers as what the item
 // applies to, and § 3.2.3.12.1 defines a vendor fix as one for the affected
 // product. Pointed at the releases that are already fixed, the customer who
@@ -241,7 +241,7 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 // that needs nothing is told to update. Which release to move to is what the
 // details say.
 //
-// **Nothing about planned work.** A commitment is one build's plan, agreed to
+// Nothing about planned work. A commitment is one build's plan, agreed to
 // inside this deployment; the same sentence in a published advisory is a
 // promise to a customer about a date, and whether to make one is the
 // publisher's.
@@ -272,7 +272,7 @@ func remediationsFor(fixed []Named, affected []string) []Remediation {
 
 // weaknessOf is what kind of flaw this is, where the catalog knows the name.
 //
-// **The root cause, and only where something said which.** The standard carries
+// The root cause, and only where something said which. The standard carries
 // one weakness per flaw and an issue is commonly classified as several, so a
 // document that stated the first of them would be stating a claim nobody made.
 // Asked of the row the data marked rather than of the order they sort in: a
@@ -339,7 +339,7 @@ func distributionFor(status string) *Distribution {
 
 // profileOf is the category the document may honestly declare.
 //
-// **CSAF 2.0 § 4.4.** The security-advisory profile is the base profile plus a
+// CSAF 2.0 § 4.4. The security-advisory profile is the base profile plus a
 // product tree, the vulnerabilities, and notes and a status on each of them.
 // Notes and references on the *document* are § 4.3's requirement — the
 // informational advisory, which is the profile for a document that carries no

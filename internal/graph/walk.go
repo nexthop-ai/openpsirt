@@ -31,7 +31,7 @@ const depth = 64
 // build, and binding six thousand identifiers into a statement was the cost
 // of asking for it; the engine walking its own edges is the same set with
 // nothing crossing the wire.
-// **Bounded on depth and not on rows**, and a caller that materializes it has
+// Bounded on depth and not on rows, and a caller that materializes it has
 // to say what it does past a size. The subtree under a build's root is every
 // component in the build, so scanning this into a slice is unbounded by
 // construction; the two callers that pass it into a subquery never hold it.
@@ -90,7 +90,7 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // reached by twenty containers is one thing inside each of them. The
 // statement says exactly that: the subtree as a set of components, joined to
 // the distinct (component, issue) pairs open in the build, counted per start.
-// **And by severity, in the same statement.** A node saying five thousand
+// And by severity, in the same statement. A node saying five thousand
 // beneath it says nothing about whether any of it matters, which is what
 // somebody deciding where to descend is asking. An issue has one rating, so
 // the bands partition the distinct issues and their counts sum back to the
@@ -169,8 +169,8 @@ type step struct {
 // one statement: each row is a node on a route, with the node it was reached
 // from, so the routes can be unwound.
 //
-// **The recursive step does not repeat the build, and the two downward walks
-// do.** That asymmetry is the indexes rather than an omission: those walk on
+// The recursive step does not repeat the build, and the two downward walks
+// do. That asymmetry is the indexes rather than an omission: those walk on
 // `parent_id` and use the index leading on the build, so the build is its
 // leading column; this walks on `child_id` and uses the one leading on that,
 // which a build predicate cannot help and could push a planner off. The answer

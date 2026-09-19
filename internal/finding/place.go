@@ -357,7 +357,7 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// nothing here has and would leave out everything fixed in an
 		// earlier release of the same line.
 		//
-		// **Matched on the fold**, which is the reason the bundle view
+		// Matched on the fold, which is the reason the bundle view
 		// existed: curl, libcurl4t64 and libcurl3t64 are one source package
 		// bumping once, and keying on the binary name would make upgrading
 		// them three acts that can disagree. Naming any of the three reaches

@@ -261,7 +261,7 @@ func (s *Store) placesOf(ctx context.Context, targetID int64, fold []int64, issu
 // This is the fix-bundle grouping read per component rather than as a list of
 // its own: a package at a version, and where it could go.
 //
-// **Two counts, because they answer different questions.** `FixedHere` is how
+// Two counts, because they answer different questions. `FixedHere` is how
 // many of what is open name this exact version as their fix, which is that
 // release's own security content. `Reached` is how many the upgrade would close
 // altogether, counting everything fixed at or before it — which is what
@@ -326,7 +326,7 @@ type ComponentGroup struct {
 	// Upgrades are the versions upstream has released that would close
 	// some of what is open here, each with how many issues it would close.
 	//
-	// **Listed, never ordered.** Comparing two of these needs an ordering per
+	// Listed, never ordered. Comparing two of these needs an ordering per
 	// ecosystem that this does not have, so there is no "nearest"
 	// and no "latest" — what there is, is every version the scanner named as
 	// carrying a fix, and the count is what makes one of them obviously worth
@@ -342,7 +342,7 @@ type ComponentGroup struct {
 // it: the text the candidate list was narrowed by, how many issues that
 // narrowing reaches now, and how many the caller went on to name.
 //
-// **`selected_by` is prose and nothing can check it.** A claim reading
+// `selected_by` is prose and nothing can check it. A claim reading
 // "drivers this image does not build" over a set actually chosen by ticking
 // everything is indistinguishable in the record from an honest one, and the
 // decision that asks for how a set was chosen asks for something an approver

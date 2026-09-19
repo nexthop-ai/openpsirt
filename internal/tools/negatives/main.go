@@ -1,6 +1,6 @@
 // Command negatives reports a 404 built from an error's own text.
 //
-// **A 404 asserts that a name reaches nothing.** Building its body from an
+// A 404 asserts that a name reaches nothing. Building its body from an
 // error publishes whatever that error carried, and the two failures compound:
 // the handlers wrote the 404 from the error, and the readers under them
 // returned the driver's message unwrapped. A connection failure reached an

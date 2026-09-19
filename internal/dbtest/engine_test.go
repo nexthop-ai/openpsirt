@@ -23,7 +23,7 @@ import (
 // harness gave it.
 func TestEachEngineIsTheEngineItSaysItIs(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		// The **label**, not the engine the connection thinks it is. Those are
+		// The label, not the engine the connection thinks it is. Those are
 		// two different facts and comparing the connection against itself
 		// proves nothing: a MySQL URL pointed at a PostgreSQL server opens as
 		// PostgreSQL and agrees with itself perfectly, while the gate greps

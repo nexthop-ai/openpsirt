@@ -1013,7 +1013,7 @@ func TestAVersionTooLongToKeyOnIsRefusedRatherThanShortened(t *testing.T) {
 	// columns they copy are not. Measured against the reference producer:
 	// 6,845 components, longest version 49 characters, nothing over 191.
 	//
-	// **Refused rather than shortened** is the part that matters. A decision
+	// Refused rather than shortened is the part that matters. A decision
 	// keyed on a truncated version would be compared against the finding's
 	// full one and match nothing, so the claim would stand on the record,
 	// cover nothing, and say so nowhere. Refused, somebody is told.

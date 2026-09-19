@@ -125,7 +125,7 @@ func (s *Store) WaitingIn(ctx context.Context, subject access.Subject,
 // part they may approve, a reader would agree to words whose other half stays
 // waiting on somebody else, and the count beside the card would be wrong.
 //
-// **And not their own.** Approving your own claim is refused, because a control
+// And not their own. Approving your own claim is refused, because a control
 // one person completes alone is not one — so a queue containing them
 // is a work list of things the reader cannot do, which teaches them to skip
 // rows. `mine` asks for exactly those instead: somebody wants to find what they
@@ -427,7 +427,7 @@ func outliersOf(claim Claim, productID int64, decisionOf map[int64]int64,
 	// The term the list was actually narrowed by, where the act recorded one,
 	// and the claimant's prose only where it did not.
 	//
-	// **The structured record is the one the check reads.** Reading the prose
+	// The structured record is the one the check reads. Reading the prose
 	// meant a claimant who narrowed by one word and wrote a sentence phrasing
 	// it differently got no "does not mention" flag at all — and the field
 	// they write is asked for in their own words, which invites exactly that.

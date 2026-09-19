@@ -140,7 +140,7 @@ func rolesFor(holds []Role) (*string, error) {
 // the token names, so naming a role they do not hold reaches nothing rather
 // than granting it.
 //
-// **A case keeps its read half and loses its write half.** Being brought into
+// A case keeps its read half and loses its write half. Being brought into
 // one is a grant on a pair of a product and an issue rather than something in
 // this vocabulary, so dropping it would make a read-only token unable to read
 // the one case it was minted for. Keeping it whole is worse: a case grant is
@@ -245,7 +245,7 @@ func (s Subject) delegate() Subject {
 // dropped entirely: administration is global, and a token narrowed to one
 // product carrying it would not be narrowed at all.
 //
-// **A copy with things removed, never a fresh subject.** Written as a struct
+// A copy with things removed, never a fresh subject. Written as a struct
 // literal it carried five fields and silently dropped the rest — who somebody
 // is, which teams they are on, and the cases they were brought into — none of
 // which is a per-product fact. Through such a token every "assigned to me"

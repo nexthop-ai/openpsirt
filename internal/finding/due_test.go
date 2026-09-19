@@ -654,7 +654,7 @@ func (f *fixture) recorded(t *testing.T, id int64, identity string) {
 func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 	// A finding somebody recorded has no scan run. Three passes reached the
 	// run for one column — when it opened — and reached it with an inner join,
-	// so a finding without one was not mis-reported but **absent**: off the
+	// so a finding without one was not mis-reported but absent: off the
 	// trend, and never rewritten when the deadline policy changed.
 	//
 	// Absent is the worse failure. A wrong number invites somebody to check

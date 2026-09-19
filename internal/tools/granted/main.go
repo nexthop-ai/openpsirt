@@ -68,7 +68,7 @@ var inside = map[string]string{
 //
 // The rule is "name both", which has two failing shapes and this used to see
 // one. It returned early unless the per-product name appeared, and the estate
-// table's name **contains** the per-product one — so a file naming only the
+// table's name contains the per-product one — so a file naming only the
 // estate table satisfied that test, and was then found to name neither once
 // the estate occurrences were taken out. A store query joining the estate
 // table alone cannot see a role held against one product, so it answers no for

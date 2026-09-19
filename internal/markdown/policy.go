@@ -22,7 +22,7 @@ import (
 // never by an address. It resolves through a path that asks who is looking,
 // which is what makes it the one scheme an image may also use.
 //
-// **Not a map anybody can widen.** An exported map is a value every importer
+// Not a map anybody can widen. An exported map is a value every importer
 // shares and any of them may write to at init, so one line in an unrelated
 // package could add a scheme to the link policy for the whole process, with
 // nothing in this file changed and no test here failing. Asked as a function
@@ -54,7 +54,7 @@ const Issue = "issue"
 
 // inspect reports what is wrong with submitted text.
 //
-// **The document is parsed and its structure examined, not scanned as lines.**
+// The document is parsed and its structure examined, not scanned as lines.
 // The first version of this matched regular expressions against each line, and
 // that is a different question from the one that matters: what the renderer
 // will make of it. The two came apart in every direction —
@@ -220,7 +220,7 @@ func schemeOf(destination string) (string, bool) {
 	if destination == "" {
 		return "", true
 	}
-	// **A destination beginning with two separators is not relative**, whatever
+	// A destination beginning with two separators is not relative, whatever
 	// the absence of a colon suggests. `//evil.example/x` is an address on
 	// another host that inherits whatever scheme the page was served over, and
 	// `/\evil.example/x` is the same thing to a browser — so read as relative,
@@ -440,7 +440,7 @@ func mintedToken(token string) bool {
 
 // mention is a name written after an @, as the editor writes one.
 //
-// **A colon is part of a name here.** A sign-in through a trusted header mints
+// A colon is part of a name here. A sign-in through a trusted header mints
 // identities like `proxy:dev`, and the editor writes whatever the identity is —
 // so a class that stopped at the colon read `@proxy:dev` as a mention of
 // "proxy", which is nobody, and the person named was never told. That is the
@@ -459,7 +459,7 @@ var mention = regexp.MustCompile(`(^|[^\w@.:-])@([A-Za-z0-9][A-Za-z0-9._:@-]{0,1
 // written — is not one. Somebody pasting a log line that happens to contain an
 // @ has not called for anybody.
 //
-// **What comes back is what was typed, not who it is.** Whether a name is
+// What comes back is what was typed, not who it is. Whether a name is
 // somebody, and whether the reader may know that, is a question for the data
 // layer; this only says what the text says.
 func Mentions(source string) []string {

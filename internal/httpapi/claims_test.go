@@ -1176,7 +1176,7 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 			t.Errorf("the judgment is offered with nothing to read: %+v", one)
 		}
 
-		// **And only to somebody who may read it.** A place identity spans
+		// And only to somebody who may read it. A place identity spans
 		// products, so a join that did not carry the subject would hand
 		// somebody the reasoning, the approver and the existence of a judgment
 		// in a product they cannot see at all.

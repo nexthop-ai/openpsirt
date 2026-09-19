@@ -14,19 +14,19 @@ import (
 // Carry takes chosen judgments onto a new line as claims waiting for
 // agreement.
 //
-// **It carries reasoning forward and never conclusions.** Each one arrives as
+// It carries reasoning forward and never conclusions. Each one arrives as
 // a claim needing approval, with the words from the old line to start from
 // rather than to start without. A version moved, which is exactly what makes
 // the old judgment stop applying — so somebody has to look at it again, and
 // what is inherited is the thinking rather than the answer.
 //
-// **Only what was offered.** A caller naming a decision the preview classified
+// Only what was offered. A caller naming a decision the preview classified
 // as already applying, or as covering nothing here, is choosing something it
 // was not asked about: the first has already happened and the second has
 // nothing to happen to. Both are refused rather than quietly skipped, because
 // a caller that got the set wrong should hear so.
 //
-// **Bounded, like every other bulk judgment**.
+// Bounded, like every other bulk judgment.
 func (s *Store) Carry(ctx context.Context, subject access.Subject, fromTarget, toTarget int64,
 	chosen []int64, cap int) (int, error) {
 

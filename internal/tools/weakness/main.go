@@ -1,19 +1,19 @@
 // Command weakness writes the weakness names a published advisory has to carry.
 //
-// **The name is not optional and cannot be invented.** CSAF states a weakness
+// The name is not optional and cannot be invented. CSAF states a weakness
 // as an identifier and the name that goes with it, and a consumer's validator
 // checks the pair against the published catalog. What is held here is the
 // identifier alone — a scanner reports "CWE-787" and which source said so, and
 // no name arrives with it — so a document naming a weakness has to get the name
 // from the authority that assigns it.
 //
-// **Fetched rather than typed, for the reason the reserved-word list is asked
-// rather than typed.** A thousand names nobody can check by eye is a file that
+// Fetched rather than typed, for the reason the reserved-word list is asked
+// rather than typed. A thousand names nobody can check by eye is a file that
 // goes wrong quietly: one transcription error is a document that fails
 // validation at a customer, months later, over a weakness nobody was looking
 // at. The catalog is published, so it is read.
 //
-// **Weaknesses only.** The catalog also carries categories and views, which
+// Weaknesses only. The catalog also carries categories and views, which
 // have identifiers of the same shape and are not what a vulnerability is
 // classified as. An identifier this does not know the name of produces no
 // weakness in the document rather than a guess.

@@ -338,7 +338,7 @@ func (d *Documents) Remove(ctx context.Context, scanID int64) error {
 
 // Held returns one document of one scan, for reading its contents back.
 //
-// **Addressed through the scan it belongs to**, not by its own identifier
+// Addressed through the scan it belongs to, not by its own identifier
 // alone: whoever authorized the scan has authorized this, and a document
 // identifier that resolved on its own would be a second way in that has to
 // remember the same rule.

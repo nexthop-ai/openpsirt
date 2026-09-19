@@ -884,7 +884,7 @@ func TestTheBundleAndComponentListsFilterOnTheirOwnProductsRating(t *testing.T) 
 	// that lost the product would answer with the published word — silently,
 	// and only on that list. The findings list has its own check above.
 	//
-	// **Two products, rating it in opposite directions**, because a join that
+	// Two products, rating it in opposite directions, because a join that
 	// merely exists is not the thing at risk: the compiler catches a missing
 	// one on all four engines, and what it cannot catch is one bound to the
 	// wrong product. With only this product rating it, a swapped binding reads

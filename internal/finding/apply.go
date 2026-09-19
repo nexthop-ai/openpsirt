@@ -258,7 +258,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 		}
 
-		// open is what is already open **that a scan governs**. A run
+		// open is what is already open that a scan governs. A run
 		// is the authority on what it found, and everything it no
 		// longer reports is closed below — so without this narrowing,
 		// the first nightly scan after somebody records a finding by
@@ -501,7 +501,7 @@ func learnedExploitation(f Finding, startedAt time.Time) *time.Time {
 // ranking reports whether an open finding's place in the order has moved, and
 // whether exploitation is what moved it.
 //
-// The two are separate, and deliberately: **every** ranking signal moves the
+// The two are separate, and deliberately: every ranking signal moves the
 // order, and exploitation is the only one that starts a clock over. A score
 // somebody revised upward is worth reordering the list for and is not worth
 // resetting a deadline over — likelihood and score are not in the deadline at

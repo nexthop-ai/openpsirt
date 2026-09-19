@@ -99,7 +99,7 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 			return nil, false, fmt.Errorf("%q: %w: it was not cut from the branch now being named",
 				name, ErrDiffers)
 		}
-		// **Filling in one that was never stated is not a change.** It was
+		// Filling in one that was never stated is not a change. It was
 		// left out, and there was no way to supply it afterwards — so a tag
 		// declared without it stayed that way, and release readiness, which
 		// asks what was cut from this branch, reported that nothing had ever

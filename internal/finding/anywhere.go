@@ -15,7 +15,7 @@ import (
 
 // The findings list across every product somebody may see.
 //
-// **The work starts from an issue as often as from a product.** Findings were
+// The work starts from an issue as often as from a product. Findings were
 // answerable one product at a time, so "which of our products are carrying
 // this, and what is running out anywhere" was a question assembled by hand
 // once per product. At a dozen products that is the first thing anybody
@@ -23,18 +23,18 @@ import (
 // one issue, and the other half is the list — with filters, an order and
 // paging.
 //
-// **One row per product, issue and component.** The same library carrying the
+// One row per product, issue and component. The same library carrying the
 // same issue in two products is two pieces of work, decided separately by
 // different people; in three builds of one product it is one, with a count.
 // That is the grain the per-product list already groups at, one level out.
 //
-// **Every product's own line still applies.** A line is a claim about what is
+// Every product's own line still applies. A line is a claim about what is
 // worth an afternoon *here*, and a list that ignored the lines would hand
 // somebody back the thousands of rows their products deliberately set aside.
 // Applied per row from the product's own column rather than from one number
 // chosen for the page.
 //
-// **Nothing about it is a new visibility rule**, and that is exactly where it
+// Nothing about it is a new visibility rule, and that is exactly where it
 // has to be right: a page spanning products is where narrowing afterwards gets
 // forgotten, and the total leaks even when no row is shown. So the narrowing
 // is in the statement, and an issue that exists only in products somebody

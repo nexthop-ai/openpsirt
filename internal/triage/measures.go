@@ -17,19 +17,19 @@ import (
 // Measures are the numbers about how this deployment is working, as opposed to
 // what it holds.
 //
-// **Every one of them is already in the record and none was ever added up.**
+// Every one of them is already in the record and none was ever added up.
 // How long a finding waits before anybody says anything, how long a claim waits
 // for a second person, and how much each person actually got through: three
 // questions a manager asks constantly, and the answer to all three was a screen
 // somebody counted rows on.
 //
-// **The arithmetic happens here rather than in SQL.** Subtracting two moments
+// The arithmetic happens here rather than in SQL. Subtracting two moments
 // is spelled four ways across the engines this runs on — `julianday`, `EXTRACT
 // (EPOCH ...)`, `TIMESTAMPDIFF` — and so is the percentile. Reading the two
 // timestamps and subtracting them in Go is one spelling that behaves the same
 // everywhere, and the bound below is what keeps that honest.
 //
-// **Bounded, and it says so.** A window of any length on a busy deployment is
+// Bounded, and it says so. A window of any length on a busy deployment is
 // more rows than a figure needs, so a fixed ceiling is read and the answer
 // reports how many it was measured over. A number quoted from a sample that
 // does not say it is a sample is the one thing a figure like this must not be.
@@ -123,13 +123,13 @@ const measuredAtMost = 5000
 
 // Measuring narrows the figures to part of the deployment.
 //
-// **Without it there were no per-team figures at all**, so a manager asking
+// Without it there were no per-team figures at all, so a manager asking
 // how their own people are doing read the deployment's numbers and a large
 // deployment's answer was the same for everybody.
 type Measuring struct {
 	// Products keeps judgments made in these products.
 	Products []int64
-	// People keeps judgments these people **proposed** — a team, resolved to
+	// People keeps judgments these people proposed — a team, resolved to
 	// its members by whoever asked.
 	//
 	// By the proposer for both waits, including the wait for a second person:

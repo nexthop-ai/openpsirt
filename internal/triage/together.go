@@ -28,7 +28,7 @@ import (
 // too, and a finding cannot import a triage decision.
 const DefaultTogetherCap = setting.DefaultTogetherCap
 
-// allowed is what every proposal in a bulk **judgment** has to satisfy before
+// allowed is what every proposal in a bulk judgment has to satisfy before
 // any of them is written.
 //
 // Checked over the whole set first, because refusing halfway is the failure
@@ -49,7 +49,7 @@ func allowed(subject access.Subject, proposals []Proposal, cap int, now time.Tim
 // permitted is everything except the bound: may this subject decide here, is
 // each proposal well formed, and is it recorded as made by whoever made it.
 //
-// **Split out because a bulk promise carries no bound.** What the cap is for is
+// Split out because a bulk promise carries no bound. What the cap is for is
 // reviewability — one sentence answering a thousand findings has to stay a size
 // a reviewer can follow, because nothing re-checks a dismissal afterwards. A
 // promise to upgrade is the one bulk write that verifies itself: the next scan
@@ -78,7 +78,7 @@ func permitted(subject access.Subject, proposals []Proposal, now time.Time) erro
 // before this ran — so they are resolved here, inside the transaction that
 // writes.
 //
-// **The component names a fold, not a package.** Naming any binary of a source
+// The component names a fold, not a package. Naming any binary of a source
 // package reaches all of them, which is the grain the list somebody picked from
 // already shows and the grain a bump is done at: one vim row on that list is
 // four packages at sixty-one places, and keyed on one binary it took four
@@ -110,7 +110,7 @@ type resolved struct {
 // which nobody does, or hiding them, which is refused.
 //
 // One outcome, one justification, one reasoning, one approval, and a separate
-// record per issue **and per place**. Each is keyed and expires on its own,
+// record per issue and per place. Each is keyed and expires on its own,
 // which is what makes one action across many findings defensible rather than a
 // blanket claim — and covering every place is what stops it reporting that it
 // answered a consumer it left open.

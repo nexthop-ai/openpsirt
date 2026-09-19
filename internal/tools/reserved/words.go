@@ -6,7 +6,7 @@ import "slices"
 // engines this runs against, so an invented alias spelled as one of them is a
 // query that parses here and fails there.
 //
-// **Two of the four are asked and two are typed**, and which is which is what
+// Two of the four are asked and two are typed, and which is which is what
 // this file has to be honest about. An engine upgrade adds reserved words —
 // MySQL and MariaDB both do, across minor releases — and a gate checking a
 // typed list keeps passing while a query inventing that alias fails as a
@@ -17,7 +17,7 @@ import "slices"
 //     "make check-engines" refuses to let drift.
 //   - SQLite and MariaDB publish nothing a query can read, so their words are
 //     typed below with the documentation each came from, and neither list is
-//     complete. **That is a gap**, and it is stated rather than glossed: a
+//     complete. That is a gap, and it is stated rather than glossed: a
 //     word either of them reserves that is not already answered by PostgreSQL
 //     or MySQL arrives here when somebody reads the page and types it.
 func reservedWords() []string {
@@ -30,8 +30,8 @@ func reservedWords() []string {
 //
 // From https://sqlite.org/lang_keywords.html, which names far more than these:
 // most of that page is already covered by what PostgreSQL and MySQL answer,
-// and the rest is not carried. **So this is a sample rather than a
-// derivation**, and the gap is the same shape as MariaDB's below — a word
+// and the rest is not carried. So this is a sample rather than a
+// derivation, and the gap is the same shape as MariaDB's below — a word
 // SQLite reserves that neither of the asked engines does, and that nobody has
 // typed here, is invisible.
 //

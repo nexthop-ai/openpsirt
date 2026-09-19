@@ -58,7 +58,7 @@ type BucketConfig struct {
 
 // NewBucket returns a store, or nil where the deployment configured none .
 //
-// **Credentials are taken from the environment when none are configured**,
+// Credentials are taken from the environment when none are configured,
 // which is the whole reason for the official client: a deployment on
 // a cloud provider gets a role that rotates rather than a long-lived key
 // somebody had to put in a variable and then keep.
@@ -130,7 +130,7 @@ func NewBucket(ctx context.Context, settings BucketConfig) (*Bucket, error) {
 	if err != nil {
 		return nil, fmt.Errorf("object store credentials: %w", err)
 	}
-	// **The address guard does not apply here, deliberately.** Everything the
+	// The address guard does not apply here, deliberately. Everything the
 	// guard exists for is an address that arrived from outside: a sign-in
 	// provider's endpoints come from a discovery document somebody else
 	// publishes, so they are pinned, refused a redirect and refused an

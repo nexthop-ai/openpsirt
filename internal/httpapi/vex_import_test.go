@@ -122,7 +122,7 @@ func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
 		if one.Publisher != "debian" || one.Statement == "" {
 			t.Errorf("the statement reads %+v, and the reasoning is the point", one)
 		}
-		// **Never applied.** Nothing was decided by uploading it.
+		// Never applied. Nothing was decided by uploading it.
 		if len(detail.Standing) != 0 {
 			t.Errorf("a VEX statement became a decision: %d standing", len(detail.Standing))
 		}
@@ -401,7 +401,7 @@ func TestAnUploadLeavesNothingBehindOnDisk(t *testing.T) {
 func TestTheDigestCoversTheWholeDocumentItStreamed(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
-		// The padding sits **outside** the top-level object, so the parser
+		// The padding sits outside the top-level object, so the parser
 		// stops at the closing brace and the drain past it actually runs.
 		// Inside the object it is a field the parser skips on its way to the
 		// end, which leaves the drain reading nothing and the test passing

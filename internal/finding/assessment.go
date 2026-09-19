@@ -76,9 +76,9 @@ var ErrNoSuchAssessment = errors.New("no assessment is recorded there")
 
 // Assess records what one product thinks of an issue.
 //
-// Rating something **worse** than published takes effect at once: nobody needs
+// Rating something worse than published takes effect at once: nobody needs
 // protecting from being told something is worse than the world says. Rating it
-// **milder** waits for a second person, because that is the direction that
+// milder waits for a second person, because that is the direction that
 // hides things — and it hides more than a position in a list. Severity sets
 // the deadline, so calling a high a low pushes its deadline out by months
 // , and where a product has said what is worth triaging at all, a
@@ -86,7 +86,7 @@ var ErrNoSuchAssessment = errors.New("no assessment is recorded there")
 // clock entirely. That is the same shape as every other act
 // that hides risk, and it is gated the same way.
 //
-// Asked of triage **on this product**. A rating moves this product's deadlines
+// Asked of triage on this product. A rating moves this product's deadlines
 // and can take its findings off its working list, and holding a role somewhere
 // else is not a reason to be trusted with either — which is what a single
 // deployment-wide rating let anybody with triage anywhere do.
@@ -208,7 +208,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 // second person here is somebody else: a control one person can complete alone
 // is not a control.
 //
-// The second person holds their role **on the product the rating belongs to**.
+// The second person holds their role on the product the rating belongs to.
 // Agreeing is what puts a milder rating into force, so it moves that product's
 // deadlines and its triage line, and a role held elsewhere buys nothing here.
 func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*Assessment, error) {
@@ -462,8 +462,8 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 // Reranked puts every open finding of these issues back where the signals now
 // say it belongs.
 //
-// **Three of the four signals the order is worked out from are properties of
-// the issue** — known exploitation, exploitation likelihood, and the score —
+// Three of the four signals the order is worked out from are properties of
+// the issue — known exploitation, exploitation likelihood, and the score —
 // and a report raises them for the issue wherever it appears. The fourth, the
 // rating, belongs to a product, so the order is worked out once per product
 // holding the issue rather than once for the deployment. The order is
@@ -478,7 +478,7 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 // stored because it cannot be worked out again is a different thing and is
 // not this.
 //
-// **Only the exploited flag moves a deadline**, and only for the rows it was
+// Only the exploited flag moves a deadline, and only for the rows it was
 // raised on, counted from when this was learned — the same rule and the same
 // moment the scanned build's own rows are clocked by. A score or a likelihood
 // moving deliberately changes no clock: neither is in the deadline, and a
@@ -705,8 +705,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 
 // Assessments lists what has been said about issues, newest first.
 //
-// Narrowed to the issues the reader may be told about **in the product the
-// claim belongs to**, which is the same rule the counts beside each row
+// Narrowed to the issues the reader may be told about in the product the
+// claim belongs to, which is the same rule the counts beside each row
 // already followed. A claim carries the severity recorded against the issue
 // and the argument somebody wrote about it, so a row about an undisclosed flaw
 // is that flaw's disclosure — reached by a route that reads as a list of

@@ -33,7 +33,7 @@ type Repeated struct {
 	Times int `bun:"times"`
 	// TotalDays is the sum of every deferral's span, in days.
 	//
-	// **A fraction, not a whole number.** Adding two moments' difference gives
+	// A fraction, not a whole number. Adding two moments' difference gives
 	// a fractional day on all four engines, and declaring it as an integer
 	// scanned on none of them: one refused a float outright and three handed
 	// back a decimal string. Rounded where it is shown rather than where it is
@@ -56,7 +56,7 @@ const DefaultRepeatedAt = 2
 
 // Repeats lists places that have been deferred more than once, worst first.
 //
-// **Counted over the decisions rather than over the findings.** A deferral is
+// Counted over the decisions rather than over the findings. A deferral is
 // one judgment about a place; the places fan out into as many findings as the
 // component has consumers, and counting those would order the list by how far
 // a component spreads through an image.

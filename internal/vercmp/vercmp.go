@@ -1,7 +1,7 @@
 // Package vercmp orders two versions of one package, where the ecosystem it
 // came from defines an ordering, and refuses where it does not.
 //
-// **The refusal is the point.** A comparison that answers confidently for a
+// The refusal is the point. A comparison that answers confidently for a
 // pair it cannot actually order is worse than no comparison, because the answer
 // arrives as a recommendation somebody schedules a release around. So callers
 // get two results — the comparison, and whether it means anything — and what

@@ -20,7 +20,7 @@ type Release struct {
 	// triage line: one per issue at a component, however many places it sits
 	// at there.
 	//
-	// **Not a row count.** Rows are places, and a component reached twenty
+	// Not a row count. Rows are places, and a component reached twenty
 	// ways carries the same issue twenty times — counting them reported
 	// 241,161 for a build every other screen reports at 7,546. The trend chart
 	// made exactly this mistake and its comment records the fix; this is the
@@ -103,8 +103,8 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		return nil, fmt.Errorf("read what is open against each build: %w", err)
 	}
 
-	// **Every build that has been scanned, whether or not anything is open
-	// against it.** Read separately and merged, because the counts come from
+	// Every build that has been scanned, whether or not anything is open
+	// against it. Read separately and merged, because the counts come from
 	// the findings and a build with none has no finding to be read from.
 	//
 	// Driven from the findings alone, a release with nothing open was simply

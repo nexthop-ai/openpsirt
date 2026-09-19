@@ -158,7 +158,7 @@ const dueLimit = 200
 
 // alreadyQueued is the builds a scan is already waiting or running for.
 //
-// **Read as identifiers rather than joined in the statement.** A job's
+// Read as identifiers rather than joined in the statement. A job's
 // reference is text, because a job may be about anything, and a target's
 // identifier is a number, so joining them means converting one inside the
 // query — and there is no spelling of that all four engines agree on. The one
@@ -194,12 +194,12 @@ func (s *Schedule) alreadyQueued(ctx context.Context) ([]int64, error) {
 
 // due is which builds have not been scanned within the interval.
 //
-// **Only builds that hold an inventory.** A target is declared before anything
+// Only builds that hold an inventory. A target is declared before anything
 // is filed against it, and scanning one with no components would record a run
 // that found nothing against a build that has nothing — an empty answer that
 // reads exactly like a clean one.
 //
-// **And not the ones already queued.** A job per cycle for a build the queue
+// And not the ones already queued. A job per cycle for a build the queue
 // has not reached yet would pile up as many jobs as cycles, each of which does
 // the same work when it finally runs.
 func (s *Schedule) due(ctx context.Context, every time.Duration, queued []int64) ([]int64, error) {

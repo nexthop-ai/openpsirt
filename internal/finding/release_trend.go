@@ -40,13 +40,13 @@ var ErrNoProductNamed = errors.New("release over release is a question about one
 
 // ReleaseTrend reports what is open against each tagged release of a product.
 //
-// **The axis follows what is being viewed**. A branch is scanned
+// The axis follows what is being viewed. A branch is scanned
 // nightly and has continuous data, so a calendar reads correctly on it. A tag
 // is one frozen point that never moves again, and releases months apart make a
 // calendar count read as slow drift rather than the step change it was — the
 // gaps between them are the chart's whole shape, and they are gaps in nothing.
 //
-// **Rates are not offered here.** How many appeared and were resolved between
+// Rates are not offered here. How many appeared and were resolved between
 // two releases is a different question from what each shipped with, and the
 // answer would be an artifact of how far apart somebody cut them. Rates always
 // plot on calendar.

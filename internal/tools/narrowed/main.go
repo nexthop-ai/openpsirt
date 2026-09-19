@@ -6,7 +6,7 @@
 // deliberately: what they were told already names the product, so refusing to
 // resolve it would refuse them the one thing they were granted while telling
 // them nothing they did not already know. What makes that safe is the sentence
-// beside it — **every read past this asks about the issue again**.
+// beside it — every read past this asks about the issue again.
 //
 // Nothing enforced that sentence. A collaborator on one embargoed issue
 // received every approved statement for the whole build, because the read that
@@ -21,7 +21,7 @@
 // subject, or to resolve an address further; it may not be handed to a read
 // that does not.
 //
-// **The names, and the address resolved from them.** A build resolved this way
+// The names, and the address resolved from them. A build resolved this way
 // is almost never read directly: it is handed to the call that turns a release
 // and a variant into a build, and the finding query is keyed on what that
 // returned. So what a resolver hands back is followed as another name, and
@@ -246,7 +246,7 @@ func resolvedIn(body *ast.BlockStmt) map[string]token.Pos {
 // derivedIn returns what a call that resolves the rest of an address was bound
 // to, given the names already resolved.
 //
-// **The hop that consumed the check.** Almost every site hands the resolved
+// The hop that consumed the check. Almost every site hands the resolved
 // names straight to one of the address resolvers and then reads through what
 // that returned, so the one use this program could see was the exempt one and
 // there was nothing left to check. The build a resolver hands back stands for

@@ -747,7 +747,7 @@ func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
 
 // A name this deployment calls its own never reaches an index.
 //
-// **What a pass sends is a component's name**, and for something built here
+// What a pass sends is a component's name, and for something built here
 // that is the name of a project, a team or a product nobody has announced. The
 // assertion is on what was asked rather than on what was stored, because the
 // two are recorded identically on purpose and a check on storage alone would

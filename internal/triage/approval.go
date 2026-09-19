@@ -50,7 +50,7 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int6
 
 // revise is the whole of a revision, inside a transaction the caller opened.
 //
-// **The policy is checked here rather than by each caller.** Every path that
+// The policy is checked here rather than by each caller. Every path that
 // stores typed text runs it before the text is stored, so that what is in the
 // column is known to have passed what was in force when it arrived — and a
 // second entry point that reached the write without it stored raw HTML,
@@ -103,7 +103,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	// something rather than seeing it for the first time — which is what the
 	// kept approval rows say.
 	//
-	// **Whole, because the argument is whole.** Per row, revising one of
+	// Whole, because the argument is whole. Per row, revising one of
 	// forty-four returned that row to the queue and left the other forty-three
 	// saying the old thing under a claim that read as agreed.
 	if _, err := s.db.NewUpdate().Model((*Approval)(nil)).

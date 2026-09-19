@@ -64,7 +64,7 @@ type Match struct {
 // the decision does not reach it and somebody has to say whether the same
 // reasoning holds.
 //
-// **The build this is being decided in is searched too**, and that is the
+// The build this is being decided in is searched too, and that is the
 // point. A build commonly ships one name at several versions — the reference
 // image carries the Go standard library at four — so the same issue at the
 // same place sits at versions right beside the one being decided. Looking only

@@ -273,7 +273,7 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			return asked, nil
 		}
 
-		// **A name of ours never leaves, and is still answered.** Recorded
+		// A name of ours never leaves, and is still answered. Recorded
 		// exactly as an unanswerable one below is, and for the same reason:
 		// left unrecorded it would stay due for ever, and the window takes
 		// the never-asked first, so it would hold the head of every pass
@@ -281,7 +281,7 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		// the two apart afterwards is the same list applied again, which is
 		// what the report of what was held back is.
 		//
-		// **Anything an index said is dropped.** It was obtained by sending
+		// Anything an index said is dropped. It was obtained by sending
 		// this name, which is the thing that stops here. Kept, the version
 		// stays on the screen with nothing that will ever refresh it, the
 		// component never reaches the report of what was held back, and the

@@ -1,7 +1,7 @@
 // Package currency asks each ecosystem's index what the newest version of
 // something is, and when it shipped.
 //
-// **This is the one thing here that reaches the network.** Everything a scan
+// This is the one thing here that reaches the network. Everything a scan
 // needs arrives as a file somebody imports, deliberately, so that a scan
 // answers the same way twice and nothing it depends on is somebody else's
 // server being up (REQ-12). That rule is about the scan path, and this is not
@@ -9,7 +9,7 @@
 // off unless a deployment turns it on, and a deployment that cannot reach out
 // loses this answer and nothing else.
 //
-// **What leaves is a component's name.** One request per component, carrying
+// What leaves is a component's name. One request per component, carrying
 // the name and nothing else. For an open-source dependency that is public
 // knowledge; for something built here it is the name of a project, a team or a
 // product nobody has announced, so what this deployment calls its own is held

@@ -338,7 +338,7 @@ func TestAlpineOrdersTheTokensItsOwnSuiteNeverPairs(t *testing.T) {
 // knowledge: every rule each algorithm has is a case below, and the ones that
 // contradict what anybody would write from the format description say so.
 //
-// **The cost of writing our own is that nobody else chose the cases**, so a
+// The cost of writing our own is that nobody else chose the cases, so a
 // pair nobody here thought of is not covered. Against that, each case names
 // the rule it pins, which a borrowed suite does not.
 
@@ -358,7 +358,7 @@ func TestRPMVersionsOrderTheWayRpmvercmpOrdersThem(t *testing.T) {
 		{"a dot and an underscore are one separator", "1.2", "1_2", 0},
 		{"two separators are one", "1.2", "1..2", 0},
 
-		// **Leading zeros carry no value at all**, which is the one most
+		// Leading zeros carry no value at all, which is the one most
 		// likely to be written wrong: these are the same version, not
 		// neighbours.
 		{"a run of zeros is the number it spells", "10.0001", "10.1", 0},
@@ -369,7 +369,7 @@ func TestRPMVersionsOrderTheWayRpmvercmpOrdersThem(t *testing.T) {
 		{"ten is more than one", "5.5p10", "5.5p1", 1},
 		{"a letter run is compared as text", "10b2", "10a1", 1},
 
-		// **A numeric run outranks an alphabetic one at the same position.**
+		// A numeric run outranks an alphabetic one at the same position.
 		{"a number outranks a letter", "1.2", "1.a", 1},
 		// Which is why a release candidate spelled as a further segment is
 		// *newer* than the release: the letters are extra, not a pre-release
@@ -415,8 +415,8 @@ func TestAlpineVersionsOrderTheWayApkOrdersThem(t *testing.T) {
 		{"a further part", "1.0.1", "1.0", 1},
 		{"a letter after the numbers", "1.0a", "1.0", 1},
 
-		// **A part with a leading zero is compared as text, not as a
-		// number**, which is the rule nothing in the format description says
+		// A part with a leading zero is compared as text, not as a
+		// number, which is the rule nothing in the format description says
 		// and the one that reverses the obvious answer.
 		{"a leading zero makes a part a fraction", "8.2.0015", "8.2.002", -1},
 		{"and so orders 07 below 10", "1.02.07", "1.02.10", -1},

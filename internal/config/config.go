@@ -394,7 +394,7 @@ func Load() (Config, error) {
 
 // absoluteBase refuses a deployment address that is not one.
 //
-// **Checked here so that every consumer may assume it is absolute**, which
+// Checked here so that every consumer may assume it is absolute, which
 // four of them already did. It was the one string setting with a required
 // shape that nothing parsed, and the failure was silent where it mattered
 // most: `OPENPSIRT_BASE_URL=psirt.example.com` — the form the value takes in a

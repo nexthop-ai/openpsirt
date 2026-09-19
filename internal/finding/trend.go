@@ -50,8 +50,8 @@ type Point struct {
 	// its critical share rises is getting worse, and one line hides that.
 	BySeverity map[string]int
 	// OpenedBySeverity and ResolvedBySeverity are the same split over the two
-	// flows. **The question a backlog is read for is what kind of thing is
-	// arriving and what kind is being answered**: ten arriving and ten
+	// flows. The question a backlog is read for is what kind of thing is
+	// arriving and what kind is being answered: ten arriving and ten
 	// resolved is a team keeping pace where both are low, and a team losing
 	// ground where the ten arriving are critical and the ten resolved are
 	// not. Split only on the open count, that reads as a flat line.

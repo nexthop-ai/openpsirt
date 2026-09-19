@@ -294,14 +294,14 @@ type what struct {
 // aboutEach names what each decision was about, for the whole page at once.
 //
 // A decision stores the place as a hash of names rather than the names, so
-// what it was about is recovered from a finding at that place. **Findings in
-// any state, not only open ones**: a judgment about something that has since
+// what it was about is recovered from a finding at that place. Findings in
+// any state, not only open ones: a judgment about something that has since
 // been fixed or removed is exactly what an audit asks for, and joining only
 // open findings would leave the oldest and most interesting rows unnamed.
 //
 // The earliest matching finding, so the answer is stable between reads rather
-// than moving as rows open and close underneath it. **One finding, chosen
-// first, and all five names read off it**: a minimum per column over the
+// than moving as rows open and close underneath it. One finding, chosen
+// first, and all five names read off it: a minimum per column over the
 // matching set is five independent answers, so a decision matching findings at
 // two components produced a row naming a component, a version and a consumer
 // that never appeared together.

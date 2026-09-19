@@ -39,12 +39,12 @@ func (e Embargoed) Passed(now time.Time) bool { return !e.DiscloseAt.After(now) 
 // Disclosing reports what is approaching disclosure, and what is past it,
 // soonest first.
 //
-// **Before the date, not on it**. The date arriving is the last
+// Before the date, not on it. The date arriving is the last
 // moment to act on it rather than the first useful warning, and a list that
 // only ever showed what was already overdue would be a list of decisions
 // somebody has already failed to make.
 //
-// **Nothing here discloses anything.** Reaching the date escalates: the row
+// Nothing here discloses anything. Reaching the date escalates: the row
 // appears, and the people who can act on it are told. Publishing embargoed
 // detail because a timer expired is the wrong default — if the fix is not
 // ready, disclosing anyway is a decision a person makes.
@@ -200,17 +200,17 @@ var ErrBackwards = errors.New("an extension moves a date later, not earlier")
 // Extend asks to move the end of an embargo, and reports whether it took
 // effect or is waiting for somebody to agree.
 //
-// **A reason is required, always**, however short the extension. One with no
+// A reason is required, always, however short the extension. One with no
 // reason is the record saying somebody moved it and nothing else, which is the
 // state the whole table exists to prevent.
 //
-// **Past a threshold it needs a second person**, and it is the same
+// Past a threshold it needs a second person, and it is the same
 // act a deferral is — keeping risk hidden for longer — so it is measured the
 // same way: against everything this embargo has *already* been moved by, not
 // against this request alone. Measured per request the exception swallows the
 // rule three weeks at a time.
 //
-// **An extension that needs agreement does not move the date until it has it.**
+// An extension that needs agreement does not move the date until it has it.
 // A proposal waiting for a second person changes nothing about the finding it
 // is about, which is already true of a decision waiting for one; an embargo
 // that quietly ran on while somebody thought about it would be the extension

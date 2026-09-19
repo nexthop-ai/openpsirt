@@ -4,7 +4,7 @@ import "strings"
 
 // rpmOrder compares two RPM versions: epoch, then version, then release.
 //
-// **Transcribed from rpmvercmp rather than derived.** The algorithm is not
+// Transcribed from rpmvercmp rather than derived. The algorithm is not
 // something to reason out from a description — the tilde and caret rules, a
 // numeric run outranking an alphabetic one, and separators being skipped
 // wholesale are each a decision somebody made, and the published test vectors

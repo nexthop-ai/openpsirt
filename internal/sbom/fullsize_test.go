@@ -100,7 +100,7 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	// one .deb, and this reader absorbed it; the generator now merges them at
 	// the source (sonic-buildimage #29237).
 	//
-	// **So this test no longer proves the merge works**, and saying otherwise
+	// So this test no longer proves the merge works, and saying otherwise
 	// was the mistake in the last version of this comment. With nothing left
 	// to merge, deleting the merging code entirely leaves both assertions
 	// below passing — verified by doing it. What they prove now is narrower
@@ -119,7 +119,7 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	// 6,854 when the generator started describing the programs in the image
 	// (sonic-buildimage #29237), and the prediction written down beforehand
 	// was that it would rise by the number of programs; it rose by the number
-	// of **distinct program names**, because a program arrives with no version
+	// of distinct program names, because a program arrives with no version
 	// and no package identifier, so identity — a name and a version — cannot
 	// tell two of the same name apart. That was 13 programs under 9 names.
 	//
@@ -130,7 +130,7 @@ func TestARealImageReadsAsOneComponentPerPackage(t *testing.T) {
 	// before. Twelve Go modules that had no consumer at all now hang off one
 	// of them.
 	//
-	// **Nothing in this fixture is merged by name any more**, so it no longer
+	// Nothing in this fixture is merged by name any more, so it no longer
 	// shows what the paragraph above describes: the four programs that
 	// appeared twice each did so because the otel container shipped its own
 	// `dockerd`, `containerd` and `runc`, and it no longer ships them. The

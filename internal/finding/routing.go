@@ -146,18 +146,18 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 
 // ApplyRules places work nobody holds, one bounded batch at a time.
 //
-// **Only what nobody holds**. A human assignment always wins, and
+// Only what nobody holds. A human assignment always wins, and
 // running a rule never takes something out of somebody's hands — so the write
 // matches on a null holder, at the moment of the write, rather than on a set
 // read beforehand.
 //
-// **First match wins**, which is why the rules are applied in order
+// First match wins, which is why the rules are applied in order
 // and each one only ever sees what the ones before it left.
 //
 // Returns how many findings it placed, whether the batch filled, and the rules
 // it could not run.
 //
-// **Filling is measured by what was read, not by what was written.** The two
+// Filling is measured by what was read, not by what was written. The two
 // differ: the page is bounded on rows read and the write re-checks the holder,
 // so a single assignment landing inside the window makes one row of the batch
 // somebody else's. Reading "wrote fewer than the cap" as "reached the end"
@@ -165,7 +165,7 @@ func (s *Store) RetireRule(ctx context.Context, by access.Subject, productID, id
 // thousand findings in it, silently, with the job reported successful and the
 // rest never routed.
 //
-// **A rule that has outgrown the bound places nothing and stops nothing else.**
+// A rule that has outgrown the bound places nothing and stops nothing else.
 // It was accepted when it was written and the tree grew under it, which is not
 // a fault of the sweep's — and the condition is permanent, so returning it as a
 // job failure stopped that product's routing entirely, every rule ordered after
@@ -318,7 +318,7 @@ func bySource(query *bun.SelectQuery, pattern string) *bun.SelectQuery {
 // a metacharacter — a package name is full of dots and plus signs and dashes,
 // and a syntax where those mean something is a syntax that surprises.
 //
-// **What SQL treats as special is escaped.** `%` and `_` are wildcards to
+// What SQL treats as special is escaped. `%` and `_` are wildcards to
 // LIKE and appear in real package names (`libssl_1_1`), so a pattern that let
 // them through would silently match more than it said. The escape character is
 // `#` rather than a backslash, because a backslash inside a string literal is
@@ -367,7 +367,7 @@ type Catches struct {
 // would be a confident wrong answer about the one thing nobody can otherwise
 // see.
 //
-// **It does not account for the rules already there.** First match wins, so
+// It does not account for the rules already there. First match wins, so
 // what this catches is what it would place only where no earlier rule claimed
 // it first — which is why the numbers are named for matching rather than for
 // placing.

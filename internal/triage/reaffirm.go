@@ -310,7 +310,7 @@ func (s *Store) carryApproval(ctx context.Context, made *Decision, claim Claim, 
 
 // carryApprovalTo is the same for every row of one act.
 //
-// **One approval row, however many decisions it stands over.** An agreement is
+// One approval row, however many decisions it stands over. An agreement is
 // an agreement to a claim's words, and the claim is what an approver reads —
 // written per decision, one person agreeing once would appear in the record
 // forty five times. The rows it takes effect on are updated together, because
@@ -403,7 +403,7 @@ type Lapsed struct {
 // image holds tens of thousands of places, and a sweep costing a write per
 // place is a sweep somebody turns off.
 //
-// **A decision covering nothing in the product is not lapsed.** A component
+// A decision covering nothing in the product is not lapsed. A component
 // that is gone altogether closed its findings and there is nothing to ask
 // anybody about, where a component still present at a different version is
 // exactly the question somebody has to answer again.
@@ -484,7 +484,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 		return Lapsed{}, err
 	}
 
-	// **Marked and read back as one act, a bounded batch at a time.** It was
+	// Marked and read back as one act, a bounded batch at a time. It was
 	// three statements on the pool with nothing around them: a crash between
 	// the update and the read left rows lapsed with nobody told, which is the
 	// outcome marking a lapse exists to prevent. And the rows were identified
@@ -833,7 +833,7 @@ type ReaffirmingClaim struct {
 	// which is what makes it one thing a second person can read.
 	Reasoning string
 	By        int64
-	// Cap bounds a re-affirmed **judgment**, which this mostly is: the outcome
+	// Cap bounds a re-affirmed judgment, which this mostly is: the outcome
 	// comes from the claim being re-made, so re-affirming a bulk dismissal
 	// comes through here. A promise carries no bound, because the next scan
 	// re-checks it; nothing re-checks a dismissal, which is the reason the cap
@@ -857,8 +857,8 @@ type Reaffirmed struct {
 
 // ReaffirmClaim re-makes every lapsed row of one action, in one act.
 //
-// **Deciding is bulk-capable at three grains and re-deciding was capable at
-// none.** A team answering one kernel issue writes a decision at each of its 45
+// Deciding is bulk-capable at three grains and re-deciding was capable at
+// none. A team answering one kernel issue writes a decision at each of its 45
 // places in one action; when the kernel moves, those 45 lapse and restoring
 // them was 45 requests with 45 separately typed justifications. This is the one
 // path that is safe to make cheap — a version bump is a prompt to re-check
@@ -917,7 +917,7 @@ func (s *Store) reaffirmClaim(ctx context.Context, subject access.Subject,
 	// place and an undisclosed one is not one a public triager may re-make in
 	// part.
 	//
-	// **Before the proposer check, not after** (REQ-42). Refusing on the
+	// Before the proposer check, not after (REQ-42). Refusing on the
 	// proposer first answered a claim in a product the caller cannot see
 	// differently from one that does not exist — one sentence against a bare
 	// refusal — which turns walking claim identifiers into a directory of
@@ -1062,7 +1062,7 @@ func placeKey(productID, vulnerabilityID int64, placeIdentity string) string {
 // whereTheyAreNow is the versions each lapsed place sits at today, which is
 // what the re-made decisions expire on.
 //
-// **Narrowed by the two lists rather than by the pairs.** No engine here spells
+// Narrowed by the two lists rather than by the pairs. No engine here spells
 // a comparison against a pair of columns the same way, so the statement asks
 // for the issues and the places separately — a superset — and the pairing is
 // done on the way back.

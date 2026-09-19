@@ -238,7 +238,7 @@ func (s *Store) SetStreamEndOfLife(ctx context.Context, streamID int64, on *time
 
 // SetReleasedOn records when a release actually went out, or clears it.
 //
-// **Settable after the fact, because that is when it is usually known.** A tag
+// Settable after the fact, because that is when it is usually known. A tag
 // is declared here so scans can be filed against it, which happens whenever
 // somebody gets to it — before the release, months after, or as part of
 // backfilling a year. Ordering releases by when they were declared here makes
@@ -270,7 +270,7 @@ func (s *Store) SetReleasedOn(ctx context.Context, streamID int64, on *time.Time
 // FillInParent records which branch a tag was cut from, where nothing has been
 // said yet.
 //
-// **Filling in, never changing**. A pipeline that does not know
+// Filling in, never changing. A pipeline that does not know
 // declares the tag without a parent, and release readiness then reports that
 // nothing has ever been released from the branch — which is indistinguishable
 // from a branch that has genuinely shipped nothing. Saying it late is the same
@@ -447,8 +447,8 @@ func (s *Store) StreamsPastEndOfLife(ctx context.Context, at time.Time) ([]int64
 
 // StreamsEndingBy is which releases will have gone out of support by a date.
 //
-// The same question asked of a day that has not arrived. **Nothing warns
-// before a release crosses**: the day it does, the deadline comes off every
+// The same question asked of a day that has not arrived. Nothing warns
+// before a release crosses: the day it does, the deadline comes off every
 // open finding on it, and a pile of work leaves every overdue count at once
 // with nobody having decided anything. Asking ahead is what makes that a date
 // somebody can plan for rather than a figure that moves overnight.
@@ -500,8 +500,8 @@ type Retired struct {
 // OutOfSupport lists the releases somebody may see that have gone out of
 // support.
 //
-// **Which releases those are is asked of StreamsEndingBy rather than spelled
-// again.** The date comparison lives in exactly one place. A report
+// Which releases those are is asked of StreamsEndingBy rather than spelled
+// again. The date comparison lives in exactly one place. A report
 // that worked it out for itself would eventually describe a different set of
 // releases from the one whose deadlines were stripped, and it is the report
 // people would believe.
@@ -593,7 +593,7 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 // SetTriageFloor records what a product considers worth triaging, or clears it
 // so the product follows the deployment again.
 //
-// **Cleared rather than set to the deployment's current value.** A product that
+// Cleared rather than set to the deployment's current value. A product that
 // copied the line the day somebody looked at it would stop following the
 // deployment the next time the deployment changed its mind, and nobody would
 // see that happen.

@@ -34,8 +34,8 @@ func types(ctx context.Context) (*columnTypes, error) {
 
 // apply runs a migration's statements in order, naming the one that failed.
 //
-// **It also makes a re-run resume rather than collide, on the two engines that
-// cannot roll one back.** Every migration here is registered in the library's
+// It also makes a re-run resume rather than collide, on the two engines that
+// cannot roll one back. Every migration here is registered in the library's
 // transactional form and takes a transaction, and on MySQL and MariaDB that
 // transaction is decorative: both commit implicitly before and after every
 // data-definition statement. A failure at statement N leaves 1 to N-1
@@ -50,7 +50,7 @@ func types(ctx context.Context) (*columnTypes, error) {
 // The other two engines have transactional data definition and never see this;
 // the check is skipped there rather than being a cost they pay for nothing.
 //
-// **The probe names the exact object the statement names**, and a statement
+// The probe names the exact object the statement names, and a statement
 // whose object it cannot identify is run rather than guessed at, failing the
 // way it always did.
 //
@@ -205,8 +205,8 @@ func typesFor(e database.Engine) *columnTypes {
 			// strict mode, leaving an approver agreeing to words that are
 			// not the words that were written.
 			//
-			// **The producer-supplied slot is the same type, for a stronger
-			// reason.** Typed text is at least bounded at submission; this is
+			// The producer-supplied slot is the same type, for a stronger
+			// reason. Typed text is at least bounded at submission; this is
 			// text a producer put in a scan file, of no length anything here
 			// controls, and it was the *smaller* of the two — 64 KB against
 			// 16 MB, on these two engines only, which is the inversion of

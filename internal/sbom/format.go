@@ -22,8 +22,8 @@ type vocabulary struct {
 //
 // Three of them for two formats: the third major version of SPDX has a table
 // of its own rather than a branch in the second's, because it shares no key
-// with it. **A vocabulary rather than a format is what a document is checked
-// against being two of**, since two major versions of one format are as
+// with it. A vocabulary rather than a format is what a document is checked
+// against being two of, since two major versions of one format are as
 // unreadable together as two formats are.
 var vocabularies = []vocabulary{
 	{format: CycloneDX, name: "CycloneDX 1.x", top: cyclonedxTop},
@@ -33,8 +33,8 @@ var vocabularies = []vocabulary{
 
 // ReadHeader reads what a document says about itself and stops.
 //
-// The contents are skipped rather than parsed **where the format states its
-// header outside them**, which two of the three do. It is not free even then —
+// The contents are skipped rather than parsed where the format states its
+// header outside them, which two of the three do. It is not free even then —
 // the interesting fields are not guaranteed to come first, and some producers
 // sort their keys — but skipping values costs a walk rather than a structure
 // per component.
@@ -72,14 +72,14 @@ func Read(r io.Reader, lim Limits) (*Document, error) {
 // read walks the document once, routing each top-level key to the vocabulary
 // that owns it.
 //
-// **A key is read by the format that owns it rather than by the format the
-// document has declared so far**, because the declaration arrives in no
+// A key is read by the format that owns it rather than by the format the
+// document has declared so far, because the declaration arrives in no
 // guaranteed position: a producer sorting its keys puts SPDX's `packages`
 // ahead of its `spdxVersion`, and CycloneDX's `components` ahead of nothing at
 // all. Requiring the declaration first would refuse documents that are
 // perfectly well formed.
 //
-// **Which vocabulary each key was routed to is recorded**, and that rather than
+// Which vocabulary each key was routed to is recorded, and that rather than
 // the keys being disjoint is what makes the arrangement safe. A handler writes
 // to the document before anything has checked what the document is, and both
 // formats state an identity — so a file carrying both keys would be stored
@@ -138,7 +138,7 @@ func (c *reader) checkFormat() error {
 		return fmt.Errorf("scan file does not say what format it is: it is neither %s nor %s",
 			CycloneDX, SPDX)
 	}
-	// **Half a declaration is not a declaration.** Either key alone leaves the
+	// Half a declaration is not a declaration. Either key alone leaves the
 	// other unstated, and an unstated version is a version this was not written
 	// against — which is what the by-name refusal exists to catch. Stating one
 	// of the two is the shape a fragment has, or of something else entirely

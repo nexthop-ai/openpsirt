@@ -13,7 +13,7 @@ import (
 
 // Spent is what the work went into, for one component in one product.
 //
-// **Where the effort went, not how much there is.** Every other figure here
+// Where the effort went, not how much there is. Every other figure here
 // counts the backlog — what is open, what is overdue, how long things wait.
 // None of them answers the question a manager asks at a planning meeting:
 // what did the last quarter actually go into. Read from the record, because
@@ -76,7 +76,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		// keeps its row, which is what a report about where the time went has
 		// to keep.
 		//
-		// **Joined rather than asked as a subquery in the select list.** The
+		// Joined rather than asked as a subquery in the select list. The
 		// same expression in the list and in the grouping is refused outright
 		// by MySQL and MariaDB under ONLY_FULL_GROUP_BY, because it reads
 		// columns the grouping does not carry — so the report answered on two

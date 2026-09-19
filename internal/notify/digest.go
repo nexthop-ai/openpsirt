@@ -289,7 +289,7 @@ func itemOf(row finding.Owned) Item {
 // Read once for the whole digest rather than asked per row: a person holding
 // two hundred things would otherwise be two hundred queries to answer one
 // message.
-// **Bounded**, on a table nothing prunes. Every other read in this package
+// Bounded, on a table nothing prunes. Every other read in this package
 // carries one, and this had neither a window nor a ceiling: it returned every
 // notification a person had ever received, once per person per digest cycle.
 func ToldAbout(ctx context.Context, db *bun.DB, personID int64) (map[string]bool, error) {

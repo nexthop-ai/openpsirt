@@ -8,7 +8,7 @@ package database
 // the list's own default — and spelling it out at each site is how two lists
 // that should agree come to differ by a number nobody chose.
 //
-// **This is the second statement of the ceiling, not the first.** The API
+// This is the second statement of the ceiling, not the first. The API
 // declares it on the parameter and refuses anything larger with a message
 // naming the bound, which is the answer a caller should get. This one is the
 // store defending itself against a caller that is not the API — a background
@@ -66,7 +66,7 @@ var (
 	// AWholeDocument is a machine-readable document generated in one piece: a
 	// build's VEX statements, which a customer's own scanner reads.
 	//
-	// **It is a refusal rather than a page.** There is no second request for
+	// It is a refusal rather than a page. There is no second request for
 	// the rest, and a document that quietly stopped at the ceiling would say
 	// "nothing is claimed about this" by omission — which is the one thing a
 	// document of dismissals must never say. Large, because a build with a

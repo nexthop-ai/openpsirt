@@ -8,7 +8,7 @@
 // PostgreSQL, and the day somebody writes `AS usage` the suite is green on
 // three engines and a production deployment on the fourth stops answering.
 //
-// **An invented name is reported for being bare, not for being reserved.**
+// An invented name is reported for being bare, not for being reserved.
 // This checked the word against a list of 321 the four engines reserve, which
 // is a strictly weaker property than the rule it was the enforcement of —
 // AGENTS.md says every identifier is quoted, including the names a query
@@ -21,7 +21,7 @@
 // It found 1,418 of them against 34 already quoted, so no reader could tell
 // which was the convention.
 //
-// **What it still cannot see is a name that is not in a literal.** An alias
+// What it still cannot see is a name that is not in a literal. An alias
 // assembled from two pieces — `"… AS " + state.alias` — is invisible to
 // anything reading source as text, and there is no parser here for four
 // dialects. That is the safe direction for a check that fails a build, and it
@@ -33,7 +33,7 @@
 // are declared, and the question there is whether a declared name collides
 // with a reserved word — which is what the list is for.
 //
-// **Only the names this code invents.** A column that exists in the schema is
+// Only the names this code invents. A column that exists in the schema is
 // not an invented name: it was declared in a migration, which every engine has
 // already accepted, and quoting or renaming those is a different job. What
 // this reads is `AS <word>`, which is exactly the syntax for making one up.
@@ -83,7 +83,7 @@ var statement = regexp.MustCompile(`(?i)\b(?:FROM|JOIN)\s+"`)
 // IF EXISTS" declares nothing called "if", and reporting one is how a check
 // that reads text rather than parsing it goes wrong.
 //
-// **Only inside the migrations**, where every string is DDL by construction,
+// Only inside the migrations, where every string is DDL by construction,
 // so the false positives that keep this check narrow elsewhere cannot arise.
 // The alias pattern above cannot see these at all — a `DROP TABLE` names no
 // alias and contains no AS — so a table renamed to something one engine

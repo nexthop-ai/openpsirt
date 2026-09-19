@@ -541,7 +541,7 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 			// one is due has already failed, and on SQLite it is waiting for
 			// the single connection the work itself is holding.
 			//
-			// **On that engine it cannot succeed while the work runs**, so
+			// On that engine it cannot succeed while the work runs, so
 			// the claim timeout is the whole of the protection there rather
 			// than a margin around this: it has to exceed the longest single
 			// unit of work, or the claim goes stale and the job is run again
@@ -620,7 +620,7 @@ func (q *Queue) Succeed(ctx context.Context, id int64, worker string) error {
 // it is allowed to be, in which case it is set aside. Retrying for ever would
 // let one job that can never succeed crowd out work that could.
 func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) error {
-	// **The attempt count and the write that acts on it, in one act.** The
+	// The attempt count and the write that acts on it, in one act. The
 	// count was read with a bare select and compared in Go, so whether this
 	// was the last attempt rested on a value fetched separately from the
 	// statement that buries or re-queues the job. The claimed-by predicate

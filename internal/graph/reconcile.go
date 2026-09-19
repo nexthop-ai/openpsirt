@@ -103,7 +103,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64, wan
 // edgeAt identifies one declared dependency: the pair and what the producer
 // said the dependency's scope is.
 //
-// **The scope is part of the key.** A producer that starts describing the same
+// The scope is part of the key. A producer that starts describing the same
 // pair differently has said something different, and an edge carrying the
 // earlier word while the document says another is a record of what nobody
 // sent. Closing the one and opening the other is what every other change to a

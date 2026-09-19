@@ -530,7 +530,7 @@ func sameDay(a, b *time.Time) bool {
 // which refuses that one reason, correctly: there is nowhere for it to say
 // what stops it.
 //
-// **Two outcomes may carry one and they ask for it differently.** A claim that
+// Two outcomes may carry one and they ask for it differently. A claim that
 // mitigations already exist *is* the mitigation, so it is required there. A
 // claim that something will not be fixed is a standing property of a shipped
 // feature — a protocol that cannot change without breaking what it is
@@ -580,7 +580,7 @@ func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Valid() {
 		return fmt.Errorf("%q is not an outcome", p.Outcome)
 	}
-	// **A tag cannot be fixed.** It was built once and is what somebody
+	// A tag cannot be fixed. It was built once and is what somebody
 	// received, so an outcome that names a date is a statement about a thing
 	// that will not move: a deferral says somebody will look again when
 	// nothing will have changed, and a promise to act says work will land in a
@@ -648,7 +648,7 @@ func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Commits() && p.CommittedTo != nil {
 		return fmt.Errorf("%q promises no work, so there is no date for it to land on", p.Outcome)
 	}
-	// **A date already past is not a date.** Nothing here checked, and the two
+	// A date already past is not a date. Nothing here checked, and the two
 	// dates fail in opposite directions: a deferral until last year takes the
 	// place's live key so nobody else may decide there, suppresses nothing,
 	// and lands in the review queue already run out — a work item the tool
@@ -704,8 +704,8 @@ const versionLimit = 191
 // matched on.
 //
 // Refused here rather than left to the write, which would answer with a
-// driver's message about a column nobody reading it has heard of. **Refused
-// rather than truncated**, which is the important half: a decision keyed on a
+// driver's message about a column nobody reading it has heard of. Refused
+// rather than truncated, which is the important half: a decision keyed on a
 // shortened version would be compared against the finding's full one and match
 // nothing, so the claim would stand on the record, cover nothing, and say so
 // nowhere.

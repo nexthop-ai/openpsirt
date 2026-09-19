@@ -13,7 +13,7 @@ func init() {
 
 // The destinations this deployment posts to.
 //
-// **One signed request, not an adapter each.** Nothing leaves this deployment
+// One signed request, not an adapter each. Nothing leaves this deployment
 // but mail, and every comparable tool reaches a chat channel and a tracker;
 // without one, a fix target is a wish and an approver discovers a claim by
 // opening the queue. One signed HTTP request gives Slack, Teams, a tracker
@@ -21,10 +21,10 @@ func init() {
 // which is what the channel interface was for, reached more cheaply than by
 // writing two of them.
 //
-// **Per kind**, so a deployment can send what is worth interrupting somebody
+// Per kind, so a deployment can send what is worth interrupting somebody
 // for to a paging endpoint and leave the rest in the notification area.
 //
-// **The secret is stored as it is, and that is deliberate.** Every other
+// The secret is stored as it is, and that is deliberate. Every other
 // credential here is hashed because it authenticates somebody to us;
 // this one authenticates *us* to somebody else, so it has to be recoverable to
 // sign with — the same reason a mail password is. It is never returned by any

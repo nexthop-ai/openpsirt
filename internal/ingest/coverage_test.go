@@ -168,7 +168,7 @@ func TestScanningTellsAPipelineKeyNothing(t *testing.T) {
 	// was last scanned by anybody is a fact about the deployment, and a key
 	// that could read it would learn about uploads it did not make.
 	//
-	// **Refused rather than answered empty.** "Here is nothing" and "you
+	// Refused rather than answered empty. "Here is nothing" and "you
 	// cannot ask" are different statements, and this is the second: a key
 	// holds no products, so an empty answer is what a person who holds nothing
 	// gets and says the wrong thing about a credential that may never ask.
@@ -259,7 +259,7 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 	// product silently dropping out — fills with releases that stopped on
 	// purpose and nobody reads it.
 	//
-	// **Reported rather than left out**: "not scanned, and that is
+	// Reported rather than left out: "not scanned, and that is
 	// fine" and "not listed" are different answers, and only one is true.
 	scanned(t, func(t *testing.T, db *database.DB, s *ingest.Store, reader access.Subject, ours, _ int64) {
 		ctx := t.Context()

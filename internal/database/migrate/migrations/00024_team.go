@@ -13,14 +13,14 @@ func init() {
 
 // A team: a named set of people that holds work.
 //
-// **A team holds work and grants nothing**: no role, no visibility, no
+// A team holds work and grants nothing: no role, no visibility, no
 // capability. That is what lets one carry mixed clearance, which is the
 // ordinary arrangement rather than a misconfiguration — a kernel team where two
 // members may read undisclosed work and four may not. A team that granted
 // anything would make routing work to it an access decision, and a queue could
 // then only be built out of people who all see the same things.
 //
-// **It is assignable as a party**, the name space it shares with a person, so
+// It is assignable as a party, the name space it shares with a person, so
 // that assignment points at either through the column it already has.
 // The party table is created with the person table, where the reasoning for it
 // is written down.

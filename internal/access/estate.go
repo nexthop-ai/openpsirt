@@ -133,7 +133,7 @@ func (s *Store) everyProduct(ctx context.Context) ([]int64, error) {
 // spreadEstate resolves estate grants into the per-product grants a subject
 // carries.
 //
-// **Resolved here rather than at each query.** Every check that asks what
+// Resolved here rather than at each query. Every check that asks what
 // somebody may do — reading, triaging, knowing a product exists, narrowing a
 // list, counting, exporting — goes through the per-product grants, so putting
 // the estate role into them answers all of those at once and by construction.

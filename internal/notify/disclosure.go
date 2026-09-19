@@ -22,7 +22,7 @@ import (
 // pastDisclosure is every embargo whose date has arrived with nothing decided,
 // against the people who should hear about it.
 //
-// **Administrators, and whoever holds it**. Nobody else: every one of
+// Administrators, and whoever holds it. Nobody else: every one of
 // these is a finding nobody has announced, so the alert is a disclosure in its
 // own right, and the person holding it is told only where they may read
 // undisclosed work in that product — an assignment that outlived the role that
@@ -38,7 +38,7 @@ func (w *Watch) pastDisclosure(ctx context.Context, admins []int64) (map[int64][
 // approachingDisclosure is every embargo whose date falls inside the lead time
 // somebody set.
 //
-// **Before the date, not on it.** The date arriving is the last moment to act
+// Before the date, not on it. The date arriving is the last moment to act
 // rather than the first useful warning, and an approver who touches disclosure
 // a few times a year has no reason to open the screen that would have told
 // them. In the application rather than by mail, because mail may not name an
@@ -58,7 +58,7 @@ func (w *Watch) approachingDisclosure(ctx context.Context, admins []int64) (map[
 // statementsRevised is every standing decision whose cited VEX statement has
 // since been set aside.
 //
-// **The decision stands.** A publisher changing their mind does not withdraw
+// The decision stands. A publisher changing their mind does not withdraw
 // somebody's judgment — a third party's claim never becomes ours — so this is
 // a condition saying the ground moved under it, not an act on the decision.
 //

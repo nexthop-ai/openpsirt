@@ -83,7 +83,7 @@ func InTheFoldOf(q *bun.SelectQuery, componentID int64) *bun.SelectQuery {
 // InTheFold is every component of the fold the named one belongs to,
 // identifier first.
 //
-// **Read as identifiers and bound back in, rather than joined.** The queries
+// Read as identifiers and bound back in, rather than joined. The queries
 // that narrow by a component read their page off finding's covering index, and
 // reaching the fold key through a join puts a third join under the aggregate —
 // 0.35 s against 0.04 s on the kernel, which is 222,435 of 272,539 open rows on

@@ -269,8 +269,8 @@ func TestWhatTheThirdVersionSaysAboutABuildIsNotStructure(t *testing.T) {
 }
 
 func TestALifecycleScopeSaysWhenNotWhether(t *testing.T) {
-	// **The one judgment in this vocabulary that the specification does not
-	// make for us.** A scope says which phase a relationship matters in, and
+	// The one judgment in this vocabulary that the specification does not
+	// make for us. A scope says which phase a relationship matters in, and
 	// says nothing about whether the target ships. Reading `build` as "does not
 	// ship" is wrong for every compiled language — a crate linked into a binary
 	// is stated as a build-phase dependency and is inside what ships — and

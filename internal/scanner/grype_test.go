@@ -369,7 +369,7 @@ func TestPatchesOnTheRelatedRecordAreKept(t *testing.T) {
 		t.Fatal("no patch reference survived output whose related records carry six of them")
 	}
 
-	// Specifically one that exists **only** on the related record. The
+	// Specifically one that exists only on the related record. The
 	// matched record for this issue carries none of the OpenSSL commits; its
 	// related record carries four, which is the whole shape this is about.
 	var here []string

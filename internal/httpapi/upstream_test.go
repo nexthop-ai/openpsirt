@@ -10,7 +10,7 @@ import (
 
 // The report answers, says why of each, and carries what it matched against.
 //
-// **The three answers, because they are recorded identically.** A held-back
+// The three answers, because they are recorded identically. A held-back
 // name and one no index knows are both "asked, no version" in the database on
 // purpose — the pass must record both or starve its own window on them — so a
 // test with only one arm would pass against a reader that returned that word

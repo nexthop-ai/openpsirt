@@ -24,7 +24,7 @@ import (
 // Each clears by the thing happening, which is the conditions clearing, events
 // acknowledged shape: nobody dismisses these, the world does.
 //
-// **Who hears follows who may read and act**, and it differs by
+// Who hears follows who may read and act, and it differs by
 // condition rather than being one rule. A claim waiting is the approver's to
 // answer, so it goes to whoever may approve it and never to its proposer, who
 // cannot approve their own. A claim sent back and a deferral ending
@@ -32,7 +32,7 @@ import (
 // to the team, because the whole point of the condition is that it belongs to
 // nobody in particular.
 //
-// **Read afresh every sweep and never remembered.** The alternative is a
+// Read afresh every sweep and never remembered. The alternative is a
 // notification written when a claim is proposed and cleared when it is
 // approved, which needs every path that approves, withdraws, sends back or
 // lapses a claim to remember to clear it — and the one that forgets leaves
@@ -303,7 +303,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 // queuesUntaken is every team queue holding work nobody has taken, against the
 // people on that team.
 //
-// **One condition per team and product rather than per finding**, which is the
+// One condition per team and product rather than per finding, which is the
 // one place these four differ in shape. The others are somebody's action —
 // a claim is one thing a person did — and this is a population: a routing rule
 // places thousands of findings in a single sweep, so a notification
@@ -311,11 +311,11 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 // to know is that their team's queue has stopped being emptied, and a count
 // says that.
 //
-// **Undecided only**, by the same test every other screen uses for it: work
+// Undecided only, by the same test every other screen uses for it: work
 // that has been argued about is not sitting still, whether or not anybody has
 // closed the finding.
 //
-// **To the team, and only to those on it who may read what is in it.** A team
+// To the team, and only to those on it who may read what is in it. A team
 // is a queue rather than a holding, so there is nobody it is
 // individually addressed to; a member who cannot read undisclosed work is not
 // told that undisclosed work is waiting, which is the same rule that decides
@@ -467,14 +467,14 @@ func itemsWaiting(n int) string {
 
 // unanswered is every report nobody has replied to.
 //
-// **Raised at once rather than after a period**, unlike the four above. They
+// Raised at once rather than after a period, unlike the four above. They
 // are about work that has stopped moving, and how long is too long is a
 // judgment; this is about a letter somebody sent us that nobody answered, and
 // the answer to how long that may go unanswered is "not at all". Prompt
 // acknowledgment is the part of coordinated disclosure a reporter judges us
 // on, and it costs nothing and is missed by being nobody's job.
 //
-// **To whoever may read the flaw and act on it**, which for a recorded flaw
+// To whoever may read the flaw and act on it, which for a recorded flaw
 // nobody has announced is whoever may triage undisclosed work in that product.
 // A report is about somebody outside this deployment and the reply goes to
 // them from a person, so this reaches the people who could be that person.

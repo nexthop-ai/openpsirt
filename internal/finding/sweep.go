@@ -15,7 +15,7 @@ import (
 
 // Sweeper applies standing routing rules to work nobody holds.
 //
-// **Queued work, in bounded batches.** One rule naming a source package sweeps
+// Queued work, in bounded batches. One rule naming a source package sweeps
 // thousands of existing unowned issues across every place each sits at, so what
 // was asked for — one rule — and what is written differ by four orders of
 // magnitude. Doing it inside the request that saved the rule would make saving

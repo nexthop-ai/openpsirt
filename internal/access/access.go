@@ -571,7 +571,7 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 
 // Products returns the products whose findings this subject may read.
 //
-// **Not every product, for an administrator**. Administering the
+// Not every product, for an administrator. Administering the
 // catalog is knowing a product exists, which is what Sees answers; this is
 // what narrows findings, counts, aggregates and exports, and an administrator
 // reads those only where they hold a role. The "all" flag is kept because the

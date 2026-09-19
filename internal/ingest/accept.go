@@ -447,7 +447,7 @@ type Refusal struct {
 
 // Refused records that an upload was turned away.
 //
-// **Best-effort by design, and the one place that is right.** This is a note
+// Best-effort by design, and the one place that is right. This is a note
 // about something that already failed; failing the failure would turn a
 // refusal the producer needs to see into a fault it cannot read. The caller
 // logs what comes back and answers the producer either way.

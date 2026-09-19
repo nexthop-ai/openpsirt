@@ -136,7 +136,7 @@ func (d Described) Identity() string {
 //
 // Three reductions, each for something a real inventory does.
 //
-// **Qualifiers are dropped.** They qualify rather than identify — an
+// Qualifiers are dropped. They qualify rather than identify — an
 // architecture, a distribution, the source package a binary came from — and a
 // build that merges two sources emits one package with them and the same
 // package without. Measured on a public switch operating-system image: 8,373
@@ -150,10 +150,10 @@ func (d Described) Identity() string {
 // this image the two spellings even disagree about it: one source called a
 // package "all" and the other "amd64".
 //
-// **Escapes are decoded.** The same version arrives as `2.3.2-2%2Bb1` and
+// Escapes are decoded. The same version arrives as `2.3.2-2%2Bb1` and
 // `2.3.2-2+b1` from the two sources, which byte comparison calls two packages.
 //
-// **The type is lowercased**, which the specification requires and which
+// The type is lowercased, which the specification requires and which
 // nothing else here relies on.
 func canonicalPurl(purl string) string {
 	purl = strings.TrimSpace(purl)
@@ -330,7 +330,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		return nil, err
 	}
 	if len(missing) > 0 {
-		// **Two writers describing the same component are agreeing.** The
+		// Two writers describing the same component are agreeing. The
 		// read above is inside the caller's transaction, which satisfies the
 		// rule about reading outside one — but it says nothing about another
 		// transaction, against another target, finding the same component
@@ -494,12 +494,12 @@ func PartsOfPurl(purl string) Parts {
 
 // FoldKey is the key the binary packages of one source package share.
 //
-// **What it groups.** A distribution cuts many binary packages from one source
+// What it groups. A distribution cuts many binary packages from one source
 // package and they move together: curl, libcurl4t64 and libcurl3t64 are one
 // bump, and treating them as three is three acts that can disagree with each
 // other. The key is what makes them one row, one judgment and one upgrade.
 //
-// **Four parts, because the source package name alone is not enough.** Measured
+// Four parts, because the source package name alone is not enough. Measured
 // on a public switch operating-system image: keyed on the name alone, 47 groups
 // fold and six of them hold binaries that disagree about which issues they
 // carry and which version fixes them. Keyed on all four, 41 groups fold and
@@ -521,14 +521,14 @@ func PartsOfPurl(purl string) Parts {
 // that use one word; the distribution separates two distributions that do; the
 // version separates one source shipped twice.
 //
-// **It groups, and it does not identify.** A component's identity stays derived
+// It groups, and it does not identify. A component's identity stays derived
 // from its own content, a finding stays keyed on its place, and a decision
 // stays keyed on that place and expires on its own version — so when a producer
 // starts stating a source package for something it did not, the grouping moves
 // and no record does. That is the whole reason this can be recomputed and
 // folding at ingest cannot.
 //
-// **Hashed rather than spelled out.** A readable composite would have to be
+// Hashed rather than spelled out. A readable composite would have to be
 // bounded to carry an index, and two keys agreeing to that bound would merge
 // two source packages into one row — which under one judgment for the whole
 // fold writes decisions across both. A name is not a candidate either: the

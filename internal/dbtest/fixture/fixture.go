@@ -4,7 +4,7 @@
 // by the database package's own tests and must not depend on the catalog or
 // the access engine.
 //
-// **No two attributes of the seeded world are accidentally equal.** Every
+// No two attributes of the seeded world are accidentally equal. Every
 // default differs from its neighbour on purpose, because the defect this
 // package exists to expose is code that reads one attribute and answers with
 // another. A seed written per package reaches for the value that collapses the

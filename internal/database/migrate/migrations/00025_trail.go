@@ -16,7 +16,7 @@ func init() {
 
 // Changes somebody made to how this deployment works.
 //
-// **Who, what, before, after and when**. Three administrative levers
+// Who, what, before, after and when. Three administrative levers
 // silently rewrite what this tool reports: changing the deadline policy
 // recomputes every open finding's deadline, raising the triage floor takes the
 // deadline off everything below it, and an end-of-life date takes it off
@@ -28,7 +28,7 @@ func init() {
 // movable with nothing recording that anybody moved it. It is the same gap the
 // triage history closes, one layer above it.
 //
-// **Both values are text, and both are kept.** What a setting held before is
+// Both values are text, and both are kept. What a setting held before is
 // not derivable afterwards, and "who raised the floor to critical" is only half
 // the question somebody asks — the other half is what it was. A value that was
 // unset is an absent before rather than an empty one, because "nobody had set

@@ -14,7 +14,7 @@ import (
 
 // Scrutiny is how much a second pair of eyes actually did.
 //
-// **It is not a list of people who broke the rule.** The rule cannot be
+// It is not a list of people who broke the rule. The rule cannot be
 // broken: an approval refuses the proposer and refuses the author of the
 // revision being agreed to, and the write is conditional on that revision
 // still being current. What it reports is where the rule did not apply, and
@@ -427,15 +427,15 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 // HiddenWithNobodyAgreeing counts the claims that hide risk with no second
 // person behind them, and the decisions they wrote.
 //
-// **This should answer zero, and a number is a control that did not hold.** The
+// This should answer zero, and a number is a control that did not hold. The
 // three outcomes that claim something needs no further work — it does not
 // apply, it will not be fixed, the fix is already here — each require a second
 // person, so a claim of one of them standing alone is not a backlog item. It is
 // the write path having been got around, and it is the one failure the record
 // cannot find on its own afterwards.
 //
-// **A deferral and a promise to act are here too, but only where the gate
-// caught them.** Both hide risk and both are approved conditionally, on where
+// A deferral and a promise to act are here too, but only where the gate
+// caught them. Both hide risk and both are approved conditionally, on where
 // the date sits against the deadline already set — so a short deferral
 // standing alone is the rule working rather than failing. What tells the two
 // apart is the gate's own verdict, written onto the decision as it was
@@ -444,7 +444,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 // path got around. Asked as the outcome alone this saw none of them, and said
 // so in a design document.
 //
-// **Whether somebody agreed is asked of the record, never of a flag.** No
+// Whether somebody agreed is asked of the record, never of a flag. No
 // approval from anybody other than the proposer, and none taken back, which is
 // the same question the report that shows these rows asks — the test that
 // matters writes a self-approval straight to the table, and a flag would be

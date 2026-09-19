@@ -21,7 +21,7 @@ import (
 // arrived overnight against the same package was not covered until somebody
 // declared it too.
 //
-// **Coverage is a join, not a stamp.** A finding is covered when its component
+// Coverage is a join, not a stamp. A finding is covered when its component
 // folds to this key in this build; nothing is written onto findings. So one row
 // changes the version and everything covered follows, and a bump declared today
 // answers a vulnerability published tomorrow with nobody acting.
@@ -121,7 +121,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		// today.
 		if have[id] {
 			// The version a release is moving to is what somebody agreed
-			// to.** Where a claim argued for it, changing it here would leave
+			// to. Where a claim argued for it, changing it here would leave
 			// the agreement standing over a promise nobody read, so it is
 			// refused and the claim named — revising that is the act that
 			// withdraws the agreement. Where nothing argued for it, the
@@ -165,7 +165,7 @@ const (
 	UpgradeLanded UpgradeState = "landed"
 	// UpgradeLapsed is the date past with work outstanding.
 	//
-	// **It returns the upgrade, not its findings.** The findings are still
+	// It returns the upgrade, not its findings. The findings are still
 	// covered — deciding them again one at a time is the thing the promise
 	// was made instead of — and what comes back is one item, to whoever holds
 	// it. Findings return on their own only when the component moved and they
@@ -222,7 +222,7 @@ type Planned struct {
 // PendingUpgrades is everything committed for one build, by the bump that would
 // deliver it, and how much of each is still open.
 //
-// **The fix-bundle query inverted.** The triager reads a bump and the issues it
+// The fix-bundle query inverted. The triager reads a bump and the issues it
 // closes; the coordinator reads a build and the bumps it is waiting on. One
 // query read from either end, which is why they are one piece rather than two
 // reports that will disagree.

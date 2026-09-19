@@ -155,7 +155,7 @@ type Store struct {
 // DerivingWithin returns a store where a grant a group derived stays in force
 // for the window the given function reports, asked each time it is needed.
 //
-// **What this bounds is staleness, not authentication.** Membership is read
+// What this bounds is staleness, not authentication. Membership is read
 // when somebody signs in, and every sign-in replaces their derived grants
 // whole, so a browser's are never older than its session. A personal token
 // never signs in — it resolves through its owner and reads whatever their last
@@ -880,7 +880,7 @@ func (s *Store) Keys(ctx context.Context) ([]Key, error) {
 // places this is needed — a review queue, a list of what was dismissed — are
 // exactly the ones that are long.
 //
-// **What this answers is never sent back to a lookup.** A display name is a
+// What this answers is never sent back to a lookup. A display name is a
 // label somebody chose and resolves to nobody; Handles is what a route naming
 // a person in its path matches.
 func (s *Store) Names(ctx context.Context, ids []int64) (map[int64]string, error) {
@@ -946,13 +946,13 @@ type Mentionable struct {
 // WhoCanRead lists the people who may read findings of this visibility in this
 // product, for offering as mentions.
 //
-// **Offering only people who can already see the thing** is the whole point.
+// Offering only people who can already see the thing is the whole point.
 // An autocomplete that lists everybody teaches somebody to mention a colleague
 // who then cannot open what they were called to, and on an undisclosed finding
 // the mention itself says that a finding exists — which is the disclosure the
 // visibility rule is there to prevent.
 //
-// **An administrator is not included for being one.** Administering the
+// An administrator is not included for being one. Administering the
 // catalog is not reading its findings, which is the split the roles were
 // separated to make possible — so an administrator holding nothing on the
 // product was offered as a mention target on an undisclosed finding there,
@@ -993,8 +993,8 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	// engines do not agree on what a case-insensitive comparison is, and
 	// one spelled the same way everywhere behaves the same way everywhere.
 	//
-	// **Folded here and again by the engine, and this is the caller where that
-	// still costs something.** Folding in Go is Unicode-aware and LOWER() on
+	// Folded here and again by the engine, and this is the caller where that
+	// still costs something. Folding in Go is Unicode-aware and LOWER() on
 	// SQLite is ASCII-only, so a display name carrying a non-ASCII capital is
 	// found on three engines and missed on the fourth. An identity is an
 	// address and ASCII; a display name is free human text and has no folded

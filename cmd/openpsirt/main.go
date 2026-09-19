@@ -459,12 +459,12 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // Refused at startup rather than through readiness, which is where every other
 // startup condition is refused and what keeps the previous replica alive.
 //
-// **Only when the database is behind.** A schema ahead of this build is a
+// Only when the database is behind. A schema ahead of this build is a
 // rollback, which has to keep working: the migrations a newer binary applied
 // are additive, and refusing here would leave a bad deployment with no way
 // back.
 //
-// **It compares version numbers, which is less than it sounds.** Before the
+// It compares version numbers, which is less than it sounds. Before the
 // first release a schema change edits the migration that created the thing
 // rather than adding one beside it, so two builds can carry the same highest
 // version and different schemas — and an existing database then matches on the

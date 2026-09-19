@@ -4,7 +4,7 @@ import "strings"
 
 // LikeEscape is the escape character every LIKE predicate here states.
 //
-// **A backslash is what it must not be.** MySQL and MariaDB treat a backslash
+// A backslash is what it must not be. MySQL and MariaDB treat a backslash
 // as an escape inside a string literal, so `ESCAPE '\'` is an unterminated
 // string: a syntax error on two engines and parsed happily by the other two.
 // SQLite has no default escape character at all, so leaving the clause out

@@ -115,8 +115,8 @@ func (s *Store) NoteOn(ctx context.Context, subject access.Subject,
 // change somebody's words — an edit that could be made by another person is
 // not a correction, it is a forgery with a timestamp.
 //
-// **Whether the asker may reach the note is settled before anything about it
-// is said back.** The row is read first, because the issue and product it
+// Whether the asker may reach the note is settled before anything about it
+// is said back. The row is read first, because the issue and product it
 // hangs off are not knowable otherwise, but no answer turns on what was in it
 // until the asker has been let in: refusing on authorship first would tell
 // anybody with an account that a note with this identifier exists, one request
@@ -293,7 +293,7 @@ func noteVisibility(ctx context.Context, db bun.IDB, productID,
 // noteReach is whether this subject may be told the issue is in this product
 // at all, and at what visibility a note about it is held.
 //
-// **Undisclosed if any place of the issue in this product is**, which is the
+// Undisclosed if any place of the issue in this product is, which is the
 // rule the finding screen already applies to what may be said: one undisclosed
 // place among fifty makes the whole of it undisclosed for anybody deciding
 // what to write. A note is one thread for the issue, so it cannot be public

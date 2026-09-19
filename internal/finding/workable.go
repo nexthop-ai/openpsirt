@@ -29,7 +29,7 @@ const (
 // a branch can be past end-of-life, and a single control offering four
 // combinations as four words is a control nobody reads correctly.
 //
-// **The zero value narrows nothing.** What the working population is is a
+// The zero value narrows nothing. What the working population is is a
 // property of the question a screen asks rather than of the data, so a caller
 // that has not been asked answers about everything; the findings list applies
 // its defaults through Working.

@@ -182,7 +182,7 @@ func TestABuildAlreadyOnTheQueueIsNotAskedForTwice(t *testing.T) {
 		if _, err := f.queue.Add(ctx, queue.Scan, strconv.FormatInt(tenth, 10)); err != nil {
 			t.Fatal(err)
 		}
-		// **Nothing else is queued**, deliberately. Converting inside the
+		// Nothing else is queued, deliberately. Converting inside the
 		// query does not merely miss: on PostgreSQL a two-digit identifier
 		// truncates to its first digit, which then matches whatever job holds
 		// *that* reference. A queue holding the single-digit build too would

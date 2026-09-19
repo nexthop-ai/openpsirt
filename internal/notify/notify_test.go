@@ -206,7 +206,7 @@ func TestAPipelineKeyIsToldNothing(t *testing.T) {
 	// A key is not a person. It has no notification area, and asking for one
 	// answers empty rather than failing — there is nothing to refuse.
 	//
-	// **The key is given the same identifier as the person**, which is the
+	// The key is given the same identifier as the person, which is the
 	// case worth testing rather than the easy one: a key's identifier comes
 	// from one table and a person's from another, so the two collide as a
 	// matter of course. Without asking what kind of subject this is, a key

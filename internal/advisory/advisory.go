@@ -173,7 +173,7 @@ type Named struct {
 // IdentificationHelper is what a release called itself, in a spelling a machine
 // can compare.
 //
-// **The identifier the build declared, never one minted here.** An identifier
+// The identifier the build declared, never one minted here. An identifier
 // only helps if it appears on both sides of the comparison, and one invented
 // here appears on one: a reader holding our image has whatever our build wrote
 // into its inventory, which is this exact string if they ingested that
@@ -213,7 +213,7 @@ type Vulnerability struct {
 
 // Weakness is the kind of flaw, as the standard carries it.
 //
-// **One, and both halves of it.** The standard states a weakness as the
+// One, and both halves of it. The standard states a weakness as the
 // identifier and the name the catalog gives it, and a consumer's validator
 // compares the pair — so an issue classified several ways states the one the
 // data calls the root cause, and one whose name the catalog does not know
@@ -423,7 +423,7 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 		// producer's, taken from a scan file, and a scan file is hostile input
 		// (REQ-66): one that wrote something other than a package identifier
 		// into the field the root is declared in would fail a customer's
-		// validator on the **whole document** rather than on this field, which
+		// validator on the whole document rather than on this field, which
 		// is a worse outcome than the field being absent.
 		if isPackageIdentifier(release.Identifier) {
 			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
@@ -687,7 +687,7 @@ type Issuance struct {
 // Issued records that an advisory for this flaw went out, and returns what was
 // recorded.
 //
-// **The digest is taken from the document as it is now**, generated inside
+// The digest is taken from the document as it is now, generated inside
 // this call rather than supplied by the caller. A caller-supplied digest is a
 // digest of whatever they say — and the question this exists to answer is
 // whether what is published is still what we would generate, which only means
@@ -771,7 +771,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 
 // Issuances is what has gone out for one flaw in one product, newest first.
 //
-// **Readable without generating a document.** Every issuance is already in the
+// Readable without generating a document. Every issuance is already in the
 // document's own revision history, which is right for a reader of the document
 // — but it made "has an advisory gone out for this, and is what is published
 // still what we would generate" a question you had to build a CSAF document to

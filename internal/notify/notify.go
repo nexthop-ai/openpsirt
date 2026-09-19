@@ -492,8 +492,8 @@ func attributable(kind Kind, private bool, productID *int64) error {
 // A cleared condition is not waiting on anybody: the thing it was about
 // stopped being true, which is the answer rather than a task.
 //
-// **Narrowed by what they may read now, not by what they could read when they
-// were told** (REQ-42 and REQ-43). Somebody whose private-triage on a product
+// Narrowed by what they may read now, not by what they could read when they
+// were told (REQ-42 and REQ-43). Somebody whose private-triage on a product
 // is withdrawn stops being served the lines naming its undisclosed findings,
 // and is served them again if it is granted back — because they were told, and
 // the record of having been told is what an auditor wants after a leak. So the
@@ -538,8 +538,8 @@ func (s *Store) Waiting(ctx context.Context, subject access.Subject,
 // narrowed by it and a rule spelled once per caller is a rule that is
 // eventually spelled wrong in one of them (REQ-42 and REQ-43).
 //
-// **The rule is that a notification stays readable while the reason it was
-// sent still holds**, which is not the same question as whether this person
+// The rule is that a notification stays readable while the reason it was
+// sent still holds, which is not the same question as whether this person
 // could read the finding it names. A notification is a message addressed to
 // somebody under a rule this deployment wrote down, and the audiences those
 // rules name are roles, cases and — for embargo notices alone — administrators
@@ -613,15 +613,15 @@ func byProduct(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 // somebody was told, and a line they have already acknowledged is still a line
 // they were sent.
 //
-// **For either thing held over the deployment**, and refused for anybody else.
+// For either thing held over the deployment, and refused for anybody else.
 // Every other read of this table is somebody reading their own; this one is a
 // person page asking after a leak, which is the one reason to read a list
 // addressed to somebody else. Enforced here rather than at the handler,
 // because that is where the rest of this table's rules live (REQ-42 and
 // REQ-43).
 //
-// **Narrowed by what the reader may see, and neither grant is a way to see
-// more.** Holding one decides who may ask this question; the rows that come
+// Narrowed by what the reader may see, and neither grant is a way to see
+// more. Holding one decides who may ask this question; the rows that come
 // back are the ones the asker could read on their own account, so somebody
 // holding nothing on a product reads the public half of a feed and not the
 // embargoed half — and an auditor, who holds no product, reads nothing.

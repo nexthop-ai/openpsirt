@@ -41,10 +41,10 @@ type Rate struct {
 
 // Compliance is what proportion of the work met its deadline, by severity.
 //
-// **Arithmetic rather than storage.** A closed row keeps the deadline it
+// Arithmetic rather than storage. A closed row keeps the deadline it
 // carried, and only *open* rows lose one at end-of-life or below the line — so
 // everything this needs is already there, and nothing is precomputed.
-// **The period bounds what closed in it; what is open is always now.** A rate
+// The period bounds what closed in it; what is open is always now. A rate
 // asked for last year says how much of the work finished then met its date.
 // The open half is a statement about the present whatever period was asked
 // for, because reconstructing what stood open on a date gone by is the

@@ -108,7 +108,7 @@ func Identified(identifier string) int {
 // became known. That is arithmetic, and says nothing about whether the project
 // is abandoned, busy, or disagrees that it is a flaw.
 //
-// **A clear year of silence, not merely an earlier year.** We have no
+// A clear year of silence, not merely an earlier year. We have no
 // disclosure date and the year in the identifier stands in for one,
 // so the comparison is only as precise as a year — and comparing two
 // year-numbers makes a five-week gap look identical to a five-year one. An

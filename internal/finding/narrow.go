@@ -28,8 +28,8 @@ import (
 
 // SortKey is a column somebody may order the findings list by.
 //
-// **An allowlist, and the allowlist is the only thing that reaches the
-// statement**. A placeholder cannot bind a column name, so a sort
+// An allowlist, and the allowlist is the only thing that reaches the
+// statement. A placeholder cannot bind a column name, so a sort
 // column arriving from a query parameter is the one value that must reach the
 // SQL text — which makes it the live hole in a codebase that parameterizes
 // everything else. Nothing here is built from what a caller
@@ -187,13 +187,13 @@ type Filter struct {
 	// in the allowlist is not a sort and falls back to the same.
 	SortBy    SortKey
 	Ascending bool
-	// Search keeps rows whose component name **or issue name** contains
+	// Search keeps rows whose component name or issue name contains
 	// this, without regard to capitals. It is how somebody finds a package
 	// in a list of thousands, where Component above is the exact name and
 	// answers a different question: "show me openssl" against "show me
 	// anything ssl-ish".
 	//
-	// **The issue half is what an advisory landing actually asks for.** The
+	// The issue half is what an advisory landing actually asks for. The
 	// first question a PSIRT is asked is "where is CVE-2026-9079 in what we
 	// ship", and matching component names alone answered nothing at all for
 	// it — the box said it searched issues and returned an empty list, which
@@ -364,7 +364,7 @@ type Filter struct {
 	Origin Origin
 	// Planned keeps or drops what a promised upgrade covers.
 	//
-	// **Derived, never stored.** A finding is covered when a standing
+	// Derived, never stored. A finding is covered when a standing
 	// `upgrade-needed` decision reaches it, which the decision already
 	// records — so the mark is a join rather than a tag written across every
 	// row an upgrade touches. A tag would be per product and could not say
@@ -607,7 +607,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	// name the issue is known by, because which identifier a publisher chose
 	// is a preference of whichever database they consulted.
 	//
-	// **Resolved once and joined, never asked per row.** This was a correlated
+	// Resolved once and joined, never asked per row. This was a correlated
 	// EXISTS over three subqueries, evaluated for every candidate finding: on
 	// a demo image of 281,884 findings it did not return inside five minutes
 	// and it held a core for minutes after the request was abandoned, which
@@ -617,7 +617,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	// pairs the statements name, once, and join the list to that. The same
 	// answer arrives in 0.27s.
 	//
-	// **Distinct on the pair**, by UNION rather than UNION ALL, so joining
+	// Distinct on the pair, by UNION rather than UNION ALL, so joining
 	// cannot multiply a finding by the number of statements about it — a
 	// filter that changed the counts it narrows would be worse than a slow
 	// one.
@@ -890,7 +890,7 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 // did — a method rather than a bare field so that a caller who forgets cannot
 // get 1 January year one, which as a deadline reads as "everything is late".
 //
-// **Read through the store so a frozen clock reaches it.** Reading the wall
+// Read through the store so a frozen clock reaches it. Reading the wall
 // clock directly is what left the overdue filter untestable, and it meant one
 // request compared "is this overdue" against one moment and "is anything off
 // the clock" against another.
@@ -1195,13 +1195,13 @@ func stateHaving(state string) string {
 // has no default escape character at all, so leaving it out makes a backslash
 // mean one thing on three engines and another on the fourth.
 //
-// **The escape character is `#`, and a backslash is what it must not be.**
+// The escape character is `#`, and a backslash is what it must not be.
 // MySQL and MariaDB treat a backslash as an escape inside a string literal, so
 // `ESCAPE '\'` is an unterminated string: a syntax error there, and parsed
 // happily by the other two. Caught by the four-engine run, which is the whole
 // reason that run exists.
 //
-// **Case is folded here and again by the engine**, which is a compromise worth
+// Case is folded here and again by the engine, which is a compromise worth
 // naming. Folding the term in Go is Unicode-aware; `LOWER()` on the column is
 // ASCII-only on SQLite — so a name carrying a non-ASCII capital is found on
 // three engines and missed on the fourth, wherever the comparison is against a

@@ -8,7 +8,7 @@ package finding
 // the issue's record has moved, because storing it is about not recomputing it
 // on every read rather than about freezing it.
 //
-// The number is **packed rather than weighted**: each signal owns a range of
+// The number is packed rather than weighted: each signal owns a range of
 // digits, so a signal never trades against a lower one. That is deliberate,
 // and the reason is explainability — somebody has to be able to
 // read a position and see why, and "it scored 0.4 higher on a weighted sum of
@@ -106,8 +106,8 @@ type Ranked struct {
 
 // Rank packs the signals into one sortable number, highest first.
 //
-// Exploited, then whether it reaches customers, then **severity, then
-// likelihood** — each owning a range of digits so it never trades against a
+// Exploited, then whether it reaches customers, then severity, then
+// likelihood — each owning a range of digits so it never trades against a
 // lower signal.
 //
 // Likelihood above severity is wrong, measured on a real image: a 2004
@@ -117,7 +117,7 @@ type Ranked struct {
 //
 // Multiplying the two is the published practice for these two scores, and the
 // same image argues against it: 95% of its issues
-// sit between 0.001 and 0.01 likelihood**, one order of magnitude, where the
+// sit between 0.001 and 0.01 likelihood, one order of magnitude, where the
 // differences are not differences anybody should act on. Multiplied, that 4.5×
 // ratio inside the spike outweighs the 2× between a medium and a critical, so
 // mediums would jump criticals constantly and on noise.

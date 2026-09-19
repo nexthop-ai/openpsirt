@@ -609,8 +609,8 @@ func TestMeasureTheFirstNightAfterTheDeadlineRuleChanged(t *testing.T) {
 		// between the two is what the rule change costs once, rather than what
 		// a night costs for ever.
 		//
-		// **It is not zero on every engine, and that is not this rule's
-		// doing.** SQLite writes nothing; PostgreSQL and MySQL rewrite every
+		// It is not zero on every engine, and that is not this rule's
+		// doing. SQLite writes nothing; PostgreSQL and MySQL rewrite every
 		// fixable row again, and the same measurement taken before this rule
 		// existed says the same thing. What a re-scan of unchanged data writes
 		// is a question about how a timestamp survives a round trip on each

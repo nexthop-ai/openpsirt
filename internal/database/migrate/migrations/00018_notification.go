@@ -22,7 +22,7 @@ func init() {
 // sent into a void, and the people who most need telling that the tool itself
 // is unwell are exactly the ones who have not opted into anything.
 //
-// **The lifetimes are the design, not a column somebody added for tidiness**
+// The lifetimes are the design, not a column somebody added for tidiness
 // . An event happened once and is acknowledged by the person it
 // happened to: you were assigned this, your dismissal was sent back, somebody
 // named you. A condition is true for as long as it is true and clears itself

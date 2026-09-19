@@ -72,7 +72,7 @@ type unanswered struct {
 
 // Unanswerable reads what has no upstream answer, and says why of each.
 //
-// **Derived rather than stored.** A held-back name and one no index knows are
+// Derived rather than stored. A held-back name and one no index knows are
 // recorded identically — asked at this time, no version — because the pass
 // must record both or starve its own window on them for ever. What tells them
 // apart is the same list applied again, here, which also means the report

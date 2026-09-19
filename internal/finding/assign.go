@@ -128,8 +128,8 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 //
 // Set for the whole group at once rather than per place: assigning one place
 // of an issue and not another is not something anybody means to do, and the
-// places of a group are the same problem seen from several parents. **Across
-// builds for the same reason** — the same code built as several variants is
+// places of a group are the same problem seen from several parents. Across
+// builds for the same reason — the same code built as several variants is
 // one piece of work, and it is answered by one judgment.
 //
 // Assigning to nobody is how something is handed back, and is deliberately the
@@ -141,7 +141,7 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 // product and the first build both 1. Taking the build keeps every call site
 // saying what it is looking at and leaves one place that knows the grain.
 //
-// **The party work lands on is a person or a team**, in the column that already
+// The party work lands on is a person or a team, in the column that already
 // holds one. Nothing here asks which it is: the whole point of one
 // column is that every filter, count and handover asks "who holds this" once.
 func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
@@ -434,7 +434,7 @@ type Holding struct {
 // stuck behind somebody: an idle account holding nothing is harmless, and work
 // waiting on a person who is not here is the thing worth surfacing.
 //
-// **Counted in pieces of work, not in rows** — an issue in a component in a
+// Counted in pieces of work, not in rows — an issue in a component in a
 // product, the same unit Unassigned and AssignedTo list in. Counting
 // rows made this screen disagree with every screen it links to: measured
 // against a real image, one kernel flaw assigned to one person read as 48 held
@@ -591,7 +591,7 @@ type Owned struct {
 	Severity      string `bun:"severity"`
 	Exploited     bool   `bun:"exploited"`
 	Product       string `bun:"product"`
-	// Stream and Variant name **a** build holding this, not the only one. A
+	// Stream and Variant name a build holding this, not the only one. A
 	// screen needs somewhere to link to and an action needs a finding to name,
 	// and where several builds hold the same code any of them will do. What
 	// says there are several is Builds, so a screen can show that instead of
@@ -621,7 +621,7 @@ type Owned struct {
 // per-product problem — it is exactly the thing that hides when every screen
 // is scoped to one product and nobody looks at the others.
 //
-// **One item per issue in a component in a product, not one per build**
+// One item per issue in a component in a product, not one per build
 // . Variants are mostly the same thing built twice: a decision is keyed
 // on the product, the place and the upstream versions and carries no variant,
 // so answering this on one build answers it on every build of that product
@@ -629,7 +629,7 @@ type Owned struct {
 // screen while doubling none of the work — which is how a queue stops being
 // read.
 //
-// **Genuine differences still break out, and they break out by themselves.** A
+// Genuine differences still break out, and they break out by themselves. A
 // component row is one name at one version, shared by every build that ships
 // it, so two variants at the same version group together and two at different
 // versions do not. Nothing here has to decide which case it is looking at.
@@ -915,13 +915,13 @@ func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build
 // onlyReadable narrows a query to what one person may read: the products they
 // hold anything on, and within those, what has been disclosed to them.
 //
-// **Both halves, together, because forgetting the first one is silent.** The
+// Both halves, together, because forgetting the first one is silent. The
 // visibility half alone admits every disclosed finding in the deployment,
 // including in products the asker holds nothing on — which reads as working,
 // because the numbers are plausible and nothing refuses.
 //
-// **The product half is not always this one, which is why the visibility half
-// is callable on its own.** A query that has already pinned a single product —
+// The product half is not always this one, which is why the visibility half
+// is callable on its own. A query that has already pinned a single product —
 // a build's readiness, one product's releases — has narrowed further than this
 // would, and applying a set membership over it would be a second clause saying
 // less. Those call inOneProduct, which is the same pairing stated for the case

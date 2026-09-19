@@ -63,11 +63,11 @@ type Readiness struct {
 // ReadyFor compares a branch's current state against the last release cut from
 // it, built the same way.
 //
-// **The same variant on both sides.** A branch built for one chip beside a
+// The same variant on both sides. A branch built for one chip beside a
 // release built for another compares two different pieces of software and
 // reads as a regression somebody then goes looking for.
 //
-// **The release is the latest one cut from this branch that we have scanned.**
+// The release is the latest one cut from this branch that we have scanned.
 // A tag declared and never built has no counts, and answering with zeroes
 // would report a clean release that does not exist.
 func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,

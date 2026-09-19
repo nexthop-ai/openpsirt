@@ -8,7 +8,7 @@ import (
 // Reading CSAF-VEX, which a supplier's VEX as evidence named alongside OpenVEX
 // from the start and which was refused with a sentence until now.
 //
-// **The two formats say the same thing in different shapes.** OpenVEX puts a
+// The two formats say the same thing in different shapes. OpenVEX puts a
 // status, a justification and the products on one statement; CSAF puts the
 // status in *which list a product identifier appears in*, the justification in
 // a flag beside it, and the products in a tree somewhere else in the document.
@@ -16,13 +16,13 @@ import (
 // the same either way — and one internal shape is what keeps the rest of the
 // application from having to know which file it came from.
 //
-// **The tree may arrive after the claims that refer to it**, and often does
+// The tree may arrive after the claims that refer to it, and often does
 // not, but nothing in the format promises an order. So identifiers are
 // collected as they are read and resolved once the document is closed, which
 // is the same thing the inventory reader does for a component's patches.
 //
-// **A product identifier that resolves to nothing is dropped, and a claim left
-// pointing at nothing is refused.** A claim we cannot place is a build's
+// A product identifier that resolves to nothing is dropped, and a claim left
+// pointing at nothing is refused. A claim we cannot place is a build's
 // judgment going missing quietly, which is the failure this whole arrangement
 // exists to remove.
 

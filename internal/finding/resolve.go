@@ -37,7 +37,7 @@ type Resolved struct {
 // Resolve closes a flaw somebody recorded, in one build, because somebody says
 // it is fixed there.
 //
-// **Resolution is computed from scans everywhere else**, and that is
+// Resolution is computed from scans everywhere else, and that is
 // the right rule: it removes the gap between marking work done and the work
 // being done, and nobody can close an issue while a release they committed to
 // still carries it. What it needs is evidence, and for this one class there is

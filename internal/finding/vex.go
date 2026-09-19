@@ -75,8 +75,8 @@ func OutcomesOffered() []string {
 
 // Prefills is the outcome a statement offers, and whether it offers one.
 //
-// **A distribution saying it will not fix something is not the distribution
-// saying it is not affected**. Debian's `no-dsa`, Ubuntu's `ignored`
+// A distribution saying it will not fix something is not the distribution
+// saying it is not affected. Debian's `no-dsa`, Ubuntu's `ignored`
 // and Red Hat's will-not-fix all mean *affected, and judged minor* — so they
 // offer a will-not-fix, never a dismissal. Prefilling `not-applicable` from one
 // would record a claim the publisher never made, with their name on it, which

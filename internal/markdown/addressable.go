@@ -17,7 +17,7 @@ import "strings"
 // in this system, and an address stored beside a claim is no different for
 // being stored rather than written in a sentence.
 //
-// **The same judgment, not a second one shaped like it.** This stopped at the
+// The same judgment, not a second one shaped like it. This stopped at the
 // scheme, so `attachment:../../etc/passwd` and a bare `issue:` were stored on
 // their own and refused inside a link — the two halves of one rule disagreeing,
 // which is the divergence attachmentFault was written to close and this
@@ -38,7 +38,7 @@ func Addressable(address string) error {
 // Autolinkable is Addressable for an address written *into* a document rather
 // than parsed out of one.
 //
-// **A destination inside angle brackets ends at the first space or bracket**,
+// A destination inside angle brackets ends at the first space or bracket,
 // so an address carrying either is not a link: it is the rest of the line
 // becoming content, and the lines after it becoming document. A scan file is
 // hostile input (REQ-66 and REQ-69) and a feed's address reaches a release

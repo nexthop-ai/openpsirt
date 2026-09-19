@@ -11,7 +11,7 @@ import (
 
 // A product's standing, per build.
 //
-// **There was no page for one product.** "How is SONiC doing" was five
+// There was no page for one product. "How is SONiC doing" was five
 // requests and a spreadsheet: what is open per build, how much of it is
 // overdue, how much has been decided, when each build was last scanned. Every
 // piece existed and none of them sat together, so the question was answered by
@@ -44,7 +44,7 @@ type BuildStanding struct {
 // HowItStands reads each build of a product with how far its work has got, and
 // the product's own totals.
 //
-// **The product's totals are not the sum of its builds.** The findings list
+// The product's totals are not the sum of its builds. The findings list
 // answers for a whole product as one row per issue and component across every
 // build it holds, so a library carrying one issue in two builds is
 // one thing to decide about and two build rows. Adding the build rows up would

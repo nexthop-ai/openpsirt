@@ -265,7 +265,7 @@ func (s *Store) BoundProviders(ctx context.Context) ([]string, error) {
 //
 // A proxy has no stable identifier to offer: it asserts a username on every
 // request and there is nothing else to match on. So the username decides, and
-// **nothing is bound** — which is what lets the provider bind its own
+// nothing is bound — which is what lets the provider bind its own
 // identifier to the same identity at a later sign-in, whichever way round
 // somebody arrives first.
 //

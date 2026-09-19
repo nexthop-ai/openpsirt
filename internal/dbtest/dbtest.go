@@ -86,7 +86,7 @@ func candidates() []candidate {
 
 // Each runs fn once against every database available, as a subtest.
 //
-// **The database arrives migrated and empty of the previous test's rows.**
+// The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
 // was migrated once per binary, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
@@ -103,7 +103,7 @@ func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Alone is Each for a test that cannot run beside another in its package.
 //
-// **The database arrives migrated and empty of the previous test's rows.**
+// The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
 // was migrated once per binary, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
@@ -121,7 +121,7 @@ func Alone(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Two runs fn against SQLite and PostgreSQL only.
 //
-// **The database arrives migrated and empty of the previous test's rows.**
+// The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
 // was migrated once per binary, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
@@ -142,7 +142,7 @@ func Two(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Servers runs fn against the three server engines and not SQLite.
 //
-// **For a test that needs two transactions open at once**, which SQLite cannot
+// For a test that needs two transactions open at once, which SQLite cannot
 // give it: its pool is one connection, so a second writer waits for a
 // connection the first is holding and the test deadlocks rather than racing.
 //
@@ -164,7 +164,7 @@ func Servers(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 
 // Only runs fn against one engine.
 //
-// **The database arrives migrated and empty of the previous test's rows.**
+// The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
 // was migrated once per binary, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
@@ -363,7 +363,7 @@ func sqliteTemplate() ([]byte, error) {
 // packages never share tables, and for the checkout so that two worktrees do
 // not either.
 //
-// **The database is kept between runs and reused.** Applying the migrations is
+// The database is kept between runs and reused. Applying the migrations is
 // nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
 // MariaDB, once per package per engine, which was 475 s of server work in a
 // run that spent 43 s of processor time — and none of it tests anything the
@@ -593,7 +593,7 @@ func Tables() []string { return slices.Clone(tables) }
 // tables lists every table, in an order safe to delete from: children before
 // the rows they reference.
 //
-// **Add new tables at the top.** A table missing from this list leaves rows
+// Add new tables at the top. A table missing from this list leaves rows
 // behind between tests, and one in the wrong position fails on the engines
 // that enforce foreign keys during a bulk delete — which is not all of them,
 // so it will look engine-specific rather than like the ordering mistake it is.

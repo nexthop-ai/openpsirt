@@ -14,8 +14,8 @@ import (
 
 // Ours is the set of names this deployment does not send to a public index.
 //
-// **Asking is the one thing here that reaches the network, and what it sends
-// is a component's name.** For an open-source dependency that is public
+// Asking is the one thing here that reaches the network, and what it sends
+// is a component's name. For an open-source dependency that is public
 // knowledge. For something built here it is not: the name of an internal
 // module is the name of a project, a team, or a product nobody has announced,
 // and a public index records every request made of it.
@@ -25,7 +25,7 @@ import (
 // the ordinary deployment leaking its own names by turning something on that
 // reads as harmless.
 //
-// **Biased toward holding back, and it says what it held.** Over-excluding
+// Biased toward holding back, and it says what it held. Over-excluding
 // loses an answer, which is visible on the screen that would have shown it and
 // in the report beside it. Under-excluding sends a name to somebody else's
 // service, which is visible nowhere and cannot be taken back.
@@ -182,7 +182,7 @@ func Owner(purl string) string {
 // everything named "co", which is an ecosystem's worth of answers lost in
 // exchange for protecting nobody's name.
 //
-// **This is the one place the bias does not run toward holding back**, and it
+// This is the one place the bias does not run toward holding back, and it
 // is not an exception to it: the bias is toward holding back names that could
 // be ours, and "com" is not a name anybody has.
 var generic = map[string]bool{
@@ -206,7 +206,7 @@ var generic = map[string]bool{
 // group and a Java package are; and each label short of the last on its own,
 // which is what an npm scope and a forge account usually are.
 //
-// **Each label rather than the first.** A coordination address is very often a
+// Each label rather than the first. A coordination address is very often a
 // name in front of the organization's own — "psirt.example.test" — and taking
 // the first alone would hold back everything called "psirt" and nothing called
 // "example", which is the opposite of what was wanted from both.
@@ -263,7 +263,7 @@ func publisherHost(namespace string) string {
 
 // RootOwners reads who publishes the things the scans were about.
 //
-// **From what each document called itself, not from the stored root.** The
+// From what each document called itself, not from the stored root. The
 // component standing for the product is stored by its name alone — a version
 // on it would give the product a new identity every night — so the package
 // identifier a build declared for itself lives on the scan record instead.
@@ -295,7 +295,7 @@ func RootOwnersFor(ctx context.Context, db bun.IDB,
 
 // MostRoots bounds how many declared identifiers one derivation reads.
 //
-// **Identifiers, not products.** What a build declares itself to be carries
+// Identifiers, not products. What a build declares itself to be carries
 // its version, so a product built nightly states a new one every night and a
 // handful of products cross this inside a year. Taken newest first, so the
 // bound falls on identifiers nothing has built in a long time and never on

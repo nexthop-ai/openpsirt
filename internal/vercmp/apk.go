@@ -8,7 +8,7 @@ import "strings"
 // a letter after a suffix is not a version, and neither is a second letter
 // after the first.
 //
-// **Transcribed from Alpine's own reader rather than derived.** The suffix
+// Transcribed from Alpine's own reader rather than derived. The suffix
 // order, a leading zero turning a number into text, and an unfinished version
 // being the greater unless it stops on a pre-release suffix are each a decision
 // somebody made. `testdata/apk-version.data` is the project's own suite, which

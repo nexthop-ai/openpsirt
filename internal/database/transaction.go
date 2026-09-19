@@ -27,7 +27,7 @@ const Attempts = 5
 // InTransaction runs fn inside a transaction and retries the whole of it if
 // the database refuses the write for a reason that going again can fix.
 //
-// **Everything fn depends on must be read inside fn.** A retry re-runs the
+// Everything fn depends on must be read inside fn. A retry re-runs the
 // closure from the beginning against a database that has moved, so a value
 // read before the transaction started, or carried over from a previous
 // attempt, describes a world that no longer exists — and writing a decision
@@ -251,7 +251,7 @@ func IsDuplicate(err error) bool {
 // which is what it looks like and not what it is. Named, it says which of the
 // two it is doing.
 //
-// **The rule about reads is unchanged**, and it reaches further here: fn may
+// The rule about reads is unchanged, and it reaches further here: fn may
 // be re-run by a retry it cannot see, so everything it depends on is read
 // inside it.
 // Each handle it may be given is named. This package's own handle embeds

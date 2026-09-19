@@ -80,7 +80,7 @@ func (s *Store) BuildsWithin(ctx context.Context, db bun.IDB, scope Scope) ([]in
 // gives: the identifiers are resolved once and bound into the statements that
 // follow, and the catalog is not joined into any of them.
 //
-// **A selection that names one whole build is not narrowed by it.** The
+// A selection that names one whole build is not narrowed by it. The
 // question these two answer is which releases to consider, and a request that
 // has already named the release has answered it. Applied anyway, the defaults —
 // branches, in support — made a tag's own findings screen report "0 of 0"

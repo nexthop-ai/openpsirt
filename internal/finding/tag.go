@@ -13,11 +13,11 @@ import (
 
 // A word somebody put on a finding.
 //
-// **People mark work regardless.** With nowhere to put it they do it inside
+// People mark work regardless. With nowhere to put it they do it inside
 // the reasoning text, where nothing can filter on it and an approver reads it
 // as part of the argument. This is where that goes instead.
 //
-// **No fixed vocabulary**, because none has been earned. A tag that becomes
+// No fixed vocabulary, because none has been earned. A tag that becomes
 // universal is a signal that it should be promoted to a real concept — "waiting
 // on vendor" is a state the tool would want to reason about rather than a
 // string somebody typed — and inventing the vocabulary first is guessing at
@@ -44,7 +44,7 @@ func TagAs(tag string) string { return strings.ToLower(strings.TrimSpace(tag)) }
 
 // TagIt puts a word on a finding.
 //
-// **Marking work is triage**, so it asks for the right that names it rather
+// Marking work is triage, so it asks for the right that names it rather
 // than for the right to read: a tag changes what a filtered list answers, and
 // somebody who may only read a product should not be able to move work into or
 // out of somebody else's saved filter.

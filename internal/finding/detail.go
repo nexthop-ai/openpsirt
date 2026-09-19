@@ -139,7 +139,7 @@ type Evidence struct {
 	// and FoundBy what produced it: which scanner, at which version,
 	// against which vulnerability database.
 	//
-	// **The run that answered is not the run that answers now**, so this
+	// The run that answered is not the run that answers now, so this
 	// cannot be worked out again later — it is a fact about a moment, like the
 	// version a place held before it moved, which is what makes storing it the
 	// permitted kind of derivation. Without it, "which scanner and which

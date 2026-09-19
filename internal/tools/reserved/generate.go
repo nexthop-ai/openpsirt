@@ -19,7 +19,7 @@ import (
 // deployment happens to run. Asking the engines is what stops the list drifting
 // from what they enforce.
 //
-// **Two of the four are asked and two are typed**, which is stated here and in
+// Two of the four are asked and two are typed, which is stated here and in
 // the generated file rather than glossed:
 //
 //   - PostgreSQL publishes pg_get_keywords(). Asked.

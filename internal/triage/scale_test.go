@@ -8,7 +8,7 @@
 // is a property of four database engines rather than of this code — so it is
 // measured on all four, on real servers, and the numbers are written down.
 //
-// **It times the act that lost its bound**, not a neighbour of it: PlanUpgrade
+// It times the act that lost its bound, not a neighbour of it: PlanUpgrade
 // resolves every place on a component inside the transaction, folds them,
 // writes a claim, a decision per place and the fix targets. A measurement of
 // the bulk judgment path would describe a different transaction, and the whole

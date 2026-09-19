@@ -154,7 +154,7 @@ type Group struct {
 	Middle int
 	Chains int
 	// Builds is how many builds in the selection hold this group, and Stream
-	// and Variant name **one** of them — not the only one. A screen needs
+	// and Variant name one of them — not the only one. A screen needs
 	// somewhere to link to and an action needs a build to name; what says
 	// there are others is the count, so a screen can show that instead of
 	// reading the named one as the whole answer. Both are empty where the
@@ -589,7 +589,7 @@ type groupHead struct {
 // everything else — so an empty cell would mean several intended things at
 // once, on the one screen whose purpose is noticing what is running out.
 //
-// **Narrowest first, where more than one holds.** The most useful sentence is
+// Narrowest first, where more than one holds. The most useful sentence is
 // the one about this finding rather than about its release, and a reader who
 // is told the release is retired learns nothing they could act on if the real
 // answer is that the rating puts it below the line.

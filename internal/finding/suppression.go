@@ -87,7 +87,7 @@ func (a ClaimsApplied) Unchanged() bool { return a.Opened == 0 && a.Closed == 0 
 // by the time anything needed it, and every carried patch would come back as
 // an outstanding vulnerability on the next re-scan.
 //
-// **stated is where the scan could have made a claim**, and a claim of any
+// stated is where the scan could have made a claim, and a claim of any
 // other origin is left alone rather than closed. Closing works by difference —
 // a claim the build no longer argues is a claim the build withdrew — and that
 // reading only holds where the build had somewhere to argue it. An inventory
@@ -229,13 +229,13 @@ type Carried struct {
 // CarriedPatches is what a build has been declaring it deals with itself, over
 // time.
 //
-// **The one thing a version comparison can never see.** A distribution carries
+// The one thing a version comparison can never see. A distribution carries
 // a fix into a package without moving its version, and the only evidence of it
 // is the build saying so in its own inventory — which is stored here and, until
 // now, read by nothing a person could reach. So the answer to "when did we
 // start carrying this, and are we still" was in the database and nowhere else.
 //
-// **Held over intervals against scans**, like the graph: a build argues the
+// Held over intervals against scans, like the graph: a build argues the
 // same things night after night, and the stretch is what makes this a history
 // rather than a list of what is true tonight. A claim that stopped is the
 // interesting row — somebody dropped a patch, and the finding it answered is

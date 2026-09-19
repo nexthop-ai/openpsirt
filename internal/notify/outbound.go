@@ -38,7 +38,7 @@ const signalTimeout = 15 * time.Second
 // without an adapter for any of them, which is what the channel interface was
 // for and is reached more cheaply than by writing two of them.
 //
-// **It carries what the channel rules already allow.** The body is composed by
+// It carries what the channel rules already allow. The body is composed by
 // the same code that composes a mail, so a notification about a
 // finding nobody has announced carries the fact that there is something and a
 // link, and nothing else — not the issue, not the component, not the build.
@@ -129,7 +129,7 @@ func (s *Signal) Run(ctx context.Context, interval time.Duration) {
 
 // Once carries what has not gone yet.
 //
-// **Nothing is retried forever.** A destination that refuses five times has
+// Nothing is retried forever. A destination that refuses five times has
 // gone, and a sweep that keeps trying it is a sweep that eventually does
 // nothing else. The row stays unsent and stays readable, which is the honest
 // end state.
@@ -247,7 +247,7 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 		Attempts: 1, FirstSeen: now,
 	}
 	if _, err := s.db.NewInsert().Model(claim).Exec(ctx); err != nil {
-		// **The unique index, and nothing else.** Every other insert in this
+		// The unique index, and nothing else. Every other insert in this
 		// tree asks which failure this was; here any error at all read as
 		// "somebody has this one", so a lost connection or a lock timeout
 		// answered "already claimed" and a sweep during a brief outage
@@ -324,7 +324,7 @@ func (s *Signal) deliver(ctx context.Context, to Outbound, row Notification) (ou
 
 // send makes the request.
 //
-// **Signed over the timestamp and the body**, so a receiver can tell a request
+// Signed over the timestamp and the body, so a receiver can tell a request
 // from us apart from one anybody could make, and cannot replay yesterday's.
 // The signature covers the timestamp precisely so that the timestamp cannot be
 // changed without breaking it.
@@ -383,16 +383,16 @@ func trimTo(text string, most int) string { return bound.Head(text, most) }
 
 // outboundClient is how a request leaves here.
 //
-// **Redirects are refused rather than followed.** A destination is configured,
+// Redirects are refused rather than followed. A destination is configured,
 // and "somewhere else" is exactly what a redirect asks us to send a signed
 // request to — a receiver that genuinely moved should be reconfigured, which
 // is visible, rather than followed, which is not.
 //
-// **Https only.** The body is signed and not encrypted, and what it carries is
+// Https only. The body is signed and not encrypted, and what it carries is
 // what somebody is being told about a vulnerability. A deployment that wants
 // to send that in clear text is not a case worth supporting.
 //
-// **A private address is allowed here**, unlike a sign-in provider's. The
+// A private address is allowed here, unlike a sign-in provider's. The
 // difference is where the address came from: a provider's endpoints arrive in
 // a discovery document from outside, and this one was typed by the operator —
 // whose chat server is quite reasonably on their own network.
@@ -414,7 +414,7 @@ func outboundClient() *http.Client {
 
 // reachable says whether an address is one this may send to.
 //
-// **Https, and no name or password in it.** The body is signed and not
+// Https, and no name or password in it. The body is signed and not
 // encrypted, and what it carries is what somebody is being told about a
 // vulnerability. Userinfo in the address is a credential this would store and
 // send, and it makes the address read as one host while reaching another:

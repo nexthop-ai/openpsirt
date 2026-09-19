@@ -13,14 +13,14 @@ func init() {
 
 // A comment's text before it was changed.
 //
-// **An edit overwrote and recorded only that it happened.** A reasoning's
+// An edit overwrote and recorded only that it happened. A reasoning's
 // revisions are kept because an approval points at one revision of the words
 // agreed to — and a comment is part of the same record that
 // goes public at disclosure, so "what it said before" being
 // unrecoverable makes that record readable and not checkable, which is the
 // property the whole append-only history exists for.
 //
-// **The previous text, written when it is replaced**, rather than every
+// The previous text, written when it is replaced, rather than every
 // version including the current one. The comment row holds what it says now;
 // this holds what it stopped saying, which is the part that was being lost.
 func upCommentHistory(ctx context.Context, tx *sql.Tx) error {

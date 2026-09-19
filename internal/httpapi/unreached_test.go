@@ -156,7 +156,7 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 			t.Fatalf("recording a destination answered %d: %s", got.Code, got.Body.String())
 		}
 
-		// **Never what it is signed with.** For Slack and for Teams the
+		// Never what it is signed with. For Slack and for Teams the
 		// address is itself the credential — the path carries the token and
 		// there is no other authentication — so neither may come back.
 		listed := asPerson(t, r, "admin", http.MethodGet, at, "")
@@ -166,7 +166,7 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 		if body := listed.Body.String(); strings.Contains(body, secret) {
 			t.Errorf("the listing hands back the signing secret: %s", body)
 		}
-		// **The secret, and not the address.** For Slack and for Teams the
+		// The secret, and not the address. For Slack and for Teams the
 		// path carries the token and there is no other authentication, which
 		// is why the trail row beside the create records the host alone — and
 		// the listing hands the whole URL back regardless. That is not

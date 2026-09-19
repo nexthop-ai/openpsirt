@@ -13,23 +13,23 @@ func init() {
 
 // The reporter, and the moment they told us.
 //
-// **Without this the coordinated-disclosure timeline cannot be evidenced at
-// all** — received, acknowledged, triaged, fixed, disclosed — and the
+// Without this the coordinated-disclosure timeline cannot be evidenced at
+// all — received, acknowledged, triaged, fixed, disclosed — and the
 // advisory's acknowledgments section is empty, which is the part a researcher
 // reads first.
 //
-// **Two of the fields do work beyond the record.** The received date is what
+// Two of the fields do work beyond the record. The received date is what
 // the embargo clock runs from: a report arriving on 1 June and typed
 // in on 15 June otherwise puts our clock two weeks behind the one the reporter
 // has a publication scheduled against, and they are the party who will publish
 // regardless. The acknowledged date is what makes an unacknowledged report a
 // condition somebody is told about.
 //
-// **A row per issue, not per finding.** A flaw recorded against four builds is
+// A row per issue, not per finding. A flaw recorded against four builds is
 // one report from one person, and four copies of their address is four places
 // for it to be wrong.
 //
-// **Researchers are assumed to email**, so these are facts somebody has in
+// Researchers are assumed to email, so these are facts somebody has in
 // hand when they type the record in rather than ceremony. A public intake form
 // stays out of scope; this is the inside half.
 func upReport(ctx context.Context, tx *sql.Tx) error {

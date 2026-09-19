@@ -211,7 +211,7 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 		// And a third person agreeing is told it has already been agreed to,
 		// and the date does not move again.
 		//
-		// **This is the read's answer, not the write's.** The row is read
+		// This is the read's answer, not the write's. The row is read
 		// before the update and the second agreement is refused there. What
 		// the update's own `approved_at IS NULL` clause guards is the race —
 		// two people agreeing between that read and that write — and the

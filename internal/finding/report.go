@@ -87,7 +87,7 @@ func (t Told) When() *time.Time {
 
 // ReportFor reads who told us about one issue, or nil where nobody did.
 //
-// **Authorized here, against the product the report was made against.** It was
+// Authorized here, against the product the report was made against. It was
 // authorized by the caller instead, which resolved the issue in whatever
 // product the request named — and an issue's identity spans its aliases, so
 // the moment a shared name is recorded the same issue is open in other
@@ -172,7 +172,7 @@ type Unanswered struct {
 // one, and it has to see them all to do that — the same shape as every other
 // condition the watch derives.
 //
-// **Only where the flaw is still open somewhere.** A report about something
+// Only where the flaw is still open somewhere. A report about something
 // long closed is history rather than an unanswered letter, and a condition
 // nobody can act on is one that teaches people to ignore the list.
 func (s *Store) Unacknowledged(ctx context.Context) ([]Unanswered, error) {

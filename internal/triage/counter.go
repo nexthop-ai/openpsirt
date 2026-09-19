@@ -12,14 +12,14 @@ import (
 
 // What would make an approver disagree.
 //
-// **An approver is shown the claim and the reasoning and nothing that argues
-// against them**, which is the rubber stamp the queue's whole shape was
+// An approver is shown the claim and the reasoning and nothing that argues
+// against them, which is the rubber stamp the queue's whole shape was
 // written against — so this is a weakness in a control rather than a card
 // layout. The material already exists: the finding's own detail carries the
 // decisions made elsewhere and what else sits at the place. What was missing
 // is putting it where the judgment is made rather than a page away from it.
 //
-// **Two counts and no argument.** It does not say a claim is wrong — nothing
+// Two counts and no argument. It does not say a claim is wrong — nothing
 // here can know that — it says what a careful reader would go and look up, so
 // that not looking is a choice rather than an omission.
 

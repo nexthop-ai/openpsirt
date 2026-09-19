@@ -18,7 +18,7 @@ type refEdge struct{ parent, child, kind string }
 // declaredScopes are the words the two formats define for what a dependency's
 // scope is, and the whole of what is recorded.
 //
-// **The producer's own word, from whichever vocabulary it wrote in.** One
+// The producer's own word, from whichever vocabulary it wrote in. One
 // format states a scope on the component and the other on the relationship,
 // and the two do not use the same words for the same idea — "required" and
 // "run" both say the target is there when the product runs. Folding them onto
@@ -507,8 +507,8 @@ func (c *reader) resolveUpstream() {
 		if !seen {
 			continue
 		}
-		// **What is already there may be a qualifier rather than a
-		// description.** Where no pedigree is stated the upstream name is
+		// What is already there may be a qualifier rather than a
+		// description. Where no pedigree is stated the upstream name is
 		// taken from the package identifier, which carries a name and no
 		// version in 459 of 535 cases — and the version is what expiry
 		// compares. A pointer naming a package the document fully describes

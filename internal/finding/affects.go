@@ -32,17 +32,17 @@ type Reset struct {
 
 // Affects makes the builds a recorded flaw is filed against exactly these.
 //
-// **Research narrows and widens what somebody first believed**, and the first
+// Research narrows and widens what somebody first believed, and the first
 // belief is written down before the analysis is finished — that is the point of
 // being able to record one early. So the set is editable, declaratively: this
 // is the list, work out what changed.
 //
-// **Widening opens findings; narrowing closes them as `invalid`** — because a
+// Widening opens findings; narrowing closes them as `invalid` — because a
 // build taken out of the set was never affected, rather than having stopped
 // being affected. The record of it stays, with the reason, so that the history
 // says what was believed and when it was corrected.
 //
-// **A reason is required whenever anything is closed.** Taking a build back out
+// A reason is required whenever anything is closed. Taking a build back out
 // of an advisory's affected list with no explanation is the state a history
 // exists to prevent.
 func (s *Store) Affects(ctx context.Context, subject access.Subject,

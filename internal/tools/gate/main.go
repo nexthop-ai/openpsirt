@@ -14,7 +14,7 @@
 // running are kept apart so that what was chosen can be seen before it runs,
 // and so that this can be asked what it would do without doing it.
 //
-// **It never narrows below what the change can break, and errs the other way.**
+// It never narrows below what the change can break, and errs the other way.
 // A path it does not recognize takes the whole gate. That is the direction a
 // check that gates a commit should be wrong in.
 package main

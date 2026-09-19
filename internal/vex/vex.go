@@ -1,7 +1,7 @@
 // Package vex writes what we have decided about the third-party components a
 // build ships, in the format a customer's own scanner reads.
 //
-// **This is the document third-party components belong in.** Advisories are
+// This is the document third-party components belong in. Advisories are
 // about flaws in our own product and are not issued for known CVEs in
 // dependencies — but a customer running a scanner against a shipped
 // image gets a list of those CVEs and asks what we say about them, which is
@@ -154,18 +154,18 @@ func (s *Store) carrying() int {
 
 // For writes the document for one build.
 //
-// **Approved claims only.** A proposal is one person's opinion and this
+// Approved claims only. A proposal is one person's opinion and this
 // document is the deployment's word to a customer — the two-person rule is
 // what makes publishing a dismissal safe, and a document carrying unapproved
 // ones would route around it.
 //
-// **Public findings only.** Every statement names an issue and a component in
+// Public findings only. Every statement names an issue and a component in
 // something we ship, so a document built from undisclosed work would announce
 // the undisclosed work. `undisclosed` includes them for somebody who may read
 // them, which is a preview rather than a thing to publish, and it is refused
 // for anybody who may not.
 //
-// **Two statuses, and silence for everything else.** `not_affected` and
+// Two statuses, and silence for everything else. `not_affected` and
 // `fixed` are what a generated VEX document names, and they are the two a
 // customer's scanner can act on. A deferral is deliberately absent rather than
 // exported as anything: a deferred item exports as affected and never as
@@ -263,7 +263,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		// identifier is assigned when it is written, so the lowest is the
 		// first written.
 		//
-		// **Read off one decision rather than taken column by column.** Three
+		// Read off one decision rather than taken column by column. Three
 		// independent minima are three answers from three claims: a category
 		// from one, the prose explaining a different reason from another, and
 		// a timestamp from a third — published, machine-readable, to every
@@ -484,7 +484,7 @@ type words struct {
 // moment have to come from the same claim, or the document says one thing in
 // the field a machine reads and another in the field a person does.
 //
-// **The reasoning is not read here at all.** It is written for a second person
+// The reasoning is not read here at all. It is written for a second person
 // inside this deployment, and the surest way for it not to be published is for
 // the query that builds the document never to fetch it.
 func (s *Store) wordsOf(ctx context.Context, decisions []int64) (map[int64]words, error) {

@@ -81,7 +81,7 @@ type Change struct {
 
 // NameLimit is how much of what a change is about the column holds.
 //
-// **A store must not be able to overflow its own column.** What is written
+// A store must not be able to overflow its own column. What is written
 // here is composed by the caller from names — a collaborator is a product, an
 // issue and a person — and the column is sized for three of them with their
 // separators. Every caller composes from stored values, each of which is a
@@ -114,7 +114,7 @@ func NewStore(db bun.IDB) *Store {
 // setting write to reach this would make a signature about auditing rather
 // than about the thing being written.
 //
-// **Written in the transaction that makes the change**, so a failure here
+// Written in the transaction that makes the change, so a failure here
 // fails the change. Both are one act, and a change recorded nowhere is the
 // state this table exists to prevent; nothing was committed, so the retry a
 // caller makes changes nothing twice.
@@ -149,7 +149,7 @@ type Over struct {
 //
 // Paged, because it only grows: a deployment a year old has every setting
 // anybody ever moved in it, and a screen that asks for all of them is one that
-// stops answering. **A period is what makes it usable at that size**: an audit
+// stops answering. A period is what makes it usable at that size: an audit
 // asks what changed in the year the certificate covers, and paging back
 // through everything since is not that question.
 func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over Over,
@@ -194,7 +194,7 @@ func (s *Store) Changes(ctx context.Context, by access.Subject, kind Kind, over 
 // every name beginning with it followed by " on ". That covers a role, which is
 // per product, and a change recorded against the bare name.
 //
-// **What LIKE treats as special is escaped.** An identity is an email address
+// What LIKE treats as special is escaped. An identity is an email address
 // and "_" is a wildcard, so `a_b@example.com` would otherwise match
 // `axb@example.com` and report somebody else's history as this person's. The
 // escape character is "#" rather than a backslash, because a backslash inside a
@@ -242,7 +242,7 @@ func (s *Store) About(ctx context.Context, by access.Subject, kind Kind, name st
 // told so, instead of being shown a deployment where nobody has ever changed
 // anything.
 //
-// **The record is shown whole**, not narrowed by which products the reader
+// The record is shown whole, not narrowed by which products the reader
 // reaches. It names them — a role granted on one, a release whose support date
 // moved — so holding this means knowing which products exist and what their
 // releases are called. That is a property of the grant rather than a leak:

@@ -18,12 +18,12 @@ import (
 // narrower one is machinery nobody chose — it is maintained on every insert and
 // every update to those columns, and it earns nothing.
 //
-// **Read from the database rather than from the migration source**, because
+// Read from the database rather than from the migration source, because
 // what matters is the schema an operator ends up with, and constraints declare
 // indexes without ever saying the word.
 //
-// **Checked on SQLite alone, deliberately, and this is the exception that
-// proves the rule.** Every other schema test runs on four engines because the
+// Checked on SQLite alone, deliberately, and this is the exception that
+// proves the rule. Every other schema test runs on four engines because the
 // engines disagree — about reserved words, about types, about what an affected
 // row count means. They do not disagree about which columns an index is on:
 // the statements are one list, and what differs between engines is spelled in

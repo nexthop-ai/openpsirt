@@ -389,7 +389,7 @@ func TestEveryTopLevelKeyTheReaderClaimsIsRecordedAsRead(t *testing.T) {
 	// read into the component the reader builds, and all are easy to record
 	// the other way.
 	//
-	// **It is strict for a scalar key and weak for a container.** A key
+	// It is strict for a scalar key and weak for a container. A key
 	// holding a list appears in the record only through its members, so all
 	// this can ask of "components" is that something under it is read. The
 	// four above are fields of a component, so a record that calls one of them

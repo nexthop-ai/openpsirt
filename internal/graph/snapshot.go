@@ -305,7 +305,7 @@ func (a *Ambiguous) Is(target error) bool { return target == ErrAmbiguous }
 // ComponentVersionAt resolves a component by name and, where one is given,
 // version.
 //
-// **A name is not unique within a build**, and not rarely. This was written
+// A name is not unique within a build, and not rarely. This was written
 // assuming it nearly always was, resolving a collision by taking the lowest
 // identifier — stable between requests, which was the property being protected.
 // A real switch image then shipped three vendored versions of one library, and
@@ -422,7 +422,7 @@ type Neighbor struct {
 	// Purl is the package identifier, which is where the kind of package it is
 	// comes from.
 	//
-	// **What tells two components of one name and one version apart.** A build
+	// What tells two components of one name and one version apart. A build
 	// ships `opennsl-modules` twice at 15.2.0.0.0.0.0.0, and asking about
 	// either by name is refused — rightly, since they are two components — so
 	// a screen listing them without this could name neither. The refusal even
@@ -705,13 +705,13 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 // ordered puts a list of neighbors in the order somebody reads it: what opens
 // first, and within each group the most findings first.
 //
-// **The number a row is ranked on is the number that describes it**: for a
+// The number a row is ranked on is the number that describes it: for a
 // branch, everything open beneath it, and for a leaf, its own count — which
 // for a leaf are the same number anyway. A container holds nothing of its own,
 // so ranking it on that put every container at zero and the list fell back to
 // alphabetical, which is what it looked like.
 //
-// **What opens still comes before what does not.** A container holds no
+// What opens still comes before what does not. A container holds no
 // findings of its own, and on a real image the root's 5,270 children put the
 // first thing that opens at position 546 when structure was not held above
 // contents. A tree whose first screen contains no branches is a list, and the

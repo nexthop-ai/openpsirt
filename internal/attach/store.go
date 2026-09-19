@@ -71,7 +71,7 @@ var (
 
 // visibilityOf is how disclosed an issue is in one product.
 //
-// **The most careful row governs.** An issue with one undisclosed finding
+// The most careful row governs. An issue with one undisclosed finding
 // against it is undisclosed here, whatever else is open beside it — the same
 // rule that decides what may be said about a group outside the application
 // . Asked at the moment of the request rather than copied onto the
@@ -145,7 +145,7 @@ func mayReach(ctx context.Context, db bun.IDB, subject access.Subject,
 
 // mayAttach reports whether a subject may put a file against this issue.
 //
-// **Attaching is triage work, not reading.** It was authorized with the read
+// Attaching is triage work, not reading. It was authorized with the read
 // test above, so a role granting nothing but the ability to read disclosed
 // findings on one product could write files into the deployment's store — and
 // what that costs is not the reader's, it is every other upload in every
@@ -181,7 +181,7 @@ func mayAttach(ctx context.Context, db bun.IDB, subject access.Subject,
 // once), and hashed on the way through so that a redaction can say later what
 // it removed.
 //
-// **`hangsOffTheIssue` says nothing is going to point at this from text.** A
+// `hangsOffTheIssue` says nothing is going to point at this from text. A
 // file attached while somebody is composing a justification is pointed at by
 // words that are not saved yet, so it waits, and the sweep collects it if they
 // abandon the form. A file attached to the issue itself — evidence, a

@@ -218,7 +218,7 @@ func (s *Store) bind(ctx context.Context, subject access.Subject, proposals []Pr
 // gate works out whether each of these proposals needs a second person, and
 // records the answer on them.
 //
-// **Whether a claim is waiting is not something its author states.** It was a
+// Whether a claim is waiting is not something its author states. It was a
 // field on the proposal, worked out by the caller before the transaction
 // opened and taken on trust — the same shape the binding deadline had, and
 // with the same consequence: a policy changing between the answer and the

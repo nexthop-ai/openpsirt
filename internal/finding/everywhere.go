@@ -14,13 +14,13 @@ import (
 
 // One issue, everywhere it sits.
 //
-// **The work starts from an issue as often as from a product**, and it could
+// The work starts from an issue as often as from a product, and it could
 // not: findings are answered per product, so "a critical just landed in
 // openssl — which of our products ship an affected version" was a question
 // asked a dozen times and assembled by hand. At a dozen products that is the
 // first thing anybody complains about.
 //
-// **Narrowed the way every other read is**, per product and per visibility, in
+// Narrowed the way every other read is, per product and per visibility, in
 // the query. A page that spans products is exactly where filtering afterwards
 // gets forgotten, and the count is the leak even when no row is shown.
 
@@ -47,7 +47,7 @@ type Sighting struct {
 // Everywhere is every build that carries one issue, across every product the
 // subject may see.
 //
-// **One row per build and component**, not per place: the same component at
+// One row per build and component, not per place: the same component at
 // the same version in two builds is two rows because they are two things
 // somebody ships, and sixty places of it in one build is one row with a count,
 // because it is one piece of work.

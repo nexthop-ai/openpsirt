@@ -82,7 +82,7 @@ func TestStandardQuotingSurvivesAlongsideStrictness(t *testing.T) {
 	// quoting is asked for by appending to the mode, and appending is only
 	// correct if what was already there is still in force.
 	//
-	// **The two have to meet on one column**, or this cannot fail for the
+	// The two have to meet on one column, or this cannot fail for the
 	// reason it is named. It declared a reserved word and an ordinary integer,
 	// wrote 1 and 2, and read 1 back — which passes with strictness entirely
 	// off, leaving the conjunction pinned by nothing. A reserved word carrying
@@ -129,7 +129,7 @@ func TestTheConnectionNamesBothModesItDependsOn(t *testing.T) {
 	// that names the mode rather than a value that came back a character
 	// short.
 	//
-	// **It cannot tell an asserted mode from an inherited one**, and nothing
+	// It cannot tell an asserted mode from an inherited one, and nothing
 	// asked of a connection can: what the session holds is the union. What
 	// catches a connection string that stops asking is the test over the
 	// string itself, in internal/database — against the server these run on,

@@ -74,7 +74,7 @@ func TestNothingStatedHoldsNothingBack(t *testing.T) {
 
 // A label's reach, and where it stops.
 //
-// **The boundary is the whole point.** Matched anywhere in the string,
+// The boundary is the whole point. Matched anywhere in the string,
 // "nexthop" would hold back every package with those letters in it; matched
 // only exactly, it would miss the organization's own family of names, which is
 // most of what it exists for.
@@ -158,7 +158,7 @@ func TestWhatTheDeploymentStatedIsHeldBackToo(t *testing.T) {
 
 // The publisher of a root, which is ours by construction.
 //
-// **The segment beside the name, never the whole namespace.** Taking the whole
+// The segment beside the name, never the whole namespace. Taking the whole
 // of it would hold back every package on a shared forge while reporting that
 // it was protecting one organization, which is the failure that would make an
 // operator turn the feature off rather than tune it.

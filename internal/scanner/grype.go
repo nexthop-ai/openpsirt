@@ -452,7 +452,7 @@ func matchedRange(details []matchDetail) string {
 // findings. Ordering it makes the stored value the same for the same report,
 // which is what keeps a re-scan from writing.
 //
-// **Which one the data calls the root cause is carried separately.** A
+// Which one the data calls the root cause is carried separately. A
 // published advisory states one weakness and a report commonly carries several,
 // so something has to say which — and taking whichever sorts first is an answer
 // with nothing behind it. The feeds say it, in the word beside each entry, and

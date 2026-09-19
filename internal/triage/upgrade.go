@@ -42,18 +42,18 @@ type Upgrade struct {
 
 // PlanUpgrade records moving a component as the answer to what is open on it.
 //
-// **One act, one claim, one decision per issue** — the same shape a bulk
+// One act, one claim, one decision per issue — the same shape a bulk
 // judgment takes, because a bump answers many issues at once and
 // answering them one at a time is what the grouping exists to avoid.
 //
-// **Gated on where the date lands** rather than on the outcome alone. A
+// Gated on where the date lands rather than on the outcome alone. A
 // commitment at or before the earliest deadline among what it covers hides
 // nothing the policy did not already allow, so it stands on its own; past that
 // deadline it defers the worst thing it covers and a second person agrees.
 // Worked out here rather than by the caller, because the deadline is a fact
 // about the set this resolves and the caller does not have it.
 //
-// **It takes no bound.** A bulk judgment takes one and this does not, and the
+// It takes no bound. A bulk judgment takes one and this does not, and the
 // difference is reversibility rather than size: nothing re-checks a dismissal,
 // so one sentence answering a thousand findings has to stay a size a reviewer
 // can follow, while the next scan re-checks every row a promise names.
@@ -247,14 +247,14 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 
 // Repromise changes what a release is moving to, or by when.
 //
-// **Editing a commitment is editing what somebody agreed to.** An approver
+// Editing a commitment is editing what somebody agreed to. An approver
 // agreed to "8.5.0 by 8 October"; a coordinator quietly rewriting either half
 // would leave the agreement standing over a promise nobody read, which is the
 // failure REQ-28 exists to prevent — so this goes through the same act revising
 // the words does: every agreement on the claim is withdrawn and every row of it
 // returns to the queue.
 //
-// **The reasoning is required, and it is the history.** Saying why a date moved
+// The reasoning is required, and it is the history. Saying why a date moved
 // is what a second person has to read, and the revisions are where "what we
 // said in October" survives being changed in November. A promise moved with no
 // sentence attached is a promise nobody can audit.

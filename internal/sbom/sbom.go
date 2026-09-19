@@ -57,7 +57,7 @@ type Limits struct {
 
 // DefaultLimits are the bounds a reader uses when given none.
 //
-// **Set from what reading costs rather than from what a document looks like.**
+// Set from what reading costs rather than from what a document looks like.
 // They were chosen as round numbers several times the largest real producer,
 // which is the right instinct and the wrong unit: measured, an edge holds
 // about half a kilobyte of heap while it is being read and a component about
@@ -81,7 +81,7 @@ type Limits struct {
 // well inside the 512 MiB the chart ships rather than several times past it,
 // which is where it was.
 //
-// **A file is bounded separately from a component**, and measured rather than
+// A file is bounded separately from a component, and measured rather than
 // assumed: a real scan catalogs 4,964 files against 89 packages on one image
 // and 21,643 against 480 on another, which is forty-five to fifty-six files per
 // package. A format that catalogs files would therefore put a switch operating

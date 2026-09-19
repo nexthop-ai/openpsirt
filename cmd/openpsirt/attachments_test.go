@@ -104,7 +104,7 @@ func TestTheRefusalNamesTheWayThrough(t *testing.T) {
 // over as credentials instead makes the two one string, and is also what makes
 // the signing well-defined.
 //
-// **Measured, not assumed:** the leak this was filed for does not happen. A
+// Measured, not assumed: the leak this was filed for does not happen. A
 // reachability failure against a credentialed endpoint reports the operation
 // and the status and never the address, so the password did not reach standard
 // error by that route. What stands is that the endpoint the client is given

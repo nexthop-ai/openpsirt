@@ -909,7 +909,7 @@ func hideSomething(t *testing.T, db *database.DB, productID int64) {
 // A version that comes back is not the data moving, and is not the data
 // standing still since the first time it was ever seen.
 //
-// **A data bundle is a build stamp**, so restoring an older one reproduces a
+// A data bundle is a build stamp, so restoring an older one reproduces a
 // version string exactly. Measured as the first sighting of whichever version
 // ran most recently, an air-gapped deployment re-importing last quarter's
 // bundle was told the data had not moved in seven months — about data that had

@@ -13,17 +13,17 @@ func init() {
 
 // A file hanging off an issue, and the record of it that outlives the bytes.
 //
-// **The bytes are not here**. What this table holds is the reference
+// The bytes are not here. What this table holds is the reference
 // the text uses, what the file is, where it went, who put it there, and — when
 // somebody has to take a file back out — what was removed and why.
 //
-// **It hangs off the issue in the product**, which is the unit a decision, an
+// It hangs off the issue in the product, which is the unit a decision, an
 // embargo and a comment already use. Not a finding row: text is written against
 // a decision and a decision covers every place an issue sits at, so binding a
 // file to whichever of forty-eight rows somebody was looking at would lose it
 // the day that row closed while its siblings stayed open.
 //
-// **There is no visibility column, deliberately.** Whether a file may be read
+// There is no visibility column, deliberately. Whether a file may be read
 // is whether its issue may be read, asked at the moment of the request. A copy
 // taken at upload would still say "private" after the embargo it documents had
 // ended, which is the shape of every stale-value defect: correct when written,

@@ -15,12 +15,12 @@ import (
 // Files keeps bytes on this machine, which is what makes the tool runnable
 // without standing an object store up first.
 //
-// **It is the development and test backend and never a production one**, the
+// It is the development and test backend and never a production one, the
 // same way SQLite is for the database: one process, one disk, no replication
 // and no signing authority of its own. Two replicas would disagree about what
 // exists.
 //
-// **Everything goes through an os.Root**, so a name cannot reach outside the
+// Everything goes through an os.Root, so a name cannot reach outside the
 // directory even if a caller one day passes one that tries. The keys are ours
 // and contain nothing a person typed, so nothing can reach that today — which
 // is a property of the callers rather than of this type, and confinement that

@@ -43,7 +43,7 @@ type Storage interface {
 	// URLFor is a short-lived address a browser may be sent to, carrying
 	// the disposition and content type we chose as response overrides.
 	//
-	// **An empty string is a legitimate answer**, and means this store cannot
+	// An empty string is a legitimate answer, and means this store cannot
 	// hand out an address of its own — so the caller serves the bytes instead.
 	// That is not a fallback for a failure; it is what a store without a
 	// signing authority looks like, and the only one of those is the local
