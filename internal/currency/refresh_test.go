@@ -13,7 +13,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -78,7 +80,7 @@ func seed(t *testing.T, db *database.DB, of []component,
 	}
 	asked := &[]string{}
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	r := currency.NewRefresher(db.DB, quiet, "the-only-replica")
+	r := currency.NewRefresher(db.DB, quiet, "the-only-replica", currency.Ours{})
 	r.Pause = 0
 	r.Index = func(ecosystem string) currency.Asker {
 		switch ecosystem {
@@ -517,7 +519,7 @@ func TestOneReplicaAsksTheIndexes(t *testing.T) {
 		index := &counted{}
 		replicas := make([]*currency.Refresher, 2)
 		for i := range replicas {
-			r := currency.NewRefresher(db.DB, quiet, fmt.Sprintf("replica-%d", i))
+			r := currency.NewRefresher(db.DB, quiet, fmt.Sprintf("replica-%d", i), currency.Ours{})
 			r.Pause = 0
 			r.Index = func(string) currency.Asker { return index }
 			replicas[i] = r
@@ -741,4 +743,121 @@ func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
 				"it had already started", len(*asked), currency.RenewEvery)
 		}
 	})
+}
+
+// A name this deployment calls its own never reaches an index.
+//
+// **What a pass sends is a component's name**, and for something built here
+// that is the name of a project, a team or a product nobody has announced. The
+// assertion is on what was asked rather than on what was stored, because the
+// two are recorded identically on purpose and a check on storage alone would
+// pass against a version that asked and then threw the answer away.
+func TestANameOfOursIsNotAskedAbout(t *testing.T) {
+	each(t, func(t *testing.T, db *database.DB) {
+		// The second one already has an answer, which is the deployment that
+		// had asking turned on before any of this existed. Everything stored
+		// against it came from sending the name that stops here.
+		had, shipped := "1.4.0", time.Now().UTC().Add(-90*24*time.Hour)
+		r, asked := seed(t, db, []component{
+			{purl: "pkg:golang/github.com/nexthop-ai/openpsirt@v1.0.0"},
+			{purl: "pkg:npm/%40nexthop/agent@1.0.0", checked: &shipped, version: &had},
+			{purl: "pkg:cargo/serde@1.0.0"},
+		}, map[string]currency.Latest{"serde": {Version: "1.0.230"}}, nil)
+		r.Ours = currency.Ourselves("https://nexthop.ai", nil)
+
+		count, err := r.Once(t.Context())
+		if err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		if len(*asked) != 1 || (*asked)[0] != "serde" {
+			t.Fatalf("asked about %v, expected only serde", *asked)
+		}
+		if count != 1 {
+			t.Fatalf("counted %d asked about, expected 1: a name held back was not asked about", count)
+		}
+		// Recorded all the same. Left unrecorded it would stay due for ever,
+		// and the window takes the never-asked first — so it would hold the
+		// head of every pass afterwards with the components behind it never
+		// reached, which is the failure the arm beside it exists for.
+		got := read(t, db)
+		for _, purl := range []string{
+			"pkg:golang/github.com/nexthop-ai/openpsirt@v1.0.0",
+			"pkg:npm/%40nexthop/agent@1.0.0",
+		} {
+			if got[purl].Checked == nil {
+				t.Errorf("%s was held back and left due for ever", purl)
+			}
+			// Dropped rather than left. Kept, the version stays on the
+			// screen with nothing that will ever refresh it, the component
+			// never reaches the report of what was held back, and the row
+			// goes stale in a day rather than in thirty — one of the two
+			// hundred slots every day for ever, sending nothing.
+			if got[purl].Version != nil {
+				t.Errorf("%s was held back and keeps the version an index gave it", purl)
+			}
+			if got[purl].Released != nil || got[purl].Summary != nil || got[purl].Project != nil {
+				t.Errorf("%s was held back and keeps what an index said about it", purl)
+			}
+		}
+	})
+}
+
+// What a scan was about is folded in as the pass runs.
+//
+// The roots come from the database rather than from configuration, so a
+// product declared this morning is one whose name does not leave this
+// afternoon. Read per pass for that reason, and this is what says so: the
+// refresher is built holding nothing and holds the root's owner back anyway.
+func TestWhatWasScannedIsHeldBack(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		r, asked := seed(t, w.DB, []component{
+			{purl: "pkg:golang/github.com/example-corp/product@v2.0.0"},
+			{purl: "pkg:golang/github.com/example-corp/internal-lib@v1.0.0"},
+			{purl: "pkg:cargo/serde@1.0.0"},
+		}, map[string]currency.Latest{"serde": {Version: "1.0.230"}}, nil)
+		carried(t, w, "pkg:golang/github.com/example-corp/product@v2.0.0",
+			"pkg:golang/github.com/example-corp/product@v2.0.0",
+			"pkg:golang/github.com/example-corp/internal-lib@v1.0.0")
+
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		if len(*asked) != 1 || (*asked)[0] != "serde" {
+			t.Fatalf("asked about %v, expected only serde: the root's owner was not held back", *asked)
+		}
+	})
+}
+
+// carried puts seeded components into the fixture's build, under a scan that
+// declared root as the identifier of the thing it was about.
+//
+// The identifier is on the scan rather than on a component, which is where a
+// build's declaration of itself is kept: the component standing for the
+// product is stored by its name alone, so that a version on it does not give
+// the product a new identity every night.
+func carried(t *testing.T, w *fixture.World, root string, purls ...string) {
+	t.Helper()
+	ctx := t.Context()
+	scan := &ingest.Scan{
+		TargetID: w.Target.ID, ContentHash: fmt.Sprintf("hash-%d", time.Now().UnixNano()),
+		BuiltAt: time.Now().UTC(), ReceivedAt: time.Now().UTC(),
+		ParserVersion: "test", Status: ingest.Accepted, RootIdentifier: root,
+	}
+	if _, err := w.DB.DB.NewInsert().Model(scan).Exec(ctx); err != nil {
+		t.Fatalf("record a scan: %v", err)
+	}
+	for _, purl := range purls {
+		var id int64
+		err := w.DB.DB.NewSelect().TableExpr(`"component" AS "c"`).
+			ColumnExpr("c.id").Where("c.purl = ?", purl).Scan(ctx, &id)
+		if err != nil {
+			t.Fatalf("find %s: %v", purl, err)
+		}
+		node := &graph.Node{
+			TargetID: w.Target.ID, ComponentID: id, OpenedScanID: scan.ID,
+		}
+		if _, err := w.DB.DB.NewInsert().Model(node).Exec(ctx); err != nil {
+			t.Fatalf("put %s in the build: %v", purl, err)
+		}
+	}
 }

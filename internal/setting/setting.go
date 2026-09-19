@@ -158,6 +158,15 @@ const (
 	// stands outside that: it is not part of a scan, it is asked of a public
 	// index, and a deployment that cannot reach out loses this answer and
 	// nothing else.
+	//
+	// **What goes out is a component's name.** One request per component to
+	// that ecosystem's public index, carrying the name and nothing else — no
+	// version, no build, no product, nothing about who is asking beyond the
+	// request itself. For an open-source dependency that is public knowledge.
+	// For something built here it is the name of a project, a team or a
+	// product nobody has announced, and a public index records every request
+	// made of it, so names this deployment calls its own are held back and the
+	// report says which.
 	UpstreamCurrency = "upstream.currency"
 	// AttachmentMaxSize is the largest single file this deployment
 	// accepts, in bytes, and AttachmentQuota is how much it will hold in

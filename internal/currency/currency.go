@@ -9,6 +9,12 @@
 // off unless a deployment turns it on, and a deployment that cannot reach out
 // loses this answer and nothing else.
 //
+// **What leaves is a component's name.** One request per component, carrying
+// the name and nothing else. For an open-source dependency that is public
+// knowledge; for something built here it is the name of a project, a team or a
+// product nobody has announced, so what this deployment calls its own is held
+// back rather than asked about — see Ours.
+//
 // Two facts and no judgment. The newest version says whether we are behind;
 // its date says whether the thing is still moving. Together they say why there
 // is no fix — an issue disclosed after a component's newest release and still

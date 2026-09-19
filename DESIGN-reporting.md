@@ -690,7 +690,7 @@ reach the filesystem and restart the process.
 | The triage floor | The severity below which findings are recorded and counted but kept off the working list. A product may state its own |
 | Quiet after | How long a build may go without a scan before it is reported as quiet |
 | Scan every | How often everything tracked is scanned again |
-| Upstream currency | Whether to ask public package indexes for the newest version. Off unless turned on: the only thing here that reaches the network |
+| Upstream currency | Whether to ask public package indexes for the newest version. Off unless turned on: the only thing here that reaches the network, and what goes out is a component's name. Names this deployment calls its own are held back, and the report of what has no upstream answer says which |
 | The two attachment bounds | The largest single file, and the deployment total |
 | Absent after | How long somebody may go without signing in before work they hold is raised |
 | The three disclosure periods | How long a finding stays undisclosed, how much that date may move in total before a second person agrees, and the lead time before it |

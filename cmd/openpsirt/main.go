@@ -251,6 +251,12 @@ func run(args []string, stdout, stderr *os.File) error {
 	// work that must happen once — rewriting deadlines after a policy
 	// change — is held by one replica, and the name is what holds it.
 	name := workerName()
+	// What this deployment calls its own, and so never sends to a public
+	// package index. Derived from the namespace it publishes under, which is
+	// the one place it has already said who it is, and unioned with whatever
+	// else the deployment stated. What a scan was about is folded in as the
+	// pass runs, because that comes from the database rather than from here.
+	ours := currency.Ourselves(cfg.PublisherNamespace, cfg.UpstreamInternal)
 	handler, _ := httpapi.New(logger, db.Validate, httpapi.Ingest{
 		DB: db, Queue: work, Replica: name,
 		Interface: httpapi.Interface{Files: pages},
@@ -277,6 +283,11 @@ func run(args []string, stdout, stderr *os.File) error {
 		},
 		Mode:  roleMode(settings),
 		Files: files,
+		// What never leaves, derived once here and read by the pass that
+		// asks and by the report saying what it held back. Two derivations
+		// of one boundary would be two boundaries the first time either
+		// moved.
+		Ours: ours,
 	})
 
 	// Every replica serves, reads and scans. Separate worker deployments would
@@ -301,7 +312,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Started on every replica and asking on one: the politeness this pass
 	// is built around is a rate per deployment, so which replica asks is
 	// settled by a lease rather than by all of them asking at once.
-	upstream := currency.NewRefresher(db.DB, logger, name)
+	upstream := currency.NewRefresher(db.DB, logger, name, ours)
 	// Places work nobody holds onto the team a standing rule names. Queued
 	// work rather than part of the request that saved the rule: one rule
 	// sweeps thousands of findings, and saving a form must not hold a

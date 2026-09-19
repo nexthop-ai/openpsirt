@@ -38,8 +38,103 @@ export function System() {
       </div>
       <VulnerabilityData />
       <TheQueue />
+      <WhatUpstreamCouldNotAnswer />
       <WebhookDelivery />
     </>
+  );
+}
+
+// How many rows to draw. Past this it is a list nobody reads through, and the
+// count beside it says how much there is.
+const MOST = 100;
+
+// What asking public indexes could not answer, and why of each.
+//
+// **Two questions that are one panel.** What was held back says what the
+// derived default is costing; what no index has heard of is the list an
+// operator reads to decide what else should be held back. A name promoted from
+// the second appears in the first afterwards, which is how somebody knows the
+// promotion worked.
+//
+// Nothing here is a fault, which is why the empty state is the good news and
+// the table is not drawn in a failing color. A private module, a vendored
+// fork and a name this deployment publishes under all reach it.
+function WhatUpstreamCouldNotAnswer() {
+  const asked = useQuery({
+    queryKey: ["upstream-unanswered"],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/upstream/unanswered", { params: { query: { limit: MOST } } })),
+  });
+
+  if (asked.isPending) return <Loading />;
+  if (asked.isError) {
+    return <Failed error={asked.error} what="What upstream could not answer could not be read." />;
+  }
+  const rows = asked.data?.items ?? [];
+  const total = asked.data?.total ?? 0;
+  // Drawn whatever the table holds. A derived default nobody can see is one an
+  // operator turns the whole feature off to escape, and this is not a
+  // statement about any product, so it does not narrow with the rows.
+  const ours = asked.data?.ours ?? [];
+
+  return (
+    <section className="panel">
+      <h3>Upstream</h3>
+      <p
+        className="hint"
+        style={{ marginTop: 0 }}
+        title="Asking a public package index sends the component's name. A name matching one of these is never sent."
+      >
+        Held back:{" "}
+        {ours.length === 0 ? (
+          <span>nothing</span>
+        ) : (
+          ours.map((name) => (
+            <span key={name} className="id" style={{ marginRight: "0.75ch" }}>
+              {name}
+            </span>
+          ))
+        )}
+      </p>
+      {rows.length === 0 ? (
+        <Empty
+          title="Nothing here has gone unanswered."
+          detail="Only components in products you may read are counted, and only after the pass has reached them — a deployment that has not turned asking on has reached none of them yet."
+        />
+      ) : (
+        <>
+          <p className="hint">
+            {total.toLocaleString()} without an answer
+            {rows.length < total && `, ${rows.length.toLocaleString()} shown`}. Only components in
+            products you may read.{" "}
+            {asked.data?.whole === false &&
+              "This estate is past what one read examines, so the count is a floor."}
+          </p>
+          <Wide>
+            <table>
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Ecosystem</th>
+                  <th>Why</th>
+                  <th>Last reached</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.purl} className="row">
+                    <td className="id">{row.purl}</td>
+                    <td className="hint">{row.ecosystem || "—"}</td>
+                    <td>{because(row.why)}</td>
+                    <td className="hint">{since(row.checked)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Wide>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -108,6 +203,23 @@ function VulnerabilityData() {
       )}
     </section>
   );
+}
+
+// What each reason means, in words rather than in the vocabulary the API uses.
+//
+// The three are different things and only one of them is anybody's to act on:
+// an unrecognized name is the candidate to hold back, a held-back name is the
+// default working, and an unreadable identifier is a document this deployment
+// accepted that nothing can turn into a request.
+function because(why?: string) {
+  switch (why) {
+    case "ours":
+      return <span className="state closed">held back, ours</span>;
+    case "unreadable":
+      return <span className="state open">identifier cannot be read</span>;
+    default:
+      return <span className="hint">no index knows it</span>;
+  }
 }
 
 // What is waiting, and what stopped being retried.
