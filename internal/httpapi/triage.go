@@ -33,7 +33,7 @@ type DecisionBody struct {
 	// Mitigation is the one claim here that rests on configuration rather
 	// than on code, so it is the one thing nothing will notice going away.
 	// Naming it does not fix that; it makes the claim checkable.
-	Mitigation    string `json:"mitigation,omitempty" maxLength:"65536" doc:"What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, and refused with any other"`
+	Mitigation    string `json:"mitigation,omitempty" maxLength:"65536" doc:"What actually stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise"`
 	DeferredUntil string `json:"deferred_until,omitempty" doc:"When a deferral returns, as a date. Required for a deferral"`
 	// FixedVersion is what makes the already-fixed claim checkable against
 	// whoever packages the component, rather than something to be taken on

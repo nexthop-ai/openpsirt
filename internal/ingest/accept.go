@@ -149,6 +149,16 @@ type Scan struct {
 	// why it is there. Nothing else on a receipt distinguishes the two.
 	Components *int `bun:"components"`
 	Placed     *int `bun:"placed"`
+	// RootIdentifier is what the document called the thing it is about, in
+	// the spelling the document used, and empty where it named no component
+	// of its own.
+	//
+	// It is what a reader of a published advisory matches a release against:
+	// an identifier only helps if it appears on both sides, and this is the
+	// string somebody holds if they ingested this same document. Minting one
+	// instead would put a name in that field that nothing outside this
+	// deployment has ever seen.
+	RootIdentifier string `bun:"root_identifier"`
 }
 
 // Store records scans and answers what to do with a new one.
@@ -402,10 +412,13 @@ func truncate(s string, most int) string { return bound.Head(s, most) }
 // Written after it has been read rather than when it arrives, because until
 // then nobody knows: an upload is bytes, and how many components it describes
 // and how many of them anything places are answers the parser produces.
-func (s *Store) Made(ctx context.Context, scanID int64, components, placed int) error {
+func (s *Store) Made(ctx context.Context, scanID int64, components, placed int,
+	rootIdentifier string) error {
+
 	_, err := s.db.NewUpdate().Model((*Scan)(nil)).
 		Set("components = ?", components).
 		Set("placed = ?", placed).
+		Set("root_identifier = ?", rootIdentifier).
 		Where("id = ?", scanID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record what the inventory was made of: %w", err)

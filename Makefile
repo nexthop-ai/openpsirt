@@ -151,7 +151,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
+.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
 
 all: check build
 
@@ -699,6 +699,20 @@ attached:
 reserved-words:
 	$(GO) run ./internal/tools/reserved generate
 	$(GO) run ./internal/tools/reserved
+
+# The weakness names a published advisory has to carry.
+#
+# The standard states a weakness as the identifier and the name the catalog
+# gives it, and a consumer's validator compares the pair — so the name comes
+# from the authority that assigns it rather than from anything typed here.
+#
+# Not in any gate, unlike "reserved-current". The engines that list asks are
+# pinned in CI and this authority is not, so a check against what it publishes
+# today would fail the build on the day MITRE ships a version, for a reason no
+# change here caused. Run it deliberately and commit what it writes; the
+# version it read is in the generated file.
+weakness-names:
+	$(GO) run ./internal/tools/weakness
 
 # That the generated half of the word list is what the engines say today.
 #

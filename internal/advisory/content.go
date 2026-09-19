@@ -3,11 +3,15 @@ package advisory
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
 // The parts of the document that carry what is held about the flaw rather than
@@ -218,6 +222,17 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 
 // remediationsFor is what a reader can do, from what is true now.
 //
+// **It names the releases.** "Update to a release in which this flaw is fixed"
+// is the instruction with the answer left out, and the answer is three lines
+// away in the same function. A reader then has to find the fixed set in the
+// product status and match identifiers by hand — which is the work a document
+// exists to save.
+//
+// Not the earliest fixed release. Picking one means ordering release names,
+// which this does not do for the reason nothing else here does: an ordering
+// that answers confidently for a pair it cannot order is worse than none. All
+// of them, in the order the tree names them, and the reader picks.
+//
 // **Stated for the releases that carry the flaw**, which is who a remediation
 // is for: CSAF § 3.2.3.12.6 defines the product identifiers as what the item
 // applies to, and § 3.2.3.12.1 defines a vendor fix as one for the affected
@@ -230,16 +245,21 @@ func scoresFor(issue *finding.Vulnerability, products []string) []Score {
 // inside this deployment; the same sentence in a published advisory is a
 // promise to a customer about a date, and whether to make one is the
 // publisher's.
-func remediationsFor(fixed, affected []string) []Remediation {
+func remediationsFor(fixed []Named, affected []string) []Remediation {
 	// Nothing to remediate where nothing carries it: a document about a flaw
 	// every release has left behind is a record rather than a warning.
 	if len(affected) == 0 {
 		return nil
 	}
 	if len(fixed) > 0 {
+		names := make([]string, 0, len(fixed))
+		for _, one := range fixed {
+			names = append(names, one.Name)
+		}
 		return []Remediation{{
-			Category:   "vendor_fix",
-			Details:    "Update to a release in which this flaw is fixed.",
+			Category: "vendor_fix",
+			Details: "Update to a release in which this flaw is fixed: " +
+				strings.Join(names, ", ") + ".",
 			ProductIDs: affected,
 		}}
 	}
@@ -249,6 +269,58 @@ func remediationsFor(fixed, affected []string) []Remediation {
 		ProductIDs: affected,
 	}}
 }
+
+// weaknessOf is what kind of flaw this is, where the catalog knows the name.
+//
+// **The root cause, and only where something said which.** The standard carries
+// one weakness per flaw and an issue is commonly classified as several, so a
+// document that stated the first of them would be stating a claim nobody made.
+// Asked of the row the data marked rather than of the order they sort in: a
+// report that called nothing the root cause leaves this saying nothing, which
+// is the same answer every other field the record cannot fill gives.
+//
+// The name comes from the catalog rather than from anything held here, because
+// a validator compares the pair against the catalog and nothing else would
+// match. An identifier it does not assign — a category, a view, a number a
+// newer catalog added — states nothing, which is the same answer this file
+// gives everywhere: a field the record cannot fill is left out.
+//
+// A failed read is not a classification, and is answered as a failure. Saying
+// nothing here reads as "this flaw has no kind", which is a statement about the
+// issue that a database that would not answer does not support — and it would
+// publish a document silently missing the field, byte-identical to one about a
+// flaw nobody classified.
+func weaknessOf(ctx context.Context, db bun.IDB, issueID int64) (*Weakness, error) {
+	var held []string
+	if err := db.NewSelect().Model((*finding.Weakness)(nil)).
+		ColumnExpr("vw.cwe").
+		Where("vw.vulnerability_id = ?", issueID).
+		Where("vw.is_primary = ?", true).
+		OrderExpr("vw.cwe").
+		Limit(1).Scan(ctx, &held); err != nil {
+		return nil, fmt.Errorf("read what kind of flaw this is: %w", err)
+	}
+	if len(held) == 0 {
+		return nil, nil
+	}
+	name, known := weakness.Name(held[0])
+	if !known {
+		return nil, nil
+	}
+	return &Weakness{ID: held[0], Name: name}, nil
+}
+
+// isPackageIdentifier says the string is the shape the standard states for a
+// product identification helper.
+//
+// The standard's own pattern, which a consumer's validator applies to the whole
+// document: a scheme, a type drawn from a small set of characters, and a name
+// after the separator. Nothing here interprets it further — what is being
+// refused is a value that is not an identifier at all, not one naming something
+// unexpected.
+func isPackageIdentifier(s string) bool { return packageIdentifier.MatchString(s) }
+
+var packageIdentifier = regexp.MustCompile(`^pkg:[A-Za-z.\-+][A-Za-z0-9.\-+]*/.+`)
 
 // distributionFor is how far the document may travel.
 //

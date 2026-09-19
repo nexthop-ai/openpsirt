@@ -528,6 +528,14 @@ func sameDay(a, b *time.Time) bool {
 // it, and a caller that carries no free text at all passes the empty string —
 // which refuses that one reason, correctly: there is nowhere for it to say
 // what stops it.
+//
+// **Two outcomes may carry one and they ask for it differently.** A claim that
+// mitigations already exist *is* the mitigation, so it is required there. A
+// claim that something will not be fixed is a standing property of a shipped
+// feature — a protocol that cannot change without breaking what it is
+// compatible with — and there is often a real thing a holder can do about it.
+// Optional there, because plenty of unfixable things have no workaround, and
+// saying so falsely is worse than saying nothing.
 func Reasons(outcome Outcome, justification Justification, mitigation string) error {
 	// The claim that something does not affect us *is* which of the
 	// recognized reasons applies, so it is not optional there — and it is
@@ -554,9 +562,10 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 				justification, outcome)
 		}
 	}
-	if justification != MitigationsExist && strings.TrimSpace(mitigation) != "" {
-		return fmt.Errorf("naming what stops it belongs to %q and no other reason",
-			MitigationsExist)
+	if justification != MitigationsExist && outcome != WontFix &&
+		strings.TrimSpace(mitigation) != "" {
+		return fmt.Errorf("naming what stops it belongs to %q and to %q, and no other reason",
+			MitigationsExist, WontFix)
 	}
 	return nil
 }

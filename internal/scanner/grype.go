@@ -375,6 +375,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 		return nil, err
 	}
 	epss := firstEPSS(match.Vulnerability.EPSS)
+	named, primary := weaknesses(match.Vulnerability.CWEs)
 	return &finding.Reported{
 		Issue: finding.Named{
 			Identifier:           match.Vulnerability.ID,
@@ -392,7 +393,8 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 			ScoreVersion:         published.version,
 			ScoreSource:          published.source,
 			ScoreKind:            published.kind,
-			Weaknesses:           weaknesses(match.Vulnerability.CWEs),
+			Weaknesses:           named,
+			PrimaryWeakness:      primary,
 		},
 		Component: graph.Described{
 			Name: match.Artifact.Name, Version: match.Artifact.Version,
@@ -444,22 +446,44 @@ func matchedRange(details []matchDetail) string {
 // — what they act on is that this is a use-after-free and so are eleven other
 // findings. Ordering it makes the stored value the same for the same report,
 // which is what keeps a re-scan from writing.
+//
+// **Which one the data calls the root cause is carried separately.** A
+// published advisory states one weakness and a report commonly carries several,
+// so something has to say which — and taking whichever sorts first is an answer
+// with nothing behind it. The feeds say it, in the word beside each entry, and
+// it was read and dropped.
+//
+// It is answered apart from the list rather than by the list's order, because
+// a list cannot say "nobody said". A report that marks none is the ordinary
+// case and it has to stay distinguishable from one that marks the first.
+//
+// Where two entries are marked, the first stands: a report naming two root
+// causes disagrees with itself, and one weakness is what gets stated.
 func weaknesses(cwes []struct {
 	CWE  string `json:"cwe"`
 	Type string `json:"type"`
-}) []string {
+}) (named []string, primary string) {
 	seen := map[string]bool{}
-	var named []string
 	for _, entry := range cwes {
 		name := strings.ToUpper(strings.TrimSpace(entry.CWE))
-		if name == "" || seen[name] {
+		if name == "" {
+			continue
+		}
+		// Asked before the duplicate is dropped. A feed carries one entry per
+		// source and the same weakness commonly appears twice under different
+		// words, so testing this after the skip below reads the first spelling
+		// and never sees the one that called it the root cause.
+		if primary == "" && strings.EqualFold(strings.TrimSpace(entry.Type), "primary") {
+			primary = name
+		}
+		if seen[name] {
 			continue
 		}
 		seen[name] = true
 		named = append(named, name)
 	}
 	sort.Strings(named)
-	return named
+	return named, primary
 }
 
 // databaseVersion says which vulnerability data a run matched against.

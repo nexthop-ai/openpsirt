@@ -76,6 +76,12 @@ type Entering struct {
 	// Weaknesses is what kind of flaw it is, by the classification the world
 	// uses. Recorded because it is what makes a set of findings comparable to
 	// anything outside this deployment.
+	//
+	// **The root cause first.** A published advisory states one weakness, so
+	// something has to say which — and unlike a feed, which marks one or marks
+	// none, a person naming several has said which they meant by naming it
+	// first. That is a stated contract rather than an inference from the
+	// order, which is why the API says it where somebody types them.
 	Weaknesses []string
 	// Disclosed says this is already public. The default is that it is not:
 	// somebody recording a flaw in their own product before it is announced is
@@ -320,11 +326,15 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return err
 		}
+		kinds := cleaned(in.Weaknesses)
 		named := Named{
 			Identifier:  identifier,
 			Severity:    severity,
 			Description: in.Summary,
-			Weaknesses:  cleaned(in.Weaknesses),
+			Weaknesses:  kinds,
+		}
+		if len(kinds) > 0 {
+			named.PrimaryWeakness = kinds[0]
 		}
 		if scored != nil {
 			named.Vector = scored.Vector

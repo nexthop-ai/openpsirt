@@ -289,6 +289,18 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// and finding the line — on the screen that exists to answer what became
 	// of an upload.
 	components, placed := len(doc.Components), len(doc.Components)-doc.Unrooted
+	// What the document called the thing it is about, which a published
+	// advisory offers a reader to match a release against.
+	//
+	// Read off the document rather than off the snapshot, and that is the
+	// whole of the condition: the snapshot puts the tracked unit in the root's
+	// place where the document named none, and what stands in is ours rather
+	// than the producer's. A reader given that would look for a name their own
+	// copy of the inventory does not carry. It is empty where the document
+	// declared nothing, because a reader sets the root and says it declared one
+	// in the same breath — and equally where it declared a root and gave it no
+	// package identifier, which is the same answer for the same reason.
+	rootIdentifier := doc.Root.Purl
 
 	// The three writes are one act. Applied separately, a graph stored beside
 	// claims that were not recorded reads as a build that has withdrawn every
@@ -306,7 +318,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 				claims, stated); err != nil {
 				return err
 			}
-			return NewStore(tx).Made(ctx, scanID, components, placed)
+			return NewStore(tx).Made(ctx, scanID, components, placed, rootIdentifier)
 		}); err != nil {
 		return nil, fmt.Errorf("scan %d: %w", scanID, err)
 	}

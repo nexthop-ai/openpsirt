@@ -165,6 +165,26 @@ type Branch struct {
 type Named struct {
 	Name string `json:"name"`
 	ID   string `json:"product_id"`
+	// Helper is how a reader matches this release against something they
+	// already hold, where the build said what it is.
+	Helper *IdentificationHelper `json:"product_identification_helper,omitempty"`
+}
+
+// IdentificationHelper is what a release called itself, in a spelling a machine
+// can compare.
+//
+// **The identifier the build declared, never one minted here.** An identifier
+// only helps if it appears on both sides of the comparison, and one invented
+// here appears on one: a reader holding our image has whatever our build wrote
+// into its inventory, which is this exact string if they ingested that
+// document. A plausible identifier nothing outside this deployment has seen is
+// worse than none, because a reader matches on it and misses.
+//
+// It is read from the scan rather than from the component, because the root
+// component is stored by name alone: a package identifier carries the version,
+// and the root's version moves every build.
+type IdentificationHelper struct {
+	Purl string `json:"purl,omitempty"`
 }
 
 // Vulnerability is the flaw and what is true of it in each release.
@@ -178,6 +198,8 @@ type Vulnerability struct {
 	Notes []Note   `json:"notes,omitempty"`
 	// Status is which releases the flaw is in and which it is out of.
 	Status Status `json:"product_status"`
+	// CWE is what kind of flaw this is, where the catalog knows the name.
+	CWE *Weakness `json:"cwe,omitempty"`
 	// What is held about the flaw beyond which releases carry it: what it
 	// scored, what a holder of an affected release can do, and whoever asked
 	// to be credited for telling us.
@@ -187,6 +209,19 @@ type Vulnerability struct {
 	// DiscoveryDate is when this deployment first recorded it, which is what
 	// it knows. When somebody outside found it is not something it holds.
 	DiscoveryDate string `json:"discovery_date,omitempty"`
+}
+
+// Weakness is the kind of flaw, as the standard carries it.
+//
+// **One, and both halves of it.** The standard states a weakness as the
+// identifier and the name the catalog gives it, and a consumer's validator
+// compares the pair — so an issue classified several ways states the one the
+// data calls the root cause, and one whose name the catalog does not know
+// states nothing. A name invented to fill the field is the single thing in the
+// document guaranteed to be caught.
+type Weakness struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // Issued is an identifier somebody else's system knows this by.
@@ -366,26 +401,42 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 	if !entered.OpenedAt.IsZero() {
 		vulnerability.DiscoveryDate = entered.OpenedAt.UTC().Format("2006-01-02")
 	}
+	if vulnerability.CWE, err = weaknessOf(ctx, s.db, issue.ID); err != nil {
+		return nil, nil, nil, err
+	}
 
 	// One branch per release, under the product, under the publisher. The
 	// tree names releases rather than components on purpose: an advisory
 	// aggregates to a product and a version range, and a reader of one is
 	// asking "am I affected", which a dependency path does not answer .
 	versions := make([]Branch, 0, len(releases))
+	// The releases somebody can move to, by the name the tree gives them. The
+	// remediation says which, and a document that named them some other way
+	// would be answering with a name nothing else in it uses.
+	fixed := make([]Named, 0, len(releases))
 	for _, release := range releases {
+		leaf := Named{
+			Name: fmt.Sprintf("%s %s", shown, release.Name()),
+			ID:   release.ProductID(product),
+		}
+		// Only where it is the shape the standard states. The string is a
+		// producer's, taken from a scan file, and a scan file is hostile input
+		// (REQ-66): one that wrote something other than a package identifier
+		// into the field the root is declared in would fail a customer's
+		// validator on the **whole document** rather than on this field, which
+		// is a worse outcome than the field being absent.
+		if isPackageIdentifier(release.Identifier) {
+			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
+		}
 		versions = append(versions, Branch{
-			Category: "product_version", Name: release.Name(),
-			Product: &Named{
-				Name: fmt.Sprintf("%s %s", shown, release.Name()),
-				ID:   release.ProductID(product),
-			},
+			Category: "product_version", Name: release.Name(), Product: &leaf,
 		})
 		if release.Holds {
 			vulnerability.Status.KnownAffected = append(
-				vulnerability.Status.KnownAffected, release.ProductID(product))
+				vulnerability.Status.KnownAffected, leaf.ID)
 		} else {
-			vulnerability.Status.Fixed = append(
-				vulnerability.Status.Fixed, release.ProductID(product))
+			vulnerability.Status.Fixed = append(vulnerability.Status.Fixed, leaf.ID)
+			fixed = append(fixed, leaf)
 		}
 	}
 	// Every release the document names, which is what a rating is stated for:
@@ -395,8 +446,7 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 		rated = append(rated, release.ProductID(product))
 	}
 	vulnerability.Scores = scoresFor(issue, rated)
-	vulnerability.Remediations = remediationsFor(
-		vulnerability.Status.Fixed, vulnerability.Status.KnownAffected)
+	vulnerability.Remediations = remediationsFor(fixed, vulnerability.Status.KnownAffected)
 
 	doc.ProductTree = ProductTree{Branches: []Branch{{
 		Category: "vendor", Name: who.Name,
@@ -416,6 +466,9 @@ type Release struct {
 	// Holds says the issue is open there. False is a release that held it and
 	// no longer does, which is the one that was fixed.
 	Holds bool
+	// Identifier is what this build's own inventory called the thing it is
+	// about, and empty where that document named no component of its own.
+	Identifier string
 }
 
 // Name is how the release is written in the document.
@@ -507,6 +560,7 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 		Stream  string `bun:"stream"`
 		Variant string `bun:"variant"`
 		Open    int    `bun:"open"`
+		Root    string `bun:"root_identifier"`
 	}
 	// One statement rather than one per build: a product with thirty tags
 	// would otherwise be thirty round trips to write one document, and the
@@ -516,6 +570,10 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = t.variant_id`).
+		// What this build's own inventory called itself, from the scan that
+		// inventory arrived on. Joined on the target's current scan, which is
+		// one row by key, so it cannot multiply the findings counted below.
+		Join(`LEFT JOIN "scan" AS "sc" ON sc.id = t.last_scan_id`).
 		ColumnExpr(`st.name AS "stream"`).
 		ColumnExpr(`va.name AS "variant"`).
 		// Counted rather than filtered, so a release that held the flaw and no
@@ -523,6 +581,9 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 		// to, and dropping it would leave finished work indistinguishable
 		// from a release that never shipped the thing.
 		ColumnExpr(`COUNT(CASE WHEN f.closed_at IS NULL THEN 1 END) AS "open"`).
+		// One value per build, aggregated because the grouping is on the
+		// build's names rather than on its key.
+		ColumnExpr(`MIN(COALESCE(sc.root_identifier, '')) AS "root_identifier"`).
 		Where("st.product_id = ?", productID).
 		Where("f.vulnerability_id = ?", issueID).
 		Where("f.visibility IN (?)", bun.List(access.Visible(subject, productID))).
@@ -536,6 +597,7 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 	for _, row := range rows {
 		releases = append(releases, Release{
 			Stream: row.Stream, Variant: row.Variant, Holds: row.Open > 0,
+			Identifier: row.Root,
 		})
 	}
 	// Ordered here rather than by the engine, so the document is byte-for-byte

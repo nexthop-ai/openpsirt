@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftKeyFor, type At } from "./Decide";
+import { draftKeyFor, mayMitigate, mustMitigate, type At } from "./Decide";
 
 const at: At = {
   product: "sonic",
@@ -40,5 +40,32 @@ describe("where a decision's reasoning is kept", () => {
     expect(draftKeyFor({ ...at, version: "" })).toBe(
       "decide:sonic:master:broadcom:CVE-2026-1:stdlib:",
     );
+  });
+});
+
+describe("which outcomes may say what a holder can do", () => {
+  it("requires it where the claim is that something already stops it", () => {
+    expect(mustMitigate("not-applicable", "inline_mitigations_already_exist")).toBe(true);
+    expect(mayMitigate("not-applicable", "inline_mitigations_already_exist")).toBe(true);
+  });
+
+  it("offers it on will-not-fix without requiring it", () => {
+    // The half that reaches a customer. A flaw that is staying is closed by no
+    // scan and issued in no advisory, so the published document's affected
+    // statement is the only way it is ever said — and that statement is only
+    // published where there is something to do instead.
+    expect(mayMitigate("wont-fix", "")).toBe(true);
+    expect(mustMitigate("wont-fix", "")).toBe(false);
+  });
+
+  it("offers it nowhere else", () => {
+    // Every other outcome is a claim about priority rather than a claim that
+    // something is handled, and the server refuses a mitigation on one.
+    for (const outcome of ["affected", "deferred", "already-fixed", "upgrade-needed"]) {
+      expect(mayMitigate(outcome, "")).toBe(false);
+    }
+    // Not applicable for one of the other recognized reasons is a claim about
+    // code, which lapses when the code moves and needs nothing said about it.
+    expect(mayMitigate("not-applicable", "vulnerable_code_not_present")).toBe(false);
   });
 });
