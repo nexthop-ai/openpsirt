@@ -398,7 +398,7 @@ func TestTheUserListSaysWhereSomebodyIsReached(t *testing.T) {
 			if person.DisplayName != "Ada" {
 				t.Errorf("the list calls ada %q", person.DisplayName)
 			}
-			// Which of the two said so, because a provider's may be replaced
+			// The source that said so, because a provider's may be replaced
 			// by a later sign-in and one recorded here never is.
 			if person.EmailSource != "recorded" {
 				t.Errorf("the list says ada's address came from %q", person.EmailSource)

@@ -284,7 +284,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	}
 	parts := input.RawBody.Data()
 
-	// How many documents may arrive with one scan, refused before any row is
+	// The number of documents one scan may carry, refused before any row is
 	// written. Each one is read within the bounds a document is read within,
 	// and without a ceiling on the count those bounds are multiplied by a
 	// number nothing decides.
@@ -301,7 +301,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 			sent, limits.MaxDocuments))
 	}
 
-	// Who is sending, before anything is read or written.
+	// The sender, before anything is read or written.
 	subject, err := requester(ctx)
 	if err != nil {
 		return nil, err
@@ -373,7 +373,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		return nil, wentWrong(in.Logger, "the target could not be recorded", err)
 	}
 
-	// What this submission is, and what it hashes to: what it says about
+	// The submission and its digest: what it says about
 	// itself comes from the inventory, and whether we already hold it is
 	// asked of everything that arrived.
 	// Every door that turns an upload away records it, not only the last one.
@@ -424,7 +424,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		Serial:        header.Serial,
 		BuiltAt:       header.BuiltAt,
 		ParserVersion: version.Get().Version,
-		// Which credential sent this. Recorded alongside the parser version so
+		// The credential that sent this. Recorded alongside the parser version so
 		// that "where did this data come from" has an answer.
 		Credential: subject.Identity,
 	}
@@ -810,7 +810,7 @@ func registerReceipts(api huma.API, in Ingest) {
 		case err != nil:
 			return nil, wentWrong(in.Logger, "the scans could not be read", err)
 		}
-		// What each run changed, in one pair of statements for the page. A
+		// The change each run made, in one pair of statements for the page. A
 		// scan that says only "scanned" leaves the reason to read it — what it
 		// did — to a second screen.
 		runs := make([]int64, 0, len(receipts))
@@ -827,7 +827,7 @@ func registerReceipts(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what the scans changed could not be read", err)
 		}
 
-		// What each upload was made of, for the page at once. The record
+		// The contents of each upload, for the page at once. The record
 		// survives the contents, so a branch build reads back as what it sent
 		// rather than as nothing — which is what it looked like before, and
 		// looks identical to an upload that failed to store anything.
@@ -882,7 +882,7 @@ func registerReceipts(api huma.API, in Ingest) {
 		}
 		out.Body.Total = total
 
-		// What those numbers were arrived at with. Read separately because it
+		// The tools those numbers were arrived at with. Read separately because it
 		// describes the build rather than any upload, and absent rather than
 		// invented where nothing has finished running yet.
 		// Not for a credential that is only allowed to see its own uploads.
@@ -997,7 +997,7 @@ func registerCoverage(api huma.API, in Ingest) {
 
 		rows, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject, scope, quietAfter)
 		if err != nil {
-			// When a build was last scanned by anybody is a person's
+			// The last scan of a build by anybody is a person's
 			// question, and the store says so. Answered as a fault it read as
 			// the deployment being broken rather than as this credential not
 			// being the one to ask.
@@ -1106,7 +1106,7 @@ func registerCoverageExport(api huma.API, in Ingest) {
 		// re-sort the same estate for every two hundred rows.
 		rows, err := ingest.NewStore(in.DB.DB).Scanning(ctx, subject, scope, quietAfter)
 		if err != nil {
-			// When a build was last scanned by anybody is a person's
+			// The last scan of a build by anybody is a person's
 			// question, and the store says so. Answered as a fault it read as
 			// the deployment being broken rather than as this credential not
 			// being the one to ask.

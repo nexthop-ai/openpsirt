@@ -56,7 +56,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 	// colleague's assignment to land in, and a row that stopped qualifying is
 	// simply not matched.
 	if !dispatches {
-		// What nobody holds, what is already theirs, and what is
+		// Work nobody holds, work already theirs, and work
 		// sitting in a queue of a team they are on. That last is not
 		// taking work off a colleague, which is the act the dispatch
 		// right names: work routed to a team is unheld until somebody

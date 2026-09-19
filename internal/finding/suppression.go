@@ -283,7 +283,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		Until         *time.Time `bun:"until"`
 	}
 	q := where(s.db.NewSelect().Model((*Claim)(nil))).
-		// When it was first said and when it stopped, read off the scans the
+		// The moment it was first said and the moment it stopped, read off the scans the
 		// interval is held against: the claim itself carries scan identifiers,
 		// and a screen needs moments.
 		Join(`JOIN "scan" AS "opened" ON opened.id = sup.opened_scan_id`).
@@ -296,7 +296,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, targ
 		ColumnExpr(`sup.origin AS "origin"`).
 		ColumnExpr(`opened.built_at AS "since"`).
 		ColumnExpr(`closed.built_at AS "until"`).
-		// What it is still saying first, newest first within that: a claim
+		// Anything still being said first, newest first within that: a claim
 		// that stopped is history and a claim that stands is the estate.
 		OrderExpr("CASE WHEN sup.closed_scan_id IS NULL THEN 0 ELSE 1 END, " +
 			"opened.built_at DESC, sup.id DESC").

@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
-// What a scan run opens, moves and closes.
+// A scan run opens, moves and closes.
 //
 // One reported issue becomes one finding per place it occupies, and the next
 // scan is a difference rather than a rewrite: what is still there is left

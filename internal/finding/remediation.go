@@ -162,7 +162,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		}
 	}
 
-	// What opened in the same window, as distinct issues, so the two figures
+	// Everything opened in the same window, as distinct issues, so the two figures
 	// are in the same unit and can be read against each other.
 	opened := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -183,7 +183,7 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	}
 	out.Opened = count
 
-	// What is open now, by how long it has been. One statement per bucket
+	// Everything open now, by how long it has been. One statement per bucket
 	// rather than a case expression, because the boundaries are moments
 	// computed here and a database that does its own date arithmetic does it
 	// four different ways.

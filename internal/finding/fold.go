@@ -7,7 +7,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// What a fold is, in SQL.
+// A fold, in SQL.
 //
 // The binary packages one source package was built at one version are one
 // thing to a person: curl, libcurl4t64 and libcurl3t64 are one bump, and

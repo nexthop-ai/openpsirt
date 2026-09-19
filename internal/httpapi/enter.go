@@ -306,7 +306,7 @@ func registerDisclosure(api huma.API, in Ingest) {
 			return nil, err
 		}
 
-		// How far ahead to look, where the caller has not said: the length
+		// The distance ahead to look, where the caller has not said: the length
 		// this deployment gives an embargo. A fixed thirty days against the
 		// ninety-day policy that ships drew an empty screen while embargoes
 		// were running, which reads as "nothing is coming".
@@ -328,7 +328,7 @@ func registerDisclosure(api huma.API, in Ingest) {
 
 		now := time.Now().UTC()
 		out := &listOutput[EmbargoedBody]{}
-		// How many there are in all, so a caller holding a full page can tell
+		// The total, so a caller holding a full page can tell
 		// a clipped page from the whole list.
 		out.Body.Total = total
 		out.Body.Items = make([]EmbargoedBody, 0, len(rows))
@@ -497,7 +497,7 @@ func registerExtensions(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what is waiting could not be read", err)
 		}
 		out := &listOutput[PendingExtensionBody]{}
-		// How many are waiting in all, because the screen was printing the
+		// The number waiting in all, because the screen was printing the
 		// length of its own page as the number.
 		out.Body.Total = total
 		out.Body.Items = make([]PendingExtensionBody, 0, len(rows))

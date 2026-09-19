@@ -131,7 +131,7 @@ func registerHolders(api huma.API, in Ingest) {
 				Kind: "person", Identity: person.Identity, Name: person.Name,
 			})
 		}
-		// How many there are to choose from, so a picker showing a page of
+		// The number to choose from, so a picker showing a page of
 		// them can say so rather than passing the page off as the whole.
 		// Counted rather than derived from the page for the reason every other
 		// capped listing here states: a figure taken off a page answers a

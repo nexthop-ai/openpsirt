@@ -93,7 +93,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.For(rating.OnStream)).
 		ColumnExpr(`st.display_name AS "stream"`).
-		// When it went out, where somebody said, and when it was declared
+		// The day it went out, where somebody said, and the day it was declared
 		// here otherwise. Ordering by the declaration alone made this chart an
 		// accident of administration: a release recorded months after it
 		// shipped sorted after ones that came out later, and a year

@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// What the report says, and why of each.
+// The report's rows, and the reason for each.
 //
 // **Held back and never heard of are recorded identically**, because the pass
 // must record both or starve its own window on them for ever. So the whole
@@ -227,7 +227,7 @@ func TestPastTheCeilingTheCountSaysSo(t *testing.T) {
 	})
 }
 
-// What the pass held back is what the report calls ours.
+// A name the pass held back is one the report calls ours.
 //
 // **The two halves are joined by nothing but the same list applied twice**, so
 // they are asserted together as well as apart. The pass records a held-back

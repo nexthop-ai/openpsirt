@@ -60,7 +60,7 @@ func upDisclosureExtension(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "disclosure_extension_approved_by_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// What this embargo has already been moved by, which is what the
+		// The distance this embargo has already been moved, which is what the
 		// threshold is measured against.
 		`CREATE INDEX "disclosure_extension_place_idx"
 			ON "disclosure_extension" ("vulnerability_id", "product_id")`,

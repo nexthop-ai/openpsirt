@@ -304,7 +304,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerReceipts(api, in)
 	// Reading back a document a build sent.
 	registerRetained(api, in)
-	// What one run of the scanner did.
+	// One run of the scanner.
 	registerRun(api, in)
 	// One product's own page.
 	registerOverview(api, in)
@@ -336,9 +336,9 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerDue(api, in)
 	registerGraph(api, in)
 	registerSettings(api, in)
-	// What asking public indexes could not answer, and why of each.
+	// Components with no upstream answer, and the reason for each.
 	registerUpstream(api, in)
-	// What the queue set aside, and putting it back.
+	// Work the queue set aside, and putting it back.
 	registerWork(api, in)
 	registerTrail(api, in)
 	registerSaved(api, in)
@@ -406,12 +406,12 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerTeams(api, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
-	// Who is on one undisclosed case. It takes both: the grant is managed
+	// The people on one undisclosed case. It takes both: the grant is managed
 	// by whoever reads the case rather than by an administrator, and it
 	// lands in the administration trail like every other access change.
 	// Who told us, and the names an issue goes by.
 	registerWhoTold(api, in)
-	// What stands about the third-party components a build ships.
+	// Standing claims about the third-party components a build ships.
 	registerVEX(api, in)
 	// One issue, everywhere it sits, across products.
 	registerIssue(api, in)
@@ -420,7 +420,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerTags(api, in)
 	// The tree seen upward, for somebody narrowed to their own work.
 	registerUpward(api, in)
-	// Where a claim's work is happening, stored and never sent to.
+	// The place a claim's work is happening, stored and never sent to.
 	registerClaimLink(api, in)
 	registerCollaborators(api, in, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
@@ -430,7 +430,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerPerson(api, in, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
-	// Where this deployment sends what it has to say.
+	// The destinations this deployment posts to.
 	registerOutbound(api, in, Administering{
 		DB: in.DB, Access: in.rights, Catalog: in.catalog, Logger: logger,
 	})
@@ -539,7 +539,7 @@ func noDatabase(logger *slog.Logger) error {
 var open = map[string]bool{
 	"/healthz": true,
 	"/readyz":  true,
-	// What somebody sees before they have a credential. It lists the
+	// The view before anybody has a credential. It lists the
 	// providers an operator configured and nothing else — the sign-in page
 	// has to draw a button per provider, and it cannot ask for that list
 	// while holding nothing. Everything under openPrefix already answers

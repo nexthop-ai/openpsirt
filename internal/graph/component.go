@@ -321,7 +321,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			FirstSeenAt:    now,
 		})
 	}
-	// What a later report knows and an earlier one did not. A component row is
+	// Anything a later report knows and an earlier one did not. A component row is
 	// content-addressed and not edited, but a column nobody has filled in is
 	// not an edit: a producer stating a supplier where the producer that wrote
 	// the row stated none is the merge rule every other field here follows, and

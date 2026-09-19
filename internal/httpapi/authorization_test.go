@@ -404,11 +404,11 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		handler, api := httpapi.New(quiet, nil, httpapi.Ingest{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(rights, access.Trust{Header: testHeader, From: sources}),
-			// Who this deployment publishes as, which is what an advisory
+			// The identity this deployment publishes as, which is what an advisory
 			// and a VEX document need. Passed in, because the deployment that
 			// has not been told is a case of its own.
 			Publisher: as,
-			// What this deployment calls its own, derived from the namespace
+			// The names this deployment calls its own, derived from the namespace
 			// it publishes under exactly as the binary derives it. Restated
 			// here it would be a second boundary that agreed until one moved.
 			Ours: currency.Ourselves(as.Namespace, nil),
@@ -510,7 +510,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"reader", http.MethodPost, mine, http.StatusForbidden},
 			{"reader", http.MethodPost, mineVars, http.StatusForbidden},
 
-			// What a product considers worth triaging hides findings, which
+			// A product's triage line hides findings, which
 			// is the act every other part of this gates. No role granted per
 			// product carries it, so it is the same authority that sets the
 			// deployment's line.
@@ -521,7 +521,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"nothing", http.MethodPut, mineFloor, http.StatusUnauthorized},
 			{"admin", http.MethodPut, mineFloor, http.StatusNoContent},
 
-			// When something goes out of support decides what carries a
+			// Going out of support decides what carries a
 			// deadline and what a build going quiet means, so it is
 			// administration for the same reason.
 			{"reader", http.MethodPut, mineEOL, http.StatusForbidden},
@@ -594,7 +594,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"admin", http.MethodGet, people, http.StatusOK},
 			{"admin", http.MethodGet, keys, http.StatusOK},
 
-			// Where roles come from, and what each group grants, is
+			// The source of roles, and what each group grants, is
 			// administration like everything else that decides access.
 			{"reader", http.MethodGet, "/v1/roles/mode", http.StatusForbidden},
 			{"triager", http.MethodGet, "/v1/roles/bindings", http.StatusForbidden},

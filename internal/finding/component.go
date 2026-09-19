@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// What is open at one component.
+// Everything open at one component.
 //
 // Not the findings list narrowed to one name: this answers per place rather
 // than per group, because somebody standing on a component in the dependency
@@ -96,7 +96,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		Places          int   `bun:"places"`
 		Total           int   `bun:"total"`
 	}
-	// How many findings the whole narrowed set holds, which is what a bulk
+	// The number of findings the whole narrowed set holds, which is what a bulk
 	// action is bounded against and what a screen counting issues
 	// cannot say. Counted over the same narrowing rather than summed from the
 	// page: a page is fifty of eight hundred.
@@ -153,7 +153,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 			ColumnExpr(`MIN(COALESCE(v.score_centi, 0)) AS "severity_centi"`).
 			ColumnExpr(`MIN(COALESCE(f.fixed_in, '')) AS "fixed_in"`).
-			// What the issue says about itself, whether anybody is known to
+			// The issue's own account of itself, whether anybody is known to
 			// be using it, and the published estimate. One row per issue
 			// already, so the aggregate is over one value.
 			ColumnExpr(`MIN(COALESCE(v.description, '')) AS "description"`).

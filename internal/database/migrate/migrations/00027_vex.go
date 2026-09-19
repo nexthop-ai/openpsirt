@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upVex, downVex)
 }
 
-// What a VEX document says about a component we ship.
+// A VEX document's statement about a component we ship.
 //
 // **A third layer, never a decision**. A build's own claims are one
 // layer, our decisions are another, and this is a third: what a distribution or
@@ -86,7 +86,7 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vex_statement_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// What a finding looks one up by: the product, the issue's name and the
+		// The key a finding looks one up by: the product, the issue's name and the
 		// component's. Only what still stands, which is the common read.
 		`CREATE INDEX "vex_statement_about_idx"
 			ON "vex_statement" ("product_id", "vulnerability", "component", "superseded_at")`,

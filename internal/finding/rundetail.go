@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// What one run of the scanner did.
+// One run of the scanner.
 //
 // **The receipt says a run happened; nothing said what it did.** A row reading
 // "scanned · 7,604 opened" is a number with no shape: opened *what*, and was

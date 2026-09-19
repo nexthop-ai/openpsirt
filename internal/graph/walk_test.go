@@ -391,7 +391,7 @@ func TestAProductsOwnRatingDrawsTheTreeTheBundleStripAndTheReleaseNote(t *testin
 		}
 
 		who := everyone(f)
-		// What each of the three says the issue is rated, read the same way
+		// Each of the three ratings for the issue, read the same way
 		// before and after.
 		treeBand := func(t *testing.T) string {
 			t.Helper()

@@ -262,7 +262,7 @@ func TestOverdueIsCountedAgainstWhoeverIsHoldingIt(t *testing.T) {
 }
 
 func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
-	// What takes a finding off the clock is a decision that applies — the
+	// A decision that applies takes a finding off the clock — the
 	// same condition that decides whether a decision suppresses the finding
 	// at all. What is running out of time excluded any live claim, so a
 	// proposal waiting for a second person took a finding off that list for

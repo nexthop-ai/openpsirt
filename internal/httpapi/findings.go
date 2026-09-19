@@ -889,7 +889,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what was decided here could not be read", err)
 		}
 
-		// What VEX documents say, matched on every name the issue is
+		// VEX statements, matched on every name the issue is
 		// known by: which identifier a publisher chose is a preference of
 		// whichever database they consulted rather than a property of the
 		// issue.

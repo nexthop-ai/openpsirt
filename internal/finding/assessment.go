@@ -427,7 +427,7 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		return fmt.Errorf("read what is published about this: %w", err)
 	}
 
-	// What the order compares, worked out by the same type a scan ranks
+	// The order's comparison, worked out by the same type a scan ranks
 	// through — the rule for which of a published score, a published word and
 	// a rating of ours decides the number is one fact, and this project's bugs
 	// have all come from letting one fact into two rules.
@@ -576,7 +576,7 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 		if err != nil {
 			return err
 		}
-		// What each of them rates it, in one statement rather than one per
+		// Each product's own rating, in one statement rather than one per
 		// product. The batched read is what RatingsIn is for, and a
 		// deployment with a dozen products would otherwise ask twelve
 		// questions to answer one.
@@ -610,7 +610,7 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 // a fixed number of days, so every finding of one issue opened by one run,
 // rated the same way, in this product, lands on the same instant.
 func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) error {
-	// What "now" means to this recount, taken once so that every group it
+	// The moment "now" means to this recount, taken once so that every group it
 	// writes is reasoned at one moment rather than at as many moments as
 	// there are groups.
 	recountedAt := time.Now().UTC()

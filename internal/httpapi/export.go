@@ -29,7 +29,7 @@ import (
 // one query shape, so a spreadsheet and a screen cannot disagree about what
 // the filter means.
 type Exporting struct {
-	// What is what the file is, in the words the report it comes from is
+	// What names the file, in the words the report it comes from is
 	// known by. Stated on every export, with the moment it was taken, by
 	// writeExport rather than by each caller: an export that cannot say
 	// what it is and when is not evidence, and a fact every file must
@@ -249,7 +249,7 @@ var asCSV = exportFormat{
 	open: func(ctx huma.Context, out Exporting) sink {
 		w := csv.NewWriter(ctx.BodyWriter())
 		width := len(out.Header)
-		// What the file says about itself, above the column names, because a
+		// The file's own header, above the column names, because a
 		// spreadsheet has nowhere else to carry it.
 		//
 		// Padded to the header's width, like every other record that is not a

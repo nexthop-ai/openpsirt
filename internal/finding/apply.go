@@ -73,7 +73,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		// Which product this build belongs to, read before anything is
+		// The product this build belongs to, read before anything is
 		// ranked. A rating belongs to a product, so what ranks here is
 		// this product's rating and not a word somebody working on
 		// another one wrote.
@@ -81,7 +81,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		// What is on record about each issue: the rating in force —
+		// The record for each issue: the rating in force —
 		// this product's where somebody here has made one, the
 		// published one otherwise — and the signals that rank it. What
 		// a finding is ordered, admitted and clocked by has to be what
@@ -115,7 +115,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		// What the build has already argued about what it ships. Applied here
+		// The build's own claims about what it ships. Applied here
 		// rather than upstream of us, so a suppressed finding is something
 		// that can be seen and accounted for instead of one that never
 		// arrived.
@@ -123,7 +123,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		if err != nil {
 			return err
 		}
-		// Which of them reached anything is worked out against what the target
+		// Those that reached anything are worked out against what the target
 		// contains, not against what was reported: a claim covering a
 		// component nothing was found in has still done its job, while one
 		// covering nothing the build ships has not.
@@ -147,7 +147,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			return fmt.Errorf("read when this run started: %w", err)
 		}
 
-		// What this product considers worth triaging. Below that line
+		// The product's triage line. Below that line
 		// nothing carries a deadline: a line says "this is not work"
 		// and a deadline says "this is work, and it is late", and
 		// holding both means one of them is lying — within a year the
@@ -189,7 +189,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 		onTheClock := moves && !supported.Past(s.now().UTC())
 
 		wanted := map[key]Finding{}
-		// How long each of them has, where it is on the clock at all. Carried
+		// The time each of them has, where it is on the clock at all. Carried
 		// beside the finding rather than on it: a deadline is worked out from
 		// the finding's own opening, and one already open opened before this
 		// run — so the window has to reach the loop below, where that is
@@ -215,7 +215,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				at := place{componentID: component.ID, consumerID: consumerID}
 				wanted[key{vulnerabilityID, at}] = Finding{
 					TargetID: targetID, Kind: Vulnerable,
-					// What a scanner found in a shipped component is public
+					// A scanner's finding in a shipped component is public
 					// knowledge by the time it reaches us: the advisory it
 					// matched is published. What is not disclosed is a finding
 					// somebody entered here.
@@ -284,7 +284,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			held[key{f.VulnerabilityID, place{f.ComponentID, value(f.ConsumerID)}}] = f
 			heldAt[at{f.VulnerabilityID, f.PlaceIdentity}] = f
 		}
-		// What those findings were about, so a version can be named rather
+		// The subject of those findings, so a version can be named rather
 		// than merely known to have changed.
 		before, err := componentsByID(ctx, tx, open)
 		if err != nil {
@@ -392,7 +392,7 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			closing = append(closing, f)
 		}
-		// What a closing finding was about is read from the component
+		// A closing finding's subject is read from the component
 		// catalog rather than from what the variant currently contains — the
 		// whole reason it is closing is usually that it is no longer there.
 		departed, err := componentsByID(ctx, tx, closing)
@@ -474,7 +474,7 @@ func same(held, found Finding) bool {
 	return held.FixState == found.FixState &&
 		held.FixedIn == found.FixedIn &&
 		sameDate(held.FixedAt, found.FixedAt) &&
-		// How it was matched moves for a real reason: a distribution
+		// The match method moves for a real reason: a distribution
 		// recording an advisory for something previously reached only by
 		// upstream identifier changes the answer from "somebody has to look"
 		// to "the people who package this said so". A night where that is all

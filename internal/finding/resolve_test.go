@@ -66,7 +66,7 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 		if closed.ClosedAt == nil {
 			t.Fatal("it is still open")
 		}
-		// Who and why, on the record. And no run: a run closed nothing here,
+		// The person and the reason, on the record. And no run: a run closed nothing here,
 		// and saying one did would put a scan's authority behind a person's
 		// judgment.
 		if closed.ClosedBy == nil || *closed.ClosedBy != who.ID {

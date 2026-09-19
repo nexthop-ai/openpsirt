@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Where this deployment answers, as a browser would name it — which is the
+// The address this deployment answers on, as a browser would name it — which is the
 // input to the same-origin check on every state-changing browser request.
 //
 // A configured address that yields no host fell through to origins derived

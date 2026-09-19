@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
-// Which sort of release a build sits in, and whether it is still in support.
+// The sort of release a build sits in, and whether it is still in support.
 const (
 	// OnBranch is a release that moves: work lands in it.
 	OnBranch = "branch"

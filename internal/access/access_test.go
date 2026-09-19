@@ -511,7 +511,7 @@ func TestBeingOnACaseIsNotReadingTheProduct(t *testing.T) {
 	if on.Reads(access.Public, 5) || on.Sees(5) {
 		t.Error("being on a case made a product readable")
 	}
-	// Which is why the per-issue question exists beside it.
+	// The reason the per-issue question exists beside it.
 	if !access.SeesOn(on, 5, 92) {
 		t.Error("somebody on a case cannot reach the issue they are on")
 	}

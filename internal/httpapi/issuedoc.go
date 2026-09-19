@@ -112,7 +112,7 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 		"customer; what goes out is the advisory or the VEX document.\n")
 	fmt.Fprintf(&out, "\nAssembled %s.\n", time.Now().UTC().Format(time.DateOnly))
 
-	// What the issue is, from what the feeds said.
+	// The issue itself, from what the feeds said.
 	out.WriteString("\n## What it is\n\n")
 	if known.Description != "" {
 		fmt.Fprintf(&out, "%s\n\n", known.Description)

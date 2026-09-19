@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upReport, downReport)
 }
 
-// Who told us, and when.
+// The reporter, and the moment they told us.
 //
 // **Without this the coordinated-disclosure timeline cannot be evidenced at
 // all** — received, acknowledged, triaged, fixed, disclosed — and the
@@ -80,7 +80,7 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "flaw_report_by_fk" FOREIGN KEY ("recorded_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// What the unacknowledged sweep reads: the reports nobody has answered.
+		// The unacknowledged sweep's index: the reports nobody has answered.
 		`CREATE INDEX "flaw_report_unanswered_idx"
 			ON "flaw_report" ("acknowledged_at", "received_on")`,
 	}

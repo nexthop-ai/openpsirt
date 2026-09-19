@@ -244,7 +244,7 @@ const envPrefix = "OPENPSIRT_"
 // operator has no reason to look.
 func Load() (Config, error) {
 	var r reader
-	// What the queue is built with where nothing says otherwise, read from
+	// The queue's defaults where nothing says otherwise, read from
 	// the queue rather than restated: two spellings of one default disagree
 	// the first time either moves.
 	queueing := queue.DefaultOptions()

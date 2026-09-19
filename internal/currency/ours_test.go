@@ -7,7 +7,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 )
 
-// What a deployment's own namespace yields, and what it does not.
+// The labels a deployment's own namespace yields, and the ones it does not.
 //
 // The three spellings exist because the ecosystems spell an organization three
 // ways, and a deployment states it once. A case that only checked the host
@@ -72,7 +72,7 @@ func TestNothingStatedHoldsNothingBack(t *testing.T) {
 	}
 }
 
-// What a label matches, and what it stops at.
+// A label's reach, and where it stops.
 //
 // **The boundary is the whole point.** Matched anywhere in the string,
 // "nexthop" would hold back every package with those letters in it; matched
@@ -133,7 +133,7 @@ func TestALabelMatchesAtSeparators(t *testing.T) {
 	}
 }
 
-// What the deployment stated is held back beside what was derived.
+// A stated name is held back beside a derived one.
 func TestWhatTheDeploymentStatedIsHeldBackToo(t *testing.T) {
 	ours := currency.Ourselves("", []string{"skunkworks", "  ", "Acme-Internal"})
 	if !ours.HeldBack("pkg:npm/skunkworks-ui") {
@@ -156,7 +156,7 @@ func TestWhatTheDeploymentStatedIsHeldBackToo(t *testing.T) {
 	}
 }
 
-// Who publishes a root, which is the part of it that is ours by construction.
+// The publisher of a root, which is ours by construction.
 //
 // **The segment beside the name, never the whole namespace.** Taking the whole
 // of it would hold back every package on a shared forge while reporting that

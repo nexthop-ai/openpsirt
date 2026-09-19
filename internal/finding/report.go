@@ -72,7 +72,7 @@ func (t Told) Stated() bool {
 		strings.TrimSpace(t.Credit) != "" || strings.TrimSpace(t.Received) != ""
 }
 
-// When is the day it arrived, where one was given and could be read.
+// The day it arrived, where one was given and could be read.
 //
 // A date nobody can parse is treated as one nobody gave, for the reason a
 // malformed setting is: the record is the point, and refusing the whole thing

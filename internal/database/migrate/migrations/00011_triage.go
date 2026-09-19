@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upTriage, downTriage)
 }
 
-// What people decide about findings.
+// Decisions about findings.
 //
 // The key is the whole design. A decision is a claim about a combination of
 // code rather than about the release it was made in, so it is keyed on what
@@ -304,7 +304,7 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "claim_revision_unique" UNIQUE ("claim_id", "ordinal")
 		)` + t.suffix,
 
-		// Who agreed, and to what exactly.
+		// The agreeing person, and what exactly they agreed to.
 		//
 		// Kept rather than reduced to a flag on the decision, because an
 		// approval that was later withdrawn is part of the record: it says a

@@ -2,7 +2,7 @@ package finding
 
 import "github.com/uptrace/bun"
 
-// How far a group has been decided, counted per place.
+// The decision state of a group, counted per place.
 //
 // Four correlated counts over our decisions in one product, at each place and
 // at the versions that place holds now. Asked as an EXISTS per place rather

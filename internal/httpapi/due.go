@@ -84,7 +84,7 @@ func registerDue(api huma.API, in Ingest) {
 
 		now := time.Now().UTC()
 		out := &listOutput[LateBody]{}
-		// How many there are in all, so a tile counting this list says what
+		// The total, so a tile counting this list says what
 		// the list it opens says. Without it the front page reported its own
 		// page size as the figure.
 		out.Body.Total = total

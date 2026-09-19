@@ -474,7 +474,7 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 	if err != nil {
 		return nil, nil, err
 	}
-	// What is beneath each neighbor, both directions in one statement.
+	// Everything beneath each neighbor, both directions in one statement.
 	if err := s.filled(ctx, productID, targetID, readable, above, below); err != nil {
 		return nil, nil, err
 	}
@@ -642,7 +642,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
-		// What is open against it here, so descending follows the findings
+		// Everything open against it here, so descending follows the findings
 		// rather than being exploration.
 		// Narrowed like every other count. Without this a reader browsing the
 		// tree gets an accurate count of the undisclosed findings under each
@@ -682,7 +682,7 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		// the rule strictly will not take a column from a joined subquery on
 		// the strength of a primary key belonging to a different table.
 		GroupExpr("c.id, c.name, c.version, kids.n, open.n").
-		// What opens comes before what does not, and within each the most
+		// Anything that opens comes before anything that does not, and within each the most
 		// findings first.
 		//
 		// Ordering by findings alone buries the structure: a container holds

@@ -61,7 +61,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, targetID, scanID int64, wan
 		}
 	}
 
-	// What the scan says is the root, where the row disagrees. Two statements
+	// The scan's own root, where the row disagrees. Two statements
 	// at most, because a build has one root and at most one node loses it.
 	for _, isRoot := range []bool{true, false} {
 		var ids []int64

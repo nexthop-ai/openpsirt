@@ -70,7 +70,7 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 			only finding.Workable
 			want int
 		}{
-			// What the screen asks unless told otherwise: the branch still in
+			// The screen's own question unless told otherwise: the branch still in
 			// support, and neither of the other two.
 			{"the default", finding.Working(nil, nil), 1},
 			{"tags as well", finding.Working(both, nil), 2},

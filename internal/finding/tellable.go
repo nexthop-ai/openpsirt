@@ -10,7 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// Who may be told that an issue exists.
+// The people who may be told that an issue exists.
 //
 // Separate from any one act on an issue because several ask the same question
 // and each answered it differently before: a rating, a finding's detail, a

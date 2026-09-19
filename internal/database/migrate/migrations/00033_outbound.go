@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upOutbound, downOutbound)
 }
 
-// Where this deployment sends what it has to say.
+// The destinations this deployment posts to.
 //
 // **One signed request, not an adapter each.** Nothing leaves this deployment
 // but mail, and every comparable tool reaches a chat channel and a tracker;
@@ -60,7 +60,7 @@ func upOutbound(ctx context.Context, tx *sql.Tx) error {
 
 		`CREATE INDEX "outbound_kind_idx" ON "outbound" ("kind", "retired_at")`,
 
-		// What has already gone where.
+		// Everything already delivered, and where it went.
 		//
 		// Keyed on the thing rather than on the notification, because a
 		// condition is opened once per person who should hear it and a channel

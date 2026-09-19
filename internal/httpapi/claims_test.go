@@ -990,7 +990,7 @@ func (r *reach) agreedThenLapsed(t *testing.T) int64 {
 }
 
 func TestOneRowEscalatingSendsTheWholeReAffirmationBack(t *testing.T) {
-	// What was agreed to was that this did not matter much, and that is not an
+	// The agreement was that this did not matter much, and that is not an
 	// agreement about what it has become. The single form already asks this
 	// per row; asked per row here, an act covering forty-five places could
 	// have written forty-four standing decisions and one waiting — an approver

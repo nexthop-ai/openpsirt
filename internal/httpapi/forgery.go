@@ -29,7 +29,7 @@ func meantToBeSent(r *http.Request, session *access.Session, base string) bool {
 		return true
 	}
 
-	// Where the request came from is checked for every browser arrival,
+	// The request's origin is checked for every browser arrival,
 	// including one carrying a session. It costs nothing and it holds when the
 	// echoed value has leaked.
 	if !sameOrigin(r, base) {

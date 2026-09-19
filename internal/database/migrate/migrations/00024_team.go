@@ -55,7 +55,7 @@ func upTeam(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "team_party_fk" FOREIGN KEY ("party_id") REFERENCES "party"("id")
 		)` + t.suffix,
 
-		// Who is on a team. Membership says nothing about what anybody may
+		// Team membership. It says nothing about what anybody may
 		// read: it says where their work arrives.
 		`CREATE TABLE "team_member" (
 			"team_id"   ` + t.ref + ` NOT NULL,
@@ -68,7 +68,7 @@ func upTeam(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "team_member_added_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// Which teams somebody is on, which is asked on every request that
+		// The teams somebody is on, asked on every request that
 		// resolves a subject and on every list narrowed to "mine".
 		`CREATE INDEX "team_member_person_idx" ON "team_member" ("person_id")`,
 	}

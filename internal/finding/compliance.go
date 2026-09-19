@@ -127,7 +127,7 @@ func (s *Store) Compliance(ctx context.Context, subject access.Subject,
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr(rating.BandExpr + ", f.vulnerability_id, f.component_id")
 
-	// What each of the four means about a group rather than about a row.
+	// Each of the four, read about a group rather than about a row.
 	// Closed when no place is still open and at least one of them carried a
 	// deadline to be judged against; met when none of those was late;
 	// deferred when every open place is covered by one, because a deferral

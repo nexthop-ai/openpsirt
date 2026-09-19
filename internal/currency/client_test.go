@@ -230,7 +230,7 @@ func TestThePublicIndexesAreReachedThroughTheGuardedClient(t *testing.T) {
 	}
 }
 
-// What each index says a package is, and where it lives. A bare name is not
+// Each index's description of a package, and where it lives. A bare name is not
 // enough for a dependency of a dependency somebody has never heard of, and the
 // indexes already carry the answer.
 func TestWhatEachIndexSaysThePackageIsAndWhereItLives(t *testing.T) {
@@ -287,7 +287,7 @@ func TestWhatEachIndexSaysThePackageIsAndWhereItLives(t *testing.T) {
 	}
 }
 
-// Where a publisher filled in more than one address, the one a reader wants
+// A publisher filling in more than one address gives the one a reader wants
 // leads: a project's own pages before its repository.
 func TestTheProjectsOwnPagesAreOfferedBeforeItsRepository(t *testing.T) {
 	a := serving(t, `{"crate":{"max_stable_version":"1.0.0",

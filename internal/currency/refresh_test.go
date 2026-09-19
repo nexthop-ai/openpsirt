@@ -567,7 +567,7 @@ func TestOneReplicaAsksTheIndexes(t *testing.T) {
 	})
 }
 
-// What an index says a package is, bounded, and where it says the package lives,
+// An index's description of a package, bounded, and the address it gives,
 // judged. Both arrive over the network from somebody else and are rendered to
 // staff who hold the most access.
 func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
@@ -802,7 +802,7 @@ func TestANameOfOursIsNotAskedAbout(t *testing.T) {
 	})
 }
 
-// What a scan was about is folded in as the pass runs.
+// A scan's own subject is folded in as the pass runs.
 //
 // The roots come from the database rather than from configuration, so a
 // product declared this morning is one whose name does not leave this

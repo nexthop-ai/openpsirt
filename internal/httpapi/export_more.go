@@ -194,7 +194,7 @@ func registerComparisonExport(api huma.API, in Ingest) {
 		}
 		out := Exporting{
 			What: "comparison of two builds",
-			// Which two builds, because a file headed "comparison" and
+			// The two builds named, because a file headed "comparison" and
 			// naming neither of them is a document nobody can check against
 			// anything, and whether the undisclosed ones are in it: a file
 			// that leaves them out reads as complete about what remains.

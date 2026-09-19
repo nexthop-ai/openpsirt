@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upLease, downLease)
 }
 
-// Which replica is doing a piece of recurring work.
+// The replica doing a piece of recurring work.
 //
 // Every replica runs the same binary with no leader and no process-local state
 // that decides anything, so work that should happen once happens on all of

@@ -588,7 +588,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 			return Subject{}, fmt.Errorf("record that %q was seen: %w", identity, err)
 		}
 	}
-	// What counts as theirs: their own name in the assignable space, and
+	// Theirs is their own name in the assignable space, and
 	// the name of every team they are on. Read here because this is the
 	// one place a person becomes a subject, and "assigned to me" has to
 	// mean the same thing on the list, the counts, the digest and the
@@ -1095,7 +1095,7 @@ func (s *Store) ReadersNamed(ctx context.Context, subject Subject, productID int
 // Nil where no role reaches that visibility at all, which is an answer rather
 // than an empty condition to be filled in.
 func (s *Store) readersIn(productID int64, visibility Visibility) *bun.SelectQuery {
-	// Which roles are enough to read at this visibility, asked of the rule
+	// The roles enough to read at this visibility, asked of the rule
 	// rather than of a list. It was the same four lines as rolesReading, in
 	// the same package, one of them named and one not — which is how "may
 	// read" comes to mean two things.

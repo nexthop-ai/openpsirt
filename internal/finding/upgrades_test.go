@@ -429,12 +429,12 @@ func TestTheByComponentViewOrdersByWhatWasAsked(t *testing.T) {
 			return groups[0].Component
 		}
 
-		// Where the weight is, which is what this view is for and what it
+		// The weight, which is what this view is for and what it
 		// answers when nothing is asked.
 		if got := leader(finding.Filter{}); got != swss.Name {
 			t.Errorf("unasked, the view leads with %q rather than the package holding the most issues", got)
 		}
-		// How far it reaches. Three issues at one place against two issues at
+		// Its reach. Three issues at one place against two issues at
 		// two places: a view that ignores the key answers the same as above.
 		if got := leader(finding.Filter{SortBy: finding.ByPlaces}); got != libnl.Name {
 			t.Errorf("sort=places leads with %q rather than the package sitting in the most places", got)

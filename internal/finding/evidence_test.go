@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// What a reader is shown about a finding, worked out from its places.
+// A reader's view of a finding, worked out from its places.
 //
 // The two rules here are asked of different populations and reading them the
 // same way is the mistake: what a scanner matched on is one line of its report

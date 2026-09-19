@@ -112,7 +112,7 @@ func TestNarrowingByWhatHoldsIt(t *testing.T) {
 			t.Errorf("a consumer nothing sits under kept %d", absent)
 		}
 
-		// What the build holds directly is the other half. Together they are
+		// The build's direct holdings are the other half. Together they are
 		// every place, which is the assertion worth making: a filter that
 		// quietly kept nothing would satisfy either half alone.
 		_, direct, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
@@ -432,7 +432,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 				"proposed_at": time.Now().UTC(),
 			}
 			if live {
-				// What makes a claim the one standing here: a key, and the
+				// The test for a claim standing here: a key, and the
 				// version the claim was made against being the one shipping.
 				row["live_key"] = state + "-live-key"
 				row["component_upstream_version"] = swss.Version
@@ -712,7 +712,7 @@ func TestARowNamesWhatPullsItInEvenWhereTheRouteUpIsUnknown(t *testing.T) {
 	})
 }
 
-// What a person recorded here, as against what a scanner reported.
+// A person's own record here, as against what a scanner reported.
 //
 // Its own question rather than a shade of another: a recorded flaw is the only
 // kind a person may close by hand, and the screen that records one had no way

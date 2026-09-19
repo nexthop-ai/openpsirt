@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// Who deals with something: giving work out, taking it back, and what each of
+// Dealing with something: giving work out, taking it back, and what each of
 // the three rights it takes may actually do.
 
 func TestWorkNobodyOwnsCanBeFoundAndGivenToSomebody(t *testing.T) {

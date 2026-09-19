@@ -83,7 +83,7 @@ func TestWithdrawingAnEstateRoleHandsBackWhatItWasHolding(t *testing.T) {
 	})
 }
 
-// What it does not touch: a role held against a named product. Those are
+// It does not touch a role held against a named product. Those are
 // withdrawn one at a time through the path that names the product, and work in
 // a product where they still hold something stays with them.
 func TestWithdrawingAnEstateRoleLeavesNamedProductsAlone(t *testing.T) {

@@ -261,7 +261,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(DISTINCT f.consumer_id) AS "consumers"`).
 		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
 		ColumnExpr(`0 AS "total"`)
-	// How far each of them has been decided, spelled once for every list
+	// The decision state of each, spelled once for every list
 	// that asks (see decided.go). Across products the row names its own.
 	body = decisionCounts(body, "st.product_id", nil,
 		claimWaiting, claimApproved, claimLapsed, claimSentBack).
@@ -285,7 +285,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, 0, err
 	}
-	// What each of the page's products rates each of its issues. Keyed on the
+	// Each product's own rating of each of its issues. Keyed on the
 	// pair, because this list spans products and one issue may be rated
 	// differently in two of them — which is the whole reason a rating belongs
 	// to a product.
@@ -298,7 +298,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		return nil, 0, err
 	}
 
-	// What people have marked these with, in their own product's words. The
+	// The marks people put on these, in their own product's words. The
 	// list is where a mark is for — the point of putting one on is finding the
 	// work again — so a mark this list did not draw was one nobody saw, on the
 	// screen somebody reaches before they have picked a product.

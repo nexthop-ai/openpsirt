@@ -178,7 +178,7 @@ func facing(customerFacing bool) string {
 // not a nicety — an unfiltered list tells somebody the names of things they
 // were never granted.
 func (s *Store) Products(ctx context.Context, subject access.Subject) ([]Product, error) {
-	// What may be known to exist rather than what may be read: an
+	// Existence rather than readability: an
 	// administrator administers the catalog without holding a role on
 	// anything in it.
 	visible, all := subject.Knows()

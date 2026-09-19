@@ -233,7 +233,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		target    int64
 		component int64
 		name      string
-		// Where the component sits in that build, which is what a decision is
+		// The component's place in that build, which is what a decision is
 		// keyed on. One entry per place, because a component can sit in more
 		// than one at once.
 		consumerID int64
@@ -266,7 +266,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			if err != nil {
 				return err
 			}
-			// Where it sits, read from the same graph a scan reads. A flaw a
+			// Its place, read from the same graph a scan reads. A flaw a
 			// person records and the same flaw a scan finds are one thing, so
 			// they are keyed the same way — and a place recorded as "directly
 			// under the product" when the component is nested is a key no
@@ -413,7 +413,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if _, err := tx.NewInsert().Model(&rows).Exec(ctx); err != nil {
 			return fmt.Errorf("record the finding: %w", err)
 		}
-		// Who told us, in the same transaction as the flaw itself. A
+		// The reporter, in the same transaction as the flaw itself. A
 		// report written afterwards is one that can be lost while the
 		// finding stands, and the reporter is the party a coordinated
 		// timeline is evidenced to. Written through the transaction

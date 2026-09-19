@@ -67,7 +67,7 @@ func upIssueNote(ctx context.Context, tx *sql.Tx) error {
 		// key rather than sorted afterwards.
 		`CREATE INDEX "issue_note_thread_idx" ON "issue_note" ("vulnerability_id", "product_id", "id")`,
 
-		// What a note said before it was changed. The previous text, written
+		// A note's text before it was changed. The previous text, written
 		// when it is replaced, rather than every version including the current
 		// one: the note row holds what it says now, and this holds what it
 		// stopped saying.

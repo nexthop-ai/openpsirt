@@ -245,14 +245,14 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// product's decisions, and a caller free to state either would be choosing
 	// whose rating its findings are judged by.
 	filter.Floor.ProductID = productID
-	// Who "mine" means, from the subject rather than from the request, and
+	// The person "mine" means, from the subject rather than from the request, and
 	// their teams with them: the column holds a party.
 	filter.HeldBy = subject.Mine()
 	// The store's clock, so the deadline filters compare against the same
 	// moment everything else here does — and so a frozen clock reaches them,
 	// which is what left the overdue filter with no test.
 	filter.now = s.now
-	// How many builds the selection holds, which is what "differs between
+	// The number of builds the selection holds, which is what "differs between
 	// builds" is measured against. The filter cannot see it.
 	filter.Builds = len(targets)
 	// A subtree is a walk over one build's edges, so it is answerable only
@@ -344,7 +344,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	if err != nil {
 		return nil, 0, err
 	}
-	// What this product rates them, where it rates them anything. One
+	// This product's own ratings, where it rates them anything. One
 	// statement for the page, like the two lookups above: the rating belongs
 	// to the product and the page is inside one, so the pair is known here.
 	rated, err := RatingsIn(ctx, s.db, []int64{productID}, issues)
@@ -401,7 +401,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 		group := groupFrom(row, named, rated, shipped, filter.Floor)
 		group.Tags = marks[markKey{row.VulnerabilityID, row.ComponentID}]
 		if oneBuild {
-			// How many distinct ways down there are: the consumers this
+			// The number of distinct ways down: the consumers this
 			// component has here, plus one for the build pulling it in
 			// directly.
 			group.Chains = row.Consumers
@@ -486,13 +486,13 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		if component.UpstreamVersion != "" {
 			group.Upstream = component.UpstreamName + " " + component.UpstreamVersion
 		}
-		// Which source package it was built from, where that is not the name
+		// The source package it was built from, where that is not the name
 		// itself. Two rows that are one bump say so on both lists.
 		if component.UpstreamName != "" && component.UpstreamName != component.Name {
 			group.Source = component.UpstreamName
 		}
 	}
-	// Why there is no deadline, said rather than left as a blank cell. The
+	// The reason there is no deadline, said rather than left as a blank cell. The
 	// reasons are asked narrowest first and the last is what is left: the line
 	// is a statement about this issue's rating, upstream having nothing to
 	// take is one about this finding, and anything else without a deadline is
@@ -792,7 +792,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// engines do not agree about what a boolean out of an aggregate is.
 		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
 		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
-		// When the earliest of these places opened, and the earliest deadline
+		// The earliest opening among these places, and the earliest deadline
 		// any of them carries. The age a deadline relates to is this one, not
 		// the year in the identifier.
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
@@ -837,12 +837,12 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// with a different word on it.
 		ColumnExpr(`COUNT(DISTINCT f.component_id) AS "packages"`).
 		ColumnExpr(`SUM(CASE WHEN f.consumer_id IS NULL THEN 1 ELSE 0 END) AS "direct"`).
-		// How many builds in the selection hold this group, and one of them to
+		// The number of builds in the selection holding this group, and one of them to
 		// name. Both are one where the selection is a single build, which is
 		// why the row says nothing about either there.
 		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
 		ColumnExpr(`MIN(f.target_id) AS "target_id"`)
-	// How far each group has been decided, counted the way the state filter
+	// The decision state of each group, counted the way the state filter
 	// counts it, so the row and the filter cannot disagree. One spelling of
 	// each state, in decided.go.
 	q = decisionCounts(q, "?", []any{productID},

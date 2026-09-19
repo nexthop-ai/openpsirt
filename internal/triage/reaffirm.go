@@ -155,7 +155,7 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	// How bad it is judged to be **now**, read here with everything else this
+	// The severity judged now, read here with everything else this
 	// turns on. Passed in by the caller it was a number from before the
 	// transaction opened, so an advisory sweep raising the severity in
 	// between — or a retry running against a database that has moved — carried
@@ -533,7 +533,7 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 				return fmt.Errorf("mark what the code moved out from under: %w", err)
 			}
 			moved = n
-			// Who to tell, read back inside the same act. The identifiers
+			// The people to tell, read back inside the same act. The identifiers
 			// are this pass's own, so nothing another sweep marked is in it.
 			if err := tx.NewSelect().Model((*Decision)(nil)).
 				ColumnExpr("de.id").
@@ -675,7 +675,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COALESCE(de.component_upstream_version, '') AS "was"`).
 		ColumnExpr(`cl.outcome AS "outcome"`).
 		ColumnExpr(`COALESCE(dr.body, '') AS "reasoning"`).
-		// What the new line has at that place, if anything.
+		// The new line's contents at that place, if anything.
 		ColumnExpr(`COALESCE((SELECT MIN(c.name) FROM "finding" AS "f"
 			JOIN "component" AS "c" ON c.id = f.component_id
 			WHERE f.target_id = ? AND f.vulnerability_id = de.vulnerability_id
@@ -735,7 +735,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 			Component: row.Component, Outcome: Outcome(row.Outcome),
 			Was: row.Was, Now: row.Now, Reasoning: row.Reasoning,
 		}
-		// What the write would refuse is not offered. A carried judgment
+		// Anything the write would refuse is not offered. A carried judgment
 		// keeps its date rather than having it quietly moved forward, so a
 		// deferral that has already run out and a promise whose date has
 		// gone by cannot be carried at all — and offering one is offering
@@ -752,7 +752,7 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		carried.Moved = append(carried.Moved, one)
 	}
 
-	// How long each postponement has already run. Somebody agreeing to carry
+	// The length each postponement has already run. Somebody agreeing to carry
 	// a deferral into a new line is agreeing to however long it has been put
 	// off in total, not to the months the new one asks for — and four
 	// consecutive carries of "not this release" are a decision nobody made.

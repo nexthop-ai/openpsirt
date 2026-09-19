@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upCommentHistory, downCommentHistory)
 }
 
-// What a comment said before it was changed.
+// A comment's text before it was changed.
 //
 // **An edit overwrote and recorded only that it happened.** A reasoning's
 // revisions are kept because an approval points at one revision of the words

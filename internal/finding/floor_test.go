@@ -241,7 +241,7 @@ func TestNothingOnAReleaseOutOfSupportIsOnAClock(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// What is already open loses its clock when the policy is applied.
+		// Anything already open loses its clock when the policy is applied.
 		if _, err := f.store.Recompute(ctx, finding.DefaultWindows()); err != nil {
 			t.Fatal(err)
 		}

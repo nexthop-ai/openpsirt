@@ -120,7 +120,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		// stated no version — which reads as no fix known, about a group where
 		// one is.
 		ColumnExpr(`COALESCE(MIN(NULLIF(f.fixed_in, '')), '') AS "fixed_in"`)
-	// How far each place has been decided, the same counts the findings list
+	// The decision state of each place, the same counts the findings list
 	// carries and by the same conditions, so the two agree about what
 	// "agreed" means. Nothing here asks whether a claim is with its author,
 	// so that column is not read and not computed.

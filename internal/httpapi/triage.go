@@ -216,7 +216,7 @@ type BecameBody struct {
 	// bulk set and setting some aside, or half of it lapsing as one build
 	// moved — and is said rather than picked between.
 	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"What became of the claim"`
-	// When is when it became that, and who did it where a person did. Both
+	// The moment it became that, and the person who did it where a person did. Both
 	// absent while it is waiting: nothing has happened to it yet.
 	When      string          `json:"when,omitempty" doc:"When it became that, as a date and time"`
 	By        string          `json:"by,omitempty" doc:"Who did it, where a person did"`
@@ -288,7 +288,7 @@ func registerTriage(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "the review queue could not be read", err)
 		}
 
-		// Which finding each row is about, and who made the claim, resolved
+		// The finding each row is about, and the person who made the claim, resolved
 		// here rather than left as identifiers. A queue row saying product 4,
 		// issue 91 is a row an approver has to make two more requests to
 		// understand, fifty times a page.
@@ -449,7 +449,7 @@ func registerTriage(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what you proposed could not be read", err)
 		}
-		// Who did it, resolved to a name. A row saying "person 7 agreed" is a
+		// The person who did it, resolved to a name. A row saying "person 7 agreed" is a
 		// row somebody has to look up, and the answer to "what became of my
 		// claim" is half about who answered it.
 		actors := make([]int64, 0, len(mine))
@@ -583,7 +583,7 @@ func registerTriage(api huma.API, in Ingest) {
 						"It is waiting for a second person again; nothing you wrote has changed.",
 					Link:    "/decisions/" + strconv.FormatInt(one.DecisionID, 10),
 					Private: one.Undisclosed,
-					// What a later read narrows by.
+					// The narrowing a later read applies.
 					ProductID:       &one.ProductID,
 					VulnerabilityID: &one.VulnerabilityID,
 				}, "person", one.PersonID, "batch", input.Batch)
@@ -751,7 +751,7 @@ func registerProposing(api huma.API, in Ingest) {
 		body := decisionBody(*decision)
 		body.Reasoning = input.Body.Reasoning
 		body.NeedsApproval = decision.NeedsApproval
-		// How much this one judgment covers, so nobody discovers afterwards
+		// The reach of this one judgment, so nobody discovers afterwards
 		// that they answered for sixty-two modules or for two versions of the
 		// same package.
 		body.Places, body.Versions = at.Places, at.Versions()
@@ -802,7 +802,7 @@ func refusedDecision(logger *slog.Logger, err error) error {
 	if database.FromEngine(err) {
 		return wentWrong(logger, "that could not be recorded", err)
 	}
-	// What is left is a sentence the triage store wrote for a person to read:
+	// The remainder is a sentence the triage store wrote for a person to read:
 	// a decision already standing here, a claim covering nothing, a threshold
 	// crossed. Those are the caller's to fix, and the message is the answer.
 	return huma.Error422UnprocessableEntity(err.Error())
@@ -820,7 +820,7 @@ func refusedText(faults markdown.Faults) error {
 	for _, fault := range faults {
 		details = append(details, &huma.ErrorDetail{
 			Message: fault.Reason,
-			// Where in the submitted text, not where in the request body. A
+			// The position in the submitted text, not in the request body. A
 			// client is pointing a cursor at a line somebody typed.
 			Location: fmt.Sprintf("line %d", fault.Line),
 			Value:    fault.Offending,
@@ -832,7 +832,7 @@ func refusedText(faults markdown.Faults) error {
 
 // decisionBody renders a decision as the API states it.
 func decisionBody(d triage.Decision) DecisionBody {
-	// What the judgment says comes from the claim: one act is one argument,
+	// The judgment's words come from the claim: one act is one argument,
 	// and this row says where it lands. A decision read without its claim is
 	// a programming error rather than a state a caller can reach, so it is
 	// left to fail here rather than rendered as an outcome nobody chose.

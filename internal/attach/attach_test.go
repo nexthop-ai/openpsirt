@@ -221,7 +221,7 @@ func TestWhatItIsIsDecidedHereAndNotByWhoeverUploadedIt(t *testing.T) {
 }
 
 func TestAFileIsAsReadableAsTheIssueItHangsOff(t *testing.T) {
-	// Why a fetch is authorized before any URL is issued, and why the
+	// The reason a fetch is authorized before any URL is issued, and the reason the
 	// visibility is not stored on the attachment: whoever may read the text may
 	// read what it refers to, and nobody else.
 	each(t, func(t *testing.T, f *fixture) {

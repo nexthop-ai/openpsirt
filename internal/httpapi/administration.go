@@ -355,7 +355,7 @@ func registerAdministration(api huma.API, a Administering) {
 			body := PersonBody{
 				Identity: person.Identity, DisplayName: person.DisplayName, Admin: person.IsAdmin,
 				Audits: person.Audits, DeactivatedAt: orAbsent(person.DeactivatedAt),
-				// Where they are reached, and which of the two sources said
+				// Their address, and which of the two sources said
 				// so. On the list as well as on the one-person read: the
 				// screen that records an address is the list, and a column
 				// that drew "none" over an address somebody had just typed
@@ -433,7 +433,7 @@ func registerAdministration(api huma.API, a Administering) {
 
 			names := catalog.NewStore(db)
 
-			// Where roles come from, and how long an authorization stays
+			// The source of roles, and how long an authorization stays
 			// redeemable, read inside the act that decides from them (REQ-71).
 			//
 			// Read before it opened, a mode switch landing between the two let

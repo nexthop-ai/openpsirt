@@ -238,7 +238,7 @@ func registerBulk(api huma.API, in Ingest) {
 			issues = append(issues, id)
 		}
 		if len(unknown) > 0 {
-			// Which ones, because a person who pasted a list wants to fix the
+			// Named individually, because a person who pasted a list wants to fix the
 			// list rather than bisect it.
 			return nil, huma.Error404NotFound(
 				"no issue is filed under " + strings.Join(clipped(unknown), ", "))

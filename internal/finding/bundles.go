@@ -720,7 +720,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		DueAt       *time.Time `bun:"due_at"`
 		ComponentID int64      `bun:"component_id"`
 	}
-	// What is open against it, per build and component. A left join rather
+	// Everything open against it, per build and component. A left join rather
 	// than the driving table: no findings is an answer, and it is the answer
 	// for every package that carries its risk underneath it rather than on
 	// itself. Narrowed by visibility here, where the counts are, because the
@@ -741,7 +741,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr("f.target_id, f.component_id")
 
-	// How many things pull it in, from the graph rather than from the
+	// The number of things pulling it in, from the graph rather than from the
 	// findings: it is a fact about the build, true whether or not anything is
 	// open. A component nothing pulls in is contained by the build itself,
 	// which counts as the one thing pulling it in.
@@ -799,7 +799,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	for _, row := range rows {
 		ids = append(ids, row.ComponentID)
 	}
-	// Where each could go, per build: the same read the by-component view
+	// The versions each could go to, per build: the same read the by-component view
 	// takes, narrowed to these builds so a stream's answer is its own.
 	upgrades, err := s.upgradesPerBuild(ctx, ids, targets, visible, name)
 	if err != nil {
@@ -884,7 +884,7 @@ func (s *Store) upgradesPerBuild(ctx context.Context, ids, targets []int64,
 		return nil, fmt.Errorf("read where a component could go in each build: %w", err)
 	}
 
-	// What each build's findings name, one entry per issue so an issue counts
+	// The versions each build's findings name, one entry per issue so an issue counts
 	// once however many versions its fix names.
 	per := map[[2]int64][]namedFix{}
 	scheme := map[[2]int64]vercmp.Scheme{}

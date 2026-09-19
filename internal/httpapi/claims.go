@@ -414,7 +414,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	[]ElsewhereBody, error) {
 
 	store := triage.NewStore(in.DB.DB)
-	// What stands is matched by key — the place and the versions this build
+	// A standing claim is matched by key — the place and the versions this build
 	// ships there — so a decision written against another version of the
 	// same place is not reported as standing here. What stood before and
 	// what might carry are asked by place: a lapsed decision no longer
@@ -495,7 +495,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	earlierOut := make([]EarlierBody, 0, len(earlier))
 	for _, one := range earlier {
 		d := one.Decision
-		// What it said is the claim's; where it landed is the row's.
+		// The words are the claim's; the landing place is the row's.
 		said := d.Claim
 		body := EarlierBody{
 			DecisionID: d.ID, ClaimID: d.ClaimID, Outcome: outcome(said.Outcome),

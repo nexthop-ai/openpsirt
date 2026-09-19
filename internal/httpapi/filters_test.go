@@ -50,7 +50,7 @@ func TestTheFiltersATriagerReachesFor(t *testing.T) {
 		if got := count(t, "due_within=400"); got == 0 {
 			t.Error("nothing is due within a year, so the deadline filter reaches nothing")
 		}
-		// What upstream did: one is fixed upstream, the other has no fix.
+		// Upstream's answer: one is fixed upstream, the other has no fix.
 		if got := count(t, "fix_state=fixed"); got != 1 {
 			t.Errorf("one issue is fixed upstream and the filter found %d", got)
 		}
@@ -78,7 +78,7 @@ func TestTheFiltersATriagerReachesFor(t *testing.T) {
 		if got := count(t, "ecosystem=deb&ecosystem=golang"); got != 2 {
 			t.Errorf("two kinds at once kept %d rows, want the two Debian packages", got)
 		}
-		// Who is dealing with it: nothing here is assigned, so "nobody" is
+		// The party dealing with it: nothing here is assigned, so "nobody" is
 		// both rows and "somebody" is none — and the two together must be the
 		// union rather than the intersection, which is what applying them one
 		// at a time would have made it.
@@ -125,7 +125,7 @@ func TestAWeaknessIsMatchedWholeAndNotAsAPrefix(t *testing.T) {
 			t.Fatal(err)
 		}
 		for i, cwe := range []string{"CWE-125", "CWE-787"} {
-			// Which is the root cause is not what this is about, and the
+			// The root cause is not what this is about, and the
 			// column is stated rather than defaulted so that no insert path
 			// can leave it unanswered.
 			row := map[string]any{

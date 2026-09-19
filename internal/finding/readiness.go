@@ -52,7 +52,7 @@ type Readiness struct {
 	// with none" and "we do not know what we shipped with" are answers a
 	// person acts on differently.
 	Shipped *Standing
-	// Why is why says what is missing when Shipped is nil, in words a
+	// Why says what is missing when Shipped is nil, in words a
 	// screen can print. Empty where there is something to compare against.
 	Why string
 	// Floor is the line these counts are at or above, so a screen can say

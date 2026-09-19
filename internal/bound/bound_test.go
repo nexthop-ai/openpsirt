@@ -68,7 +68,7 @@ func TestABoundOfNoneKeepsNothing(t *testing.T) {
 }
 
 func TestABadByteEarlyOnDoesNotSwallowWhatFollowsIt(t *testing.T) {
-	// What is cut is often a program's own output, and a scanner that fails
+	// The text cut is often a program's own output, and a scanner that fails
 	// writes whatever it likes to standard error. Asked whether the whole
 	// kept prefix decodes, the trim walked back past every good character to
 	// the first bad byte and threw away the rest — so the recorded reason for

@@ -453,7 +453,7 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 		return nil
 	}
 	q = q.Set("latest_version = ?", latest.Version)
-	// What the index says the package is, and where it is developed. Both are
+	// The index's description of the package, and where it is developed. Both are
 	// somebody else's text arriving over the network and rendered to staff who
 	// hold the most access, so both are bounded and the address is judged
 	// before it is stored rather than only before it is drawn.

@@ -184,7 +184,7 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 		}
 		for _, wanted := range []string{
 			"CVE-2026-9999",
-			// What it is, where it is, and what was decided.
+			// The issue, its places, and the decisions.
 			"read past the end of the buffer",
 			"libnl-3-200",
 			"not-applicable",
@@ -194,7 +194,7 @@ func TestEverythingKnownAboutOneIssueIsADocument(t *testing.T) {
 			// And who agreed, because a dismissal standing on one person is
 			// the thing an inquiry is most likely to be about.
 			"reviewer",
-			// Where it is written up, from what the report carried.
+			// The write-up address, from what the report carried.
 			"https://nvd.nist.gov/vuln/detail/CVE-2026-9999",
 		} {
 			if !strings.Contains(written, wanted) {

@@ -365,7 +365,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`MIN(f.assigned_to) AS "assigned_to"`).
 		ColumnExpr(`MAX(f.assigned_to) AS "assigned_high"`).
 		ColumnExpr(`COUNT(f.assigned_to) AS "assigned_count"`).
-		// How many groups the question has, counted over the grouped result
+		// The number of groups the question has, counted over the grouped result
 		// and before the limit. A screen that counted its own page said two
 		// hundred over a list of four hundred and sixty-two.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).

@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upNotification, downNotification)
 }
 
-// What somebody is told, and the two different lifetimes that has.
+// Everything somebody is told, and the two lifetimes that has.
 //
 // Everyone gets a notification area, not only administrators: a triager sees
 // work arriving, a proposer sees a dismissal sent back, an approver sees what
@@ -132,7 +132,7 @@ func upNotification(ctx context.Context, tx *sql.Tx) error {
 				REFERENCES "vulnerability"("id")
 		)` + t.suffix,
 
-		// What the area reads: one person's unread, newest first. The
+		// The area's own read: one person's unread, newest first. The
 		// visibility narrowing that follows it is over one person's unread
 		// rows, which is the small set this index already produces.
 		`CREATE INDEX "notification_unread_idx"

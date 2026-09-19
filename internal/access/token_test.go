@@ -374,7 +374,7 @@ func TestANarrowedTokenIsStillTheSamePerson(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Who they are does not change because a credential was pinned.
+		// Identity does not change because a credential was pinned.
 		if narrowed.Party() != whole.Party() || narrowed.Party() == 0 {
 			t.Errorf("a narrowed token is party %d and the person is party %d",
 				narrowed.Party(), whole.Party())

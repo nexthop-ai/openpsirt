@@ -9,14 +9,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// Who may read what, asked of the store rather than of a handler.
+// Read access, asked of the store rather than of a handler.
 //
 // The rule is enforced in the data layer with a subject on the query, so these
 // ask the store directly: a check that only a handler makes is a check the
 // next handler forgets.
 
 func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
-	// What visibility on the query is actually about. The enforcement is
+	// Visibility on the query. The enforcement is
 	// on the query, so this tests the query rather than a handler that
 	// remembered to ask.
 	each(t, func(t *testing.T, f *fixture) {

@@ -14,7 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
-// What a list is narrowed to before it is paged.
+// The narrowing applied to a list before it is paged.
 //
 // Every filter the findings list offers, and the one expression each becomes.
 // Narrowing belongs here rather than in whatever displays the result: a filter
@@ -557,7 +557,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		})
 		q = q.Where("f.component_id IN (?)", where)
 	}
-	// What the producer called it. Correlated on the build rather than bound
+	// The producer's own name for it. Correlated on the build rather than bound
 	// to one, so the cross-product list can ask it too, and the leading column
 	// of the statement is the one the edge index leads with.
 	if words := trimmed(f.DeclaredAs); len(words) > 0 {
@@ -570,7 +570,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 				Where("ge.closed_scan_id IS NULL").
 				Where("ge.kind IN (?)", bun.List(words)))
 	}
-	// What holds it. A place records the component that pulls it in, so asking
+	// The component holding it. A place records the one that pulls it in, so asking
 	// what is inside a container is asking for places whose consumer is that
 	// container — and what the build holds directly is the places with none.
 	if f.UnderTheBuild {
@@ -578,7 +578,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	} else if under := strings.TrimSpace(f.Under); under != "" {
 		q = q.Where("f.consumer_id IN (?)", componentsWhere(q, "c.name = ?", under))
 	}
-	// Who is dealing with it. Set for the whole group at once, so a group is
+	// The party dealing with it. Set for the whole group at once, so a group is
 	// held when its places are — asked as MIN and MAX rather than as one row,
 	// because a group whose places disagree is not "mine" and saying so would
 	// hand somebody work that is half theirs.
@@ -587,7 +587,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	// applied one at a time. Applied one at a time they would AND, and "mine
 	// or nobody's" would be a list of nothing.
 	q = f.heldBy(q)
-	// What this product said about the issue, as against what was published. A
+	// This product's own word on the issue, as against what was published. A
 	// rating of its own is the record of a priority somebody changed here —
 	// and a rating another product made is not, which is why the set is keyed
 	// on the product rather than on the issue alone.
@@ -601,7 +601,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 					Where("ir.product_id = ?", f.ProductID))
 		}
 	}
-	// What an uploaded VEX document says about this, matched the way a
+	// An uploaded VEX document's statement about this, matched the way a
 	// finding's own screen matches it: on the component's name and on every
 	// name the issue is known by, because which identifier a publisher chose
 	// is a preference of whichever database they consulted.
@@ -824,7 +824,7 @@ func (f Filter) heldBy(q *bun.SelectQuery) *bun.SelectQuery {
 func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 	publishers, saidIt := trimmed(f.Publishers), trimmed(f.VexStatus)
 	if len(publishers) > 0 || len(saidIt) > 0 {
-		// Which statements are being asked about, written once and used for
+		// The statements being asked about, written once and used for
 		// both arms of the union below.
 		asked := []string{"ss.superseded_at IS NULL"}
 		var about []any
@@ -1105,7 +1105,7 @@ func (f Filter) byState(q *bun.SelectQuery) *bun.SelectQuery {
 		ColumnExpr("MAX(CASE WHEN de.live_key IS NOT NULL AND "+standingHere+
 			` AND cl.outcome = ? THEN 1 ELSE 0 END) AS "planned"`,
 			append(append([]any{}, inForce...), string(upgradeNeeded))...).
-		// Which kind of judgment stands here, counted only for the claim that
+		// The kind of judgment standing here, counted only for the claim that
 		// currently stands: a dismissal withdrawn eighteen months ago must not
 		// answer for its place, which is the same rule "approved" above holds
 		// — and neither must one still waiting for a second person, or asking

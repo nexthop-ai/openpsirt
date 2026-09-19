@@ -231,7 +231,7 @@ func registerAssessment(api huma.API, in Ingest) {
 			}
 			return nil, wentWrong(in.Logger, "what we have said could not be read", err)
 		}
-		// What each rating's product is called, read once for the page rather
+		// The name of each rating's product, read once for the page rather
 		// than per row.
 		products, shown, err := productsNamed(ctx, in, claims)
 		if err != nil {

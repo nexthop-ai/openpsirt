@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upAssessment, downAssessment)
 }
 
-// What one product thinks of an issue, as against what was published about it.
+// One product's own view of an issue, as against what was published about it.
 //
 // Recorded against the issue rather than against a place, and against one
 // product rather than against the deployment. Keyed to a place it would have

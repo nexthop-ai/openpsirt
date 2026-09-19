@@ -110,7 +110,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 	// this finding and differing for another, and the two are different things
 	// to say about it.
 	seen := map[bool]map[string]int{true: {}, false: {}}
-	// What makes two rows the same entry, which is not the same question for
+	// The test for two rows being the same entry, which is not the same question for
 	// the two lists.
 	//
 	// A build the judgment already reaches is one thing to be told about,
@@ -151,7 +151,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		return Reach{}, access.Denied(fmt.Sprintf("read findings in product %d", at.ProductID))
 	}
 	identities := make([]string, 0, len(places))
-	// What each place is keyed on, which is what decides whether a build is
+	// The key of each place, which decides whether a build is
 	// reached by matching or has to be ticked. Two places of one finding can
 	// hold different versions, so the comparison is per place and cannot be
 	// asked of the statement.

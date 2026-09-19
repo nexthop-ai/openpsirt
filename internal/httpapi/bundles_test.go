@@ -91,7 +91,7 @@ func TestOneBumpIsOneRowHoweverManyPackagesItMoves(t *testing.T) {
 		if all.Total != 3 {
 			t.Fatalf("the fixture lists %d rows, want its three folds", all.Total)
 		}
-		// Which is the whole point: three rows to answer one at a time, or one
+		// The whole point: three rows to answer one at a time, or one
 		// bump to declare. The one with no fix is in neither the bundle nor
 		// its issue count.
 	})
@@ -590,7 +590,7 @@ func TestAPromisedUpgradeSaysWhereItStandsAndLapsesAsOneItem(t *testing.T) {
 			t.Errorf("a promise for %s reads as %+v, want planned", ahead, one)
 		}
 
-		// Who is carrying it, which is what a lapsed one comes back
+		// The party carrying it, which is what a lapsed one comes back
 		// to. Held only where one party holds all of what is still
 		// open under it: a bump split between two people is nobody's,
 		// and naming one of them would hand somebody work that is half

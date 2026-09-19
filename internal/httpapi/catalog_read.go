@@ -72,7 +72,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 				return nil, wentWrong(d.Logger, "cannot count what is open", err)
 			}
 		}
-		// When each product was last scanned comes from the same answer the
+		// The last scan of each product comes from the same answer the
 		// home page reads, rather than a second query that could disagree
 		// with it about which build counts.
 		seen, err := lastScans(ctx, d.Scans(), subject)

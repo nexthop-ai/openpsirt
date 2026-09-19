@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
-// What a run says about itself, and what it costs to read back.
+// A run's own account of itself, and the cost of reading it back.
 //
 // A receipt names the scanner and the vulnerability database it was measured
 // with, because a feed ships bad data for a week and is corrected afterwards.

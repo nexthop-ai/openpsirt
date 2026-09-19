@@ -349,7 +349,7 @@ func (s *Store) registerJoins(productID int64,
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.Here, productID).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
-		// What pulls the component in. Left, because a build holds some
+		// The component's consumer. Left, because a build holds some
 		// components directly and those have no consumer at all.
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		// Liveness is asked of the columns rather than of the join, for the
@@ -415,7 +415,7 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		ColumnExpr(`f.closed_at AS "closed_at"`).
 		ColumnExpr(`f.due_at AS "due_at"`).
-		// Why it closed, in both the words the tool chose and the words a
+		// The reason it closed, in both the words the tool chose and the words a
 		// person typed. A closure with no reason was refused of whoever
 		// wrote it and then readable by nobody, so the refusal was a promise
 		// the tool did not keep.

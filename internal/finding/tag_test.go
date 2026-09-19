@@ -129,7 +129,7 @@ func TestMarkingAFindingWithAWord(t *testing.T) {
 			t.Errorf("a word nobody used kept %d rows and counted %d", len(none), noneTotal)
 		}
 
-		// What is in use is what people wrote, which is what a filter offers.
+		// The tags in use are the ones people wrote, which is what a filter offers.
 		inUse, err := f.store.TagsInUse(t.Context(), who, f.productID)
 		if err != nil {
 			t.Fatal(err)

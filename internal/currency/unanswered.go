@@ -11,7 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// Why is why says which of three things left a component without an upstream
+// Why says which of three things left a component without an upstream
 // answer.
 //
 // One report rather than two, because the two questions are asked together.

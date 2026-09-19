@@ -74,7 +74,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		wanted[target] = true
 	}
 
-	// What is filed now, and what the flaw is in. Read before the transaction
+	// Everything filed now, and the flaw's subject. Read before the transaction
 	// because resolving a component is a walk of a build's graph, and because
 	// a build that does not hold it has to be refused before anything is
 	// written — which is what recording already does for the same reason. The
@@ -139,9 +139,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 
 		here := map[int64]bool{}
 		var closing []int64
-		// How many rows this would open, counted as they are resolved.
+		// The number of rows this would open, counted as they are resolved.
 		opened := 0
-		// Which builds are being taken out, as against how many rows that
+		// The builds being taken out, as against the rows that
 		// is: a build holding the component in two places is one build.
 		out.Closed = 0
 		leaving := map[int64]bool{}

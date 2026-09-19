@@ -207,7 +207,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	for i := range open {
 		open[i] = map[int64]string{}
 	}
-	// Where an issue stopped being present without explanation, per step.
+	// Issues that stopped being present without explanation, per step.
 	// The scanner going quiet is a fault to investigate rather than a fix,
 	// so it is held back from the resolved count even though the issue has
 	// left the set.
@@ -217,7 +217,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	}
 
 	for _, row := range rows {
-		// Which step an unexplained disappearance falls in, worked out once
+		// The step an unexplained disappearance falls in, worked out once
 		// from the moment rather than by walking the steps looking for it.
 		// Inside the loop below it did not depend on the step it sat in, so a
 		// row that went quiet re-walked every bucket once per step — steps

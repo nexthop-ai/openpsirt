@@ -9,7 +9,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
-// How a product is doing, per build.
+// A product's standing, per build.
 //
 // **There was no page for one product.** "How is SONiC doing" was five
 // requests and a spreadsheet: what is open per build, how much of it is

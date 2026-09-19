@@ -15,7 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
-// What to say when a name reaches nothing.
+// The words for a name that reaches nothing.
 //
 // One place, because there were several spellings of the same sentence and two
 // that described the wrong thing entirely — a missing person and a missing

@@ -7,7 +7,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// What is open against a product, a branch or a variant — the numbers the
+// Everything open against a product, a branch or a variant — the numbers the
 // catalog screens draw.
 //
 // Counting is reading, so these carry a subject like every other read, and the

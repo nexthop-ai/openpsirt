@@ -115,7 +115,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	if err != nil {
 		return nil, err
 	}
-	// What may be read of the two, which is the narrower of the two answers.
+	// The readable part of the two, which is the narrower of the two answers.
 	if len(earlier) < len(visible) {
 		visible = earlier
 	}
@@ -182,7 +182,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 		comparison.Fixed = append(comparison.Fixed, c)
 	}
 
-	// Why each of them went, read from the rows that closed in the later
+	// The reason each of them went, read from the rows that closed in the later
 	// build — the earlier build's rows are still open in its own history.
 	//
 	// One read per batch rather than one per entry. A comparison against a
@@ -210,7 +210,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	// second time, in a column heading, and it disagreed with this one.
 	comparison.Fixed, comparison.Closed = partition(comparison.Fixed)
 
-	// What stands over what is still there. Read only for the still-present
+	// Judgments standing over what is still there. Read only for the still-present
 	// entries, because that is the list somebody signs a release off against
 	// — what was fixed needs no justification and what is newly present has
 	// not been looked at yet.

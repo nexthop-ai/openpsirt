@@ -137,7 +137,7 @@ func TestTwoWritersInterningOneComponentBothSucceed(t *testing.T) {
 			t.Fatal("the first writer recorded nothing")
 		}
 
-		// What the loser of the race does: it read before that row existed,
+		// The loser of the race read before that row existed,
 		// so it writes both, and one of them is already there.
 		if err := database.InBatchesKeeping(ctx, f.db.DB, []graph.Component{
 			{

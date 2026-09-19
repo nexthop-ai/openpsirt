@@ -64,7 +64,7 @@ func upCollaborator(ctx context.Context, tx *sql.Tx) error {
 		`CREATE UNIQUE INDEX "case_collaborator_live_idx"
 			ON "case_collaborator" ("product_id", "vulnerability_id", "live_person_id")`,
 
-		// What a subject is resolved with: every case one person is on, read
+		// The key a subject is resolved with: every case one person is on, read
 		// at sign-in beside their roles.
 		`CREATE INDEX "case_collaborator_person_idx"
 			ON "case_collaborator" ("person_id", "live_person_id")`,

@@ -7,7 +7,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// What produced a finding.
+// A finding's provenance.
 //
 // **The question a corrected feed makes urgent.** A vulnerability database
 // shipping bad data for a week is corrected afterwards, and the work done on

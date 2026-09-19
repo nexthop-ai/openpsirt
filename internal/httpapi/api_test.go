@@ -36,7 +36,7 @@ func TestProbesAnswerWithoutAuthentication(t *testing.T) {
 }
 
 func TestTheVersionIsNotToldToStrangers(t *testing.T) {
-	// Which build is running is small reconnaissance, but it is
+	// The running build is small reconnaissance, but it is
 	// reconnaissance: it says which published issues might apply here. Every
 	// documented route is authenticated, and this one is not an exception
 	// because it looks harmless.

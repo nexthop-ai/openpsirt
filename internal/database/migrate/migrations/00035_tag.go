@@ -56,7 +56,7 @@ func upTag(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "finding_tag_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// What the list filters on: everything in a product carrying a tag.
+		// The list's filter: everything in a product carrying a tag.
 		`CREATE INDEX "finding_tag_named_idx" ON "finding_tag" ("product_id", "tag")`,
 	}
 
