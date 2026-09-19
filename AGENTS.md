@@ -96,7 +96,7 @@ its discovery.
 
 | Rule | |
 |---|---|
-| **A heading names a thing** | A noun phrase. No verb, no question, no wh-word, no gerund, six words at most. "Upstream currency", not "Asking upstream what is current". "Index responses", not "What an index says". "Version ordering", not "Ordering the versions a scanner named" |
+| **A heading names a thing** | A noun phrase, six words at most. No question, no wh-word, and no gerund taking an object — "Upstream currency", not "Asking upstream what is current"; "Index responses", not "What an index says"; "Version ordering", not "Ordering the versions a scanner named". A bare gerund naming a process is a noun and is fine: "Parsing", "Scanning" |
 | **A sentence states a fact** | Present tense, indicative. "A held-back name is recorded as asked", not "What tells them apart afterwards is the same list applied again" |
 | **No antithesis as a frame** | Write the thing that is true. "X, not Y" and "not Y but X" are two facts where one was needed, and the false one is the one that gets remembered |
 | **No lead-in sentences** | Open on the fact. "A decision is keyed on the product, the issue and the place", not "Nothing in what identifies a decision names the release it was made in — and that is deliberate" |
