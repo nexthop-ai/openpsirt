@@ -4390,6 +4390,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/upstream/unanswered": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List components with no upstream answer
+         * @description What asking public package indexes did not answer, and why of each.
+         *
+         *     **Asking is the one thing here that reaches the network, and what it sends is a component's name.** For an open-source dependency that is public knowledge; for something built here it is the name of a project, a team, or a product nobody has announced. So names this deployment calls its own are never sent, and `ours` is what they were matched against.
+         *
+         *     **Held back is biased toward holding back.** Over-excluding loses an answer, which is visible here and on the screen that would have shown it. Under-excluding sends a name to somebody else's service, which is visible nowhere.
+         *
+         *     `unknown` is the candidate list: a component no public index has heard of is a private module or a vendored fork, and the names on it are what an operator promotes into `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
+         *
+         *     **A component the pass has not reached yet is not here.** It is waiting rather than unanswered, and reporting a first day's backlog as though the indexes had failed would make the list useless on the day somebody reads it.
+         *
+         *     Answers only components in products you may read.
+         *
+         *     **Requires:** any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-unanswered-upstream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/version": {
         parameters: {
             query?: never;
@@ -9045,6 +9077,37 @@ export interface components {
              * @description How many decisions those acts wrote
              */
             rows: number;
+        };
+        UnansweredBody: {
+            /** @description When the pass last reached it. For a name of ours that is when it was last decided against rather than when anything was asked */
+            checked: string;
+            /** @description Which ecosystem the identifier names, read out of it rather than stored */
+            ecosystem?: string;
+            /** @description The package identifier, which is the name that would be sent */
+            purl: string;
+            /**
+             * @description 'ours' was never sent: this deployment calls the name its own. 'unknown' was sent and no index had heard of it. 'unreadable' is an identifier nothing can turn into a request
+             * @enum {string}
+             */
+            why: "ours" | "unknown" | "unreadable";
+        };
+        UnansweredOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/UnansweredOutputBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["UnansweredBody"][] | null;
+            /** @description The names this deployment holds back, from its publisher namespace, from what the scans were about, and from what it stated. A name here is matched against each part of a package's name, either exactly or followed by one of - . _ */
+            ours: string[] | null;
+            /**
+             * Format: int64
+             * @description How many there are in all, through the same filter as the page
+             */
+            total: number;
+            /** @description Whether every candidate was examined. False means the estate is past what one read classifies, and the total is a floor */
+            whole: boolean;
         };
         UnassignedBody: {
             /**
@@ -16189,6 +16252,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["List-unassignedResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-unanswered-upstream": {
+        parameters: {
+            query?: {
+                /** @description How many to return */
+                limit?: number;
+                /** @description How many to skip */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnansweredOutputBody"];
                 };
             };
             /** @description Error */

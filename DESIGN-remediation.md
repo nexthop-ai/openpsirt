@@ -258,6 +258,61 @@ not-found for a renamed package and for some transient conditions, and letting
 one of those destroy a version already in hand would sit on the hole for a
 month.
 
+### What leaves, and what does not
+
+**What a request carries is a component's name.** One per component, the name
+and nothing else — no version, no build, no product. For an open-source
+dependency that is public knowledge. For something built here it is the name of
+a project, a team, or a product nobody has announced, and a public index
+records every request made of it.
+
+So a name this deployment calls its own is never sent. Three sources, unioned:
+
+| Source | What it yields |
+|---|---|
+| The namespace this deployment publishes under | The organization in the three spellings the ecosystems use: the host, the host reversed, which is what a Maven group and a Java package are, and each label short of the top-level domain. Already required for CSAF and VEX and already meaning "who we are", so a deployment that publishes anything has said this once |
+| What each build declared itself to be | The account, scope or group that identifier is published under. A root is the product this deployment builds, so who publishes it is this deployment by construction. Taken from the scan record rather than from the stored component, because the component standing for the product is stored by its name alone — a version on it would give the product a new identity every night |
+| What the deployment stated | Whatever else an operator named, for what the other two cannot reach |
+
+| Rule | Reason |
+|---|---|
+| A name is matched a part at a time, either exactly or followed by a separator | Matched anywhere in the string, one organization's name holds back every package containing those letters; matched only exactly, it misses the family of names the organization actually publishes, which is most of what it is for |
+| The segment beside the package's name, never the whole namespace | A forge host is shared by everybody. Taking it would hold back most of an ecosystem while reporting that it was protecting one organization, which is the failure that makes an operator turn the feature off rather than tune it |
+| Nothing is derived from the root's own name | A product called "core" would hold back every package whose name starts that way. A default that wrong is one nobody tunes |
+| A label that names a kind of registration rather than an organization is dropped | Where a deployment publishes under a second-level registration, the generic part is nobody's name. It is a closed handful rather than a list of where each country's registrations begin, which is a file this does not have |
+| It is a better default, not a control | A deployment needing certainty about what leaves it leaves the whole feature off, which is where it ships. This is what stops an ordinary deployment leaking its own names by turning on something that reads as harmless |
+| Biased toward holding back, and it says what it held | Over-excluding loses an answer, which is visible on the screen that would have shown it and in the report beside it. Under-excluding sends a name to somebody else's service, which is visible nowhere and cannot be taken back |
+| A held-back component is recorded as though it had been asked about | The window takes the never-asked first. Left unrecorded it would hold the head of every pass afterwards for ever, with the components behind it never reached — the same failure the classification above exists for |
+| The roots are read per pass, the rest at startup | A product declared this morning is one whose name should not leave this afternoon. The other two come from configuration and change on a redeploy |
+
+### What has no upstream answer
+
+Two questions that are one report, because they are asked together: what was
+held back says what the default is costing, and what no public index has heard
+of is the list an operator reads to decide what else should be held back. A
+name promoted from the second appears in the first afterwards, which is how
+somebody knows the promotion worked.
+
+| Why there is no answer | |
+|---|---|
+| It is ours | Never sent. The names it was matched against travel with the report, so a row can be checked rather than taken on trust |
+| No index knows it | Sent, and nothing had heard of it. A private module and a vendored fork both look like this, and neither is a fault |
+| The identifier cannot be read | Nothing can turn it into a request. Kept apart from the one above because it is a fault in a document this deployment accepted rather than a fact about the world, and reading it as "no index knows this" would put it on the list of names somebody is about to hold back, where it means nothing |
+
+**Derived rather than stored.** A held-back name and one no index knows are
+recorded identically, because the pass must record both. What tells them apart
+is the same list applied again at read time, which also means the report
+follows a change to the list immediately instead of waiting for a month of
+backoff to expire.
+
+**A component the pass has not reached is not on it.** It is waiting rather
+than unanswered, and reporting a first day's backlog as though the indexes had
+failed would make the list useless on the day somebody reads it.
+
+Narrowed to the products the reader may read. A package identifier says what a
+build is made of, so a list of them across the estate is an answer about
+products rather than about the deployment (REQ-42).
+
 ## Ordering the versions a scanner named
 
 Where a component could go is every version the findings open against it name as

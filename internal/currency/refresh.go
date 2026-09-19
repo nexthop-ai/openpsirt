@@ -69,6 +69,14 @@ type Refresher struct {
 	// Now is the clock, so a test can ask what happens a month from now
 	// without waiting a month.
 	Now func() time.Time
+	// Ours is what this deployment calls its own, from its publisher
+	// namespace and whatever else it stated. The roots a scan was about are
+	// added per pass rather than held here, because a product declared this
+	// morning is one whose name should not leave this afternoon.
+	//
+	// The zero value holds nothing back, which is a deployment that has
+	// configured no publisher and scanned nothing published under a namespace.
+	Ours Ours
 	// leases is how the replicas decide which of them asks. replica names this
 	// one in the lease it takes, and interval is how long it is taken for —
 	// remembered by Run so the pass can take it again as it goes rather than
@@ -83,12 +91,12 @@ type Refresher struct {
 //
 // The name identifies this replica in the lease. Every replica runs this pass,
 // and only the one holding the lease asks anything.
-func NewRefresher(db *bun.DB, logger *slog.Logger, replica string) *Refresher {
+func NewRefresher(db *bun.DB, logger *slog.Logger, replica string, ours Ours) *Refresher {
 	client := New()
 	return &Refresher{
 		db: db, Index: client.For, logger: logger,
 		leases: queue.NewLeases(db), replica: replica,
-		Pause: betweenAsks, Now: time.Now,
+		Pause: betweenAsks, Now: time.Now, Ours: ours,
 	}
 }
 
@@ -221,6 +229,15 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// Read once for the pass rather than once per component. It is one
+	// statement over the roots, and the answer cannot change part way through
+	// a pass in any way that matters: a product declared during it is held
+	// back from the next one, a few minutes later.
+	roots, err := RootOwners(ctx, r.db)
+	if err != nil {
+		return 0, fmt.Errorf("read who publishes what was scanned: %w", err)
+	}
+	ours := r.Ours.With(roots...)
 	asked := 0
 	for at, component := range due {
 		if ctx.Err() != nil {
@@ -254,6 +271,20 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		}
 		if !on {
 			return asked, nil
+		}
+
+		// **A name of ours never leaves, and is still answered.** Recorded
+		// exactly as an unanswerable one below is, and for the same reason:
+		// left unrecorded it would stay due for ever, and the window takes
+		// the never-asked first, so it would hold the head of every pass
+		// afterwards with the components behind it never reached. What tells
+		// the two apart afterwards is the same list applied again, which is
+		// what the report of what was held back is.
+		if ours.HeldBack(component.Purl) {
+			if err := r.record(ctx, component.ID, Latest{}); err != nil {
+				return asked, err
+			}
+			continue
 		}
 
 		// **A question with nowhere to send it is still answered.** Not

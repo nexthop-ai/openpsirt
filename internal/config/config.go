@@ -195,6 +195,16 @@ type Config struct {
 	// PublisherCategory is what the standard calls the kind of publisher.
 	// A deployment publishing about its own product is a vendor.
 	PublisherCategory string
+	// UpstreamInternal are names this deployment never sends to a public
+	// package index, on top of the ones derived from the publisher's
+	// namespace and from what the scans were about.
+	//
+	// Here rather than among the settings an administrator tunes, beside the
+	// namespace the default is derived from. Asking upstream is a switch an
+	// administrator throws; what leaves the deployment when it is on is a
+	// boundary the person who deployed it drew, and a boundary that can be
+	// widened from inside the application is not one.
+	UpstreamInternal []string
 	// SessionLifetime bounds a sign-in. Zero takes the built-in default.
 	SessionLifetime time.Duration
 
@@ -281,6 +291,7 @@ func Load() (Config, error) {
 		PublisherName:          env("PUBLISHER_NAME", ""),
 		PublisherNamespace:     env("PUBLISHER_NAMESPACE", ""),
 		PublisherCategory:      env("PUBLISHER_CATEGORY", "vendor"),
+		UpstreamInternal:       listed(env("UPSTREAM_INTERNAL", "")),
 		TrustedGroupsHeader:    env("TRUSTED_GROUPS_HEADER", ""),
 		TrustedGroupsDelimiter: env("TRUSTED_GROUPS_DELIMITER", ","),
 		PlainHTTP:              r.boolean("PLAIN_HTTP", false),
@@ -484,4 +495,19 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// listed reads a comma-separated value into the names it carries.
+//
+// Empty entries are dropped rather than kept as a name of nothing: a trailing
+// comma is what a list assembled by a template looks like, and a name that is
+// the empty string would match everything it was compared against.
+func listed(raw string) []string {
+	var names []string
+	for _, name := range strings.Split(raw, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
