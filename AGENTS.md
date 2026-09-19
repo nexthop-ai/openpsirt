@@ -5,7 +5,7 @@ vulnerabilities here rather than in the build, tracks what changes release to
 release, and gives people somewhere to triage findings and follow them through
 to a fix. It is Apache 2.0, installed and run by other people (REQ-01 and REQ-10).
 
-**Read `REQUIREMENTS.md` before proposing anything.** Most questions have already
+Read `REQUIREMENTS.md` before proposing anything. Most questions have already
 been answered there, with the reasoning. If you think a decision is wrong, say
 so and cite its ID — do not quietly implement something else.
 
@@ -23,13 +23,13 @@ so and cite its ID — do not quietly implement something else.
 Code satisfies a design document. A design document names the decision IDs it
 implements. A decision says why.
 
-**If code does something no design document describes, it is a remnant.** Either
+If code does something no design document describes, it is a remnant. Either
 the design document is out of date or the code should not be there. Both get
 re-examined; neither is assumed correct. This is the whole reason the design
 documents exist, so keeping them current is part of the change, not follow-up
 work.
 
-**The other direction is checked by the gate.** `make check` fails on a
+The other direction is checked by the gate. `make check` fails on a
 decision in force that no design document names. A decision that is not built
 yet is not exempt — the document for its area says that it is not built, in
 words, which is the difference between a plan somebody can read and a gap
@@ -37,7 +37,7 @@ somebody rediscovers by clicking. Naming a decision means describing it: adding
 the identifier to a "Satisfies" line without writing what it does makes the
 audit trail a lie, which is worse than the gap it was hiding.
 
-**The gate cannot check that half, and does not pretend to.** It matches
+The gate cannot check that half, and does not pretend to. It matches
 identifiers rather than reading prose, so naming a decision anywhere in a
 design document satisfies it, and a range — `REQ-23, REQ-24, REQ-25` — names all
 three. A hundred and thirty-two of the decisions in force are claimed by a
@@ -50,27 +50,27 @@ nothing is claimed by nobody.
 
 All at the repository root, named `DESIGN-<area>.md`.
 
-- **Keep them language-agnostic.** They describe behavior, architecture and
- domain concepts — SBOM structure, dependency paths, triage outcomes,
- visibility rules. Never type names, struct fields, function signatures or
- source paths. Implementation pointers belong in code.
-- **Name the decisions they satisfy**, by ID. That is the audit trail — and
- naming means describing: a `Satisfies` line citing an identifier the document
- never explains reads as an audit trail and is not.
-- **A decision that is only a choice of tool is not named by a design
- document.** Which language, which router, which query builder, which chart
- library: describing those here is forbidden by the rule directly above, so
- requiring them to be named here asks for two things that cannot both be true.
- `REQUIREMENTS.md` is where each of those lives and the only place it needs to,
- and the gate carries the list. The test for adding one is narrow — the
- decision picks a tool and nothing else — because putting a decision about
- behavior on that list to quiet the gate is the failure the list exists to
- avoid.
-- **Record what the decisions did not cover.** Plenty gets chosen while writing
- code that no decision anticipated. Those choices are exactly what an auditor
- cannot distinguish from an accident, so write them down.
-- **Update them in the same change as the code.** A design document that lags is
- worse than none, because it is trusted and wrong.
+- Keep them language-agnostic. They describe behavior, architecture and domain
+  concepts — SBOM structure, dependency paths, triage outcomes, visibility
+  rules. Never type names, struct fields, function signatures or source paths.
+  Implementation pointers belong in code.
+- Name the decisions they satisfy, by ID. That is the audit trail — and naming
+  means describing: a `Satisfies` line citing an identifier the document never
+  explains reads as an audit trail and is not.
+- A decision that is only a choice of tool is not named by a design document.
+  Which language, which router, which query builder, which chart library:
+  describing those here is forbidden by the rule directly above, so requiring
+  them to be named here asks for two things that cannot both be true.
+  `REQUIREMENTS.md` is where each of those lives and the only place it needs
+  to, and the gate carries the list. The test for adding one is narrow — the
+  decision picks a tool and nothing else — because putting a decision about
+  behavior on that list to quiet the gate is the failure the list exists to
+  avoid.
+- Record what the decisions did not cover. Plenty gets chosen while writing
+  code that no decision anticipated. Those choices are exactly what an auditor
+  cannot distinguish from an accident, so write them down.
+- Update them in the same change as the code. A design document that lags is
+  worse than none, because it is trusted and wrong.
 
 ### The Spec register
 
@@ -147,7 +147,7 @@ without the archaeology.
 | "Maintained as a complement, every other unaskable ecosystem passed this filter, reached the asker, found none and was recorded empty" | "Candidates are built from the list of ecosystems with an index, never from its complement" |
 | "This panicked into the recovery middleware and answered 500, where the route already has words for it" | "A handler reached without a database refuses in words" |
 
-**A section that has drifted reads a particular way**: a heading that asks a
+A section that has drifted reads a particular way: a heading that asks a
 question, paragraphs opening with a bolded claim, a reason three sentences past
 its rule, and a past tense anywhere at all. Rewrite it rather than appending
 to it.
@@ -165,7 +165,7 @@ happen before 1.0, what the owner deferred, decisions taken but not
 implemented, questions waiting on an answer, and what was measured and left
 alone deliberately.
 
-**Nothing may reference it** — not code, not comments, not commit messages, not
+Nothing may reference it — not code, not comments, not commit messages, not
 the design documents. It is a work list, not a record. Anything durable moves
 to `REQUIREMENTS.md` or a `DESIGN-*.md` before it is ticked off.
 
@@ -200,7 +200,7 @@ unpick later.
 
 ## Nothing is made faster until it is measured slow
 
-**Work out an answer when it is asked for.** No caching, no precomputed
+Work out an answer when it is asked for. No caching, no precomputed
 totals, no refresh job, no denormalized copy — until somebody has measured a
 real deployment and found a real problem. A stale answer is a cost paid up
 front for a benefit nobody has demonstrated, and it brings its own bugs:
@@ -211,7 +211,7 @@ mature tool nearby stores metric snapshots and refreshes them hourly, and
 copying that looked like prudence rather than what it was — adopting somebody
 else's constraints, from a hosted product with traffic this one will not see.
 
-**Storing a derived value to be correct is a different thing.** Some values
+Storing a derived value to be correct is a different thing. Some values
 cannot be worked out again later at all, because the moment they describe is
 gone. What a place held before a version moved is recorded as the scan applies,
 because that is the only point at which both versions are in hand. How many
@@ -220,8 +220,8 @@ is what somebody agreed to rather than what the matching rules would say today.
 Those are facts about a moment, stored for the same reason a scan's provenance
 is.
 
-**A value that can still be worked out is not one of those, and storing it does
-not freeze it.** A finding's urgency is stored so that a list can sort on it
+A value that can still be worked out is not one of those, and storing it does
+not freeze it. A finding's urgency is stored so that a list can sort on it
 without joining four signals for every row on every page — that is speed, and it
 earns its place — and it is rewritten when the signals move, because it
 describes an issue rather than a moment (REQ-32). Reading "stored" as "frozen"
@@ -231,19 +231,19 @@ neither buys the right to go stale.
 
 ## Two limits that erode if they are not rules
 
-**A short-bump flag is inequality, never ordering.** Saying "this moved and is
+A short-bump flag is inequality, never ordering. Saying "this moved and is
 still not the version that fixes it" needs no version comparison. Adding one is
 per-ecosystem work — Debian epochs, RPM release segments, semantic versions, and
 the ecosystems that follow none of them — and an ordering that answers
 confidently for a pair it cannot actually order is worse than none, because the
 wrong answer is a recommendation somebody acts on.
 
-**No decision records this**, and two documents cited REQ-21 for it, which is
+No decision records this, and two documents cited REQ-21 for it, which is
 about findings opening and closing as scans change. So it is a judgment rather
 than a commitment, and it is the owner's to revisit: nothing has been promised
 here either way.
 
-**A bulk judgment is bounded, and a bulk promise is not.** One action recording
+A bulk judgment is bounded, and a bulk promise is not. One action recording
 a judgment against many issues is deliberate and useful; one action writing an
 unbounded number of rows is a denial of service somebody triggers by accident.
 The cap is a setting rather than a constant, and every bulk judgment has one
@@ -257,21 +257,21 @@ closes — so that path takes no cap at all. The transaction-size half of what a
 cap was doing was measured rather than assumed, and needs nothing: a promise
 over 243,950 places commits in 8.3 seconds on SQLite and 23.9 on PostgreSQL.
 
-**Bound what is written, not what was asked for.** The two differ whenever one
+Bound what is written, not what was asked for. The two differ whenever one
 named thing expands into many rows — an issue sits at many places — so a limit
 checked against the request lets a small request do a large amount of work
 (REQ-27).
 
 ## Source file size
 
-**Target about 1200 lines per source file.** A point to split at, not a hard
+Target about 1200 lines per source file. A point to split at, not a hard
 limit.
 
 A file past it is usually doing more than one thing. The cost is not storage —
 it is that nobody reads to the end, changes get made in the wrong place, and
 review gets shallower the further down the diff it goes.
 
-Split by **responsibility, not by line count**. Cutting a coherent file in half
+Split by responsibility, not by line count. Cutting a coherent file in half
 to hit a number makes it worse, and a 1300-line file that genuinely does one
 thing is better left alone than split badly. Act on the trend rather than the
 threshold: splitting late is far more work than splitting early.
@@ -285,11 +285,11 @@ length.
 `REQUIREMENTS.md` records choices somebody made and could have made differently.
 Most of what gets learned while building is not that: it is what a format, an
 engine or a protocol turned out to require, and nobody chose it. That is real
-and it has to be written down — **in a design document, which is where how
-something works is recorded**. Putting it in the decisions table makes a table
+and it has to be written down — in a design document, which is where how
+something works is recorded. Putting it in the decisions table makes a table
 of judgments into a table of facts, and the judgments stop being findable.
 
-**The test is whether somebody could disagree.** A person can disagree that
+The test is whether somebody could disagree. A person can disagree that
 attachments belong outside the database, or that four database engines are worth
 supporting. Nobody can disagree that one format has no way to say which
 vulnerability a patch resolves — that is the format, and the only decision
@@ -301,31 +301,31 @@ nearby is what to do about it.
 | Inventories are read from build pipelines, one adapter per producer, in these formats | How a reader is picked, which key a version is declared in, what a lifecycle scope of `test` places |
 | Identity is derived from content rather than what a file supplies | Which columns the hash is taken over |
 
-**Say it in one plain sentence.** A row that needs a paragraph is usually two
+Say it in one plain sentence. A row that needs a paragraph is usually two
 things, or a mechanism wearing a decision's clothes. It is prose a person reads
 years later to find out whether a choice still holds, so it is written the way
 the rest of these documents are — plainly, no contractions, and without naming a
 variable, a key path, a function or a version of somebody else's specification.
 Reach for any of those and the row belongs in a design document instead.
 
-**Adding one is the owner's call, and nothing else is.** A decision is a
+Adding one is the owner's call, and nothing else is. A decision is a
 commitment the project is held to, and one that arrives as a side effect of
 building something is a commitment nobody made. Propose it; do not append it.
 Removing one is the same conversation in reverse.
 
-**`REQUIREMENTS.md` is never edited while implementing something.** Not to
+`REQUIREMENTS.md` is never edited while implementing something. Not to
 record what was just built, not to add the row a new behavior seems to want, not
 to reword one that reads awkwardly next to the code. A change to that file is
 its own change, asked for on its own.
 
-**Agreement to build something is not agreement to record a decision.** They are
+Agreement to build something is not agreement to record a decision. They are
 different questions and the second is asked separately: "yes, do that" is a yes
 to the work. Adding a row needs a yes to the row — quote it, and wait. An owner
 who approves a feature and finds a commitment in the decisions table has been
 held to something they never agreed to, which is the whole failure this rule
 exists to stop.
 
-**Assume it is not a decision.** Most of what gets built is what a format, an
+Assume it is not a decision. Most of what gets built is what a format, an
 engine, an ecosystem or a protocol requires, and nobody chose it — how one
 distribution orders its version strings is not a judgment anybody can disagree
 with. That goes in a design document, which is where how something works is
@@ -334,7 +334,7 @@ chosen otherwise, and then still ask.
 
 ## Decision identifiers
 
-**Keep rows sorted by identifier within each table.** Adding a decision next to
+Keep rows sorted by identifier within each table. Adding a decision next to
 a related one is the natural instinct and it scrambles the order — which makes a
 reference document hard to scan and makes it look like entries are missing.
 Append, sort, and use a cross-reference to point at the related decision.
@@ -345,7 +345,7 @@ document that cites one.
 ## Nothing is compatible with anything yet
 
 Below 1.0 there is no schema compatibility and no API compatibility (REQ-76).
-A schema change **edits the migration that created the thing** rather than
+A schema change edits the migration that created the thing rather than
 adding one beside it, and anybody holding a development database recreates it. The version in the API path is the shape it will have, not a
 promise anybody may hold us to.
 
@@ -355,8 +355,8 @@ catches an ordering mistake between them. They collapse into one before 1.0
 
 ## Decisions carry the evidence that forced them
 
-**Where a decision was settled by a measurement, the measurement goes in the
-justification.** Not "the fan-out is large" but "335,021 findings for one
+Where a decision was settled by a measurement, the measurement goes in the
+justification. Not "the fan-out is large" but "335,021 findings for one
 image, 305,487 of them a single kernel across 62 modules". Not "walking is
 cheap" but "3 ms on PostgreSQL, 11 ms on MySQL, for the worst component in a
 real graph".
@@ -372,14 +372,14 @@ of the two was wrong.
 
 ## Code conventions
 
-**No implementation-timeline language in code or comments.** Never write "for
+No implementation-timeline language in code or comments. Never write "for
 now", "temporarily", "first cut", "later", "in this phase", "step N", or
 anything describing *when* in the build something happens. Such notes rot the
 moment the next change lands. Comment the current behavior and why. If
 something genuinely is missing, describe the missing behavior or the
 limitation — not when it will arrive.
 
-**A comment describes the code that is there, not the code that was.** "It was
+A comment describes the code that is there, not the code that was. "It was
 a card with a heading and two hints" and "the form had the card's name until
 the card became Triage" describe something a reader cannot see and will never
 see. The history belongs in the commit message, and where it is a decision, in
@@ -395,13 +395,13 @@ This is not the rule above about tense. A comment may say why a shape is
 necessary, including that the obvious alternative fails; what it may not do is
 tell the story of the edit that produced it.
 
-**The tree does not follow this yet.** Comment lines across the tree still
+The tree does not follow this yet. Comment lines across the tree still
 narrate what stood there before — "it was a select fed by the mentions
 endpoint", "what used to be a checkbox per place". They are correct about the
 code beside them and wrong about what a comment is for, and they are fixed as
 the files are touched rather than in a sweep of their own.
 
-**A comment does not count the tree's own contents.** Not "fifteen class names
+A comment does not count the tree's own contents. Not "fifteen class names
 are styled by nothing", not "thirty-two fixtures do this", not "this is at
 0.0%". A number like that is false the moment anybody edits what it counts, and
 a count of something wrong is false as soon as it is fixed — usually by the
@@ -410,7 +410,7 @@ to tell whether it still holds, which is worse than no figure at all. Say what
 the shape is; if the count matters, the gate that produces it prints the number
 at the time it looked.
 
-**A measurement is not a count, and measurements stay.** "3 ms on PostgreSQL,
+A measurement is not a count, and measurements stay. "3 ms on PostgreSQL,
 11 ms on MySQL", "335,021 findings for one image, 305,487 of them a single
 kernel", "1,415 against 38": these are facts about the world or about real
 data, they are why the code has the shape it has, and somebody can re-run them
@@ -419,14 +419,14 @@ in two years and see whether they still hold. That is exactly what
 describes something outside this repository — keep it — or something a commit
 here can change — cut it.
 
-**No ticket or tracker references in code, comments or documents.** A bare
+No ticket or tracker references in code, comments or documents. A bare
 number is unactionable at the code and rots as work is split or superseded.
 Describe the behavior, reason or limitation instead, and keep issue linkage in
 the tracker and the pull request.
 
-**Comment density matches the surrounding code.** Explain why, not what.
+Comment density matches the surrounding code. Explain why, not what.
 
-**API descriptions are reference documentation, not prose.** A summary is an
+API descriptions are reference documentation, not prose. A summary is an
 imperative verb and the thing it acts on, in the words the domain actually uses
 — "Upload an SBOM", "List vulnerability findings", "Approve a triage decision".
 Not "Send what a build shipped", "What is open against a build", "Agree to a
@@ -436,12 +436,12 @@ paraphrase that avoids naming the thing reads as a riddle.
 A description says what the operation does, what it takes, what comes back, and
 what a caller must know that is not obvious — a 202 that returns before
 parsing, a field required only for one outcome, an approval that a later edit
-withdraws. **The reasoning belongs in `REQUIREMENTS.md` and the design documents,
-not here.** Somebody reading the API reference is trying to make a request
+withdraws. The reasoning belongs in `REQUIREMENTS.md` and the design documents,
+not here. Somebody reading the API reference is trying to make a request
 work, and an explanation of why the design is what it is stands between them
 and that.
 
-**The mechanical half of that is a gate; the rest is judgment.** A test walks
+The mechanical half of that is a gate; the rest is judgment. A test walks
 the document the server builds and fails a missing summary or description, a
 summary shaped like one of the counter-examples above, a summary written as a
 sentence rather than a label, an operation that says nothing about what it
@@ -450,7 +450,7 @@ nobody outside this repository has. Whether a paragraph is an explanation of
 the design or a thing a caller has to know is not checkable and stays a
 person's to decide.
 
-**Interface copy is labels, not prose**, on the same principle as the rule
+Interface copy is labels, not prose, on the same principle as the rule
 above: the reasoning belongs in the design documents, not on the screen. Cut
 before rewriting, because most of what a screen explains it already shows — a
 clickable row looks clickable, a column header names its column. What survives
@@ -467,7 +467,7 @@ contractions below, which is about text read years later. `DESIGN-interface.md`
 any of it; the copy reached 6,700 words of explanation across 65 files once
 already.
 
-**American spelling, everywhere.** License, not licence. Catalog, normalize,
+American spelling, everywhere. License, not licence. Catalog, normalize,
 behavior, color, authorize. It applies to prose, comments and identifiers
 alike — a codebase that spells one word two ways makes both unsearchable, and
 the choice matters less than the consistency.
@@ -475,14 +475,14 @@ the choice matters less than the consistency.
 Two things are exempt because they are not ours to respell: text quoted from a
 producer's output, and field names defined by a format we consume.
 
-**No contractions in anything durable.** The design documents have none and
+No contractions in anything durable. The design documents have none and
 `REQUIREMENTS.md` had thirty-one, which is the same document at a different
 register — and a decision is read years later by somebody deciding whether it
 still holds. It is not a rule about formality: an expanded "does not" is one
 word harder to misread than "doesn't" in a sentence that is already carrying a
 negation. Temporary documents and commit messages are exempt.
 
-**The name is written OpenPSIRT.** In prose and in anything a person reads —
+The name is written OpenPSIRT. In prose and in anything a person reads —
 documentation, the API description, the version the binary prints, a chart
 description. It is a product name, and a product name that appears in three
 casings reads like three different things.
@@ -520,12 +520,12 @@ gets ticked without being read.
 - Every change runs against all four database engines in CI.
 - Test fixtures include a real SBOM per supported producer, plus one full-size
  fixture for performance work.
-- **Authorization is tested as a matrix**: role × visibility × endpoint,
+- Authorization is tested as a matrix: role × visibility × endpoint,
  including counts, aggregates, search and exports.
 - Regression tests are named for the invariant they pin.
 
-**A gate that iterates a collection counts what it examined and fails on
-zero.** The form is `internal/config/documented_test.go:44-45` — `if len(reads)
+A gate that iterates a collection counts what it examined and fails on
+zero. The form is `internal/config/documented_test.go:44-45` — `if len(reads)
 == 0 { t.Fatal("no settings were found in the source, so this checked
 nothing") }` — and its two-direction join is the standard: it reports both a
 setting documented and not read, and one read and not documented. Sixteen gates
@@ -536,7 +536,7 @@ exit code with the message thrown away. A gate reached only by running the
 program over the tree is the third of those — lift the detection into a
 function and give it one input that must be reported and one that must not.
 
-**A test named for an arm has an input that reaches only that arm**, and the
+A test named for an arm has an input that reaches only that arm, and the
 check is coverage of the named line rather than the test passing. Eighteen
 tests ran on a corpus that was a strict subset of the domain their own name
 described: the table wanted one direction of a comparison, so the three arms
@@ -545,8 +545,8 @@ of them; the only over-long name was rejected by an earlier rule. Each passed,
 and deleting the arm it named left the suite green. `go test -coverprofile`
 over the package under test carries the per-statement counts that answer it.
 
-**Two tests asserting the same property are redundant only when they take the
-same path through the code under test.** The check is a path argument, not a
+Two tests asserting the same property are redundant only when they take the
+same path through the code under test. The check is a path argument, not a
 comparison of assertion text. A whole-tree scan produced seventeen mechanical
 overlap clusters and every genuine one was refuted: the worked example is
 `web/src/ui/versions.test.ts:19` against `:31` over `versions.ts:19-21` — both
@@ -555,7 +555,7 @@ where the second returns on line 20 without it. The other shapes were the same
 behavior at two layers, and the same predicate over different input classes.
 Nothing was deleted.
 
-**The same test the other way round.** `:25` and `:31` also both return the
+The same test the other way round. `:25` and `:31` also both return the
 empty string, and they *are* the same path: a level of one and a level of none
 both leave the length test on line 19 with nothing, and neither reaches line
 21. Two assertions that read differently and execute identically is what this
@@ -563,12 +563,11 @@ rule says to look for.
 
 ## Commits and pull requests
 
-- **No `Co-Authored-By` trailers.** This project will use DCO, where the only
- trailer that carries meaning is `Signed-off-by`. A co-author trailer asserts
- authorship that nobody has signed for, and mixing the two makes the sign-off
- chain ambiguous. Tools that add one by default must be told not to.
+| | |
+|---|---|
+| No `Co-Authored-By` trailers | This project will use DCO, where the only trailer that carries meaning is `Signed-off-by`. A co-author trailer asserts authorship that nobody has signed for, and mixing the two makes the sign-off chain ambiguous. Tools that add one by default must be told not to |
 
- **This holds from the root commit.** It did not hold before: of the last four
+ This holds from the root commit. It did not hold before: of the last four
  hundred commits of the history this repository was imported from, seventy-nine
  carried a co-author trailer added by tooling that was not told not to, and
  thirteen carried one with no sign-off at all. That history was not brought
@@ -577,14 +576,14 @@ rule says to look for.
 - Explain **why** in the body. The diff already shows what.
 - Design document updates belong in the same commit as the behavior they
  describe.
-- **Every change reaches `main` through a pull request and the merge queue.**
+- Every change reaches `main` through a pull request and the merge queue.
  Nothing is pushed to `main` directly, including by an administrator.
-- **One check is required: `Merge Status`.** It is an aggregator — it waits for
+- One check is required: `Merge Status`. It is an aggregator — it waits for
  every other check on the commit to pass or be skipped, so a workflow added
  later gates a merge without anybody editing the ruleset. What that costs is
  stated where it is defined: a workflow contributing no check run on the event
- cannot be distinguished from one that has not started, so **every workflow
-   meant to gate a merge declares `merge_group:` alongside `pull_request:`**.
+ cannot be distinguished from one that has not started, so every workflow
+   meant to gate a merge declares `merge_group:` alongside `pull_request:`.
 
 ### Pull request descriptions
 
@@ -600,7 +599,7 @@ somebody working out later why the code looks like this. Both are in a hurry.
 | **A screenshot where the layout moved** | A reviewer cannot see a rearranged screen in a diff, and asking them to build the branch to find out is asking for a shallower review |
 | **What is left undone, said** | A branch that lands with something out of scope says so, rather than leaving the next person to discover it |
 
-**Nothing about how the change was produced.** No tool, no assistant, no
+Nothing about how the change was produced. No tool, no assistant, no
 session, no generated-by footer — not in the description, the title, the
 commits, the branch name, the code, or a review comment. It is the same rule as
 the co-author trailer above and for a stronger reason: the sign-off is a
@@ -609,25 +608,25 @@ otherwise contradicts the one trailer that carries meaning here.
 
 ### Development workflow
 
-**Commit and push as work lands. Never leave finished work sitting in a working
-tree.** A working tree is one disk, one machine and one accident away from
+Commit and push as work lands. Never leave finished work sitting in a working
+tree. A working tree is one disk, one machine and one accident away from
 being gone; a pushed commit is not. So a stretch of work ends with a commit
 and a push, and a long stretch is committed in purposeful pieces along the
 way — a decision recorded, a behavior built with its design document, a
 screen rebuilt — each with a body that says why.
 
-**Never force-push.** As long as history is only ever added to, everything is
+Never force-push. As long as history is only ever added to, everything is
 recoverable, and a mistake is fixed by a commit on top rather than by
 rewriting what somebody else may already have pulled.
 
-**Where it goes.** A branch, and a pull request from it. The work is pushed as
+Where it goes. A branch, and a pull request from it. The work is pushed as
 it lands and the pull request is where it is reviewed; the queue is what puts
 it on `main`. The gate runs before the push regardless of what CI will do
 afterwards: `make gate` for a commit, `make gate full` for a push carrying
 more than one. Waiting for CI to find what one command here finds in minutes
 is how a queue fills with entries that were never going to merge.
 
-**The history starts at the import.** What came before it was development
+The history starts at the import. What came before it was development
 against a single working copy, and it was not carried across — so `main` has
 one root commit and every commit after it arrived through a pull request. The
 reasoning that history would have held is not lost, because this project does
@@ -635,7 +634,7 @@ not keep it there: `REQUIREMENTS.md` holds every decision and the
 `DESIGN-*.md` documents hold how each area works, and `make unclaimed` fails
 when a requirement no document names.
 
-**Three steps of the gate pass only on a commit.** `openapi-current`,
+Three steps of the gate pass only on a commit. `openapi-current`,
 `web-api` and `reserved-current` each regenerate a file and diff it against the
 last commit, so on an uncommitted tree they report the file as stale.
 Regenerate, commit the generated file with the change that produced it, and
@@ -662,21 +661,21 @@ same command and the same pinned versions.
 | `make engines-down` | Removes them |
 | `make engines-status` | What is running, and which engines are unconfigured |
 
-**While working, run `make test`.** It is the SQLite-only, parallel, cached
+While working, run `make test`. It is the SQLite-only, parallel, cached
 run — a few seconds — and it is what to run after every change. It does not
 prove portability, and it says so: every server engine is reported as skipped
 by `OPENPSIRT_TEST_ENGINES`, which is a different message from an engine that
 is not configured.
 
-**Before committing, run `make gate`.** It reads what the working tree has
+Before committing, run `make gate`. It reads what the working tree has
 changed and runs the tier that change lands in, which is the whole gate for
 most commits and seconds for a prose edit. Not `make lint` and `make test`:
 those two pass on work that CI rejects, because the gate also runs
 `unreachable`, the OpenAPI drift check and the frontend, and because the quick
 loop drops the race detector and the three server engines.
 
-**At the end of a session, and before a push carrying accumulated work, run
-`make gate full`** — which is `make check && make check-engines`. A clean tree
+At the end of a session, and before a push carrying accumulated work, run
+`make gate full` — which is `make check && make check-engines`. A clean tree
 gets the same answer from `make gate`, because there is nothing there to choose
 from.
 
@@ -685,7 +684,7 @@ from.
 `DESIGN-build.md` holds the table; the point of the target is that nobody has
 to consult it. Two things about it are worth knowing here.
 
-**A change to documents alone is checked as documents**: the document tests and
+A change to documents alone is checked as documents: the document tests and
 `make unclaimed`, seconds rather than minutes. That covers both things a
 document can actually break — a link pointing at a heading that has been
 renamed, and a decision in force that no design document names. Nothing else in
@@ -694,7 +693,7 @@ engines ran, which a document cannot affect — it can only pass, and a check
 that can only pass is not evidence. Running it anyway is not caution; it is a
 habit that makes the gate look expensive and teaches people to skip it.
 
-**The generated files are not documents in this sense.**
+The generated files are not documents in this sense.
 `docs/reference/openapi.yaml` and the TypeScript client take the API tier, and
 their two steps only pass on a commit anyway. A design document updated
 alongside the behavior it describes is in a commit with code in it, which is
@@ -723,7 +722,7 @@ slip there is, and it used to report fully green.
 `make check` names the engines it did not test, rather than staying silent
 unless all three are missing.
 
-**What it does not cover.** It asserts three test functions in three packages,
+What it does not cover. It asserts three test functions in three packages,
 and that the committed reserved-word list is what the engines answer today. The
 rest of the suite runs against whatever is configured, so `check-engines`
 passing does not prove that every test ran on every engine — it proves the
@@ -744,7 +743,7 @@ makefile if present, so a machine is configured once instead of once per
 command. `make engines-down` removes them; `make engines-status` says what is
 running and which engines are unconfigured.
 
-**Do not set this up by hand, and do not write `local.mk` yourself.** A setup
+Do not set this up by hand, and do not write `local.mk` yourself. A setup
 document followed by hand is how three engines of four end up unconfigured
 while the suite reports green, which is the failure this whole area exists to
 prevent. If something about the arrangement needs to change, change the target
@@ -773,7 +772,7 @@ the file is not the run that uses it. Run `make engines-up` first, then
 
 Add it to `tables` in `internal/dbtest`, ahead of everything it points at.
 
-**Membership is enforced and the order is not.** A test in `internal/dbtest`
+Membership is enforced and the order is not. A test in `internal/dbtest`
 asks the migrated schema what tables it made and fails on a name in one list
 and not the other, in both directions — a table the migrations make and the
 list omits is never emptied between tests, and a name no migration makes is a
