@@ -252,6 +252,7 @@ behind every line of it.
 |---|---|
 | [What is built](built.md) | How far each area has actually got |
 | [Trying it](trying.md) | Standing one up to look at |
+| [Sending a build](pipeline.md) | What a pipeline does: declare, mint a key, post the inventory |
 | [Configuration](configuration.md) | Every setting, and what reads it |
 | [API reference](reference/api.md) | Every operation, generated from the server |
 | [Privileges](reference/privileges.md) | Which role reaches which endpoint |
