@@ -15,12 +15,12 @@ import (
 // An export writes every row even where its reader's own page is smaller than
 // the export's.
 //
-// The loop used to step by the page size and stop on a short page, which reads
-// that constant as the truth about a store's page. It is a guess: a reader
-// whose ceiling is lower answers with a short page every time, so the export
-// would stop after the first one — a file holding a fraction of the answer and
-// saying nothing, which is the failure the whole export path is written to
-// avoid. Watched failing before the loop was changed.
+// Stepping by the page size and stopping on a short page reads that constant
+// as the truth about a store's page. It is a guess: a reader whose ceiling is
+// lower answers with a short page every time, so the export stops after the
+// first one — a file holding a fraction of the answer and saying nothing,
+// which is the failure the whole export path is written to avoid. Watched
+// failing against the stepping loop.
 func TestAnExportWritesEveryRowWhateverTheReadersPageIs(t *testing.T) {
 	for _, readerPage := range []int{1, 3, exportPage - 1, exportPage, exportPage + 7} {
 		t.Run(fmt.Sprint(readerPage), func(t *testing.T) {
@@ -62,9 +62,9 @@ func TestAnExportWritesEveryRowWhateverTheReadersPageIs(t *testing.T) {
 // A streamed export writes every row too, and the walk's refusal reaches the
 // caller.
 //
-// The register streams rather than pages, because paging is what made it cost
-// 52 minutes. What must not change is the two things a file has to do: hold
-// every row, and say so when it does not.
+// The register streams rather than pages, because paging costs it 52 minutes.
+// Two things a file has to do either way: hold every row, and say so when it
+// does not.
 func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 	const rows = 250
 	out := Exporting{
@@ -142,13 +142,13 @@ func TestAnExportThatFailsPartwayStopsAndSaysSo(t *testing.T) {
 	}
 }
 
-// TestAnExportThatStopsEarlySaysSoInTheFile is the one thing the export path
-// exists to guarantee, written by no test until now.
+// TestAnExportThatStopsEarlySaysSoInTheFile pins the one thing the export path
+// exists to guarantee.
 //
 // A file that simply stops is a file somebody reads as complete. The status is
 // long gone by the time a page can fail — the headers went out with the first
-// byte — so saying it in the body is the only honest thing left, and it is the
-// half that had never run in either format.
+// byte — so saying it in the body is the only honest thing left, and nothing
+// else exercises that half in either format.
 func TestAnExportThatStopsEarlySaysSoInTheFile(t *testing.T) {
 	for _, c := range []struct {
 		format string

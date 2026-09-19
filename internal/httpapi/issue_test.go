@@ -59,8 +59,8 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 		}
 
 		// Nothing affected is an answer, and it is the one a customer inquiry
-		// asks for: "are you affected by this" could be answered yes and
-		// never no.
+		// asks for: the question of whether we are affected can otherwise be
+		// answered yes and never no.
 		//
 		// And the two ways of not being affected answer identically. Somebody
 		// who reaches no product, and somebody asking about an identifier

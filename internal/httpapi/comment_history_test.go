@@ -87,7 +87,7 @@ func TestWhatACommentSaidBeforeIsKept(t *testing.T) {
 		}
 
 		// Somebody who may not read what it is about is told nothing about
-		// what it used to say either.
+		// its earlier revisions either.
 		if got := asPerson(t, r, "nothing", http.MethodGet, at+"/history", ""); got.Code < 400 {
 			t.Errorf("somebody who reaches nothing read a comment's history: %d", got.Code)
 		}

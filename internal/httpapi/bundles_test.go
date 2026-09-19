@@ -489,7 +489,7 @@ func TestABuildHasOneCommitmentPerFold(t *testing.T) {
 		r.scannedSiblings(t)
 
 		// The two curl issues name different versions as their fix, which is
-		// what used to split the plan in two.
+		// what would split the plan in two if the version decided coverage.
 		if _, err := r.db.DB.NewUpdate().Table("finding").
 			Set("fixed_in = ?", "8.6.0-1").
 			Where(`vulnerability_id IN (SELECT id FROM "vulnerability" WHERE identifier = ?)`,

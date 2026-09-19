@@ -422,8 +422,8 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		Serial:        header.Serial,
 		BuiltAt:       header.BuiltAt,
 		ParserVersion: version.Get().Version,
-		// The credential that sent this. Recorded alongside the parser version so
-		// that "where did this data come from" has an answer.
+		// The credential that sent this, recorded alongside the parser
+		// version, so the provenance of the data has an answer.
 		Credential: subject.Identity,
 	}
 
@@ -881,8 +881,9 @@ func registerReceipts(api huma.API, in Ingest) {
 		}
 		out.Body.Total = total
 
-		// The tools those numbers were arrived at with. Read separately because it
-		// describes the build rather than any upload, and absent rather than
+		// The tools those numbers were arrived at with. Read separately
+		// because it describes the build rather than any upload, and absent
+		// rather than
 		// invented where nothing has finished running yet.
 		// Not for a credential that is only allowed to see its own uploads.
 		// This endpoint deliberately narrows receipts to what a key sent —

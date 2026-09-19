@@ -220,7 +220,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 			t.Fatal(err)
 		}
 
-		// **Everybody here is seeded with no display name**, which is a
+		// Everybody here is seeded with no display name, which is a
 		// degeneracy rather than a choice. access.Store.Names answers a
 		// display name where one is known and the identity otherwise, so with
 		// none set every read of a name in this package comes back as the
@@ -404,13 +404,14 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 		handler, api := httpapi.New(quiet, nil, httpapi.Ingest{
 			DB: db, Queue: queue.New(db, queue.DefaultOptions()), Files: files,
 			Access: access.NewResolver(rights, access.Trust{Header: testHeader, From: sources}),
-			// The identity this deployment publishes as, which is what an advisory
-			// and a VEX document need. Passed in, because the deployment that
-			// has not been told is a case of its own.
+			// The identity this deployment publishes as, which an advisory
+			// and a VEX document both need. Passed in, because the deployment
+			// that has not been told is a case of its own.
 			Publisher: as,
-			// The names this deployment calls its own, derived from the namespace
-			// it publishes under exactly as the binary derives it. Restated
-			// here it would be a second boundary that agreed until one moved.
+			// The names this deployment calls its own, derived from the
+			// namespace it publishes under exactly as the binary derives it.
+			// Restated here it is a second boundary that agrees until one
+			// moves.
 			Ours: currency.Ourselves(as.Namespace, nil),
 		})
 		fn(t, &reach{handler: handler, key: secret, revoked: revokedSecret,
@@ -444,7 +445,7 @@ func TestWhoMayReachWhat(t *testing.T) {
 			mineScans  = "/v1/products/mine/streams/master/variants/broadcom/scans"
 			theirFound = "/v1/products/theirs/findings?stream=master&variant=broadcom"
 			// The same list with the branch and the variant left
-			// at "all" . Widening the selection is exactly the
+			// at "all". Widening the selection is exactly the
 			// shape that leaves a check behind on the narrow path.
 			mineWhole  = "/v1/products/mine/findings"
 			theirWhole = "/v1/products/theirs/findings"
@@ -623,10 +624,10 @@ func TestWhoMayReachWhat(t *testing.T) {
 }
 
 func TestWhatSomebodyCannotSeeLooksExactlyLikeWhatIsNotThere(t *testing.T) {
-	// The whole of what makes a product invisible, in one property. If these two
-	// answers differ in any way — the code, the body, a header — then
-	// somebody holding one product can enumerate every other by guessing
-	// names and watching which guesses answer differently.
+	// The whole of what makes a product invisible, in one property. If these
+	// two answers differ in any way — the code, the body, a header — then
+	// somebody holding one product can enumerate every other by guessing names
+	// and watching which guesses answer differently.
 	eachReach(t, func(t *testing.T, r *reach) {
 		for _, pair := range [][2]string{
 			{"/v1/products/theirs/streams", "/v1/products/nosuch/streams"},
@@ -755,10 +756,9 @@ func TestScanningShowsOnlyTheBuildsTheAskerHolds(t *testing.T) {
 			t.Fatalf("a reader could not ask what has been scanned: %d", rec.Code)
 		}
 		body := rec.Body.String()
-		// Both directions. "Theirs is absent" is also what an endpoint that
-		// answers nothing to everybody looks like, and that endpoint would
-		// have passed this test for as long as the fixture built no builds at
-		// all — which it did.
+		// Both directions. "Theirs is absent" is also what an endpoint
+		// answering nothing to everybody looks like, and a fixture that builds
+		// no builds at all satisfies both.
 		if !contains(body, "mine") {
 			t.Errorf("the build they hold something on is missing: %s", body)
 		}
@@ -782,8 +782,8 @@ func contains(haystack, needle string) bool {
 func TestNothingButTheProbesAnswersWithoutACredential(t *testing.T) {
 	// Guarding one prefix leaves everything outside it open by default, and
 	// the framework registers routes of its own: the API document and the
-	// schemas it references were served to anybody who asked, including the
-	// running version that the endpoint reporting it is authenticated to
+	// schemas it references are served to anybody who asks, including the
+	// running version the endpoint reporting it is authenticated to
 	// withhold.
 	twoReach(t, func(t *testing.T, r *reach) {
 		for _, path := range []string{
@@ -819,13 +819,12 @@ func TestNothingButTheProbesAnswersWithoutACredential(t *testing.T) {
 			}
 		}
 
-		// And the subtree beneath it, which nothing exercised. What is down
-		// there redirects to a provider or refuses; what it must never do is
-		// answer 200 with anything in it, because a stranger is who reaches
-		// it. The design said "nothing under it reads anything", which was an
-		// absolute and was false — sign-in reads its own key, its own
-		// sessions and the account a first arrival needs — so what is asserted
-		// here is the part that is true and checkable: no domain data.
+		// And the subtree beneath it. What is down there redirects to a
+		// provider or refuses; what it must never do is answer 200 with
+		// anything in it, because a stranger is who reaches it. Sign-in reads
+		// its own key, its own sessions and the account a first arrival
+		// needs, so what is asserted here is the part that is checkable: no
+		// domain data.
 		for _, path := range []string{
 			"/v1/sign-in/",
 			"/v1/sign-in/stub",
@@ -937,13 +936,14 @@ func TestAMalformedCredentialIsRefused(t *testing.T) {
 // builds and puts a pipeline key at every operation declaring a scope that
 // excludes one.
 //
-// The declaration wrote a document and nothing else for this scope: nearly
-// every operation carrying it said "any recognized credential" and then refused
-// every credential that is not a person, so the generated reference, the
-// extension a client generator reads, and an access review all stated a rule
-// the code contradicted.
-// Two operations really do mean any credential — a key reads back the scans it
-// sent — which is why the word could not simply be redefined.
+// A declaration that writes a document and nothing else leaves this scope
+// unenforced: an operation carrying it says "any recognized credential" and
+// then refuses every credential that is not a person, so the generated
+// reference, the extension a client generator reads and an access review all
+// state a rule the code contradicts.
+//
+// Two operations do mean any credential — a key reads back the scans it sent —
+// which is why the word cannot simply be redefined.
 func TestWhatAnOperationSaysItNeedsIsWhatItEnforces(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		checked := 0
@@ -1070,9 +1070,8 @@ func TestRolesCannotBeBoundToGroupsNothingCanReport(t *testing.T) {
 // deriving is r with the role-assignment mode wired, answering group-bound or
 // direct.
 //
-// It is the one piece of an API's configuration that a running deployment
-// always sets and nothing here did, so the guard reading it short-circuited on
-// nil in every test and neither of its arms was ever executed.
+// A running deployment always sets it. Left nil, the guard reading it
+// short-circuits and neither of its arms is ever executed.
 func deriving(t *testing.T, r *reach, groups bool) *reach {
 	t.Helper()
 	files, err := attach.NewFiles(t.TempDir())

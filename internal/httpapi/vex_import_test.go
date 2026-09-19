@@ -391,10 +391,10 @@ func TestAnUploadLeavesNothingBehindOnDisk(t *testing.T) {
 
 // The document is read as a stream, and the digest still covers all of it.
 //
-// It used to be held whole and then copied to parse from — about two and a
-// half times the byte limit, against a container that ships with less than
-// that, so importing a large vendor document killed the process instead of
-// answering. Streaming it puts the digest on the way past, and a digest over
+// Held whole and then copied to parse from, it costs about two and a half
+// times the byte limit against a container that ships with less than that, so
+// importing a large vendor document kills the process instead of answering.
+// Streaming it puts the digest on the way past, and a digest over
 // part of a document is worse than none: it is what says whether a publisher
 // has revised what they said, so two different documents hashing alike would
 // leave a decision citing evidence that has since changed.

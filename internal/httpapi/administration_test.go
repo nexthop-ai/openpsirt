@@ -94,9 +94,9 @@ func TestGrantingARoleDoesNotAskWhetherItWorks(t *testing.T) {
 				recorded.Code, recorded.Body.String())
 		}
 
-		// And the reply describes the record. It used to be the request handed
-		// back, so whatever the caller said about a grant came back as though
-		// the deployment had confirmed it.
+		// And the reply describes the record rather than the request. Handed
+		// the request back, whatever the caller says about a grant comes back
+		// as though the deployment had confirmed it.
 		var made struct {
 			Item struct {
 				Holds []struct {

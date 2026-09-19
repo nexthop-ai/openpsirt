@@ -268,8 +268,8 @@ func TestTheSameFileSentAgainReportsSuccess(t *testing.T) {
 }
 
 // A second suppression document, differing from the first in the issue it
-// argues about. What a build changes between two uploads of one inventory is
-// its judgment about itself.
+// argues about. Between two uploads of one inventory, a build's judgment about
+// itself is what changes.
 const secondSuppression = `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": "urn:y", "version": 1,
  "statements": [{"vulnerability": {"name": "CVE-2026-2"}, "status": "not_affected",
  "products": [{"@id": "pkg:deb/debian/libc6"}]}]}`
@@ -277,9 +277,9 @@ const secondSuppression = `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": 
 func TestAnUnchangedInventoryWithChangedJudgmentsIsTaken(t *testing.T) {
 	// A build whose contents have not moved and which has since worked out
 	// that three issues do not apply to it re-sends the same inventory with
-	// different claims beside it. Hashing the inventory alone answered 200
-	// and dropped the claims, so the findings the build had already answered
-	// stayed open behind a success.
+	// different claims beside it. Hashing the inventory alone answers 200 and
+	// drops the claims, so the findings the build has already answered stay
+	// open behind a success.
 	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
 		built := nowish()
 		body := inventory(built, "libc6")

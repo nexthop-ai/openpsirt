@@ -498,10 +498,10 @@ func TestAnExportedFilenameCannotEndTheHeader(t *testing.T) {
 
 func TestTheCrossProductExportCarriesTheProductAndTheVisibility(t *testing.T) {
 	// The cross-product list is the screen somebody reporting upward is on,
-	// and it was the one list whose answer could not leave the application:
-	// every export was a product's own route. What this pins is that the file
-	// is the same query with the same subject — the product as a column, and
-	// an undisclosed finding absent for somebody who may not read it.
+	// and with every export a product's own route it is the one list whose
+	// answer cannot leave the application. This pins the file as the same
+	// query with the same subject — the product as a column, and an
+	// undisclosed finding absent for somebody who may not read it.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		if _, err := r.db.DB.NewUpdate().Table("finding").
@@ -689,9 +689,9 @@ func TestCoverageStatesTheThresholdItsQuietColumnWasComputedAgainst(t *testing.T
 }
 
 func TestAFileWithNothingToStateStatesNothing(t *testing.T) {
-	// The record has no severity line and never had one. It used to answer
-	// with an empty "triaged_at_or_above", which is a key about findings on a
-	// file about judgments — worse than silence, because somebody reads it.
+	// The record has no severity line. An empty "triaged_at_or_above" is a key
+	// about findings on a file about judgments — worse than silence, because
+	// somebody reads it.
 	twoReach(t, func(t *testing.T, r *reach) {
 		got := asPerson(t, r, "private-triage", http.MethodGet, "/v1/audit.json", "")
 		if got.Code != http.StatusOK {

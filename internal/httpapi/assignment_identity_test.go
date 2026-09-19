@@ -7,11 +7,11 @@ import (
 )
 
 func TestNoRouteSaysWhetherAnIdentityHasAnAccount(t *testing.T) {
-	// walked rather than spot-checked. The rule had been applied to the
-	// assignment writes and to handing work back, and missed on the read
-	// beside them — the third time the same shape had been found. So this
-	// asserts the invariant across every route carrying an {identity}, and
-	// a route added later is caught by being added to this table.
+	// walked rather than spot-checked. Applied to the assignment writes and
+	// to handing work back, the rule is missed on the read beside them, which
+	// is the same shape a third time. So this asserts the invariant across
+	// every route carrying an {identity}, and a route added later is caught
+	// by being added to this table.
 	//
 	// Two ways to satisfy it. A route open to any credential answers a
 	// name nobody holds exactly as it answers a name somebody holds whose

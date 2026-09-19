@@ -640,10 +640,10 @@ func (r *reach) scannedShared(t *testing.T) {
 }
 
 func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
-	// A library at two places with two issues used to read four under every
-	// parent, because a finding is one issue at one place. Somebody who
-	// drilled down one path is looking at one place and expects two — and
-	// the list the number opens has to show the same.
+	// A library at two places with two issues reads four under every parent
+	// where the count is per finding, because a finding is one issue at one
+	// place. Somebody who drilled down one path is looking at one place and
+	// expects two — and the list the number opens has to show the same.
 	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedShared(t)
 		const build = "/v1/products/mine/streams/master/variants/broadcom"
@@ -1106,9 +1106,9 @@ func TestAJudgmentAboutTheSameCodeInAnotherProductIsOffered(t *testing.T) {
 	// in it, deliberately, so that a place is recognized across variants. The
 	// same key recognizes it across products — two products shipping the same
 	// library under the same consumer are the same code in the same position —
-	// and nothing offered a team the judgment another team had already made
-	// about it. Deciding it again from scratch is the work the grouping exists
-	// to avoid.
+	// and without it no team is offered the judgment another team has already
+	// made about it. Deciding it again from scratch is the work the grouping
+	// exists to avoid.
 	eachReach(t, func(t *testing.T, r *reach) {
 		ctx := t.Context()
 		r.scanned(t)

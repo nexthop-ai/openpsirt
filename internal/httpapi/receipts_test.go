@@ -210,8 +210,8 @@ func TestAReceiptSaysWhatArrivedAfterTheContentsAreGone(t *testing.T) {
 	//
 	// The hash is the point. A re-parse means asking the build to send the
 	// file again, and without something to compare against the second copy
-	// is taken on trust — so a receipt that forgot what it had read left
-	// the producer no way to prove it was sending back the same file.
+	// is taken on trust — so a receipt that does not record what it read
+	// leaves the producer no way to prove they are sending the same file.
 	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
 		if code, _ := f.send(t, upload(t, f.path,
 			inventory(nowish(), "libc6"), suppression, suppression)); code != http.StatusAccepted {

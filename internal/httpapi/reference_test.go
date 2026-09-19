@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// namesADecision matches a decision identifier, which belongs in REQUIREMENTS.md
-// and the design documents and nowhere a client reads.
+// namesADecision matches a decision identifier, which belongs in
+// REQUIREMENTS.md and the design documents and nowhere a client reads.
 //
 // Any three or four capitals and a number, rather than a list of prefixes.
 // The list named eighteen, not one of which appears anywhere in this
@@ -49,12 +49,12 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 	// obvious. The reasoning belongs in REQUIREMENTS.md — somebody reading this
 	// is trying to make a request work.
 	//
-	// **What this can check is the half that is mechanical.** Whether a
-	// paragraph is an explanation of the design or a thing a caller has to
-	// know is a person's judgment and stays one; two summaries reproduced
-	// AGENTS.md's own counter-examples verbatim, and one description cited a
-	// decision identifier into a document published to people who have no way
-	// to look it up. Those are checkable, and this checks them.
+	// The mechanical half is what this checks. Whether a paragraph is an
+	// explanation of the design or a thing a caller has to know is a person's
+	// judgment and stays one; a summary reproducing AGENTS.md's own
+	// counter-examples verbatim, and a description citing a decision
+	// identifier into a document published to people who have no way to look
+	// it up, are checkable.
 	twoReach(t, func(t *testing.T, r *reach) {
 		var checked int
 		for path, item := range r.api.OpenAPI().Paths {
@@ -100,9 +100,9 @@ func TestEveryOperationReadsAsReferenceDocumentation(t *testing.T) {
 //
 // A description lives in a struct tag, which has to be a literal, so a field
 // two bodies both carry is written out twice with nothing holding the two
-// equal. They had already drifted: the person screen's body and the
-// administration body described `sees_nothing` differently, and the published
-// reference carried the wrong one of the two for as long as it stood.
+// equal. Left to drift, the person screen's body and the administration body
+// describe `sees_nothing` differently, and the published reference carries
+// whichever of the two was registered first.
 //
 // Named fields rather than every repeated name: plenty of names mean different
 // things in different bodies — "places" is what a claim wrote in one and what
