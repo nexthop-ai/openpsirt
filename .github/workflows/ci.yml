@@ -104,7 +104,29 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
+          # The module cache. Its key is the checksum file, which is what that
+          # cache is about, and the build cache below is keyed separately
+          # because it is about something else.
           cache: true
+      # The build cache, kept current.
+      #
+      # setup-go stores the build cache under the same key as the modules —
+      # the checksum file — and a cache is written only when its key is new.
+      # So what a run restores is the compilation of whatever the tree looked
+      # like the last time a dependency moved, and everything changed since is
+      # compiled again. It is the largest block in this job that is not a test.
+      #
+      # Written on main and read everywhere. A branch restores what the last
+      # merge left, which is at most one merge stale, and writing from every
+      # branch would churn a shared ten gigabytes for entries nothing reads
+      # twice. Go's build cache is content-addressed, so a stale entry is
+      # ignored rather than used: the failure mode is a slow run, never a
+      # wrong one.
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: go-build-${{ runner.os }}-
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           # The version the image builds the interface with. "make check" runs
@@ -135,6 +157,14 @@ jobs:
         # known vulnerabilities, dependency licenses, the OpenAPI document
         # being current, the bill of materials, and the interface.
         run: make check
+
+      # Written here rather than beside the restore, so what is stored is the
+      # compilation this job did rather than what it started with.
+      - uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ github.run_id }}
 
       - name: Confirm every engine ran, and that each was the engine it claimed
         # A skipped engine passes silently, which would make the matrix

@@ -97,7 +97,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make gate` | The checks this change has to pass, chosen from what it touches |
 | `make gate full` | All of them, whatever the change touches |
 | `make test` | SQLite only, packages in parallel, cached. Seconds |
-| `make test-all` | Every configured engine, nothing cached: the two runs below |
+| `make test-all` | Every configured engine, nothing cached: the two runs below, at once |
 | `make test-race` | SQLite with the race detector, tests within a package beside each other |
 | `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
@@ -340,6 +340,19 @@ SQLite spends and almost none of what a server engine does.
 
 The detector is a property of the binary and cannot be turned on for one
 subtest, so `test-all` is two runs: SQLite with it, the three servers without.
+
+The two run at once. They share no engine, so neither can see the other's rows,
+and they are bottlenecked on different things — the detector is in-process work
+and the server pass spends its time waiting on a socket — so each fills what the
+other leaves idle. Each takes half the cores, so the number of test binaries
+alive at once is what a single pass has, and the peak memory falls rather than
+rises: 119 s and 3.4 GB run one after another, 100 s and 1.5 GB run together,
+on twelve cores with everything warm.
+
+Each pass writes to its own file and both are printed when they finish.
+Interleaved, two runs of fifty packages are two answers to "did it pass" with no
+way to tell which said what. A failure in either fails the target, which is
+checked by breaking one pass at a time and watching it go red.
 
 `OPENPSIRT_TEST_ENGINES` narrows which engines a run touches, and `test` and
 `test-race` both set it to `sqlite`. The pool's idle reaper, the migration lock
