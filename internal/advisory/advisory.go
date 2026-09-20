@@ -74,8 +74,11 @@ var ErrNoSuchIssue = errors.New("this product holds no issue by that name")
 type Document struct {
 	Document    Meta        `json:"document"`
 	ProductTree ProductTree `json:"product_tree"`
-	// Vulnerabilities holds one entry. An advisory aggregates a product
-	// and a version range rather than a path, and this is about one flaw.
+	// Vulnerabilities holds one entry per issue the advisory covers, which
+	// is what lets several flaws released together be one document on one
+	// date. Each aggregates to a product and a version range rather than to
+	// a path: a reader is asking whether they are affected, and the answer
+	// is a release.
 	Vulnerabilities []Vulnerability `json:"vulnerabilities"`
 }
 

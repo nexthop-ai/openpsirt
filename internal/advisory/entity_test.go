@@ -328,3 +328,86 @@ func TestAnIssuanceIsOneRecordForADocumentCoveringTwoFlaws(t *testing.T) {
 		}
 	})
 }
+
+func TestOneAdvisoryCoversFlawsInTwoProductsAndNamesEachProductsReleases(t *testing.T) {
+	// The half of the decision that reversed it. Keyed on a product and an
+	// issue, an advisory about two products could not exist — and a vendor
+	// releasing one fix across two products writes one document about it.
+	each(t, func(t *testing.T, f *fixture) {
+		here := f.recorded(t, f.master)
+		there := f.recorded(t, f.other)
+		named := f.covering(t,
+			[2]string{"sonic", here}, [2]string{"switchd", there})
+
+		doc, err := f.store.ForAdvisory(t.Context(), f.who, issuer, named)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		if len(doc.Vulnerabilities) != 2 {
+			t.Fatalf("the document carries %d vulnerabilities", len(doc.Vulnerabilities))
+		}
+		// One vendor, two products under it. The vendor is the publisher and
+		// does not repeat; the products do.
+		if len(doc.ProductTree.Branches) != 1 {
+			t.Fatalf("the tree carries %d vendors", len(doc.ProductTree.Branches))
+		}
+		products := doc.ProductTree.Branches[0].Branches
+		if len(products) != 2 {
+			t.Fatalf("the tree names %d products, want both: %+v", len(products), products)
+		}
+		// Each status names releases of the product its issue was covered in
+		// and of no other, which is what the pair is for: a status about a
+		// release of the wrong product is a claim about a build nobody made.
+		under := map[string]string{}
+		for _, product := range products {
+			for _, release := range product.Branches {
+				under[release.Product.ID] = product.Name
+			}
+		}
+		for at, want := range []string{"Hardware Platform Images", "Switch Daemon"} {
+			named := doc.Vulnerabilities[at].Status.KnownAffected
+			if len(named) == 0 {
+				t.Fatalf("entry %d names no affected release", at)
+			}
+			for _, id := range named {
+				if under[id] != want {
+					t.Errorf("entry %d names %q, which the tree puts under %q, want %q",
+						at, id, under[id], want)
+				}
+			}
+		}
+	})
+}
+
+func TestAnAdvisorySpanningTwoProductsIsHiddenFromSomebodyHoldingOne(t *testing.T) {
+	// Whole or not at all, in the case that makes it matter: a reader
+	// holding one of the two products would otherwise be handed a document
+	// that reads as a complete statement about a product it never mentions.
+	each(t, func(t *testing.T, f *fixture) {
+		here := f.recorded(t, f.master)
+		there := f.recorded(t, f.other)
+		both := f.covering(t, [2]string{"sonic", here}, [2]string{"switchd", there})
+		one := f.covering(t, [2]string{"sonic", here})
+
+		// Somebody holding the first product and nothing on the second.
+		partly := access.NewPerson(f.who.ID+2, "partly", false, map[int64][]access.Role{
+			f.product: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+		}, 0)
+		if _, err := f.store.ForAdvisory(t.Context(), partly, issuer, both); !errors.Is(
+			err, advisory.ErrNoSuchAdvisory) {
+			t.Errorf("a document about a product they hold nothing on was generated: %v", err)
+		}
+		// And the one they can see the whole of still answers, so the rule is
+		// a narrowing rather than a wall.
+		if _, err := f.store.ForAdvisory(t.Context(), partly, issuer, one); err != nil {
+			t.Errorf("an advisory wholly within what they hold was refused: %v", err)
+		}
+		rows, total, err := f.store.List(t.Context(), partly, advisory.Covering{}, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || len(rows) != 1 || rows[0].Identifier != one {
+			t.Errorf("%d of %d advisories were listed, want only %s", len(rows), total, one)
+		}
+	})
+}

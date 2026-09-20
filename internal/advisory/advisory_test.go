@@ -41,9 +41,15 @@ type fixture struct {
 	// once. With one fixed release, "all of them, in the order the tree names
 	// them" passes just as well as "the first" or "the last".
 	older int64
-	who   access.Subject
-	seq   int
-	built time.Time
+	// A second product, and a build of it. One advisory covering flaws in two
+	// products is the half of the decision that reversed it, and with one
+	// product a document that named every product once and one that named
+	// the only product it had would read alike.
+	otherProduct int64
+	other        int64
+	who          access.Subject
+	seq          int
+	built        time.Time
 }
 
 // document generates the advisory for one issue in one product, through an
@@ -96,19 +102,28 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		tagged := w.TargetFor(w.Tag, w.Customer)
 		earlier := w.DeclareStream(w.Product, "v2.3.9", catalog.Tag, &w.Branch.ID)
 		older := w.TargetFor(earlier, w.Customer)
+		// A second product with a branch and a build, so an advisory can span
+		// two.
+		second := w.DeclareProduct("switchd", "Switch Daemon")
+		secondBranch := w.DeclareStream(second, "main", catalog.Branch, nil)
+		secondVariant := w.DeclareVariant(second, "mellanox", true)
+		secondTarget := w.TargetFor(secondBranch, secondVariant)
 		f := &fixture{
 			db: w.DB, store: advisory.NewStore(w.DB.DB), finds: finding.NewStore(w.DB.DB),
 			graph: graph.NewStore(w.DB.DB), scans: ingest.NewStore(w.DB.DB),
 			product: w.Product.ID, master: w.Target.ID, tagged: tagged.ID,
-			older: older.ID,
+			older:        older.ID,
+			otherProduct: second.ID, other: secondTarget.ID,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
 				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				second.ID:    {access.PublicRead, access.PrivateRead, access.PrivateTriage},
 			}, 0),
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		}
 		f.shipped(t, f.master)
 		f.shipped(t, f.tagged)
 		f.shipped(t, f.older)
+		f.shipped(t, f.other)
 		fn(t, f)
 	})
 }
