@@ -1275,9 +1275,11 @@ and a link.</p>
 <p>On the Helm chart these are the <code>mail</code> values, and the password goes in a
 Secret the chart makes or one you name.</p>
 <h2 id="advisory-publication">Advisory publication<a class="headerlink" href="#advisory-publication" title="Permanent link">&para;</a></h2>
-<p>An advisory is a document about a flaw in your own product. It is generated
-from what this deployment already holds and handed to you; nothing is sent
-anywhere, and nothing records that you published it.</p>
+<p>An advisory is a document about flaws in your own products, under an
+identifier this deployment mints. It is generated from what the deployment
+already holds and handed to you; nothing is sent anywhere. That you published
+it is recorded when you say so, which is what lets the next document be a
+revision.</p>
 <p>Both a name and a namespace are needed for either to do anything. A CSAF
 document requires a publisher, so with one missing no advisory is generated and
 the refusal says which — rather than handing you a document that fails
@@ -1305,6 +1307,11 @@ validation after you have sent it.</p>
 <td><code>OPENPSIRT_PUBLISHER_CATEGORY</code></td>
 <td>What the standard calls the kind of publisher: <code>coordinator</code>, <code>discoverer</code>, <code>other</code>, <code>translator</code>, <code>user</code> or <code>vendor</code>. A deployment publishing about its own product is a vendor. Anything else is refused at startup — the value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them</td>
 <td><code>vendor</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ADVISORY_PREFIX</code></td>
+<td>What a minted advisory identifier opens with, before the year and a number within it — the half a reader recognizes the publisher by. A letter followed by up to nineteen letters, digits or hyphens, upper case; anything else is refused at startup. Unset, no advisory can be started and the refusal says so: an identifier traceable to no publisher is in every document that went out, where a refusal is fixed once</td>
+<td>unset</td>
 </tr>
 </tbody>
 </table>
