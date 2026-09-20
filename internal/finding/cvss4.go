@@ -141,24 +141,24 @@ var spans = map[int][]string{
 // The worst vector in each class, which is what a member's distance is
 // measured from.
 //
+// Only the classes that have a step below them, for the same reason the
+// reaches are: a class at its lowest contributes no distance, so the vector
+// its members would be measured against is never measured against.
+//
 // The scheme lists several worst members for some classes — reachable over the
-// network with no privileges is as bad as adjacent with low privileges. Every
-// member of a class that has a step below it sits at the same total distance
-// from the class floor, so the first is taken and the rest are there to be
-// checked against it. A class with nothing below it contributes no distance at
-// all, and its members do not have to agree.
+// network with no privileges is as bad as adjacent with low privileges. They
+// sit at the same total distance from the class floor, so the first is taken
+// and the rest are there to be checked against it.
 var worstFour = map[int]map[int][]string{
-	1: {0: {"AV:N/PR:N/UI:N"}, 1: {"AV:A/PR:N/UI:N", "AV:N/PR:L/UI:N", "AV:N/PR:N/UI:P"},
-		2: {"AV:P/PR:N/UI:N", "AV:A/PR:L/UI:P"}},
-	2: {0: {"AC:L/AT:N"}, 1: {"AC:H/AT:N", "AC:L/AT:P"}},
-	4: {1: {"SC:H/SI:H/SA:H"}, 2: {"SC:L/SI:L/SA:L"}},
+	1: {0: {"AV:N/PR:N/UI:N"}, 1: {"AV:A/PR:N/UI:N", "AV:N/PR:L/UI:N", "AV:N/PR:N/UI:P"}},
+	2: {0: {"AC:L/AT:N"}},
+	4: {1: {"SC:H/SI:H/SA:H"}},
 }
 
 // worstThreeSix is the same for the pair of classes that move together.
 var worstThreeSix = map[int]map[int][]string{
 	0: {0: {"VC:H/VI:H/VA:H"}},
 	1: {0: {"VC:L/VI:H/VA:H", "VC:H/VI:L/VA:H"}},
-	2: {1: {"VC:L/VI:L/VA:L"}},
 }
 
 // scoreFour works out a version 4.0 base vector.
@@ -248,7 +248,6 @@ func classesOf(given map[string]string) eqs {
 func macroScore(given map[string]string) float64 {
 	e := classesOf(given)
 	value := macroScores[e.key()]
-	worst := worstOf(e)
 
 	// Class five never separates two base vectors: nothing states
 	// exploitation, so every base vector sits at the top of it. It still
@@ -274,7 +273,7 @@ func macroScore(given map[string]string) float64 {
 		}
 		// The scale is in tenths, which is what turns a reach into a length.
 		total += (value - below) *
-			(away(given, worst, spans[class]...) / (float64(reachOf(e, class)) * 0.1))
+			(away(given, worstIn(e, class), spans[class]...) / (float64(reachOf(e, class)) * 0.1))
 	}
 	if counted > 0 {
 		value -= total / float64(counted)
@@ -282,10 +281,12 @@ func macroScore(given map[string]string) float64 {
 	return math.Round(math.Min(math.Max(value, 0), 10)*10) / 10
 }
 
-// worstOf is the worst vector in the class a vector falls in.
-func worstOf(e eqs) map[string]string {
-	return stateOf(worstFour[1][e[0]][0] + "/" + worstFour[2][e[1]][0] + "/" +
-		worstThreeSix[e[2]][e[5]][0] + "/" + worstFour[4][e[3]][0])
+// worstIn is the worst vector of one class of one vector.
+func worstIn(e eqs, class int) map[string]string {
+	if class == threeSix {
+		return stateOf(worstThreeSix[e[2]][e[5]][0])
+	}
+	return stateOf(worstFour[class][e[class-1]][0])
 }
 
 // stateOf reads the metrics a fragment of a vector names.

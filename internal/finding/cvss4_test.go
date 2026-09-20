@@ -122,12 +122,13 @@ func TestTheClassScoresAreTheOnesABaseVectorReaches(t *testing.T) {
 	}
 }
 
-func TestTheReachesAreTheOnesAClassWithAStepBelowItNeeds(t *testing.T) {
-	// A reach is the divisor that turns a vector's distance into a
-	// proportion, and it is only ever divided by where the class has a step
-	// below it to move toward. Both directions: a class that needs one and
-	// has none divides by zero, and one carried for a class that never needs
-	// it is a transcribed number nothing would find wrong.
+func TestTheClassTablesCarryOnlyWhatAStepBelowNeeds(t *testing.T) {
+	// A reach and a worst vector are both read only where the class has a
+	// step below it to move toward: a class at its lowest contributes no
+	// distance, so neither is ever divided by or measured against. Both
+	// directions — a class that needs one and has none, and one carried for a
+	// class that never needs it, which is a transcribed value nothing would
+	// find wrong.
 	needed := map[[2]int]bool{}
 	walked := 0
 	baseFours(func(given map[string]string, _ string) {
@@ -142,25 +143,47 @@ func TestTheReachesAreTheOnesAClassWithAStepBelowItNeeds(t *testing.T) {
 				t.Fatalf("class %s divides its distance for step %d by nothing",
 					e.key(), class)
 			}
+			if len(worstIn(e, class)) == 0 {
+				t.Fatalf("class %s measures its distance for step %d against nothing",
+					e.key(), class)
+			}
 		}
 	})
 	if walked == 0 {
 		t.Fatal("no base vectors were walked, so this checked nothing")
 	}
+	carried := map[[2]int]bool{}
 	for class, byValue := range reachFour {
 		for held := range byValue {
-			if !needed[[2]int{class, held}] {
-				t.Errorf("a reach is carried for step %d at %d and nothing needs it",
-					class, held)
-			}
+			carried[[2]int{class, held}] = true
+		}
+	}
+	for class, byValue := range worstFour {
+		for held := range byValue {
+			carried[[2]int{class, held}] = true
 		}
 	}
 	for three, by := range reachThreeSix {
 		for six := range by {
-			if !needed[[2]int{threeSix, three*10 + six}] {
-				t.Errorf("a reach is carried for the pair %d and %d and nothing needs it",
-					three, six)
-			}
+			carried[[2]int{threeSix, three*10 + six}] = true
+		}
+	}
+	for three, by := range worstThreeSix {
+		for six := range by {
+			carried[[2]int{threeSix, three*10 + six}] = true
+		}
+	}
+	if len(carried) == 0 {
+		t.Fatal("the tables carry nothing, so this checked nothing")
+	}
+	for held := range carried {
+		if !needed[held] {
+			t.Errorf("step %d at %d is carried and nothing needs it", held[0], held[1])
+		}
+	}
+	for held := range needed {
+		if !carried[held] {
+			t.Errorf("step %d at %d is needed and nothing carries it", held[0], held[1])
 		}
 	}
 }
