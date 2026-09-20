@@ -173,8 +173,8 @@ func (f *fixture) recorded(t *testing.T, target int64) string {
 	return f.recordedAs(t, target)
 }
 
-// recordedAs is the same, classified as these kinds of flaw, the root cause
-// first.
+// disclosed is the same, already announced — so nothing but the product rules
+// it out of a read.
 func (f *fixture) disclosed(t *testing.T, target int64) string {
 	t.Helper()
 	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
@@ -188,6 +188,8 @@ func (f *fixture) disclosed(t *testing.T, target int64) string {
 	return identifier
 }
 
+// recordedAs is recorded, classified as these kinds of flaw, the root cause
+// first.
 func (f *fixture) recordedAs(t *testing.T, target int64, weaknesses ...string) string {
 	t.Helper()
 	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
