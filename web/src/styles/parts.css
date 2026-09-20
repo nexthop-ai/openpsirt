@@ -14,16 +14,16 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: 13px 15px;
-  box-shadow: var(--shadow);
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: var(--gap-hair);
+  gap: var(--gap-tight);
   cursor: pointer;
   text-align: left;
 }
 .kpi:hover {
-  border-color: var(--accent-line);
+  border-color: var(--line-strong);
+  background: var(--raised);
 }
 /* A figure is drawn as a button where it acts and as a link where it opens a
    list. Both are the same card, and a link brings its own color and underline
@@ -34,11 +34,9 @@ a.kpi:hover {
   text-decoration: none;
 }
 .kpi .l {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
-  font-weight: 600;
+  font-size: var(--step--1);
+  color: var(--muted);
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: var(--gap-tight);
@@ -50,15 +48,15 @@ a.kpi:hover {
   display: inline-block;
 }
 .kpi .n {
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
 .kpi .d {
-  font-size: var(--step--1);
-  color: var(--muted);
+  font-size: 12px;
+  color: var(--faint);
 }
 .kpi .d.bad {
   color: var(--sev-critical);
@@ -79,7 +77,6 @@ a.kpi:hover {
   border-radius: var(--radius-lg);
   background: var(--surface);
   padding: 16px;
-  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   gap: var(--gap-loose);
@@ -99,14 +96,13 @@ a.kpi:hover {
 }
 .panel h3 {
   margin: 0;
-  font-size: var(--step-1);
-  letter-spacing: -0.01em;
+  font-size: 14px;
   font-weight: 600;
 }
 .panel .tally {
   margin-left: auto;
-  font-size: var(--step-2);
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
@@ -171,15 +167,13 @@ a.kpi:hover {
   border-radius: var(--radius-lg);
   background: var(--surface);
   padding: 16px;
-  box-shadow: var(--shadow);
 }
 .card + .card {
   margin-top: 14px;
 }
 .card > h3 {
   margin: 0 0 10px;
-  font-size: var(--step-1);
-  letter-spacing: -0.01em;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -257,20 +251,19 @@ a.kpi:hover {
 
 /* ---------- severity, state, tags ---------- */
 
+/* A dot and a word, with no fill behind them. The band's color is carried by
+   both, and a tinted pill on every row of a fifty-row list is fifty patches
+   of color competing with the one column that is read first. */
 .sev {
   --c: var(--muted);
   display: inline-flex;
   align-items: center;
   gap: var(--gap-tight);
-  font-weight: 600;
-  font-size: 11.5px;
+  font-weight: 500;
+  font-size: 12px;
   line-height: 1.6;
-  padding: 1px 9px 1px 7px;
-  border-radius: var(--pill);
   color: var(--c);
-  background: color-mix(in oklab, var(--c) 12%, transparent);
   white-space: nowrap;
-  letter-spacing: 0.005em;
 }
 .sev::before {
   content: "";
@@ -324,10 +317,10 @@ a.kpi:hover {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 1px 8px;
-  border-radius: var(--pill);
+  padding: 1px 6px;
+  border-radius: 4px;
   white-space: nowrap;
   --c: var(--muted);
   color: var(--c);
@@ -372,7 +365,7 @@ a.kpi:hover {
   gap: var(--gap-tight);
   font-size: 11.5px;
   padding: 1px 8px;
-  border-radius: var(--pill);
+  border-radius: 4px;
   white-space: nowrap;
   --c: var(--muted);
   color: var(--c);
@@ -686,7 +679,7 @@ tr.row.on > td {
 .vchip {
   font-size: 10.5px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--pill);
+  border-radius: 4px;
   padding: 0 7px;
   color: var(--muted);
   white-space: nowrap;
@@ -776,7 +769,7 @@ button.vchip {
   align-items: center;
   padding: 2px 7px;
   border: 1px solid var(--line);
-  border-radius: var(--pill);
+  border-radius: 4px;
   font-size: var(--step--1);
   color: var(--muted);
   white-space: nowrap;
@@ -795,29 +788,31 @@ button.vchip {
   align-items: center;
   margin-bottom: 12px;
 }
+/* A chip that is on is drawn in ink rather than in the accent. The accent is
+   for what opens something; a filter in force is a state, and the two must
+   not read alike on a toolbar that holds both. */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: var(--gap-tight);
-  padding: 5px 11px;
+  padding: 4px 10px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
-  border-radius: var(--pill);
+  border-radius: var(--radius);
   font-size: var(--step--1);
   cursor: pointer;
-  color: var(--muted);
+  color: var(--ink);
   white-space: nowrap;
   font-family: inherit;
 }
 .chip:hover {
-  border-color: var(--accent-line);
-  color: var(--ink);
+  border-color: var(--faint);
 }
 .chip[aria-pressed="true"] {
-  background: var(--accent-soft);
-  border-color: var(--accent-line);
-  color: var(--accent);
-  font-weight: 600;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--canvas);
+  font-weight: 500;
 }
 /* The same strength a disabled button gets, because it is the same meaning.
    At 0.45 a muted label composited to about 2.2:1 against white, below the
@@ -849,7 +844,7 @@ button.vchip {
   font: inherit;
   padding: 4px 8px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--pill);
+  border-radius: var(--radius);
   background: var(--surface);
   color: var(--ink);
 }
@@ -862,7 +857,7 @@ button.vchip {
 .seg {
   display: inline-flex;
   border: 1px solid var(--line-strong);
-  border-radius: var(--pill);
+  border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface);
 }
@@ -879,9 +874,9 @@ button.vchip {
   border-left: 1px solid var(--line-strong);
 }
 .seg button[aria-pressed="true"] {
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
+  background: var(--ink);
+  color: var(--canvas);
+  font-weight: 500;
 }
 /* What switching to that view would show. Quieter than the label, because the
    label is what is being chosen and the number is why. */
@@ -892,7 +887,8 @@ button.vchip {
   color: var(--faint);
 }
 .seg button[aria-pressed="true"] .n {
-  color: var(--accent);
+  color: inherit;
+  opacity: 0.7;
 }
 /* A list being re-read is still the list. It dims rather than being replaced,
    so the rows somebody was narrowing stay where they are while the next answer
@@ -962,7 +958,7 @@ button.vchip {
   gap: var(--gap);
   background: var(--surface);
   border: 1px solid var(--line-strong);
-  border-radius: var(--pill);
+  border-radius: var(--radius);
   padding: 0 12px;
   height: 32px;
   width: 280px;
@@ -1002,7 +998,6 @@ button.vchip {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 /* A table inside something that is already a block of its own: rows laid out
    in columns, with none of the edges that say "separate object". Bordered
@@ -1012,7 +1007,6 @@ button.vchip {
   border: 0;
   border-radius: 0;
   background: none;
-  box-shadow: none;
 }
 table {
   border-collapse: collapse;
@@ -1021,18 +1015,16 @@ table {
 }
 thead th {
   text-align: left;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--faint);
-  font-weight: 600;
-  padding: 10px 12px;
-  background: var(--raised);
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  padding: 8px 12px;
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
 tbody td {
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-bottom: 1px solid var(--line);
   vertical-align: top;
 }
@@ -1074,7 +1066,7 @@ th.num {
    And the padding is a worklist's rather than a table's. */
 .findings tbody td,
 .findings thead th {
-  padding: 6px 9px;
+  padding: 6px 10px;
 }
 .findings .compname {
   white-space: nowrap;
@@ -1205,10 +1197,9 @@ button.edited {
 }
 .counter h5 {
   margin: 0 0 5px;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
 }
 .counter ul {
   margin: 0;
@@ -1333,11 +1324,9 @@ tr.places td {
 }
 .field > label,
 .field > span.l {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
-  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
 }
 /* Number and date were not in this list, so every one of them drew as an
    unstyled browser default — no border, no background, the wrong font. It
@@ -1355,7 +1344,7 @@ input[type="date"] {
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  padding: 7px 10px;
+  padding: 6px 10px;
   width: 100%;
 }
 /* The accent border and the wash around it are an addition to the global focus
@@ -1388,42 +1377,44 @@ input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
+/* The primary button is ink on the canvas, whichever look is on: black on
+   white, and in the dark look white on black. The accent is kept for what
+   opens something, so a button and a link never read as the same kind of
+   thing. The secondary shapes are the same outline in two weights of text. */
 .btn {
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-  padding: 7px 14px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--canvas);
+  padding: 6px 12px;
   border-radius: var(--radius);
   cursor: pointer;
   font-size: var(--step--1);
-  font-weight: 600;
+  font-weight: 500;
   font-family: inherit;
   white-space: nowrap;
 }
 .btn:hover {
-  filter: brightness(1.06);
+  background: color-mix(in oklab, var(--ink) 88%, var(--canvas));
+  border-color: color-mix(in oklab, var(--ink) 88%, var(--canvas));
 }
 .btn.ghost {
-  background: none;
-  color: var(--accent);
-}
-.btn.ghost:hover {
-  background: var(--accent-soft);
-  filter: none;
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink);
 }
 .btn.quiet {
   background: var(--surface);
   border-color: var(--line-strong);
   color: var(--muted);
 }
+.btn.ghost:hover,
 .btn.quiet:hover {
   background: var(--raised);
-  filter: none;
+  border-color: var(--line-strong);
 }
 .btn[disabled] {
   opacity: var(--dim);
   cursor: not-allowed;
-  filter: none;
 }
 /* A field that is not taking anything looks like one. Nothing said so: a
    disabled input kept the live surface and the ordinary border, so the
@@ -1552,7 +1543,7 @@ textarea:disabled {
   border: 0;
   background: none;
   cursor: pointer;
-  padding: 8px 14px;
+  padding: 7px 12px;
   margin-bottom: -1px;
   border-bottom: 2px solid transparent;
   color: var(--muted);
@@ -1563,23 +1554,20 @@ textarea:disabled {
 .tab2[aria-selected="true"] {
   color: var(--ink);
   font-weight: 600;
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--ink);
 }
+/* The count beside a tab is a number and not a badge: quieter than the word
+   it counts, and the same shape whether the tab is selected or not. */
 .tab2 .n {
   margin-left: 6px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  background: var(--raised);
-  border-radius: 999px;
-  padding: 1px 7px;
-  color: var(--muted);
+  color: var(--faint);
 }
 .tab2[aria-selected="true"] .n {
-  background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--muted);
 }
 .tab2.urgent .n {
-  background: color-mix(in oklab, var(--sev-exploited) 12%, transparent);
   color: var(--sev-exploited);
 }
 
@@ -1607,11 +1595,9 @@ textarea:disabled {
 }
 .filtergroup legend {
   padding: 0;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
   margin-bottom: 8px;
 }
 .filterset {
@@ -1688,8 +1674,7 @@ textarea:disabled {
   min-width: 150px;
 }
 .filters .choicesat {
-  border-radius: var(--pill);
-  padding: 5px 11px;
+  padding: 4px 10px;
 }
 .choicesat {
   display: flex;
@@ -1759,9 +1744,19 @@ textarea:disabled {
   gap: var(--gap-tight);
   margin-bottom: 12px;
 }
+/* A filter in force is read rather than pressed, so it sits on the raised
+   tone with its label quieter than its value, and never in the ink a chip
+   that is pressed takes. */
+.narrowed .chip,
+.narrowed .chip[aria-pressed="true"] {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--ink);
+  font-weight: 500;
+}
 .narrowed .chip .l {
-  color: var(--muted);
-  font-weight: 600;
+  color: var(--faint);
+  font-weight: 400;
 }
 
 /* ---------- who holds what, as a grid ---------- */

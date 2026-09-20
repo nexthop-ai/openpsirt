@@ -78,7 +78,6 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: 16px 18px;
-  box-shadow: var(--shadow);
 }
 @media (width <= 900px) {
   .evidence {
@@ -93,11 +92,9 @@
 }
 .evblock h4 {
   margin: 0;
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--faint);
-  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
 }
 .evblock p {
   margin: 0;
@@ -116,11 +113,9 @@
   line-height: 1.1;
 }
 .score .l {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
-  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
   /* A tile may say more than one thing under its number — what a score is on
      and who published it, what an estimate means and the day it is about —
      and side by side they ran into each other as one word. */
@@ -142,11 +137,9 @@
 }
 .refs .kind {
   flex: none;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 1px 5px;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 0 5px;
   border-radius: 4px;
   background: var(--raised);
   color: var(--muted);
@@ -265,11 +258,9 @@
   gap: 3px;
 }
 .ourview .l {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
-  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
 }
 .ourview .theirs {
   color: var(--muted);
@@ -295,7 +286,7 @@
   align-items: center;
   flex-wrap: nowrap;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: default;
 }
 .tree .node > button.id {
@@ -428,7 +419,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--muted);
   border: 1px solid var(--line);
-  border-radius: var(--pill);
+  border-radius: 4px;
   padding: 0 7px;
   flex: none;
 }
@@ -454,9 +445,7 @@
   text-decoration: underline;
 }
 .tree .repeat {
-  font-size: 9.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-size: 10.5px;
   color: var(--faint);
   border: 1px dashed var(--line-strong);
   border-radius: 3px;
@@ -676,12 +665,11 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  padding: 14px 16px 14px 18px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 9px;
   position: relative;
-  box-shadow: var(--shadow);
 }
 .qcard::before {
   content: "";
@@ -741,9 +729,9 @@
   gap: var(--gap-loose);
   flex-wrap: wrap;
   padding: 10px 14px;
-  border: 1px dashed var(--accent-line);
-  background: var(--accent-soft);
-  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--raised);
+  border-radius: var(--radius-lg);
   font-size: var(--step--1);
 }
 .batchbar .spacer {
@@ -828,9 +816,7 @@
   color: var(--muted);
 }
 .col li .why .mark {
-  font-size: 9.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 10.5px;
   border-radius: 3px;
   padding: 0 4px;
   margin-right: 5px;
@@ -1121,7 +1107,7 @@
   gap: 3px;
 }
 .sheet > footer .btn.ghost kbd.onbtn {
-  color: var(--accent);
+  color: inherit;
 }
 
 /* ---------- the finding after a decision is recorded ---------- */
@@ -1161,11 +1147,9 @@
   min-width: 0;
 }
 .dgrid .l {
-  font-size: 10.5px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--faint);
-  font-weight: 600;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
 }
 .dgrid .v {
   font-size: var(--step--1);
@@ -1381,7 +1365,7 @@
    least often read, so it sits below what somebody deciding reads first. */
 .pathblock h3 {
   margin: 0 0 8px;
-  font-size: var(--step-1);
+  font-size: 14px;
   font-weight: 600;
 }
 

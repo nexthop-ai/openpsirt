@@ -1,11 +1,14 @@
 /* The looks, the tokens every rule reads, and the base element rules.
    First, because everything after it is written in terms of these. */
 
-/* The tokens, the type scale, the shell and every component are the restyled
-   mockup's, taken as they were settled rather than approximated. The mockup
-   drew the interface inside a frame; here the frame is the page, so its
-   tokens sit on the root and its grid on the app container. A look is a token
-   set, chosen per person and kept in the browser.
+/* The shell is the restyled mockup's; the work surface below it is quieter
+   than the mockup drew it. One white plane, hairlines where the mockup had
+   borders and shadows, sentence-case labels where it had uppercase ones, and
+   a primary button in ink so that the accent means one thing, which is
+   "this opens something". The mockup drew the interface inside a frame; here
+   the frame is the page, so its tokens sit on the root and its grid on the
+   app container. A look is a token set, chosen per person and kept in the
+   browser.
    Severity is its own scale, deliberately not the accent — "urgent" and
    "clickable" must never read as the same thing. */
 
@@ -20,19 +23,19 @@
   --font: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, sfmono-regular, menlo, monospace;
 
-  --canvas: #f1f3f7;
+  --canvas: #fff;
   --surface: #fff;
-  --raised: #f5f7fa;
-  --ink: #161b24;
-  --muted: #5d6675;
-  --faint: #8b93a1;
-  --line: #e2e6ec;
-  --line-strong: #cdd3dc;
+  --raised: #f7f8fa;
+  --ink: #111318;
+  --muted: #5b6270;
+  --faint: #8a919e;
+  --line: #eaecf0;
+  --line-strong: #d6dae0;
 
-  --accent: #2b62e3;
+  --accent: #2f5fd8;
   --accent-ink: #fff;
-  --accent-soft: rgb(43 98 227 / 10%);
-  --accent-line: rgb(43 98 227 / 35%);
+  --accent-soft: rgb(47 95 216 / 8%);
+  --accent-line: rgb(47 95 216 / 30%);
 
   --side-bg: #141a23;
   --side-ink: #e6eaf0;
@@ -62,10 +65,14 @@
   --ok: #1f7a4d;
   --wait: #8a5a10;
 
+  /* Shadows are for what floats: a list of suggestions, the picker, a
+     drawer. A card on the page is set off by a hairline and nothing else,
+     because the work surface is one plane and a shadow says there are
+     two. */
   --shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 1px 3px rgb(16 24 40 / 6%);
   --shadow-lg: 0 12px 32px rgb(16 24 40 / 18%);
-  --radius: 8px;
-  --radius-lg: 12px;
+  --radius: 6px;
+  --radius-lg: 8px;
   --pill: 999px;
 
   /* The stacking ladder, in the order things actually stack.
@@ -166,8 +173,8 @@
 
   --shadow: 0 1px 0 rgb(255 255 255 / 3%) inset;
   --shadow-lg: 0 18px 50px rgb(0 0 0 / 55%);
-  --radius: 10px;
-  --radius-lg: 14px;
+  --radius: 6px;
+  --radius-lg: 8px;
   --pill: 999px;
 
   --step--1: 12.5px;
