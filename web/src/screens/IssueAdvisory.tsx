@@ -175,7 +175,8 @@ export function IssueAdvisory({
             <span key={one.advisory}>
               {at > 0 && ", "}
               <span className="id">{one.advisory}</span>
-              {(one.issuances ?? 0) > 0 && ` (out ${one.issuances}\u00d7)`}
+              {` (${one.status})`}
+              {(one.issuances ?? 0) > 0 && ` · out ${one.issuances}\u00d7`}
             </span>
           ))}
           . Starting another says it twice.

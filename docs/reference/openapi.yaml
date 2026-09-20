@@ -186,6 +186,10 @@ components:
         advisory:
           description: The identifier this deployment minted, which is what the document is tracked by
           type: string
+        agreed:
+          description: How many people agree to what it says now. None means it cannot go out
+          format: int64
+          type: integer
         covers:
           items:
             $ref: "#/components/schemas/CoveredBody"
@@ -193,6 +197,13 @@ components:
             - array
             - "null"
         minted_at:
+          type: string
+        status:
+          description: Where the document is in its life. Draft until it has gone out, final once it has and somebody agrees to what it says now, interim where it has gone out and has been edited since
+          enum:
+            - draft
+            - final
+            - interim
           type: string
         title:
           type: string
@@ -206,6 +217,10 @@ components:
       properties:
         advisory:
           type: string
+        agreed:
+          description: How many people agree to what it says now
+          format: int64
+          type: integer
         issuances:
           description: How many times it has gone out
           format: int64
@@ -220,6 +235,13 @@ components:
           description: How many products those sit in
           format: int64
           type: integer
+        status:
+          description: Where the document is in its life
+          enum:
+            - draft
+            - final
+            - interim
+          type: string
         title:
           type: string
       required:
@@ -227,6 +249,8 @@ components:
         - issues
         - products
         - issuances
+        - status
+        - agreed
         - minted_at
       type: object
     AffectsBody:

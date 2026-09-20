@@ -324,19 +324,40 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject,
 	return nil
 }
 
-// Agreed is who has agreed to what the advisory says as it stands.
+// Standing is where an advisory is in its life and who agrees to what it says.
+type Standing struct {
+	// Status is the word the document's tracking carries.
+	Status string
+	// Agreed is the agreements on the edition the advisory currently points
+	// at, oldest first. None is what a document that may not go out looks
+	// like.
+	Agreed []Approval
+}
+
+// Where reports where the advisory stands, without generating its document.
 //
-// The agreements on the edition the advisory currently points at, oldest
-// first. An edition nobody has agreed to answers with none, which is what a
-// document that may not go out looks like.
-func (s *Store) Agreed(ctx context.Context, subject access.Subject,
-	identifier string) ([]Approval, error) {
+// Somebody deciding whether to read it, agree to it or publish it is asking
+// before anything is assembled, and assembling a document to find out whether
+// it may go out reads every flaw it covers to answer a question about two
+// rows.
+func (s *Store) Where(ctx context.Context, subject access.Subject,
+	identifier string) (*Standing, error) {
 
 	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
 		return nil, err
 	}
-	return s.agreed(ctx, row)
+	agreed, err := s.agreed(ctx, row)
+	if err != nil {
+		return nil, err
+	}
+	gone, err := s.issuances(ctx, row)
+	if err != nil {
+		return nil, err
+	}
+	return &Standing{
+		Status: statusOf(len(gone) > 0, len(agreed) > 0), Agreed: agreed,
+	}, nil
 }
 
 // agreed is the same, for a caller that has already narrowed.

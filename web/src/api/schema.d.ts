@@ -4793,12 +4793,27 @@ export interface components {
             readonly $schema?: string;
             /** @description The identifier this deployment minted, which is what the document is tracked by */
             advisory: string;
+            /**
+             * Format: int64
+             * @description How many people agree to what it says now. None means it cannot go out
+             */
+            agreed?: number;
             covers: components["schemas"]["CoveredBody"][] | null;
             minted_at: string;
+            /**
+             * @description Where the document is in its life. Draft until it has gone out, final once it has and somebody agrees to what it says now, interim where it has gone out and has been edited since
+             * @enum {string}
+             */
+            status?: "draft" | "final" | "interim";
             title?: string;
         };
         AdvisoryListedBody: {
             advisory: string;
+            /**
+             * Format: int64
+             * @description How many people agree to what it says now
+             */
+            agreed: number;
             /**
              * Format: int64
              * @description How many times it has gone out
@@ -4815,6 +4830,11 @@ export interface components {
              * @description How many products those sit in
              */
             products: number;
+            /**
+             * @description Where the document is in its life
+             * @enum {string}
+             */
+            status: "draft" | "final" | "interim";
             title?: string;
         };
         AffectsBody: {

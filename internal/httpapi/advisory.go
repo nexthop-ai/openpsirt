@@ -140,6 +140,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 			out.Body.Items = append(out.Body.Items, AdvisoryListedBody{
 				Advisory: one.Identifier, Title: one.Title,
 				Issues: one.Issues, Products: one.Products, Issuances: one.Issuances,
+				Status: one.Status(), Agreed: one.Agreed,
 				MintedAt: one.MintedAt.Format(time.RFC3339),
 			})
 		}
@@ -164,11 +165,18 @@ func registerAdvisory(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		row, held, err := advisory.NewStore(in.DB.DB).Covers(ctx, subject, input.Advisory)
+		store := advisory.NewStore(in.DB.DB)
+		row, held, err := store.Covers(ctx, subject, input.Advisory)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the advisory could not be read")
 		}
-		return &struct{ Body AdvisoryBody }{Body: bodyFor(row, held)}, nil
+		where, err := store.Where(ctx, subject, input.Advisory)
+		if err != nil {
+			return nil, advisoryRefused(in, err, "the advisory could not be read")
+		}
+		body := bodyFor(row, held)
+		body.Status, body.Agreed = where.Status, len(where.Agreed)
+		return &struct{ Body AdvisoryBody }{Body: body}, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -492,8 +500,13 @@ func bodyFor(row *advisory.Advisory, held []advisory.Covered) AdvisoryBody {
 
 // AdvisoryBody is one advisory and the issues it covers.
 type AdvisoryBody struct {
-	Advisory string        `json:"advisory" doc:"The identifier this deployment minted, which is what the document is tracked by"`
-	Title    string        `json:"title,omitempty"`
+	Advisory string `json:"advisory" doc:"The identifier this deployment minted, which is what the document is tracked by"`
+	Title    string `json:"title,omitempty"`
+	// Status and Agreed are left out where the advisory was just started or
+	// just retitled, which answers with what the act did rather than with
+	// where the advisory stands.
+	Status   string        `json:"status,omitempty" enum:"draft,final,interim" doc:"Where the document is in its life. Draft until it has gone out, final once it has and somebody agrees to what it says now, interim where it has gone out and has been edited since"`
+	Agreed   int           `json:"agreed,omitempty" doc:"How many people agree to what it says now. None means it cannot go out"`
 	MintedAt string        `json:"minted_at"`
 	Covers   []CoveredBody `json:"covers"`
 }
@@ -511,6 +524,8 @@ type AdvisoryListedBody struct {
 	Issues    int    `json:"issues" doc:"How many issues it covers"`
 	Products  int    `json:"products" doc:"How many products those sit in"`
 	Issuances int    `json:"issuances" doc:"How many times it has gone out"`
+	Status    string `json:"status" enum:"draft,final,interim" doc:"Where the document is in its life"`
+	Agreed    int    `json:"agreed" doc:"How many people agree to what it says now"`
 	MintedAt  string `json:"minted_at"`
 }
 

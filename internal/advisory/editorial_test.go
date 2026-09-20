@@ -8,6 +8,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 )
 
+// standingOn is the agreements standing on what the advisory says now.
+func standingOn(t *testing.T, f *fixture, named string) ([]advisory.Approval, error) {
+	t.Helper()
+	where, err := f.store.Where(t.Context(), f.who, named)
+	if err != nil {
+		return nil, err
+	}
+	return where.Agreed, nil
+}
+
 // TestEditingTakesBackTheAgreementStandingOnWhatItReplaced runs each of the
 // three acts that change what a document says.
 //
@@ -51,7 +61,7 @@ func TestEditingTakesBackTheAgreementStandingOnWhatItReplaced(t *testing.T) {
 				named := f.covering(t, [2]string{"sonic", identifier})
 				f.agreed(t, named)
 
-				standing, err := f.store.Agreed(ctx, f.who, named)
+				standing, err := standingOn(t, f, named)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -61,7 +71,7 @@ func TestEditingTakesBackTheAgreementStandingOnWhatItReplaced(t *testing.T) {
 
 				one.edit(t, f, named)
 
-				standing, err = f.store.Agreed(ctx, f.who, named)
+				standing, err = standingOn(t, f, named)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -157,7 +167,7 @@ func TestAgreeingTwiceIsRefusedAndTakingItBackIsNot(t *testing.T) {
 		if err := f.store.Withdraw(ctx, f.approver, named); err != nil {
 			t.Fatalf("taking an agreement back: %v", err)
 		}
-		standing, err := f.store.Agreed(ctx, f.who, named)
+		standing, err := standingOn(t, f, named)
 		if err != nil {
 			t.Fatal(err)
 		}
