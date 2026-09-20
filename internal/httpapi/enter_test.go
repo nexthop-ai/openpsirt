@@ -445,7 +445,12 @@ func TestAFlawAssessedUnderVersionFourIsRecordedWithTheSchemeItWasAssessedUnder(
 	// assesses itself, so this is the scheme that matters most. A number
 	// recorded without it cannot be placed: 7.5 under version 3 and 7.5 under
 	// version 4 are two different judgments.
-	twoReach(t, func(t *testing.T, r *reach) {
+	//
+	// On every engine, because it is the only test that reaches the aggregate
+	// carrying the scheme, and an aggregate is SQL. Both lists: the one inside
+	// a product and the one spanning them, which are separate statements and
+	// the second is where two schemes share a column.
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		const at = "/v1/products/mine/findings"
 		made := asPerson(t, r, "private-triage", http.MethodPost, at,
@@ -460,34 +465,47 @@ func TestAFlawAssessedUnderVersionFourIsRecordedWithTheSchemeItWasAssessedUnder(
 		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
 			t.Fatal(err)
 		}
-		var listed struct {
-			Items []struct {
-				Vulnerability string  `json:"vulnerability"`
-				Severity      string  `json:"severity"`
-				Score         float64 `json:"score"`
-				ScoreVersion  string  `json:"score_version"`
-			} `json:"items"`
+		for _, at := range []struct{ what, path string }{
+			{"inside the product", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"across every product", "/v1/findings"},
+		} {
+			t.Run(at.what, func(t *testing.T) {
+				// Read fresh. A field left out of a payload is left alone by
+				// the decoder rather than cleared, so a struct reused across
+				// two reads reports the first read's answer for anything the
+				// second omits — and an omitted scheme is the thing under
+				// test.
+				var listed struct {
+					Items []struct {
+						Vulnerability string  `json:"vulnerability"`
+						Severity      string  `json:"severity"`
+						Score         float64 `json:"score"`
+						ScoreVersion  string  `json:"score_version"`
+					} `json:"items"`
+				}
+				read(t, r, "private-triage", at.path, &listed)
+				for _, item := range listed.Items {
+					if item.Vulnerability != recorded.Identifier {
+						continue
+					}
+					if item.ScoreVersion != "4.0" {
+						t.Errorf("the list says the score is on %q, want the 4.0 it was "+
+							"assessed under", item.ScoreVersion)
+					}
+					// 10.0 by the published tables, which is "critical".
+					if item.Severity != "critical" {
+						t.Errorf("the vector said critical and the finding reads %q",
+							item.Severity)
+					}
+					if item.Score != 10 {
+						t.Errorf("the score is %v, want the 10.0 the vector works out to",
+							item.Score)
+					}
+					return
+				}
+				t.Error("what was recorded is not in the list")
+			})
 		}
-		read(t, r, "private-triage",
-			"/v1/products/mine/findings?stream=master&variant=broadcom", &listed)
-		for _, item := range listed.Items {
-			if item.Vulnerability != recorded.Identifier {
-				continue
-			}
-			if item.ScoreVersion != "4.0" {
-				t.Errorf("the list says the score is on %q, want the 4.0 it was assessed under",
-					item.ScoreVersion)
-			}
-			// 10.0 by the published tables, which is "critical".
-			if item.Severity != "critical" {
-				t.Errorf("the vector said critical and the finding reads %q", item.Severity)
-			}
-			if item.Score < 9.9 || item.Score > 10 {
-				t.Errorf("the score is %v, want the 10.0 the vector works out to", item.Score)
-			}
-			return
-		}
-		t.Error("what was recorded is not in the list")
 	})
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metricsOf, read, vectorOf, versionOf } from "./Scoring";
+import { carriedTo, metricsOf, read, vectorOf, versionOf } from "./Scoring";
 
 const WHOLE = { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "H", I: "H", A: "H" };
 const WHOLE_FOUR = {
@@ -112,6 +112,39 @@ describe("what a composed vector says it is", () => {
     // A vector is compared as a string in places that are not this tool, so
     // the order is part of what it is rather than a matter of presentation.
     expect(vectorOf(WHOLE, "CVSS:3.1")).toBe("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
+  });
+});
+
+describe("what survives a change of scheme", () => {
+  it("keeps an answer the new scheme also offers", () => {
+    // Four metrics are asked by both generations, and three of them offer the
+    // same answers. Dropping those would make somebody answer again to say
+    // the same thing.
+    expect(carriedTo("CVSS:4.0", { AV: "N", AC: "H", PR: "L", S: "U", C: "H" })).toEqual({
+      AV: "N",
+      AC: "H",
+      PR: "L",
+    });
+  });
+
+  it("drops an answer the new scheme does not offer, metric or value", () => {
+    // User interaction is asked by both and answered differently: version 3
+    // asks whether a person has to act, version 4 asks how. Carried by name
+    // alone, Required composes a version 4 vector the scoring refuses — and
+    // the metric reads as answered while its control shows nothing.
+    expect(carriedTo("CVSS:4.0", { AV: "N", UI: "R" })).toEqual({ AV: "N" });
+    expect(carriedTo("CVSS:3.1", { AV: "N", UI: "P" })).toEqual({ AV: "N" });
+    expect(carriedTo("CVSS:3.1", { AV: "N", UI: "A" })).toEqual({ AV: "N" });
+    // The one answer it does carry, because both generations offer it.
+    expect(carriedTo("CVSS:4.0", { UI: "N" })).toEqual({ UI: "N" });
+  });
+
+  it("composes nothing from an answer it dropped", () => {
+    // The whole of why the value matters: eleven metrics answered with a
+    // version 3 user interaction is not a version 4 vector.
+    const carried = carriedTo("CVSS:4.0", { ...WHOLE_FOUR, UI: "R" });
+    expect(carried.UI).toBeUndefined();
+    expect(vectorOf(carried, "CVSS:4.0")).toBe("");
   });
 });
 

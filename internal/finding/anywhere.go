@@ -241,6 +241,11 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
 		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
+		// Whether anything here carries a score at all, and the scheme it is
+		// on. This list spans products, so it is the one place a version 3
+		// number and a version 4 number sit in the same column.
+		ColumnExpr(`MAX(CASE WHEN v.score_centi IS NULL THEN 0 ELSE 1 END) AS "scored"`).
+		ColumnExpr(`MAX(COALESCE(v.score_version, '')) AS "score_version"`).
 		ColumnExpr(`SUM(CASE WHEN f.suppressed_by IS NULL THEN 0 ELSE 1 END) AS "answered"`).
 		ColumnExpr(`MIN(f.opened_at) AS "opened_at"`).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).

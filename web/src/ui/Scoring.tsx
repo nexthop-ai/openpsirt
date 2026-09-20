@@ -228,6 +228,17 @@ export function versionOf(vector: string): string {
 //
 // Nothing rather than a partial vector: one metric unanswered is not a base
 // vector, and a score from the rest would be a number nobody could reproduce.
+// carriedTo is the answers a scheme also asks for, by the value and not only
+// by the metric.
+export function carriedTo(under: string, chosen: Record<string, string>): Record<string, string> {
+  const asks = new Map(metricsOf(under).map((m) => [m.key, new Set(m.values.map((v) => v.value))]));
+  const kept: Record<string, string> = {};
+  for (const [metric, value] of Object.entries(chosen)) {
+    if (asks.get(metric)?.has(value)) kept[metric] = value;
+  }
+  return kept;
+}
+
 export function vectorOf(chosen: Record<string, string>, under: string): string {
   const metrics = metricsOf(under);
   const parts = metrics.map((m) => chosen[m.key]);
@@ -288,15 +299,13 @@ export function Scoring({
     onChange(vectorOf(next, version));
   }
 
-  // Changing the scheme keeps the answers the new one also asks for. The two
-  // generations share five metrics and ask the rest differently, so what
-  // carries over is what means the same thing in both.
+  // Changing the scheme keeps the answers the new one also asks for, by the
+  // value and not only by the metric. The generations share four metrics and
+  // user interaction is not one the answers carry across: version 3 asks it as
+  // present or absent, version 4 as passive or active. Kept by name alone, an
+  // answer of Required composes a version 4 vector the scoring refuses.
   function compose(under: string) {
-    const keeps = new Set(metricsOf(under).map((m) => m.key));
-    const next: Record<string, string> = {};
-    for (const [metric, value] of Object.entries(chosen)) {
-      if (keeps.has(metric)) next[metric] = value;
-    }
+    const next = carriedTo(under, chosen);
     setVersion(under);
     setChosen(next);
     onChange(vectorOf(next, under));
