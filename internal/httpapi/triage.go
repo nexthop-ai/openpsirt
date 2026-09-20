@@ -83,6 +83,7 @@ type FindingRefBody struct {
 	Version       string  `json:"version" doc:"The version that ships"`
 	Severity      string  `json:"severity,omitempty" doc:"Our rating where one stands, else as published"`
 	Score         float64 `json:"score,omitempty"`
+	ScoreVersion  string  `json:"score_version,omitempty" doc:"The scoring system the number is on"`
 	Exploited     bool    `json:"exploited,omitempty"`
 	FixState      string  `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed"`
 	FixedIn       string  `json:"fixed_in,omitempty"`

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 )
@@ -12,8 +13,16 @@ import (
 // A deferral short enough to stand on nobody's say-so but the proposer's,
 // which is the exception the rule carries and the pattern this report exists
 // to make visible across a program.
-const shortDeferral = `{"outcome":"deferred","deferred_until":"2026-09-20",` +
-	`"reasoning":"Not this sprint; the release is next week."}`
+//
+// Counted from today. A deferral returns on a date still to come, so a fixed
+// one is refused from the day it arrives — and the refusal is a test failing
+// for the calendar rather than for the behavior it names. A week is short
+// against the threshold that asks for a second person, which is thirty days.
+func shortDeferral() string {
+	returns := time.Now().UTC().AddDate(0, 0, 7).Format(time.DateOnly)
+	return `{"outcome":"deferred","deferred_until":"` + returns + `",` +
+		`"reasoning":"Not this sprint; the release is next week."}`
+}
 
 func scrutiny(t *testing.T, r *reach, who, query string) struct {
 	Alone  []httpapi.UnagreedBody       `json:"alone"`
@@ -56,7 +65,7 @@ func TestRiskStandingOnOnePersonIsReportedWithWhatItClaimed(t *testing.T) {
 			t.Fatalf("something stands alone before anything was decided: %+v", before.Alone)
 		}
 
-		r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", shortDeferral)
+		r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", shortDeferral())
 
 		after := scrutiny(t, r, "private-triage", "")
 		if len(after.Alone) != 1 {
@@ -119,7 +128,7 @@ func TestScrutinyRefusesAProductTheAskerMayNotRead(t *testing.T) {
 	// which products a deployment has, one guess at a time.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
-		r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", shortDeferral)
+		r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", shortDeferral())
 
 		real := asPerson(t, r, "private-triage", http.MethodGet,
 			"/v1/approvals/scrutiny?product=theirs", "")

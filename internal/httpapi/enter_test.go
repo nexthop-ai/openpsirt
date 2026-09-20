@@ -432,10 +432,79 @@ func TestAVectorThisCannotScoreIsTheCallersToFix(t *testing.T) {
 		const at = "/v1/products/mine/findings"
 		got := asPerson(t, r, "private-triage", http.MethodPost, at,
 			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"Something is wrong.",`+
-				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"}`)
+				`"vector":"AV:N/AC:L/Au:N/C:P/I:P/A:P"}`)
 		if got.Code != http.StatusUnprocessableEntity {
-			t.Errorf("a version this cannot score answered %d, want it named as the caller's"+
+			t.Errorf("a scheme this cannot score answered %d, want it named as the caller's"+
 				" to fix: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestAFlawAssessedUnderVersionFourIsRecordedWithTheSchemeItWasAssessedUnder(t *testing.T) {
+	// The population a deployment writes advisories about is the one it
+	// assesses itself, so this is the scheme that matters most. A number
+	// recorded without it cannot be placed: 7.5 under version 3 and 7.5 under
+	// version 4 are two different judgments.
+	//
+	// On every engine, because it is the only test that reaches the aggregate
+	// carrying the scheme, and an aggregate is SQL. Both lists: the one inside
+	// a product and the one spanning them, which are separate statements and
+	// the second is where two schemes share a column.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		const at = "/v1/products/mine/findings"
+		made := asPerson(t, r, "private-triage", http.MethodPost, at,
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		for _, at := range []struct{ what, path string }{
+			{"inside the product", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"across every product", "/v1/findings"},
+		} {
+			t.Run(at.what, func(t *testing.T) {
+				// Read fresh. A field left out of a payload is left alone by
+				// the decoder rather than cleared, so a struct reused across
+				// two reads reports the first read's answer for anything the
+				// second omits — and an omitted scheme is the thing under
+				// test.
+				var listed struct {
+					Items []struct {
+						Vulnerability string  `json:"vulnerability"`
+						Severity      string  `json:"severity"`
+						Score         float64 `json:"score"`
+						ScoreVersion  string  `json:"score_version"`
+					} `json:"items"`
+				}
+				read(t, r, "private-triage", at.path, &listed)
+				for _, item := range listed.Items {
+					if item.Vulnerability != recorded.Identifier {
+						continue
+					}
+					if item.ScoreVersion != "4.0" {
+						t.Errorf("the list says the score is on %q, want the 4.0 it was "+
+							"assessed under", item.ScoreVersion)
+					}
+					// 10.0 by the published tables, which is "critical".
+					if item.Severity != "critical" {
+						t.Errorf("the vector said critical and the finding reads %q",
+							item.Severity)
+					}
+					if item.Score != 10 {
+						t.Errorf("the score is %v, want the 10.0 the vector works out to",
+							item.Score)
+					}
+					return
+				}
+				t.Error("what was recorded is not in the list")
+			})
 		}
 	})
 }
@@ -630,4 +699,73 @@ func quotedJSON(s string) string {
 		panic(err)
 	}
 	return string(encoded)
+}
+
+func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
+	// A number alone is not readable across schemes, and a rule enforced at
+	// one of six places holds until somebody does their job. Two of these
+	// leave the deployment as files a script reads, where a bare column of
+	// numbers from two schemes is a ranking that is not one.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		for _, at := range []struct{ what, path string }{
+			{"the findings list", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"the list across products", "/v1/findings"},
+			{"the issue", "/v1/issues/" + recorded.Identifier},
+			{"the forwarded document", "/v1/issues/" + recorded.Identifier + "/document"},
+			{"the export of one product", "/v1/products/mine/findings.csv"},
+			{"the export of every product", "/v1/findings.csv"},
+		} {
+			t.Run(at.what, func(t *testing.T) {
+				got := asPerson(t, r, "private-triage", http.MethodGet, at.path, "")
+				if got.Code != http.StatusOK {
+					t.Fatalf("GET %s answered %d: %s", at.path, got.Code, got.Body.String())
+				}
+				body := got.Body.String()
+				if !strings.Contains(body, recorded.Identifier) {
+					t.Fatalf("what was recorded is not in %s", at.what)
+				}
+				if !strings.Contains(body, "10") {
+					t.Fatalf("%s carries no score, so this checked nothing:\n%s", at.what, body)
+				}
+				// The vector states the scheme inside itself, so a surface
+				// carrying the vector would answer this without ever saying
+				// which scheme its number is on. Taken out before asking.
+				said := strings.ReplaceAll(body, "CVSS:4.0", "")
+				// The scheme, however the surface spells it. A payload says
+				// 4.0 in a field, a document says it in a sentence, and a
+				// spreadsheet says it in a column.
+				if !strings.Contains(said, "4.0") {
+					t.Errorf("%s carries the score and not the scheme it is on:\n%s",
+						at.what, body)
+				}
+			})
+		}
+	})
+}
+
+func TestScoringAnEmptyVectorIsRefusedRatherThanAnswered(t *testing.T) {
+	// A parameter that is required is checked for being there rather than for
+	// saying anything, and scoring nothing answers nothing — so an empty one
+	// came back 200 with every field empty, including a severity this
+	// operation's own enumeration has no word for.
+	twoReach(t, func(t *testing.T, r *reach) {
+		got := asPerson(t, r, "triager", http.MethodGet, "/v1/score?vector=", "")
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("an empty vector answered %d: %s", got.Code, got.Body.String())
+		}
+	})
 }

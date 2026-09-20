@@ -439,6 +439,50 @@ func (f *fixture) pointsAt(t *testing.T, identifier, advisory string,
 	}
 }
 
+func TestAFlawAssessedUnderAnUncarriedSchemeStatesNoScore(t *testing.T) {
+	// The standard's score object has a field for a version 2 score and a
+	// version 3 score, and version 4 arrives with its next version. The
+	// number is held and shown here; a document that put it in the version 3
+	// field would state a version the field's own schema does not have.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		for _, c := range []struct {
+			what   string
+			vector string
+			scores int
+		}{
+			{"a scheme the document carries", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", 1},
+			{"one it does not",
+				"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H", 0},
+		} {
+			t.Run(c.what, func(t *testing.T) {
+				_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
+					TargetIDs: []int64{f.master}, Component: carrier.Name,
+					Summary: "The management socket answers before anyone authenticated.",
+					Vector:  c.vector,
+				})
+				if err != nil {
+					t.Fatalf("recording a flaw: %v", err)
+				}
+				doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+				if err != nil {
+					t.Fatalf("generating: %v", err)
+				}
+				if got := len(doc.Vulnerabilities[0].Scores); got != c.scores {
+					t.Fatalf("the document states %d scores, want %d", got, c.scores)
+				}
+				if c.scores == 0 {
+					return
+				}
+				// The version the field states is one its schema knows.
+				if v := doc.Vulnerabilities[0].Scores[0].CVSSv3.Version; v != "3.1" {
+					t.Errorf("the score states version %q", v)
+				}
+			})
+		}
+	})
+}
+
 func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 	// The score, the credit, the places to go and what to do about it are all
 	// held, and the document carried none of them: a reader got which

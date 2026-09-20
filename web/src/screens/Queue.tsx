@@ -686,7 +686,14 @@ function Card({
             ) : f.fix_state === "mixed" ? (
               <span>upstream fix differs by build</span>
             ) : null}
-            {typeof f.score === "number" && <span>CVSS {f.score.toFixed(1)}</span>}
+            {/* The scheme beside the number. Two are scorable and their
+                numbers are not comparable, so a bare score invites a reader to
+                rank one against another. */}
+            {typeof f.score === "number" && (
+              <span>
+                CVSS{f.score_version ? ` ${f.score_version}` : ""} {f.score.toFixed(1)}
+              </span>
+            )}
             {f.description && f.description.length >= 200 && (
               <button
                 type="button"

@@ -471,7 +471,10 @@ func registerExport(api huma.API, in Ingest) {
 			What:  "findings",
 			About: []Stated{{"triaged at or above", line}},
 			Header: []string{
-				"issue", "severity", "score", "exploited", "component", "version",
+				// The scheme beside the score. Two are scorable and their
+				// numbers are not comparable, so a column of them read by
+				// somebody's script is a ranking that is not one.
+				"issue", "severity", "score", "score scheme", "exploited", "component", "version",
 				"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
 				"stream", "variant",
 			},
@@ -493,7 +496,7 @@ func registerExport(api huma.API, in Ingest) {
 					}
 					rows = append(rows, []string{
 						g.Vulnerability, g.Severity, scoreCell(g.Scored, g.ScoreCenti),
-						strconv.FormatBool(g.Exploited),
+						g.ScoreVersion, strconv.FormatBool(g.Exploited),
 						g.Component, g.Version, g.Ecosystem, g.FixedIn,
 						strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
 						g.State, opened, due,
@@ -559,7 +562,8 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 			What:  "findings, every product",
 			About: []Stated{{"triaged at or above", "each product's own line"}},
 			Header: []string{
-				"product", "issue", "severity", "score", "exploited", "component", "version",
+				"product", "issue", "severity", "score", "score scheme", "exploited",
+				"component", "version",
 				"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
 				"stream", "variant",
 			},
@@ -581,7 +585,7 @@ func registerAnywhereExport(api huma.API, in Ingest) {
 					}
 					rows = append(rows, []string{
 						g.Product, g.Vulnerability, g.Severity, scoreCell(g.Scored, g.ScoreCenti),
-						strconv.FormatBool(g.Exploited),
+						g.ScoreVersion, strconv.FormatBool(g.Exploited),
 						g.Component, g.Version, g.Ecosystem, g.FixedIn,
 						strconv.Itoa(g.Packages), strconv.Itoa(g.Consumers),
 						g.State, opened, due,

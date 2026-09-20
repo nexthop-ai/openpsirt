@@ -153,6 +153,10 @@ type FindingBody struct {
 	// and "critical" under v3 — so two rows can tie on the number while their
 	// words disagree, and without the number that looks mis-sorted.
 	Score float64 `json:"score,omitempty" doc:"The severity as a number, which is what the order compares"`
+	// ScoreVersion is the scheme that number is on. Two schemes are scorable
+	// here and their numbers are not comparable, so a row carrying the number
+	// without the scheme invites the comparison it cannot support.
+	ScoreVersion string `json:"score_version,omitempty" doc:"The scoring system the number is on"`
 }
 
 // FindingsOutput is a page of what is open.
@@ -466,11 +470,12 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 				Fold: group.Fold, Packages: group.Packages, Consumers: group.Consumers,
 				Places: group.Places, Answered: group.Answered,
 				State: group.State, SentBack: group.SentBack,
-				Exploited:   group.Exploited,
-				Likelihood:  float64(group.LikelihoodPPM) / 1_000_000,
-				Score:       float64(group.ScoreCenti) / 100,
-				NoDeadline:  string(group.NoDeadline),
-				Undisclosed: group.Undisclosed,
+				Exploited:    group.Exploited,
+				Likelihood:   float64(group.LikelihoodPPM) / 1_000_000,
+				Score:        float64(group.ScoreCenti) / 100,
+				ScoreVersion: group.ScoreVersion,
+				NoDeadline:   string(group.NoDeadline),
+				Undisclosed:  group.Undisclosed,
 			}
 			if group.DiscloseAt != nil {
 				row.DiscloseAt = group.DiscloseAt.Format(time.DateOnly)

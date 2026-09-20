@@ -654,6 +654,45 @@ A report's size is components × matches × references, and a producer controls
 the first factor by uploading a scan file — so nothing about it is bounded by
 anything this deployment chose unless it is bounded here.
 
+### Ratings a report carries
+
+A report states several ratings of one issue, from different sources and under
+different generations of the scheme.
+
+| Rule | |
+|---|---|
+| The first stating both a score and a vector is recorded | They disagree, and the first stated is at least a stable answer. One issue holds one score, so the others are not kept |
+| The generation is recorded beside the number | Two generations are scorable and their numbers are not comparable. Left off, a number is placed by guessing at its vector |
+| The number is the publisher's, recorded as given | Recomputing it would replace what somebody published with an answer to a different question |
+
+Both generations arrive, and they arrive differently. Of 5,037 issues published
+in a two-week window, 1,939 carry a rating: 1,245 under version 3 alone, 167
+under version 4 alone, and 527 under both. So a report holding two generations
+of one rating is ordinary rather than a transitional case, and which one a
+finding records is which the report states first.
+
+| Shape | |
+|---|---|
+| A version 3 vector carries the base metrics alone | None of the 1,838 version 3 ratings those 1,772 issues carry states a temporal or environmental metric |
+| A version 4 vector carries every metric the scheme has, with a placeholder where nothing was stated | 694 of 694 |
+| Where a version 4 vector states an exploit maturity, the number published beside it is not a base score | 163 of 694. The field is still the one a producer calls the base score, and the value is that metric applied to it |
+
+Scoring here is over the base metrics, so a number worked out from a recorded
+version 4 vector is the base score and differs from the publisher's wherever
+exploitation was claimed. Nothing recomputes a recorded rating, which is what
+keeps the two from being mistaken for each other.
+
+Publishers also disagree with the scheme's own reference calculator. Of the 531
+version 4 ratings claiming nothing about exploitation, 528 score exactly as
+published and 3 differ by a tenth — and on all three the reference agrees with
+this implementation rather than with the published number.
+
+A scanned estate holds the same mixture, weighted toward what was published
+earlier. Across 6,883 issues, 4,959 carry a vector: 4,815 under version 3, 143
+under version 4, and one under version 2, which nothing here scores. Seven of
+the 143 state an exploit maturity. The remaining 1,924 issues carry no vector,
+and a severity word is all there is to rank them by.
+
 ## Scan coverage
 
 Every other failure here is loud. Silence is the failure that is not: a build

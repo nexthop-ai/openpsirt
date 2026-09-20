@@ -1,6 +1,7 @@
 package finding_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -56,16 +57,22 @@ func TestAVectorThisDoesNotUnderstandIsRefusedRatherThanScored(t *testing.T) {
 	// A number that came out of the wrong formula looks exactly like every
 	// other number here, and nothing downstream could tell.
 	for _, c := range []struct{ what, vector string }{
-		{"version 4, whose base formula is different", "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"},
 		{"version 2, a different scheme entirely", "AV:N/AC:L/Au:N/C:P/I:P/A:P"},
+		{"a version this does not implement", "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+		{"version 4's metrics under a version 3 heading",
+			"CVSS:3.1/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"},
 		{"a metric missing", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H"},
 		{"a value that metric does not take", "CVSS:3.1/AV:Z/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
 		{"a metric given twice", "CVSS:3.1/AV:N/AV:L/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
 		{"nonsense", "not a vector"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
-			if _, err := finding.Score(c.vector); err == nil {
-				t.Errorf("%s was scored anyway", c.what)
+			// Pinned to the sentinel, not to there being an error. Two
+			// callers branch on it to answer the caller rather than reporting
+			// a fault, so an unwrapped refusal turns a malformed vector into
+			// a 500 where a sibling test demands a 422.
+			if _, err := finding.Score(c.vector); !errors.Is(err, finding.ErrNotAVector) {
+				t.Errorf("%s answered %v, want it named as the caller's to fix", c.what, err)
 			}
 		})
 	}

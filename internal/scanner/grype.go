@@ -178,22 +178,7 @@ type grypeMatch struct {
 		KEV  []struct {
 			ID string `json:"id"`
 		} `json:"knownExploited"`
-		CVSS []struct {
-			Version string `json:"version"`
-			Vector  string `json:"vector"`
-			// Source is who published this rating and whether it
-			// is the primary one. Provenance is recorded for
-			// everything else a scan says — what found it, what it
-			// was matched from, what it was matched in — and the
-			// number a deadline is set from had none, so a reader
-			// asking "who says 5.9" had nowhere to go. Absent in
-			// some reports, which is itself an answer.
-			Source  string `json:"source"`
-			Type    string `json:"type"`
-			Metrics struct {
-				BaseScore float64 `json:"baseScore"`
-			} `json:"metrics"`
-		} `json:"cvss"`
+		CVSS []publishedRating `json:"cvss"`
 		// CWEs is what kind of weakness this is. Several entries
 		// usually say the same thing from different sources, and the
 		// interesting part is the identifier rather than who said it.
@@ -671,14 +656,15 @@ type rated struct {
 	kind    string
 }
 
-// rating picks the severity score to record, and the vector it assumes.
+// publishedRating is one rating a report carries, as whoever published it
+// stated it.
 //
-// The first that states both. A report carries several ratings from different
-// sources and they disagree; taking the first stated is at least a stable
-// answer, and the vector travels with the number so that what the number
-// assumed is readable rather than lost. Who published it travels with them for
-// the same reason: everything else a scan says carries its provenance.
-func rating(ratings []struct {
+// Source is who published it and Type whether it is the primary rating.
+// Provenance travels with everything else a scan says — what found it, what
+// it was matched from, what it was matched in — so a reader asking who says
+// 5.9 has somewhere to go. Both are absent in some reports, which is itself
+// an answer.
+type publishedRating struct {
 	Version string `json:"version"`
 	Vector  string `json:"vector"`
 	Source  string `json:"source"`
@@ -686,7 +672,27 @@ func rating(ratings []struct {
 	Metrics struct {
 		BaseScore float64 `json:"baseScore"`
 	} `json:"metrics"`
-}) rated {
+}
+
+// rating picks the severity score to record, and the vector it assumes.
+//
+// The first that states both. A report carries several ratings from different
+// sources and they disagree; taking the first stated is at least a stable
+// answer, and the vector travels with the number so that what the number
+// assumed is readable rather than lost. Who published it travels with them for
+// the same reason: everything else a scan says carries its provenance.
+//
+// A report commonly rates one issue under two generations of the scheme. Which
+// of them is recorded is which the report states first, and the other is not
+// kept: one issue holds one score. The two are not comparable as numbers, so
+// the generation is recorded beside the number rather than left to be guessed
+// from the vector.
+//
+// The number is the publisher's and is recorded as given. A version 4 vector
+// carries every metric the scheme has, and where it states an exploit maturity
+// the number beside it is not a base score — recomputing it here would replace
+// what somebody published with an answer to a different question.
+func rating(ratings []publishedRating) rated {
 	for _, published := range ratings {
 		if published.Metrics.BaseScore > 0 && published.Vector != "" {
 			return rated{

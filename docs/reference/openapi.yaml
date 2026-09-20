@@ -2854,6 +2854,9 @@ components:
           description: The severity as a number, which is what the order compares
           format: double
           type: number
+        score_version:
+          description: The scoring system the number is on
+          type: string
         sent_back:
           description: A live claim at one of these places is currently with its author, sent back for more
           type: boolean
@@ -3025,6 +3028,9 @@ components:
         score:
           format: double
           type: number
+        score_version:
+          description: The scoring system the number is on
+          type: string
         severity:
           description: Our rating where one stands, else as published
           type: string
@@ -3485,6 +3491,9 @@ components:
         score:
           format: double
           type: number
+        score_version:
+          description: The scoring system the number is on
+          type: string
         severity:
           type: string
         total:
@@ -7094,8 +7103,12 @@ components:
         vector:
           description: As it was read, upper-cased
           type: string
+        version:
+          description: The scheme the vector is on
+          type: string
       required:
         - vector
+        - version
         - score
         - severity
       type: object
@@ -19918,18 +19931,22 @@ paths:
       description: |-
         Returns the base score and the severity band a vector works out to. It reads nothing and records nothing.
 
-        CVSS 3.0 and 3.1 only. Version 4 has a different base formula and version 2 is a different scheme, and scoring either with this one produces a number nothing downstream could tell apart from a real one.
+        An empty vector is refused rather than answered with empty fields.
+
+        CVSS 3.0, 3.1 and 4.0. A vector on any other scheme is refused, including version 2. Metrics outside the base set are read and ignored, so a vector carrying threat or environmental metrics scores as the base vector in it.
+
+        Scores from two schemes are not comparable as numbers. The severity band is, and it is the same five words over the same five ranges under both.
 
         Requires: any signed-in person, and not a pipeline key. Answers a calculation, and reads nothing.
       operationId: score-vector
       parameters:
-        - description: A CVSS 3.0 or 3.1 base vector
+        - description: A CVSS 3.0, 3.1 or 4.0 base vector
           explode: false
           in: query
           name: vector
           required: true
           schema:
-            description: A CVSS 3.0 or 3.1 base vector
+            description: A CVSS 3.0, 3.1 or 4.0 base vector
             type: string
       responses:
         "200":
