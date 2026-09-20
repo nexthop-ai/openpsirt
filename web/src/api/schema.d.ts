@@ -6530,6 +6530,8 @@ export interface components {
             products: number;
             /** Format: double */
             score?: number;
+            /** @description The scoring system the number is on */
+            score_version?: string;
             severity?: string;
             /** Format: int64 */
             total: number;

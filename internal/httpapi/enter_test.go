@@ -700,3 +700,59 @@ func quotedJSON(s string) string {
 	}
 	return string(encoded)
 }
+
+func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
+	// A number alone is not readable across schemes, and a rule enforced at
+	// one of six places holds until somebody does their job. Two of these
+	// leave the deployment as files a script reads, where a bare column of
+	// numbers from two schemes is a ranking that is not one.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
+				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		for _, at := range []struct{ what, path string }{
+			{"the findings list", "/v1/products/mine/findings?stream=master&variant=broadcom"},
+			{"the list across products", "/v1/findings"},
+			{"the issue", "/v1/issues/" + recorded.Identifier},
+			{"the forwarded document", "/v1/issues/" + recorded.Identifier + "/document"},
+			{"the export of one product", "/v1/products/mine/findings.csv"},
+			{"the export of every product", "/v1/findings.csv"},
+		} {
+			t.Run(at.what, func(t *testing.T) {
+				got := asPerson(t, r, "private-triage", http.MethodGet, at.path, "")
+				if got.Code != http.StatusOK {
+					t.Fatalf("GET %s answered %d: %s", at.path, got.Code, got.Body.String())
+				}
+				body := got.Body.String()
+				if !strings.Contains(body, recorded.Identifier) {
+					t.Fatalf("what was recorded is not in %s", at.what)
+				}
+				if !strings.Contains(body, "10") {
+					t.Fatalf("%s carries no score, so this checked nothing:\n%s", at.what, body)
+				}
+				// The vector states the scheme inside itself, so a surface
+				// carrying the vector would answer this without ever saying
+				// which scheme its number is on. Taken out before asking.
+				said := strings.ReplaceAll(body, "CVSS:4.0", "")
+				// The scheme, however the surface spells it. A payload says
+				// 4.0 in a field, a document says it in a sentence, and a
+				// spreadsheet says it in a column.
+				if !strings.Contains(said, "4.0") {
+					t.Errorf("%s carries the score and not the scheme it is on:\n%s",
+						at.what, body)
+				}
+			})
+		}
+	})
+}

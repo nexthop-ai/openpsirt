@@ -122,7 +122,14 @@ func issueDocument(ctx context.Context, in Ingest, subject access.Subject,
 		said = append(said, known.Severity)
 	}
 	if known.Score > 0 {
-		said = append(said, fmt.Sprintf("%.1f", known.Score))
+		// The scheme with the number, where one is recorded. A document that
+		// leaves this deployment is read beside documents from elsewhere, and
+		// a bare number cannot be placed against one on the other scheme.
+		if known.ScoreVersion != "" {
+			said = append(said, fmt.Sprintf("%.1f on CVSS %s", known.Score, known.ScoreVersion))
+		} else {
+			said = append(said, fmt.Sprintf("%.1f", known.Score))
+		}
 	}
 	if known.Exploited {
 		said = append(said, "known exploited")

@@ -3491,6 +3491,9 @@ components:
         score:
           format: double
           type: number
+        score_version:
+          description: The scoring system the number is on
+          type: string
         severity:
           type: string
         total:
