@@ -184,7 +184,7 @@ func (s *Store) byName(ctx context.Context, subject access.Subject,
 		ColumnExpr("COUNT(*)").
 		Where("advisory_id = ?", row.ID).
 		Where("removed_at IS NULL").
-		Where("product_id NOT IN (?)", bun.In(seen(subject))).
+		Where("product_id NOT IN (?)", bun.List(seen(subject))).
 		Scan(ctx, &beyond); err != nil {
 		return nil, fmt.Errorf("check what advisory %q covers: %w", identifier, err)
 	}
@@ -447,7 +447,7 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 		TableExpr(`"advisory" AS "ad"`).
 		Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
 			WHERE ac.advisory_id = ad.id AND ac.removed_at IS NULL
-			  AND ac.product_id NOT IN (?))`, bun.In(seen(subject)))
+			  AND ac.product_id NOT IN (?))`, bun.List(seen(subject)))
 
 	// Narrowed to what covers one issue, where a caller asked. A screen about
 	// one flaw is asking which advisories already say something about it,

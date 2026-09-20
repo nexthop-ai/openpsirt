@@ -74,7 +74,7 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 	if len(productIDs) > 0 {
 		q = q.Where(`EXISTS (SELECT 1 FROM "advisory_issue" AS "ai4"
 			WHERE ai4.advisory_id = ad.id AND ai4.removed_at IS NULL
-			  AND ai4.product_id IN (?))`, bun.In(productIDs))
+			  AND ai4.product_id IN (?))`, bun.List(productIDs))
 	}
 	// Either side, or neither: an unbounded side is the beginning or now,
 	// which is what a period's zero side means everywhere else here.
@@ -104,7 +104,7 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 			  AND f.vulnerability_id = ac.vulnerability_id
 			  AND f.kind = ?
 			  AND f.visibility IN (?)))`,
-		finding.Entered, bun.In(readable(subject)))
+		finding.Entered, bun.List(readable(subject)))
 
 	var rows []Went
 	if err := q.Scan(ctx, &rows); err != nil {

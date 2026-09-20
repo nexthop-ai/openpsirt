@@ -570,14 +570,6 @@ func (s *Store) releases(ctx context.Context, subject access.Subject,
 	return releases, nil
 }
 
-// statusOf says where the document sits in its life.
-func statusOf(row *finding.Finding) string {
-	if row.Visibility == access.Private {
-		return "draft"
-	}
-	return "final"
-}
-
 func categoryOf(p publisher.Named) string {
 	if p.Category == "" {
 		return "vendor"

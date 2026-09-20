@@ -241,7 +241,7 @@ func TestNoTwoOperationsClaimOneMethodAndPath(t *testing.T) {
 		if strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		body, err := os.ReadFile(name)
+		body, err := os.ReadFile(name) //nolint:gosec // G304: every path is this package's own source
 		if err != nil {
 			t.Fatal(err)
 		}
