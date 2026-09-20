@@ -389,9 +389,9 @@ run costs.
 
 | Engine | Setting | Where it is asked for |
 |---|---|---|
-| SQLite | `synchronous` off | A pragma on every test connection |
+| SQLite | `synchronous` off | A pragma on every test connection `dbtest` opens; `dbtest.Racing` builds its own handle and keeps the default |
 | PostgreSQL | `synchronous_commit` off | The connection string, so the session gets it and the server is untouched |
-| MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server, once per engine per binary — both are global on this protocol, so there is no session to ask |
+| MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server, once per engine per binary — both are global on this protocol, so there is no session to ask, and the change outlives the run for every database on that server |
 
 Nothing a test can observe changes. The settings govern what survives a crash,
 not what a statement returns, what a transaction sees, or which constraint an

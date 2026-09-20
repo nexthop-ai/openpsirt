@@ -44,7 +44,13 @@ func TestATestConnectionDoesNotWaitForACommitToReachDisk(t *testing.T) {
 			// Still durable, and the two reasons are different: a connection
 			// that may not set a global is one the suite runs on anyway, and
 			// one that may is a harness that stopped asking.
-			if _, err := db.ExecContext(ctx, `SET GLOBAL innodb_flush_log_at_trx_commit = 0`); err != nil {
+			//
+			// Asked by writing back the value the server already holds. A
+			// probe that sets the relaxed value repairs what it is checking,
+			// and a server kept between runs then reads both zeros and passes
+			// with the harness still silent.
+			if _, err := db.ExecContext(ctx,
+				`SET GLOBAL innodb_flush_log_at_trx_commit = ?`, flush); err != nil {
 				t.Skipf("this connection may not set a global, so the server keeps its own durability: %v", err)
 			}
 			t.Errorf("innodb_flush_log_at_trx_commit is %d and sync_binlog is %d on a connection that may set them, "+
