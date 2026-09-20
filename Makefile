@@ -208,9 +208,9 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || echo 2); h=$$((n / 2)); 	if [ $$h
 # time.
 test-all:
 	@( OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1 -p $(TEST_HALF) \
-	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$$$0; fflush() }' ) & detector=$$!; \
+	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$0; fflush() }' ) & detector=$$!; \
 	( OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1 -p $(TEST_HALF) \
-	    $(PACKAGES) 2>&1 | awk '{ print "[servers]      " $$$$0; fflush() }' ) & portability=$$!; \
+	    $(PACKAGES) 2>&1 | awk '{ print "[servers]      " $$0; fflush() }' ) & portability=$$!; \
 	failed=0; \
 	wait $$detector || failed=1; \
 	wait $$portability || failed=1; \
