@@ -404,9 +404,9 @@ func (a *assembly) status() string {
 // titleOf is what the document calls itself.
 //
 // What somebody titled it, where they did. An advisory covering several flaws
-// has no one sentence that describes it, so what stands in is the product it
-// is about and how many flaws it names — a title naming one of them would
-// describe the document as being about that one.
+// has no one sentence that describes it, so what stands in is its own name and
+// how many flaws it covers — a title naming one of them would describe the
+// document as being about that one.
 func titleOf(row *Advisory, a *assembly) string {
 	if row.Title != "" {
 		return row.Title
@@ -719,7 +719,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	return recorded, nil
 }
 
-// Issuances is what has gone out for one advisory, newest first.
+// Issuances is what has gone out for one advisory, oldest first.
 //
 // Readable without generating a document. Every issuance is already in the
 // document's own revision history, which is right for a reader of the document

@@ -158,9 +158,11 @@ Secret the chart makes or one you name.
 
 ## Advisory publication
 
-An advisory is a document about a flaw in your own product. It is generated
-from what this deployment already holds and handed to you; nothing is sent
-anywhere, and nothing records that you published it.
+An advisory is a document about flaws in your own products, under an
+identifier this deployment mints. It is generated from what the deployment
+already holds and handed to you; nothing is sent anywhere. That you published
+it is recorded when you say so, which is what lets the next document be a
+revision.
 
 Both a name and a namespace are needed for either to do anything. A CSAF
 document requires a publisher, so with one missing no advisory is generated and

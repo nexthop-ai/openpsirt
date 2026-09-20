@@ -105,8 +105,16 @@ export function Published() {
               <tbody>
                 {rows.map((row) => (
                   <tr key={`${row.advisory} ${row.ordinal}`} className="row">
+                    {/* The document it went out as. There is no screen for
+                        an advisory in its own right, so this goes to what the
+                        report is about: the document itself. */}
                     <td>
-                      <span className="id">{row.advisory}</span>
+                      <a
+                        className="id linkish"
+                        href={`/v1/advisories/${encodeURIComponent(row.advisory)}/document`}
+                      >
+                        {row.advisory}
+                      </a>
                       {row.title && <div className="hint">{row.title}</div>}
                     </td>
                     {/* Both counts, because one issue in three products and

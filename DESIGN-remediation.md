@@ -441,6 +441,9 @@ It names the issues it covers and the products each of those is covered in.
 | An issue is named once per product | The pair is what a status is stated about. Named twice, a reader gets two answers about one release and the document is refused |
 | Only a flaw recorded here | An issue a scanner reported against a third-party component is dependency hygiene a consumer reads out of the inventory. Refused when it is added rather than when the document is generated, so the refusal names the issue somebody chose |
 | An advisory with no issues generates nothing | The standard requires at least one, and a document about nothing is not a draft of anything |
+| An advisory is read whole or not at all | Somebody who may not see every issue it covers is told it does not exist, which is the answer a name nobody minted gets. A document with one of its products left out reads as a complete statement about a product it says nothing about, and a row saying one went out is as much a disclosure as the document |
+| One covering nothing is its minter's alone | Covering nothing it satisfies every narrowing there is, and its title is prose somebody typed that goes on to be the document's. The same holds for one whose issues were all taken off |
+| An issue taken off leaves its record | Who removed a flaw from a document is a question a deleted row does not answer. Naming it again revives that record rather than writing a second, which is also what keeps the pair unique |
 
 An advisory is the rare, deliberate document. A vendor does not notify a
 customer per inherited issue: those reach the release note and the disposition
@@ -567,15 +570,16 @@ decision's identifier, and its words are read by that identifier.
 An issuance records when an advisory went out, by whom, and a digest of what
 went out. It is keyed on the advisory, which is what makes a revision of a
 document covering two issues one record rather than two.
-Without it a second advisory for the same flaw could carry no revision history
+Without it a second document for the same advisory could carry no revision history
 and could not increment its version, both of which CSAF validators check.
 
 | Rule | Reason |
 |---|---|
 | It is a fact about a moment | What was published on a date cannot be worked out again once a release is added, a decision is revised or a fix lands |
-| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version and the revision history all move on generation or *because* of issuance. What is hashed is the title, the notes, the product tree and the vulnerability |
+| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version and the revision history all move on generation or *because* of issuance. What is hashed is the title, the product tree and the vulnerabilities |
 | The digest is taken from the document generated here | A caller-supplied digest is a digest of whatever they say, and both sides of the comparison must come from the same place |
 | The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
+| A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |
 
 ## Publisher identity
 

@@ -70,16 +70,34 @@ export function IssueAdvisory({
   // keyed away from.
   const draft = useMutation({
     mutationFn: async (of: string) => {
-      const started = await unwrap(
-        await api.POST("/v1/advisories", { body: { title: summaryTitle } }),
-      );
-      const name = started.advisory;
-      await unwrap(
-        await api.POST("/v1/advisories/{advisory}/issues", {
-          params: { path: { advisory: name } },
-          body: { product: of, vulnerability },
-        }),
-      );
+      // The one already started, where a previous attempt got that far. A
+      // name is minted before anything knows the flaw may be named on it, and
+      // most issues on this screen are a scanner's report about somebody
+      // else's component — which the add refuses. Minting again on each
+      // attempt spends a number out of the year's sequence that nothing
+      // removes, and the sequence is visible in the identifiers that do go
+      // out.
+      //
+      // No title. What an advisory is called is a decision somebody makes
+      // about a document, and the flaw's identifier is not one — sent here it
+      // would title a two-flaw document after whichever flaw started it,
+      // which is what the server's fallback exists to avoid.
+      let name = advisory;
+      if (name === "") {
+        const started = await unwrap(await api.POST("/v1/advisories", { body: {} }));
+        name = started.advisory;
+      }
+      try {
+        await unwrap(
+          await api.POST("/v1/advisories/{advisory}/issues", {
+            params: { path: { advisory: name } },
+            body: { product: of, vulnerability },
+          }),
+        );
+      } catch (failed) {
+        setAdvisory(name);
+        throw failed;
+      }
       const document = await unwrap(
         await api.GET("/v1/advisories/{advisory}/document", {
           params: { path: { advisory: name } },
@@ -107,7 +125,6 @@ export function IssueAdvisory({
     },
   });
 
-  const summaryTitle = `${vulnerability}`;
   const document = draft.data?.document;
   const written = useMemo(() => (document ? JSON.stringify(document, null, 2) : ""), [document]);
   if (products.length === 0) return null;

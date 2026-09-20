@@ -21,6 +21,15 @@ import (
 const startsAdvisory = "A triage role on some product. An advisory names no product " +
 	"until an issue is added to it, so there is none for the role to be held on here."
 
+// namesAFlaw is what naming a flaw on an advisory, or taking one off, asks
+// for.
+//
+// The role on the product named in the request rather than on some product:
+// naming a flaw is what puts it into a document published about that product,
+// and taking one back off is as much a statement about it.
+const namesAFlaw = "A triage role on the product named in the request. Naming a flaw on " +
+	"an advisory is what puts it into a document published about that product."
+
 // advisoryRefused maps what the store refuses to what a caller is told.
 func advisoryRefused(in Ingest, err error, what string) error {
 	switch {
@@ -168,7 +177,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"component is refused, and refused at this point rather than when the document " +
 			"is generated, so the refusal names the issue you chose.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, anyPerson, startsAdvisory, triageRights()...), func(ctx context.Context, input *struct {
+	}, anyPerson, namesAFlaw, triageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 		Body     struct {
 			Product       string `json:"product" minLength:"1"`
@@ -209,7 +218,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"went out at a moment, and editing the advisory afterwards is how the next " +
 			"revision differs from the last.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
-	}, anyPerson, startsAdvisory, triageRights()...), func(ctx context.Context, input *struct {
+	}, anyPerson, namesAFlaw, triageRights()...), func(ctx context.Context, input *struct {
 		Advisory      string `path:"advisory"`
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`

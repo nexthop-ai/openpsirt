@@ -237,7 +237,7 @@ export interface paths {
          *
          *     Only a flaw recorded here. An issue a scanner reported against a third-party component is refused, and refused at this point rather than when the document is generated, so the refusal names the issue you chose.
          *
-         *     Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
          */
         post: operations["add-advisory-issue"];
         delete?: never;
@@ -262,7 +262,7 @@ export interface paths {
          *
          *     Nothing here asks whether the advisory has gone out. An issuance records what went out at a moment, and editing the advisory afterwards is how the next revision differs from the last.
          *
-         *     Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
          */
         delete: operations["drop-advisory-issue"];
         options?: never;

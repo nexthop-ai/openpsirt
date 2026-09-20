@@ -68,9 +68,9 @@ export function Issue() {
 
   const it = found.data;
   const rows = it?.items ?? [];
-  // The products carrying it, once each and in the order they appear. The
-  // advisory is a statement about one product, and this issue may sit in
-  // several.
+  // The products carrying it, once each and in the order they appear. An
+  // advisory names a flaw together with the product it is covered in, and
+  // this issue may sit in several.
   // Anything of it still undisclosed there is folded in per
   // product, because one undisclosed place makes the whole of it undisclosed
   // for anybody deciding what may be said about it.

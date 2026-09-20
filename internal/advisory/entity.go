@@ -21,7 +21,8 @@ import (
 //
 // A configuration gap rather than a bad request, the way a missing publisher
 // is: whoever is asking cannot fix it, and an operator can.
-var ErrNoPrefix = errors.New("no advisory identifier prefix is configured")
+var ErrNoPrefix = errors.New(
+	"no advisory identifier prefix is configured: set OPENPSIRT_ADVISORY_PREFIX")
 
 // ErrNoSuchAdvisory says there is no advisory by that name that this reader
 // may see.
@@ -179,16 +180,30 @@ func (s *Store) byName(ctx context.Context, subject access.Subject,
 		return nil, database.FromRead(err, ErrNoSuchAdvisory,
 			fmt.Sprintf("look up advisory %q", identifier))
 	}
-	var beyond int
-	if err := s.db.NewSelect().Model((*Cover)(nil)).
-		ColumnExpr("COUNT(*)").
-		Where("advisory_id = ?", row.ID).
-		Where("removed_at IS NULL").
-		Where("product_id NOT IN (?)", bun.List(seen(subject))).
-		Scan(ctx, &beyond); err != nil {
+	var held struct {
+		Live   int `bun:"live"`
+		Beyond int `bun:"beyond"`
+	}
+	if err := s.db.NewSelect().
+		TableExpr(`"advisory_issue" AS "ac"`).
+		ColumnExpr(`COUNT(*) AS "live"`).
+		ColumnExpr(`SUM(CASE WHEN ac.product_id IN (?) THEN 0 ELSE 1 END) AS "beyond"`,
+			bun.List(seen(subject))).
+		Where("ac.advisory_id = ?", row.ID).
+		Where("ac.removed_at IS NULL").
+		Scan(ctx, &held); err != nil {
 		return nil, fmt.Errorf("check what advisory %q covers: %w", identifier, err)
 	}
-	if beyond > 0 {
+	if held.Beyond > 0 {
+		return nil, ErrNoSuchAdvisory
+	}
+	// An advisory covering nothing is its minter's alone. Covering nothing it
+	// satisfies every narrowing there is, and its title is prose somebody
+	// typed that goes on to be the document's — so between minting it and
+	// naming the first flaw on it, "Remote code execution in the recovery
+	// console" would be readable by anybody signed in. The same holds for one
+	// whose issues were all taken off.
+	if held.Live == 0 && row.MintedBy != subject.ID {
 		return nil, ErrNoSuchAdvisory
 	}
 	return &row, nil
@@ -197,9 +212,12 @@ func (s *Store) byName(ctx context.Context, subject access.Subject,
 // seen is the products this subject may read findings in, as a list a
 // statement can bind.
 //
-// A person holding every product is given a sentinel no product identifier
-// takes, because "everything" has no list and a statement asking for one needs
-// something to bind.
+// A person holding every product is answered with nothing, which a binder
+// renders as a null — and a product identifier is never in a list of one null,
+// so a clause asking for the covers outside what they hold finds none. A
+// person holding no product is given a sentinel no identifier takes, because
+// a statement asking for a list needs something to bind and an empty one is
+// not it.
 func seen(subject access.Subject) []int64 {
 	products, all := subject.Products()
 	if all {
@@ -288,6 +306,13 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 			AdvisoryID: row.ID, ProductID: named.ID, VulnerabilityID: issue.ID,
 			AddedAt: added, AddedBy: subject.ID,
 		}).Exec(ctx)
+		// The count above turns the constraint into a refusal a caller can
+		// act on, and the constraint is what actually decides it: two writers
+		// arriving together both read nothing and both insert, and the loser
+		// would otherwise carry the raw constraint up as a fault.
+		if database.IsDuplicate(err) {
+			return ErrAlreadyCovered
+		}
 		return err
 	})
 	if errors.Is(err, ErrAlreadyCovered) {
@@ -454,7 +479,12 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 		TableExpr(`"advisory" AS "ad"`).
 		Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
 			WHERE ac.advisory_id = ad.id AND ac.removed_at IS NULL
-			  AND ac.product_id NOT IN (?))`, bun.List(seen(subject)))
+			  AND ac.product_id NOT IN (?))`, bun.List(seen(subject))).
+		// And one covering nothing is its minter's alone, for the reason
+		// reading one by name applies: covering nothing it satisfies every
+		// narrowing, and its title is prose somebody typed.
+		Where(`(ad.minted_by = ? OR EXISTS (SELECT 1 FROM "advisory_issue" AS "al"
+			WHERE al.advisory_id = ad.id AND al.removed_at IS NULL))`, subject.ID)
 
 	// Narrowed to what covers one issue, where a caller asked. A screen about
 	// one flaw is asking which advisories already say something about it,
@@ -469,7 +499,7 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 		q = q.Where(`EXISTS (SELECT 1 FROM "advisory_issue" AS "ac3"
 			JOIN "product" AS "pd3" ON pd3.id = ac3.product_id
 			WHERE ac3.advisory_id = ad.id AND ac3.removed_at IS NULL
-			  AND pd3.name = ?)`, over.Product)
+			  AND pd3.name = ?)`, fold(over.Product))
 	}
 
 	total, err := q.Clone().Count(ctx)

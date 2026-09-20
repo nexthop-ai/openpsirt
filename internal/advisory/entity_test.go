@@ -195,6 +195,29 @@ func TestAnIssueIsNamedOncePerProductAndRefusedWhereAScannerReportedIt(t *testin
 	})
 }
 
+func TestAListNarrowedToAProductIsMatchedHoweverItIsTyped(t *testing.T) {
+	// A product's name is stored folded, so a filter comparing what somebody
+	// typed against it answers an empty list for the same product spelled
+	// with capitals — and an empty list is a real answer, so nothing says it
+	// went wrong.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		f.covering(t, [2]string{"sonic", identifier})
+		for _, typed := range []string{"sonic", "SONiC", "  SoNiC  "} {
+			t.Run(typed, func(t *testing.T) {
+				rows, total, err := f.store.List(t.Context(), f.who,
+					advisory.Covering{Product: typed}, 0, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if total != 1 || len(rows) != 1 {
+					t.Errorf("%q matched %d of %d advisories", typed, len(rows), total)
+				}
+			})
+		}
+	})
+}
+
 func TestAnAdvisoryCoveringNothingGeneratesNothing(t *testing.T) {
 	// The standard requires at least one vulnerability, and a document about
 	// nothing is not a draft of anything.
@@ -485,6 +508,63 @@ func TestWhatWentOutAboutAnotherProductIsNotReported(t *testing.T) {
 		}
 		if len(rows) != 0 {
 			t.Errorf("an advisory about another product was reported here: %+v", rows)
+		}
+	})
+}
+
+func TestAnAdvisoryCoveringNothingIsItsMintersAlone(t *testing.T) {
+	// Covering nothing it satisfies every narrowing there is — the check is
+	// for covers outside what a reader holds, and there are none. Its title
+	// is prose somebody typed that goes on to be the published document's, so
+	// between minting it and naming the first flaw, anybody signed in could
+	// read it. The same holds for one whose issues were all taken off.
+	each(t, func(t *testing.T, f *fixture) {
+		made, err := f.store.Mint(t.Context(), f.who, issuer,
+			"Remote code execution in the recovery console")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Somebody else who triages the same products, so nothing but the
+		// emptiness rules them out.
+		other := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{
+				f.product:      {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				f.otherProduct: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+			}, 0)
+		if _, _, err := f.store.Covers(t.Context(), other, made.Identifier); !errors.Is(
+			err, advisory.ErrNoSuchAdvisory) {
+			t.Errorf("somebody else read an empty advisory's title: %v", err)
+		}
+		rows, total, err := f.store.List(t.Context(), other, advisory.Covering{}, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 0 || total != 0 {
+			t.Errorf("an empty advisory was listed to somebody else: %d of %d", len(rows), total)
+		}
+		// Its minter still reads it, which is what makes this a narrowing
+		// rather than a hole somebody falls into after minting.
+		if _, _, err := f.store.Covers(t.Context(), f.who, made.Identifier); err != nil {
+			t.Errorf("the minter could not read what they had just started: %v", err)
+		}
+
+		// And once it covers something, the ordinary rule takes over.
+		identifier := f.recorded(t, f.master)
+		if _, err := f.store.Add(t.Context(), f.who, made.Identifier,
+			"sonic", identifier); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := f.store.Covers(t.Context(), other, made.Identifier); err != nil {
+			t.Errorf("somebody who may see everything it covers was refused: %v", err)
+		}
+		// Emptied again, it goes back to being its minter's.
+		if err := f.store.Drop(t.Context(), f.who, made.Identifier,
+			"sonic", identifier); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := f.store.Covers(t.Context(), other, made.Identifier); !errors.Is(
+			err, advisory.ErrNoSuchAdvisory) {
+			t.Errorf("an emptied advisory stayed readable: %v", err)
 		}
 	})
 }
