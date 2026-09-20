@@ -96,13 +96,13 @@
   z-index: var(--z-fab);
   width: 52px;
   height: 52px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--canvas);
   border: 0;
   cursor: pointer;
   box-shadow:
-    0 8px 22px color-mix(in oklab, var(--accent) 45%, transparent),
+    0 6px 18px rgb(0 0 0 / 22%),
     0 1px 2px rgb(0 0 0 / 20%);
   display: grid;
   place-items: center;

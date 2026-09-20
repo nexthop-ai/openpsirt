@@ -128,17 +128,29 @@ they can reach.
 
 ## The look
 
-The tokens, the type scale, the shell and every component come from the restyled
-mockup, taken as settled rather than approximated (REQ-60). The mockup drew the
-interface inside a frame; here the frame is the page, so its tokens sit on the
-root element and its grid on the application container. That is the whole
-translation, and it is why a screen here can be put beside its mockup and
-compared control for control.
+The shell — the rail, the top bar, the scope picker — is the restyled mockup's,
+taken as settled rather than approximated (REQ-60). The work surface below it
+is quieter than the mockup drew it, and § Divergence from the mockup lists each
+difference. The mockup drew the interface inside a frame; here the frame is the
+page, so its tokens sit on the root element and its grid on the application
+container.
 
 Two looks, one markup. A look is a token set — colors, the two typefaces, radii,
 shadows — and nothing else. One is a dark rail over a light surface; the other
 is dark throughout. They are called light mode and dark mode, because that is
 what every other application on the same screen calls them.
+
+### The work surface
+
+| Rule | |
+|---|---|
+| One plane | The canvas and the surface are the same color. A card, a table and a figure are set off by a hairline and nothing else; a shadow says there are two planes, and it is kept for what floats — a list of suggestions, the picker, a drawer |
+| Corners are small | Six pixels on a control and eight on a card. A tag takes four |
+| A label is sentence case | The label over a block, a column head, a field's name and a figure's caption are the words a person would use, in the muted tone and at the small step. Uppercase is kept for the two marks that are read as marks — known-exploited and a bulk claim |
+| The primary button is ink | Black on the canvas in the light look, white on it in the dark look. The accent is for what opens something, so a button and a link never read as the same kind of thing. A secondary button is the same outline in two weights of text |
+| A pressed filter is ink too | A chip or a segment that is on is drawn in ink, and a filter in force above the list sits on the raised tone with its label quieter than its value. Neither borrows the accent, because a state and a link must not read alike on one toolbar |
+| Severity is a dot and a word | Colored by the band, with no fill behind them. A tinted pill on every row of a fifty-row list is fifty patches of color competing with the column that is read first |
+| A count beside a tab is a number | Quieter than the word it counts and the same shape whether the tab is selected or not |
 
 | Rule | |
 |---|---|
@@ -1570,6 +1582,10 @@ than inherited.
 | The sign-in screen is drawn where there is one way in | It is sent straight on to the provider. Nothing is collected there and there is nothing to choose, so the screen was a button whose only purpose was to be pressed. Three arrivals still draw it: the offer made over live work after a session ended, the one straight after a sign-out — where the provider still holds its own session, so forwarding signs somebody back in and makes signing out impossible — and any second arrival in a tab that already forwarded, because somebody refused after authenticating has to be able to reach a screen rather than be sent round again |
 | The inventories table carries product, branch and variant columns | The screen is scoped to one build, so those are the scope bar rather than a column repeated on every row. What it adds is when the producer says the build was made |
 | Settings write "3 days" in the field | The server takes and returns its own duration syntax, so what is typed is what is stored and the reading — "= 3 days" — sits beside it rather than in it |
+| A gray canvas with white cards raised on a shadow | One white plane with hairlines. § The work surface holds the whole of it |
+| Uppercase, letter-spaced labels over every block | Sentence case, at the small step, in the muted tone |
+| The accent on the primary button, on a pressed chip and on a selected tab | Ink on all three. The accent is kept for what opens something |
+| A tinted pill for the severity word | A dot and the word, colored by the band |
 
 The trend is drawn by hand rather than by the charting library. Open runs to
 thousands and a week's new or resolved to tens, so on the library's one shared
