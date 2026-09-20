@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -196,6 +197,13 @@ type Config struct {
 	// PublisherCategory is what the standard calls the kind of publisher.
 	// A deployment publishing about its own product is a vendor.
 	PublisherCategory string
+	// AdvisoryPrefix is what a minted advisory identifier opens with.
+	//
+	// No default. An identifier is what a reader cites a document by and what
+	// they search for later, so a generic one traceable to no publisher is
+	// worse than refusing to mint: the refusal is fixed once by an operator,
+	// and the identifier is in every document that went out.
+	AdvisoryPrefix string
 	// UpstreamInternal are names this deployment never sends to a public
 	// package index, on top of the ones derived from the publisher's
 	// namespace and from what the scans were about.
@@ -292,6 +300,7 @@ func Load() (Config, error) {
 		PublisherName:          env("PUBLISHER_NAME", ""),
 		PublisherNamespace:     env("PUBLISHER_NAMESPACE", ""),
 		PublisherCategory:      env("PUBLISHER_CATEGORY", "vendor"),
+		AdvisoryPrefix:         env("ADVISORY_PREFIX", ""),
 		UpstreamInternal:       listed(env("UPSTREAM_INTERNAL", "")),
 		TrustedGroupsHeader:    env("TRUSTED_GROUPS_HEADER", ""),
 		TrustedGroupsDelimiter: env("TRUSTED_GROUPS_DELIMITER", ","),
@@ -373,6 +382,14 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("OPENPSIRT_PUBLISHER_CATEGORY: want one of "+
 			"\"coordinator\", \"discoverer\", \"other\", \"translator\", \"user\" or "+
 			"\"vendor\", got %q", c.PublisherCategory)
+	}
+	// The value reaches every advisory identifier verbatim, and an identifier
+	// is matched, cited and searched for. Refused at startup beside the two
+	// above, for the reason those are: the alternative is documents that are
+	// wrong in a way only a reader outside this deployment notices.
+	if c.AdvisoryPrefix != "" && !advisoryPrefix.MatchString(c.AdvisoryPrefix) {
+		return Config{}, fmt.Errorf("OPENPSIRT_ADVISORY_PREFIX: want a letter followed by up "+
+			"to nineteen letters, digits or hyphens, got %q", c.AdvisoryPrefix)
 	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")
@@ -512,3 +529,9 @@ func listed(raw string) []string {
 	}
 	return names
 }
+
+// advisoryPrefix is the shape a minted advisory identifier may open with.
+//
+// Upper case, because the identifier is folded for matching and a prefix that
+// varies in case would read as two publishers to anybody scanning a list.
+var advisoryPrefix = regexp.MustCompile(`^[A-Z][A-Z0-9-]{0,19}$`)

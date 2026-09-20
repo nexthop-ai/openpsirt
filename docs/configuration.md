@@ -172,6 +172,7 @@ validation after you have sent it.
 | `OPENPSIRT_PUBLISHER_NAME` | The organization advisories say issued them. Set it and the namespace together, or neither | unset |
 | `OPENPSIRT_PUBLISHER_NAMESPACE` | A URL identifying that organization, which is what a reader of a CSAF document matches on | unset |
 | `OPENPSIRT_PUBLISHER_CATEGORY` | What the standard calls the kind of publisher: `coordinator`, `discoverer`, `other`, `translator`, `user` or `vendor`. A deployment publishing about its own product is a vendor. Anything else is refused at startup — the value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them | `vendor` |
+| `OPENPSIRT_ADVISORY_PREFIX` | What a minted advisory identifier opens with, before the year and a number within it — the half a reader recognizes the publisher by. A letter followed by up to nineteen letters, digits or hyphens, upper case; anything else is refused at startup. Unset, no advisory can be started and the refusal says so: an identifier traceable to no publisher is in every document that went out, where a refusal is fixed once | unset |
 
 On the Helm chart these go through `extraEnv`, since a deployment that does not
 publish needs none of them.
