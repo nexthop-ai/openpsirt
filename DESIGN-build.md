@@ -349,10 +349,12 @@ alive at once is what a single pass has, and the peak memory falls rather than
 rises: 119 s and 3.4 GB run one after another, 100 s and 1.5 GB run together,
 on twelve cores with everything warm.
 
-Each pass writes to its own file and both are printed when they finish.
-Interleaved, two runs of fifty packages are two answers to "did it pass" with no
-way to tell which said what. A failure in either fails the target, which is
-checked by breaking one pass at a time and watching it go red.
+Each pass labels its own lines. Held and printed at the end, a run says nothing
+for the whole of it — on a slow machine a quarter of an hour of a log that looks
+stopped — and interleaved without labels, two runs of fifty packages are two
+answers to "did it pass" with no way to tell which said what. A failure in
+either fails the target, which is checked by breaking one pass at a time and
+watching it go red.
 
 `OPENPSIRT_TEST_ENGINES` narrows which engines a run touches, and `test` and
 `test-race` both set it to `sqlite`. The pool's idle reaper, the migration lock

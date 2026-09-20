@@ -192,10 +192,24 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || echo 2); h=$$((n / 2)); 	if [ $$h
 # cores with everything warm, and more where the two passes are further apart
 # in length than they are here.
 #
-# Output is held and printed per pass. Interleaved, two runs of fifty packages
-# are two answers to "did it pass" with no way to tell which said what.
+# Each pass labels its own lines rather than being held and printed at the
+# end. Held, a run says nothing for the whole of it — which on a slow machine
+# is a quarter of an hour of a log that looks stopped — and interleaved without
+# labels, two runs of fifty packages are two answers to "did it pass" with no
+# way to tell which said what.
+#
+# The label goes through a pipe, and the shell here runs with pipefail, so a
+# failing pass is still a failing pipeline. Watched going red one pass at a
+# time.
 test-all:
-	@race=$$(mktemp); servers=$$(mktemp); 	trap 'rm -f "$$race" "$$servers"' EXIT; 	OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1 -p $(TEST_HALF) 	  $(PACKAGES) > "$$race" 2>&1 & detector=$$!; 	OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1 -p $(TEST_HALF) 	  $(PACKAGES) > "$$servers" 2>&1 & portability=$$!; 	failed=0; 	wait $$detector || failed=1; 	wait $$portability || failed=1; 	echo "--- the race detector, on SQLite ---"; cat "$$race"; 	echo "--- the three server engines ---"; cat "$$servers"; 	exit $$failed
+	@( OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1 -p $(TEST_HALF) \
+	    $(PACKAGES) 2>&1 | sed 's/^/[sqlite -race] /' ) & detector=$$!; \
+	( OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1 -p $(TEST_HALF) \
+	    $(PACKAGES) 2>&1 | sed 's/^/[servers]      /' ) & portability=$$!; \
+	failed=0; \
+	wait $$detector || failed=1; \
+	wait $$portability || failed=1; \
+	exit $$failed
 
 # The detector, on the engine every checkout has. Its own target, for running
 # one pass by hand; the gate runs both at once through test-all.
