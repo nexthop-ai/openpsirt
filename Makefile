@@ -198,14 +198,19 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || echo 2); h=$$((n / 2)); 	if [ $$h
 # labels, two runs of fifty packages are two answers to "did it pass" with no
 # way to tell which said what.
 #
+# The label is flushed per line. Left to its own buffering a filter holds four
+# kilobytes before writing, which on a pipe is most of a pass — so the log went
+# quiet exactly as it did when the output was held deliberately, and for a
+# reason harder to see.
+#
 # The label goes through a pipe, and the shell here runs with pipefail, so a
 # failing pass is still a failing pipeline. Watched going red one pass at a
 # time.
 test-all:
 	@( OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1 -p $(TEST_HALF) \
-	    $(PACKAGES) 2>&1 | sed 's/^/[sqlite -race] /' ) & detector=$$!; \
+	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$$$0; fflush() }' ) & detector=$$!; \
 	( OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1 -p $(TEST_HALF) \
-	    $(PACKAGES) 2>&1 | sed 's/^/[servers]      /' ) & portability=$$!; \
+	    $(PACKAGES) 2>&1 | awk '{ print "[servers]      " $$$$0; fflush() }' ) & portability=$$!; \
 	failed=0; \
 	wait $$detector || failed=1; \
 	wait $$portability || failed=1; \
