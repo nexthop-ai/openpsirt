@@ -14,6 +14,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Class-name checks](#class-name-checks)
 - [Database engines](#database-engines)
 - [Test databases](#test-databases)
+- [Commit durability](#commit-durability)
 - [Pinned pairs](#pinned-pairs)
 - [Hash pinning per ecosystem](#hash-pinning-per-ecosystem)
 - [Static analysis](#static-analysis)
@@ -378,6 +379,41 @@ directory — says so and runs alone.
 
 Together: one minute fifteen against warm servers and two minutes forty-five
 against cold ones, from four minutes four seconds.
+
+## Commit durability
+
+A test database is created by the harness and dropped by a later run, and a
+crash part-way through a suite is answered by running the suite again. The
+durability a commit waits for protects nothing here, and it is most of what a
+run costs.
+
+| Engine | Setting | Where it is asked for |
+|---|---|---|
+| SQLite | `synchronous` off | A pragma on every test connection |
+| PostgreSQL | `synchronous_commit` off | The connection string, so the session gets it and the server is untouched |
+| MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server, once per engine per binary — both are global on this protocol, so there is no session to ask |
+
+Nothing a test can observe changes. The settings govern what survives a crash,
+not what a statement returns, what a transaction sees, or which constraint an
+engine enforces.
+
+| Every package, one engine | Durable | Relaxed |
+|---|---|---|
+| PostgreSQL | 90 s | 60 s |
+| MySQL | 59 s | 12 s |
+| MariaDB | 19 s | 12 s |
+| The three together | 240 s | 77 s |
+
+The harness asks, rather than the command line the server was started with. A
+server a run meets is not always one this repository started: `make engines-up`
+passes the same intent at startup, which also reaches the settings an engine
+accepts only there, and a workflow declaring a service container has no command
+line to pass. Asking from the connection reaches both.
+
+A connection that may not set a global leaves the server as it is and the suite
+runs slower. A test reads the setting back from the session it was handed and
+fails where it is durable on a connection that could have changed it, which
+separates a harness that stopped asking from a server nobody may configure.
 
 ## Pinned pairs
 
