@@ -404,6 +404,14 @@ engine enforces.
 | MariaDB | 19 s | 12 s |
 | The three together | 240 s | 77 s |
 
+The saving belongs to the storage underneath rather than to the engines.
+Containers on a workstation pay the durable figures above. The servers a
+GitHub runner starts pay little enough that the whole server pass does not
+move: 412 s against 413 s, where the variance between two runs of the same
+tree is 5 s to 10 s on each of the large packages. The configuration this
+reaches is therefore a server somebody else started, which is the one
+`make engines-up` cannot pass a command line to.
+
 The harness asks, rather than the command line the server was started with. A
 server a run meets is not always one this repository started: `make engines-up`
 passes the same intent at startup, which also reaches the settings an engine
