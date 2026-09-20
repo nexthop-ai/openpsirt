@@ -158,6 +158,17 @@ describe("what a pasted vector is read as", () => {
     expect(read("")).toEqual({});
   });
 
+  it("keeps the first metric of a vector that states no scheme", () => {
+    // Dropping the first field whatever it holds eats a metric, and the one
+    // it eats is the one that would have said which scheme the vector is on:
+    // attack requirements belong to version 4 alone, so losing it stamps a
+    // version 4 vector as version 3.
+    expect(read("AT:N/AV:N/AC:L")).toEqual({ AT: "N", AV: "N", AC: "L" });
+    expect(versionOf("AT:N/AV:N/AC:L/PR:N/UI:N")).toBe("CVSS:4.0");
+    // And the scheme is still dropped where the vector opens with one.
+    expect(read("CVSS:4.0/AT:N/AV:N")).toEqual({ AT: "N", AV: "N" });
+  });
+
   it("reads it however it was capitalized", () => {
     expect(read("cvss:3.1/av:n/ac:l")).toEqual({ AV: "N", AC: "L" });
   });

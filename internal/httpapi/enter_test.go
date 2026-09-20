@@ -756,3 +756,16 @@ func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
 		}
 	})
 }
+
+func TestScoringAnEmptyVectorIsRefusedRatherThanAnswered(t *testing.T) {
+	// A parameter that is required is checked for being there rather than for
+	// saying anything, and scoring nothing answers nothing — so an empty one
+	// came back 200 with every field empty, including a severity this
+	// operation's own enumeration has no word for.
+	twoReach(t, func(t *testing.T, r *reach) {
+		got := asPerson(t, r, "triager", http.MethodGet, "/v1/score?vector=", "")
+		if got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("an empty vector answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}

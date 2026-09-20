@@ -3951,6 +3951,8 @@ export interface paths {
          * Score a CVSS vector
          * @description Returns the base score and the severity band a vector works out to. It reads nothing and records nothing.
          *
+         *     An empty vector is refused rather than answered with empty fields.
+         *
          *     CVSS 3.0, 3.1 and 4.0. A vector on any other scheme is refused, including version 2. Metrics outside the base set are read and ignored, so a vector carrying threat or environmental metrics scores as the base vector in it.
          *
          *     Scores from two schemes are not comparable as numbers. The severity band is, and it is the same five words over the same five ranges under both.

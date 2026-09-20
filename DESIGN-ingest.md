@@ -673,7 +673,7 @@ finding records is which the report states first.
 
 | Shape | |
 |---|---|
-| A version 3 vector carries the base metrics alone | None of 1,838 carried a temporal or environmental metric |
+| A version 3 vector carries the base metrics alone | None of the 1,838 version 3 ratings those 1,772 issues carry states a temporal or environmental metric |
 | A version 4 vector carries every metric the scheme has, with a placeholder where nothing was stated | 694 of 694 |
 | Where a version 4 vector states an exploit maturity, the number published beside it is not a base score | 163 of 694. The field is still the one a producer calls the base score, and the value is that metric applied to it |
 

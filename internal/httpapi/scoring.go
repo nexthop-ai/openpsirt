@@ -3,7 +3,9 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -16,6 +18,7 @@ func registerScoring(api huma.API, in Ingest) {
 		Summary: "Score a CVSS vector",
 		Description: "Returns the base score and the severity band a vector works out to. " +
 			"It reads nothing and records nothing.\n\n" +
+			"An empty vector is refused rather than answered with empty fields.\n\n" +
 			"CVSS 3.0, 3.1 and 4.0. A vector on any other scheme is refused, including " +
 			"version 2. Metrics outside the base set are read and ignored, so a vector " +
 			"carrying threat or environmental metrics scores as the base vector in it.\n\n" +
@@ -35,6 +38,15 @@ func registerScoring(api huma.API, in Ingest) {
 		if _, err := reading(ctx); err != nil {
 			return nil, err
 		}
+		// An empty vector is the caller's to fix. Required checks that the
+		// parameter is present rather than that it says anything, and scoring
+		// nothing answers nothing — which would leave every field of the
+		// reply empty, including a severity this operation's own enumeration
+		// has no word for.
+		if strings.TrimSpace(input.Vector) == "" {
+			return nil, asked(in.Logger,
+				fmt.Errorf("%w: state a vector to score", finding.ErrNotAVector))
+		}
 		scored, err := finding.Score(input.Vector)
 		if errors.Is(err, finding.ErrNotAVector) {
 			return nil, asked(in.Logger, err)
@@ -50,12 +62,10 @@ func registerScoring(api huma.API, in Ingest) {
 				Severity string  `json:"severity" enum:"none,low,medium,high,critical" doc:"The band the score falls in"`
 			}
 		}{}
-		if scored != nil {
-			out.Body.Vector = scored.Vector
-			out.Body.Version = scored.Scheme()
-			out.Body.Score = float64(scored.ScoreCenti) / 100
-			out.Body.Severity = scored.Severity
-		}
+		out.Body.Vector = scored.Vector
+		out.Body.Version = scored.Scheme()
+		out.Body.Score = float64(scored.ScoreCenti) / 100
+		out.Body.Severity = scored.Severity
 		return out, nil
 	})
 }

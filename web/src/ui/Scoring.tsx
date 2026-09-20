@@ -255,7 +255,11 @@ export function vectorOf(chosen: Record<string, string>, under: string): string 
 // somebody pasted from a scanner, and the eight this composes are still in it.
 export function read(vector: string): Record<string, string> {
   const chosen: Record<string, string> = {};
-  for (const part of vector.toUpperCase().split("/").slice(1)) {
+  const parts = vector.toUpperCase().split("/");
+  // The scheme, where the vector opens with one. Dropping the first field
+  // whatever it holds eats a metric on a vector that states no scheme, and
+  // the metric it eats is the one that would have said which scheme it is on.
+  for (const part of parts[0]?.startsWith("CVSS:") ? parts.slice(1) : parts) {
     const [metric, value] = part.split(":");
     if (metric && value) chosen[metric] = value;
   }
@@ -340,7 +344,8 @@ export function Scoring({
         )}
         {scored.data?.severity && (
           <span className="hint">
-            <b>{scored.data.score?.toFixed(1)}</b> · {scored.data.severity}
+            CVSS {scored.data.version} <b>{scored.data.score?.toFixed(1)}</b> ·{" "}
+            {scored.data.severity}
           </span>
         )}
         {vector === "" && answered > 0 && (
@@ -366,10 +371,7 @@ export function Scoring({
               ))}
             </select>
             {version === "CVSS:4.0" && (
-              <p className="hint">
-                Published advisories carry no score under 4.0. CSAF 2.0 has a field for a 3.x score
-                and none for a 4.0 one.
-              </p>
+              <p className="hint">Published advisories carry no score under 4.0.</p>
             )}
           </div>
           {metrics.map((metric) => (

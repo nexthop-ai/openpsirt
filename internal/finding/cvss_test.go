@@ -1,6 +1,7 @@
 package finding_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -66,8 +67,12 @@ func TestAVectorThisDoesNotUnderstandIsRefusedRatherThanScored(t *testing.T) {
 		{"nonsense", "not a vector"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
-			if _, err := finding.Score(c.vector); err == nil {
-				t.Errorf("%s was scored anyway", c.what)
+			// Pinned to the sentinel, not to there being an error. Two
+			// callers branch on it to answer the caller rather than reporting
+			// a fault, so an unwrapped refusal turns a malformed vector into
+			// a 500 where a sibling test demands a 422.
+			if _, err := finding.Score(c.vector); !errors.Is(err, finding.ErrNotAVector) {
+				t.Errorf("%s answered %v, want it named as the caller's to fix", c.what, err)
 			}
 		})
 	}

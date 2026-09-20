@@ -224,6 +224,12 @@ export function FindingsTable({
                         <span
                           className="hint"
                           style={{ marginLeft: 6 }}
+                          role="img"
+                          aria-label={
+                            row.score_version
+                              ? `${row.score.toFixed(1)} on CVSS ${row.score_version}`
+                              : undefined
+                          }
                           title={row.score_version ? `CVSS ${row.score_version}` : undefined}
                         >
                           {row.score.toFixed(1)}

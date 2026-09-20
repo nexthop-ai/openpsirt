@@ -2,6 +2,7 @@ package finding
 
 import (
 	"bufio"
+	"errors"
 	"math"
 	"os"
 	"strconv"
@@ -319,8 +320,12 @@ func TestAVersionFourVectorIsRefusedForWhatItLeavesOutOrGetsWrong(t *testing.T) 
 			"CVSS:4.0/AV:N/AV:L/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
-			if _, err := Score(c.vector); err == nil {
-				t.Errorf("%s was scored anyway", c.what)
+			// Pinned to the sentinel, not to there being an error. Two
+			// callers branch on it to answer the caller rather than reporting
+			// a fault, so an unwrapped refusal turns a malformed vector into
+			// a 500 where a sibling test demands a 422.
+			if _, err := Score(c.vector); !errors.Is(err, ErrNotAVector) {
+				t.Errorf("%s answered %v, want it named as the caller's to fix", c.what, err)
 			}
 		})
 	}
