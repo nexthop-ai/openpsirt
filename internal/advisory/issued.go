@@ -59,8 +59,12 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 		TableExpr(`"advisory_issuance" AS "ai"`).
 		Join(`JOIN "advisory" AS "ad" ON ad.id = ai.advisory_id`).
 		Join(`JOIN "person" AS "pe" ON pe.id = ai.issued_by`).
+		// The title the document carried when it went out, not the one the
+		// advisory has now. A record of what was published says what was
+		// published.
+		Join(`JOIN "advisory_edition" AS "ae" ON ae.id = ai.edition_id`).
 		ColumnExpr(`ad.identifier AS "advisory"`).
-		ColumnExpr(`COALESCE(ad.title, '') AS "title"`).
+		ColumnExpr(`COALESCE(ae.title, '') AS "title"`).
 		ColumnExpr(`ai.ordinal AS "ordinal"`).
 		ColumnExpr(`ai.summary AS "summary"`).
 		ColumnExpr(`pe.identity AS "issued_by"`).

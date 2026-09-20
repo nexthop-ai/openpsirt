@@ -149,6 +149,56 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /**
+         * Retitle an advisory
+         * @description Gives the advisory a new title, as a new edition of what it says.
+         *
+         *     Every agreement standing on the old title is taken back. A second person agreed to particular words, and different words are a document nobody has agreed to.
+         *
+         *     Requires a triage role on every product the advisory covers, because what it says about one of them is part of the same document as what it says about another.
+         *
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         */
+        patch: operations["retitle-advisory"];
+        trace?: never;
+    };
+    "/v1/advisories/{advisory}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an advisory
+         * @description Records that you have read what this advisory says and agree to it.
+         *
+         *     The agreement names the edition it was given against rather than the advisory. Retitling it, naming another flaw on it or taking one off opens a new edition and takes the agreement back, so what stands is always an agreement to the document as it reads now.
+         *
+         *     You may not agree to an advisory you started or whose current edition you wrote, and there is no override. A deployment with one person can therefore not publish an advisory, which is the control working rather than a gap in it.
+         *
+         *     Requires a triage role on every product the advisory covers.
+         *
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         */
+        post: operations["approve-advisory"];
+        /**
+         * Withdraw approval of an advisory
+         * @description Takes back every agreement standing on what the advisory says now.
+         *
+         *     An act somebody performs, rather than something an edit does for them: editing takes agreements back because the words moved, and this is somebody saying they no longer agree to words that have not.
+         *
+         *     It needs no agreement of its own. Taking one back stops a document going out, which exposes the question rather than hiding it.
+         *
+         *     Answers 422 where no agreement is standing.
+         *
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         */
+        delete: operations["withdraw-advisory-approval"];
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -210,6 +260,8 @@ export interface paths {
          *     It is what lets a second document be a revision. Without it a second document cannot carry a revision history or a higher version, and both are things CSAF validators check; a document that fails validation is one a customer's tooling drops.
          *
          *     The published advisory itself stays with whoever published it. The digest is what makes "is what is published still what we generate" a question with an answer, and it is taken from the document generated here rather than from anything sent — a digest of whatever a caller says answers nothing.
+         *
+         *     Answers 409 where nobody has agreed to what the advisory says.
          *
          *     Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
          */
@@ -4793,6 +4845,20 @@ export interface components {
             /** @description The moment the agreement was taken back, by the approver or by somebody editing the words it was given for */
             withdrawn_at?: string;
         };
+        AgreementBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AgreementBody.json
+             */
+            readonly $schema?: string;
+            agreed_at: string;
+            /**
+             * Format: int64
+             * @description The edition agreed to. A later edition is a document nobody has agreed to yet
+             */
+            edition: number;
+        };
         AlsoBuild: {
             stream: string;
             variant: string;
@@ -8558,6 +8624,16 @@ export interface components {
              */
             within: number;
         };
+        "Retitle-advisoryRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Retitle-advisoryRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What to call it. Empty, the document names the issues it covers */
+            title: string;
+        };
         "Revise-claimRequest": {
             /**
              * Format: uri
@@ -9881,6 +9957,101 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdvisoryBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retitle-advisory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Retitle-advisoryRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvisoryBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "approve-advisory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgreementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-advisory-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

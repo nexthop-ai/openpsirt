@@ -37,7 +37,9 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 			t.Errorf("its history reads as %+v", first.Document.Tracking.History)
 		}
 
-		// Somebody publishes it, and says so.
+		// Somebody publishes it, and says so. A second person agrees to what
+		// it says first, which is what an issuance asks for.
+		agreedTo(t, r, at)
 		got := asPerson(t, r, "private-triage", http.MethodPost, at+"/issuance",
 			`{"summary":"Initial publication"}`)
 		if got.Code != http.StatusCreated {
@@ -112,4 +114,19 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 				recorded.Digest, third.Digest)
 		}
 	})
+}
+
+// agreedTo has a second person agree to what the advisory at this path says,
+// which is what an issuance asks for.
+//
+// private-dispatcher holds private triage on the one product and did not start
+// any of these advisories, which is the pair of things agreeing asks of
+// somebody.
+func agreedTo(t *testing.T, r *reach, at string) {
+	t.Helper()
+	if got := asPerson(t, r, "private-dispatcher", http.MethodPost,
+		at+"/approval", ""); got.Code != http.StatusCreated {
+		t.Fatalf("agreeing to the advisory at %s answered %d: %s",
+			at, got.Code, got.Body.String())
+	}
 }

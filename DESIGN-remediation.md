@@ -3,7 +3,7 @@
 Declared fix intent, how the tool determines whether it arrived, and the
 documents generated from what was decided.
 
-Satisfies REQ-15, REQ-19, REQ-33, REQ-34, REQ-35, REQ-36, REQ-39.
+Satisfies REQ-15, REQ-19, REQ-24, REQ-28, REQ-33, REQ-34, REQ-35, REQ-36, REQ-39.
 
 Neighboring pieces: the escalation view, per-item time remaining and the SLA
 compliance rate are in `DESIGN-reporting.md`; the assignment model is in
@@ -23,6 +23,7 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 - [External links](#external-links)
 - [Publication](#publication)
 - [The advisory](#the-advisory)
+- [Editorial state](#editorial-state)
 - [The CSAF document](#the-csaf-document)
 - [The VEX document](#the-vex-document)
 - [Issuance records](#issuance-records)
@@ -453,6 +454,41 @@ inherited issue severe enough to say something about before the next release
 cut — single or low double digits a year. The trigger is a non-public issue
 becoming public.
 
+## Editorial state
+
+Where a document is in its life, read from what people did about it. A document
+nobody has published is a draft; one that has gone out and whose current words
+a second person agrees to is final; one that has gone out and has been edited
+since is published and still being worked on.
+
+| Status | Reached by |
+|---|---|
+| `draft` | Nothing has gone out |
+| `final` | It has gone out, and an agreement stands on what it says now |
+| `interim` | It has gone out, and it has been edited since |
+
+The embargo answers a different question and is answered elsewhere. A document
+about disclosed flaws can be unfinished, and one about an embargoed flaw can be
+ready to go — so how far a document may travel is its distribution label, read
+from whether anything it covers is still held back, and the editorial state
+says whether this is the publisher's settled word.
+
+### Editions and agreement
+
+An edition is what an advisory says at a point. It carries the title, which is
+the prose this deployment chose; what it covered at that moment is recoverable
+from when each flaw was named on it and taken off.
+
+| Rule | |
+|---|---|
+| An agreement names an edition | A second pair of eyes reads particular words. One naming the advisory would still be standing after somebody rewrote them, and nothing would report that (REQ-24 and REQ-28) |
+| Retitling, naming a flaw and taking one off each open a new edition | All three change what the document says. An approver read a document covering three flaws, and a fourth added under their agreement is one nobody read |
+| Opening an edition takes back every agreement standing on the one it replaced | The record says a second person did once agree, and to which edition |
+| Neither the person who started the advisory nor the author of the edition standing may agree to it | Whoever started it chose the name a reader cites it by and, in the ordinary case, the flaws it covers. There is no override, so a deployment with one person publishes no advisory — the control working rather than a gap in it |
+| Taking an agreement back is a person's act and needs no agreement of its own | An edit takes one back because the words moved; this is somebody saying they no longer agree to words that have not. It stops a document going out, which exposes the question rather than hiding it |
+| An advisory goes out once an agreement stands on what it says | The text is the company speaking. Whether the flaws behind it are public is not asked: an advisory about an embargoed flaw sent to a coordinating body is what coordinated disclosure is made of, and the distribution label is what keeps it safe |
+| An issuance names the edition that went out | The advisory moves on and what was published does not, so a record of March's document read through the advisory answers with June's title |
+
 ## The CSAF document
 
 A CSAF 2.0 document generated for one advisory, from what is already held.
@@ -464,7 +500,7 @@ Nothing is sent anywhere.
 | The document's identity is the advisory's minted identifier | A document naming an issue's identifier as its own tracking identifier claims to be the authority on that issue, which a coordinator is and this deployment is not |
 | One entry per issue, and one branch per product | The tree carries a vendor branch holding one product branch for each product the advisory covers, and every status names releases of the product the issue was covered in |
 | The publisher is deployment configuration, not an administrator's setting | It is the identity of the organization running this. Both a name and a namespace are required, because a document naming no publisher is not a CSAF document |
-| A document about an undisclosed flaw is a draft, and says so | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either |
+| A document about an undisclosed flaw travels no further, whatever its editorial state | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either. The distribution label is what carries this; the tracking status says where the document is in its life |
 | Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
 | The document's version is the last number its own revision history states | Counted separately the two disagree the moment an advisory has been issued once, and a validator compares them. They agree by accident for a document nobody has published, which is where the disagreement hides |
@@ -484,7 +520,7 @@ somebody deciding whether to act.
 | Scores | The CVSS base vector, scored here | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. A vector this deployment cannot score, or one on a scheme the standard's score object has no field for — version 4, which arrives with the standard's next version — yields nothing rather than a number in the wrong place |
 | Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gives it so somebody can reply, not so it can be published, and "anonymous" is a real answer to the question the credit field asks |
 | Remediations | Stated for the releases that still carry the flaw, and the details name the releases that do not | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
-| Distribution | The same fact the tracking status reads — a draft is RED, a disclosed document is WHITE | Handing a draft to somebody who may pass it on is the disclosure the embargo exists to hold. The labels are the standard's four, which is why a final document is WHITE rather than the word the protocol renamed it to |
+| Distribution | Whether anything it covers is still held back — RED while anything is, WHITE otherwise | Handing a document about a flaw nobody outside has been told about to somebody who may pass it on is the disclosure the embargo exists to hold, and that is true of a document at any point in its editorial life. The labels are the standard's four, which is why a disclosed document is WHITE rather than the word the protocol renamed it to |
 
 An address a report supplied goes through the rule an address stored beside a
 claim goes through, and a custom application scheme is dropped rather than
@@ -576,7 +612,7 @@ and could not increment its version, both of which CSAF validators check.
 | Rule | Reason |
 |---|---|
 | It is a fact about a moment | What was published on a date cannot be worked out again once a release is added, a decision is revised or a fix lands |
-| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version and the revision history all move on generation or *because* of issuance. What is hashed is the title, the product tree and the vulnerabilities |
+| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version, the revision history and the tracking status all move on generation or *because* of issuance. What is hashed is the title, the product tree and the vulnerabilities. The status leaves nothing unwatched: its other move is to `interim`, which follows a change to the words or the flaws covered, and both of those are hashed |
 | The digest is taken from the document generated here | A caller-supplied digest is a digest of whatever they say, and both sides of the comparison must come from the same place |
 | The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
 | A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |
@@ -609,13 +645,9 @@ Every adapter that would send an advisory somewhere, which is the whole of
 Publication above. The CSAF document is generated and served; no destination,
 no adapter and no route to one exists.
 
-An editorial state of the advisory's own. The document's tracking status is
-read from the disclosure of the issues it covers — draft while any of them is
-undisclosed — which is the embargo rather than a decision somebody made about
-the document. The two come apart in both directions: a document about
-disclosed issues can still be unfinished, and one about an embargoed issue can
-be ready to go. The standard's third status, for a document published and
-still being worked on, cannot be expressed at all.
+Prose of the deployment's own in the document beyond its title. An edition
+carries the title, and the rest of what a reader acts on is assembled from the
+flaws the advisory covers.
 
 ## Limits
 

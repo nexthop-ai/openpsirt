@@ -662,7 +662,14 @@ var tables = []string{
 	// Before advisory, product, vulnerability and person, all of which it
 	// points at.
 	"advisory_issue",
-	// After the two above, which point at it, and before person.
+	// Before advisory_edition, advisory and person, all of which it points
+	// at.
+	"advisory_approval",
+	// Before advisory and person, both of which it points at. The advisory
+	// points back at an edition with no foreign key, so only this direction
+	// has an order to keep.
+	"advisory_edition",
+	// After the four above, which point at it, and before person.
 	"advisory",
 	// Before person, which it points at.
 	"outbound",

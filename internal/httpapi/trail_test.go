@@ -346,8 +346,10 @@ var outsideTheTrail = map[string]string{
 	"reaffirm-claim":         "the decision record",
 	"reaffirm-decision":      "the decision record",
 	"add-advisory-issue":     "the decision record",
+	"approve-advisory":       "the decision record",
 	"drop-advisory-issue":    "the decision record",
 	"record-advisory-issued": "the decision record",
+	"retitle-advisory":       "the decision record",
 	"record-finding":         "the decision record",
 	"repromise-upgrade":      "the decision record",
 	"resolve-finding":        "the decision record",
@@ -364,10 +366,11 @@ var outsideTheTrail = map[string]string{
 
 	// Recorded on the thing it changed, with who and when. A second row in
 	// the trail would be a copy that can disagree with it.
-	"acknowledge-report": "recorded on the report, which names who answered it and when",
-	"redact-attachment":  "recorded on the attachment",
-	"upload-attachment":  "recorded on the attachment, which names who uploaded it",
-	"upload-scan":        "recorded as the scan's provenance",
+	"acknowledge-report":         "recorded on the report, which names who answered it and when",
+	"withdraw-advisory-approval": "recorded on the agreement, which names who took it back and when",
+	"redact-attachment":          "recorded on the attachment",
+	"upload-attachment":          "recorded on the attachment, which names who uploaded it",
+	"upload-scan":                "recorded as the scan's provenance",
 
 	// One person's own, and nothing anybody else reads changes.
 	"acknowledge-all-notifications": "their own notifications",

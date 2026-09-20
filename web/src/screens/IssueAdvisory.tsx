@@ -110,6 +110,17 @@ export function IssueAdvisory({
       void already.refetch();
     },
   });
+  // Agreeing to what the advisory says, which is what publishing asks for.
+  // Whoever started it may not, and neither may whoever wrote the words
+  // standing, so the refusal is the ordinary answer here rather than a fault.
+  const agree = useMutation({
+    mutationFn: async (of: string) =>
+      unwrap(
+        await api.POST("/v1/advisories/{advisory}/approval", {
+          params: { path: { advisory: of } },
+        }),
+      ),
+  });
   const record = useMutation({
     mutationFn: async (of: string) =>
       unwrap(
@@ -216,9 +227,10 @@ export function IssueAdvisory({
 
           {document && (
             <>
-              {/* The tracking block is what a reader checks first: a document
-              about an undisclosed flaw is a draft and says so, and reaching a
-              disclosure date discloses nothing. */}
+              {/* The tracking block is what a reader checks first. The status
+              says where the document is in its life; how far it may travel is
+              the distribution label, which is red while anything it covers is
+              still held back. */}
               <p className="hint">
                 <span className="id">{document.document?.tracking?.id}</span> · version{" "}
                 {document.document?.tracking?.version} · {document.document?.tracking?.status}
@@ -239,12 +251,27 @@ export function IssueAdvisory({
                 <button
                   type="button"
                   className="btn quiet"
+                  disabled={agree.isPending}
+                  onClick={() => agree.mutate(advisory)}
+                >
+                  {agree.isPending ? "Agreeing…" : "Agree to what it says"}
+                </button>
+                <button
+                  type="button"
+                  className="btn quiet"
                   disabled={record.isPending}
                   onClick={() => record.mutate(advisory)}
                 >
                   {record.isPending ? "Recording…" : "Record that it went out"}
                 </button>
               </div>
+              <p className="hint">
+                A second person agrees to what it says before it goes out. You cannot agree to one
+                you started or whose words you wrote.
+              </p>
+              {agree.error != null && (
+                <Failed error={agree.error} what="That could not be agreed to." />
+              )}
               <p className="hint">
                 Recorded here, published elsewhere. What went out cannot be rebuilt later, and a
                 revision needs the record of the first.

@@ -203,6 +203,7 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 		if len(gone.Items) != 0 {
 			t.Errorf("nothing has been published and %d issuances came back", len(gone.Items))
 		}
+		agreedTo(t, r, at)
 		if issued := asPerson(t, r, "private-triage", http.MethodPost, at+"/issuance",
 			`{"summary":"First advisory."}`); issued.Code != http.StatusCreated {
 			t.Fatalf("recording an issuance answered %d: %s", issued.Code, issued.Body.String())

@@ -324,6 +324,7 @@ func TestAnIssuanceIsOneRecordForADocumentCoveringTwoFlaws(t *testing.T) {
 		second := f.recorded(t, f.tagged)
 		named := f.covering(t, [2]string{"sonic", first}, [2]string{"sonic", second})
 
+		f.agreed(t, named)
 		if _, err := f.store.Issued(t.Context(), f.who, issuer, named, "Both"); err != nil {
 			t.Fatalf("recording that it went out: %v", err)
 		}
@@ -483,6 +484,7 @@ func TestWhatWentOutAboutAnotherProductIsNotReported(t *testing.T) {
 		// rules it out.
 		there := f.disclosed(t, f.other)
 		named := f.covering(t, [2]string{"switchd", there})
+		f.agreed(t, named)
 		if _, err := f.store.Issued(t.Context(), f.who, issuer, named, "Went out"); err != nil {
 			t.Fatalf("recording that it went out: %v", err)
 		}

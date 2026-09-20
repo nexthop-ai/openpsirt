@@ -38,8 +38,14 @@ func advisoryRefused(in Ingest, err error, what string) error {
 		// whoever is asking cannot fix it from here, and an operator can.
 		return huma.Error409Conflict(err.Error())
 	case errors.Is(err, advisory.ErrNotOurs), errors.Is(err, advisory.ErrAlreadyCovered),
-		errors.Is(err, advisory.ErrNothingToSay):
+		errors.Is(err, advisory.ErrNothingToSay), errors.Is(err, advisory.ErrAlreadyAgreed),
+		errors.Is(err, advisory.ErrNothingAgreed):
 		return asked(in.Logger, err)
+	case errors.Is(err, advisory.ErrSamePerson), errors.Is(err, advisory.ErrNotAgreed):
+		// The state the advisory is in refuses this, rather than the request
+		// being malformed. What a caller does about it is an act somewhere
+		// else — a second person agreeing, or the flaw being disclosed.
+		return huma.Error409Conflict(err.Error())
 	case errors.Is(err, advisory.ErrNoSuchAdvisory):
 		return huma.Error404NotFound(advisory.ErrNoSuchAdvisory.Error())
 	case errors.Is(err, advisory.ErrNoSuchIssue), errors.Is(err, catalog.ErrNotFound):
@@ -316,6 +322,107 @@ func registerAdvisory(api huma.API, in Ingest) {
 	})
 
 	huma.Register(api, requiring(huma.Operation{
+		OperationID: "retitle-advisory", Method: http.MethodPatch,
+		Path:    "/v1/advisories/{advisory}",
+		Summary: "Retitle an advisory",
+		Description: "Gives the advisory a new title, as a new edition of what it says.\n\n" +
+			"Every agreement standing on the old title is taken back. A second person " +
+			"agreed to particular words, and different words are a document nobody has " +
+			"agreed to.\n\n" +
+			"Requires a triage role on every product the advisory covers, because what it " +
+			"says about one of them is part of the same document as what it says about " +
+			"another.",
+		Tags: []string{"Findings"},
+	}, anyPerson, namesAFlaw, triageRights()...), func(ctx context.Context, input *struct {
+		Advisory string `path:"advisory"`
+		Body     struct {
+			Title string `json:"title" maxLength:"191" doc:"What to call it. Empty, the document names the issues it covers"`
+		}
+	}) (*struct{ Body AdvisoryBody }, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, noDatabase(in.Logger)
+		}
+		row, held, err := advisory.NewStore(in.DB.DB).Retitle(ctx, subject,
+			input.Advisory, input.Body.Title)
+		if err != nil {
+			return nil, advisoryRefused(in, err, "the advisory could not be retitled")
+		}
+		return &struct{ Body AdvisoryBody }{Body: bodyFor(row, held)}, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "approve-advisory", Method: http.MethodPost,
+		Path:    "/v1/advisories/{advisory}/approval",
+		Summary: "Approve an advisory",
+		Description: "Records that you have read what this advisory says and agree to it.\n\n" +
+			"The agreement names the edition it was given against rather than the " +
+			"advisory. Retitling it, naming another flaw on it or taking one off opens a " +
+			"new edition and takes the agreement back, so what stands is always an " +
+			"agreement to the document as it reads now.\n\n" +
+			"You may not agree to an advisory you started or whose current edition you " +
+			"wrote, and there is no override. A deployment with one person can therefore " +
+			"not publish an advisory, which is the control working rather than a gap in " +
+			"it.\n\n" +
+			"Requires a triage role on every product the advisory covers.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
+	}, anyPerson, namesAFlaw, triageRights()...), func(ctx context.Context, input *struct {
+		Advisory string `path:"advisory"`
+	}) (*struct {
+		Status int
+		Body   AgreementBody
+	}, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, noDatabase(in.Logger)
+		}
+		given, err := advisory.NewStore(in.DB.DB).Approve(ctx, subject, input.Advisory)
+		if err != nil {
+			return nil, advisoryRefused(in, err, "that could not be agreed to")
+		}
+		return &struct {
+			Status int
+			Body   AgreementBody
+		}{Status: http.StatusCreated, Body: AgreementBody{
+			Edition: given.EditionID, AgreedAt: given.ApprovedAt.Format(time.RFC3339),
+		}}, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "withdraw-advisory-approval", Method: http.MethodDelete,
+		Path:    "/v1/advisories/{advisory}/approval",
+		Summary: "Withdraw approval of an advisory",
+		Description: "Takes back every agreement standing on what the advisory says now.\n\n" +
+			"An act somebody performs, rather than something an edit does for them: " +
+			"editing takes agreements back because the words moved, and this is somebody " +
+			"saying they no longer agree to words that have not.\n\n" +
+			"It needs no agreement of its own. Taking one back stops a document going out, " +
+			"which exposes the question rather than hiding it.\n\n" +
+			"Answers 422 where no agreement is standing.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
+	}, anyPerson, namesAFlaw, triageRights()...), func(ctx context.Context, input *struct {
+		Advisory string `path:"advisory"`
+	}) (*struct{}, error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, noDatabase(in.Logger)
+		}
+		if err := advisory.NewStore(in.DB.DB).Withdraw(ctx, subject, input.Advisory); err != nil {
+			return nil, advisoryRefused(in, err, "that could not be withdrawn")
+		}
+		return &struct{}{}, nil
+	})
+
+	huma.Register(api, requiring(huma.Operation{
 		OperationID: "record-advisory-issued", Method: http.MethodPost,
 		Path:    "/v1/advisories/{advisory}/issuance",
 		Summary: "Record that an advisory went out",
@@ -332,7 +439,8 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"The published advisory itself stays with whoever published it. The digest is " +
 			"what makes \"is what is published still what we generate\" a question with an " +
 			"answer, and it is taken from the document generated here rather than from " +
-			"anything sent — a digest of whatever a caller says answers nothing.",
+			"anything sent — a digest of whatever a caller says answers nothing.\n\n" +
+			"Answers 409 where nobody has agreed to what the advisory says.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, anyPerson, startsAdvisory, triageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
@@ -388,6 +496,12 @@ type AdvisoryBody struct {
 	Title    string        `json:"title,omitempty"`
 	MintedAt string        `json:"minted_at"`
 	Covers   []CoveredBody `json:"covers"`
+}
+
+// AgreementBody is one person's agreement to what an advisory says.
+type AgreementBody struct {
+	Edition  int64  `json:"edition" doc:"The edition agreed to. A later edition is a document nobody has agreed to yet"`
+	AgreedAt string `json:"agreed_at"`
 }
 
 // AdvisoryListedBody is one advisory as a list of them reads it.

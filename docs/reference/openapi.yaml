@@ -270,6 +270,26 @@ components:
         - by
         - at
       type: object
+    AgreementBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AgreementBody.json
+          format: uri
+          readOnly: true
+          type: string
+        agreed_at:
+          type: string
+        edition:
+          description: The edition agreed to. A later edition is a document nobody has agreed to yet
+          format: int64
+          type: integer
+      required:
+        - edition
+        - agreed_at
+      type: object
     AlsoBuild:
       additionalProperties: false
       properties:
@@ -6929,6 +6949,23 @@ components:
         - ending_open
         - within
       type: object
+    Retitle-advisoryRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Retitle-advisoryRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        title:
+          description: What to call it. Empty, the document names the issues it covers
+          maxLength: 191
+          type: string
+      required:
+        - title
+      type: object
     Revise-claimRequest:
       additionalProperties: false
       properties:
@@ -9237,6 +9274,127 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+    patch:
+      description: |-
+        Gives the advisory a new title, as a new edition of what it says.
+
+        Every agreement standing on the old title is taken back. A second person agreed to particular words, and different words are a document nobody has agreed to.
+
+        Requires a triage role on every product the advisory covers, because what it says about one of them is part of the same document as what it says about another.
+
+        Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+      operationId: retitle-advisory
+      parameters:
+        - in: path
+          name: advisory
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Retitle-advisoryRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdvisoryBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Retitle an advisory
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        any_of:
+          - public-triage
+          - private-triage
+        note: A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+  /v1/advisories/{advisory}/approval:
+    delete:
+      description: |-
+        Takes back every agreement standing on what the advisory says now.
+
+        An act somebody performs, rather than something an edit does for them: editing takes agreements back because the words moved, and this is somebody saying they no longer agree to words that have not.
+
+        It needs no agreement of its own. Taking one back stops a document going out, which exposes the question rather than hiding it.
+
+        Answers 422 where no agreement is standing.
+
+        Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+      operationId: withdraw-advisory-approval
+      parameters:
+        - in: path
+          name: advisory
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Withdraw approval of an advisory
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        any_of:
+          - public-triage
+          - private-triage
+        note: A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+    post:
+      description: |-
+        Records that you have read what this advisory says and agree to it.
+
+        The agreement names the edition it was given against rather than the advisory. Retitling it, naming another flaw on it or taking one off opens a new edition and takes the agreement back, so what stands is always an agreement to the document as it reads now.
+
+        You may not agree to an advisory you started or whose current edition you wrote, and there is no override. A deployment with one person can therefore not publish an advisory, which is the control working rather than a gap in it.
+
+        Requires a triage role on every product the advisory covers.
+
+        Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+      operationId: approve-advisory
+      parameters:
+        - in: path
+          name: advisory
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgreementBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Approve an advisory
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: person
+        any_of:
+          - public-triage
+          - private-triage
+        note: A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
   /v1/advisories/{advisory}/document:
     get:
       description: |-
@@ -9322,6 +9480,8 @@ paths:
         It is what lets a second document be a revision. Without it a second document cannot carry a revision history or a higher version, and both are things CSAF validators check; a document that fails validation is one a customer's tooling drops.
 
         The published advisory itself stays with whoever published it. The digest is what makes "is what is published still what we generate" a question with an answer, and it is taken from the document generated here rather than from anything sent — a digest of whatever a caller says answers nothing.
+
+        Answers 409 where nobody has agreed to what the advisory says.
 
         Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
       operationId: record-advisory-issued

@@ -60,9 +60,14 @@ type Advisory struct {
 	// identifier would make a string operation four engines spell differently.
 	Year   int `bun:"minted_year,notnull"`
 	Number int `bun:"mint_number,notnull"`
-	// Title is what somebody called it. Absent until anybody says otherwise,
-	// and the document falls back to naming the issues it covers.
-	Title    string    `bun:"title"`
+	// EditionID is what the advisory says as it stands. An approval points
+	// at one edition rather than at the advisory, so this moving is exactly
+	// what withdraws an approval.
+	EditionID *int64 `bun:"edition_id"`
+	// Title is what somebody called it, read from that edition rather than
+	// stored here. Absent until anybody says otherwise, and the document
+	// falls back to naming the issues it covers.
+	Title    string    `bun:"title,scanonly"`
 	MintedAt time.Time `bun:"minted_at,notnull"`
 	MintedBy int64     `bun:"minted_by,notnull"`
 }
@@ -147,11 +152,23 @@ func (s *Store) Mint(ctx context.Context, subject access.Subject, who publisher.
 		made = &Advisory{
 			Identifier: fmt.Sprintf("%s-%d-%04d", who.Prefix, year, highest+1),
 			Year:       year, Number: highest + 1,
-			Title: title, MintedAt: minted, MintedBy: subject.ID,
+			MintedAt: minted, MintedBy: subject.ID,
 		}
 		made.Folded = fold(made.Identifier)
-		_, err := tx.NewInsert().Model(made).Exec(ctx)
-		return err
+		if _, err := tx.NewInsert().Model(made).Exec(ctx); err != nil {
+			return err
+		}
+		// The first edition, so that an advisory always has words somebody
+		// can be asked to agree to. Without it the title would sit nowhere
+		// until the first edit, and an approval would have no edition to
+		// name.
+		edition, err := openEdition(ctx, tx, made.ID, subject.ID, title, minted)
+		if err != nil {
+			return err
+		}
+		made.EditionID = &edition.ID
+		made.Title = title
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start an advisory: %w", err)
@@ -174,6 +191,9 @@ func (s *Store) byName(ctx context.Context, subject access.Subject,
 	}
 	var row Advisory
 	err := s.db.NewSelect().Model(&row).
+		ColumnExpr(`"ad".*`).
+		ColumnExpr(`COALESCE("ae"."title", '') AS "title"`).
+		Join(`LEFT JOIN "advisory_edition" AS "ae" ON "ae"."id" = "ad"."edition_id"`).
 		Where("identifier_folded = ?", fold(identifier)).
 		Limit(1).Scan(ctx)
 	if err != nil {
@@ -296,11 +316,13 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 			// second one written, which is what keeps the pair unique — and
 			// it reads as what it is: on the advisory again, put there by
 			// whoever did that.
-			_, err = tx.NewUpdate().Model((*Cover)(nil)).
+			if _, err = tx.NewUpdate().Model((*Cover)(nil)).
 				Set("removed_at = NULL").Set("removed_by = NULL").
 				Set("added_at = ?", added).Set("added_by = ?", subject.ID).
-				Where("id = ?", held.ID).Exec(ctx)
-			return err
+				Where("id = ?", held.ID).Exec(ctx); err != nil {
+				return err
+			}
+			return reopen(ctx, tx, row, subject.ID, added)
 		}
 		_, err = tx.NewInsert().Model(&Cover{
 			AdvisoryID: row.ID, ProductID: named.ID, VulnerabilityID: issue.ID,
@@ -313,7 +335,10 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 		if database.IsDuplicate(err) {
 			return ErrAlreadyCovered
 		}
-		return err
+		if err != nil {
+			return err
+		}
+		return reopen(ctx, tx, row, subject.ID, added)
 	})
 	if errors.Is(err, ErrAlreadyCovered) {
 		return nil, err
@@ -360,24 +385,50 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
-	res, err := s.db.NewUpdate().Model((*Cover)(nil)).
-		Set("removed_at = ?", s.now().UTC().Truncate(time.Microsecond)).
-		Set("removed_by = ?", subject.ID).
-		Where("advisory_id = ?", row.ID).
-		Where("product_id = ?", named.ID).
-		Where("vulnerability_id = ?", issue.ID).
-		Where("removed_at IS NULL").
-		Exec(ctx)
+	removed := s.now().UTC().Truncate(time.Microsecond)
+	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		res, err := tx.NewUpdate().Model((*Cover)(nil)).
+			Set("removed_at = ?", removed).
+			Set("removed_by = ?", subject.ID).
+			Where("advisory_id = ?", row.ID).
+			Where("product_id = ?", named.ID).
+			Where("vulnerability_id = ?", issue.ID).
+			Where("removed_at IS NULL").
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		// An affected-row count means rows matched. Nothing matched is an
+		// issue the advisory did not cover, which is the caller's to fix
+		// rather than a quiet success — and the edition below must not open
+		// for a change that did not happen.
+		if n, err := res.RowsAffected(); err == nil && n == 0 {
+			return ErrNoSuchIssue
+		}
+		return reopen(ctx, tx, row, subject.ID, removed)
+	})
+	if errors.Is(err, ErrNoSuchIssue) {
+		return err
+	}
 	if err != nil {
 		return fmt.Errorf("take an issue off an advisory: %w", err)
 	}
-	// An affected-row count means rows matched. Nothing matched is an issue
-	// the advisory did not cover, which is the caller's to fix rather than a
-	// quiet success.
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
-		return ErrNoSuchIssue
-	}
 	return nil
+}
+
+// reopen opens an edition for a change that left the title alone.
+//
+// Naming a flaw on an advisory and taking one back off both change what the
+// document says, so both take back every agreement standing on what it said
+// before — an approver read a document covering three flaws, and a fourth
+// added under their agreement is one nobody read.
+func reopen(ctx context.Context, tx bun.Tx, row *Advisory, who int64, now time.Time) error {
+	title, err := carryTitle(ctx, tx, row.ID)
+	if err != nil {
+		return err
+	}
+	_, err = openEdition(ctx, tx, row.ID, who, title, now)
+	return err
 }
 
 // Covers is what the advisory covers, in the order it was assembled.
@@ -445,8 +496,14 @@ type Listed struct {
 	// Issuances is how many times it has gone out. More than none is the
 	// thing somebody scanning the list is looking for.
 	Issuances int
-	MintedAt  time.Time
+	// Agreed is how many people have agreed to what it says as it stands.
+	// None is what a document that may not go out looks like.
+	Agreed   int
+	MintedAt time.Time
 }
+
+// Status is where the document is in its life, in the standard's words.
+func (l Listed) Status() string { return statusOf(l.Issuances > 0, l.Agreed > 0) }
 
 // Covering narrows a list to the advisories that say something about one
 // issue, one product, or both.
@@ -510,7 +567,10 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 	var rows []Listed
 	err = q.
 		ColumnExpr(`ad.identifier AS "identifier"`).
-		ColumnExpr(`COALESCE(ad.title, '') AS "title"`).
+		ColumnExpr(`COALESCE((SELECT ae2.title FROM "advisory_edition" AS "ae2"
+			WHERE ae2.id = ad.edition_id), '') AS "title"`).
+		ColumnExpr(`(SELECT COUNT(*) FROM "advisory_approval" AS "aa2"
+			WHERE aa2.edition_id = ad.edition_id AND aa2.withdrawn_at IS NULL) AS "agreed"`).
 		ColumnExpr(`ad.minted_at AS "minted_at"`).
 		ColumnExpr(`(SELECT COUNT(*) FROM "advisory_issue" AS "ai2"
 			WHERE ai2.advisory_id = ad.id AND ai2.removed_at IS NULL) AS "issues"`).
