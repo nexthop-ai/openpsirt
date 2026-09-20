@@ -66,8 +66,48 @@ export interface paths {
             cookie?: never;
         };
         /**
+         * List advisories
+         * @description Every advisory you may see, newest first.
+         *
+         *     An advisory covering a product you hold nothing on is not listed, and the total says the same. A document is read whole or not at all: one with a product quietly left out reads as a complete statement about a product it says nothing about.
+         *
+         *     `issues` and `products` are both given because one issue in three products and three issues in one are different documents, and a single count reads the same for each.
+         *
+         *     `product` and `vulnerability` narrow it to what covers them, which is what a screen about one flaw asks before somebody starts another advisory about it.
+         *
+         *     Requires: public-triage or private-triage. What you hold decides what comes back rather than whether you may ask
+         */
+        get: operations["list-advisories"];
+        put?: never;
+        /**
+         * Start an advisory
+         * @description Mints an identifier and returns the empty advisory under it.
+         *
+         *     The identifier is minted here rather than chosen. It is what a reader cites the document by and what a revision of it keeps, so two advisories under one name is a state this has no way back from.
+         *
+         *     An advisory covers issues, which are added one at a time and each names the product it is covered in. Until one is added the advisory generates no document: the standard requires at least one vulnerability, and a document about nothing is not a draft of anything.
+         *
+         *     Requires a prefix configured for this deployment to mint under.
+         *
+         *     Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+         */
+        post: operations["start-advisory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/advisories/published": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
          * List advisories that have gone out
-         * @description Every advisory published from this deployment in a period, newest first, with which flaw it was about, which revision it was, who published it and what the document hashed to at the time.
+         * @description Every advisory published from this deployment in a period, newest first, with how much it covered, which revision it was, who published it and what the document hashed to at the time.
          *
          *     Advisories are about flaws in our own product, recorded here by hand. Known issues in third-party components are tracked and fixed rather than published about, and the document for those is a VEX statement per build.
          *
@@ -83,6 +123,148 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/advisories/{advisory}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an advisory
+         * @description The advisory and the issues it covers, in the order they were added.
+         *
+         *     An advisory covering a product you hold nothing on answers as one that does not exist. Told apart, the pair of answers says what exists.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-advisory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/advisories/{advisory}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate a CSAF document for an advisory
+         * @description Returns a CSAF 2.0 document for this advisory: what it covers, and which releases hold each issue and which no longer do.
+         *
+         *     One entry per issue and one product branch per product, so several flaws released together are one document on one date.
+         *
+         *     The document is generated, not published. Nothing is sent anywhere. Recording that it was issued is a separate request, and what it keeps is a digest of what was generated, so that whether what you published is still what this would generate can be answered.
+         *
+         *     A document about an undisclosed flaw is a draft, and says so in `tracking.status`. Reaching a disclosure date discloses nothing, so nothing here does either.
+         *
+         *     An advisory covering no issue is refused: the standard requires at least one. Requires a publisher configured for this deployment, because a document naming none is not a valid CSAF document.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-advisory-document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/advisories/{advisory}/issuance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the times an advisory went out
+         * @description What has been published for this advisory, oldest first: which revision, when, and what the document hashed to at the time.
+         *
+         *     Readable without generating a document. Every issuance is in the document's own revision history, which is right for a reader of the document — but it made "has this gone out, and is what is published still what we would generate" a question you had to build a CSAF document to answer, and somebody deciding whether to publish a revision is asking before they generate anything.
+         *
+         *     The published document itself belongs to whoever published it. The digest is what makes the comparison possible, and it was taken from the document generated here rather than from anything sent.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-advisory-issuances"];
+        put?: never;
+        /**
+         * Record that an advisory went out
+         * @description Records that this advisory was published: when, by whom, and a digest of the document as it stands now.
+         *
+         *     A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once the record it came from has moved on — a release is added, a decision is revised, a fix lands — so if it is not written down when it happens it is gone.
+         *
+         *     It is what lets a second document be a revision. Without it a second document cannot carry a revision history or a higher version, and both are things CSAF validators check; a document that fails validation is one a customer's tooling drops.
+         *
+         *     The published advisory itself stays with whoever published it. The digest is what makes "is what is published still what we generate" a question with an answer, and it is taken from the document generated here rather than from anything sent — a digest of whatever a caller says answers nothing.
+         *
+         *     Requires: public-triage or private-triage. A triage role on some product. An advisory names no product until an issue is added to it, so there is none for the role to be held on here.
+         */
+        post: operations["record-advisory-issued"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/advisories/{advisory}/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add an issue to an advisory
+         * @description Names an issue in a product as covered by this advisory.
+         *
+         *     The pair, not the issue alone: an issue in two products is two entries, because the releases that carry it differ and a status is stated about releases.
+         *
+         *     Only a flaw recorded here. An issue a scanner reported against a third-party component is refused, and refused at this point rather than when the document is generated, so the refusal names the issue you chose.
+         *
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         */
+        post: operations["add-advisory-issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/advisories/{advisory}/issues/{product}/{vulnerability}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take an issue off an advisory
+         * @description Removes one issue in one product from this advisory.
+         *
+         *     Nothing here asks whether the advisory has gone out. An issuance records what went out at a moment, and editing the advisory afterwards is how the next revision differs from the last.
+         *
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         */
+        delete: operations["drop-advisory-issue"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2044,74 +2226,6 @@ export interface paths {
         get: operations["list-holders"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/issues/{vulnerability}/advisory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Generate a CSAF advisory for an issue
-         * @description Returns a CSAF 2.0 document for a flaw in this product: what it is, and which releases hold it and which no longer do.
-         *
-         *     The document is generated, not published. Nothing is sent anywhere. Recording that a document was issued is a separate request, and what it keeps is the digest of what was generated, so that whether what you published is still what this would generate can be answered.
-         *
-         *     Only for a flaw in what you ship. An issue a scanner reported against a third-party component is refused: that is dependency hygiene a consumer can already read out of the inventory, and a vendor advisory for every upstream CVE in a dependency is not what an advisory is.
-         *
-         *     A document about an undisclosed flaw is a draft, and says so in `tracking.status`. Reaching a disclosure date discloses nothing, so nothing here does either.
-         *
-         *     Requires a publisher configured for this deployment: a document naming none is not a valid CSAF document.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-advisory"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/products/{product}/issues/{vulnerability}/advisory/issuance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List the advisories that went out for a flaw
-         * @description What has been published about this flaw in this product, newest first: which revision, when, and what the document hashed to at the time.
-         *
-         *     Readable without generating a document. Every issuance is in the document's own revision history, which is right for a reader of the document — but it made "has an advisory gone out, and is what is published still what we would generate" a question you had to build a CSAF document to answer, and somebody deciding whether to publish a revision is asking before they generate anything.
-         *
-         *     The published document itself belongs to whoever published it. The digest is what makes the comparison possible, and it was taken from the document generated here rather than from anything sent.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["list-advisory-issuances"];
-        put?: never;
-        /**
-         * Record that an advisory went out
-         * @description Records that an advisory for this flaw was published: when, by whom, and a digest of the document as it stands now.
-         *
-         *     A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once the record it came from has moved on — a release is added, a decision is revised, a fix lands — so if it is not written down when it happens it is gone.
-         *
-         *     It is what lets a second document be a revision. Without it a second advisory for the same flaw cannot carry a revision history or a higher version, and both are things CSAF validators check; a document that fails validation is one a customer's tooling drops.
-         *
-         *     The published advisory itself stays with whoever published it. The digest is what makes "is what is published still what we generate" a question with an answer, and it is taken from the document generated here rather than from anything sent — a digest of whatever a caller says answers nothing.
-         *
-         *     Requires: public-triage or private-triage on the product
-         */
-        post: operations["record-advisory-issued"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4577,6 +4691,17 @@ export interface components {
             names?: string[] | null;
             summary?: string;
         };
+        "Add-advisory-issueRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Add-advisory-issueRequest.json
+             */
+            readonly $schema?: string;
+            product: string;
+            /** @description The identifier the issue is filed under */
+            vulnerability: string;
+        };
         "Add-outboundRequest": {
             /**
              * Format: uri
@@ -4606,6 +4731,39 @@ export interface components {
             team: string;
             /** @description A source package name */
             upstream?: string;
+        };
+        AdvisoryBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdvisoryBody.json
+             */
+            readonly $schema?: string;
+            /** @description The identifier this deployment minted, which is what the document is tracked by */
+            advisory: string;
+            covers: components["schemas"]["CoveredBody"][] | null;
+            minted_at: string;
+            title?: string;
+        };
+        AdvisoryListedBody: {
+            advisory: string;
+            /**
+             * Format: int64
+             * @description How many times it has gone out
+             */
+            issuances: number;
+            /**
+             * Format: int64
+             * @description How many issues it covers
+             */
+            issues: number;
+            minted_at: string;
+            /**
+             * Format: int64
+             * @description How many products those sit in
+             */
+            products: number;
+            title?: string;
         };
         AffectsBody: {
             /**
@@ -5459,6 +5617,20 @@ export interface components {
              * @description The number out of support, across every build and not only this page. Silence there is expected, so these are never counted as quiet
              */
             unsupported: number;
+        };
+        CoveredBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/CoveredBody.json
+             */
+            readonly $schema?: string;
+            added_at: string;
+            product: string;
+            /** @description The product's display name, where it has one */
+            product_name?: string;
+            summary?: string;
+            vulnerability: string;
         };
         CoveredBuild: {
             /**
@@ -6778,6 +6950,17 @@ export interface components {
             items: components["schemas"]["UnassignedBody"][] | null;
             /** Format: int64 */
             total: number;
+        };
+        ListBodyAdvisoryListedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyAdvisoryListedBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdvisoryListedBody"][] | null;
+            /** Format: int64 */
+            total?: number;
         };
         ListBodyApprovalBody: {
             /**
@@ -8925,6 +9108,16 @@ export interface components {
              */
             state: "proposed" | "approved";
         };
+        "Start-advisoryRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Start-advisoryRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What to call it. Left out, the document names the issues it covers */
+            title?: string;
+        };
         Statement: {
             action_statement?: string;
             impact_statement?: string;
@@ -9367,19 +9560,29 @@ export interface components {
             name: string;
         };
         WentBody: {
+            /** @description The identifier it went out under */
+            advisory: string;
             /** @description The document's digest when it went out. The published document belongs to whoever published it; this is what makes comparing it possible */
             digest: string;
-            /** @description The flaw it was written about, under the identifier it is filed here */
-            issue: string;
             issued_at: string;
             issued_by: string;
+            /**
+             * Format: int64
+             * @description How many issues it covered
+             */
+            issues: number;
             /**
              * Format: int64
              * @description The issuance number, counting from one. Above one is a revision
              */
             ordinal: number;
-            product: string;
+            /**
+             * Format: int64
+             * @description How many products those sat in
+             */
+            products: number;
             summary?: string;
+            title?: string;
         };
         WhoBody: {
             /**
@@ -9551,6 +9754,75 @@ export interface operations {
             };
         };
     };
+    "list-advisories": {
+        parameters: {
+            query?: {
+                /** @description Only advisories covering something in this product */
+                product?: string;
+                /** @description Only advisories covering this issue */
+                vulnerability?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyAdvisoryListedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "start-advisory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Start-advisoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvisoryBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-published-advisories": {
         parameters: {
             query?: {
@@ -9577,6 +9849,201 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OverPeriodWentBodyBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-advisory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The identifier this deployment minted */
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvisoryBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-advisory-document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Document"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-advisory-issuances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyIssuanceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "record-advisory-issued": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Record-advisory-issuedRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuanceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-advisory-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Add-advisory-issueRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoveredBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "drop-advisory-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                advisory: string;
+                product: string;
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -12800,108 +13267,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListBodyHolderBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-advisory": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The identifier the issue is filed under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Document"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-advisory-issuances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                /** @description The identifier the issue is filed under */
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyIssuanceBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "record-advisory-issued": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                product: string;
-                vulnerability: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Record-advisory-issuedRequest"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IssuanceBody"];
                 };
             };
             /** @description Error */

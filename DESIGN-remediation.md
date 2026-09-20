@@ -22,6 +22,7 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 - [Build-declared suppressions](#build-declared-suppressions)
 - [External links](#external-links)
 - [Publication](#publication)
+- [The advisory](#the-advisory)
 - [The CSAF document](#the-csaf-document)
 - [The VEX document](#the-vex-document)
 - [Issuance records](#issuance-records)
@@ -427,14 +428,41 @@ the inventory.
 | Publishing aggregates | One advisory covers a product and a version range, not a path. A reader is asking "am I affected", and the answer is a version |
 | Optional and configured per deployment | Nobody should need an account anywhere to use this |
 
+## The advisory
+
+An advisory is a record of its own, under an identifier this deployment mints.
+It names the issues it covers and the products each of those is covered in.
+
+| Rule | |
+|---|---|
+| An advisory is keyed on itself | Not on the product and the issue. The standard carries vulnerabilities as an array and means the document's tracking identifier to be the publisher's own name for the document, so a key made of one product and one issue cannot express a document about two and hands out somebody else's name for one of them |
+| The identifier is minted here | A year and a number under a prefix the deployment configures. It is the name a reader cites the document by and the name a revision of it keeps, so it belongs to the document rather than to whichever issue was first |
+| An advisory names many issues, across many products | Several embargoed flaws released together is one document on one date, which is what coordinated release is. One issue in two products is two entries, because the releases that carry it differ |
+| An issue is named once per product | The pair is what a status is stated about. Named twice, a reader gets two answers about one release and the document is refused |
+| Only a flaw recorded here | An issue a scanner reported against a third-party component is dependency hygiene a consumer reads out of the inventory. Refused when it is added rather than when the document is generated, so the refusal names the issue somebody chose |
+| An advisory with no issues generates nothing | The standard requires at least one, and a document about nothing is not a draft of anything |
+| An advisory is read whole or not at all | Somebody who may not see every issue it covers is told it does not exist, which is the answer a name nobody minted gets. A document with one of its products left out reads as a complete statement about a product it says nothing about, and a row saying one went out is as much a disclosure as the document |
+| One covering nothing is its minter's alone | Covering nothing it satisfies every narrowing there is, and its title is prose somebody typed that goes on to be the document's. The same holds for one whose issues were all taken off |
+| An issue taken off leaves its record | Who removed a flaw from a document is a question a deleted row does not answer. Naming it again revives that record rather than writing a second, which is also what keeps the pair unique |
+
+An advisory is the rare, deliberate document. A vendor does not notify a
+customer per inherited issue: those reach the release note and the disposition
+register, and a customer reads them at upgrade time. What an advisory is
+written for is a flaw recorded here, an embargo reaching its date, or an
+inherited issue severe enough to say something about before the next release
+cut — single or low double digits a year. The trigger is a non-public issue
+becoming public.
+
 ## The CSAF document
 
-A CSAF 2.0 document generated for one issue in one product, from what is already
-held. Nothing is sent anywhere.
+A CSAF 2.0 document generated for one advisory, from what is already held.
+Nothing is sent anywhere.
 
 | Rule | Reason |
 |---|---|
 | Only for a flaw in what this deployment ships | An issue a scanner reported against a third-party component is refused by name rather than answered with a document that looks the same and means something else |
+| The document's identity is the advisory's minted identifier | A document naming an issue's identifier as its own tracking identifier claims to be the authority on that issue, which a coordinator is and this deployment is not |
+| One entry per issue, and one branch per product | The tree carries a vendor branch holding one product branch for each product the advisory covers, and every status names releases of the product the issue was covered in |
 | The publisher is deployment configuration, not an administrator's setting | It is the identity of the organization running this. Both a name and a namespace are required, because a document naming no publisher is not a CSAF document |
 | A document about an undisclosed flaw is a draft, and says so | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either |
 | Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
@@ -539,16 +567,19 @@ decision's identifier, and its words are read by that identifier.
 
 ## Issuance records
 
-An advisory records when it went out, by whom, and a digest of what went out.
-Without it a second advisory for the same flaw could carry no revision history
+An issuance records when an advisory went out, by whom, and a digest of what
+went out. It is keyed on the advisory, which is what makes a revision of a
+document covering two issues one record rather than two.
+Without it a second document for the same advisory could carry no revision history
 and could not increment its version, both of which CSAF validators check.
 
 | Rule | Reason |
 |---|---|
 | It is a fact about a moment | What was published on a date cannot be worked out again once a release is added, a decision is revised or a fix lands |
-| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version and the revision history all move on generation or *because* of issuance. What is hashed is the title, the notes, the product tree and the vulnerability |
+| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version and the revision history all move on generation or *because* of issuance. What is hashed is the title, the product tree and the vulnerabilities |
 | The digest is taken from the document generated here | A caller-supplied digest is a digest of whatever they say, and both sides of the comparison must come from the same place |
 | The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
+| A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |
 
 ## Publisher identity
 
@@ -577,6 +608,14 @@ it points at. The signed outbound request is built and is described in
 Every adapter that would send an advisory somewhere, which is the whole of
 Publication above. The CSAF document is generated and served; no destination,
 no adapter and no route to one exists.
+
+An editorial state of the advisory's own. The document's tracking status is
+read from the disclosure of the issues it covers — draft while any of them is
+undisclosed — which is the embargo rather than a decision somebody made about
+the document. The two come apart in both directions: a document about
+disclosed issues can still be unfinished, and one about an embargoed issue can
+be ready to go. The standard's third status, for a document published and
+still being worked on, cannot be expressed at all.
 
 ## Limits
 

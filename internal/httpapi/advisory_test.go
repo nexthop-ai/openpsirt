@@ -57,6 +57,32 @@ type csaf struct {
 	} `json:"vulnerabilities"`
 }
 
+// advisoryOver mints an advisory, names one issue in one product on it, and
+// answers the identifier it was minted under.
+//
+// Two requests where there used to be none: an advisory is a record of its own
+// now, so what a document is about is stated rather than read off the path.
+func advisoryOver(t *testing.T, r *reach, who, product, identifier string) string {
+	t.Helper()
+	made := asPerson(t, r, who, http.MethodPost, "/v1/advisories", `{}`)
+	if made.Code != http.StatusCreated {
+		t.Fatalf("starting an advisory answered %d: %s", made.Code, made.Body.String())
+	}
+	var started struct {
+		Advisory string `json:"advisory"`
+	}
+	if err := json.Unmarshal(made.Body.Bytes(), &started); err != nil {
+		t.Fatal(err)
+	}
+	added := asPerson(t, r, who, http.MethodPost,
+		"/v1/advisories/"+started.Advisory+"/issues",
+		`{"product":"`+product+`","vulnerability":"`+identifier+`"}`)
+	if added.Code != http.StatusCreated {
+		t.Fatalf("adding %s answered %d: %s", identifier, added.Code, added.Body.String())
+	}
+	return started.Advisory
+}
+
 func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *testing.T) {
 	// The two halves of publishing only our own flaws in one test, because the
 	// boundary is the whole point: an advisory is about a vulnerability in our
@@ -81,8 +107,9 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 			t.Fatal(err)
 		}
 
-		at := "/v1/products/mine/issues/" + recorded.Identifier + "/advisory"
-		got := asPerson(t, r, "private-triage", http.MethodGet, at, "")
+		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
+		at := "/v1/advisories/" + named
+		got := asPerson(t, r, "private-triage", http.MethodGet, at+"/document", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("generating answered %d: %s", got.Code, got.Body.String())
 		}
@@ -103,9 +130,16 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 		if doc.Document.Category != "csaf_security_advisory" {
 			t.Errorf("the document is categorized %q", doc.Document.Category)
 		}
-		if doc.Document.Tracking.ID != recorded.Identifier {
-			t.Errorf("tracked as %q, want the identifier it is filed under",
-				doc.Document.Tracking.ID)
+		// The advisory's own name, not the issue's. A document naming an
+		// issue's identifier as its own tracking identifier claims to be the
+		// authority on that issue, which a coordinator is and this deployment
+		// is not — and it breaks outright at two issues.
+		if doc.Document.Tracking.ID != named {
+			t.Errorf("tracked as %q, want the advisory's own identifier %q",
+				doc.Document.Tracking.ID, named)
+		}
+		if doc.Document.Tracking.ID == recorded.Identifier {
+			t.Error("the document is tracked under the issue's identifier")
 		}
 		// Undisclosed, so the document is prepared rather than issued — the
 		// one field a reader checks before acting on it.
@@ -141,17 +175,17 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 		}
 		// Everything a status refers to has to be named in the tree, or the
 		// document refers to something it never introduced.
-		var named bool
+		var introduced bool
 		for _, vendor := range doc.ProductTree.Branches {
 			for _, product := range vendor.Branches {
 				for _, release := range product.Branches {
 					if release.Product.ID == affected {
-						named = true
+						introduced = true
 					}
 				}
 			}
 		}
-		if !named {
+		if !introduced {
 			t.Errorf("the product tree does not name %q, which a status refers to", affected)
 		}
 
@@ -182,11 +216,13 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 			t.Errorf("the issuance reads as %+v", gone.Items[0])
 		}
 
-		// And the other half: an issue a scanner reported is refused.
-		scanned := asPerson(t, r, "private-triage", http.MethodGet,
-			"/v1/products/mine/issues/CVE-2026-9999/advisory", "")
+		// And the other half: an issue a scanner reported is refused, at the
+		// point somebody names it rather than when the document is generated,
+		// so the refusal names the issue they chose.
+		scanned := asPerson(t, r, "private-triage", http.MethodPost, at+"/issues",
+			`{"product":"mine","vulnerability":"CVE-2026-9999"}`)
 		if scanned.Code != http.StatusUnprocessableEntity {
-			t.Errorf("an advisory for a scanner's finding answered %d: %s",
+			t.Errorf("a scanner's finding was added to an advisory: %d %s",
 				scanned.Code, scanned.Body.String())
 		}
 	})
@@ -214,9 +250,10 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotGeneratedForSomebodyWhoMayNotSeeIt
 			t.Fatal(err)
 		}
 
-		at := "/v1/products/mine/issues/" + recorded.Identifier + "/advisory"
+		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
 		for _, who := range []string{"reader", "triager"} {
-			got := asPerson(t, r, who, http.MethodGet, at, "")
+			got := asPerson(t, r, who, http.MethodGet,
+				"/v1/advisories/"+named+"/document", "")
 			if got.Code != http.StatusNotFound {
 				t.Errorf("%s generated an advisory about an undisclosed flaw: %d %s",
 					who, got.Code, got.Body.String())
@@ -251,33 +288,58 @@ func TestAProductYouCannotSeeAnswersLikeOneNobodyDeclared(t *testing.T) {
 
 		// "outsider" holds a role on theirs and nothing on mine, so "mine" is
 		// a product they may not see. "nosuch" was never declared. The two
-		// must be indistinguishable on every route.
+		// must be indistinguishable wherever a product is named.
+		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
 		for _, route := range []struct {
+			what   string
 			method string
-			path   string
-			body   string
+			path   func(product string) string
+			body   func(product string) string
 		}{
-			{http.MethodGet, "/advisory", ""},
-			{http.MethodGet, "/advisory/issuance", ""},
-			{http.MethodPost, "/advisory/issuance", `{"summary":"Issued."}`},
+			{"adding an issue", http.MethodPost,
+				func(string) string { return "/v1/advisories/" + named + "/issues" },
+				func(p string) string {
+					return `{"product":"` + p + `","vulnerability":"` + recorded.Identifier + `"}`
+				}},
+			{"taking one off", http.MethodDelete,
+				func(p string) string {
+					return "/v1/advisories/" + named + "/issues/" + p + "/" + recorded.Identifier
+				},
+				func(string) string { return "" }},
 		} {
 			invisible := asPerson(t, r, "outsider", route.method,
-				"/v1/products/mine/issues/"+recorded.Identifier+route.path, route.body)
+				route.path("mine"), route.body("mine"))
 			undeclared := asPerson(t, r, "outsider", route.method,
-				"/v1/products/nosuch/issues/"+recorded.Identifier+route.path, route.body)
+				route.path("nosuch"), route.body("nosuch"))
 
 			if invisible.Code != undeclared.Code {
-				t.Errorf("%s%s: a product they may not see answers %d and one nobody "+
+				t.Errorf("%s: a product they may not see answers %d and one nobody "+
 					"declared answers %d — the difference is a directory",
-					route.method, route.path, invisible.Code, undeclared.Code)
+					route.what, invisible.Code, undeclared.Code)
 			}
 			if invisible.Code >= 500 {
-				t.Errorf("%s%s: a product they may not see faulted: %d %s",
-					route.method, route.path, invisible.Code, invisible.Body.String())
+				t.Errorf("%s: a product they may not see faulted: %d %s",
+					route.what, invisible.Code, invisible.Body.String())
 			}
 			if invisible.Body.String() != undeclared.Body.String() {
-				t.Errorf("%s%s: the two refusals read differently:\n  %s\n  %s",
-					route.method, route.path, invisible.Body.String(), undeclared.Body.String())
+				t.Errorf("%s: the two refusals read differently:\n  %s\n  %s",
+					route.what, invisible.Body.String(), undeclared.Body.String())
+			}
+		}
+
+		// And the same pair one level up: an advisory somebody may not see
+		// and one nobody minted.
+		for _, at := range []string{"", "/document", "/issuance"} {
+			unseeable := asPerson(t, r, "outsider", http.MethodGet,
+				"/v1/advisories/"+named+at, "")
+			nonexistent := asPerson(t, r, "outsider", http.MethodGet,
+				"/v1/advisories/EXNET-1999-0001"+at, "")
+			if unseeable.Code != nonexistent.Code ||
+				unseeable.Body.String() != nonexistent.Body.String() {
+				t.Errorf("GET %s: an advisory they may not see answers %d %s and one "+
+					"nobody minted answers %d %s", at,
+					unseeable.Code, unseeable.Body.String(),
+					nonexistent.Code, nonexistent.Body.String())
 			}
 		}
 	})

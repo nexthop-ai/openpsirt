@@ -10,7 +10,7 @@ import (
 
 func published(t *testing.T, r *reach, who string) []httpapi.WentBody {
 	t.Helper()
-	got := asPerson(t, r, who, http.MethodGet, "/v1/advisories", "")
+	got := asPerson(t, r, who, http.MethodGet, "/v1/advisories/published", "")
 	if got.Code != http.StatusOK {
 		t.Fatalf("%s asking what has been published answered %d: %s",
 			who, got.Code, got.Body.String())
@@ -52,8 +52,9 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotListedToSomebodyWhoMayNotReadIt(t 
 		if rows := published(t, r, "private-triage"); len(rows) != 0 {
 			t.Fatalf("something was published before anything was: %+v", rows)
 		}
+		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
 		out := asPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/mine/issues/"+recorded.Identifier+"/advisory/issuance",
+			"/v1/advisories/"+named+"/issuance",
 			`{"summary":"Sent to the coordinating body."}`)
 		if out.Code != http.StatusCreated && out.Code != http.StatusOK {
 			t.Fatalf("recording the issuance answered %d: %s", out.Code, out.Body.String())
@@ -61,6 +62,14 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotListedToSomebodyWhoMayNotReadIt(t 
 
 		if rows := published(t, r, "triager"); len(rows) != 0 {
 			t.Errorf("somebody who may not read undisclosed work was told about it: %+v", rows)
+		}
+		// And somebody holding a different product entirely. The flaw's
+		// visibility is the wrong question to ask them: asked alone it says
+		// whether they read undisclosed work anywhere, and a public flaw in
+		// a product they hold nothing on would pass it — carrying the
+		// identifier, the title, the summary and the digest.
+		if rows := published(t, r, "outsider"); len(rows) != 0 {
+			t.Errorf("somebody holding another product was told what went out here: %+v", rows)
 		}
 		// And the other direction, which is what stops the narrowing being a
 		// filter that hides everything from everybody.

@@ -209,6 +209,7 @@ demo-up: demo-down
 	  -e OPENPSIRT_ATTACHMENT_DIR="/data/attachments" \
 	  -e OPENPSIRT_PUBLISHER_NAME="OpenPSIRT Demo" \
 	  -e OPENPSIRT_PUBLISHER_NAMESPACE="https://demo.openpsirt.invalid" \
+	  -e OPENPSIRT_ADVISORY_PREFIX="DEMO" \
 	  $(DEMO_IMAGE) >/dev/null
 	@# Files go on the container's disk rather than in an object store. That is
 	@# the development backend and the demo says so on startup — one process

@@ -279,7 +279,7 @@ func run(args []string, stdout, stderr *os.File) error {
 		SessionLifetime: cfg.SessionLifetime,
 		Publisher: publisher.Named{
 			Name: cfg.PublisherName, Namespace: cfg.PublisherNamespace,
-			Category: cfg.PublisherCategory,
+			Category: cfg.PublisherCategory, Prefix: cfg.AdvisoryPrefix,
 		},
 		Mode:  roleMode(settings),
 		Files: files,

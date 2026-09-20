@@ -14,7 +14,8 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		flaw := r.embargoed(t)
-		at := "/v1/products/mine/issues/" + flaw + "/advisory"
+		named := advisoryOver(t, r, "private-triage", "mine", flaw)
+		at := "/v1/advisories/" + named
 
 		var first struct {
 			Document struct {
@@ -27,7 +28,7 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 				} `json:"tracking"`
 			} `json:"document"`
 		}
-		read(t, r, "private-triage", at, &first)
+		read(t, r, "private-triage", at+"/document", &first)
 		if first.Document.Tracking.Version != "1" {
 			t.Fatalf("a document nobody has issued is version %q",
 				first.Document.Tracking.Version)
@@ -65,7 +66,7 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 				} `json:"tracking"`
 			} `json:"document"`
 		}
-		read(t, r, "private-triage", at, &second)
+		read(t, r, "private-triage", at+"/document", &second)
 		// Three entries — the flaw recorded, the issuance, and this document
 		// being generated — so the version is 3. Counted separately from the
 		// history it said 2, and a CSAF validator compares the two.
@@ -87,7 +88,7 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 			`{"summary":"Added the fixed release"}`); got.Code != http.StatusCreated {
 			t.Fatalf("recording a second issuance answered %d: %s", got.Code, got.Body.String())
 		}
-		read(t, r, "private-triage", at, &second)
+		read(t, r, "private-triage", at+"/document", &second)
 		if len(second.Document.Tracking.History) != 4 {
 			t.Fatalf("after two issuances its history reads as %+v",
 				second.Document.Tracking.History)

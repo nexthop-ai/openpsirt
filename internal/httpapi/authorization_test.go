@@ -164,6 +164,10 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 	t.Helper()
 	reachAs(t, on, publisher.Named{
 		Name: "Example Networks", Namespace: "https://example.test",
+		// The prefix a minted advisory identifier opens with. A deployment
+		// that has not been told cannot start one, which is a case of its own
+		// and has its own test.
+		Prefix: "EXNET",
 	}, fn)
 }
 

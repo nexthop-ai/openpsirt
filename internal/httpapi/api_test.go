@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -212,5 +214,58 @@ func TestThePagesOwnInlineScriptIsAllowedByHashAndNothingWider(t *testing.T) {
 	if strings.Contains(bare.Header().Get("Content-Security-Policy"), "sha256-") {
 		t.Errorf("an API-only deployment carries a script hash: %s",
 			bare.Header().Get("Content-Security-Policy"))
+	}
+}
+
+func TestNoTwoOperationsClaimOneMethodAndPath(t *testing.T) {
+	// Registering a second operation on a path another already holds is
+	// accepted: the last one wins, the first stops answering, and nothing is
+	// said. A duplicate operation identifier panics; a duplicate method and
+	// path does not.
+	//
+	// What that looks like afterwards is a route whose tests pass because they
+	// were rewritten to follow it, and a different route that quietly stopped
+	// existing — which is how a report about what was published came to be
+	// answered by a list of what exists.
+	//
+	// The generated document cannot show the collision, because the two share
+	// one entry by the time it is built. So the registrations are counted in
+	// the source and joined against what the document ended up holding: one
+	// swallowed by another leaves the second number short.
+	registered := 0
+	sources, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range sources {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		body, err := os.ReadFile(name) //nolint:gosec // G304: every path is this package's own source
+		if err != nil {
+			t.Fatal(err)
+		}
+		registered += strings.Count(string(body), "huma.Register(api")
+	}
+	if registered == 0 {
+		t.Fatal("no registrations were found in the source, so this checked nothing")
+	}
+
+	described := 0
+	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, Ingest{})
+	for _, item := range api.OpenAPI().Paths {
+		for _, operation := range []*huma.Operation{
+			item.Get, item.Post, item.Put, item.Patch, item.Delete,
+			item.Head, item.Options, item.Trace,
+		} {
+			if operation != nil {
+				described++
+			}
+		}
+	}
+	if described != registered {
+		t.Errorf("%d operations are registered in the source and %d reached the document, "+
+			"so %d were claimed by another on the same method and path",
+			registered, described, registered-described)
 	}
 }

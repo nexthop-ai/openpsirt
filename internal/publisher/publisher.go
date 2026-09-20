@@ -19,6 +19,14 @@ type Named struct {
 	// publishing about its own product is a vendor, which is the default;
 	// nothing here derives it. VEX has no such field and ignores it.
 	Category string
+	// Prefix is what a minted advisory identifier opens with, and it is the
+	// half of that identifier a reader recognizes the publisher by.
+	//
+	// Stated rather than derived from the name. A prefix worked out from
+	// "Example, Inc." is a string nobody publishes under, and an identifier
+	// is the one thing in a document that has to match what the organization
+	// already calls its advisories.
+	Prefix string
 }
 
 // Stated reports whether enough is configured to name a publisher.
@@ -27,3 +35,10 @@ type Named struct {
 // document. An unconfigured deployment is told so rather than handed something
 // that fails validation wherever it is taken next.
 func (n Named) Stated() bool { return n.Name != "" && n.Namespace != "" }
+
+// Mints reports whether enough is configured to mint an advisory identifier.
+//
+// Separate from Stated because the two are asked at different moments: a
+// document needs a publisher when it is generated, and an identifier is minted
+// once, earlier, when somebody starts writing the advisory.
+func (n Named) Mints() bool { return n.Prefix != "" }

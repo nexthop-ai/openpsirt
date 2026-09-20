@@ -54,6 +54,10 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		// the document verbatim, so a typo produced advisories that fail
 		// validation wherever anybody takes them — the one use a generated
 		// advisory has.
+		{"ADVISORY_PREFIX", "nexthop"},
+		{"ADVISORY_PREFIX", "NEXT HOP"},
+		{"ADVISORY_PREFIX", "1NEXTHOP"},
+		{"ADVISORY_PREFIX", "NEXTHOPNEXTHOPNEXTHOPNEXTHOP"},
 		{"PUBLISHER_CATEGORY", "vendo"},
 		{"PUBLISHER_CATEGORY", "Vendor"},
 		{"PUBLISHER_CATEGORY", ""},

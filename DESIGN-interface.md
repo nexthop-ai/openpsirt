@@ -1059,15 +1059,18 @@ is still reachable over HTTP and referenced nowhere in the interface.
 
 ### The advisory
 
-The advisory has a screen, on the issue. Both endpoints answered and nothing
-called them, so the one output of this tool that leaves the company was the one
-output nobody here could make.
+An advisory is started from the issue it is about. The endpoints answered and
+nothing called them, so the one output of this tool that leaves the company was
+the one output nobody here could make.
 
 | Rule | |
 |---|---|
-| Drafted per product | That is the grain of the document: an advisory is a vendor's statement about something they ship, and an issue may sit in several products. A flaw in somebody else's component is refused, and the refusal is shown rather than swallowed |
+| Started from a flaw, and an ordinary advisory from there | An advisory is a record of its own covering issues, and this is the narrow case that begins with one: start it, name this flaw in this product on it. `DESIGN-remediation.md` § The advisory holds what an advisory is |
+| What already covers this flaw is said before another is started | The question before starting a second is whether one already says it |
+| A flaw in somebody else's component is refused when it is named | The refusal names the issue somebody chose, and is shown rather than swallowed |
+| No screen for an advisory in its own right | One covering several flaws is started and read through the issue that began it. Nothing lists what an advisory covers, adds a second flaw to one, or takes one off |
 | Shown as text and never rendered (REQ-66) | What a reader has to check is exactly what a customer's tooling will receive |
-| What has already gone out is said before anything is drafted | Every issuance is in the document's own revision history, which is right for a reader of the document — but it made "has an advisory gone out, and is what is published still what we would generate" a question you had to build a CSAF document to answer |
+| What has already gone out is readable without generating anything | Every issuance is in the document's own revision history, which is right for a reader of the document — but it made "has an advisory gone out, and is what is published still what we would generate" a question you had to build a CSAF document to answer |
 | Recording that it went out is its own act, next to the draft rather than inside it | What was published on a date cannot be worked out again once a release is added or a decision is revised, and without the record a second document cannot be a revision — which a customer's validator checks |
 
 ## The editor

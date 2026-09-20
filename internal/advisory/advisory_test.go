@@ -22,7 +22,9 @@ import (
 )
 
 // issuer is a deployment that has been told who it publishes as.
-var issuer = publisher.Named{Name: "Example Networks", Namespace: "https://example.test"}
+var issuer = publisher.Named{
+	Name: "Example Networks", Namespace: "https://example.test", Prefix: "EXNET",
+}
 
 type fixture struct {
 	db      *database.DB
@@ -39,9 +41,53 @@ type fixture struct {
 	// once. With one fixed release, "all of them, in the order the tree names
 	// them" passes just as well as "the first" or "the last".
 	older int64
-	who   access.Subject
-	seq   int
-	built time.Time
+	// A second product, and a build of it. One advisory covering flaws in two
+	// products is the half of the decision that reversed it, and with one
+	// product a document that named every product once and one that named
+	// the only product it had would read alike.
+	otherProduct int64
+	other        int64
+	// A second person, so an authorization test writes as somebody the
+	// database knows. A subject invented in a test fails the foreign key on
+	// whoever did it, which passes a refusal test for the wrong reason.
+	second *access.Account
+	who    access.Subject
+	seq    int
+	built  time.Time
+}
+
+// document generates the advisory for one issue in one product, through an
+// advisory minted for it.
+//
+// Most of what this file pins is what a document says about one flaw, and that
+// is unchanged by the document being keyed on an advisory rather than on the
+// pair. What the advisory added is a step before generating: mint, then name
+// what it covers.
+func (f *fixture) document(t *testing.T, product, identifier string) (*advisory.Document, error) {
+	t.Helper()
+	made, err := f.store.Mint(t.Context(), f.who, issuer, "")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := f.store.Add(t.Context(), f.who, made.Identifier, product, identifier); err != nil {
+		return nil, err
+	}
+	return f.store.ForAdvisory(t.Context(), f.who, issuer, made.Identifier)
+}
+
+// covering mints an advisory over the pairs given, and answers its name.
+func (f *fixture) covering(t *testing.T, pairs ...[2]string) string {
+	t.Helper()
+	made, err := f.store.Mint(t.Context(), f.who, issuer, "")
+	if err != nil {
+		t.Fatalf("starting an advisory: %v", err)
+	}
+	for _, one := range pairs {
+		if _, err := f.store.Add(t.Context(), f.who, made.Identifier, one[0], one[1]); err != nil {
+			t.Fatalf("adding %s in %s: %v", one[1], one[0], err)
+		}
+	}
+	return made.Identifier
 }
 
 var (
@@ -60,19 +106,29 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		tagged := w.TargetFor(w.Tag, w.Customer)
 		earlier := w.DeclareStream(w.Product, "v2.3.9", catalog.Tag, &w.Branch.ID)
 		older := w.TargetFor(earlier, w.Customer)
+		// A second product with a branch and a build, so an advisory can span
+		// two.
+		second := w.DeclareProduct("switchd", "Switch Daemon")
+		secondBranch := w.DeclareStream(second, "main", catalog.Branch, nil)
+		secondVariant := w.DeclareVariant(second, "mellanox", true)
+		secondTarget := w.TargetFor(secondBranch, secondVariant)
+		another := w.DeclarePerson("reader", "A Reader", false)
 		f := &fixture{
 			db: w.DB, store: advisory.NewStore(w.DB.DB), finds: finding.NewStore(w.DB.DB),
 			graph: graph.NewStore(w.DB.DB), scans: ingest.NewStore(w.DB.DB),
 			product: w.Product.ID, master: w.Target.ID, tagged: tagged.ID,
-			older: older.ID,
+			older:        older.ID,
+			otherProduct: second.ID, other: secondTarget.ID, second: another,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
 				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				second.ID:    {access.PublicRead, access.PrivateRead, access.PrivateTriage},
 			}, 0),
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		}
 		f.shipped(t, f.master)
 		f.shipped(t, f.tagged)
 		f.shipped(t, f.older)
+		f.shipped(t, f.other)
 		fn(t, f)
 	})
 }
@@ -117,7 +173,22 @@ func (f *fixture) recorded(t *testing.T, target int64) string {
 	return f.recordedAs(t, target)
 }
 
-// recordedAs is the same, classified as these kinds of flaw, the root cause
+// disclosed is the same, already announced — so nothing but the product rules
+// it out of a read.
+func (f *fixture) disclosed(t *testing.T, target int64) string {
+	t.Helper()
+	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
+		TargetIDs: []int64{target}, Component: carrier.Name, Severity: "high",
+		Summary:   "The management socket answers before anyone authenticated.",
+		Disclosed: true,
+	})
+	if err != nil {
+		t.Fatalf("recording a disclosed flaw: %v", err)
+	}
+	return identifier
+}
+
+// recordedAs is recorded, classified as these kinds of flaw, the root cause
 // first.
 func (f *fixture) recordedAs(t *testing.T, target int64, weaknesses ...string) string {
 	t.Helper()
@@ -138,14 +209,13 @@ func TestAnAdvisoryNamesEveryReleaseHoldingTheFlawAndNamesEachInTheTree(t *testi
 	// document with one cannot show that the list follows the findings
 	// rather than the build somebody happened to ask from.
 	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
 		identifier := f.recorded(t, f.master)
 		// The same issue in the tagged release. Recording again would mint a
 		// second identifier, so the row is filed against the issue that
 		// already exists — which is what one flaw in two releases is.
 		f.alsoIn(t, identifier, f.tagged)
 
-		doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatalf("generating: %v", err)
 		}
@@ -212,7 +282,7 @@ func TestAReleaseThatFixedTheFlawIsNamedAsFixedRatherThanLeftOut(t *testing.T) {
 			t.Errorf("closed %d locations, want the one the release holds", done.Closed)
 		}
 
-		doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatalf("generating: %v", err)
 		}
@@ -233,7 +303,8 @@ func TestAnAdvisoryIsRefusedWhereNobodyHasSaidWhoPublishesIt(t *testing.T) {
 	// which part is missing.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
-		_, err := f.store.For(t.Context(), f.who, publisher.Named{}, "sonic", identifier)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		_, err := f.store.ForAdvisory(t.Context(), f.who, publisher.Named{}, named)
 		if !errors.Is(err, advisory.ErrNoPublisher) {
 			t.Errorf("an unconfigured deployment generated a document: %v", err)
 		}
@@ -245,8 +316,8 @@ func TestAnAdvisoryIsRefusedWhereNobodyHasSaidWhoPublishesIt(t *testing.T) {
 		// The message names the half that is missing, and only that half —
 		// whoever reads it cannot fix it, and the operator who can is reading
 		// it relayed rather than sitting at the process.
-		_, err = f.store.For(t.Context(), f.who,
-			publisher.Named{Name: "Example Networks"}, "sonic", identifier)
+		_, err = f.store.ForAdvisory(t.Context(), f.who,
+			publisher.Named{Name: "Example Networks"}, named)
 		if !errors.Is(err, advisory.ErrNoPublisher) {
 			t.Errorf("a publisher with no namespace was accepted: %v", err)
 		}
@@ -327,7 +398,8 @@ func TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal(t *testing.
 		// does: what somebody sees should be the name they will find in an
 		// advisory, and the minted name stays an alias so nothing that used
 		// it stops resolving.
-		doc, err := f.store.For(ctx, f.who, issuer, "sonic", "CVE-2026-4242")
+		named := f.covering(t, [2]string{"sonic", "CVE-2026-4242"})
+		doc, err := f.store.ForAdvisory(ctx, f.who, issuer, named)
 		if err != nil {
 			t.Fatalf("generating: %v", err)
 		}
@@ -363,10 +435,10 @@ func TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal(t *testing.
 
 		// Issued with no summary, so the history says what happened rather
 		// than nothing.
-		if _, err := f.store.Issued(ctx, f.who, issuer, "sonic", "CVE-2026-4242", ""); err != nil {
+		if _, err := f.store.Issued(ctx, f.who, issuer, named, ""); err != nil {
 			t.Fatal(err)
 		}
-		doc, err = f.store.For(ctx, f.who, issuer, "sonic", "CVE-2026-4242")
+		doc, err = f.store.ForAdvisory(ctx, f.who, issuer, named)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -393,9 +465,13 @@ func TestTheDocumentsVersionIsTheLastNumberItsHistoryStates(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		identifier := f.recorded(t, f.master)
+		// One advisory across all three states. A revision history is the
+		// history of one document, so minting a second would be asking a
+		// fresh document whether it remembers what the first published.
+		named := f.covering(t, [2]string{"sonic", identifier})
 		matches := func(t *testing.T, when string) {
 			t.Helper()
-			doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+			doc, err := f.store.ForAdvisory(ctx, f.who, issuer, named)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -411,11 +487,11 @@ func TestTheDocumentsVersionIsTheLastNumberItsHistoryStates(t *testing.T) {
 		}
 
 		matches(t, "before anything has gone out")
-		if _, err := f.store.Issued(ctx, f.who, issuer, "sonic", identifier, "First"); err != nil {
+		if _, err := f.store.Issued(ctx, f.who, issuer, named, "First"); err != nil {
 			t.Fatal(err)
 		}
 		matches(t, "after one issuance")
-		if _, err := f.store.Issued(ctx, f.who, issuer, "sonic", identifier, "Second"); err != nil {
+		if _, err := f.store.Issued(ctx, f.who, issuer, named, "Second"); err != nil {
 			t.Fatal(err)
 		}
 		matches(t, "after two")
@@ -464,7 +540,7 @@ func TestAFlawAssessedUnderAnUncarriedSchemeStatesNoScore(t *testing.T) {
 				if err != nil {
 					t.Fatalf("recording a flaw: %v", err)
 				}
-				doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+				doc, err := f.document(t, "sonic", identifier)
 				if err != nil {
 					t.Fatalf("generating: %v", err)
 				}
@@ -506,7 +582,7 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 			finding.Reference{URL: "https://example.test/commit/abc", Kind: finding.Report},
 			finding.Reference{URL: "ms-msdt:calc", Kind: finding.Report})
 
-		doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatalf("generating: %v", err)
 		}
@@ -575,7 +651,7 @@ func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 				t.Fatalf("closing it in a tagged release: %v", err)
 			}
 		}
-		doc, err = f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		doc, err = f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -609,7 +685,6 @@ func TestTheDocumentDeclaresOnlyAProfileItSatisfies(t *testing.T) {
 	// failed two of its mandatory tests, which is a document a customer's
 	// tooling drops — the one use a generated advisory has.
 	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
 		identifier := f.recorded(t, f.master)
 
 		// A flaw of our own that nobody outside has written up: no references
@@ -617,7 +692,7 @@ func TestTheDocumentDeclaresOnlyAProfileItSatisfies(t *testing.T) {
 		// the informational advisory's list instead, this declared the base
 		// profile and a customer's tooling filtering for security advisories
 		// skipped it.
-		doc, err := f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatalf("generating: %v", err)
 		}
@@ -639,7 +714,7 @@ func TestTheDocumentDeclaresOnlyAProfileItSatisfies(t *testing.T) {
 		}
 
 		f.pointsAt(t, identifier, "https://example.test/advisories/1")
-		doc, err = f.store.For(ctx, f.who, issuer, "sonic", identifier)
+		doc, err = f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -774,7 +849,7 @@ func TestTheProductTreeNamesEachReleaseByWhatItsOwnInventoryCalledIt(t *testing.
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
 
-		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -804,7 +879,7 @@ func TestAReleaseWhoseInventoryNamedNoRootOffersNothingToMatchOn(t *testing.T) {
 		f.shippedAs(t, f.master, "")
 		identifier := f.recorded(t, f.master)
 
-		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -843,7 +918,7 @@ func TestTheAdvisoryNamesTheFlawInTheCatalogsOwnWordsRatherThanTheScreens(t *tes
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recordedAs(t, f.master, "CWE-119")
 
-		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -868,7 +943,7 @@ func TestTheAdvisoryStatesTheRootCauseRatherThanWhicheverSortsFirst(t *testing.T
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recordedAs(t, f.master, "CWE-20", "CWE-119")
 
-		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -890,7 +965,7 @@ func TestAWeaknessTheCatalogDoesNotAssignIsLeftOutRatherThanNamed(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recordedAs(t, f.master, "CWE-999999")
 
-		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -904,7 +979,7 @@ func TestAFlawNobodyClassifiedSaysNothingAboutItsKind(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		identifier := f.recorded(t, f.master)
 
-		doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+		doc, err := f.document(t, "sonic", identifier)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -940,7 +1015,7 @@ func TestAnIdentifierThatIsNotOneIsNotPublished(t *testing.T) {
 				f.shippedAs(t, f.master, one.declared)
 				identifier := f.recorded(t, f.master)
 
-				doc, err := f.store.For(t.Context(), f.who, issuer, "sonic", identifier)
+				doc, err := f.document(t, "sonic", identifier)
 				if err != nil {
 					t.Fatal(err)
 				}
