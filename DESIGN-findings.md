@@ -416,7 +416,8 @@ and averaged over the classes that have something below them.
 
 | Rule | |
 |---|---|
-| The classes carried are the ones a base vector reaches | Ninety-six of the published two hundred and seventy. The rest are reached once the threat and environmental metrics are scored, and the table grows with the code that reads them: a transcribed number nothing runs is a number nobody would find wrong |
+| The classes carried are the ones scoring a base vector consults | Sixty of the published two hundred and seventy: the class a vector falls in, and the class below it wherever that contributes a distance. The rest are read once the threat and environmental metrics are scored, and the table grows with the code that reads them — a transcribed number nothing runs is a number nobody would find wrong |
+| Exploitation contributes no distance | It is unstated on every base vector, so a vector has travelled none of the way down that class. The class counts toward the mean and adds nothing to it, and the score of the class below it is never read |
 | A flaw with no impact anywhere scores zero before the tables | The lowest class is worth more than zero, so the one honest zero has to be recognized ahead of the lookup |
 | A distance is measured from the first worst vector the class lists | Every member of a class that has a step below it is the same distance from the class floor. A class with nothing below it contributes no distance, and two of those list members that disagree |
 

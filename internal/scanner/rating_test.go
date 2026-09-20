@@ -66,6 +66,31 @@ func TestARatingIsRecordedUnderTheGenerationItWasStatedIn(t *testing.T) {
 	}
 }
 
+func TestARatingStatingNoGenerationTakesTheOneItsVectorStates(t *testing.T) {
+	// A report is not required to say which generation a rating is on, and
+	// some do not: the rating is taken on a score and a vector alone. The
+	// vector states its own generation, so the number is placeable either way
+	// rather than sitting bare beside one from the other scheme.
+	for _, c := range []struct{ vector, want string }{
+		{four, "4.0"},
+		{three, "3.1"},
+	} {
+		t.Run(c.want, func(t *testing.T) {
+			got := rating([]publishedRating{published("", c.vector, 7.1)})
+			if got.version != "" {
+				t.Fatalf("the reader invented a generation of %q", got.version)
+			}
+			scored, err := finding.Score(got.vector)
+			if err != nil {
+				t.Fatalf("scoring what was recorded: %v", err)
+			}
+			if scored.Scheme() != c.want {
+				t.Errorf("the vector reads as %q, want %q", scored.Scheme(), c.want)
+			}
+		})
+	}
+}
+
 func TestAVectorARatingCarriesIsOneThisCanScore(t *testing.T) {
 	// The vector a report states is stored whole and read back by everything
 	// that shows the assumptions behind a number. A generation this cannot

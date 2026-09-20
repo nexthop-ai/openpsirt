@@ -90,36 +90,59 @@ func baseFours(each func(given map[string]string, vector string)) {
 	walk(0)
 }
 
-func TestTheClassScoresAreTheOnesABaseVectorReaches(t *testing.T) {
-	// Both directions. A class a vector falls in or steps down to and the
-	// table does not carry scores as zero with nothing saying so; a class the
-	// table carries and no vector reaches is a transcribed number that could
-	// be wrong for years without anything failing.
-	reached := map[string]bool{}
-	walked := 0
+func TestTheClassScoresAreTheOnesABaseVectorConsults(t *testing.T) {
+	// Both directions, over what scoring reads rather than over what a class
+	// steps toward. A class whose score is read and the table does not carry
+	// scores as zero with nothing saying so; a class the table carries and
+	// nothing reads is a transcribed number that could be wrong for years
+	// without anything failing.
+	reached := consulted(t)
+	for key := range reached {
+		if _, held := macroScores[key]; !held {
+			t.Errorf("scoring reads class %s and the table does not carry it", key)
+		}
+	}
+	for key := range macroScores {
+		if !reached[key] {
+			t.Errorf("the table carries class %s and nothing reads it", key)
+		}
+	}
+}
+
+// reads is every class score scoring one vector consults: the class it falls
+// in, and the class below it wherever that contributes a distance.
+//
+// Class five contributes none — exploitation is unstated on every base vector
+// — so the class below it is stepped toward and never read. Measuring what a
+// class steps toward rather than what is read counts thirty-six entries as
+// checked that nothing consults.
+func reads(e eqs) []string {
+	keys := []string{e.key()}
+	for class := 1; class <= 4; class++ {
+		for _, step := range e.down(class) {
+			keys = append(keys, step.key())
+		}
+	}
+	return keys
+}
+
+// consulted is every class score any base vector reads.
+func consulted(t *testing.T) map[string]bool {
+	t.Helper()
+	seen, walked := map[string]bool{}, 0
 	baseFours(func(given map[string]string, _ string) {
 		walked++
-		e := classesOf(given)
-		reached[e.key()] = true
-		for class := 1; class <= 5; class++ {
-			for _, step := range e.down(class) {
-				reached[step.key()] = true
-			}
+		if harmless(given) {
+			return
+		}
+		for _, key := range reads(classesOf(given)) {
+			seen[key] = true
 		}
 	})
 	if walked == 0 {
 		t.Fatal("no base vectors were walked, so this checked nothing")
 	}
-	for key := range reached {
-		if _, held := macroScores[key]; !held {
-			t.Errorf("a base vector reaches class %s and the table does not carry it", key)
-		}
-	}
-	for key := range macroScores {
-		if !reached[key] {
-			t.Errorf("the table carries class %s and no base vector reaches it", key)
-		}
-	}
+	return seen
 }
 
 func TestTheClassTablesCarryOnlyWhatAStepBelowNeeds(t *testing.T) {
@@ -196,7 +219,7 @@ func classValue(e eqs, class int) int {
 	return e[class-1]
 }
 
-func TestEveryClassAndEveryStepBetweenThemIsScoredByTheCorpus(t *testing.T) {
+func TestEveryClassScoreIsReadByTheCorpus(t *testing.T) {
 	// The corpus is what says the table is transcribed correctly, so a table
 	// entry it never reads is an entry nothing checks.
 	read := map[string]bool{}
@@ -205,12 +228,8 @@ func TestEveryClassAndEveryStepBetweenThemIsScoredByTheCorpus(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", vector, err)
 		}
-		e := classesOf(given)
-		read[e.key()] = true
-		for class := 1; class <= 5; class++ {
-			for _, step := range e.down(class) {
-				read[step.key()] = true
-			}
+		for _, key := range reads(classesOf(given)) {
+			read[key] = true
 		}
 	}
 	if len(read) == 0 {

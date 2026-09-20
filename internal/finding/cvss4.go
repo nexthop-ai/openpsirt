@@ -265,6 +265,10 @@ func macroScore(given map[string]string) float64 {
 		}
 		counted++
 		if class == 5 {
+			// No distance from this class: exploitation is unstated on every
+			// base vector, so a vector has travelled none of the way down it.
+			// It counts toward the mean and adds nothing to it, and the score
+			// of the class below it is never read.
 			continue
 		}
 		below := macroScores[steps[0].key()]
@@ -312,36 +316,32 @@ func away(given, worst map[string]string, of ...string) float64 {
 // macroScores is the published score of each equivalence class.
 //
 // Transcribed from the reference calculator FIRST publishes for the scheme,
-// which carries it as a table of 270. Ninety-six of those are the classes a
-// base vector falls in or steps down to; the rest are reached only once the
-// threat and environmental metrics are scored, and the table grows with the
-// code that reads them. A transcribed number nothing runs is a number nobody
-// would find wrong.
+// which carries it as a table of 270. Sixty of those are the classes scoring a
+// base vector actually consults — the class a vector falls in, and the one
+// below it in each class that contributes a distance. The rest are reached
+// only once the threat and environmental metrics are scored, and the table
+// grows with the code that reads them. A transcribed number nothing runs is a
+// number nobody would find wrong.
+//
+// Nothing below class five is here: exploitation is unstated on every base
+// vector, so the class contributes no distance and the score of the class
+// below it is never read.
 //
 // Copyright FIRST.ORG, Inc., Red Hat, and contributors. BSD-2-Clause.
 var macroScores = map[string]float64{
-	"000100": 10.0, "000101": 9.6, "000110": 9.3, "000200": 9.3,
-	"000201": 9.0, "000210": 8.9, "001100": 9.3, "001101": 9.2,
-	"001110": 8.9, "001200": 8.8, "001201": 8.0, "001210": 7.8,
-	"002101": 7.9, "002111": 6.9, "002201": 6.9, "002211": 5.5,
-	"010100": 9.5, "010101": 9.1, "010110": 9.0, "010200": 9.2,
-	"010201": 8.1, "010210": 8.2, "011100": 9.2, "011101": 8.2,
-	"011110": 8.0, "011200": 8.4, "011201": 7.0, "011210": 7.1,
-	"012101": 7.1, "012111": 5.2, "012201": 6.3, "012211": 2.9,
-	"100100": 9.4, "100101": 8.9, "100110": 8.6, "100200": 8.7,
-	"100201": 7.5, "100210": 7.4, "101100": 8.6, "101101": 7.6,
-	"101110": 7.4, "101200": 7.2, "101201": 5.7, "101210": 5.7,
-	"102101": 6.5, "102111": 5.8, "102201": 5.3, "102211": 2.1,
-	"110100": 9.0, "110101": 7.7, "110110": 7.5, "110200": 7.7,
-	"110201": 6.6, "110210": 6.8, "111100": 7.4, "111101": 5.9,
-	"111110": 5.7, "111200": 6.1, "111201": 5.2, "111210": 5.7,
-	"112101": 5.8, "112111": 2.6, "112201": 2.3, "112211": 1.3,
-	"200100": 8.6, "200101": 7.4, "200110": 7.4, "200200": 7.0,
-	"200201": 5.4, "200210": 5.2, "201100": 7.2, "201101": 5.7,
-	"201110": 5.5, "201200": 5.3, "201201": 3.6, "201210": 3.4,
-	"202101": 4.7, "202111": 2.1, "202201": 2.4, "202211": 0.9,
-	"210100": 7.3, "210101": 5.5, "210110": 5.9, "210200": 5.4,
-	"210201": 4.3, "210210": 4.5, "211100": 6.1, "211101": 5.1,
-	"211110": 4.8, "211200": 4.6, "211201": 1.8, "211210": 1.7,
-	"212101": 2.4, "212111": 1.2, "212201": 1.0, "212211": 0.3,
+	"000100": 10.0, "000101": 9.6, "000200": 9.3, "000201": 9.0,
+	"001100": 9.3, "001101": 9.2, "001200": 8.8, "001201": 8.0,
+	"002101": 7.9, "002201": 6.9, "010100": 9.5, "010101": 9.1,
+	"010200": 9.2, "010201": 8.1, "011100": 9.2, "011101": 8.2,
+	"011200": 8.4, "011201": 7.0, "012101": 7.1, "012201": 6.3,
+	"100100": 9.4, "100101": 8.9, "100200": 8.7, "100201": 7.5,
+	"101100": 8.6, "101101": 7.6, "101200": 7.2, "101201": 5.7,
+	"102101": 6.5, "102201": 5.3, "110100": 9.0, "110101": 7.7,
+	"110200": 7.7, "110201": 6.6, "111100": 7.4, "111101": 5.9,
+	"111200": 6.1, "111201": 5.2, "112101": 5.8, "112201": 2.3,
+	"200100": 8.6, "200101": 7.4, "200200": 7.0, "200201": 5.4,
+	"201100": 7.2, "201101": 5.7, "201200": 5.3, "201201": 3.6,
+	"202101": 4.7, "202201": 2.4, "210100": 7.3, "210101": 5.5,
+	"210200": 5.4, "210201": 4.3, "211100": 6.1, "211101": 5.1,
+	"211200": 4.6, "211201": 1.8, "212101": 2.4, "212201": 1.0,
 }
