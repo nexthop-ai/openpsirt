@@ -1,0 +1,330 @@
+package advisory_test
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/publisher"
+)
+
+func TestOneAdvisoryCoversSeveralFlawsAndTheDocumentStatesEachOfThem(t *testing.T) {
+	// The whole of why an advisory is keyed on itself. Several embargoed
+	// flaws released together is one document on one date, and a key made of
+	// a product and an issue cannot express it: the standard carries
+	// vulnerabilities as an array, and this held exactly one.
+	each(t, func(t *testing.T, f *fixture) {
+		first := f.recorded(t, f.master)
+		second := f.recorded(t, f.tagged)
+		named := f.covering(t,
+			[2]string{"sonic", first}, [2]string{"sonic", second})
+
+		doc, err := f.store.ForAdvisory(t.Context(), f.who, issuer, named)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		if len(doc.Vulnerabilities) != 2 {
+			t.Fatalf("the document carries %d vulnerabilities, want both",
+				len(doc.Vulnerabilities))
+		}
+		// Each names the flaw it is about, in the order they were added.
+		for at, want := range []string{first, second} {
+			var said bool
+			for _, id := range doc.Vulnerabilities[at].IDs {
+				said = said || id.Text == want
+			}
+			if !said {
+				t.Errorf("entry %d says nothing about %s: %+v", at, want, doc.Vulnerabilities[at].IDs)
+			}
+		}
+		// And the document is tracked under its own name rather than under
+		// either flaw's, which is the thing that cannot be true of two.
+		if doc.Document.Tracking.ID != named {
+			t.Errorf("tracked as %q, want the advisory's own name %q",
+				doc.Document.Tracking.ID, named)
+		}
+	})
+}
+
+func TestTwoFlawsInOneProductNameItsReleasesOnce(t *testing.T) {
+	// Every status refers to a release the tree introduced, and the tree
+	// introduces each one once. Written per issue, a document covering two
+	// flaws in one product would carry the product twice and every release
+	// twice — which a reader's tooling reads as two products.
+	each(t, func(t *testing.T, f *fixture) {
+		first := f.recorded(t, f.master)
+		second := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", first}, [2]string{"sonic", second})
+
+		doc, err := f.store.ForAdvisory(t.Context(), f.who, issuer, named)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		if len(doc.ProductTree.Branches) != 1 {
+			t.Fatalf("the tree carries %d vendors", len(doc.ProductTree.Branches))
+		}
+		products := doc.ProductTree.Branches[0].Branches
+		if len(products) != 1 {
+			t.Fatalf("one product is named %d times: %+v", len(products), products)
+		}
+		seen := map[string]int{}
+		for _, release := range products[0].Branches {
+			seen[release.Product.ID]++
+		}
+		for id, times := range seen {
+			if times != 1 {
+				t.Errorf("the tree names %q %d times", id, times)
+			}
+		}
+		// And both entries still refer to what the tree introduced.
+		for at, one := range doc.Vulnerabilities {
+			for _, id := range one.Status.KnownAffected {
+				if seen[id] == 0 {
+					t.Errorf("entry %d refers to %q, which the tree never names", at, id)
+				}
+			}
+		}
+	})
+}
+
+func TestAnAdvisoryIsReadWholeOrNotAtAll(t *testing.T) {
+	// A document with one of its products quietly left out reads as a
+	// complete statement about a product it says nothing about. So somebody
+	// who may not see everything it covers is told it does not exist, which
+	// is the same answer they get for a name nobody minted.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+
+		// Somebody holding nothing on this product at all.
+		stranger := access.NewPerson(f.who.ID+1, "stranger", false,
+			map[int64][]access.Role{}, 0)
+		if _, _, err := f.store.Covers(t.Context(), stranger, named); !errors.Is(
+			err, advisory.ErrNoSuchAdvisory) {
+			t.Errorf("somebody holding nothing read it: %v", err)
+		}
+		if _, err := f.store.ForAdvisory(t.Context(), stranger, issuer, named); !errors.Is(
+			err, advisory.ErrNoSuchAdvisory) {
+			t.Errorf("somebody holding nothing generated it: %v", err)
+		}
+		// The same answer a name nobody minted gets, so the pair says nothing
+		// about what exists.
+		if _, _, err := f.store.Covers(t.Context(), stranger, "EXNET-1999-0001"); !errors.Is(
+			err, advisory.ErrNoSuchAdvisory) {
+			t.Errorf("a name nobody minted answered differently: %v", err)
+		}
+		// And it is listed to neither, which is the count half of the same
+		// rule: a row saying an advisory exists is as much a disclosure.
+		rows, total, err := f.store.List(t.Context(), stranger, advisory.Covering{}, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 0 || total != 0 {
+			t.Errorf("somebody holding nothing was shown %d of %d advisories", len(rows), total)
+		}
+	})
+}
+
+func TestAnIdentifierIsMintedInSequenceAndMatchedWithoutRegardToCapitals(t *testing.T) {
+	// The name is minted rather than chosen: it is what a reader cites the
+	// document by and what a revision of it keeps, so two under one name is a
+	// state there is no way back from.
+	each(t, func(t *testing.T, f *fixture) {
+		first, err := f.store.Mint(t.Context(), f.who, issuer, "")
+		if err != nil {
+			t.Fatalf("starting one: %v", err)
+		}
+		second, err := f.store.Mint(t.Context(), f.who, issuer, "")
+		if err != nil {
+			t.Fatalf("starting a second: %v", err)
+		}
+		if first.Identifier == second.Identifier {
+			t.Fatalf("two advisories were minted as %q", first.Identifier)
+		}
+		// The prefix the deployment configures, the year, and a number within
+		// it — which is what makes it citable as this publisher's.
+		want := fmt.Sprintf("%s-%d-", issuer.Prefix, first.MintedAt.Year())
+		if !strings.HasPrefix(first.Identifier, want) {
+			t.Errorf("minted as %q, want it opening with %q", first.Identifier, want)
+		}
+		if second.Number != first.Number+1 {
+			t.Errorf("the numbers ran %d then %d", first.Number, second.Number)
+		}
+		// Matched however it is typed, which is the rule every identifier
+		// here is matched under.
+		if _, _, err := f.store.Covers(t.Context(), f.who,
+			strings.ToLower(first.Identifier)); err != nil {
+			t.Errorf("the name did not resolve in lower case: %v", err)
+		}
+	})
+}
+
+func TestAnAdvisoryCannotBeStartedWhereNothingSaysWhatToMintUnder(t *testing.T) {
+	// An identifier traceable to no publisher is in every document that went
+	// out, where a refusal is fixed once by an operator.
+	each(t, func(t *testing.T, f *fixture) {
+		_, err := f.store.Mint(t.Context(), f.who,
+			publisher.Named{Name: "Example Networks", Namespace: "https://example.test"}, "")
+		if !errors.Is(err, advisory.ErrNoPrefix) {
+			t.Errorf("an unconfigured deployment minted a name: %v", err)
+		}
+	})
+}
+
+func TestAnIssueIsNamedOncePerProductAndRefusedWhereAScannerReportedIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		made, err := f.store.Mint(t.Context(), f.who, issuer, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Add(t.Context(), f.who, made.Identifier,
+			"sonic", identifier); err != nil {
+			t.Fatalf("adding it: %v", err)
+		}
+		// Twice is refused: the pair is what a status is stated about, and
+		// named twice a reader gets two answers about one release.
+		if _, err := f.store.Add(t.Context(), f.who, made.Identifier,
+			"sonic", identifier); !errors.Is(err, advisory.ErrAlreadyCovered) {
+			t.Errorf("the same issue was named twice: %v", err)
+		}
+	})
+}
+
+func TestAnAdvisoryCoveringNothingGeneratesNothing(t *testing.T) {
+	// The standard requires at least one vulnerability, and a document about
+	// nothing is not a draft of anything.
+	each(t, func(t *testing.T, f *fixture) {
+		made, err := f.store.Mint(t.Context(), f.who, issuer, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.ForAdvisory(t.Context(), f.who, issuer,
+			made.Identifier); !errors.Is(err, advisory.ErrNothingToSay) {
+			t.Errorf("an empty advisory generated a document: %v", err)
+		}
+	})
+}
+
+func TestTakingAnIssueOffRecordsWhoDidAndPuttingItBackRevivesTheRow(t *testing.T) {
+	// Who removed an issue from an advisory is a question a deleted row does
+	// not answer, so the row stays. Adding it again revives that row rather
+	// than writing a second, which is what keeps the pair unique.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+
+		if err := f.store.Drop(t.Context(), f.who, named, "sonic", identifier); err != nil {
+			t.Fatalf("taking it off: %v", err)
+		}
+		_, held, err := f.store.Covers(t.Context(), f.who, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 0 {
+			t.Errorf("it still covers %d issues", len(held))
+		}
+		// The row it left behind carries who took it off.
+		var off struct {
+			By int64 `bun:"removed_by"`
+		}
+		if err := f.db.DB.NewSelect().TableExpr(`"advisory_issue" AS "ac"`).
+			ColumnExpr("ac.removed_by").
+			Where("ac.removed_at IS NOT NULL").
+			Limit(1).Scan(t.Context(), &off); err != nil {
+			t.Fatalf("reading what it left behind: %v", err)
+		}
+		if off.By != f.who.ID {
+			t.Errorf("the removal records %d as having done it, want %d", off.By, f.who.ID)
+		}
+		// Taking off something already off is the caller's to fix rather than
+		// a quiet success.
+		if err := f.store.Drop(t.Context(), f.who, named, "sonic", identifier); err == nil {
+			t.Error("taking it off twice answered as though it had been there")
+		}
+		// And putting it back is one row, not two.
+		if _, err := f.store.Add(t.Context(), f.who, named, "sonic", identifier); err != nil {
+			t.Fatalf("putting it back: %v", err)
+		}
+		_, held, err = f.store.Covers(t.Context(), f.who, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 1 {
+			t.Errorf("after putting it back it covers %d issues", len(held))
+		}
+	})
+}
+
+func TestTwoAdvisoriesMayCoverOneFlaw(t *testing.T) {
+	// Keyed on the pair, a second document about one flaw was unrepresentable
+	// — which is wrong in both directions: a flaw written up once for
+	// customers and again for a coordinator is two documents about one flaw.
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		first := f.covering(t, [2]string{"sonic", identifier})
+		second := f.covering(t, [2]string{"sonic", identifier})
+		if first == second {
+			t.Fatal("the two advisories were minted under one name")
+		}
+		for _, named := range []string{first, second} {
+			doc, err := f.store.ForAdvisory(t.Context(), f.who, issuer, named)
+			if err != nil {
+				t.Fatalf("%s: %v", named, err)
+			}
+			if doc.Document.Tracking.ID != named {
+				t.Errorf("%s is tracked as %q", named, doc.Document.Tracking.ID)
+			}
+		}
+		// And a list narrowed to that flaw shows both.
+		rows, total, err := f.store.List(t.Context(), f.who,
+			advisory.Covering{Vulnerability: identifier}, 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if total != 2 || len(rows) != 2 {
+			t.Errorf("%d of %d advisories cover it, want both", len(rows), total)
+		}
+	})
+}
+
+func TestAnIssuanceIsOneRecordForADocumentCoveringTwoFlaws(t *testing.T) {
+	// Keyed on the pair, publishing a document about two flaws wrote two
+	// issuances and each carried its own version — so the next document's
+	// revision history depended on which flaw was asked about.
+	each(t, func(t *testing.T, f *fixture) {
+		first := f.recorded(t, f.master)
+		second := f.recorded(t, f.tagged)
+		named := f.covering(t, [2]string{"sonic", first}, [2]string{"sonic", second})
+
+		if _, err := f.store.Issued(t.Context(), f.who, issuer, named, "Both"); err != nil {
+			t.Fatalf("recording that it went out: %v", err)
+		}
+		gone, err := f.store.Issuances(t.Context(), f.who, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(gone) != 1 {
+			t.Fatalf("a document about two flaws went out %d times", len(gone))
+		}
+		if gone[0].Ordinal != 1 {
+			t.Errorf("the first issuance is numbered %d", gone[0].Ordinal)
+		}
+		// And the next document is a revision of the one document.
+		doc, err := f.store.ForAdvisory(t.Context(), f.who, issuer, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		history := doc.Document.Tracking.RevisionHistory
+		if len(history) != 3 {
+			t.Fatalf("its history reads as %+v", history)
+		}
+		if doc.Document.Tracking.Version != history[len(history)-1].Number {
+			t.Errorf("the document is version %q and its history ends at %q",
+				doc.Document.Tracking.Version, history[len(history)-1].Number)
+		}
+	})
+}

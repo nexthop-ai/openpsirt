@@ -211,15 +211,17 @@ func seen(subject access.Subject) []int64 {
 	return products
 }
 
-// fold is an advisory identifier as uniqueness and lookup ask it.
+// fold is an identifier as uniqueness and lookup ask it.
 //
-// Upper-cased and bounded, the way every other identifier stored here is. A
-// name people type is matched without regard to capitals; the stored value is
-// normalized rather than the comparison asked to fold, because the four
-// engines default to different collations and a normalized value compares the
-// same under any of them.
+// Lower-cased and bounded, which is what the folded column beside an issue's
+// identifier holds — so one spelling answers for an advisory's own name and
+// for the issue names a narrowed list compares against. A name people type is
+// matched without regard to capitals; the stored value is normalized rather
+// than the comparison asked to fold, because the four engines default to
+// different collations and a normalized value compares the same under any of
+// them.
 func fold(identifier string) string {
-	return bound.HeadRunes(strings.ToUpper(strings.TrimSpace(identifier)), database.NameWidth)
+	return bound.HeadRunes(strings.ToLower(strings.TrimSpace(identifier)), database.NameWidth)
 }
 
 // Add names an issue in a product as covered by the advisory.
