@@ -32,7 +32,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -255,76 +254,64 @@ func NewStore(db *bun.DB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// For assembles the advisory for one issue in one product.
-func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, identifier string) (*Document, error) {
+// ForAdvisory assembles the document for one advisory.
+//
+// One entry per issue the advisory covers, and one product branch per product
+// those issues are covered in. The standard carries vulnerabilities as an
+// array, which is what lets several embargoed flaws be released together as
+// one document on one date.
+func (s *Store) ForAdvisory(ctx context.Context, subject access.Subject, who publisher.Named,
+	identifier string) (*Document, error) {
 
-	doc, _, _, err := s.forResolved(ctx, subject, who, product, identifier)
+	doc, _, err := s.forAdvisory(ctx, subject, who, identifier)
 	return doc, err
 }
 
-// forResolved is the same, answering with what it resolved on the way.
+// forAdvisory is the same, answering with the advisory it resolved on the way.
 //
-// Recording an issuance needs the product and the issue the document was built
-// from, and asked for them again it resolved both a second time — four round
-// trips for answers already in hand, and a window: an issue refiled under a
-// better-known name in between keyed the issuance on a row the hashed document
-// was not built from.
-func (s *Store) forResolved(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, identifier string) (*Document, *catalog.Product, *finding.Vulnerability, error) {
+// Recording an issuance needs the advisory the document was built from, and
+// asked for it again it resolved it a second time — round trips for an answer
+// already in hand, and a window in which what the advisory covers changed
+// between the document being hashed and the issuance being keyed.
+func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who publisher.Named,
+	identifier string) (*Document, *Advisory, error) {
 
 	if !who.Stated() {
-		return nil, nil, nil, missingPublisher(who)
+		return nil, nil, missingPublisher(who)
 	}
-	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
+	// Authorized before anything is assembled, and refused whole: byName turns
+	// away an advisory covering a product this reader may not see, because a
+	// document with one of its products quietly left out reads as a complete
+	// statement about a product it says nothing about.
+	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	// Authorized before the identifier is resolved, so a name nobody holds
-	// and a name somebody holds come back the same way.
-	if subject.Kind != access.Person || !subject.Sees(named.ID) {
-		return nil, nil, nil, ErrNoSuchIssue
-	}
-
-	issue, entered, err := s.ours(ctx, subject, named.ID, identifier)
+	held, err := s.covers(ctx, row.ID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	aliases, err := s.namesOf(ctx, issue.ID)
-	if err != nil {
-		return nil, nil, nil, err
+	if len(held) == 0 {
+		return nil, nil, ErrNothingToSay
 	}
-	// Anything already published for this flaw. A second document for the
-	// same one has to carry a higher version and a revision history, and
-	// both are things a CSAF validator checks — a document that fails
-	// validation is one a customer's tooling drops.
-	gone, err := s.issuances(ctx, named.ID, issue.ID)
+	gone, err := s.issuances(ctx, row.ID)
 	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	releases, err := s.releases(ctx, subject, named.ID, issue.ID)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	pointers, err := s.referencesTo(ctx, issue)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	credited, err := s.creditedFor(ctx, named.ID, issue.ID)
-	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	now := s.now().UTC()
-	shown := named.DisplayName
-	if shown == "" {
-		shown = named.Name
+	assembled := &assembly{who: who, seen: map[string]bool{}}
+	for _, one := range held {
+		if err := s.cover(ctx, subject, assembled, one); err != nil {
+			return nil, nil, err
+		}
 	}
 
-	// Built before the document, because the version it states is the number
-	// of its own last entry.
-	history := revisions(entered.OpenedAt.UTC(), gone, now)
+	// The earliest recording among the issues it covers. A document dates
+	// itself from when this deployment first knew about what it is about, and
+	// an advisory about several flaws first knew about the oldest of them.
+	opened := assembled.opened
+	history := revisions(opened, gone, now)
 
 	doc := &Document{}
 	doc.Document = Meta{
@@ -333,21 +320,25 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 		// tests describes the document as something it is not, and a reader's
 		// tooling drops it on exactly that.
 		CSAFVersion: "2.0",
-		Title:       fmt.Sprintf("%s: %s", shown, summaryOf(issue, identifier)),
+		Title:       titleOf(row, assembled),
 		Language:    "en-US",
 		Publisher: Issuer{
 			Category: categoryOf(who), Name: who.Name,
 			Namespace: who.Namespace,
 		},
 		Tracking: Tracking{
-			ID: identifier, Status: statusOf(entered),
+			// The advisory's own name. A document naming an issue's
+			// identifier as its own tracking identifier claims to be the
+			// authority on that issue, which a coordinator is and this
+			// deployment is not.
+			ID: row.Identifier, Status: assembled.status(),
 			// The number of the last entry in the history below, rather than
 			// a second count of the same thing. Counted separately the two
 			// disagree the moment an advisory has been issued once: the
 			// history numbers this document N+2 and the version says N+1,
 			// and a validator compares them.
 			Version:            history[len(history)-1].Number,
-			InitialReleaseDate: entered.OpenedAt.UTC(),
+			InitialReleaseDate: opened,
 			CurrentReleaseDate: now,
 			// The build that wrote it, read from the binary rather than held in
 			// a variable something has to remember to set — one nobody set
@@ -360,103 +351,67 @@ func (s *Store) forResolved(ctx context.Context, subject access.Subject, who pub
 			RevisionHistory: history,
 		},
 	}
-	if text := summaryOf(issue, identifier); text != "" {
-		doc.Document.Notes = []Note{{Category: "description", Title: "Summary", Text: text}}
-	}
-	doc.Document.References = pointers
+	doc.Document.References = assembled.pointers
 	doc.Document.Distribution = distributionFor(doc.Document.Tracking.Status)
-
-	vulnerability := Vulnerability{
-		Title:           summaryOf(issue, identifier),
-		IDs:             []Issued{{SystemName: who.Name, Text: identifier}},
-		Acknowledgments: credited,
-	}
-	// The same sentence the document carries, on the entry a reader of one
-	// vulnerability stops at. The profile asks for both, and two readers is
-	// what it is asking about: somebody scanning the document and somebody
-	// whose tooling walked to this entry.
-	if text := summaryOf(issue, identifier); text != "" {
-		vulnerability.Notes = []Note{{Category: "description", Title: "Summary", Text: text}}
-	}
-	// A CVE assigned later is another name for the same issue, and the
-	// issue is then filed under it. Where that has happened the document
-	// says so in the field a reader looks in.
-	if isCVE(issue.Identifier) {
-		vulnerability.CVE = issue.Identifier
-	}
-	// And every other name it goes by, in the field that carries names . A
-	// reader searching by the identifier a coordinator gave them finds
-	// this document, which is the one lookup a published advisory exists
-	// to serve — and the CVE is filled in from an alias where the issue is
-	// still filed under the identifier we minted.
-	for _, name := range aliases {
-		if name == identifier || name == issue.Identifier {
-			continue
-		}
-		vulnerability.IDs = append(vulnerability.IDs, Issued{SystemName: "alias", Text: name})
-		if vulnerability.CVE == "" && isCVE(name) {
-			vulnerability.CVE = name
-		}
-	}
-	if !entered.OpenedAt.IsZero() {
-		vulnerability.DiscoveryDate = entered.OpenedAt.UTC().Format("2006-01-02")
-	}
-	if vulnerability.CWE, err = weaknessOf(ctx, s.db, issue.ID); err != nil {
-		return nil, nil, nil, err
-	}
-
-	// One branch per release, under the product, under the publisher. The
-	// tree names releases rather than components on purpose: an advisory
-	// aggregates to a product and a version range, and a reader of one is
-	// asking "am I affected", which a dependency path does not answer .
-	versions := make([]Branch, 0, len(releases))
-	// The releases somebody can move to, by the name the tree gives them. The
-	// remediation says which, and a document that named them some other way
-	// would be answering with a name nothing else in it uses.
-	fixed := make([]Named, 0, len(releases))
-	for _, release := range releases {
-		leaf := Named{
-			Name: fmt.Sprintf("%s %s", shown, release.Name()),
-			ID:   release.ProductID(product),
-		}
-		// Only where it is the shape the standard states. The string is a
-		// producer's, taken from a scan file, and a scan file is hostile input
-		// (REQ-66): one that wrote something other than a package identifier
-		// into the field the root is declared in would fail a customer's
-		// validator on the whole document rather than on this field, which
-		// is a worse outcome than the field being absent.
-		if isPackageIdentifier(release.Identifier) {
-			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
-		}
-		versions = append(versions, Branch{
-			Category: "product_version", Name: release.Name(), Product: &leaf,
-		})
-		if release.Holds {
-			vulnerability.Status.KnownAffected = append(
-				vulnerability.Status.KnownAffected, leaf.ID)
-		} else {
-			vulnerability.Status.Fixed = append(vulnerability.Status.Fixed, leaf.ID)
-			fixed = append(fixed, leaf)
-		}
-	}
-	// Every release the document names, which is what a rating is stated for:
-	// the score is the flaw's, and the flaw is the same flaw in each of them.
-	rated := make([]string, 0, len(releases))
-	for _, release := range releases {
-		rated = append(rated, release.ProductID(product))
-	}
-	vulnerability.Scores = scoresFor(issue, rated)
-	vulnerability.Remediations = remediationsFor(fixed, vulnerability.Status.KnownAffected)
-
 	doc.ProductTree = ProductTree{Branches: []Branch{{
-		Category: "vendor", Name: who.Name,
-		Branches: []Branch{{
-			Category: "product_name", Name: shown, Branches: versions,
-		}},
+		Category: "vendor", Name: who.Name, Branches: assembled.products,
 	}}}
-	doc.Vulnerabilities = []Vulnerability{vulnerability}
+	doc.Vulnerabilities = assembled.vulnerabilities
 	doc.Document.Category = profileOf(doc)
-	return doc, named, issue, nil
+	return doc, row, nil
+}
+
+// assembly is a document being built out of what several issues carry.
+//
+// One place for the parts that are per-document rather than per-issue: the
+// product tree branches, which two issues in one product share, and the
+// addresses, which two issues may both point at.
+type assembly struct {
+	who publisher.Named
+	// products is one branch per product, in the order the issues were added,
+	// each holding the releases any of its issues named. A release named by
+	// two issues is one branch that both statuses point at.
+	products []Branch
+	// at is where each product's branch sits in products, and seen is every
+	// release already named, so neither is written twice.
+	at   map[string]int
+	seen map[string]bool
+
+	vulnerabilities []Vulnerability
+	pointers        []Reference
+	pointed         map[string]bool
+	// opened is the earliest recording among the issues, and undisclosed says
+	// any of them is still held back.
+	opened      time.Time
+	undisclosed bool
+}
+
+// status is what the document's tracking says about where it is in its life.
+//
+// Read from the disclosure of the issues it covers rather than from a decision
+// somebody made about the document. Reaching a disclosure date discloses
+// nothing, so a document about anything still held back says it is a draft.
+func (a *assembly) status() string {
+	if a.undisclosed {
+		return "draft"
+	}
+	return "final"
+}
+
+// titleOf is what the document calls itself.
+//
+// What somebody titled it, where they did. An advisory covering several flaws
+// has no one sentence that describes it, so what stands in is the product it
+// is about and how many flaws it names — a title naming one of them would
+// describe the document as being about that one.
+func titleOf(row *Advisory, a *assembly) string {
+	if row.Title != "" {
+		return row.Title
+	}
+	if len(a.vulnerabilities) == 1 {
+		return a.vulnerabilities[0].Title
+	}
+	return fmt.Sprintf("%s: %d issues", row.Identifier, len(a.vulnerabilities))
 }
 
 // Release is one build of the product and where it stands on the issue.
@@ -659,7 +614,7 @@ func (s *Store) namesOf(ctx context.Context, id int64) ([]string, error) {
 	return names, nil
 }
 
-// Issuance is one time an advisory for one flaw went out.
+// Issuance is one time an advisory went out.
 //
 // A fact about a moment rather than a derived value: what was published on a
 // date cannot be worked out again once the record it was generated from has
@@ -668,9 +623,11 @@ func (s *Store) namesOf(ctx context.Context, id int64) ([]string, error) {
 type Issuance struct {
 	bun.BaseModel `bun:"table:advisory_issuance,alias:ai"`
 
-	ID              int64 `bun:"id,pk,autoincrement"`
-	ProductID       int64 `bun:"product_id,notnull"`
-	VulnerabilityID int64 `bun:"vulnerability_id,notnull"`
+	ID int64 `bun:"id,pk,autoincrement"`
+	// AdvisoryID is what this is an issuance of. Keyed on the advisory, which
+	// is what makes a revision of a document covering two issues one record
+	// rather than two.
+	AdvisoryID int64 `bun:"advisory_id,notnull"`
 	// Ordinal is which issuance this is, counting from one. It is what the
 	// document's version says, and a validator checks that a revised document
 	// carries a higher one than the last.
@@ -684,8 +641,7 @@ type Issuance struct {
 	IssuedAt time.Time `bun:"issued_at,notnull"`
 }
 
-// Issued records that an advisory for this flaw went out, and returns what was
-// recorded.
+// Issued records that an advisory went out, and returns what was recorded.
 //
 // The digest is taken from the document as it is now, generated inside
 // this call rather than supplied by the caller. A caller-supplied digest is a
@@ -696,7 +652,7 @@ type Issuance struct {
 // The ordinal is read and used in one transaction, so two people recording an
 // issuance at the same moment cannot be handed the same number.
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, identifier, summary string) (*Issuance, error) {
+	identifier, summary string) (*Issuance, error) {
 
 	// The submission policy, before the summary is stored. It is typed prose
 	// that goes into the published revision history, so what is in the column
@@ -707,10 +663,10 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	}
 
 	// One resolution, which the document was built from. Asked again it was
-	// four more round trips for answers already in hand — and an issue refiled
-	// under a better-known name in between keyed the issuance on a row the
-	// hashed document was not built from.
-	doc, named, issue, err := s.forResolved(ctx, subject, who, product, identifier)
+	// more round trips for an answer already in hand — and what the advisory
+	// covers changing in between would key the issuance on a document that was
+	// never hashed.
+	doc, row, err := s.forAdvisory(ctx, subject, who, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -744,8 +700,8 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// retry of a rolled-back attempt would re-insert a model carrying both
 		// of that attempt's answers.
 		recorded = &Issuance{
-			ProductID: named.ID, VulnerabilityID: issue.ID,
-			Digest: hex.EncodeToString(sum[:]), Summary: summary,
+			AdvisoryID: row.ID,
+			Digest:     hex.EncodeToString(sum[:]), Summary: summary,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
 		// Scanned into a value rather than read through a cursor: a cursor
@@ -754,8 +710,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		var highest int
 		if err := tx.NewSelect().Model((*Issuance)(nil)).
 			ColumnExpr("COALESCE(MAX(ordinal), 0)").
-			Where("product_id = ?", named.ID).
-			Where("vulnerability_id = ?", issue.ID).
+			Where("advisory_id = ?", row.ID).
 			Scan(ctx, &highest); err != nil {
 			return err
 		}
@@ -769,58 +724,37 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	return recorded, nil
 }
 
-// Issuances is what has gone out for one flaw in one product, newest first.
+// Issuances is what has gone out for one advisory, newest first.
 //
 // Readable without generating a document. Every issuance is already in the
 // document's own revision history, which is right for a reader of the document
-// — but it made "has an advisory gone out for this, and is what is published
-// still what we would generate" a question you had to build a CSAF document to
-// answer. Somebody deciding whether to publish a revision is asking before
-// they generate anything.
+// — but it made "has this gone out, and is what is published still what we
+// would generate" a question you had to build a CSAF document to answer.
+// Somebody deciding whether to publish a revision is asking before they
+// generate anything.
 //
-// Narrowed like everything else: an advisory is about a flaw in a product, so
-// whoever may read that product's findings may read what went out about them.
+// Narrowed the way the document is: an advisory covering a product this reader
+// may not see is one they are told does not exist, and a count of its
+// issuances is as much a disclosure as the document.
 func (s *Store) Issuances(ctx context.Context, subject access.Subject,
-	product, identifier string) ([]Issuance, error) {
+	identifier string) ([]Issuance, error) {
 
-	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
+	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
 		return nil, err
 	}
-	// The same refusal For gives, and for the same reason. Answered as a
-	// denial it reached the handler with no arm for it and became a 500, while
-	// a product nobody declared answered 404 — so the pair of answers said
-	// which products exist, which is the oracle every refusal here is shaped
-	// to avoid.
-	if subject.Kind != access.Person || !subject.Sees(named.ID) {
-		return nil, ErrNoSuchIssue
-	}
-	// Authorized before the identifier is resolved, so a name nobody holds
-	// and a name in a product this reader cannot see answer alike.
-	issue, _, err := s.ours(ctx, subject, named.ID, identifier)
-	if err != nil {
-		return nil, err
-	}
-	gone, err := s.issuances(ctx, named.ID, issue.ID)
-	if err != nil {
-		return nil, err
-	}
-	// Newest first, unlike the document's history: a screen is answering "what
-	// is the state of this now", and a document is telling a story from the
-	// beginning.
-	for i, j := 0, len(gone)-1; i < j; i, j = i+1, j-1 {
-		gone[i], gone[j] = gone[j], gone[i]
-	}
-	return gone, nil
+	return s.issuances(ctx, row.ID)
 }
 
-// issuances is what has gone out for one flaw, oldest first.
-func (s *Store) issuances(ctx context.Context, productID, issueID int64) ([]Issuance, error) {
+// issuances is what has gone out for one advisory, oldest first.
+//
+// Oldest first because it becomes the revision history, which a document
+// states in the order it happened.
+func (s *Store) issuances(ctx context.Context, advisoryID int64) ([]Issuance, error) {
 	var rows []Issuance
 	err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).
-		Where("vulnerability_id = ?", issueID).
-		Order("ordinal").
+		Where("advisory_id = ?", advisoryID).
+		OrderExpr("ai.ordinal ASC").
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what has gone out: %w", err)
@@ -828,13 +762,6 @@ func (s *Store) issuances(ctx context.Context, productID, issueID int64) ([]Issu
 	return rows, nil
 }
 
-// revisions is the history a reader of the document sees.
-//
-// The first entry is the day the flaw was recorded here, which is what the
-// document dates itself from. Every issuance after that is an entry of its
-// own, because the point of the history is that a reader can tell one revision
-// from another — and the last entry is this document, which has not gone out
-// yet and says so.
 func revisions(opened time.Time, gone []Issuance, now time.Time) []Revision {
 	out := make([]Revision, 0, len(gone)+2)
 	out = append(out, Revision{Number: "1", Date: opened, Summary: "Recorded in OpenPSIRT"})
@@ -861,4 +788,161 @@ func revisions(opened time.Time, gone []Issuance, now time.Time) []Revision {
 		})
 	}
 	return out
+}
+
+// cover adds what one issue in one product contributes to the document.
+//
+// Its entry among the vulnerabilities, its product's branch in the tree, and
+// the addresses it points at. A product branch and a release branch are each
+// written once however many issues name them: written twice, a reader's
+// tooling sees two products where the document means one.
+func (s *Store) cover(ctx context.Context, subject access.Subject,
+	a *assembly, one Covered) error {
+
+	issue, entered, err := s.ours(ctx, subject, one.ProductID, one.Issue)
+	if err != nil {
+		return err
+	}
+	aliases, err := s.namesOf(ctx, issue.ID)
+	if err != nil {
+		return err
+	}
+	releases, err := s.releases(ctx, subject, one.ProductID, issue.ID)
+	if err != nil {
+		return err
+	}
+	pointers, err := s.referencesTo(ctx, issue)
+	if err != nil {
+		return err
+	}
+	credited, err := s.creditedFor(ctx, one.ProductID, issue.ID)
+	if err != nil {
+		return err
+	}
+
+	opened := entered.OpenedAt.UTC()
+	if a.opened.IsZero() || opened.Before(a.opened) {
+		a.opened = opened
+	}
+	if entered.Visibility == access.Private {
+		a.undisclosed = true
+	}
+
+	summary := summaryOf(issue, one.Issue)
+	vulnerability := Vulnerability{
+		Title:           summary,
+		IDs:             []Issued{{SystemName: a.who.Name, Text: one.Issue}},
+		Acknowledgments: credited,
+	}
+	// The same sentence the entry carries, on the note a reader of one
+	// vulnerability stops at. The profile asks for both, and two readers is
+	// what it is asking about: somebody scanning the document and somebody
+	// whose tooling walked to this entry.
+	if summary != "" {
+		vulnerability.Notes = []Note{{Category: "description", Title: "Summary", Text: summary}}
+	}
+	// A CVE assigned later is another name for the same issue, and the issue
+	// is then filed under it. Where that has happened the document says so in
+	// the field a reader looks in.
+	if isCVE(issue.Identifier) {
+		vulnerability.CVE = issue.Identifier
+	}
+	// And every other name it goes by, in the field that carries names. A
+	// reader searching by the identifier a coordinator gave them finds this
+	// document, which is the one lookup a published advisory exists to serve —
+	// and the CVE is filled in from an alias where the issue is still filed
+	// under the identifier we minted.
+	for _, name := range aliases {
+		if name == one.Issue || name == issue.Identifier {
+			continue
+		}
+		vulnerability.IDs = append(vulnerability.IDs, Issued{SystemName: "alias", Text: name})
+		if vulnerability.CVE == "" && isCVE(name) {
+			vulnerability.CVE = name
+		}
+	}
+	if !entered.OpenedAt.IsZero() {
+		vulnerability.DiscoveryDate = opened.Format("2006-01-02")
+	}
+	if vulnerability.CWE, err = weaknessOf(ctx, s.db, issue.ID); err != nil {
+		return err
+	}
+
+	// One branch per release, under the product, under the publisher. The
+	// tree names releases rather than components on purpose: an advisory
+	// aggregates to a product and a version range, and a reader of one is
+	// asking "am I affected", which a dependency path does not answer.
+	fixed := make([]Named, 0, len(releases))
+	rated := make([]string, 0, len(releases))
+	for _, release := range releases {
+		leaf := Named{
+			Name: fmt.Sprintf("%s %s", one.ProductName, release.Name()),
+			ID:   release.ProductID(one.Product),
+		}
+		// Only where it is the shape the standard states. The string is a
+		// producer's, taken from a scan file, and a scan file is hostile input
+		// (REQ-66): one that wrote something other than a package identifier
+		// into the field the root is declared in would fail a customer's
+		// validator on the whole document rather than on this field, which
+		// is a worse outcome than the field being absent.
+		if isPackageIdentifier(release.Identifier) {
+			leaf.Helper = &IdentificationHelper{Purl: release.Identifier}
+		}
+		a.release(one, release, leaf)
+		if release.Holds {
+			vulnerability.Status.KnownAffected = append(
+				vulnerability.Status.KnownAffected, leaf.ID)
+		} else {
+			vulnerability.Status.Fixed = append(vulnerability.Status.Fixed, leaf.ID)
+			fixed = append(fixed, leaf)
+		}
+		// Every release the entry names, which is what a rating is stated for:
+		// the score is the flaw's, and the flaw is the same flaw in each.
+		rated = append(rated, leaf.ID)
+	}
+	vulnerability.Scores = scoresFor(issue, rated)
+	vulnerability.Remediations = remediationsFor(fixed, vulnerability.Status.KnownAffected)
+
+	a.vulnerabilities = append(a.vulnerabilities, vulnerability)
+	a.point(pointers)
+	return nil
+}
+
+// release records one release under its product's branch, once.
+func (a *assembly) release(one Covered, of Release, leaf Named) {
+	if a.at == nil {
+		a.at = map[string]int{}
+	}
+	where, held := a.at[one.Product]
+	if !held {
+		a.products = append(a.products, Branch{
+			Category: "product_name", Name: one.ProductName,
+		})
+		where = len(a.products) - 1
+		a.at[one.Product] = where
+	}
+	if a.seen[leaf.ID] {
+		return
+	}
+	a.seen[leaf.ID] = true
+	a.products[where].Branches = append(a.products[where].Branches, Branch{
+		Category: "product_version", Name: of.Name(), Product: &leaf,
+	})
+}
+
+// point adds addresses the document does not already carry.
+//
+// Each address once. Two issues written up on one page is ordinary, and a
+// document naming it twice reads as two places to go.
+func (a *assembly) point(pointers []Reference) {
+	if a.pointed == nil {
+		a.pointed = map[string]bool{}
+	}
+	for _, one := range pointers {
+		if a.pointed[one.URL] {
+			continue
+		}
+		a.pointed[one.URL] = true
+		a.pointers = append(a.pointers, one)
+	}
 }

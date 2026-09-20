@@ -56,6 +56,13 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 			-- folds, so the folded value is stored rather than the
 			-- comparison being asked to fold.
 			"identifier_folded" ` + t.name + ` NOT NULL,
+			-- The two parts the identifier was minted from, kept as numbers.
+			-- Minting asks for the highest number in the current year, and
+			-- taking that out of the identifier would mean parsing a string
+			-- four engines parse differently. The identifier stays the name
+			-- that was given, so a prefix changed later renames nothing.
+			"minted_year"      ` + t.ref + ` NOT NULL,
+			"mint_number"      ` + t.ref + ` NOT NULL,
 			-- What somebody titled it. The document falls back to naming the
 			-- issues it covers, so this is absent until anybody says
 			-- otherwise.
@@ -63,6 +70,7 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 			"minted_at"  ` + t.timestamp + ` NOT NULL,
 			"minted_by"  ` + t.ref + ` NOT NULL,
 			CONSTRAINT "advisory_identifier_once" UNIQUE ("identifier_folded"),
+			CONSTRAINT "advisory_number_once" UNIQUE ("minted_year", "mint_number"),
 			CONSTRAINT "advisory_by_fk" FOREIGN KEY ("minted_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
@@ -76,6 +84,13 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
 			"added_at"         ` + t.timestamp + ` NOT NULL,
 			"added_by"         ` + t.ref + ` NOT NULL,
+			-- Taken back off, by whom. The row stays so that the act has
+			-- somewhere to be written: deleted, who removed an issue from an
+			-- advisory is a question nothing answers. Adding it again revives
+			-- this row rather than writing a second one, which is what keeps
+			-- the pair unique.
+			"removed_at"       ` + t.timestamp + ` NULL,
+			"removed_by"       ` + t.refNull + ` NULL,
 			CONSTRAINT "advisory_issue_once"
 				UNIQUE ("advisory_id", "product_id", "vulnerability_id"),
 			CONSTRAINT "advisory_issue_advisory_fk"
@@ -84,7 +99,9 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 				FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "advisory_issue_issue_fk"
 				FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
-			CONSTRAINT "advisory_issue_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id")
+			CONSTRAINT "advisory_issue_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id"),
+			CONSTRAINT "advisory_issue_off_fk"
+				FOREIGN KEY ("removed_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
 		`CREATE TABLE "advisory_issuance" (

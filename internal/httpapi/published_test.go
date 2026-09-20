@@ -10,7 +10,7 @@ import (
 
 func published(t *testing.T, r *reach, who string) []httpapi.WentBody {
 	t.Helper()
-	got := asPerson(t, r, who, http.MethodGet, "/v1/advisories", "")
+	got := asPerson(t, r, who, http.MethodGet, "/v1/advisories/published", "")
 	if got.Code != http.StatusOK {
 		t.Fatalf("%s asking what has been published answered %d: %s",
 			who, got.Code, got.Body.String())
@@ -52,8 +52,9 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotListedToSomebodyWhoMayNotReadIt(t 
 		if rows := published(t, r, "private-triage"); len(rows) != 0 {
 			t.Fatalf("something was published before anything was: %+v", rows)
 		}
+		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
 		out := asPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/mine/issues/"+recorded.Identifier+"/advisory/issuance",
+			"/v1/advisories/"+named+"/issuance",
 			`{"summary":"Sent to the coordinating body."}`)
 		if out.Code != http.StatusCreated && out.Code != http.StatusOK {
 			t.Fatalf("recording the issuance answered %d: %s", out.Code, out.Body.String())

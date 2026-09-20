@@ -12,8 +12,13 @@ import (
 
 // WentBody is one advisory that went out.
 type WentBody struct {
-	Product string `json:"product"`
-	Issue   string `json:"issue" doc:"The flaw it was written about, under the identifier it is filed here"`
+	Advisory string `json:"advisory" doc:"The identifier it went out under"`
+	Title    string `json:"title,omitempty"`
+	// Issues and Products are both given because one issue in three products
+	// and three issues in one are different documents, and a single count
+	// reads the same for each.
+	Issues   int `json:"issues" doc:"How many issues it covered"`
+	Products int `json:"products" doc:"How many products those sat in"`
 	// Ordinal is which issuance this was, counting from one. Anything above
 	// one is a revision, which is what somebody reading a period is looking
 	// for.
@@ -33,10 +38,13 @@ type WentBody struct {
 func registerPublished(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-published-advisories", Method: http.MethodGet,
-		Path:    "/v1/advisories",
+		// A period's report rather than the advisories themselves, which is
+		// what /v1/advisories answers. The two ask different questions: one
+		// is what exists, the other is what went out and what went out twice.
+		Path:    "/v1/advisories/published",
 		Summary: "List advisories that have gone out",
 		Description: "Every advisory published from this deployment in a period, newest first, " +
-			"with which flaw it was about, which revision it was, who published it and what " +
+			"with how much it covered, which revision it was, who published it and what " +
 			"the document hashed to at the time.\n\n" +
 			"Advisories are about flaws in our own product, recorded here by hand. Known " +
 			"issues in third-party components are tracked and fixed rather than published " +
@@ -81,7 +89,8 @@ func registerPublished(api huma.API, in Ingest) {
 		out.Body.Items = make([]WentBody, 0, len(gone))
 		for _, row := range gone {
 			out.Body.Items = append(out.Body.Items, WentBody{
-				Product: row.Product, Issue: row.Issue, Ordinal: row.Ordinal,
+				Advisory: row.Advisory, Title: row.Title,
+				Issues: row.Issues, Products: row.Products, Ordinal: row.Ordinal,
 				Summary: row.Summary, IssuedBy: row.IssuedBy,
 				IssuedAt: stamp(row.IssuedAt), Digest: row.Digest,
 			})

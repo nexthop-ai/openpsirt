@@ -57,6 +57,32 @@ type csaf struct {
 	} `json:"vulnerabilities"`
 }
 
+// advisoryOver mints an advisory, names one issue in one product on it, and
+// answers the identifier it was minted under.
+//
+// Two requests where there used to be none: an advisory is a record of its own
+// now, so what a document is about is stated rather than read off the path.
+func advisoryOver(t *testing.T, r *reach, who, product, identifier string) string {
+	t.Helper()
+	made := asPerson(t, r, who, http.MethodPost, "/v1/advisories", `{}`)
+	if made.Code != http.StatusCreated {
+		t.Fatalf("starting an advisory answered %d: %s", made.Code, made.Body.String())
+	}
+	var started struct {
+		Advisory string `json:"advisory"`
+	}
+	if err := json.Unmarshal(made.Body.Bytes(), &started); err != nil {
+		t.Fatal(err)
+	}
+	added := asPerson(t, r, who, http.MethodPost,
+		"/v1/advisories/"+started.Advisory+"/issues",
+		`{"product":"`+product+`","vulnerability":"`+identifier+`"}`)
+	if added.Code != http.StatusCreated {
+		t.Fatalf("adding %s answered %d: %s", identifier, added.Code, added.Body.String())
+	}
+	return started.Advisory
+}
+
 func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *testing.T) {
 	// The two halves of publishing only our own flaws in one test, because the
 	// boundary is the whole point: an advisory is about a vulnerability in our
@@ -81,8 +107,9 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 			t.Fatal(err)
 		}
 
-		at := "/v1/products/mine/issues/" + recorded.Identifier + "/advisory"
-		got := asPerson(t, r, "private-triage", http.MethodGet, at, "")
+		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
+		at := "/v1/advisories/" + named
+		got := asPerson(t, r, "private-triage", http.MethodGet, at+"/document", "")
 		if got.Code != http.StatusOK {
 			t.Fatalf("generating answered %d: %s", got.Code, got.Body.String())
 		}
@@ -103,9 +130,16 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 		if doc.Document.Category != "csaf_security_advisory" {
 			t.Errorf("the document is categorized %q", doc.Document.Category)
 		}
-		if doc.Document.Tracking.ID != recorded.Identifier {
-			t.Errorf("tracked as %q, want the identifier it is filed under",
-				doc.Document.Tracking.ID)
+		// The advisory's own name, not the issue's. A document naming an
+		// issue's identifier as its own tracking identifier claims to be the
+		// authority on that issue, which a coordinator is and this deployment
+		// is not — and it breaks outright at two issues.
+		if doc.Document.Tracking.ID != named {
+			t.Errorf("tracked as %q, want the advisory's own identifier %q",
+				doc.Document.Tracking.ID, named)
+		}
+		if doc.Document.Tracking.ID == recorded.Identifier {
+			t.Error("the document is tracked under the issue's identifier")
 		}
 		// Undisclosed, so the document is prepared rather than issued — the
 		// one field a reader checks before acting on it.
@@ -141,17 +175,17 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 		}
 		// Everything a status refers to has to be named in the tree, or the
 		// document refers to something it never introduced.
-		var named bool
+		var introduced bool
 		for _, vendor := range doc.ProductTree.Branches {
 			for _, product := range vendor.Branches {
 				for _, release := range product.Branches {
 					if release.Product.ID == affected {
-						named = true
+						introduced = true
 					}
 				}
 			}
 		}
-		if !named {
+		if !introduced {
 			t.Errorf("the product tree does not name %q, which a status refers to", affected)
 		}
 
@@ -182,11 +216,13 @@ func TestAnAdvisoryIsGeneratedForAFlawWeRecordedAndRefusedForOneWeDidNot(t *test
 			t.Errorf("the issuance reads as %+v", gone.Items[0])
 		}
 
-		// And the other half: an issue a scanner reported is refused.
-		scanned := asPerson(t, r, "private-triage", http.MethodGet,
-			"/v1/products/mine/issues/CVE-2026-9999/advisory", "")
+		// And the other half: an issue a scanner reported is refused, at the
+		// point somebody names it rather than when the document is generated,
+		// so the refusal names the issue they chose.
+		scanned := asPerson(t, r, "private-triage", http.MethodPost, at+"/issues",
+			`{"product":"mine","vulnerability":"CVE-2026-9999"}`)
 		if scanned.Code != http.StatusUnprocessableEntity {
-			t.Errorf("an advisory for a scanner's finding answered %d: %s",
+			t.Errorf("a scanner's finding was added to an advisory: %d %s",
 				scanned.Code, scanned.Body.String())
 		}
 	})

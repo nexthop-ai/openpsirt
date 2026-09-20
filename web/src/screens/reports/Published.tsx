@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../api/client";
 import { unwrap } from "../../api/queries";
 import { useScope } from "../../app/scope";
@@ -46,7 +46,7 @@ export function Published() {
     queryKey: ["published", product, when],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/advisories", {
+        await api.GET("/v1/advisories/published", {
           params: { query: { ...when, ...(product ? { product } : {}) } },
         }),
       ),
@@ -90,8 +90,8 @@ export function Published() {
             <table>
               <thead>
                 <tr>
-                  <th>Flaw</th>
-                  <th>Product</th>
+                  <th>Advisory</th>
+                  <th>Covers</th>
                   <th>Revision</th>
                   <th>Published</th>
                   <th>By</th>
@@ -104,13 +104,18 @@ export function Published() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={`${row.product} ${row.issue} ${row.ordinal}`} className="row">
+                  <tr key={`${row.advisory} ${row.ordinal}`} className="row">
                     <td>
-                      <Link to={`/issues/${encodeURIComponent(row.issue ?? "")}`} className="id">
-                        {row.issue}
-                      </Link>
+                      <span className="id">{row.advisory}</span>
+                      {row.title && <div className="hint">{row.title}</div>}
                     </td>
-                    <td>{row.product}</td>
+                    {/* Both counts, because one issue in three products and
+                        three issues in one are different documents and a
+                        single number reads the same for each. */}
+                    <td className="hint">
+                      {row.issues} {row.issues === 1 ? "issue" : "issues"} in {row.products}{" "}
+                      {row.products === 1 ? "product" : "products"}
+                    </td>
                     <td>
                       {(row.ordinal ?? 1) > 1 ? (
                         <span className="state open">revision {(row.ordinal ?? 1) - 1}</span>
