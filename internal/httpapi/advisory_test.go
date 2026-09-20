@@ -250,9 +250,10 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotGeneratedForSomebodyWhoMayNotSeeIt
 			t.Fatal(err)
 		}
 
-		at := "/v1/products/mine/issues/" + recorded.Identifier + "/advisory"
+		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
 		for _, who := range []string{"reader", "triager"} {
-			got := asPerson(t, r, who, http.MethodGet, at, "")
+			got := asPerson(t, r, who, http.MethodGet,
+				"/v1/advisories/"+named+"/document", "")
 			if got.Code != http.StatusNotFound {
 				t.Errorf("%s generated an advisory about an undisclosed flaw: %d %s",
 					who, got.Code, got.Body.String())
@@ -287,33 +288,58 @@ func TestAProductYouCannotSeeAnswersLikeOneNobodyDeclared(t *testing.T) {
 
 		// "outsider" holds a role on theirs and nothing on mine, so "mine" is
 		// a product they may not see. "nosuch" was never declared. The two
-		// must be indistinguishable on every route.
+		// must be indistinguishable wherever a product is named.
+		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
 		for _, route := range []struct {
+			what   string
 			method string
-			path   string
-			body   string
+			path   func(product string) string
+			body   func(product string) string
 		}{
-			{http.MethodGet, "/advisory", ""},
-			{http.MethodGet, "/advisory/issuance", ""},
-			{http.MethodPost, "/advisory/issuance", `{"summary":"Issued."}`},
+			{"adding an issue", http.MethodPost,
+				func(string) string { return "/v1/advisories/" + named + "/issues" },
+				func(p string) string {
+					return `{"product":"` + p + `","vulnerability":"` + recorded.Identifier + `"}`
+				}},
+			{"taking one off", http.MethodDelete,
+				func(p string) string {
+					return "/v1/advisories/" + named + "/issues/" + p + "/" + recorded.Identifier
+				},
+				func(string) string { return "" }},
 		} {
 			invisible := asPerson(t, r, "outsider", route.method,
-				"/v1/products/mine/issues/"+recorded.Identifier+route.path, route.body)
+				route.path("mine"), route.body("mine"))
 			undeclared := asPerson(t, r, "outsider", route.method,
-				"/v1/products/nosuch/issues/"+recorded.Identifier+route.path, route.body)
+				route.path("nosuch"), route.body("nosuch"))
 
 			if invisible.Code != undeclared.Code {
-				t.Errorf("%s%s: a product they may not see answers %d and one nobody "+
+				t.Errorf("%s: a product they may not see answers %d and one nobody "+
 					"declared answers %d — the difference is a directory",
-					route.method, route.path, invisible.Code, undeclared.Code)
+					route.what, invisible.Code, undeclared.Code)
 			}
 			if invisible.Code >= 500 {
-				t.Errorf("%s%s: a product they may not see faulted: %d %s",
-					route.method, route.path, invisible.Code, invisible.Body.String())
+				t.Errorf("%s: a product they may not see faulted: %d %s",
+					route.what, invisible.Code, invisible.Body.String())
 			}
 			if invisible.Body.String() != undeclared.Body.String() {
-				t.Errorf("%s%s: the two refusals read differently:\n  %s\n  %s",
-					route.method, route.path, invisible.Body.String(), undeclared.Body.String())
+				t.Errorf("%s: the two refusals read differently:\n  %s\n  %s",
+					route.what, invisible.Body.String(), undeclared.Body.String())
+			}
+		}
+
+		// And the same pair one level up: an advisory somebody may not see
+		// and one nobody minted.
+		for _, at := range []string{"", "/document", "/issuance"} {
+			unseeable := asPerson(t, r, "outsider", http.MethodGet,
+				"/v1/advisories/"+named+at, "")
+			nonexistent := asPerson(t, r, "outsider", http.MethodGet,
+				"/v1/advisories/EXNET-1999-0001"+at, "")
+			if unseeable.Code != nonexistent.Code ||
+				unseeable.Body.String() != nonexistent.Body.String() {
+				t.Errorf("GET %s: an advisory they may not see answers %d %s and one "+
+					"nobody minted answers %d %s", at,
+					unseeable.Code, unseeable.Body.String(),
+					nonexistent.Code, nonexistent.Body.String())
 			}
 		}
 	})

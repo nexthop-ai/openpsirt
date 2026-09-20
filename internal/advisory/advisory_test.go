@@ -175,6 +175,19 @@ func (f *fixture) recorded(t *testing.T, target int64) string {
 
 // recordedAs is the same, classified as these kinds of flaw, the root cause
 // first.
+func (f *fixture) disclosed(t *testing.T, target int64) string {
+	t.Helper()
+	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{
+		TargetIDs: []int64{target}, Component: carrier.Name, Severity: "high",
+		Summary:   "The management socket answers before anyone authenticated.",
+		Disclosed: true,
+	})
+	if err != nil {
+		t.Fatalf("recording a disclosed flaw: %v", err)
+	}
+	return identifier
+}
+
 func (f *fixture) recordedAs(t *testing.T, target int64, weaknesses ...string) string {
 	t.Helper()
 	_, identifier, err := f.finds.Enter(t.Context(), f.who, finding.Entering{

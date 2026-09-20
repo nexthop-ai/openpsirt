@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
@@ -444,6 +445,46 @@ func TestNamingAFlawOnAnAdvisoryAsksForTheRoleOnThatProduct(t *testing.T) {
 		if _, err := f.store.Add(t.Context(), reader, named, "sonic", here); !errors.Is(
 			err, advisory.ErrAlreadyCovered) {
 			t.Errorf("the product they triage refused them: %v", err)
+		}
+	})
+}
+
+func TestWhatWentOutAboutAnotherProductIsNotReported(t *testing.T) {
+	// The flaw's visibility is the wrong question to ask on its own. Asked
+	// alone it says whether this reader reads undisclosed work anywhere, so
+	// somebody holding private reading on one product passes it for a
+	// disclosed flaw in a product they hold nothing on — and the row carries
+	// the identifier, the title, the summary and the digest.
+	each(t, func(t *testing.T, f *fixture) {
+		// Disclosed, and in the second product, so nothing but the product
+		// rules it out.
+		there := f.disclosed(t, f.other)
+		named := f.covering(t, [2]string{"switchd", there})
+		if _, err := f.store.Issued(t.Context(), f.who, issuer, named, "Went out"); err != nil {
+			t.Fatalf("recording that it went out: %v", err)
+		}
+
+		// Somebody holding both sees it, which is what says the row is there.
+		rows, err := f.store.Published(t.Context(), f.who, nil, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 {
+			t.Fatalf("the row it went out as is not there: %+v", rows)
+		}
+
+		// And somebody who reads undisclosed work on the first product and
+		// holds nothing on the second does not.
+		elsewhere := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{
+				f.product: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+			}, 0)
+		rows, err = f.store.Published(t.Context(), elsewhere, nil, time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 0 {
+			t.Errorf("an advisory about another product was reported here: %+v", rows)
 		}
 	})
 }

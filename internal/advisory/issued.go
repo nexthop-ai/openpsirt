@@ -85,8 +85,16 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 		q = q.Where("ai.issued_at < ?", until)
 	}
 
-	// The advisory has to be one this reader may see the whole of, which is
-	// the rule reading one by name applies. Asked of the issues it covers
+	// Every product it covers is one this reader holds something on. Without
+	// it the clause below asks only whether a visibility is one they may read
+	// somewhere, so a public flaw in a product they hold nothing on passes —
+	// and the row carries the identifier, the title, the summary and the
+	// digest.
+	q = q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ap"
+		WHERE ap.advisory_id = ad.id AND ap.removed_at IS NULL
+		  AND ap.product_id NOT IN (?))`, bun.List(seen(subject)))
+
+	// And every issue it covers is one they may see. Asked of the issues
 	// rather than of the issuance, because that is where a visibility lives —
 	// an issuance carries none of its own, and reading one as public because
 	// it has no visibility column is how an undisclosed flaw would be
@@ -117,8 +125,9 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 //
 // A statement spanning products cannot bind one product's answer, so what it
 // binds is the union: public always, and private where this subject reads it
-// on any product. The product half of the rule is asked separately, by the
-// clause that requires every issue to sit in a product they hold.
+// on any product. On its own it is too loose — a public flaw in a product
+// they hold nothing on reads as visible — so the clause above it asks the
+// product half, and neither stands without the other.
 func readable(subject access.Subject) []access.Visibility {
 	products, all := subject.Products()
 	if all {
