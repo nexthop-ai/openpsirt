@@ -284,3 +284,78 @@ func TestTheTwoSchemesBandOneScoreTheSameWay(t *testing.T) {
 		})
 	}
 }
+
+func TestAPublishedVectorScoresAsTheBaseVectorInsideIt(t *testing.T) {
+	// Version 4 ratings arrive carrying every metric the scheme has, with X
+	// where nothing was stated. Where the exploit maturity is one of those,
+	// the number published beside the vector is that metric applied — under a
+	// field its producer still calls the base score. This scores the base
+	// metrics, so the two agree only where nothing was claimed about
+	// exploitation.
+	file, err := os.Open("testdata/cvss4-published.txt")
+	if err != nil {
+		t.Fatalf("reading the published ratings: %v", err)
+	}
+	defer file.Close()
+	unstated, stated := 0, 0
+	lines := bufio.NewScanner(file)
+	for lines.Scan() {
+		line := strings.TrimSpace(lines.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) != 3 {
+			t.Fatalf("%q is not an issue, a vector and a score", line)
+		}
+		issue, vector := parts[0], parts[1]
+		published, err := strconv.ParseFloat(parts[2], 64)
+		if err != nil {
+			t.Fatalf("%s states no score: %v", issue, err)
+		}
+		t.Run(issue, func(t *testing.T) {
+			got, err := Score(vector)
+			if err != nil {
+				t.Fatalf("scoring: %v", err)
+			}
+			// The same answer as the base metrics alone, which is what says
+			// the rest were read and ignored rather than refused.
+			bare := []string{"CVSS:4.0"}
+			for _, part := range strings.Split(vector, "/")[1:] {
+				metric, _, _ := strings.Cut(part, ":")
+				for _, base := range baseFour {
+					if metric == base {
+						bare = append(bare, part)
+					}
+				}
+			}
+			alone, err := Score(strings.Join(bare, "/"))
+			if err != nil {
+				t.Fatalf("scoring the base metrics alone: %v", err)
+			}
+			if got.ScoreCenti != alone.ScoreCenti {
+				t.Errorf("the whole vector scored %d and its base metrics %d",
+					got.ScoreCenti, alone.ScoreCenti)
+			}
+			claimed := strings.Contains(vector, "/E:P/") || strings.Contains(vector, "/E:U/")
+			switch {
+			case claimed:
+				stated++
+				if got.ScoreCenti <= int(math.Round(published*100)) {
+					t.Errorf("scored %d against a published %v, and a claim that exploitation "+
+						"is less than certain only ever lowers a number",
+						got.ScoreCenti, published)
+				}
+			default:
+				unstated++
+				if got.ScoreCenti != int(math.Round(published*100)) {
+					t.Errorf("scored %d against a published %v", got.ScoreCenti, published)
+				}
+			}
+		})
+	}
+	if unstated == 0 || stated == 0 {
+		t.Fatalf("%d ratings claim nothing about exploitation and %d do, and this needs "+
+			"both to have checked anything", unstated, stated)
+	}
+}
