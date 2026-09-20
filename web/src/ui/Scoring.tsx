@@ -15,28 +15,45 @@ import { useReseed } from "./reseed";
 // and a deployment, and the deployment reading this is not the one the finding
 // is about.
 
-// The eight metrics, their values, and what each value means in words.
+// A metric, its values, and what each value means in words.
 //
 // The words matter more than the letters: somebody rating a flaw for the first
 // time is choosing between "over the network" and "physical access", not
 // between N and P.
-const METRICS: {
+type Metric = {
   key: string;
   label: string;
   help: string;
   values: { value: string; label: string }[];
-}[] = [
-  {
-    key: "AV",
-    label: "Attack vector",
-    help: "The attacker's position",
-    values: [
-      { value: "N", label: "Network — reachable remotely" },
-      { value: "A", label: "Adjacent — same broadcast or shared segment" },
-      { value: "L", label: "Local — a shell or a local account" },
-      { value: "P", label: "Physical — hands on the device" },
-    ],
-  },
+};
+
+// The two metrics both generations ask the same way.
+const ATTACK_VECTOR: Metric = {
+  key: "AV",
+  label: "Attack vector",
+  help: "The attacker's position",
+  values: [
+    { value: "N", label: "Network — reachable remotely" },
+    { value: "A", label: "Adjacent — same broadcast or shared segment" },
+    { value: "L", label: "Local — a shell or a local account" },
+    { value: "P", label: "Physical — hands on the device" },
+  ],
+};
+
+const PRIVILEGES: Metric = {
+  key: "PR",
+  label: "Privileges required",
+  help: "Access the attacker must already hold",
+  values: [
+    { value: "N", label: "None" },
+    { value: "L", label: "Low — an ordinary account" },
+    { value: "H", label: "High — administrative" },
+  ],
+};
+
+// The metrics of a version 3 base vector.
+const THREE: Metric[] = [
+  ATTACK_VECTOR,
   {
     key: "AC",
     label: "Attack complexity",
@@ -46,16 +63,7 @@ const METRICS: {
       { value: "H", label: "High — depends on conditions they cannot arrange" },
     ],
   },
-  {
-    key: "PR",
-    label: "Privileges required",
-    help: "Access the attacker must already hold",
-    values: [
-      { value: "N", label: "None" },
-      { value: "L", label: "Low — an ordinary account" },
-      { value: "H", label: "High — administrative" },
-    ],
-  },
+  PRIVILEGES,
   {
     key: "UI",
     label: "User interaction",
@@ -106,33 +114,125 @@ const METRICS: {
   },
 ];
 
-// The versions of the scheme this composes a vector under.
+// The metrics of a version 4 base vector.
 //
-// The base formula is the same in both, so the two score identically — what
-// differs is what the vector says it is, and that is a statement about which
-// scheme somebody assessed under rather than a formatting detail.
-const NEWEST = "CVSS:3.1";
-const KNOWN = [NEWEST, "CVSS:3.0"];
+// Eleven rather than eight, and they are not the eight with three added: what
+// version 3 asked once about impact, version 4 asks twice — once about the
+// thing that is broken and once about what sits downstream of it.
+const FOUR: Metric[] = [
+  ATTACK_VECTOR,
+  {
+    key: "AC",
+    label: "Attack complexity",
+    help: "Defenses the attacker has to get past",
+    values: [
+      { value: "L", label: "Low — nothing to defeat" },
+      { value: "H", label: "High — a built-in mitigation has to be defeated" },
+    ],
+  },
+  {
+    key: "AT",
+    label: "Attack requirements",
+    help: "Conditions the deployment has to be in",
+    values: [
+      { value: "N", label: "None — it works on any deployment" },
+      { value: "P", label: "Present — it needs a particular state, or a race won" },
+    ],
+  },
+  PRIVILEGES,
+  {
+    key: "UI",
+    label: "User interaction",
+    help: "Action by somebody else",
+    values: [
+      { value: "N", label: "None" },
+      { value: "P", label: "Passive — somebody has to be using it" },
+      { value: "A", label: "Active — somebody has to take the action" },
+    ],
+  },
+  ...impact("V", "Vulnerable system", "the component itself"),
+  ...impact("S", "Subsequent system", "whatever sits downstream of it"),
+];
 
-// versionOf is the scheme a vector states, or the newest where it states none.
+// The three impact metrics, which version 4 asks twice over.
+function impact(of: string, subject: string, what: string): Metric[] {
+  return [
+    ["C", "confidentiality", "Data that can be read"],
+    ["I", "integrity", "Data that can be changed"],
+    ["A", "availability", "Service that can be stopped"],
+  ].map(([letter, aspect, help]) => ({
+    key: of + letter,
+    label: `${subject} ${aspect}`,
+    help: `${help} in ${what}`,
+    values: [
+      { value: "H", label: "High" },
+      { value: "L", label: "Low" },
+      { value: "N", label: "None" },
+    ],
+  }));
+}
+
+// The schemes a vector may be composed under, newest first.
+//
+// Version 3.0 and 3.1 share a base formula and score identically; version 4
+// does not, and a number under one is not comparable with a number under the
+// other. What they share is the band, which is why a list can hold both.
+const SCHEMES: { version: string; metrics: Metric[] }[] = [
+  { version: "CVSS:4.0", metrics: FOUR },
+  { version: "CVSS:3.1", metrics: THREE },
+  { version: "CVSS:3.0", metrics: THREE },
+];
+
+// The scheme a new assessment is composed under unless somebody picks another.
+//
+// Not the newest one. A published advisory is a CSAF 2.0 document, whose score
+// object has a field for a version 3 score and none for a version 4 score, so
+// a flaw assessed under version 4 publishes without one. Version 4 is offered
+// and the screen says what choosing it costs.
+const DEFAULT = "CVSS:3.1";
+
+// The metrics one scheme states.
+export function metricsOf(version: string): Metric[] {
+  return SCHEMES.find((s) => s.version === version)?.metrics ?? THREE;
+}
+
+// The metrics only one of the two generations has, which is what tells them
+// apart when a vector states no scheme.
+const TELLS = [
+  { version: "CVSS:4.0", keys: ["AT", "VC", "VI", "VA", "SC", "SI", "SA"] },
+  { version: DEFAULT, keys: ["S", "C", "I", "A"] },
+];
+
+// versionOf is the scheme a vector is on.
 //
 // Kept through an edit. Re-stamping a vector recorded under 3.0 as 3.1 because
 // somebody changed one metric rewrites what the original assessment claimed,
 // and it is silent — the score does not move, because the formula did not.
+//
+// A vector stating no scheme is read for the metrics that belong to one
+// generation and not the other. Stamping it with a default instead labels a
+// version 4 vector as version 3, which is a score under a formula that never
+// produced it.
 export function versionOf(vector: string): string {
   const stated = vector.toUpperCase().split("/")[0] ?? "";
-  return KNOWN.includes(stated) ? stated : NEWEST;
+  if (SCHEMES.some((s) => s.version === stated)) return stated;
+  const chosen = read(vector);
+  for (const tell of TELLS) {
+    if (tell.keys.some((key) => chosen[key])) return tell.version;
+  }
+  return DEFAULT;
 }
 
-// vectorOf assembles what has been chosen, or nothing until all eight are.
+// vectorOf assembles what has been chosen, or nothing until every metric of
+// the scheme is answered.
 //
-// Nothing rather than a partial vector: eight metrics with one unanswered is
-// not a base vector, and a score from seven of them would be a number nobody
-// could reproduce.
+// Nothing rather than a partial vector: one metric unanswered is not a base
+// vector, and a score from the rest would be a number nobody could reproduce.
 export function vectorOf(chosen: Record<string, string>, under: string): string {
-  const parts = METRICS.map((m) => chosen[m.key]);
+  const metrics = metricsOf(under);
+  const parts = metrics.map((m) => chosen[m.key]);
   if (parts.some((p) => !p)) return "";
-  return under + "/" + METRICS.map((m, i) => `${m.key}:${parts[i]}`).join("/");
+  return under + "/" + metrics.map((m, i) => `${m.key}:${parts[i]}`).join("/");
 }
 
 // The metrics a vector states, which is the reverse of the above. A vector
@@ -160,12 +260,19 @@ export function Scoring({
 }) {
   const [chosen, setChosen] = useState<Record<string, string>>(() => read(vector));
   const [open, setOpen] = useState(false);
+  // The scheme being composed under, which an empty form does not get from a
+  // vector. Held here so that picking one opens the right metrics before any
+  // of them are answered.
+  const [version, setVersion] = useState(() => versionOf(vector));
 
   // Kept in step with whatever the caller holds, so that a vector pasted in
   // whole lights up the metrics it states. Re-seeded rather than remounted:
   // picking the last metric completes the vector, and a remount would collapse
   // the metric list at the moment somebody finished with it.
-  useReseed(vector, () => setChosen(read(vector)));
+  useReseed(vector, () => {
+    setChosen(read(vector));
+    if (vector !== "") setVersion(versionOf(vector));
+  });
 
   const scored = useQuery({
     queryKey: ["score", vector],
@@ -173,13 +280,31 @@ export function Scoring({
     queryFn: async () => unwrap(await api.GET("/v1/score", { params: { query: { vector } } })),
   });
 
+  const metrics = metricsOf(version);
+
   function pick(metric: string, value: string) {
     const next = { ...chosen, [metric]: value };
     setChosen(next);
-    onChange(vectorOf(next, versionOf(vector)));
+    onChange(vectorOf(next, version));
   }
 
-  const answered = METRICS.filter((m) => chosen[m.key]).length;
+  // Changing the scheme keeps the answers the new one also asks for. The two
+  // generations share five metrics and ask the rest differently, so what
+  // carries over is what means the same thing in both.
+  function compose(under: string) {
+    const keeps = new Set(metricsOf(under).map((m) => m.key));
+    const next: Record<string, string> = {};
+    for (const [metric, value] of Object.entries(chosen)) {
+      if (keeps.has(metric)) next[metric] = value;
+    }
+    setVersion(under);
+    setChosen(next);
+    onChange(vectorOf(next, under));
+    setOpen(true);
+  }
+
+  const answered = metrics.filter((m) => chosen[m.key]).length;
+  const left = metrics.length - answered;
 
   return (
     <div className="field">
@@ -210,13 +335,35 @@ export function Scoring({
           </span>
         )}
         {vector === "" && answered > 0 && (
-          <span className="hint">{8 - answered} more to answer — a score needs all eight.</span>
+          <span className="hint">
+            {left} more to answer — a score needs all {metrics.length}.
+          </span>
         )}
       </div>
 
       {open && (
         <div className="fields">
-          {METRICS.map((metric) => (
+          <div className="field">
+            <label htmlFor="cvss-version">Scheme</label>
+            <select
+              id="cvss-version"
+              value={version}
+              onChange={(event) => compose(event.target.value)}
+            >
+              {SCHEMES.map((scheme) => (
+                <option key={scheme.version} value={scheme.version}>
+                  {scheme.version.replace("CVSS:", "CVSS ")}
+                </option>
+              ))}
+            </select>
+            {version === "CVSS:4.0" && (
+              <p className="hint">
+                Published advisories carry no score under 4.0. CSAF 2.0 has a field for a 3.x score
+                and none for a 4.0 one.
+              </p>
+            )}
+          </div>
+          {metrics.map((metric) => (
             <div className="field" key={metric.key}>
               <label htmlFor={`cvss-${metric.key}`}>
                 {metric.label} <span className="hint">{metric.key}</span>

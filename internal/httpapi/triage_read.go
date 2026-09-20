@@ -488,7 +488,11 @@ func findingRef(described map[int64]triage.Described, decisionID int64) *Finding
 		Places: d.Places, Decided: d.Decided,
 	}
 	if d.Issue.ScoreCenti != nil {
+		// The scheme with the number. Two are scorable and their numbers are
+		// not comparable, so a card carrying one without the other invites
+		// somebody approving a claim to weigh it against the last one.
 		body.Score = float64(*d.Issue.ScoreCenti) / 100
+		body.ScoreVersion = d.Issue.ScoreVersion
 	}
 	return body
 }

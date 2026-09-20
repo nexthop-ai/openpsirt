@@ -3028,6 +3028,9 @@ components:
         score:
           format: double
           type: number
+        score_version:
+          description: The scoring system the number is on
+          type: string
         severity:
           description: Our rating where one stands, else as published
           type: string

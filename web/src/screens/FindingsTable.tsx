@@ -216,8 +216,16 @@ export function FindingsTable({
                     </td>
                     <td>
                       <Severity word={row.severity} />
+                      {/* The word leads because it is the part that compares
+                          across schemes; two schemes weigh a 7.5 differently
+                          and both call it high. Which scheme the number is on
+                          is on the number. */}
                       {row.score ? (
-                        <span className="hint" style={{ marginLeft: 6 }}>
+                        <span
+                          className="hint"
+                          style={{ marginLeft: 6 }}
+                          title={row.score_version ? `CVSS ${row.score_version}` : undefined}
+                        >
                           {row.score.toFixed(1)}
                         </span>
                       ) : null}

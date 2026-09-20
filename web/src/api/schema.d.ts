@@ -6281,6 +6281,8 @@ export interface components {
             product: string;
             /** Format: double */
             score?: number;
+            /** @description The scoring system the number is on */
+            score_version?: string;
             /** @description Our rating where one stands, else as published */
             severity?: string;
             stream: string;
