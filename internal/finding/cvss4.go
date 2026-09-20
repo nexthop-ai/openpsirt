@@ -64,7 +64,7 @@ func (e eqs) key() string {
 //
 // Read rather than the table of scores, so that a class the table has lost is
 // a class this still reaches and the gap is reported.
-var stepsIn = eqs{3, 2, 3, 3, 3, 2}
+var stepsIn = [6]int{3, 2, 3, 3, 3, 2}
 
 // down is every MacroVector one step below in the given class.
 //
@@ -107,17 +107,36 @@ func (e eqs) down(class int) []eqs {
 
 // The furthest a vector can sit from the worst member of its class, per class.
 //
-// The divisor that turns a vector's distance into a proportion. Class five
-// contributes no distance, so it carries none.
+// The divisor that turns a vector's distance into a proportion. Only the
+// classes that have a step below them: a class at its lowest contributes no
+// distance, so a reach for it would never be divided by anything. Class five
+// carries none for the same reason it contributes nothing.
 var reachFour = map[int]map[int]int{
-	1: {0: 1, 1: 4, 2: 5},
-	2: {0: 1, 1: 2},
-	4: {1: 5, 2: 4},
+	1: {0: 1, 1: 4},
+	2: {0: 1},
+	4: {1: 5},
 }
 
 // reachThreeSix is the same for the pair of classes that move together, keyed
 // on both of them.
-var reachThreeSix = map[int]map[int]int{0: {0: 7}, 1: {0: 8}, 2: {1: 10}}
+var reachThreeSix = map[int]map[int]int{0: {0: 7}, 1: {0: 8}}
+
+// reachOf is that divisor for one class of one vector.
+func reachOf(e eqs, class int) int {
+	if class == threeSix {
+		return reachThreeSix[e[2]][e[5]]
+	}
+	return reachFour[class][e[class-1]]
+}
+
+// threeSix is the class that carries class six along with it.
+const threeSix = 3
+
+// spans is the metrics whose distances each class is measured over.
+var spans = map[int][]string{
+	1: {"AV", "PR", "UI"}, 2: {"AC", "AT"},
+	threeSix: {"VC", "VI", "VA"}, 4: {"SC", "SI", "SA"},
+}
 
 // The worst vector in each class, which is what a member's distance is
 // measured from.
@@ -235,17 +254,10 @@ func macroScore(given map[string]string) float64 {
 	// exploitation, so every base vector sits at the top of it. It still
 	// counts, because the mean is over the classes that have something below
 	// them and this one does.
-	distances := map[int]float64{
-		1: away(given, worst, "AV", "PR", "UI"),
-		2: away(given, worst, "AC", "AT"),
-		3: away(given, worst, "VC", "VI", "VA"),
-		4: away(given, worst, "SC", "SI", "SA"),
-	}
-	reach := map[int]int{
-		1: reachFour[1][e[0]], 2: reachFour[2][e[1]],
-		3: reachThreeSix[e[2]][e[5]], 4: reachFour[4][e[3]],
-	}
-
+	// Class five never separates two base vectors: nothing states
+	// exploitation, so every base vector sits at the top of it. It still
+	// counts, because the mean is over the classes that have something below
+	// them and this one does.
 	total, counted := 0.0, 0
 	for class := 1; class <= 5; class++ {
 		steps := e.down(class)
@@ -261,7 +273,8 @@ func macroScore(given map[string]string) float64 {
 			below = math.Max(below, macroScores[step.key()])
 		}
 		// The scale is in tenths, which is what turns a reach into a length.
-		total += (value - below) * (distances[class] / (float64(reach[class]) * 0.1))
+		total += (value - below) *
+			(away(given, worst, spans[class]...) / (float64(reachOf(e, class)) * 0.1))
 	}
 	if counted > 0 {
 		value -= total / float64(counted)

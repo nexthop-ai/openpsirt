@@ -122,6 +122,57 @@ func TestTheClassScoresAreTheOnesABaseVectorReaches(t *testing.T) {
 	}
 }
 
+func TestTheReachesAreTheOnesAClassWithAStepBelowItNeeds(t *testing.T) {
+	// A reach is the divisor that turns a vector's distance into a
+	// proportion, and it is only ever divided by where the class has a step
+	// below it to move toward. Both directions: a class that needs one and
+	// has none divides by zero, and one carried for a class that never needs
+	// it is a transcribed number nothing would find wrong.
+	needed := map[[2]int]bool{}
+	walked := 0
+	baseFours(func(given map[string]string, _ string) {
+		walked++
+		e := classesOf(given)
+		for class := 1; class <= 4; class++ {
+			if len(e.down(class)) == 0 {
+				continue
+			}
+			needed[[2]int{class, classValue(e, class)}] = true
+			if reachOf(e, class) <= 0 {
+				t.Fatalf("class %s divides its distance for step %d by nothing",
+					e.key(), class)
+			}
+		}
+	})
+	if walked == 0 {
+		t.Fatal("no base vectors were walked, so this checked nothing")
+	}
+	for class, byValue := range reachFour {
+		for held := range byValue {
+			if !needed[[2]int{class, held}] {
+				t.Errorf("a reach is carried for step %d at %d and nothing needs it",
+					class, held)
+			}
+		}
+	}
+	for three, by := range reachThreeSix {
+		for six := range by {
+			if !needed[[2]int{threeSix, three*10 + six}] {
+				t.Errorf("a reach is carried for the pair %d and %d and nothing needs it",
+					three, six)
+			}
+		}
+	}
+}
+
+// classValue is what a class sits at, spelled the way its reach is keyed.
+func classValue(e eqs, class int) int {
+	if class == threeSix {
+		return e[2]*10 + e[5]
+	}
+	return e[class-1]
+}
+
 func TestEveryClassAndEveryStepBetweenThemIsScoredByTheCorpus(t *testing.T) {
 	// The corpus is what says the table is transcribed correctly, so a table
 	// entry it never reads is an entry nothing checks.
