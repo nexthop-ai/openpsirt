@@ -411,3 +411,39 @@ func TestAnAdvisorySpanningTwoProductsIsHiddenFromSomebodyHoldingOne(t *testing.
 		}
 	})
 }
+
+func TestNamingAFlawOnAnAdvisoryAsksForTheRoleOnThatProduct(t *testing.T) {
+	// Naming a flaw on an advisory is what puts it into a document published
+	// about that product. Asked for the role anywhere, somebody who triages
+	// one product and only reads another publishes about the second.
+	each(t, func(t *testing.T, f *fixture) {
+		here := f.recorded(t, f.master)
+		there := f.recorded(t, f.other)
+		named := f.covering(t, [2]string{"sonic", here})
+
+		// Triage on the first product, reading on the second — and somebody
+		// the database knows, because a subject invented here fails the
+		// foreign key on whoever did it and passes a refusal test for the
+		// wrong reason.
+		reader := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{
+				f.product:      {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				f.otherProduct: {access.PublicRead, access.PrivateRead},
+			}, 0)
+		if _, err := f.store.Add(t.Context(), reader, named, "switchd", there); err == nil {
+			t.Error("somebody who only reads a product named its flaw on an advisory")
+		}
+		// And taking one off asks the same, because it is as much a statement
+		// about that product as putting it on was.
+		both := f.covering(t, [2]string{"switchd", there})
+		if err := f.store.Drop(t.Context(), reader, both, "switchd", there); err == nil {
+			t.Error("somebody who only reads a product took its flaw off an advisory")
+		}
+		// The product they do triage still answers, so this is a rule rather
+		// than a wall.
+		if _, err := f.store.Add(t.Context(), reader, named, "sonic", here); !errors.Is(
+			err, advisory.ErrAlreadyCovered) {
+			t.Errorf("the product they triage refused them: %v", err)
+		}
+	})
+}

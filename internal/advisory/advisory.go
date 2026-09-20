@@ -290,14 +290,14 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	if err != nil {
 		return nil, nil, err
 	}
-	held, err := s.covers(ctx, row.ID)
+	held, err := s.covers(ctx, row)
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(held) == 0 {
 		return nil, nil, ErrNothingToSay
 	}
-	gone, err := s.issuances(ctx, row.ID)
+	gone, err := s.issuances(ctx, row)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -738,17 +738,21 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	return s.issuances(ctx, row.ID)
+	return s.issuances(ctx, row)
 }
 
 // issuances is what has gone out for one advisory, oldest first.
 //
 // Oldest first because it becomes the revision history, which a document
 // states in the order it happened.
-func (s *Store) issuances(ctx context.Context, advisoryID int64) ([]Issuance, error) {
+//
+// It takes the advisory rather than its identifier for the reason the read of
+// what it covers does: the clearance is the argument, and the only things that
+// answer with one have narrowed or just minted it.
+func (s *Store) issuances(ctx context.Context, row *Advisory) ([]Issuance, error) {
 	var rows []Issuance
 	err := s.db.NewSelect().Model(&rows).
-		Where("advisory_id = ?", advisoryID).
+		Where("advisory_id = ?", row.ID).
 		OrderExpr("ai.ordinal ASC").
 		Scan(ctx)
 	if err != nil {

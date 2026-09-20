@@ -237,16 +237,18 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
-		return nil, access.Denied("add an issue to an advisory")
-	}
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
 	if err != nil {
 		return nil, err
 	}
 	// Authorized before the identifier is resolved, so a name nobody holds
 	// and a name somebody holds come back the same way.
-	if !subject.Sees(named.ID) {
+	//
+	// The triage role on this product, not on some product. Naming a flaw on
+	// an advisory is what puts it into a document published about that
+	// product, so somebody who triages one product and only reads another
+	// would otherwise publish about the second.
+	if !triages(subject, named.ID) {
 		return nil, ErrNoSuchIssue
 	}
 	issue, _, err := s.ours(ctx, subject, named.ID, identifier)
@@ -319,14 +321,14 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
-	if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
-		return access.Denied("take an issue off an advisory")
-	}
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
 	if err != nil {
 		return err
 	}
-	if !subject.Sees(named.ID) {
+	// The same role adding it asks for. Taking a flaw back off a document
+	// about a product is as much a statement about that product as putting it
+	// on was.
+	if !triages(subject, named.ID) {
 		return ErrNoSuchIssue
 	}
 	issue, _, err := s.ours(ctx, subject, named.ID, identifier)
@@ -361,7 +363,7 @@ func (s *Store) Covers(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, nil, err
 	}
-	held, err := s.covers(ctx, row.ID)
+	held, err := s.covers(ctx, row)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -375,7 +377,12 @@ func (s *Store) Covers(ctx context.Context, subject access.Subject,
 // caller that went through it is reading rows it has already been cleared for.
 // Narrowing again here would be a second spelling of one rule, and two
 // spellings disagree.
-func (s *Store) covers(ctx context.Context, advisoryID int64) ([]Covered, error) {
+//
+// It takes the advisory rather than its identifier so that the clearance is
+// the argument: the only things that answer with one are byName, which
+// narrows, and Mint, which just made it and covers nothing. A caller holding
+// an identifier cannot reach this without going through one of them.
+func (s *Store) covers(ctx context.Context, row *Advisory) ([]Covered, error) {
 	var rows []Covered
 	err := s.db.NewSelect().
 		TableExpr(`"advisory_issue" AS "ac"`).
@@ -388,7 +395,7 @@ func (s *Store) covers(ctx context.Context, advisoryID int64) ([]Covered, error)
 		ColumnExpr(`v.id AS "issue_id"`).
 		ColumnExpr(`COALESCE(v.description, '') AS "summary"`).
 		ColumnExpr(`ac.added_at AS "added_at"`).
-		Where("ac.advisory_id = ?", advisoryID).
+		Where("ac.advisory_id = ?", row.ID).
 		Where("ac.removed_at IS NULL").
 		// The order it was assembled in, which is the order somebody chose.
 		// Left to the engine, two documents generated from the same facts are
@@ -491,4 +498,15 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 		return nil, 0, fmt.Errorf("read the advisories: %w", err)
 	}
 	return rows, total, nil
+}
+
+// triages reports whether this subject may decide things about one product.
+//
+// The role on that product rather than anywhere. Starting an advisory asks for
+// the role somewhere, because an advisory names no product until an issue is
+// added to it; naming one is the act that picks the product, and from there
+// the ordinary per-product rule applies.
+func triages(subject access.Subject, productID int64) bool {
+	return subject.Holds(access.PublicTriage, productID) ||
+		subject.Holds(access.PrivateTriage, productID)
 }
