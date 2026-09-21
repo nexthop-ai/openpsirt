@@ -58,13 +58,26 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 		// stands on one signature.
 		Where(standing, held...)
 
-	query = matchVersion(query, "de.component_upstream_version", at.ComponentUpstream)
-	query = matchVersion(query, "de.consumer_upstream_version", at.ConsumerUpstream)
+	// The versions, except where the claim is that the match itself is wrong:
+	// that one covers the place at whatever it now holds, because the
+	// versions are not what it is about. Grouped, so the two halves are one
+	// condition rather than two that a later clause could come between.
+	query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.WhereOr("claim.outcome = ?", Mismatched).
+			WhereGroup(" OR ", func(q *bun.SelectQuery) *bun.SelectQuery {
+				q = matchVersion(q, "de.component_upstream_version", at.ComponentUpstream)
+				return matchVersion(q, "de.consumer_upstream_version", at.ConsumerUpstream)
+			})
+	})
 
-	// An agreed claim outranks a waiting one. Ordering by identifier alone let
-	// a newer unapproved claim shadow an approved one, which is a way for one
-	// person to overturn a decision two people made.
-	if err := query.OrderExpr("CASE WHEN de.state = ? THEN 0 ELSE 1 END, de.id DESC", Approved).
+	// An agreed claim outranks a waiting one, and a claim that the match is
+	// wrong outranks both: a judgment about risk at a place the match does not
+	// describe is a judgment about something that is not there. Ordering by
+	// identifier alone let a newer unapproved claim shadow an approved one,
+	// which is a way for one person to overturn a decision two people made.
+	if err := query.OrderExpr(
+		"CASE WHEN claim.outcome = ? THEN 0 ELSE 1 END, "+
+			"CASE WHEN de.state = ? THEN 0 ELSE 1 END, de.id DESC", Mismatched, Approved).
 		Limit(1).Scan(ctx); err != nil {
 		// No decision standing is an answer. Anything else is a fault, and
 		// reporting it as "nothing stands" would turn a lost race or a lock
@@ -238,7 +251,8 @@ type Filter struct {
 	// entirely legitimate — an outcome that hides nothing needs no second
 	// person, and a short deferral stands on its own — so it is asked together
 	// with an outcome. What it is for is showing that no *dismissal* sits in
-	// it: not-applicable, will-not-fix and already-fixed all require approval, so
+	// it: not-applicable, wrong match, will-not-fix and already-fixed all
+	// require approval, so
 	// that query should return nothing, and a row in it is a control that
 	// failed.
 	//
@@ -246,6 +260,16 @@ type Filter struct {
 	// why asking it tests the two-person rule rather than reading an
 	// assertion somebody made about it.
 	Alone bool
+	// InForce limits to judgments that apply now: agreed to, or standing
+	// without needing agreement, and still holding the place they were made
+	// about.
+	//
+	// The state filter beside it asks something else. A judgment is approved
+	// and still lapses when the code moves out from under it, so a list of
+	// approved judgments is a list of what was once agreed rather than of
+	// what stands — which is the question asked of the corrections in force,
+	// where the whole point is that nothing expires them.
+	InForce bool
 	// Proposer and Approver limit to one person's part in it, by sign-in
 	// identity. Approver matches an agreement that still stands.
 	Proposer string

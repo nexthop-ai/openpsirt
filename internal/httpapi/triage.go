@@ -642,9 +642,10 @@ func registerProposing(api huma.API, in Ingest) {
 		OperationID: "decide", Method: http.MethodPost,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/places/{place}/decision",
 		Summary: "Record a triage decision for a finding",
-		Description: "Records how a finding was triaged: `affected`, `not-applicable`, `deferred`, " +
-			"`wont-fix`, `already-fixed` or `patch-needed`.\n\n" +
-			"`not-applicable` requires a `justification` from the standard VEX vocabulary. " +
+		Description: "Records how a finding was triaged: `affected`, `not-applicable`, " +
+			"`mismatched`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.\n\n" +
+			"`not-applicable` and `mismatched` require a `justification` from the standard " +
+			"VEX vocabulary. " +
 			"`deferred` requires `deferred_until` as a date. `already-fixed` requires " +
 			"`fixed_version`, the version whoever packages the component states the fix " +
 			"arrived in — it is recorded for a reader and never compared against what ships.\n\n" +
@@ -658,6 +659,14 @@ func registerProposing(api huma.API, in Ingest) {
 			"The decision applies to every build running the same component and consumer upstream " +
 			"versions, including future releases — it is matched by code, not copied between " +
 			"releases. It stops applying automatically when either upstream version changes.\n\n" +
+			"`mismatched` is the exception, and the only one: it says the scanner matched " +
+			"this against something it is not, which is a claim about identity rather than " +
+			"about risk. It covers the place at whatever versions the place holds, and no " +
+			"version change expires it — a bump does not make a wrong match right. Its " +
+			"`justification` is limited to the two reasons that say something is not there, " +
+			"`component_not_present` and `vulnerable_code_not_present`; the three that " +
+			"describe how code is reached or what stops it are refused, because a version " +
+			"bump changes those and this outcome would carry them past it.\n\n" +
 			"The response says whether a second person must approve it. Most outcomes require " +
 			"approval; a deferral shorter than the configured threshold does not.\n\n" +
 			"It also says how many findings this one judgment covers, and how many distinct " +

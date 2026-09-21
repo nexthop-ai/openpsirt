@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // Judged is one judgment as an auditor reads it: what was decided, about what,
@@ -58,7 +59,16 @@ type Agreed struct {
 }
 
 // Standing reports whether this judgment applies now.
-func (j Judged) Standing() bool { return j.State == Approved && j.LiveKey != nil }
+//
+// The row's own reading of what Filter.InForce asks of the record. A claim
+// that needs nobody stands while it is proposed, which is what the two of them
+// have to agree about.
+func (j Judged) Standing() bool {
+	if j.LiveKey == nil {
+		return false
+	}
+	return j.State == Approved || (j.State == Proposed && !j.NeedsApproval && j.SentBackAt == nil)
+}
 
 // BySomebodyElse reports whether the people who proposed and agreed differ,
 // which is the control a downgrade needing a second person exists for stated
@@ -147,6 +157,13 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		}
 		if len(f.States) > 0 {
 			q = q.Where("de.state IN (?)", bun.List(f.States))
+		}
+		// What applies now, which is the same condition Judged.Standing
+		// reports off a row: a claim still holding its key, agreed to or
+		// standing without needing agreement.
+		if f.InForce {
+			standing, held := finding.InForce()
+			q = q.Where("de.live_key IS NOT NULL").Where(standing, held...)
 		}
 		// The period is the proposal's date, not the approval's. A judgment
 		// belongs to when it was made; dating it by its agreement would move

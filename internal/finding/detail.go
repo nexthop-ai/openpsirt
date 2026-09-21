@@ -464,6 +464,33 @@ type evidenceRow struct {
 	DueAt         *time.Time `bun:"due_at"`
 }
 
+// standingHere is the body of the subquery that picks the one decision
+// standing at a finding's place: the correction in force if there is one, and
+// otherwise the oldest claim keyed on the versions the place holds. The caller
+// supplies the product and reads one column off it.
+//
+// A claim waiting for a second person is in the list, because the screen says
+// what has been claimed here as well as what governs. It does not outrank an
+// agreement: a correction nobody has agreed to governs nothing, and put first
+// it named a decision on the screen that every other reader of the same place
+// — what suppresses a finding, what a published document says — disagreed
+// with.
+//
+// Ordered rather than aggregated, so that every column read through it names
+// the same row.
+const standingHere = `FROM "decision" AS "de"
+	JOIN "claim" AS "cl" ON cl.id = de.claim_id
+	WHERE de.product_id = ?
+	  AND de.vulnerability_id = f.vulnerability_id
+	  AND de.place_identity = f.place_identity
+	  AND de.live_key IS NOT NULL
+	  AND ` + KeyMatches + `
+	ORDER BY CASE WHEN cl.outcome = '` + Mismatched + `'
+	                   AND (de.state = 'approved'
+	                        OR (de.needs_approval = FALSE AND de.sent_back_at IS NULL))
+	              THEN 0 ELSE 1 END, de.id
+	LIMIT 1`
+
 // Detail reads everything held about one issue in one component of a build.
 func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vulnerabilityID,
 	componentID int64) (*Evidence, error) {
@@ -510,23 +537,16 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		// that ships the same component reads as standing on this screen; and
 		// a live claim is about the versions it was keyed on, so without the
 		// second a claim about last release's version answers for this one.
-		ColumnExpr(`(SELECT MIN(de.id) FROM "decision" AS "de"
-			WHERE de.product_id = ?
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND de.live_key IS NOT NULL
-			  AND `+KeyMatches+`) AS "decision"`, productID).
-		// And which claim that decision is a row of, so that a claim
-		// shown on the finding can name the places it covers rather
-		// than only count them. At most one live decision stands per
-		// combination of code , so this is the same single row the
-		// column above reaches.
-		ColumnExpr(`(SELECT MIN(de.claim_id) FROM "decision" AS "de"
-			WHERE de.product_id = ?
-			  AND de.vulnerability_id = f.vulnerability_id
-			  AND de.place_identity = f.place_identity
-			  AND de.live_key IS NOT NULL
-			  AND `+KeyMatches+`) AS "claim"`, productID).
+		//
+		// One row, chosen the same way in both columns. A claim that the
+		// match is wrong covers the place at whatever version it holds, so it
+		// can stand beside a claim keyed on this one — and there it is the
+		// answer, because a judgment about risk at a place the match does not
+		// describe is a judgment about something that is not there. Taken as
+		// two independent minimums the two columns could name different rows,
+		// which is a claim identifier that belongs to another decision.
+		ColumnExpr(`(SELECT de.id `+standingHere+`) AS "decision"`, productID).
+		ColumnExpr(`(SELECT de.claim_id `+standingHere+`) AS "claim"`, productID).
 		ColumnExpr(`CASE WHEN f.suppressed_by IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
 		ColumnExpr(`f.urgency AS "urgency"`).
 		ColumnExpr(`f.fix_state AS "fix_state"`).

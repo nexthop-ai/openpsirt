@@ -467,6 +467,12 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 		return db.NewSelect().Model((*Decision)(nil)).
 			ColumnExpr("de.id").
 			Where("de.state IN (?, ?)", Proposed, Approved).
+			// A claim about the match rather than about the version does not
+			// stop applying when the version moves. A bump does not make a
+			// wrong match right, and lapsing one would hand the same wrong
+			// match back at every point release.
+			Where(`NOT EXISTS (SELECT 1 FROM "claim" AS "lc"`+
+				` WHERE lc.id = de.claim_id AND lc.outcome = ?)`, Mismatched).
 			Where("de.product_id = (?)", db.NewSelect().
 				ColumnExpr("st.product_id").
 				TableExpr(`"target" AS "tg"`).

@@ -171,8 +171,8 @@ var settable = []struct {
 		aDuration, nil, func(Ingest) string { return setting.DefaultQueuedAfter.String() }, false},
 	{setting.DiscloseAfter, "How long a finding nobody has announced stays that way before its date. What a deployment's coordinated-disclosure policy says, which is the deployment's to state rather than ours: an embargo somebody outside can hold us to is one they were told the length of",
 		aDuration, nil, func(Ingest) string { return setting.DefaultDiscloseAfter.String() }, false},
-	{setting.ExtensionThreshold, "How much an embargo may be moved by in total before a second person has to agree. Measured against everything the date has already been moved by, not against the extension being asked for",
-		aDuration, nil, func(Ingest) string { return setting.DefaultExtensionThreshold.String() }, false},
+	{setting.MovementThreshold, "How far an embargo's end may be carried in total before a second person has to agree. Measured against everything the date has already been moved by, not against the movement being asked for, and a date brought forward counts the same distance as one pushed back",
+		aDuration, nil, func(Ingest) string { return setting.DefaultMovementThreshold.String() }, false},
 	{setting.DisclosureLead, "How long before an embargo's date the people who could still move it are told it is coming. An extension nobody can agree to in time is an approval in name only",
 		aDuration, nil, func(Ingest) string { return setting.DefaultDisclosureLead.String() }, false},
 }

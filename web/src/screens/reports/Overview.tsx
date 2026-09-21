@@ -33,11 +33,13 @@ const WINDOWS = [7, 30, 90] as const;
 const NEWEST = 20;
 const REPEATS = 50;
 
-// The three outcomes that hide risk, and so the three that need a second
-// person. Named together because "what has been argued away" is asked of all
-// of them at once, and asked of one it answers about a third of the program.
-const DISMISSALS: ("not-applicable" | "wont-fix" | "already-fixed")[] = [
+// The outcomes that dismiss, and so the ones that need a second person. Named
+// together because "what has been argued away" is asked of all of them at
+// once, and asked of some it answers about part of the program while reading
+// as the whole.
+const DISMISSALS: ("not-applicable" | "mismatched" | "wont-fix" | "already-fixed")[] = [
   "not-applicable",
+  "mismatched",
   "wont-fix",
   "already-fixed",
 ];

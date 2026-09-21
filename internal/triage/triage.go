@@ -23,6 +23,17 @@ const (
 	Affected Outcome = "affected"
 	// NotApplicable means it does not affect this product here.
 	NotApplicable Outcome = "not-applicable"
+	// Mismatched means the scanner matched this against something it is not.
+	// The finding is wrong rather than answered.
+	//
+	// A claim about identity, where every other outcome is a judgment about
+	// risk. That is what makes it the one outcome the versions do not expire:
+	// a decision is stored under the versions it was a claim about and stops
+	// applying when they move, which is right for how dangerous something is
+	// and wrong for whether the thing is there at all. A version bump does
+	// not make a wrong match right, so without this the same wrong match
+	// comes back at every point release and somebody answers it again.
+	Mismatched Outcome = "mismatched"
 	// Deferred means it affects us and is not being worked on until a date.
 	Deferred Outcome = "deferred"
 	// WontFix means it affects us and will not be addressed.
@@ -60,8 +71,8 @@ const (
 
 // Outcomes are all of them, in the order a person meets them.
 func Outcomes() []Outcome {
-	return []Outcome{Affected, NotApplicable, Deferred, WontFix, AlreadyFixed,
-		UpgradeNeeded, PatchNeeded}
+	return []Outcome{Affected, NotApplicable, Mismatched, Deferred, WontFix,
+		AlreadyFixed, UpgradeNeeded, PatchNeeded}
 }
 
 // OutcomesOneAtATime are the outcomes one act may record against one finding.
@@ -107,17 +118,18 @@ func OutcomesThatHideRisk() []Outcome {
 }
 
 // OutcomesDismissing are the outcomes that claim no further work is needed:
-// it does not apply, it will not be fixed, the fix is already here.
+// it does not apply, the match is wrong, it will not be fixed, the fix is
+// already here.
 //
 // Told apart from the rest of what hides risk by carrying no date. A deferral
 // says when somebody will look again and a commitment says when the work
 // lands, so each of those is a statement about the future that something later
-// checks; these three close the question, and nothing re-opens it.
+// checks; these close the question, and nothing re-opens it.
 //
-// Named rather than written out at each site. It was spelled as a literal
-// triple in three places, and a fourth dismissing outcome added to two of them
-// would have gone quietly uncounted in the third — which is a condition
-// reporting that a control held.
+// Named rather than written out at each site. Spelled as a literal list
+// wherever it is asked, an outcome added to some of those sites and not the
+// others goes quietly uncounted — which is a condition reporting that a
+// control held.
 func OutcomesDismissing() []Outcome {
 	kept := make([]Outcome, 0, len(Outcomes()))
 	for _, each := range Outcomes() {
@@ -169,6 +181,28 @@ func (o Outcome) Commits() bool { return o == UpgradeNeeded || o == PatchNeeded 
 // an outcome makes a statement about the future at all.
 func (o Outcome) Dated() bool { return o.Commits() || o == Deferred }
 
+// StandsAtAnyVersion reports whether a claim with this outcome keeps applying
+// when the code under it moves.
+//
+// One outcome does. Identity is structural and expiry is version-based, and
+// neither reaches into the other: a claim that the match itself is wrong is
+// about the first, so the second has nothing to say about it. Every other
+// outcome is a judgment made under the versions it was made against, and a
+// judgment about risk that outlived them would be the bump at the top of a
+// build failing to re-open a question somebody has to answer again.
+func (o Outcome) StandsAtAnyVersion() bool { return o == Mismatched }
+
+// NeedsJustification reports whether this outcome says which recognized reason
+// applies, which is a claim two of them make.
+//
+// Both are claims that something is not the problem here, and which reason
+// applies is the whole of what each says. The rest are claims about priority
+// or about work, and a reason on one of those states something the claim does
+// not make.
+func (o Outcome) NeedsJustification() bool {
+	return o == NotApplicable || o == Mismatched
+}
+
 // Justification is why something does not affect us.
 //
 // The vocabulary is the one the exchange format already defines rather than
@@ -192,6 +226,33 @@ const (
 	// MitigationsExist means something already in place stops it.
 	MitigationsExist Justification = "inline_mitigations_already_exist"
 )
+
+// AboutIdentity reports whether this reason claims something is not there,
+// rather than that what is there cannot be reached or is already stopped.
+//
+// The distinction a correction turns on. A correction does not lapse when the
+// code moves, so the reason behind one has to be a reason no version bump can
+// answer. That something is absent is such a reason; that it is unreachable or
+// already mitigated is a claim about surroundings and configuration, which a
+// bump changes all the time — recorded as a correction it would put a judgment
+// about risk beyond the rule that re-examines it.
+func (j Justification) AboutIdentity() bool {
+	return j == ComponentNotPresent || j == CodeNotPresent
+}
+
+// JustificationsCorrecting are the reasons a correction may state.
+//
+// Named here rather than written out where it is enforced, so that what is
+// left out is stated once and stays stated.
+func JustificationsCorrecting() []Justification {
+	kept := make([]Justification, 0, len(Justifications()))
+	for _, each := range Justifications() {
+		if each.AboutIdentity() {
+			kept = append(kept, each)
+		}
+	}
+	return kept
+}
 
 // Justifications are the recognized categories.
 func Justifications() []Justification {

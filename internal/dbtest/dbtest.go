@@ -686,7 +686,7 @@ var tables = []string{
 	// Before person and target, both of which it points at.
 	"upgrade",
 	// Before person, vulnerability and product, all of which it points at.
-	"disclosure_extension",
+	"disclosure_movement",
 	// Before product, vulnerability, component and person, all of which it
 	// points at.
 	"finding_tag",

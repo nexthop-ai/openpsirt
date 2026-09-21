@@ -133,7 +133,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 			PlaceIdentity:     row.PlaceIdentity,
 			ComponentUpstream: orEmpty(row.ComponentUpstreamVersion),
 			ConsumerUpstream:  orEmpty(row.ConsumerUpstreamVersion),
-		})
+		}, claim.Outcome.StandsAtAnyVersion())
 		if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
 			Set("state = ?", Proposed).
 			Set("live_key = ?", key).
@@ -435,10 +435,10 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Where("de.id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
-		Where("COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr).
-		Where("COALESCE(de.consumer_upstream_version, '') = "+finding.ConsumerUpstreamExpr).
+		Where(finding.KeyMatches).
 		Where("f.visibility IN (?)", bun.List(readable)).
 		Count(ctx)
 	if err != nil {

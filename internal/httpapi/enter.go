@@ -345,9 +345,10 @@ func registerDisclosure(api huma.API, in Ingest) {
 	})
 }
 
-// ExtensionBody is one time somebody moved the end of an embargo.
-type ExtensionBody struct {
+// MovementBody is one time somebody moved the end of an embargo.
+type MovementBody struct {
 	ID            int64  `json:"id"`
+	Act           string `json:"act" enum:"extension,shortening" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner"`
 	Was           string `json:"was" doc:"The embargo's previous end"`
 	Until         string `json:"until" doc:"The end that was asked for"`
 	Reason        string `json:"reason"`
@@ -356,20 +357,21 @@ type ExtensionBody struct {
 	NeedsApproval bool   `json:"needs_approval" doc:"Whether a second person had to agree"`
 	ApprovedBy    string `json:"approved_by,omitempty"`
 	ApprovedAt    string `json:"approved_at,omitempty"`
-	// InForce says the date follows this one. An extension waiting for
+	// InForce says the date follows this one. A movement waiting for
 	// agreement has moved nothing.
 	InForce bool `json:"in_force"`
 }
 
-// PendingExtensionBody is one request to move a date that is waiting for a
+// PendingMovementBody is one request to move a date that is waiting for a
 // second person, with the issue it is about.
-type PendingExtensionBody struct {
+type PendingMovementBody struct {
 	ID            int64  `json:"id"`
 	Product       string `json:"product"`
 	Vulnerability string `json:"vulnerability"`
+	Act           string `json:"act" enum:"extension,shortening" doc:"Which act is being asked for"`
 	Was           string `json:"was" doc:"The embargo's end now"`
 	Until         string `json:"until" doc:"The end being asked for"`
-	Days          int    `json:"days" doc:"The distance later, in days"`
+	Days          int    `json:"days" doc:"How far the date moves, in days, whichever way it moves"`
 	By            string `json:"by" doc:"The person who asked"`
 	AskedAt       string `json:"asked_at"`
 	Reason        string `json:"reason"`
@@ -377,68 +379,105 @@ type PendingExtensionBody struct {
 	Mine bool `json:"mine,omitempty" doc:"You asked for this, so you may not be the second person"`
 }
 
-func registerExtensions(api huma.API, in Ingest) {
+func registerMovements(api huma.API, in Ingest) {
 	const path = "/v1/products/{product}/issues/{vulnerability}/disclosure"
 
-	huma.Register(api, requiring(huma.Operation{
-		OperationID: "extend-disclosure", Method: http.MethodPost, Path: path,
-		Summary: "Ask to move a disclosure date later",
-		Description: "Moves the end of an embargo, across every undisclosed finding of this " +
-			"issue in this product.\n\n" +
-			"A reason is required, always, however short the extension. One with no reason " +
-			"is a record saying somebody moved it and nothing else.\n\n" +
-			"Past a threshold it needs a second person, and the threshold is measured " +
-			"against everything this embargo has already been moved by rather than against " +
-			"this request alone — measured per request, the exception swallows the rule three " +
-			"weeks at a time. It is the same act a deferral is, and the same shape.\n\n" +
-			"An extension that needs agreement moves nothing until it has it. The request " +
-			"is on record either way; `in_force` says whether the date follows it.\n\n" +
-			"A date only ever moves later. Bringing one forward is disclosing sooner, which is " +
-			"a different act.",
-		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, perProduct, "A second person agrees past the threshold.", []access.Role{access.PrivateTriage}...), func(ctx context.Context, input *struct {
+	// One handler for both acts. What differs between them is the act
+	// recorded, the direction the date has to move and the words on the
+	// operation; the authorization, the reason and the threshold are one rule
+	// and a second copy of them is a second rule that drifts. Each act is
+	// registered on its own line all the same, because the check that no two
+	// operations claim one method and path counts registrations in this
+	// source.
+	type movingInput = struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 		Body          struct {
 			Until  string `json:"until" doc:"The date the embargo should end"`
-			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"The reason it is being extended"`
+			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"The reason the date is moving"`
 		}
-	}) (*struct {
+	}
+	type movingOutput = struct {
 		Status int
-		Body   ExtensionBody
-	}, error) {
-		subject, store, product, issue, err := embargoAt(ctx, in, input.Product, input.Vulnerability)
-		if err != nil {
-			return nil, err
-		}
-		until, err := time.Parse(time.DateOnly, input.Body.Until)
-		if err != nil {
-			return nil, huma.Error422UnprocessableEntity(
-				"until has to be a date, as 2026-12-31")
-		}
-
-		asked, err := store.Extend(ctx, subject, product, issue, until, input.Body.Reason)
-		if err != nil {
-			if errors.Is(err, finding.ErrNotEmbargoed) {
-				return nil, noSuchFinding()
+		Body   MovementBody
+	}
+	moving := func(act finding.Act) func(context.Context, *movingInput) (*movingOutput, error) {
+		return func(ctx context.Context, input *movingInput) (*movingOutput, error) {
+			subject, store, product, issue, err := embargoAt(ctx, in, input.Product, input.Vulnerability)
+			if err != nil {
+				return nil, err
 			}
-			return nil, refusedFinding(in, err)
+			until, err := time.Parse(time.DateOnly, input.Body.Until)
+			if err != nil {
+				return nil, huma.Error422UnprocessableEntity(
+					"until has to be a date, as 2026-12-31")
+			}
+
+			move := store.Extend
+			if act == finding.Shortening {
+				move = store.BringForward
+			}
+			asked, err := move(ctx, subject, product, issue, until, input.Body.Reason)
+			if err != nil {
+				if errors.Is(err, finding.ErrNotEmbargoed) {
+					return nil, noSuchFinding()
+				}
+				return nil, refusedFinding(in, err)
+			}
+			body, err := movementBody(ctx, in, []finding.Movement{*asked})
+			if err != nil {
+				return nil, wentWrong(in.Logger, "the movement could not be read back", err)
+			}
+			return &movingOutput{Status: http.StatusCreated, Body: body[0]}, nil
 		}
-		body, err := extensionBody(ctx, in, []finding.Extension{*asked})
-		if err != nil {
-			return nil, wentWrong(in.Logger, "the extension could not be read back", err)
-		}
-		return &struct {
-			Status int
-			Body   ExtensionBody
-		}{Status: http.StatusCreated, Body: body[0]}, nil
-	})
+	}
+	gated := func(operation huma.Operation) huma.Operation {
+		return requiring(operation, perProduct, "A second person agrees past the threshold.",
+			[]access.Role{access.PrivateTriage}...)
+	}
+
+	huma.Register(api, gated(huma.Operation{
+		OperationID: "extend-disclosure", Method: http.MethodPost, Path: path + "/extension",
+		Summary: "Extend a disclosure date",
+		Description: "Moves the end of an embargo later, across every undisclosed finding of " +
+			"this issue in this product.\n\n" +
+			"A reason is required, always, however short the extension. One with no reason " +
+			"is a record saying somebody moved it and nothing else.\n\n" +
+			"Past a threshold it needs a second person, and the threshold is measured " +
+			"against how far this embargo's end has already been carried rather than against " +
+			"this request alone — measured per request, the exception swallows the rule three " +
+			"weeks at a time. It is the same act a deferral is, and the same shape.\n\n" +
+			"An extension that needs agreement moves nothing until it has it. The request " +
+			"is on record either way; `in_force` says whether the date follows it.\n\n" +
+			"A date sent earlier is refused here. Ending an embargo sooner is a different " +
+			"act, recorded as one: `POST .../disclosure/shortening`.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
+	}), moving(finding.Extension))
+
+	huma.Register(api, gated(huma.Operation{
+		OperationID: "shorten-disclosure", Method: http.MethodPost, Path: path + "/shortening",
+		Summary: "Bring a disclosure date forward",
+		Description: "Moves the end of an embargo sooner, across every undisclosed finding of " +
+			"this issue in this product. What a coordinator or a peer vendor publishing on a " +
+			"date of their own asks for, and what a leak leaves.\n\n" +
+			"Its own act rather than an extension sent a smaller date. Shortening an embargo " +
+			"because it leaked and extending one because a fix slipped are different events, " +
+			"and which of them happened is read off the record rather than inferred from the " +
+			"direction a date moved.\n\n" +
+			"A reason is required, and the same threshold applies: how far this embargo's end " +
+			"has already been carried, counting a date brought forward the same distance as " +
+			"one pushed back. Past it a second person agrees, and until they do the date " +
+			"does not move.\n\n" +
+			"A date sent later is refused here. Extend with `POST .../disclosure/extension`.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
+	}), moving(finding.Shortening))
 
 	huma.Register(api, requiring(huma.Operation{
-		OperationID: "list-disclosure-extensions", Method: http.MethodGet, Path: path,
+		OperationID: "list-disclosure-movements", Method: http.MethodGet, Path: path,
 		Summary: "List how an embargo has been moved",
-		Description: "Every time this embargo was moved, oldest first, with why and by whom.\n\n" +
-			"Kept in full and never overwritten. One extension is a judgment and six is a " +
+		Description: "Every time this embargo was moved, oldest first, with which act it " +
+			"was, why, and by whom.\n\n" +
+			"Kept in full and never overwritten. One movement is a judgment and six is a " +
 			"policy nobody wrote down, and the difference is invisible if each replaces the " +
 			"last. A request still waiting for agreement is here too: what was asked for is " +
 			"part of how long this stayed hidden, whether or not it was granted.",
@@ -446,31 +485,32 @@ func registerExtensions(api huma.API, in Ingest) {
 	}, perProduct, "Only where you may read undisclosed work.", privateRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
-	}) (*listOutput[ExtensionBody], error) {
+	}) (*listOutput[MovementBody], error) {
 		subject, store, product, issue, err := embargoAt(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
-		rows, err := store.Extensions(ctx, subject, product, issue)
+		rows, err := store.Movements(ctx, subject, product, issue)
 		if err != nil {
 			return nil, refusedFinding(in, err)
 		}
-		items, err := extensionBody(ctx, in, rows)
+		items, err := movementBody(ctx, in, rows)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "the extensions could not be read", err)
+			return nil, wentWrong(in.Logger, "the movements could not be read", err)
 		}
-		out := &listOutput[ExtensionBody]{}
+		out := &listOutput[MovementBody]{}
 		out.Body.Items = items
 		return out, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
-		OperationID: "list-pending-extensions", Method: http.MethodGet,
-		Path:    "/v1/disclosure-extensions",
-		Summary: "List extension requests waiting for a second person",
+		OperationID: "list-pending-disclosure-movements", Method: http.MethodGet,
+		Path:    "/v1/disclosure-movements",
+		Summary: "List disclosure-date movements waiting for a second person",
 		Description: "Every request to move a disclosure date that nobody has agreed to yet, " +
-			"across the products you may read undisclosed work in, newest first.\n\n" +
-			"Until this there was nowhere to be that second person. A request could be " +
+			"across the products you may read undisclosed work in, newest first. Both acts " +
+			"are here, and `act` says which each one is.\n\n" +
+			"Without this there is nowhere to be that second person. A request could be " +
 			"read on the finding it belongs to and nowhere else, so the only way to find one " +
 			"was to already know it existed — which is the failure the review queue exists to " +
 			"prevent, in the one place where what is being agreed to is how long something " +
@@ -478,12 +518,12 @@ func registerExtensions(api huma.API, in Ingest) {
 			"Your own requests are here too, marked as yours. You cannot agree to one — " +
 			"the endpoint refuses it — but a proposer looking for what is holding a case up " +
 			"should not have their own request hidden from them.\n\n" +
-			"Agree with `POST /v1/disclosure-extensions/{id}/approval`.",
+			"Agree with `POST /v1/disclosure-movements/{id}/approval`.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Only where you may read undisclosed work."), func(ctx context.Context, input *struct {
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0" doc:"The offset into the list"`
-	}) (*listOutput[PendingExtensionBody], error) {
+	}) (*listOutput[PendingMovementBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -496,15 +536,16 @@ func registerExtensions(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what is waiting could not be read", err)
 		}
-		out := &listOutput[PendingExtensionBody]{}
+		out := &listOutput[PendingMovementBody]{}
 		// The number waiting in all: without it a screen prints the length of
 		// its own page as the number.
 		out.Body.Total = total
-		out.Body.Items = make([]PendingExtensionBody, 0, len(rows))
+		out.Body.Items = make([]PendingMovementBody, 0, len(rows))
 		for _, row := range rows {
-			out.Body.Items = append(out.Body.Items, PendingExtensionBody{
+			out.Body.Items = append(out.Body.Items, PendingMovementBody{
 				ID:      row.ID,
 				Product: row.Product, Vulnerability: row.Vulnerability,
+				Act: string(row.Act),
 				Was: row.Was.Format(time.DateOnly), Until: row.Until.Format(time.DateOnly),
 				By:      row.AskedByName,
 				AskedAt: row.AskedAt.Format(time.RFC3339),
@@ -513,19 +554,20 @@ func registerExtensions(api huma.API, in Ingest) {
 				// may not be the one who agrees, and a row somebody cannot act
 				// on has to say why before they press it.
 				Mine: row.AskedBy == subject.ID,
-				Days: int(row.Until.Sub(row.Was).Hours() / 24),
+				// How far, whichever way. The act says which way.
+				Days: int(row.Distance().Hours() / 24),
 			})
 		}
 		return out, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
-		OperationID: "agree-to-extension", Method: http.MethodPost,
-		Path:    "/v1/disclosure-extensions/{id}/approval",
-		Summary: "Approve a disclosure-date extension",
-		Description: "Records a second person agreeing, and moves the date.\n\n" +
+		OperationID: "agree-to-disclosure-movement", Method: http.MethodPost,
+		Path:    "/v1/disclosure-movements/{id}/approval",
+		Summary: "Approve a disclosure-date movement",
+		Description: "Records a second person agreeing, and moves the date. Either act.\n\n" +
 			"The person who asked may not be the one who agrees. That is the control the " +
-			"threshold exists to reach, and an extension somebody approved for themselves is " +
+			"threshold exists to reach, and a movement somebody approved for themselves is " +
 			"the same as one nobody approved.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, perProduct, "Not the person who asked for it.", []access.Role{access.PrivateTriage}...), func(ctx context.Context, input *struct {
@@ -538,7 +580,7 @@ func registerExtensions(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		err = finding.NewStore(in.DB.DB).AgreeToExtension(ctx, subject, input.ID)
+		err = finding.NewStore(in.DB.DB).AgreeToMovement(ctx, subject, input.ID)
 		switch {
 		case errors.Is(err, finding.ErrNotEmbargoed):
 			return nil, noSuchFinding()
@@ -579,8 +621,8 @@ func embargoAt(ctx context.Context, in Ingest, productName, issueName string) (
 	return subject, finding.NewStore(in.DB.DB), product.ID, issue, nil
 }
 
-// extensionBody names the people an extension record refers to by identifier.
-func extensionBody(ctx context.Context, in Ingest, rows []finding.Extension) ([]ExtensionBody, error) {
+// movementBody names the people a movement record refers to by identifier.
+func movementBody(ctx context.Context, in Ingest, rows []finding.Movement) ([]MovementBody, error) {
 	people := make([]int64, 0, len(rows)*2)
 	for _, row := range rows {
 		people = append(people, row.AskedBy)
@@ -592,10 +634,10 @@ func extensionBody(ctx context.Context, in Ingest, rows []finding.Extension) ([]
 	if err != nil {
 		return nil, err
 	}
-	out := make([]ExtensionBody, 0, len(rows))
+	out := make([]MovementBody, 0, len(rows))
 	for _, row := range rows {
-		body := ExtensionBody{
-			ID: row.ID, Was: stamp(row.Was), Until: stamp(row.Until),
+		body := MovementBody{
+			ID: row.ID, Act: string(row.Act), Was: stamp(row.Was), Until: stamp(row.Until),
 			Reason: row.Reason, AskedBy: names[row.AskedBy],
 			AskedAt: stamp(row.AskedAt), NeedsApproval: row.NeedsApproval,
 			InForce: row.InForce(),

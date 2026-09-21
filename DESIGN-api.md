@@ -185,7 +185,7 @@ refuse an absurd request rather than to cut a page.
 | What ends it | The list growing past the ceiling on a real deployment. It gains an offset then, and the screen gains the control to use it |
 
 Four of them take an offset: what is running out of time, what is approaching
-disclosure, the extensions waiting for a second person, and the deferrals that
+disclosure, the disclosure-date movements waiting for a second person, and the deferrals that
 keep repeating. Each grows with the estate, and each answers with a total as
 well — a caller holding a full page cannot otherwise tell a clipped page from
 the whole list, and a screen then prints the length of its own page as the

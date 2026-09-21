@@ -38,7 +38,7 @@ REQ-44, REQ-45, REQ-56, REQ-68, REQ-69's server half.
 - [The administration trail](#the-administration-trail)
 - [Secrets and logs](#secrets-and-logs)
 - [Disclosure](#disclosure)
-- [Disclosure extensions](#disclosure-extensions)
+- [Disclosure-date movements](#disclosure-date-movements)
 - [Case collaborators](#case-collaborators)
 - [Values a deployment mints](#values-a-deployment-mints)
 - [Mail addresses](#mail-addresses)
@@ -1051,20 +1051,28 @@ The date arriving tells administrators, and whoever holds the finding where they
 may still read undisclosed work in that product. A condition rather than an
 event: it stands while the date is past and nothing has been decided.
 
-## Disclosure extensions
+## Disclosure-date movements
 
 Needs a reason, and past a threshold that is a setting — thirty days by default —
-a second person (REQ-38). The same shape as a deferral, because it is the same
-act: keeping risk hidden for longer.
+a second person (REQ-38). The same shape as a deferral, because moving a date
+is the same act: changing how long something stays hidden.
+
+Two acts, recorded apart.
+
+| Act | What it says |
+|---|---|
+| **Extension** | The embargo ends later. The unilateral case: the fix slipped |
+| **Shortening** | The embargo ends sooner. The coordinated case: a coordinator or a peer vendor is publishing on a date of their own, or the detail leaked |
 
 | Rule | Reason |
 |---|---|
+| Which act it was is stored, not read off the two dates | "We extended it because the fix slipped" and "we shortened it because it leaked" are different events, and a reader inferring which from the direction a date moved is reading an inference |
+| Each act refuses the date the other takes | A date typed the wrong way round would otherwise be recorded as a decision somebody made |
 | A reason is required always, however short | One with no reason is a record saying somebody moved it and nothing else |
-| The threshold is measured against everything the embargo has already moved by | Measured per request, the exception swallows the rule three weeks at a time. Only extensions that took effect count |
-| An extension that needs agreement moves nothing until it has it | An embargo running on while somebody thought about it would be the extension taking effect on one person's say-so with a queue entry as decoration |
-| The person who asked may not be the one who agrees | That is the control the threshold exists to reach |
-| A date only ever moves later | Bringing one forward is disclosing sooner, which is a different act |
-| Every request is kept, granted or not, oldest first, with why and by whom | One extension is a judgment and six is a policy nobody wrote down, and the difference is invisible if each replaces the last |
+| The threshold is measured against how far the end has already been carried | Measured per request, the exception swallows the rule three weeks at a time. Only movements that took effect count, and each counts by its distance rather than by its direction — a date pulled in and pushed back is a date nobody can rely on, whichever way it went last |
+| A movement that needs agreement moves nothing until it has it | An embargo running on while somebody thought about it would be the movement taking effect on one person's say-so with a queue entry as decoration |
+| The person who asked may not be the one who agrees | That is the control the threshold exists to reach. It is the control both acts need: a shortening publishes sooner than the people relying on the date were told |
+| Every request is kept, granted or not, oldest first, with which act, why and by whom | One movement is a judgment and six is a policy nobody wrote down, and the difference is invisible if each replaces the last |
 
 There is somewhere to be the second person. A request over the threshold could
 be read on the finding it belongs to and nowhere else, so the only way to find
@@ -1077,6 +1085,11 @@ own is shown and marked and cannot be agreed to — hiding it would leave somebo
 hunting for what is holding their case up. That is the opposite of the review
 queue's rule: there an entry is work the reader might do, and here it is a state
 of the case.
+
+Peer coordination is not built. Shared cross-organization embargoes, a
+coordinator's own record and a peer vendor's schedule are organizational
+practice rather than tooling, and what a coordinator's date means here is one
+person deciding to bring ours in and another agreeing.
 
 ## Case collaborators
 

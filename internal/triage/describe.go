@@ -235,6 +235,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
@@ -245,8 +246,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where("de.claim_id IN (?)", bun.List(claims)).
 		Where("de.live_key IS NOT NULL").
 		Where("st.product_id = de.product_id").
-		Where("COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr).
-		Where("COALESCE(de.consumer_upstream_version, '') = "+finding.ConsumerUpstreamExpr).
+		Where(finding.KeyMatches).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.component_id IN (?)", bun.List(components)).
 		Where("f.closed_at IS NULL").

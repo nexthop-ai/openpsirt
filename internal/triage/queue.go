@@ -277,6 +277,7 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
@@ -286,8 +287,7 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		Where("de.claim_id IN (?)", bun.List(claims)).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
-		Where("COALESCE(de.component_upstream_version, '') = " + finding.ComponentUpstreamExpr).
-		Where("COALESCE(de.consumer_upstream_version, '') = " + finding.ConsumerUpstreamExpr)
+		Where(finding.KeyMatches)
 	err := readableFindings(query, subject, "f", "st.product_id").
 		GroupExpr("de.claim_id, st.display_name, va.display_name").
 		OrderExpr("de.claim_id, st.display_name, va.display_name").
@@ -387,6 +387,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
@@ -395,8 +396,7 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		Where("de.claim_id IN (?)", bun.List(claimIDs)).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
-		Where("COALESCE(de.component_upstream_version, '') = " + finding.ComponentUpstreamExpr).
-		Where("COALESCE(de.consumer_upstream_version, '') = " + finding.ConsumerUpstreamExpr).
+		Where(finding.KeyMatches).
 		Where("f.fixed_in <> ''")
 	if err := readableFindings(known, subject, "f", "st.product_id").
 		GroupExpr("de.claim_id, f.vulnerability_id").

@@ -238,7 +238,9 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			-- its own.
 			"selected_by"                ` + t.free + ` NULL,
 			-- What this decision is a claim about, while it is still a live
-			-- claim: the place and both upstream versions, hashed. Set to null
+			-- claim: the place and both upstream versions, hashed — and the
+			-- place alone where the claim stands at any version, because the
+			-- versions are not what it is about. Set to null
 			-- the moment it is withdrawn or lapses, because a decision that no
 			-- longer applies is history and must not block a fresh one.
 			--

@@ -162,28 +162,36 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 			t.Fatal(err)
 		}
 		at := "/v1/products/mine/issues/" + recorded.Identifier + "/disclosure"
+		extend := at + "/extension"
 
 		// A reason is required.
-		if got := asPerson(t, r, "private-triage", http.MethodPost, at,
+		if got := asPerson(t, r, "private-triage", http.MethodPost, extend,
 			`{"until":"2030-01-01","reason":""}`); got.Code < 400 {
 			t.Errorf("an embargo was extended for no stated reason: %d", got.Code)
 		}
 		// And somebody who may not see undisclosed work cannot move one.
-		if got := asPerson(t, r, "triager", http.MethodPost, at,
+		if got := asPerson(t, r, "triager", http.MethodPost, extend,
 			`{"until":"2030-01-01","reason":"Because."}`); got.Code < 400 {
 			t.Errorf("somebody holding only public triage moved an embargo: %d", got.Code)
 		}
+		// Each act refuses the date the other one takes, so neither is ever
+		// recorded as the other.
+		if got := asPerson(t, r, "private-triage", http.MethodPost, at+"/shortening",
+			`{"until":"2030-01-01","reason":"Pulling it in."}`); got.Code < 400 {
+			t.Errorf("a later date was recorded as a shortening: %d", got.Code)
+		}
 
 		// Years out, so well past the threshold: it waits.
-		got = asPerson(t, r, "private-triage", http.MethodPost, at,
+		got = asPerson(t, r, "private-triage", http.MethodPost, extend,
 			`{"until":"2030-01-01","reason":"Upstream has not answered."}`)
 		if got.Code != http.StatusCreated {
 			t.Fatalf("asking answered %d: %s", got.Code, got.Body.String())
 		}
 		var asked struct {
-			ID            int64 `json:"id"`
-			NeedsApproval bool  `json:"needs_approval"`
-			InForce       bool  `json:"in_force"`
+			ID            int64  `json:"id"`
+			Act           string `json:"act"`
+			NeedsApproval bool   `json:"needs_approval"`
+			InForce       bool   `json:"in_force"`
 		}
 		if err := json.Unmarshal(got.Body.Bytes(), &asked); err != nil {
 			t.Fatal(err)
@@ -191,9 +199,12 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		if !asked.NeedsApproval || asked.InForce {
 			t.Errorf("a four-year extension stood on one person's say-so: %+v", asked)
 		}
+		if asked.Act != "extension" {
+			t.Errorf("the record calls it %q, want it recorded as an extension", asked.Act)
+		}
 
 		// The person who asked may not agree to it.
-		approval := fmt.Sprintf("/v1/disclosure-extensions/%d/approval", asked.ID)
+		approval := fmt.Sprintf("/v1/disclosure-movements/%d/approval", asked.ID)
 		if got := asPerson(t, r, "private-triage", http.MethodPost, approval, `{}`); got.Code != http.StatusConflict {
 			t.Errorf("agreeing to one's own extension answered %d, want 409", got.Code)
 		}
@@ -201,6 +212,7 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		// The history is kept whether or not anybody agreed.
 		var history struct {
 			Items []struct {
+				Act     string `json:"act"`
 				Reason  string `json:"reason"`
 				InForce bool   `json:"in_force"`
 			} `json:"items"`
@@ -212,6 +224,9 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		if history.Items[0].InForce {
 			t.Error("an extension nobody agreed to is reported as in force")
 		}
+		if history.Items[0].Act != "extension" {
+			t.Errorf("the history does not say which act it was: %+v", history.Items[0])
+		}
 
 		// And there is somewhere to be the second person. Until this, a
 		// request could be read on the finding it belongs to and nowhere else,
@@ -221,17 +236,21 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 				ID            int64  `json:"id"`
 				Vulnerability string `json:"vulnerability"`
 				Product       string `json:"product"`
+				Act           string `json:"act"`
 				Days          int    `json:"days"`
 				By            string `json:"by"`
 				Mine          bool   `json:"mine"`
 			} `json:"items"`
 		}
-		read(t, r, "private-dispatcher", "/v1/disclosure-extensions", &pending)
+		read(t, r, "private-dispatcher", "/v1/disclosure-movements", &pending)
 		if len(pending.Items) != 1 || pending.Items[0].ID != asked.ID {
 			t.Fatalf("what is waiting to be agreed to reads as %+v", pending.Items)
 		}
 		if pending.Items[0].Days <= 0 || pending.Items[0].By == "" {
-			t.Errorf("the row does not say how much longer, or who asked: %+v", pending.Items[0])
+			t.Errorf("the row does not say how far, or who asked: %+v", pending.Items[0])
+		}
+		if pending.Items[0].Act != "extension" {
+			t.Errorf("the row does not say which act is waiting: %+v", pending.Items[0])
 		}
 		if pending.Items[0].Mine {
 			t.Error("somebody else's request is reported as this reader's own")
@@ -244,7 +263,7 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 				Mine bool `json:"mine"`
 			} `json:"items"`
 		}
-		read(t, r, "private-triage", "/v1/disclosure-extensions", &theirs)
+		read(t, r, "private-triage", "/v1/disclosure-movements", &theirs)
 		if len(theirs.Items) != 1 || !theirs.Items[0].Mine {
 			t.Errorf("a proposer's own request reads as %+v", theirs.Items)
 		}
@@ -257,7 +276,7 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 				ID int64 `json:"id"`
 			} `json:"items"`
 		}
-		read(t, r, "triager", "/v1/disclosure-extensions", &public)
+		read(t, r, "triager", "/v1/disclosure-movements", &public)
 		if len(public.Items) != 0 {
 			t.Errorf("somebody who may not read undisclosed work sees %+v", public.Items)
 		}
@@ -282,15 +301,15 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := r.db.DB.NewInsert().Model(&finding.Extension{
-			VulnerabilityID: issue, ProductID: theirProduct.ID,
+		if _, err := r.db.DB.NewInsert().Model(&finding.Movement{
+			VulnerabilityID: issue, ProductID: theirProduct.ID, Act: finding.Extension,
 			Was: time.Now().UTC(), Until: time.Now().UTC().AddDate(1, 0, 0),
 			Reason: "Somebody else's case.", AskedBy: asker.ID, AskedAt: time.Now().UTC(),
 			NeedsApproval: true,
 		}).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		read(t, r, "private-triage", "/v1/disclosure-extensions", &pending)
+		read(t, r, "private-triage", "/v1/disclosure-movements", &pending)
 		if len(pending.Items) != 1 {
 			t.Errorf("a request in a product they read nothing undisclosed in is listed: %+v",
 				pending.Items)
@@ -302,7 +321,7 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 			approval, `{}`); got.Code != http.StatusNoContent {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
-		read(t, r, "private-dispatcher", "/v1/disclosure-extensions", &pending)
+		read(t, r, "private-dispatcher", "/v1/disclosure-movements", &pending)
 		if len(pending.Items) != 0 {
 			t.Errorf("an extension somebody agreed to is still waiting: %+v", pending.Items)
 		}
@@ -621,7 +640,10 @@ func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 			{"closing it", http.MethodPost, build + "/findings/%s/resolve",
 				`{"because":"invalid"}`},
 			{"extending the embargo", http.MethodPost,
-				"/v1/products/mine/issues/%s/disclosure",
+				"/v1/products/mine/issues/%s/disclosure/extension",
+				`{"until":"2027-01-01T00:00:00Z","reason":"Probing for the date."}`},
+			{"bringing the embargo in", http.MethodPost,
+				"/v1/products/mine/issues/%s/disclosure/shortening",
 				`{"until":"2027-01-01T00:00:00Z","reason":"Probing for the date."}`},
 			{"its attachments", http.MethodGet,
 				"/v1/products/mine/issues/%s/attachments", ""},

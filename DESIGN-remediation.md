@@ -562,9 +562,9 @@ component the document is about, where it declared one.
 
 ## The VEX document
 
-Assembled from approved `not-applicable` and `already-fixed` claims (REQ-39),
-and from `wont-fix` claims that say what a holder can do instead, for one
-product, stream and variant.
+Assembled from approved `not-applicable`, `mismatched` and `already-fixed`
+claims (REQ-39), and from `wont-fix` claims that say what a holder can do
+instead, for one product, stream and variant.
 
 A customer running their own scanner against a shipped image asks "which of these
 are you not affected by" more often than they ask for an advisory. Generating it

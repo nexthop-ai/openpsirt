@@ -11,9 +11,9 @@ import { Severity } from "../ui/Severity";
 
 // The two things waiting for a second person that are not claims.
 //
-// An embargo extension and a severity rating both hide risk on one person's
-// say-so unless somebody agrees, which is why they are in the review queue at
-// all — and neither is a claim about code, so neither shares the card, the
+// A movement of a disclosure date and a severity rating both hide risk on one
+// person's say-so unless somebody agrees, which is why they are in the review
+// queue at all — and neither is a claim about code, so neither shares the card, the
 // selection or the batch that the claims use. They are here together because
 // what they have in common is exactly that.
 
@@ -34,11 +34,14 @@ function said(shown: number, total?: number): string {
 // asks for. Named here so the pager and the request cannot disagree.
 export const PENDING_PAGE = 50;
 
-// Embargo extensions waiting for a second person.
+// Movements of a disclosure date waiting for a second person.
 //
-// The reason is the whole of what is being agreed to. An extension moves a
+// The reason is the whole of what is being agreed to. A movement changes a
 // date somebody outside could hold us to, and the only thing distinguishing a
 // judgment from a habit is why — so the reason leads and the dates follow it.
+//
+// Which act it is leads the dates, because an embargo ending later and one
+// ending sooner are different things to agree to.
 //
 // A request of your own is shown and cannot be agreed to. The person who
 // asked may not be the one who agrees, which is the control the threshold
@@ -51,7 +54,7 @@ export function Embargoes({
   onGo,
   error,
 }: {
-  waiting: Body<"PendingExtensionBody">[];
+  waiting: Body<"PendingMovementBody">[];
   // The number waiting in all. Without it the page length is printed as the
   // figure, so the fifty-first request was not in the number and nothing said
   // so.
@@ -69,15 +72,15 @@ export function Embargoes({
   const agree = useMutation({
     mutationFn: async (id: number) =>
       unwrap(
-        await api.POST("/v1/disclosure-extensions/{id}/approval", { params: { path: { id } } }),
+        await api.POST("/v1/disclosure-movements/{id}/approval", { params: { path: { id } } }),
       ),
-    onSuccess: () => void queries.invalidateQueries({ queryKey: ["extensions"] }),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["movements"] }),
   });
 
   if (error != null) {
     return (
       <div style={{ marginTop: 22 }}>
-        <Failed error={error} what="Extension requests could not be read." />
+        <Failed error={error} what="Requests to move a disclosure date could not be read." />
       </div>
     );
   }
@@ -86,10 +89,10 @@ export function Embargoes({
   return (
     <>
       <div className="screen-head" id="embargoes" style={{ marginTop: 22 }}>
-        <h2>Extension requests</h2>
+        <h2>Disclosure dates</h2>
         <p>
-          {said(waiting.length, total)} · somebody has asked to keep something hidden longer than
-          this deployment allows on one person&rsquo;s word. Reaching the date discloses nothing by
+          {said(waiting.length, total)} · somebody has asked to move a date further than this
+          deployment allows on one person&rsquo;s word. Reaching the date discloses nothing by
           itself; what is being agreed to is how long it stays hidden.
         </p>
       </div>
@@ -106,8 +109,9 @@ export function Embargoes({
             </div>
             <p className="reading">{row.reason}</p>
             <p className="hint">
-              Ends <b>{row.was}</b> → <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()} days
-              longer.
+              {row.act === "shortening" ? "Brought forward" : "Extended"} · ends <b>{row.was}</b> →{" "}
+              <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()} days
+              {row.act === "shortening" ? " sooner" : " longer"}.
             </p>
             <div className="cardfoot">
               <button

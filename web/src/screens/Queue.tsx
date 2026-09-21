@@ -131,10 +131,10 @@ export function Queue() {
   const [embargoAt, setEmbargoAt] = useState(0);
   const [ratingAt, setRatingAt] = useState(0);
   const embargoes = useQuery({
-    queryKey: ["extensions", "pending", embargoAt],
+    queryKey: ["movements", "pending", embargoAt],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/disclosure-extensions", {
+        await api.GET("/v1/disclosure-movements", {
           params: { query: { limit: PENDING_PAGE, offset: embargoAt } },
         }),
       ),
@@ -426,7 +426,7 @@ export function Queue() {
         error={ratings.isError ? ratings.error : undefined}
       />
 
-      {/* The extension read is deliberately quiet for somebody who may read
+      {/* The movement read is deliberately quiet for somebody who may read
           nothing undisclosed — an empty list rather than a refusal — so only a
           real failure is handed on. */}
       <Embargoes

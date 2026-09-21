@@ -453,8 +453,9 @@ a short deferral stands on its own until the cumulative time crosses the
 threshold. The screen states which of the two questions is being asked.
 
 It exists to show that no dismissal sits in that population.
-Not-applicable, will-not-fix and already-fixed all require approval, so that
-query should return nothing, and a row in it is a control that failed.
+Not-applicable, wrong match, will-not-fix and already-fixed all require
+approval, so that query should return nothing, and a row in it is a control
+that failed.
 
 That is why nobody has to open it to find out. The same question is asked as
 a condition and told to administrators when it stops answering nothing —
@@ -494,17 +495,18 @@ record screen lists every judgment with its reasoning, its approvals and the
 dates. Which of the five reasons applied is on the row rather than a filter,
 because it is what an auditor reads on the row they stopped at.
 
-A dismissal is any of three outcomes, and anything counting or listing them
-asks for all three:
+A dismissal is any of four outcomes, and anything counting or listing them
+asks for all four:
 
 | Outcome | The claim |
 |---|---|
 | Not applicable | The vulnerable code is not reachable |
+| Wrong match | The scanner matched something that is not here |
 | Will not fix | It is not worth fixing |
 | Already fixed here | Whoever packages the component backported the fix |
 
 What they have in common is that nothing was changed, which is why they are the
-three that need a second person. Asked of one, a program that dismisses
+four that need a second person. Asked of one, a program that dismisses
 everything as "will not fix" reads as a program that has argued nothing away.
 
 Where a dismissal is listed, the place is named. A judgment covering forty
@@ -575,6 +577,16 @@ The exception report is the record with its filters set — dismissals no second
 person has a standing agreement on. REQ-53 names it as the report that should
 come back empty, and the record's own empty state is already written as that
 answer rather than as an absence.
+
+The standing corrections are the record with its other filters set: the wrong
+matches that apply now. Every other judgment lapses when the code moves, so
+each comes back round to somebody; a correction does not, and the only way to
+read the set is to ask for it. `DESIGN-triage.md` § Corrections holds what one
+is.
+
+Applying now is not the same question as having been approved. A judgment is
+approved and lapses afterwards when the code moves out from under it, so the
+state filter answers what was once agreed to.
 
 ### Rubber-stamp
 

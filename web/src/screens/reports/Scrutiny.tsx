@@ -32,10 +32,10 @@ import { Wide } from "../../ui/Wide";
 // contain the failure at any setting.
 const WINDOWS = [30, 90, 365, 3650] as const;
 
-// The three outcomes that hide risk and need a second person. Named here
+// The outcomes that dismiss, and so the ones that need a second person. Named here
 // because a deferral standing alone reads very differently from a dismissal
 // standing alone, and the table has to say which it is looking at.
-const DISMISSALS = new Set(["not-applicable", "wont-fix", "already-fixed"]);
+const DISMISSALS = new Set(["not-applicable", "mismatched", "wont-fix", "already-fixed"]);
 
 // The rows each section carries. Sent rather than left to the server's
 // default, because the number has to be the one the notice below quotes: a

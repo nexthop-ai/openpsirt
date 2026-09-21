@@ -544,10 +544,18 @@ func (s *Store) whatStands(ctx context.Context, productID, targetID int64,
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		// The decision at this place, in this product, at the versions the
 		// place holds now — the same match the counts above are made with.
+		//
+		// The match is a condition of the query rather than of the join,
+		// because it asks the claim what outcome it is and the claim hangs off
+		// the decision: named in the decision's own ON clause it reaches an
+		// alias that is joined after it, which SQLite allows and MySQL and
+		// MariaDB refuse. Both joins are inner, so the two are the same
+		// question asked in the one place every engine agrees on.
 		Join(`JOIN "decision" AS "de" ON de.vulnerability_id = f.vulnerability_id
 			AND de.place_identity = f.place_identity AND de.product_id = ?
-			AND de.state = ? AND de.live_key IS NOT NULL AND `+KeyMatches, productID, "approved").
+			AND de.state = ? AND de.live_key IS NOT NULL`, productID, "approved").
 		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
+		Where(KeyMatches).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`cl.id AS "claim"`).

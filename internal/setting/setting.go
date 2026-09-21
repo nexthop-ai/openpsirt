@@ -62,11 +62,12 @@ const (
 	// before the date arrives. It gives the embargo an end somebody outside
 	// could hold us to, which is the point of having one at all.
 	DiscloseAfter = "disclosure.after"
-	// ExtensionThreshold is how much an embargo may be moved by, in total,
+	// MovementThreshold is how far an embargo's end may be carried, in total,
 	// before a second person has to agree to moving it further. Cumulative for
-	// the same reason the deferral one is: measured per extension, the
-	// exception swallows the rule three weeks at a time.
-	ExtensionThreshold = "disclosure.extension-threshold"
+	// the same reason the deferral one is: measured per movement, the
+	// exception swallows the rule three weeks at a time. Both acts count, and
+	// each by how far it moved the date rather than by which way.
+	MovementThreshold = "disclosure.movement-threshold"
 	// DeferralThreshold is how long something may be put off before a second
 	// person has to agree. It ships with a starting point rather than a fixed
 	// rule, because how long is too long is a judgment about a product.
@@ -382,14 +383,14 @@ const DefaultScanEvery = 24 * time.Hour
 // a trigger.
 const DefaultDiscloseAfter = 90 * 24 * time.Hour
 
-// DefaultExtensionThreshold is how much an embargo may be moved by in total
+// DefaultMovementThreshold is how far an embargo's end may be carried in total
 // before a second person has to agree.
 //
 // Thirty days: enough that a fix slipping a sprint is ordinary triage, and not
 // enough that a ninety-day embargo becomes a year without anybody else
 // noticing. Like the deferral threshold it ships as a starting point rather
 // than a rule, because how long is too long is a judgment about a product.
-const DefaultExtensionThreshold = 30 * 24 * time.Hour
+const DefaultMovementThreshold = 30 * 24 * time.Hour
 
 // On and Off are what a setting that is a switch may be set to.
 //

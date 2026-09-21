@@ -196,11 +196,11 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 		}
 
 		// The person who asked may not be the one who agrees.
-		if err := f.store.AgreeToExtension(t.Context(), who, long.ID); err == nil {
-			t.Error("somebody agreed to their own extension")
+		if err := f.store.AgreeToMovement(t.Context(), who, long.ID); err == nil {
+			t.Error("somebody agreed to their own request")
 		}
 		other := f.someoneElse(t, access.PrivateTriage)
-		if err := f.store.AgreeToExtension(t.Context(), other, long.ID); err != nil {
+		if err := f.store.AgreeToMovement(t.Context(), other, long.ID); err != nil {
 			t.Fatal(err)
 		}
 		if got := f.endsAt(t, issue); !got.Equal(now.Add(28 * 24 * time.Hour)) {
@@ -220,7 +220,7 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 		// the barrier `internal/catalog/race_test.go` is written against, and
 		// is not covered here.
 		third := f.someoneElse(t, access.PrivateTriage)
-		if err := f.store.AgreeToExtension(t.Context(), third, long.ID); !errors.Is(
+		if err := f.store.AgreeToMovement(t.Context(), third, long.ID); !errors.Is(
 			err, finding.ErrAlreadyAgreed) {
 			t.Errorf("agreeing a second time answered %v, want ErrAlreadyAgreed", err)
 		}
@@ -230,11 +230,11 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 	})
 }
 
-func TestAnExtensionSaysWhyAndOnlyEverMovesForward(t *testing.T) {
+func TestAnExtensionSaysWhyAndOnlyEverMovesLater(t *testing.T) {
 	// An extension with no reason is the record saying somebody moved it and
 	// nothing else, which is the state the whole history exists to prevent.
-	// And "extension" means later: bringing a date forward is disclosing
-	// sooner, which is a different act and not this one.
+	// And "extension" means later: bringing a date forward is a different act
+	// and is refused here, so that neither is recorded as the other.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PrivateTriage)
@@ -246,7 +246,7 @@ func TestAnExtensionSaysWhyAndOnlyEverMovesForward(t *testing.T) {
 			t.Error("an embargo was extended for no stated reason")
 		}
 		if _, err := f.store.Extend(t.Context(), who, f.productID, issue,
-			was.Add(-24*time.Hour), "Bringing it forward."); !errors.Is(err, finding.ErrBackwards) {
+			was.Add(-24*time.Hour), "Bringing it forward."); !errors.Is(err, finding.ErrNotLater) {
 			t.Errorf("a date was moved earlier by an extension: %v", err)
 		}
 		// Somebody who may not see undisclosed work cannot move one either.
@@ -260,15 +260,183 @@ func TestAnExtensionSaysWhyAndOnlyEverMovesForward(t *testing.T) {
 			was.Add(3*24*time.Hour), "Two more days of testing."); err != nil {
 			t.Fatal(err)
 		}
-		history, err := f.store.Extensions(t.Context(), who, f.productID, issue)
+		history, err := f.store.Movements(t.Context(), who, f.productID, issue)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(history) != 1 {
-			t.Fatalf("%d extensions on record, want the one that happened", len(history))
+			t.Fatalf("%d movements on record, want the one that happened", len(history))
 		}
 		if history[0].Reason == "" || !history[0].Was.Equal(was) {
 			t.Errorf("the record does not say what was moved or why: %+v", history[0])
+		}
+		if history[0].Act != finding.Extension {
+			t.Errorf("the record calls it %q, want it recorded as an extension", history[0].Act)
+		}
+	})
+}
+
+func TestBringingADateForwardIsItsOwnAct(t *testing.T) {
+	// A coordinator publishing on a date of their own, or a leak, pulls an
+	// embargo's end in. Recorded as what it is rather than as an extension
+	// carrying a smaller date: a reader asking which of the two happened reads
+	// the act, and does not infer it from the direction a date moved.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PrivateTriage)
+		issue := f.embargoed(t, who)
+		was := f.endsAt(t, issue)
+
+		// The control, broken: no reason, and nothing moves.
+		if _, err := f.store.BringForward(t.Context(), who, f.productID, issue,
+			was.Add(-7*24*time.Hour), "   "); err == nil {
+			t.Error("a date was brought forward for no stated reason")
+		}
+		if got := f.endsAt(t, issue); !got.Equal(was) {
+			t.Errorf("the embargo moved to %s on a request that was refused", got)
+		}
+		// And the act has to be the one that moves the date the way it is
+		// going. A later date here is an extension somebody filed wrongly.
+		if _, err := f.store.BringForward(t.Context(), who, f.productID, issue,
+			was.Add(24*time.Hour), "Slipping."); !errors.Is(err, finding.ErrNotEarlier) {
+			t.Errorf("a date was moved later by a shortening: %v", err)
+		}
+		// Somebody who may not see undisclosed work cannot move one either.
+		if _, err := f.store.BringForward(t.Context(), f.planner(t, access.PublicTriage),
+			f.productID, issue, was.Add(-24*time.Hour), "Because."); err == nil {
+			t.Error("somebody holding only public triage brought an embargo in")
+		}
+
+		// A week in. Under the threshold, so it stands on its own.
+		short, err := f.store.BringForward(t.Context(), who, f.productID, issue,
+			was.Add(-7*24*time.Hour), "The coordinator is publishing on the 3rd.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if short.NeedsApproval {
+			t.Error("a week in was sent to a queue")
+		}
+		if got := f.endsAt(t, issue); !got.Equal(was.Add(-7 * 24 * time.Hour)) {
+			t.Errorf("the embargo ends %s, want it brought in a week to %s",
+				got, was.Add(-7*24*time.Hour))
+		}
+		if short.Act != finding.Shortening {
+			t.Errorf("the record calls it %q, want it recorded as a shortening", short.Act)
+		}
+
+		// The threshold counts how far the end has been carried, whichever way
+		// each movement went. A week in and four weeks back is five weeks of
+		// movement, so this one waits for somebody else.
+		now := f.endsAt(t, issue)
+		long, err := f.store.Extend(t.Context(), who, f.productID, issue,
+			now.Add(28*24*time.Hour), "Upstream has not answered.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !long.NeedsApproval {
+			t.Error("five weeks of movement stood on one person's say-so")
+		}
+		if got := f.endsAt(t, issue); !got.Equal(now) {
+			t.Errorf("the embargo moved to %s while the request was still waiting", got)
+		}
+
+		// Both acts are on the record, each saying which it was.
+		history, err := f.store.Movements(t.Context(), who, f.productID, issue)
+		if err != nil {
+			t.Fatal(err)
+		}
+		acts := make([]finding.Act, 0, len(history))
+		for _, row := range history {
+			acts = append(acts, row.Act)
+		}
+		if len(acts) != 2 || acts[0] != finding.Shortening || acts[1] != finding.Extension {
+			t.Errorf("the record reads %v, want a shortening then an extension", acts)
+		}
+	})
+}
+
+func TestAgreeingMovesTheDateFromWhereItIsNow(t *testing.T) {
+	// A request waits in the queue while other movements take effect, so the
+	// date it was measured against is not the date it would move. Agreed
+	// against the old one, an extension carries the end backwards — the act
+	// recorded as doing the one thing it never does — and the threshold
+	// counts a distance nothing travelled.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PrivateTriage)
+		other := f.someoneElse(t, access.PrivateTriage)
+		issue := f.embargoed(t, who)
+		was := f.endsAt(t, issue)
+
+		// Two extensions asked for, both past the threshold, so neither moves
+		// anything yet.
+		near, err := f.store.Extend(t.Context(), who, f.productID, issue,
+			was.Add(40*24*time.Hour), "The fix missed the release train.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		far, err := f.store.Extend(t.Context(), who, f.productID, issue,
+			was.Add(90*24*time.Hour), "Upstream has not answered at all.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !near.NeedsApproval || !far.NeedsApproval {
+			t.Fatalf("a movement past the threshold stood alone: %+v %+v", near, far)
+		}
+
+		// The longer one is agreed to first, and the date follows it.
+		if err := f.store.AgreeToMovement(ctx, other, far.ID); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.endsAt(t, issue); !got.Equal(far.Until) {
+			t.Fatalf("the embargo ends %s, want %s", got, far.Until)
+		}
+
+		// Agreeing to the shorter one would now carry the date backwards,
+		// which an extension never does. Refused, and nothing moves.
+		if err := f.store.AgreeToMovement(ctx, other, near.ID); !errors.Is(err, finding.ErrNotLater) {
+			t.Errorf("agreeing to the earlier extension answered %v, want ErrNotLater", err)
+		}
+		if got := f.endsAt(t, issue); !got.Equal(far.Until) {
+			t.Errorf("the embargo was carried back to %s by an extension", got)
+		}
+	})
+}
+
+func TestAMovementThatNeededNobodyCannotBeAgreedTo(t *testing.T) {
+	// It moved the date when it was asked for. Agreeing would write its old
+	// date over whatever has happened since, and there is no agreement to
+	// record: the record says it needed none.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PrivateTriage)
+		issue := f.embargoed(t, who)
+		was := f.endsAt(t, issue)
+
+		short, err := f.store.Extend(ctx, who, f.productID, issue,
+			was.Add(7*24*time.Hour), "Two more days of testing, and a weekend.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if short.NeedsApproval {
+			t.Fatal("a week's extension was sent to a queue")
+		}
+		// Somebody brings it in again afterwards.
+		if _, err := f.store.BringForward(ctx, who, f.productID, issue,
+			was.Add(2*24*time.Hour), "The coordinator is publishing sooner."); err != nil {
+			t.Fatal(err)
+		}
+		ends := f.endsAt(t, issue)
+
+		other := f.someoneElse(t, access.PrivateTriage)
+		if err := f.store.AgreeToMovement(ctx, other, short.ID); !errors.Is(
+			err, finding.ErrAlreadyAgreed) {
+			t.Errorf("agreeing to a movement that needed nobody answered %v", err)
+		}
+		if got := f.endsAt(t, issue); !got.Equal(ends) {
+			t.Errorf("the embargo went back to %s, which nobody asked for now", got)
 		}
 	})
 }

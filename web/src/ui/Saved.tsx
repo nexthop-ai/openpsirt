@@ -1,4 +1,4 @@
-import { JUSTIFICATIONS } from "./Outcome";
+import { reasonOffered, reasonsFor } from "./Outcome";
 import { notACredential } from "./noautofill";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +18,7 @@ type InBulk = Body<"PreparedBody">["outcome"];
 
 const PREPARES: Record<InBulk, string> = {
   "not-applicable": "Not applicable",
+  mismatched: "Wrong match",
   deferred: "Deferred",
   "wont-fix": "Will not fix",
   "already-fixed": "Already fixed",
@@ -101,6 +102,16 @@ export function Saved({
   // a date, because a rule saved in March means "put this off for a quarter"
   // and a date would be wrong the week after it was saved.
   const [days, setDays] = useState("");
+  // The two outcomes whose claim is which recognized reason applies, and the
+  // reasons each may state. A correction carries past every version bump, so
+  // the three reasons a bump can change are not among the ones it offers.
+  const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
+  const reasons = reasonsFor(outcome);
+  // Dropped rather than carried when the outcome moves under it: a correction
+  // takes only the reasons no version bump can answer, and a rule prepared
+  // with one the endpoint refuses fails when somebody presses the button
+  // rather than when they saved the thing that fills it in.
+  const reason = reasonOffered(outcome, justification);
 
   const kept = useKept(product);
   const save = useMutation({
@@ -119,8 +130,8 @@ export function Saved({
                     // hides the Because select and would otherwise keep what
                     // was chosen in it, storing a reason the decision endpoint
                     // refuses.
-                    ...(outcome === "not-applicable" && justification
-                      ? { justification: justification as Prepared["justification"] }
+                    ...(needsJustification && reason
+                      ? { justification: reason as Prepared["justification"] }
                       : {}),
                     reasoning: reasoning.trim(),
                     ...(outcome === "deferred" ? { defer_days: Number(days) } : {}),
@@ -233,20 +244,18 @@ export function Saved({
                   ))}
                 </select>
               </label>
-              {outcome === "not-applicable" && (
+              {needsJustification && (
                 <label className="field">
                   <span>Because</span>
-                  <select
-                    value={justification}
-                    onChange={(event) => setJustification(event.target.value)}
-                  >
+                  <select value={reason} onChange={(event) => setJustification(event.target.value)}>
                     <option value="">Select one</option>
-                    {/* From the one list rather than typed out again. A third
-                        copy offered the same five reasons in different words,
-                        so the same claim read one way where it was chosen and
-                        another where it was read back — and a sixth reason
-                        would have been missing here with nothing to say so. */}
-                    {JUSTIFICATIONS.map((each) => (
+                    {/* From the one list rather than typed out again, so the
+                        same claim reads the same way where it is chosen and
+                        where it is read back, and a reason the vocabulary
+                        gains appears here without anybody adding it. Which
+                        list it is depends on the outcome: a correction takes
+                        only the reasons no version bump can answer. */}
+                    {reasons.map((each) => (
                       <option key={each.value} value={each.value}>
                         {each.label}
                       </option>
