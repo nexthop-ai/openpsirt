@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
+	"time"
 )
 
 // vexDocument is the parts of a generated document a revision is read from.
@@ -199,4 +201,56 @@ func recordedIssuance(t *testing.T, r *reach, who string) struct {
 		t.Fatal(err)
 	}
 	return recorded
+}
+
+// TestEveryDateTheDocumentStatesIsOneTheStandardParses walks a generated CSAF
+// document and fails a date a validator would refuse.
+//
+// The standard defines every date it carries as a date and a time. A bare day
+// passes a schema check run without format assertions and is refused by the
+// validator a customer runs, which drops the document — the failure that looks
+// like nothing happening.
+//
+// Over every field whose name ends in the standard's suffix rather than over
+// the one that was wrong, because the next field added carries the same rule
+// and nobody will remember it.
+func TestEveryDateTheDocumentStatesIsOneTheStandardParses(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		flaw := r.embargoed(t)
+		named := advisoryOver(t, r, "private-triage", "mine", flaw)
+
+		var document map[string]any
+		read(t, r, "private-triage", "/v1/advisories/"+named+"/document", &document)
+
+		checked := 0
+		var walk func(path string, node any)
+		walk = func(path string, node any) {
+			switch held := node.(type) {
+			case map[string]any:
+				for key, value := range held {
+					if text, is := value.(string); is && strings.HasSuffix(key, "_date") {
+						checked++
+						if _, err := time.Parse(time.RFC3339, text); err != nil {
+							t.Errorf("%s/%s is %q, which the standard cannot parse as a "+
+								"date and a time", path, key, text)
+						}
+						continue
+					}
+					walk(path+"/"+key, value)
+				}
+			case []any:
+				for at, value := range held {
+					walk(fmt.Sprintf("%s/%d", path, at), value)
+				}
+			}
+		}
+		walk("", document)
+		// A sweep that reached nothing looks exactly like a sweep that found
+		// nothing wrong. The document states when the flaw was recorded, when
+		// it was released and when each revision happened.
+		if checked < 3 {
+			t.Fatalf("only %d dates were reached, so this proves little", checked)
+		}
+	})
 }

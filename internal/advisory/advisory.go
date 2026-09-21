@@ -213,6 +213,12 @@ type Vulnerability struct {
 	Acknowledgments []Acknowledgment `json:"acknowledgments,omitempty"`
 	// DiscoveryDate is when this deployment first recorded it, which is what
 	// it knows. When somebody outside found it is not something it holds.
+	//
+	// A timestamp rather than a day. The standard asks every date it defines
+	// for a date and a time, and a validator refuses a bare day — which is a
+	// document a customer's tooling drops. A string rather than a moment,
+	// because a moment nothing recorded has to be absent rather than stated
+	// as the zero one, and an empty struct is not omitted.
 	DiscoveryDate string `json:"discovery_date,omitempty"`
 }
 
@@ -928,7 +934,7 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		}
 	}
 	if !entered.OpenedAt.IsZero() {
-		vulnerability.DiscoveryDate = opened.Format("2006-01-02")
+		vulnerability.DiscoveryDate = opened.UTC().Format(time.RFC3339)
 	}
 	if vulnerability.CWE, err = weaknessOf(ctx, s.db, issue.ID); err != nil {
 		return err
