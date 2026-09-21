@@ -88,7 +88,7 @@ inferred from a rule, so adding a route never adds an exception.
 | 202 | Accepted, not yet done. Only an upload, which answers before it has been read |
 | 204 | Done, with nothing worth saying |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
-| 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired variant, a variant renamed after a document naming it went out |
+| 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a retirement of something already retired, a name another row already holds |
 | 422 | Understood, and cannot be stored as written |
 
 Not found and not yours are one answer. A product somebody holds nothing on is

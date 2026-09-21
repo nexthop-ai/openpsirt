@@ -886,13 +886,13 @@ components:
           description: Issues at components, the unit every count here uses
           format: int64
           type: integer
+        out_of_support:
+          description: This build's release is out of support
+          type: boolean
         overdue:
           description: The number past a deadline
           format: int64
           type: integer
-        retired:
-          description: This build's release is out of support
-          type: boolean
         stream:
           type: string
         stream_kind:
@@ -1705,6 +1705,9 @@ components:
         last_refused_at:
           description: The moment an upload against this build was last turned away. Absent where none has been
           type: string
+        out_of_support:
+          description: Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet
+          type: boolean
         product:
           type: string
         quiet:
@@ -1718,7 +1721,7 @@ components:
           description: The words the producer was given the last time one was turned away, in the same words they were given
           type: string
         retired:
-          description: Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet
+          description: Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet
           type: boolean
         stream:
           type: string
@@ -6228,9 +6231,6 @@ components:
           description: Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
-        retired:
-          description: Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted
-          type: boolean
         tags:
           description: The number of tags declared
           format: int64
@@ -8217,6 +8217,9 @@ components:
           format: uri
           readOnly: true
           type: string
+        display_name:
+          description: The same name as it was spelled. Absent where it is the name itself
+          type: string
         end_of_life:
           description: The date support ends, as YYYY-MM-DD
           type: string
@@ -8247,6 +8250,9 @@ components:
         released_on:
           description: For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in
           type: string
+        retired:
+          description: Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted
+          type: boolean
       required:
         - name
         - kind
@@ -8709,6 +8715,9 @@ components:
         customer_facing:
           description: Whether this reaches customers. Defaults to yes
           type: boolean
+        display_name:
+          description: The same name as it was spelled. Absent where it is the name itself
+          type: string
         name:
           description: The name scans use for this build of the stream
           maxLength: 191
@@ -13744,11 +13753,11 @@ paths:
   /v1/products/{product}:
     delete:
       description: |-
-        Takes a product out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays: its findings are still open, its decisions still stand, and the documents published for it still name it.
+        Takes a product out of use. It is offered nowhere and no scan may be filed against it. Everything already filed against it stays: its findings are still open, its decisions still stand, and the documents published for it still name it.
 
-        Its releases and variants are left as they are and go out of every list with it, because they are reached through the product. Declaring the product again brings it back with them.
+        Its releases and variants go out of every list with it and are otherwise left as they are. Declaring the product again brings it back with them.
 
-        Not an end-of-support date, which is beside this and says something else: a date records that support ended and hides nothing, because a release is asked about long after it stops being supported.
+        An end-of-support date is a separate setting with a separate effect: it takes the deadline off what is open and leaves the product listed and scannable.
 
         Requires: administrator
       operationId: retire-product
@@ -13776,9 +13785,9 @@ paths:
       description: |-
         Corrects what a product is called. Both names are left alone where the request omits them.
 
-        The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, or an advisory covering it has been published: a reader who holds one matches it by that name, and the record of what went out names no name to correct. Retire the product and declare the intended one instead.
+        The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, or a published advisory covers it. Retire the product and declare the intended one instead.
 
-        The displayed name is what screens show and what a document names the product in prose. Nothing is identified by it, so it may be corrected at any time.
+        The displayed name is what screens show and what a document names the product in prose. It may be corrected at any time.
 
         Requires: administrator
       operationId: amend-product
@@ -17675,6 +17684,8 @@ paths:
 
         A stream past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
 
+        A retired stream is left out unless asked for. Ask for it to resolve a name already in hand rather than to offer a choice; each one says that it is retired.
+
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-streams
       parameters:
@@ -17683,6 +17694,13 @@ paths:
           required: true
           schema:
             type: string
+        - description: Include streams that have been retired. They say so, and no scan may be filed against one
+          explode: false
+          in: query
+          name: retired
+          schema:
+            description: Include streams that have been retired. They say so, and no scan may be filed against one
+            type: boolean
         - description: "Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read"
           explode: false
           in: query
@@ -17750,7 +17768,7 @@ paths:
       description: |-
         Takes a release out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays. Declaring it again brings it back.
 
-        Not an end-of-support date, which is beside this: a date records that support ended and hides nothing, because a release is asked about long after it stops being supported. This says the release is not tracked here.
+        An end-of-support date is a separate setting with a separate effect: it takes the deadline off what is open and leaves the release listed and scannable.
 
         Requires: administrator
       operationId: retire-stream
@@ -17783,9 +17801,9 @@ paths:
       description: |-
         Corrects what a release is called.
 
-        Refused once a VEX document has gone out for any build of this release, or a published advisory named it: a reader who holds one matches it by that name. A release cannot be retired and declared again as a way round that, because the second one holds none of this one's history.
+        Refused once a VEX document has gone out for any build of this release, or a published advisory named it. Declare the intended name as a release of its own: retiring this one and declaring it again returns this same release under this same name.
 
-        Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from. Both say what a release is rather than what it is called.
+        Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from.
 
         Requires: administrator
       operationId: amend-stream
@@ -20177,9 +20195,9 @@ paths:
   /v1/products/{product}/variants/{variant}:
     delete:
       description: |-
-        Takes a variant out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays: its findings are still open, its decisions still stand, and the documents published for it still name it. The releases it was built as still list it.
+        Takes a variant out of use. It is offered nowhere and no scan may be filed against it. Everything already filed against it stays: its findings are still open, its decisions still stand, the documents published for it still name it, and the releases it was built as still list it.
 
-        The name stays spoken for. Declaring it again brings this variant back rather than making a second one, so a build that declares what it needs keeps working and nothing is stranded.
+        The name stays spoken for. Declaring it again brings this variant back rather than making a second one.
 
         Requires: administrator
       operationId: retire-variant
@@ -20212,9 +20230,9 @@ paths:
       description: |-
         Corrects what a variant is called and whether it reaches customers. Both are left alone where the request omits them.
 
-        A name is refused once an OpenVEX document has been published for any release built as this variant. A document is identified by the build it describes, so a reader who already holds one would read the next as a different document rather than as a revision, and the record of what went out names no name to correct. Retire the variant and declare the intended one instead.
+        A name is refused once an OpenVEX document has been published for any release built as this variant. Retire the variant and declare the intended one instead.
 
-        Whether it reaches customers feeds how its findings rank, and may be corrected at any time. A name another variant of this product holds is refused, including one that is retired.
+        A name another variant of this product holds is refused, including a retired one. Whether it reaches customers feeds how its findings rank and may be corrected at any time.
 
         Requires: administrator
       operationId: amend-variant

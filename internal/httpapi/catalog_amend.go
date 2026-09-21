@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
@@ -30,13 +32,10 @@ func registerVariantEdits(api huma.API, d Declaring) {
 		Description: "Corrects what a variant is called and whether it reaches customers. " +
 			"Both are left alone where the request omits them.\n\n" +
 			"A name is refused once an OpenVEX document has been published for any release " +
-			"built as this variant. A document is identified by the build it describes, so a " +
-			"reader who already holds one would read the next as a different document rather " +
-			"than as a revision, and the record of what went out names no name to correct. " +
-			"Retire the variant and declare the intended one instead.\n\n" +
-			"Whether it reaches customers feeds how its findings rank, and may be corrected " +
-			"at any time. A name another variant of this product holds is refused, including " +
-			"one that is retired.",
+			"built as this variant. Retire the variant and declare the intended one instead.\n\n" +
+			"A name another variant of this product holds is refused, including a retired " +
+			"one. Whether it reaches customers feeds how its findings rank and may be " +
+			"corrected at any time.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
@@ -75,19 +74,26 @@ func registerVariantEdits(api huma.API, d Declaring) {
 			}
 			about := product.Name + " " + variant.Name
 
-			if name != "" && !strings.EqualFold(name, variant.Name) {
-				issued, err := published(ctx, tx, "variant", variant.ID)
-				if err != nil {
-					return wentWrong(d.Logger, "that variant could not be renamed", err)
-				}
-				if issued {
-					return heldByReaders("variant")
+			// A correction that only moves the spelling is still a correction.
+			// The matching name and the spelling shown move together, so
+			// asking for "Broadcom" where the row says "broadcom" changes
+			// what every screen shows — and only a change to the matching
+			// name can be refused, because only that is in an identifier.
+			if name != "" && (!strings.EqualFold(name, variant.Name) || name != variant.DisplayName) {
+				if !strings.EqualFold(name, variant.Name) {
+					issued, err := published(ctx, tx, "variant", variant.ID)
+					if err != nil {
+						return wentWrong(d.Logger, "that variant could not be renamed", err)
+					}
+					if issued {
+						return heldByReaders("variant")
+					}
 				}
 				if err := store.RenameVariant(ctx, product.ID, variant.ID, name); err != nil {
-					return declineDeclaration(err)
+					return declineRename(d.Logger, err)
 				}
 				if err := noted(ctx, tx, trail.Catalog, about,
-					trail.Said(variant.Name, true), trail.Said(name, true)); err != nil {
+					trail.Said(variant.DisplayName, true), trail.Said(name, true)); err != nil {
 					return notRecorded(d.Logger, err)
 				}
 				about = product.Name + " " + name
@@ -115,12 +121,11 @@ func registerVariantEdits(api huma.API, d Declaring) {
 		Path:    "/v1/products/{product}/variants/{variant}",
 		Summary: "Retire a build variant",
 		Description: "Takes a variant out of use. It is offered nowhere and no scan may be " +
-			"filed against it, while everything already filed against it stays: its findings " +
-			"are still open, its decisions still stand, and the documents published for it " +
-			"still name it. The releases it was built as still list it.\n\n" +
+			"filed against it. Everything already filed against it stays: its findings are " +
+			"still open, its decisions still stand, the documents published for it still " +
+			"name it, and the releases it was built as still list it.\n\n" +
 			"The name stays spoken for. Declaring it again brings this variant back rather " +
-			"than making a second one, so a build that declares what it needs keeps working " +
-			"and nothing is stranded.",
+			"than making a second one.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
@@ -179,12 +184,10 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 		Description: "Corrects what a product is called. Both names are left alone where the " +
 			"request omits them.\n\n" +
 			"The name is what scans, paths and published documents use. It is refused once a " +
-			"VEX document has gone out for any build of this product, or an advisory covering " +
-			"it has been published: a reader who holds one matches it by that name, and the " +
-			"record of what went out names no name to correct. Retire the product and declare " +
-			"the intended one instead.\n\n" +
+			"VEX document has gone out for any build of this product, or a published advisory " +
+			"covers it. Retire the product and declare the intended one instead.\n\n" +
 			"The displayed name is what screens show and what a document names the product in " +
-			"prose. Nothing is identified by it, so it may be corrected at any time.",
+			"prose. It may be corrected at any time.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
@@ -210,6 +213,7 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 			if err != nil {
 				return undeclared(d.Logger, err, "that product could not be looked up")
 			}
+			about := product.Name
 			if name != "" && !strings.EqualFold(name, product.Name) {
 				issued, err := published(ctx, tx, "product", product.ID)
 				if err != nil {
@@ -219,18 +223,22 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 					return heldByReaders("product")
 				}
 				if err := store.RenameProduct(ctx, product.ID, name); err != nil {
-					return declineDeclaration(err)
+					return declineRename(d.Logger, err)
 				}
 				if err := noted(ctx, tx, trail.Catalog, product.Name,
 					trail.Said(product.Name, true), trail.Said(name, true)); err != nil {
 					return notRecorded(d.Logger, err)
 				}
+				// One request may move both, and the second row is about the
+				// product as it is now. Filed under the name it had, it names
+				// a product that no longer resolves.
+				about = name
 			}
 			if shown != "" && shown != product.DisplayName {
 				if err := store.SetProductDisplayName(ctx, product.ID, shown); err != nil {
 					return declineDeclaration(err)
 				}
-				if err := noted(ctx, tx, trail.Catalog, product.Name,
+				if err := noted(ctx, tx, trail.Catalog, about,
 					trail.Said(product.DisplayName, true), trail.Said(shown, true)); err != nil {
 					return notRecorded(d.Logger, err)
 				}
@@ -246,15 +254,13 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 		OperationID: "retire-product", Method: http.MethodDelete, Path: "/v1/products/{product}",
 		Summary: "Retire a product",
 		Description: "Takes a product out of use. It is offered nowhere and no scan may be " +
-			"filed against it, while everything already filed against it stays: its findings " +
-			"are still open, its decisions still stand, and the documents published for it " +
-			"still name it.\n\n" +
-			"Its releases and variants are left as they are and go out of every list with it, " +
-			"because they are reached through the product. Declaring the product again brings " +
-			"it back with them.\n\n" +
-			"Not an end-of-support date, which is beside this and says something else: a date " +
-			"records that support ended and hides nothing, because a release is asked about " +
-			"long after it stops being supported.",
+			"filed against it. Everything already filed against it stays: its findings are " +
+			"still open, its decisions still stand, and the documents published for it still " +
+			"name it.\n\n" +
+			"Its releases and variants go out of every list with it and are otherwise left " +
+			"as they are. Declaring the product again brings it back with them.\n\n" +
+			"An end-of-support date is a separate setting with a separate effect: it takes " +
+			"the deadline off what is open and leaves the product listed and scannable.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
@@ -294,11 +300,11 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 		Summary: "Amend a branch or tag",
 		Description: "Corrects what a release is called.\n\n" +
 			"Refused once a VEX document has gone out for any build of this release, or a " +
-			"published advisory named it: a reader who holds one matches it by that name. " +
-			"A release cannot be retired and declared again as a way round that, because the " +
-			"second one holds none of this one's history.\n\n" +
-			"Whether it is a branch or a tag does not move here, and neither does the branch a " +
-			"tag was cut from. Both say what a release is rather than what it is called.",
+			"published advisory named it. Declare the intended name as a release of its own: " +
+			"retiring this one and declaring it again returns this same release under this " +
+			"same name.\n\n" +
+			"Whether it is a branch or a tag does not move here, and neither does the branch " +
+			"a tag was cut from.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
@@ -340,9 +346,13 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 				}
 			}
 			if err := store.RenameStream(ctx, product.ID, stream.ID, name); err != nil {
-				return declineDeclaration(err)
+				return declineRename(d.Logger, err)
 			}
-			return noteOrFail(ctx, tx, d, product.Name+" "+stream.Name, name)
+			if err := noted(ctx, tx, trail.Catalog, product.Name+" "+stream.Name,
+				trail.Said(stream.DisplayName, true), trail.Said(name, true)); err != nil {
+				return notRecorded(d.Logger, err)
+			}
+			return nil
 		}); err != nil {
 			return nil, err
 		}
@@ -356,9 +366,8 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 		Description: "Takes a release out of use. It is offered nowhere and no scan may be " +
 			"filed against it, while everything already filed against it stays. Declaring it " +
 			"again brings it back.\n\n" +
-			"Not an end-of-support date, which is beside this: a date records that support " +
-			"ended and hides nothing, because a release is asked about long after it stops " +
-			"being supported. This says the release is not tracked here.",
+			"An end-of-support date is a separate setting with a separate effect: it takes " +
+			"the deadline off what is open and leaves the release listed and scannable.",
 		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
@@ -396,16 +405,6 @@ func registerCatalogAmends(api huma.API, d Declaring) {
 		}
 		return &struct{}{}, nil
 	})
-}
-
-// noteOrFail records a rename and turns a failure to record it into the answer
-// for one.
-func noteOrFail(ctx context.Context, tx bun.Tx, d Declaring, was, became string) error {
-	if err := noted(ctx, tx, trail.Catalog, was,
-		trail.Said(was, true), trail.Said(became, true)); err != nil {
-		return notRecorded(d.Logger, err)
-	}
-	return nil
 }
 
 // published reports whether anything naming this part of the catalog has gone
@@ -452,9 +451,36 @@ func published(ctx context.Context, db bun.IDB, level string, id int64) (bool, e
 //
 // It names what to do instead, which is the part a caller can act on.
 func heldByReaders(level string) error {
+	// A product and a variant can be retired and the intended name declared
+	// beside them, because what a new one holds is a fresh start and that is
+	// what was wanted. A release cannot: declaring it again brings this same
+	// row back under this same name, and a second release holds none of this
+	// one's history, so the remedy that works for the other two is the one
+	// thing this endpoint's own description says does not work here.
+	remedy := "Retire it and declare the intended name instead."
+	if level == "release" {
+		remedy = "Declare the intended name as a release of its own; this one keeps the " +
+			"name readers hold it by."
+	}
 	return huma.NewError(http.StatusConflict,
 		"a document naming this "+level+" has been published, so its name is what "+
-			"readers already hold it by. Retire it and declare the intended name instead.")
+			"readers already hold it by. "+remedy)
+}
+
+// declineRename turns a refused rename into the answer that describes it.
+//
+// Beside declineDeclaration, whose default arm publishes a store error's own
+// text as a 400. A rename loses a race with another rename on a unique index,
+// and that arm answered with the engine's constraint message — the name of an
+// index nobody outside this repository has.
+func declineRename(logger *slog.Logger, err error) error {
+	if errors.Is(err, catalog.ErrExists) || errors.Is(err, catalog.ErrNotFound) {
+		return declineDeclaration(err)
+	}
+	if database.IsDuplicate(err) {
+		return huma.NewError(http.StatusConflict, "that name is already taken")
+	}
+	return wentWrong(logger, "that name could not be recorded", err)
 }
 
 // reaches names the two states in the words the record is read in.

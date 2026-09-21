@@ -6,6 +6,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // TestRenamingAVariantIsRefusedOnceADocumentHasGoneOut pins the rule the whole
@@ -320,4 +323,161 @@ func TestOnlyAnAdministratorAmendsAProductOrRelease(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestAnAdvisoryForOneProductDoesNotRefuseAnothersRename pins that the release
+// question is asked about the release rather than about the product.
+//
+// Two products shipping one upstream library hold the same CVE. Asked without
+// tying the advisory's own product to the release's, an advisory published for
+// either refuses a correction on the other — the over-refusal that asking
+// about the release rather than about the product exists to avoid.
+func TestAnAdvisoryForOneProductDoesNotRefuseAnothersRename(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		r.alsoScannedInto(t, "theirs", "master", "mellanox")
+
+		// A flaw of ours, published as an advisory covering "mine" alone.
+		// The other product is then given a finding for the same vulnerability
+		// row, which is the one shape this query must not match: a
+		// vulnerability is one row however many products hold it, so joining
+		// an advisory to a release through the finding alone reaches every
+		// product that holds the same issue.
+		made := asPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+			`{"builds":[{"stream":"master","variant":"broadcom"}],`+
+				`"summary":"The management socket answers before anyone authenticated.",`+
+				`"severity":"critical"}`)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("recording a flaw answered %d: %s", made.Code, made.Body.String())
+		}
+		var recorded struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		at := "/v1/advisories/" + advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
+		agreedTo(t, r, at)
+		if issued := asPerson(t, r, "private-triage", http.MethodPost, at+"/issuance",
+			`{"summary":"First advisory."}`); issued.Code != http.StatusCreated {
+			t.Fatalf("publishing answered %d: %s", issued.Code, issued.Body.String())
+		}
+		r.alsoHolds(t, "theirs", "master", "mellanox", recorded.Identifier)
+
+		// The other product holds the same issue and is named by no published
+		// document, so its names are still ours to correct.
+		if got := asPerson(t, r, "admin", http.MethodPatch,
+			"/v1/products/theirs/streams/master",
+			`{"name":"main"}`); got.Code != http.StatusNoContent {
+			t.Errorf("renaming another product's release answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "admin", http.MethodPatch, "/v1/products/theirs",
+			`{"name":"others"}`); got.Code != http.StatusNoContent {
+			t.Errorf("renaming another product answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+// TestAVEXDocumentRefusesAProductAndReleaseRename pins the other half of what
+// a name is refused on.
+//
+// An advisory and a VEX document are two ways a name reaches a reader, and a
+// deployment that publishes only the second is the one this covers. Without
+// it, the two VEX arms at the product and the release could both be deleted
+// with the suite green.
+func TestAVEXDocumentRefusesAProductAndReleaseRename(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		recordedIssuance(t, r, "triager")
+
+		for _, at := range []string{"/v1/products/mine", "/v1/products/mine/streams/master"} {
+			got := asPerson(t, r, "admin", http.MethodPatch, at, `{"name":"other"}`)
+			if got.Code != http.StatusConflict {
+				t.Fatalf("renaming %s after a VEX document went out answered %d: %s",
+					at, got.Code, got.Body.String())
+			}
+			if !strings.Contains(got.Body.String(), "published") {
+				t.Errorf("renaming %s refuses without saying why: %s", at, got.Body.String())
+			}
+		}
+
+		// A release is told the remedy that works for it. Retiring and
+		// declaring it again returns this same release under this same name.
+		got := asPerson(t, r, "admin", http.MethodPatch, "/v1/products/mine/streams/master",
+			`{"name":"other"}`)
+		if strings.Contains(got.Body.String(), "Retire it and declare") {
+			t.Errorf("a release is told to retire and redeclare: %s", got.Body.String())
+		}
+	})
+}
+
+// TestACaseOnlyRenameMovesTheSpellingShown pins that correcting only the
+// capitals is still a correction, at every level that has a spelling of its
+// own.
+//
+// The matching name and the spelling shown are derived from one string, so a
+// request that moves only the second has to be carried out — and cannot be
+// refused for publication, because nothing an identifier holds has moved.
+func TestACaseOnlyRenameMovesTheSpellingShown(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		recordedIssuance(t, r, "triager")
+
+		if got := asPerson(t, r, "admin", http.MethodPatch,
+			"/v1/products/mine/variants/broadcom",
+			`{"name":"Broadcom"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("recapitalizing a variant answered %d: %s", got.Code, got.Body.String())
+		}
+		var built struct {
+			Items []struct {
+				Name    string `json:"name"`
+				Spelled string `json:"display_name"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/products/mine/streams/master/variants", &built)
+		if len(built.Items) != 1 {
+			t.Fatalf("the release names %d variants", len(built.Items))
+		}
+		// Matched the same way and spelled the way it was asked for.
+		if built.Items[0].Name != "broadcom" || built.Items[0].Spelled != "Broadcom" {
+			t.Errorf("the variant is matched as %q and shown as %q",
+				built.Items[0].Name, built.Items[0].Spelled)
+		}
+	})
+}
+
+// alsoHolds gives another product's build a finding for one issue by name.
+//
+// Beside alsoScannedInto, which seeds its own issue. A vulnerability is one
+// row however many products report it, so naming the identifier is what puts
+// two products on the same row — which is the state a query joining an
+// advisory to a release through the finding table has to tell apart.
+func (r *reach) alsoHolds(t *testing.T, product, stream, variant, identifier string) {
+	t.Helper()
+	ctx := t.Context()
+	names := catalog.NewStore(r.db.DB)
+	located, err := names.Locate(ctx, product, stream, variant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := names.TargetFor(ctx, located.StreamID, located.VariantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	findings := finding.NewStore(r.db.DB)
+	run, err := findings.Begin(ctx, finding.Run{
+		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
+		DatabaseVersion: "2026-08-28", RanHere: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := findings.Apply(ctx, target.ID, run.ID, []finding.Reported{{
+		Issue:     finding.Named{Identifier: identifier, Severity: "high"},
+		Component: seededLib,
+		FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
+	}}); err != nil {
+		t.Fatal(err)
+	}
 }

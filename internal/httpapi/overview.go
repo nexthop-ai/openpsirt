@@ -27,7 +27,10 @@ type BuildStandingBody struct {
 	// because it stopped being supported reads as expected rather than as
 	// a fault.
 	LastScanAt string `json:"last_scan_at,omitempty" doc:"The moment a scan last arrived here. Absent where none ever has"`
-	Retired    bool   `json:"retired,omitempty" doc:"This build's release is out of support"`
+	// Named for what it says, because the product above carries a "retired"
+	// of its own meaning taken out of use. The two are the distinction both
+	// design documents draw, and one word for both is how they get confused.
+	OutOfSupport bool `json:"out_of_support,omitempty" doc:"This build's release is out of support"`
 }
 
 // OverviewOutput is one product, as a page about that product.
@@ -160,7 +163,7 @@ func registerOverview(api huma.API, in Ingest) {
 			}
 			if cover, has := covered[key]; has {
 				body.StreamKind = cover.StreamKind
-				body.Retired = cover.Retired
+				body.OutOfSupport = cover.OutOfSupport
 				if cover.LastReceivedAt != nil {
 					body.LastScanAt = stamp(*cover.LastReceivedAt)
 				}

@@ -20,10 +20,18 @@ import { Release } from "./Release";
 // catalog says so, and a naming convention is a rule nobody agreed to.
 export function Stream() {
   const { product = "", stream = "" } = useParams();
+  // Retired releases included, and keyed apart from the offered list because
+  // of it. This resolves a name somebody arrived with rather than offering a
+  // choice, and a retired tag missing from the answer falls through to the
+  // branch view — which is the one thing this screen exists to prevent.
   const streams = useQuery({
-    queryKey: ["streams", product],
+    queryKey: ["streams", product, "retired"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/products/{product}/streams", { params: { path: { product } } })),
+      unwrap(
+        await api.GET("/v1/products/{product}/streams", {
+          params: { path: { product }, query: { retired: true } },
+        }),
+      ),
   });
 
   if (streams.isPending) return <Loading />;

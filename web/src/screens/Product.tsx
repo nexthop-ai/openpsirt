@@ -134,7 +134,7 @@ export function Product() {
                           {row.stream}
                         </Link>{" "}
                         <span className="hint">·</span> <span className="id">{row.variant}</span>
-                        {row.retired && (
+                        {row.out_of_support && (
                           <>
                             {" "}
                             <span

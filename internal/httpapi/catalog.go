@@ -90,10 +90,6 @@ type ProductBody struct {
 	// EndOfLife is when support ends for every release that has not stated its
 	// own. Absent means nothing has said one, which reads as supported.
 	EndOfLife string `json:"end_of_life,omitempty" doc:"The date support ends for releases that have not stated their own, as YYYY-MM-DD"`
-	// Retired is absent from every row of the lists, which stop offering what
-	// is out of use. It is answered on a single product read, where somebody
-	// arriving by a link they kept has to be told why nothing offers it.
-	Retired bool `json:"retired,omitempty" doc:"Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted"`
 }
 
 // EndOfLifeBody is when something goes out of support.
@@ -114,7 +110,11 @@ type TriageFloorBody struct {
 // StreamBody is a branch or a tag.
 type StreamBody struct {
 	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this branch or tag"`
-	Kind string `json:"kind" enum:"branch,tag" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
+	// DisplayName is the same name as it was typed. It is stored beside the
+	// matched one at every level, and absent here a correction that moved only
+	// the capitals wrote a value nothing could read.
+	DisplayName string `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
+	Kind        string `json:"kind" enum:"branch,tag" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
 	// Parent is the branch a tag was cut from, which is what lets a branch be
 	// compared against its last release.
 	Parent string `json:"parent,omitempty" doc:"For a tag, the branch it was cut from"`
@@ -122,6 +122,9 @@ type StreamBody struct {
 	// orders the release-over-release chart, because the day a release was
 	// recorded here is an accident of administration.
 	ReleasedOn string `json:"released_on,omitempty" doc:"For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in"`
+	// Retired appears only where the list was asked for retired rows, which
+	// is a caller resolving a name rather than offering a choice.
+	Retired bool `json:"retired,omitempty" doc:"Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted"`
 	// Open and LastScanAt, for the same reason the product list carries them:
 	// a line that has stopped being built looks identical to a healthy one
 	// until somebody opens it.
@@ -140,6 +143,9 @@ type StreamBody struct {
 // VariantBody is one of the ways a stream is built.
 type VariantBody struct {
 	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this build of the stream"`
+	// DisplayName is the same name as it was typed, for the reason the stream
+	// body carries one.
+	DisplayName string `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
 	// CustomerFacing is a pointer so that leaving it out is not the same as
 	// saying no. An unclassified artifact should rank as though it ships,
 	// which means the default is yes and silence must not read as a denial.
@@ -215,10 +221,22 @@ func variantList(rows []catalog.Variant) *listOutput[VariantBody] {
 	for _, row := range rows {
 		facing := row.CustomerFacing
 		out.Body.Items = append(out.Body.Items, VariantBody{
-			Name: row.Name, CustomerFacing: &facing, Retired: row.Retired(),
+			Name: row.Name, DisplayName: spelled(row.Name, row.DisplayName),
+			CustomerFacing: &facing, Retired: row.Retired(),
 		})
 	}
 	return out
+}
+
+// spelled is the display name where it says something the name does not.
+//
+// Absent where the two are the same string, so a reader is not handed the
+// same word twice and a client has one thing to fall back to.
+func spelled(name, display string) string {
+	if display == name {
+		return ""
+	}
+	return display
 }
 
 // refused turns a refusal from the data layer into one the caller sees as a

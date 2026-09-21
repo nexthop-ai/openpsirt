@@ -270,7 +270,7 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 		if len(before) != 2 || !before[0].Quiet {
 			t.Fatalf("the silent build is not quiet to begin with: %+v", before)
 		}
-		if before[0].Retired {
+		if before[0].OutOfSupport {
 			t.Fatal("a build nobody has dated reads as out of support")
 		}
 
@@ -288,7 +288,7 @@ func TestAReleaseOutOfSupportIsNotReportedAsHavingGoneQuiet(t *testing.T) {
 			t.Fatalf("a release out of support left the list: %d rows, was %d", len(after), len(before))
 		}
 		for _, row := range after {
-			if !row.Retired {
+			if !row.OutOfSupport {
 				t.Errorf("%s %s does not read as out of support", row.Stream, row.Variant)
 			}
 			if row.Quiet {

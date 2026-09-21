@@ -244,7 +244,7 @@ func TestARetiredProductAndReleaseLeaveTheOfferedLists(t *testing.T) {
 		if err := s.RetireStream(ctx, stream.ID); err != nil {
 			t.Fatalf("retire the release: %v", err)
 		}
-		lines, err := s.Streams(ctx, admin, product.ID)
+		lines, err := s.Streams(ctx, admin, product.ID, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -313,7 +313,7 @@ func TestRetiringAProductLeavesItsReleasesAlone(t *testing.T) {
 		}
 
 		admin := access.NewPerson(1, "admin", true, nil, 0)
-		lines, err := s.Streams(ctx, admin, product.ID)
+		lines, err := s.Streams(ctx, admin, product.ID, false)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -106,10 +106,13 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			"typo in a pipeline is refused rather than quietly creating a line with findings " +
 			"and reports of its own.\n\n" +
 			"A stream past its end-of-life date is listed and says so. It stops being a " +
-			"place a fix may be declared for, and what is open against it is still counted.",
+			"place a fix may be declared for, and what is open against it is still counted.\n\n" +
+			"A retired stream is left out unless asked for. Ask for it to resolve a name " +
+			"already in hand rather than to offer a choice; each one says that it is retired.",
 		Tags: []string{"Catalog"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
+		Retired bool   `query:"retired" doc:"Include streams that have been retired. They say so, and no scan may be filed against one"`
 		CountsQuery
 	}) (*listOutput[StreamBody], error) {
 		subject, err := reading(ctx)
@@ -124,7 +127,7 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		if err != nil {
 			return nil, undeclared(d.Logger, err, "that product could not be looked up")
 		}
-		rows, err := store.Streams(ctx, subject, product.ID)
+		rows, err := store.Streams(ctx, subject, product.ID, in.Retired)
 		if err != nil {
 			return nil, refused(d.Logger, err, "cannot list streams")
 		}
@@ -159,8 +162,10 @@ func registerCatalogReading(api huma.API, d Declaring) {
 		out.Body.Items = make([]StreamBody, 0, len(rows))
 		for _, row := range rows {
 			body := StreamBody{
-				Name: row.Name, Kind: string(row.Kind),
+				Name: row.Name, DisplayName: spelled(row.Name, row.DisplayName),
+				Kind: string(row.Kind),
 				Open: counted(in.Counts, open, row.ID), LastScanAt: seen[row.Name],
+				Retired: row.Retired(),
 			}
 			if row.ParentID != nil {
 				body.Parent = named[*row.ParentID]

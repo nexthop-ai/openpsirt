@@ -344,13 +344,6 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		return nil, huma.Error403Forbidden("not authorized")
 	}
 
-	// A retired variant takes no scan. It is the other half of retiring one:
-	// the lists stop offering it and this stops it being filed against anyway
-	// by a pipeline still configured for it. Refused in the words that say
-	// what to do, because the sender is a build script somebody has to fix.
-	//
-	// After authorization, so that a sender who may not file against this
-	// product cannot learn from the refusal that the name exists at all.
 	// A retired product, release or variant takes no scan. It is the other
 	// half of retiring one: the lists stop offering it and this stops a
 	// pipeline still configured for it filing against it anyway. The refusal
@@ -987,11 +980,14 @@ type CoverageBody struct {
 	RefusedBecause string `json:"refused_because,omitempty" doc:"The words the producer was given the last time one was turned away, in the same words they were given"`
 	QuietDays      int    `json:"quiet_days" doc:"The span since, in days, measured from the last arrival or from when the build was declared"`
 	Quiet          bool   `json:"quiet,omitempty" doc:"Whether that is longer than this deployment allows"`
-	// Retired is reported rather than the row being left out. A release that
+	// OutOfSupport is reported rather than the row being left out. A release that
 	// stopped being scanned because it stopped being supported is expected
 	// rather than a fault, but "not scanned, and that is fine" and "not
 	// listed" are different answers.
-	Retired bool `json:"retired,omitempty" doc:"Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet"`
+	OutOfSupport bool `json:"out_of_support,omitempty" doc:"Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet"`
+	// RetiredFromUse is the other reason silence is expected, and a different
+	// one: nothing may be filed against this build at all.
+	RetiredFromUse bool `json:"retired,omitempty" doc:"Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet"`
 }
 
 func registerCoverage(api huma.API, in Ingest) {
@@ -1046,7 +1042,7 @@ func registerCoverage(api huma.API, in Ingest) {
 			if row.Quiet {
 				out.Body.Quiet++
 			}
-			if row.Retired {
+			if row.OutOfSupport {
 				out.Body.Unsupported++
 				continue
 			}
@@ -1065,13 +1061,14 @@ func registerCoverage(api huma.API, in Ingest) {
 		out.Body.Items = make([]CoverageBody, 0, len(rows))
 		for _, row := range rows {
 			body := CoverageBody{
-				Product:    row.Product,
-				Stream:     row.Stream,
-				StreamKind: row.StreamKind,
-				Variant:    row.Variant,
-				QuietDays:  int(row.Since.Hours() / 24),
-				Quiet:      row.Quiet,
-				Retired:    row.Retired,
+				Product:        row.Product,
+				Stream:         row.Stream,
+				StreamKind:     row.StreamKind,
+				Variant:        row.Variant,
+				QuietDays:      int(row.Since.Hours() / 24),
+				Quiet:          row.Quiet,
+				OutOfSupport:   row.OutOfSupport,
+				RetiredFromUse: row.RetiredFromUse,
 			}
 			if row.LastReceivedAt != nil {
 				body.LastReceivedAt = stamp(*row.LastReceivedAt)
@@ -1149,7 +1146,7 @@ func registerCoverageExport(api huma.API, in Ingest) {
 			Header: []string{
 				"product", "stream", "kind", "variant",
 				"last_received_at", "last_refused_at", "refused_because",
-				"quiet_days", "quiet", "retired",
+				"quiet_days", "quiet", "out_of_support", "retired",
 			},
 			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
 				if offset >= len(rows) {
@@ -1177,7 +1174,8 @@ func registerCoverageExport(api huma.API, in Ingest) {
 						refused, why,
 						strconv.Itoa(int(row.Since.Hours() / 24)),
 						strconv.FormatBool(row.Quiet),
-						strconv.FormatBool(row.Retired),
+						strconv.FormatBool(row.OutOfSupport),
+						strconv.FormatBool(row.RetiredFromUse),
 					})
 				}
 				return written, nil

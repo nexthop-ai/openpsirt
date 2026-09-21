@@ -229,6 +229,25 @@ func (s *Store) restoreStream(ctx context.Context, streamID int64) error {
 	return counted(res, "release", streamID, "bring it back")
 }
 
+// EveryProduct lists every product, retired ones included.
+//
+// Beside Products, which answers what is offered and leaves out what is out of
+// use. This answers what exists, for a caller naming rows that already refer
+// to a product rather than offering anybody a choice: a role held against a
+// retired product is still held, and a table that cannot name it renders the
+// role against a blank.
+//
+// Unauthorized, the way the name lookups beside it are. A caller reaches this
+// having been authorized for the act it is part of, and the answer is a name
+// they already hold an identifier for.
+func (s *Store) EveryProduct(ctx context.Context) ([]Product, error) {
+	var rows []Product
+	if err := s.db.NewSelect().Model(&rows).Order("name").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("list every product: %w", err)
+	}
+	return rows, nil
+}
+
 // counted turns an update that matched nothing into the reason it did.
 //
 // Matched rather than changed: the connection settings make an affected count
