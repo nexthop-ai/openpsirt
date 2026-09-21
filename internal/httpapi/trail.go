@@ -103,7 +103,7 @@ func dayOf(at *time.Time) string {
 type ChangeBody struct {
 	At   string `json:"at"`
 	By   string `json:"by" doc:"The person who made the change, by sign-in identity"`
-	Kind string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"The kind of thing that changed"`
+	Kind string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog" doc:"The kind of thing that changed"`
 	// About is the subject: the setting's name, the person and product a role
 	// was granted on, the release whose support date moved.
 	About string `json:"about"`
@@ -136,7 +136,7 @@ func registerTrail(api huma.API, in Ingest) {
 			"it holds.",
 		Tags: []string{"Administration"},
 	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
-		Kind string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias" doc:"Keep only changes of one kind"`
+		Kind string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog" doc:"Keep only changes of one kind"`
 		Period
 		Limit  int `query:"limit" default:"50" minimum:"1" maximum:"200"`
 		Offset int `query:"offset" minimum:"0"`

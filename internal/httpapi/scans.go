@@ -344,6 +344,19 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		return nil, huma.Error403Forbidden("not authorized")
 	}
 
+	// A retired variant takes no scan. It is the other half of retiring one:
+	// the lists stop offering it and this stops it being filed against anyway
+	// by a pipeline still configured for it. Refused in the words that say
+	// what to do, because the sender is a build script somebody has to fix.
+	//
+	// After authorization, so that a sender who may not file against this
+	// product cannot learn from the refusal that the name exists at all.
+	if named.VariantRetired {
+		return nil, huma.NewError(http.StatusConflict, fmt.Sprintf(
+			"variant %q of %q is retired and takes no scan; declare it again to bring it back",
+			named.Variant, named.Product))
+	}
+
 	// Refusing before storing. Deciding costs a query; deciding afterwards
 	// costs however long it takes to store tens of megabytes we then throw
 	// away, on a deployment already behind on its work. It happens after

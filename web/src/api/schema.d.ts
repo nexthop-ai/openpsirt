@@ -3838,6 +3838,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/variants/{variant}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a build variant
+         * @description Takes a variant out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays: its findings are still open, its decisions still stand, and the documents published for it still name it. The releases it was built as still list it.
+         *
+         *     The name stays spoken for. Declaring it again brings this variant back rather than making a second one, so a build that declares what it needs keeps working and nothing is stranded.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-variant"];
+        options?: never;
+        head?: never;
+        /**
+         * Amend a build variant
+         * @description Corrects what a variant is called and whether it reaches customers. Both are left alone where the request omits them.
+         *
+         *     A name is refused once an OpenVEX document has been published for any release built as this variant. A document is identified by the build it describes, so a reader who already holds one would read the next as a different document rather than as a revision, and the record of what went out names no name to correct. Retire the variant and declare the intended one instead.
+         *
+         *     Whether it reaches customers feeds how its findings rank, and may be corrected at any time. A name another variant of this product holds is refused, including one that is retired.
+         *
+         *     Requires: administrator
+         */
+        patch: operations["amend-variant"];
+        trace?: never;
+    };
     "/v1/products/{product}/vex-statements": {
         parameters: {
             query?: never;
@@ -4971,6 +5005,18 @@ export interface components {
             /** @description The version that build ships under this name, where it ships more than one */
             version?: string;
         };
+        "Amend-variantRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Amend-variantRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Whether it reaches customers. Omitted leaves it alone */
+            customer_facing?: boolean;
+            /** @description What to call it instead. Omitted leaves the name alone */
+            name?: string;
+        };
         AnywhereOutputBody: {
             /**
              * Format: uri
@@ -5455,7 +5501,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -9913,7 +9959,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -9953,7 +9999,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -15918,6 +15964,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeclaredVariantBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-variant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "amend-variant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Amend-variantRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

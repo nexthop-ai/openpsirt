@@ -239,3 +239,39 @@ func settledDigest(doc *Statements) (string, error) {
 	sum := sha256.Sum256(body)
 	return hex.EncodeToString(sum[:]), nil
 }
+
+// AnyIssuedForVariant reports whether a document has gone out for any build of
+// one variant.
+//
+// What a rename is refused on. A document is identified by the build it is
+// about — the publisher's namespace, then the product, the release and the
+// variant — and that identifier is inside the digest of what went out. A
+// reader tells a revision of a document they hold from a second document by
+// whether the identifier matches, so moving the name after publication does
+// not revise the document: it mints a different one, and leaves the one people
+// have looking abandoned.
+//
+// The record cannot carry the correction either. An issuance is stored against
+// the build and the revision number, and never against the name, so a rename
+// would leave every row reading as a revision of a document that never went
+// out under that name.
+//
+// Asked of the variant rather than of one build, because a variant is built on
+// every release and any one of them having gone out is enough.
+//
+// A function over the handle it is given rather than a method, so that it runs
+// inside the transaction that acts on the answer. A store here holds a pool
+// because it opens transactions of its own, and asking this outside the
+// rename's transaction answers for a database the rename no longer writes to:
+// a document issued between the two would be published under a name this had
+// already said nothing was published under.
+func AnyIssuedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool, error) {
+	issued, err := db.NewSelect().Model((*Issuance)(nil)).
+		Join(`JOIN "target" AS "tg" ON tg.id = vi.target_id`).
+		Where("tg.variant_id = ?", variantID).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether anything has gone out for this variant: %w", err)
+	}
+	return issued, nil
+}

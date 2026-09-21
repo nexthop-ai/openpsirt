@@ -91,6 +91,13 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 		//
 		// customer_facing feeds ranking, and defaults true because an
 		// unclassified artifact should rank as though it ships.
+		//
+		// retired_at takes a variant out of use without taking anything it
+		// holds with it. Its findings, its decisions and the documents that
+		// went out for it all name it, so the row stays and the lists stop
+		// offering it — the same shape a team and a routing rule use. The
+		// name stays spoken for while it is retired, and declaring it again
+		// is what brings it back.
 		`CREATE TABLE "variant" (
 			"id"              ` + t.id + `,
 			"product_id"      ` + t.ref + ` NOT NULL,
@@ -98,6 +105,7 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 			"display_name"    ` + t.text + ` NOT NULL,
 			"customer_facing" ` + t.boolean + ` NOT NULL,
 			"created_at"      ` + t.timestamp + ` NOT NULL,
+			"retired_at"      ` + t.timestamp + ` NULL,
 			CONSTRAINT "variant_name_unique" UNIQUE ("product_id", "name"),
 			CONSTRAINT "variant_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
 		)` + t.suffix,

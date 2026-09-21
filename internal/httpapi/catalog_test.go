@@ -60,6 +60,33 @@ func (d *declaring) putAs(t *testing.T, who, path, body string) (int, map[string
 	return d.do(t, req)
 }
 
+func (d *declaring) patch(t *testing.T, path, body string) (int, map[string]any) {
+	t.Helper()
+	return d.patchAs(t, d.admin, path, body)
+}
+
+func (d *declaring) patchAs(t *testing.T, who, path, body string) (int, map[string]any) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPatch, path, bytes.NewBufferString(body))
+	fromOurOwnPage(req)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(testHeader, who)
+	return d.do(t, req)
+}
+
+func (d *declaring) remove(t *testing.T, path string) (int, map[string]any) {
+	t.Helper()
+	return d.removeAs(t, d.admin, path)
+}
+
+func (d *declaring) removeAs(t *testing.T, who, path string) (int, map[string]any) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodDelete, path, nil)
+	fromOurOwnPage(req)
+	req.Header.Set(testHeader, who)
+	return d.do(t, req)
+}
+
 func (d *declaring) get(t *testing.T, path string) (int, map[string]any) {
 	t.Helper()
 	return d.getAs(t, d.admin, path)

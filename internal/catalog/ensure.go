@@ -151,6 +151,17 @@ func (s *Store) ensureVariant(ctx context.Context, productID int64, name string,
 			return nil, false, fmt.Errorf("variant %q: %w: it was declared as %s",
 				name, ErrDiffers, facing(existing.CustomerFacing))
 		}
+		// Declaring a retired one brings it back, which is how retiring is
+		// undone. A pipeline runs this on every build and the name is still
+		// spoken for while retired, so the alternative is a build script that
+		// starts failing because an administrator tidied a list.
+		if existing.Retired() {
+			if err := s.restoreVariant(ctx, existing.ID); err != nil {
+				return nil, false, err
+			}
+			existing.RetiredAt = nil
+			return existing, true, nil
+		}
 		return existing, false, nil
 	case !errors.Is(err, ErrNotFound):
 		return nil, false, err
@@ -215,13 +226,20 @@ func (s *Store) Streams(ctx context.Context, subject access.Subject, productID i
 }
 
 // Variants lists the ways a product is built.
+//
+// What the product declares, which is what a scan may name and what every
+// picker offers. A retired one is left out: it is offered nowhere, and this is
+// the list the offers are made from. What a release was actually built as is
+// BuiltAs, and that keeps them.
 func (s *Store) Variants(ctx context.Context, subject access.Subject, productID int64) ([]Variant, error) {
 	if !subject.Sees(productID) {
 		return nil, access.Denied("list the variants of a product")
 	}
 	var rows []Variant
 	err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).Order("name").Scan(ctx)
+		Where("product_id = ?", productID).
+		Where(`"v"."retired_at" IS NULL`).
+		Order("name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list variants: %w", err)
 	}
@@ -231,6 +249,9 @@ func (s *Store) Variants(ctx context.Context, subject access.Subject, productID 
 // BuiltAs lists the variants a release has actually been built as, which is a
 // subset of what the product builds: a release predating a variant has no row
 // for it, and one that stopped being built as something keeps its history.
+// A retired variant is still listed here, for that reason — the findings filed
+// against it are still open and still somewhere, and a release that stopped
+// naming where they are reads as a release that does not hold them.
 // The product the release belongs to is read here rather than accepted, for
 // the reason its counterpart over findings gives: a caller that can name the
 // product can name a different one, and then the check is answering a question

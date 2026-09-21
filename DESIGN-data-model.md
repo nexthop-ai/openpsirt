@@ -133,7 +133,39 @@ target for it.
 
 Each variant records whether it is customer-facing, which feeds ranking. It
 defaults to customer-facing, so an unclassified artifact ranks as though it
-ships.
+ships. An administrator corrects it; a pipeline declaring the variant again
+with the other value is refused, because it moves what everybody is told to
+work on first.
+
+### Variant corrections
+
+A variant is named once and everything downstream points at it, so what it is
+called can be wrong and stay wrong.
+
+| Rule | |
+|---|---|
+| The matching name and the spelling shown move together | A name people type is matched without regard to capitals, and both halves are derived from one string. Moved apart, a variant is matched as one thing and shown as another |
+| A name another variant of the product holds is refused, retired ones included | The name stays spoken for while a variant is retired, which is what lets declaring it again bring that variant back rather than making a second |
+| A name is refused once a document naming it has been published | A published OpenVEX document is identified by the build it describes, and the variant is inside that identifier. Renamed afterwards, the next document carries a different identifier, which a reader holding the first reads as a second document rather than as a revision of theirs. The record of what went out carries the build and the revision number and never a name, so nothing there can be corrected to match |
+| Whether it reaches customers stays correctable | It is in no document and is not what anything is identified by. It feeds ranking, so correcting it is worth doing and is an administrator's act |
+
+### Variant retirement
+
+A variant is retired rather than deleted, the way a team is retired and a
+person deactivated. The row stays and everything filed against it stays with
+it.
+
+| Rule | |
+|---|---|
+| It is offered nowhere | The list of what a product is built as stops naming it, and so does every picker reading that list |
+| A release still names it among what it was built as | The findings filed against it are still open and still somewhere, and a release that stopped naming where they are reads as a release that does not hold them |
+| No scan may be filed against it | Declaration before use decides what a scan may name, and a retired variant is no longer declared. The refusal says to declare it again, because what has to change is a build script somebody maintains |
+| Everything already filed against it still resolves by name | Its findings, its decisions and the documents published for it are all reached by resolving the name |
+| Declaring it again brings it back | A pipeline runs the declaration on every build and the name is still spoken for, so the alternative is a build script that starts failing because an administrator tidied a list. What it reaches has to match, the way any declaration of something already declared does |
+| Retiring one already retired is refused | Answered as done, two administrators retiring it at once would both record having done it |
+
+Renaming, correcting what a variant reaches and retiring one are administrative
+acts and each leaves a record of who did it and what it held before.
 
 ## Declaration before use
 

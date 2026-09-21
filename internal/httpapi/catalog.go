@@ -194,6 +194,7 @@ type listBody[T any] struct {
 // what the tool reports — the hardest of the three to find.
 func registerCatalog(api huma.API, d Declaring) {
 	registerDeclaring(api, d)
+	registerVariantEdits(api, d)
 	registerCatalogPolicy(api, d)
 	registerCatalogReading(api, d)
 }

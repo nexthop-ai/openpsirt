@@ -210,6 +210,37 @@ var administrativeActs = []trailedAct{
 		body: `{"released_on":"2026-03-31"}`, kind: "release", about: "mine master",
 	},
 	{
+		// Renamed, reclassified and retired in that order, on the variant
+		// nothing else here is built as. Each is one row, so each is its own
+		// act: a single request doing both leaves two and the newest is only
+		// half of what it did.
+		id: "amend-variant", what: "a variant renamed", method: http.MethodPatch,
+		path: "/v1/products/mine/variants/lab-only", body: `{"name":"lab-bench"}`,
+		kind: "catalog", about: "mine lab-only",
+		drive: func(t *testing.T, r *reach, seen *seeded) *httptest.ResponseRecorder {
+			// Declared here rather than relied on, and on a variant nothing
+			// is built as: the three acts below rename and then retire it,
+			// and doing that to the one the world scanned would take the
+			// build every act after this reads out from under them.
+			// Declaring leaves no row of its own, so the newest row after
+			// this is still the rename's.
+			asPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/variants",
+				`{"name":"lab-only","customer_facing":false}`)
+			return asPerson(t, r, "admin", http.MethodPatch,
+				"/v1/products/mine/variants/lab-only", `{"name":"lab-bench"}`)
+		},
+	},
+	{
+		id: "amend-variant", what: "a variant's reach to customers",
+		method: http.MethodPatch, path: "/v1/products/mine/variants/lab-bench",
+		body: `{"customer_facing":true}`, kind: "catalog", about: "mine lab-bench",
+	},
+	{
+		id: "retire-variant", what: "a variant retired", method: http.MethodDelete,
+		path: "/v1/products/mine/variants/lab-bench",
+		kind: "catalog", about: "mine lab-bench",
+	},
+	{
 		id: "record-team", what: "a team", method: http.MethodPost, path: "/v1/teams",
 		body: `{"name":"kernel"}`, kind: "team", about: "kernel",
 	},
