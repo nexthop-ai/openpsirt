@@ -296,9 +296,16 @@ func registerAuditExport(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
+		// What was asked for, printed on the file. A sheet headed "the record
+		// of judgments" over a narrowed population is a sheet nobody can
+		// check against anything.
+		about := []Stated{{"from", asDay(since)}, {"to", asDay(until)}}
+		if filter.InForce {
+			about = append(about, Stated{"applies", "still standing"})
+		}
 		out := Exporting{
 			What:  "the record of judgments",
-			About: []Stated{{"from", asDay(since)}, {"to", asDay(until)}},
+			About: about,
 			Header: []string{
 				"id", "proposed", "product", "issue", "component", "version", "consumer",
 				"outcome", "justification", "deferred until", "fixed version",

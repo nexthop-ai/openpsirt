@@ -11,6 +11,7 @@ Nothing else may reference this file. Anything durable belongs in
 - [Deferred by the owner](#deferred-by-the-owner)
 - [Decided, not built](#decided-not-built)
 - [Known gaps](#known-gaps)
+- [Owner decisions outstanding](#owner-decisions-outstanding)
 - [Measured, recorded, not fixed](#measured-recorded-not-fixed)
 - [Not planned](#not-planned)
 
@@ -67,9 +68,13 @@ gap somebody rediscovers by auditing.
 
 ## Owner decisions outstanding
 
-Each is a proposal rather than a change. **One of them is a wrong answer on
-screen rather than a question** — the team queue below — and is marked as such,
-because a list that mixes those two reads as though none of it is urgent.
+Each is a proposal rather than a change, except where it says otherwise.
+**One of them is a wrong answer on screen rather than a question** — the team
+queue below — and is marked as such, because a list that mixes those two reads
+as though none of it is urgent. **Two of them are behavior that is built and a
+row that is not**, which is the shape `AGENTS.md` describes: agreement to build
+something is not agreement to record a decision, and a row nobody asked for is
+a commitment nobody made.
 
 | | |
 |---|---|
@@ -82,6 +87,8 @@ because a list that mixes those two reads as though none of it is urgent.
 | **Saved filters cannot be opened on the list that spans products** | They are stored per product, so the cross-product list — which is where the default landing view is — offers none. Making one span products is a change to what a saved filter is, and the position that they stay personal is about ownership rather than about scope |
 | **The package-kind picker enumerates a set the API calls open** | The kind is read out of the identifier a producer wrote, so an image carrying `nuget`, `composer` or `swift` components can be narrowed to them through the address and not from the screen — and the next kind goes short the way `apk` and `rpm` did. The durable shape is the kinds actually present travelling with the read, with the labels a display map falling back to the raw word; that is a question the server does not answer yet, so it is a capability rather than a fix |
 | **A tracker reference in a durable comment is not gated** | One was found by reading. `internal/tools/readable` walks every file type and is the gate positioned to carry it, but its whole subject is bytes a text tool skips — a second, unrelated rule there would make its name a lie. It is a gate of its own or nothing |
+| **No decision records that one outcome outlives a version bump** | Built, and the row is not. REQ-25 says a decision lapses when the software changes; a claim that the scanner matched something that is not here does not, because it is about identity rather than about risk. `DESIGN-triage.md` § Corrections describes it |
+| **No decision records that a disclosure date may be brought forward** | Built, and the row is not. REQ-38 is written about extending one, and ending an embargo sooner is the coordinated case: a coordinator or a peer vendor publishing on a date of their own, or a leak. `DESIGN-access.md` § Disclosure-date movements describes it |
 | **Eight other `internal/httpapi` tests hand-roll the scanned-build seed** | The one this touched now builds it once, in the file. The wider move is a helper in `internal/dbtest/fixture`, which seeds a catalog and has nothing for a scan, a graph or a finding |
 
 ## Measured, recorded, not fixed

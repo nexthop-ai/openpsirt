@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JUSTIFICATIONS, type Justification } from "./Outcome";
+import { JUSTIFICATIONS, JUSTIFICATIONS_CORRECTING, type Justification } from "./Outcome";
 
 // The vocabulary was adopted so that export would be nearly free and CSAF is
 // the adapter that matters, so whichever of these somebody picks is what ships
@@ -30,6 +30,17 @@ describe("the recognized justifications", () => {
       expect(each.label, `${each.value} is labeled with its own token`).not.toBe(each.value);
       expect(each.label).not.toContain("_");
     }
+  });
+
+  it("offers a correction only the reasons no version bump can answer", () => {
+    // A correction stands at every version, so a reason a bump can address
+    // would be a judgment about risk that nothing re-examines. The endpoint
+    // refuses the other three; offering them here would be a refusal somebody
+    // meets after writing the reasoning.
+    expect(JUSTIFICATIONS_CORRECTING.map((each) => each.value).sort()).toEqual([
+      "component_not_present",
+      "vulnerable_code_not_present",
+    ]);
   });
 
   it("gives each one a distinct label", () => {

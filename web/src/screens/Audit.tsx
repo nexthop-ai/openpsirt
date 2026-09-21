@@ -180,6 +180,11 @@ export function Audit() {
     products.length > 0 ? products.join(", ") : "every product you can see",
     said(OUTCOMES, outcomes),
     said(STATES, states),
+    // Printed like the rest, because a sheet headed "wrong match" over rows
+    // that include judgments the code moved out from under is a sheet nobody
+    // can check against anything.
+    inForce ? "still standing" : "",
+    alone ? "no second person agreed" : "",
     from || to ? `proposed ${from || "at any time"} to ${to || "now"}` : "",
   ]
     .filter(Boolean)
