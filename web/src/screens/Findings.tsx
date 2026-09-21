@@ -28,27 +28,28 @@ import { useWho } from "../app/session";
 // is 153 pages of one product's findings, which is not a list anybody
 // assembles a day's work out of.
 import {
+  acrossProducts,
+  asAsked,
   BY_DEFAULT,
-  LEAST_FIRST,
   daysBack,
+  hidden,
+  identityOf,
+  LEAST_FIRST,
+  listQuery,
   ORDERS,
   PAGE,
   PAGES,
-  SORTS,
-  acrossProducts,
-  asAsked,
-  listQuery,
   pageSize,
-  withEach,
-  withParam,
-  withParams,
-  hidden,
-  identityOf,
   pathTo,
-  widened,
+  SORTS,
   type Row,
   type SortWord,
   usePaging,
+  widened,
+  withEach,
+  withinVariant,
+  withParam,
+  withParams,
 } from "./list";
 
 // The filters the by-bump view can apply, by the key their chip carries.
@@ -198,7 +199,7 @@ export function Findings() {
   // Built from the address rather than from the values read out of it, so that
   // the finding screen can build the same query from the same address and
   // there is one place a filter is translated.
-  const query = useMemo(() => listQuery(asked), [asked]);
+  const query = useMemo(() => withinVariant(listQuery(asked), Boolean(variant)), [asked, variant]);
 
   // The same question as a file: every filter the list asked, and never the
   // paging, since a file is the whole of a narrowing rather than the page in
@@ -716,6 +717,7 @@ export function Findings() {
           tags={inUse.data?.items ?? []}
           oneBuild={oneBuild}
           spanning={spanning}
+          variantNamed={Boolean(variant)}
         />
       )}
 

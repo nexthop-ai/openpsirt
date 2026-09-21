@@ -55,6 +55,14 @@ export const FIX_STATES = [
   ["mixed", "Differs between builds"],
 ] as const;
 
+// How a group is spread over the variants of a branch. "Only this variant"
+// is offered where one is named, because it is a question about that one.
+export const SPREADS = [
+  ["", "Any"],
+  ["only", "Only this variant"],
+  ["every", "Every variant"],
+] as const;
+
 export const STATES = [
   ["", "Any"],
   ["undecided", "Undecided"],
@@ -334,6 +342,11 @@ export function activeFilters(params: URLSearchParams): Active[] {
   each("weakness", "Weakness", []);
   each("tag", "Tag", []);
   if (at("differs") === "1") add("differs", "Differs between builds", "only");
+  add(
+    "variants",
+    "Across variants",
+    SPREADS.find(([word]) => word !== "" && word === at("variants"))?.[1].toLowerCase() ?? "",
+  );
   return out;
 }
 
@@ -462,6 +475,7 @@ export function Filters({
   tags,
   oneBuild,
   spanning,
+  variantNamed,
 }: {
   params: URLSearchParams;
   set: (key: string, value: string) => void;
@@ -476,6 +490,9 @@ export function Filters({
   tags: string[];
   oneBuild: boolean;
   spanning: boolean;
+  // Whether the selection names a variant, which is what "only this
+  // variant" is about.
+  variantNamed: boolean;
 }) {
   const at = (key: string) => params.get(key) ?? "";
   const all = (key: string) => params.getAll(key).filter(Boolean);
@@ -750,6 +767,19 @@ export function Filters({
             hint="Open in some builds of this selection and not others"
             on={at("differs") === "1"}
             onChange={(on) => flag("differs", on)}
+          />
+        )}
+        {!spanning && (
+          <Pick
+            label="Across variants"
+            hint={
+              variantNamed
+                ? "What no other variant on the same branch has, or what every variant has"
+                : "What every variant on the branch has. Pick a variant to ask what is specific to it"
+            }
+            value={at("variants")}
+            options={variantNamed ? SPREADS : SPREADS.filter(([word]) => word !== "only")}
+            onChange={(value) => set("variants", value)}
           />
         )}
       </Group>

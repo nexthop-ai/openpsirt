@@ -1026,8 +1026,10 @@
 .ostats .o.ok b {
   color: var(--ok);
 }
+/* The color alone: the shorthand resets the background image with it, and the
+   shade on a clipped edge is drawn as one. */
 .outliers .tablewrap {
-  background: var(--surface);
+  background-color: var(--surface);
 }
 
 /* ---------- other builds: the guided review ---------- */

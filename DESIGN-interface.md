@@ -370,12 +370,14 @@ and what is running out anywhere" with the weaker of the two lists. The server
 has no such split: both routes take the same filters from one definition.
 
 What is absent without a product is what has no meaning without one. A subtree
-is a walk over one build's edges and "differs between builds" is a statement
-about a selection, so neither is offered and neither is sent — dropped from the
-query rather than left in the address, because a filter somebody can no longer
-see or clear is one that narrows a list for reasons it does not show. Saved
-filters, deciding from the list and the export are a product's own and come back
-the moment a product is picked.
+is a walk over one build's edges, and "differs between builds" and the spread
+across variants are statements about a selection, so none is offered and none
+is sent — dropped from the query rather than left in the address, because a
+filter somebody can no longer see or clear is one that narrows a list for
+reasons it does not show. "Only this variant" is likewise offered and sent only
+where the selection names a variant, because it is a question about that one.
+Saved filters, deciding from the list and the export are a product's own and
+come back the moment a product is picked.
 
 The product becomes a column where it varies, and the row links to that product's
 list.
@@ -480,6 +482,7 @@ back in its own order rather than refusing.
 | **An empty list says what emptied it and offers the way back** | A narrowed list matching nothing is a dead end: the controls that produced it are scrolled off above, and what is left on screen says so and offers nothing. It names how many filters are in force and carries a control that takes all of them off — and says "nothing is open here at all" where none was in force, which is a different answer |
 | **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided lead now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the order control above the list |
 | **A row is decided where it sits** | Opening a row carries the same decision form the finding screen does, over the list rather than instead of it. What a claim requires and what it writes are unchanged — a second person still agrees — and what changes is the two journeys per row, each of which read the list again on the way back. Everything the form cannot show there is one link away |
+| A screen that is waiting says so with a mark that moves | The word alone is one faint line on a page that is otherwise still, and a still page reads as a stopped one. The mark carries no text, so a screen reader hears the word once; the page-wide reduced-motion rule stops it, and a still ring beside the word is still a mark |
 | **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. Unmounting the whole screen — the search box, the chips, the count and the controls with it — blanks the thing being narrowed and takes the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
 | **Each view's button carries what that view would show** | The three answer one narrowing at three grains and the difference is the whole reason to switch: a by-issue list of 7,455 rows is 341 by component and 284 by upgrade. Without the numbers the list opened on its longest view and read as the only one. The by-upgrade figure is a fix-bundle aggregate, measured at 2.2 s against a backlog of 8,376, so it is held for five minutes rather than asked again as somebody pages |
 | **The list opens by issue, whatever the size** | No threshold, and the other two are a click away in the toggle and in the address as a chip that removes itself. A list that jumps to a different grain past a number nobody set is a list that answers a different question on two products |
@@ -1526,7 +1529,8 @@ scroll sideways. That is why the tables here are written rather than installed.
 | Rule | |
 |---|---|
 | A small screen is shaped around review and respond, not bulk work | Read a finding, agree to one or send it back, see what is assigned to you. Nobody triages three hundred findings on a phone, so the wide-only screens stay wide and say so rather than being folded into something unusable |
-| Every table that is wider than the screen says so | Nearly every table scrolled sideways inside its own frame and none mentioned it, which reads as a page cut off rather than as a table with more in it. Said above the table and pinned so it stays visible while the table moves. **Only the ones that are wider**: a stylesheet cannot ask, so the table measures itself and says which it is — a note about scrolling over a two-column table that fits teaches people to stop reading the notes |
+| Every table that is wider than its box says so, at every width | A table scrolling sideways inside its own frame with nothing saying so reads as a page cut off rather than as a table with more in it. Said above the table and pinned so it stays visible while the table moves, and the clipped edge is shaded so the overflow shows before the note is read. **Only the ones that are wider**: a stylesheet cannot ask, so the table measures itself and says which it is — a note about scrolling over a two-column table that fits teaches people to stop reading the notes |
+| A table that scrolls takes a tab stop | The arrow keys move a box only once it has focus, and a box only a pointer can scroll is a table a keyboard cannot read to the end of. The stop is there only while there is somewhere to scroll to |
 | Headings and field labels are noun phrases (REQ-60) | The name of the thing, the way a settings screen anywhere else names one. Written as descriptions — "When somebody counts as absent" — they make somebody scanning for the one they came to change read thirty sentences instead of thirty names. The explanation stays underneath. Three had no name at all, falling through to the last segment of a configuration key: a card headed "After" |
 | Labels use the conventional word (REQ-60) | Reject, Trend, Assignments, Unassigned, Justification, Path, EPSS, Locations, Access, Lapsed decisions, Submit. A caption on a screen is a sentence at most |
 | A form field is not a credential | Every text and number box says so in the four attributes the password managers actually read. They guess from shape and proximity, so a short box beside another short box is offered a saved login. `autocomplete` alone does not do it: browsers ignore it for saved logins by design. Nothing here is exempt, because nothing here is a credential — this deployment never holds a password |
@@ -1644,6 +1648,8 @@ Coverage of the interface is measured and reported by the gate.
 | **Five rules restated what a wider media query already applied** | A phone layout fixed by appending a corrected copy at the bottom of the stylesheet rather than editing the rule where it lives: anything under 780 is under 900, so they changed nothing and read as though they did |
 | **The thirty-first table that scrolls** | The release-readiness table on home, cut off on a phone with nothing explaining why |
 | **An operation the API offers that no screen reaches** | The generated client type-checks what a screen sends against what the server takes, so a screen cannot disagree with the shape — but an endpoint or a field nothing calls is not a disagreement, and neither the unreachable-code check nor the decision gate looks at it. Four were found by configuring a deployment from empty: creating a pipeline key, granting administration, narrowing a personal token to a product, and the withdrawn flag on a token row. Walking the API document against the generated client's call sites is what would catch it |
+| **A background shorthand one sheet later resets an image another set** | The shade on a clipped table edge is a background image, and a rule giving that box a background color with the shorthand takes the image with it at equal specificity. The screen keeps its color and loses the thing that said the table was cut off |
+| **The shade stops at the header row and the hovered row** | Both carry an opaque background — the header for its sticky cells, the hovered row for its fill — so the box's own background does not show through them. The note above the table is what says the table scrolls; the shade is a second signal and is absent on two rows of it |
 | **What only a browser shows** | Six screens passed the type check, the lint and their tests, and every one was wrong on screen. A chip styled by a block-level class stood a row of pills on end. A holder's name was drawn in placeholder grey. A component's name came out empty, read off a chain that was not there. A form refused to submit and never said what was missing. A comment box offered no mentions. A superseded upload reported a clean scan. None of these is a screen disagreeing with the server, which is the only kind of wrong the checks can see |
 
 ## File organization

@@ -373,10 +373,12 @@ type Paging struct {
 
 // AtOneBuild narrows a list within a single product's builds, and has no
 // meaning across products: a subtree is a walk over one build's edges, and
-// "differs between builds" is a statement about a selection.
+// "differs between builds" and the spread across variants are statements
+// about a selection.
 type AtOneBuild struct {
-	Beneath string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused"`
-	Differs bool   `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
+	Beneath        string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused"`
+	Differs        bool   `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
+	AcrossVariants string `query:"across_variants" enum:"only,every" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
 }
 
 func registerFindings(api huma.API, in Ingest) {

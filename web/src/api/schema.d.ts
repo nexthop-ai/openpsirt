@@ -12922,6 +12922,8 @@ export interface operations {
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
+                /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
+                across_variants?: "only" | "every";
                 /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only issues somebody is known to be exploiting */
@@ -13071,6 +13073,8 @@ export interface operations {
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
+                /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
+                across_variants?: "only" | "every";
                 /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only issues somebody is known to be exploiting */
@@ -13182,6 +13186,8 @@ export interface operations {
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
+                /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
+                across_variants?: "only" | "every";
                 /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only issues somebody is known to be exploiting */
@@ -13296,6 +13302,8 @@ export interface operations {
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
+                /** @description Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held */
+                across_variants?: "only" | "every";
                 /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only issues somebody is known to be exploiting */

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/danielgtaylor/huma/v2"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -60,6 +62,14 @@ func narrowing(ctx context.Context, in Ingest, q ScopeQuery,
 		return out, err
 	}
 	filter.DiffersBetweenBuilds = at.Differs
+	// What is specific to a variant is a question about one of them, so
+	// asking it of a selection that names none is refused in words rather
+	// than answered with an empty list nothing explains.
+	filter.AcrossVariants = finding.VariantSpread(at.AcrossVariants)
+	if filter.AcrossVariants == finding.OnlyThisVariant && scope.VariantID == nil {
+		return out, huma.Error422UnprocessableEntity(
+			"across_variants=only needs a variant: name the one to ask what is specific to")
+	}
 	out.Store = finding.NewStore(in.DB.DB)
 	if filter.Beneath, err = beneathIn(ctx, in, scope, at.Beneath); err != nil {
 		return out, err

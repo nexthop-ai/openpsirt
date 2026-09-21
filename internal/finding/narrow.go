@@ -393,6 +393,24 @@ type Filter struct {
 	// DiffersBetweenBuilds is measured against. Set by whoever resolved the
 	// selection, because the filter cannot see it.
 	Builds int
+	// AcrossVariants keeps rows by how they are spread over the variants of
+	// the branch they sit on: only the named variant holds them there, or
+	// every variant does. Compared on that branch, so a fix a newer branch
+	// landed on every variant does not read as specific to the variant being
+	// looked at.
+	AcrossVariants VariantSpread
+	// VariantID is the variant the selection names, where it names one.
+	// Targets is the builds it holds, which AcrossVariants reads as the
+	// signal that a selection was resolved at all: applied to a filter
+	// nobody resolved, its comparison would find nothing anywhere and keep
+	// every row as though it were unique.
+	Targets   []int64
+	VariantID *int64
+	// Visible is what the reader may see, set with the two above. A finding
+	// in another variant is compared only where the reader could see it
+	// there too, so that "specific to this variant" never says a hidden
+	// finding exists.
+	Visible []access.Visibility
 	// Publishers keeps only what a named VEX publisher has a statement
 	// about, and VexStatus only what that statement says. Being able to
 	// find that population is the point of taking the documents at all: on
@@ -722,6 +740,7 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.DiffersBetweenBuilds && f.Builds > 1 {
 		q = q.Having("COUNT(DISTINCT f.target_id) < ?", f.Builds)
 	}
+	q = f.acrossVariants(q)
 	if f.Beneath != nil {
 		// The subtree as the engine walks it, not as a list of identifiers
 		// bound back in: under a build's root that list is the whole build.
@@ -730,6 +749,86 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 	q = f.byState(q)
 	if !f.BelowFloor {
 		q = f.Floor.narrow(q)
+	}
+	return q
+}
+
+// VariantSpread is how a group is spread over the variants of a branch.
+type VariantSpread string
+
+const (
+	// AnyVariants is no narrowing by spread.
+	AnyVariants VariantSpread = ""
+	// OnlyThisVariant keeps rows no other variant of the same branch holds
+	// open — what is specific to the variant the selection names.
+	OnlyThisVariant VariantSpread = "only"
+	// EveryVariant keeps rows every build of the same branch holds open —
+	// what is common to the product rather than to how it was built.
+	EveryVariant VariantSpread = "every"
+)
+
+// onThisRowsBranch is the branch the row's own build sits on.
+//
+// Spelled as a scalar subquery, which is how the other five lookups of this
+// shape here are written, rather than as a join correlated outward from
+// inside a subquery.
+const onThisRowsBranch = `(SELECT tg0.stream_id FROM "target" AS "tg0"` +
+	` WHERE tg0.id = f.target_id)`
+
+// acrossVariants keeps rows by how the variants of a branch share them.
+//
+// The comparison is against the other builds on the row's own branch, whatever
+// the selection holds. Taken over the selection's branches together, a
+// selection naming a variant and leaving the branch at all compares each row
+// against every other variant on either branch: an issue open on one branch's
+// variant and on a different variant of another branch is dropped from "only",
+// though on its own branch nothing else has it.
+//
+// A row is held elsewhere where the same issue is open at the same fold, which
+// is the grain the list groups by. The fold is looked up from the row's
+// component rather than read off the outer query, because not every query this
+// narrows has the component joined under a known name.
+//
+// Both conditions are placed on the rows rather than as a HAVING, because the
+// question is about a place: a group open on two branches keeps the places
+// where its variant is alone with it and drops the places where it is not.
+func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
+	if f.AcrossVariants == AnyVariants || len(f.Targets) == 0 {
+		return q
+	}
+	// The same issue at the same fold, open and seen by this reader; which
+	// build is added by the caller.
+	heldElsewhere := func() *bun.SelectQuery {
+		return q.NewSelect().TableExpr(`"finding" AS "f2"`).
+			Join(`JOIN "component" AS "c2" ON c2.id = f2.component_id`).
+			ColumnExpr("1").
+			Where("f2.vulnerability_id = f.vulnerability_id").
+			Where(`c2.fold_key = (SELECT c1.fold_key FROM "component" AS "c1"`+
+				` WHERE c1.id = f.component_id)`).
+			Where("f2.closed_at IS NULL").
+			Where("f2.visibility IN (?)", bun.List(f.Visible))
+	}
+	switch f.AcrossVariants {
+	case OnlyThisVariant:
+		// A variant has to be named for "only this one" to mean anything;
+		// the caller refuses the request before it reaches here, and this
+		// is the same answer for a caller that did not.
+		if f.VariantID == nil {
+			return q.Where("1 = 0")
+		}
+		others := q.NewSelect().TableExpr(`"target" AS "tg2"`).
+			ColumnExpr("tg2.id").
+			Where("tg2.stream_id = "+onThisRowsBranch).
+			Where("tg2.variant_id <> ?", *f.VariantID)
+		return q.Where("NOT EXISTS (?)", heldElsewhere().
+			Where("f2.target_id IN (?)", others))
+	case EveryVariant:
+		// No build on the row's own branch lacks it.
+		lacking := q.NewSelect().TableExpr(`"target" AS "tg2"`).
+			ColumnExpr("tg2.id").
+			Where("tg2.stream_id = "+onThisRowsBranch).
+			Where("NOT EXISTS (?)", heldElsewhere().Where("f2.target_id = tg2.id"))
+		return q.Where("NOT EXISTS (?)", lacking)
 	}
 	return q
 }

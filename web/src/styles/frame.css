@@ -521,9 +521,15 @@ button {
 /* ---------- two rules that are the page's rather than a screen's ---------- */
 
 /* Somebody who has asked their system for less movement gets none, which is
-   the whole page rather than any screen's part of it. */
+   the whole page rather than any screen's part of it.
+
+   The pseudo-elements are named alongside, because the universal selector does
+   not match them and the mark a screen waits with is drawn on one. A rule that
+   reads as covering everything covers the elements only. */
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     transition: none !important;
     animation: none !important;
   }

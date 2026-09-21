@@ -27,7 +27,7 @@ import { Markdown } from "../ui/Markdown";
 import { Decide, said, type Recorded } from "../ui/Decide";
 import { useKept } from "../ui/Saved";
 import { Because } from "../ui/Outcome";
-import { fromAt, listQuery, pathTo, where, windowFor } from "./list";
+import { fromAt, listQuery, pathTo, where, windowFor, withinVariant } from "./list";
 
 // One finding: what the issue is, how bad, what upstream has done, where it
 // sits, the evidence — and the working screen for deciding it, before and
@@ -195,7 +195,14 @@ export function Finding() {
   const settled = rule === "" || !rules.isPending;
 
   const list = useMemo(() => new URLSearchParams(from), [from]);
-  const listed = useMemo(() => listQuery(list), [list]);
+  // Through the same guard the list applies: what is specific to a variant is
+  // a question about one, and an address carrying the filter without a variant
+  // is refused by the server — which would take the previous and next row with
+  // it rather than the filter.
+  const listed = useMemo(
+    () => withinVariant(listQuery(list), Boolean(list.get("variant"))),
+    [list],
+  );
   // Widened by one at each end, so that stepping off a page finds the row on
   // the next one rather than stopping at a boundary the reader never chose.
   const span = useMemo(() => windowFor(listed.offset, listed.limit), [listed]);

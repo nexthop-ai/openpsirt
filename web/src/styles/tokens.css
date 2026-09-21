@@ -70,6 +70,8 @@
      because the work surface is one plane and a shadow says there are
      two. */
   --shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 1px 3px rgb(16 24 40 / 6%);
+  /* The shade on the clipped edge of a table that scrolls sideways. */
+  --shade: rgb(16 24 40 / 14%);
   --shadow-lg: 0 12px 32px rgb(16 24 40 / 18%);
   --radius: 6px;
   --radius-lg: 8px;
@@ -172,6 +174,7 @@
   --wait: #e6b566;
 
   --shadow: 0 1px 0 rgb(255 255 255 / 3%) inset;
+  --shade: rgb(0 0 0 / 45%);
   --shadow-lg: 0 18px 50px rgb(0 0 0 / 55%);
   --radius: 6px;
   --radius-lg: 8px;

@@ -257,8 +257,13 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	// which is what left the overdue filter with no test.
 	filter.now = s.now
 	// The number of builds the selection holds, which is what "differs between
-	// builds" is measured against. The filter cannot see it.
+	// builds" is measured against. The filter cannot see it. The builds
+	// themselves, the variant named and what the reader may see, for the
+	// comparison across variants, which reaches builds outside the selection.
 	filter.Builds = len(targets)
+	filter.Targets = targets
+	filter.VariantID = scope.VariantID
+	filter.Visible = visible
 	// A subtree is a walk over one build's edges, so it is answerable only
 	// where the selection is one build. Asked across several it is refused
 	// rather than answered from whichever build sorted first — which is what
