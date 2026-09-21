@@ -3,7 +3,11 @@ package httpapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
@@ -129,4 +133,72 @@ func agreedTo(t *testing.T, r *reach, at string) {
 		t.Fatalf("agreeing to the advisory at %s answered %d: %s",
 			at, got.Code, got.Body.String())
 	}
+}
+
+// TestAWriteOnAnAdvisoryNeedsTheRoleOnEveryProductItCovers reaches the arm
+// that answers an authorization refusal here.
+//
+// Left to the default arm it answers 422 carrying the denial's own sentence,
+// which names the internal product identifier — a number nothing else
+// publishes. Deleting the arm leaves the suite green without this.
+func TestAWriteOnAnAdvisoryNeedsTheRoleOnEveryProductItCovers(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		ctx := t.Context()
+		r.scannedWithEvidence(t)
+		flaw := r.embargoed(t)
+		named := advisoryOver(t, r, "private-triage", "mine", flaw)
+
+		// Somebody who triages one product and reads the one this advisory
+		// covers. The triage role is what carries them past the route's own
+		// requirement, so what refuses them is the rule this pins rather than
+		// the middleware above it — and the read is what lets them resolve
+		// the advisory, so it is not the answer a name nobody minted gets.
+		partly, err := r.rights.Ensure(ctx, "part-triage", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.Claim(ctx, partly.ID, "part-triage"); err != nil {
+			t.Fatal(err)
+		}
+		var mine, theirs int64
+		for name, into := range map[string]*int64{"mine": &mine, "theirs": &theirs} {
+			if err := r.db.DB.NewSelect().Table("product").Column("id").
+				Where("name = ?", name).Scan(ctx, into); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, held := range []struct {
+			product int64
+			role    access.Role
+		}{
+			{theirs, access.PublicTriage},
+			{mine, access.PublicRead}, {mine, access.PrivateRead},
+		} {
+			if err := r.rights.GrantRole(ctx, partly.ID, held.product, held.role); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// They may read it, which is what makes the refusal below about the
+		// role rather than about the advisory being out of reach.
+		if got := asPerson(t, r, "part-triage", http.MethodGet,
+			"/v1/advisories/"+named, ""); got.Code != http.StatusOK {
+			t.Fatalf("reading an advisory in a product they read answered %d: %s",
+				got.Code, got.Body.String())
+		}
+
+		refused := asPerson(t, r, "part-triage", http.MethodPatch,
+			"/v1/advisories/"+named, `{"title":"Not theirs to call"}`)
+		if refused.Code != http.StatusForbidden {
+			t.Fatalf("retitling an advisory covering a product they only read answered %d: %s",
+				refused.Code, refused.Body.String())
+		}
+		// And the refusal carries no internal identifier, which is what the
+		// arm exists to withhold.
+		for _, leaked := range []string{strconv.FormatInt(mine, 10), strconv.FormatInt(theirs, 10)} {
+			if strings.Contains(refused.Body.String(), leaked) {
+				t.Errorf("the refusal names an internal product identifier: %s",
+					refused.Body.String())
+			}
+		}
+	})
 }

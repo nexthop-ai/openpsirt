@@ -709,6 +709,8 @@ is the same kind of claim.
 | What sent the upload that was refused | A person. "Which of our pipelines is the broken one" is the first question a deployment with several asks, and a refusal that names only the build does not answer it |
 | What the refused document said it was built from | A person, for the out-of-order failure specifically: the refusal says the clock did not move, and this is what it said the time was |
 | What the refused upload hashed to | A person, comparing the refusal against what the producer believes it sent. It is also how a producer retrying one broken document is told apart from one sending a differently broken document each night, which are different faults and read the same in the count |
+| Who took an agreement to an advisory back | A person asking who stopped a document going out. An edit takes agreements back as a side effect of moving the words, so the person recorded here is often not the one who set out to withdraw anything |
+| When an edition of an advisory was written | A person reconstructing what an advisory covered when somebody agreed to it. An edition records the title and the moment; which flaws it named is read from when each was added and taken off, which needs the moment |
 
 A column that is written, never read, and has no answer to "who would want it" is
 a defect. That is how the redundant indexes above were found.

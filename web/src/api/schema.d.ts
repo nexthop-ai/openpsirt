@@ -157,7 +157,7 @@ export interface paths {
          *
          *     Requires a triage role on every product the advisory covers, because what it says about one of them is part of the same document as what it says about another.
          *
-         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         patch: operations["retitle-advisory"];
         trace?: never;
@@ -177,24 +177,22 @@ export interface paths {
          *
          *     The agreement names the edition it was given against rather than the advisory. Retitling it, naming another flaw on it or taking one off opens a new edition and takes the agreement back, so what stands is always an agreement to the document as it reads now.
          *
-         *     You may not agree to an advisory you started or whose current edition you wrote, and there is no override. A deployment with one person can therefore not publish an advisory, which is the control working rather than a gap in it.
+         *     You may not agree to an advisory you started or whose current edition you wrote. Both answer 409, and there is no override, so a deployment with one person publishes no advisory.
          *
          *     Requires a triage role on every product the advisory covers.
          *
-         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         post: operations["approve-advisory"];
         /**
          * Withdraw approval of an advisory
          * @description Takes back every agreement standing on what the advisory says now.
          *
-         *     An act somebody performs, rather than something an edit does for them: editing takes agreements back because the words moved, and this is somebody saying they no longer agree to words that have not.
-         *
-         *     It needs no agreement of its own. Taking one back stops a document going out, which exposes the question rather than hiding it.
+         *     Every agreement standing, not only your own. It needs no agreement of its own, and the advisory cannot go out until somebody agrees again.
          *
          *     Answers 422 where no agreement is standing.
          *
-         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         *     Requires: public-triage or private-triage. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
          */
         delete: operations["withdraw-advisory-approval"];
         options?: never;
@@ -217,7 +215,7 @@ export interface paths {
          *
          *     The document is generated, not published. Nothing is sent anywhere. Recording that it was issued is a separate request, and what it keeps is a digest of what was generated, so that whether what you published is still what this would generate can be answered.
          *
-         *     A document about an undisclosed flaw is a draft, and says so in `tracking.status`. Reaching a disclosure date discloses nothing, so nothing here does either.
+         *     How far the document may travel is its distribution label, red while anything it covers is still held back. `tracking.status` says where the document is in its life. Reaching a disclosure date discloses nothing, so nothing here does either.
          *
          *     An advisory covering no issue is refused: the standard requires at least one. Requires a publisher configured for this deployment, because a document naming none is not a valid CSAF document.
          *
@@ -289,7 +287,7 @@ export interface paths {
          *
          *     Only a flaw recorded here. An issue a scanner reported against a third-party component is refused, and refused at this point rather than when the document is generated, so the refusal names the issue you chose.
          *
-         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
          */
         post: operations["add-advisory-issue"];
         delete?: never;
@@ -314,7 +312,7 @@ export interface paths {
          *
          *     Nothing here asks whether the advisory has gone out. An issuance records what went out at a moment, and editing the advisory afterwards is how the next revision differs from the last.
          *
-         *     Requires: public-triage or private-triage. A triage role on the product named in the request. Naming a flaw on an advisory is what puts it into a document published about that product.
+         *     Requires: public-triage or private-triage. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
          */
         delete: operations["drop-advisory-issue"];
         options?: never;
@@ -4801,7 +4799,7 @@ export interface components {
             covers: components["schemas"]["CoveredBody"][] | null;
             minted_at: string;
             /**
-             * @description Where the document is in its life. Draft until it has gone out, final once it has and somebody agrees to what it says now, interim where it has gone out and has been edited since
+             * @description Where the document is in its life. Final where somebody agrees to what it says now, interim where it has gone out and nobody does, draft before either
              * @enum {string}
              */
             status?: "draft" | "final" | "interim";
@@ -4875,7 +4873,7 @@ export interface components {
             agreed_at: string;
             /**
              * Format: int64
-             * @description The edition agreed to. A later edition is a document nobody has agreed to yet
+             * @description Which edition was agreed to, counting from one within this advisory. A later edition is a document nobody has agreed to yet
              */
             edition: number;
         };

@@ -194,6 +194,17 @@ func carryTitle(ctx context.Context, tx bun.Tx, advisoryID int64) (string, error
 	return edition.Title, nil
 }
 
+// Agreement is one agreement, as the act that gave it answers.
+//
+// It carries the edition's ordinal rather than its row identifier. What a
+// reader follows is which edition this is, counting from one within the
+// advisory; the row identifier counts editions across the deployment and is a
+// number a caller can do nothing with.
+type Agreement struct {
+	Edition  int
+	AgreedAt time.Time
+}
+
 // Approve records a second person agreeing to what the advisory says.
 //
 // Against one edition, not against the advisory, for the reason the claim
@@ -205,7 +216,7 @@ func carryTitle(ctx context.Context, tx bun.Tx, advisoryID int64) (string, error
 // pair of eyes has to be the second pair: whoever minted an advisory chose the
 // name a reader cites it by and, in the ordinary case, the flaws it covers.
 func (s *Store) Approve(ctx context.Context, subject access.Subject,
-	identifier string) (*Approval, error) {
+	identifier string) (*Agreement, error) {
 
 	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
@@ -232,7 +243,7 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 	}
 
 	now := s.now().UTC().Truncate(time.Microsecond)
-	var given *Approval
+	var given *Agreement
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
 		// Read inside the transaction, because the edition the advisory
 		// points at is what is being agreed to and it moves under an edit.
@@ -266,12 +277,15 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 		if already > 0 {
 			return ErrAlreadyAgreed
 		}
-		given = &Approval{
+		_, err := tx.NewInsert().Model(&Approval{
 			AdvisoryID: row.ID, EditionID: edition.ID,
 			ApprovedBy: subject.ID, ApprovedAt: now,
+		}).Exec(ctx)
+		if err != nil {
+			return err
 		}
-		_, err := tx.NewInsert().Model(given).Exec(ctx)
-		return err
+		given = &Agreement{Edition: edition.Ordinal, AgreedAt: now}
+		return nil
 	})
 	switch {
 	case errors.Is(err, ErrSamePerson), errors.Is(err, ErrAlreadyAgreed),
@@ -395,20 +409,26 @@ func (s *Store) agreed(ctx context.Context, row *Advisory) ([]Approval, error) {
 // The two come apart in both directions: a document about disclosed issues can
 // still be unfinished, and one about an embargoed issue can be ready to go.
 //
-// Every arm is a fact somebody created deliberately. A document nobody has
-// published is a draft whatever anybody thinks of it; one that has gone out
-// and whose current words a second person agrees to is final; one that has
-// gone out and has been edited since is published and being worked on, which
-// is the third status and the one that could not be expressed at all while
-// this was read from the embargo.
+// The agreement is asked first, because the document a reader holds is
+// generated before it is published and the bytes that go out have to say what
+// they are. Asked in the other order, the one file an operator actually sends
+// says it is a draft: no issuance exists at the moment it is generated, and
+// recording one first does not help, because the history then numbers the
+// next document past what went out.
+//
+// So a document a second person agrees to is the publisher's settled word,
+// published or not; one that has gone out with nobody agreeing to what it
+// says now is published and still being worked on, which is the third status
+// and the one that could not be expressed at all while this was read from the
+// embargo; and anything else is being written.
 func statusOf(issued, agreed bool) string {
 	switch {
-	case !issued:
-		return "draft"
 	case agreed:
 		return "final"
-	default:
+	case issued:
 		return "interim"
+	default:
+		return "draft"
 	}
 }
 

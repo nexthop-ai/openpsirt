@@ -1084,6 +1084,9 @@ the one output nobody here could make.
 | Shown as text and never rendered (REQ-66) | What a reader has to check is exactly what a customer's tooling will receive |
 | What has already gone out is readable without generating anything | Every issuance is in the document's own revision history, which is right for a reader of the document — but it made "has an advisory gone out, and is what is published still what we would generate" a question you had to build a CSAF document to answer |
 | Recording that it went out is its own act, next to the draft rather than inside it | What was published on a date cannot be worked out again once a release is added or a decision is revised, and without the record a second document cannot be a revision — which a customer's validator checks |
+| Where each advisory covering this flaw stands is shown beside its name | Whether one is agreed to and whether it has gone out is what somebody asks before starting a second |
+| Agreeing is said, never offered here | Whoever reaches this panel started the advisory a moment ago, and they are the person agreeing refuses. A control leading to a refusal is worse than no control. `DESIGN-remediation.md` § Editorial state holds who may agree |
+| Nothing here gives the agreement a document needs to go out | It belongs to the advisory in its own right, which has no screen. Until it does, agreement is reachable through the endpoints alone |
 
 ## The editor
 

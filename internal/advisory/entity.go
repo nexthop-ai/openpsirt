@@ -275,6 +275,13 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
+	// Naming a flaw opens an edition and takes back every agreement standing
+	// on the advisory, which is a change to what it says about every product
+	// it covers. Asked before the product in the request is resolved,
+	// because a refusal here is about the advisory rather than about a name.
+	if err := s.mayWrite(ctx, subject, row, "name a flaw on an advisory"); err != nil {
+		return nil, err
+	}
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
 	if err != nil {
 		return nil, err
@@ -282,10 +289,10 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 	// Authorized before the identifier is resolved, so a name nobody holds
 	// and a name somebody holds come back the same way.
 	//
-	// The triage role on this product, not on some product. Naming a flaw on
-	// an advisory is what puts it into a document published about that
-	// product, so somebody who triages one product and only reads another
-	// would otherwise publish about the second.
+	// And the triage role on this product as well as on the ones it already
+	// covers. Naming a flaw is what puts it into a document published about
+	// that product, so somebody who triages one product and only reads
+	// another would otherwise publish about the second.
 	if !triages(subject, named.ID) {
 		return nil, ErrNoSuchIssue
 	}
@@ -371,13 +378,18 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
+	// The same rule adding one asks for, and for the same reason: taking a
+	// flaw off opens an edition and takes back every agreement standing on
+	// the advisory.
+	if err := s.mayWrite(ctx, subject, row, "take a flaw off an advisory"); err != nil {
+		return err
+	}
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
 	if err != nil {
 		return err
 	}
-	// The same role adding it asks for. Taking a flaw back off a document
-	// about a product is as much a statement about that product as putting it
-	// on was.
+	// Taking a flaw back off a document about a product is as much a
+	// statement about that product as putting it on was.
 	if !triages(subject, named.ID) {
 		return ErrNoSuchIssue
 	}

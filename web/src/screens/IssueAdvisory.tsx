@@ -110,17 +110,6 @@ export function IssueAdvisory({
       void already.refetch();
     },
   });
-  // Agreeing to what the advisory says, which is what publishing asks for.
-  // Whoever started it may not, and neither may whoever wrote the words
-  // standing, so the refusal is the ordinary answer here rather than a fault.
-  const agree = useMutation({
-    mutationFn: async (of: string) =>
-      unwrap(
-        await api.POST("/v1/advisories/{advisory}/approval", {
-          params: { path: { advisory: of } },
-        }),
-      ),
-  });
   const record = useMutation({
     mutationFn: async (of: string) =>
       unwrap(
@@ -252,27 +241,20 @@ export function IssueAdvisory({
                 <button
                   type="button"
                   className="btn quiet"
-                  disabled={agree.isPending}
-                  onClick={() => agree.mutate(advisory)}
-                >
-                  {agree.isPending ? "Agreeing…" : "Agree to what it says"}
-                </button>
-                <button
-                  type="button"
-                  className="btn quiet"
                   disabled={record.isPending}
                   onClick={() => record.mutate(advisory)}
                 >
                   {record.isPending ? "Recording…" : "Record that it went out"}
                 </button>
               </div>
+              {/* Said rather than offered. Whoever reaches this panel is the
+              person who just named the flaw on the advisory, and they are the
+              one agreeing refuses — a button leading to a refusal is worse
+              than no button. */}
               <p className="hint">
-                A second person agrees to what it says before it goes out. You cannot agree to one
-                you started or whose words you wrote.
+                A second person agrees to what it says before it goes out, which is not you: you
+                started this one.
               </p>
-              {agree.error != null && (
-                <Failed error={agree.error} what="That could not be agreed to." />
-              )}
               <p className="hint">
                 Recorded here, published elsewhere. What went out cannot be rebuilt later, and a
                 revision needs the record of the first.

@@ -457,15 +457,20 @@ becoming public.
 ## Editorial state
 
 Where a document is in its life, read from what people did about it. A document
-nobody has published is a draft; one that has gone out and whose current words
-a second person agrees to is final; one that has gone out and has been edited
-since is published and still being worked on.
+a second person agrees to is the publisher's settled word; one that has gone out
+with nobody agreeing to what it says now is published and still being worked on;
+anything else is being written.
 
 | Status | Reached by |
 |---|---|
-| `draft` | Nothing has gone out |
-| `final` | It has gone out, and an agreement stands on what it says now |
-| `interim` | It has gone out, and it has been edited since |
+| `final` | An agreement stands on what it says now, whether or not it has gone out |
+| `interim` | It has gone out, and no agreement stands on what it says now |
+| `draft` | Neither |
+
+The agreement is asked before the issuance. A document is generated before it
+is published, so the bytes an operator sends have to say what they are — and
+asked in the other order the one file that actually goes out says it is a
+draft.
 
 The embargo answers a different question and is answered elsewhere. A document
 about disclosed flaws can be unfinished, and one about an embargoed flaw can be
@@ -484,8 +489,10 @@ from when each flaw was named on it and taken off.
 | An agreement names an edition | A second pair of eyes reads particular words. One naming the advisory would still be standing after somebody rewrote them, and nothing would report that (REQ-24 and REQ-28) |
 | Retitling, naming a flaw and taking one off each open a new edition | All three change what the document says. An approver read a document covering three flaws, and a fourth added under their agreement is one nobody read |
 | Opening an edition takes back every agreement standing on the one it replaced | The record says a second person did once agree, and to which edition |
+| Changing what an advisory says needs a triage role on every product it covers | An advisory is read whole or not at all, so what it says about one product is part of the same document as what it says about another. Retitling, agreeing, taking an agreement back, and naming or removing a flaw all ask for it |
+| The roles that may agree are the triage pair rather than the approver role a claim takes | Agreeing to an advisory is agreeing to a statement about every product it covers, which is what the triage roles are held per product for |
 | Neither the person who started the advisory nor the author of the edition standing may agree to it | Whoever started it chose the name a reader cites it by and, in the ordinary case, the flaws it covers. There is no override, so a deployment with one person publishes no advisory — the control working rather than a gap in it |
-| Taking an agreement back is a person's act and needs no agreement of its own | An edit takes one back because the words moved; this is somebody saying they no longer agree to words that have not. It stops a document going out, which exposes the question rather than hiding it |
+| Taking an agreement back is an act of anybody who may change what the advisory says, and takes back every agreement standing | What it stops is the document going out rather than one person's opinion of it, so it needs no agreement of its own |
 | An advisory goes out once an agreement stands on what it says | The text is the company speaking. Whether the flaws behind it are public is not asked: an advisory about an embargoed flaw sent to a coordinating body is what coordinated disclosure is made of, and the distribution label is what keeps it safe |
 | An issuance names the edition that went out | The advisory moves on and what was published does not, so a record of March's document read through the advisory answers with June's title |
 
@@ -612,7 +619,7 @@ and could not increment its version, both of which CSAF validators check.
 | Rule | Reason |
 |---|---|
 | It is a fact about a moment | What was published on a date cannot be worked out again once a release is added, a decision is revised or a fix lands |
-| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version, the revision history and the tracking status all move on generation or *because* of issuance. What is hashed is the title, the product tree and the vulnerabilities. The status leaves nothing unwatched: its other move is to `interim`, which follows a change to the words or the flaws covered, and both of those are hashed |
+| The digest covers what the document says, not the whole document | The current release date, the generator's date, the version and the revision history all move on generation or *because* of issuance, and the tracking status follows the agreement rather than the words. What is hashed is the title, the product tree and the vulnerabilities |
 | The digest is taken from the document generated here | A caller-supplied digest is a digest of whatever they say, and both sides of the comparison must come from the same place |
 | The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
 | A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |

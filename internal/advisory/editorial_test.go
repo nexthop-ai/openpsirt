@@ -207,9 +207,13 @@ func TestTheDocumentSaysWhereItIsInItsLifeRatherThanWhetherItIsEmbargoed(t *test
 			}
 		}
 
-		says(t, "before anything has gone out", "draft")
+		says(t, "with nobody agreeing and nothing published", "draft")
+
+		// Final before it has gone out, because this is the file the operator
+		// sends. Asked the other way round the one document that actually
+		// leaves says it is a draft.
 		f.agreed(t, named)
-		says(t, "agreed to but not yet published", "draft")
+		says(t, "agreed to and not yet published", "final")
 
 		if _, err := f.store.Issued(ctx, f.who, issuer, named, "First"); err != nil {
 			t.Fatal(err)
@@ -224,6 +228,13 @@ func TestTheDocumentSaysWhereItIsInItsLifeRatherThanWhetherItIsEmbargoed(t *test
 
 		f.agreed(t, named)
 		says(t, "published and agreed to again", "final")
+
+		// And taking the agreement back reaches interim without a word
+		// moving, which is the arm the edit above cannot tell apart.
+		if err := f.store.Withdraw(ctx, f.approver, named); err != nil {
+			t.Fatal(err)
+		}
+		says(t, "published with the agreement taken back", "interim")
 	})
 }
 
@@ -350,11 +361,56 @@ func TestChangingWhatAnAdvisorySaysNeedsTheRoleOnEveryProductItCovers(t *testing
 		if err := f.store.Withdraw(ctx, partly, named); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("taking an agreement back with triage on one of two answered %v", err)
 		}
+		// Naming a flaw and taking one off are on this list because both open
+		// an edition and take back every agreement standing on the whole
+		// advisory. Checked against the product in the request alone, the
+		// person above could undo a second person's agreement to a document
+		// about a product they only read — by acting on the one they triage.
+		another := f.recorded(t, f.master)
+		if _, err := f.store.Add(ctx, partly, named, "sonic", another); !errors.Is(
+			err, access.ErrDenied) {
+			t.Errorf("naming a flaw with triage on one of two products answered %v", err)
+		}
+		if err := f.store.Drop(ctx, partly, named, "sonic", here); !errors.Is(
+			err, access.ErrDenied) {
+			t.Errorf("taking a flaw off with triage on one of two products answered %v", err)
+		}
 
 		// And somebody holding it on both may, which says the refusals are
 		// the missing role rather than the path being shut.
 		if _, err := f.store.Approve(ctx, f.approver, named); err != nil {
 			t.Errorf("somebody triaging both products could not agree: %v", err)
+		}
+	})
+}
+
+// TestRetitlingRunsTheSubmissionPolicyBeforeStoring holds the invariant every
+// path that stores typed text is held to.
+//
+// A title is our own prose and it reaches the published document verbatim.
+// Retitling is a new such path, and the policy is enforced at submission
+// rather than at render because nothing on the server renders.
+func TestRetitlingRunsTheSubmissionPolicyBeforeStoring(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		if _, _, err := f.store.Retitle(ctx, f.who, named, "What it is called"); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, _, err := f.store.Retitle(ctx, f.who, named,
+			"Slipping <script>alert(1)</script> past it"); err == nil {
+			t.Error("raw HTML in a title was stored")
+		}
+		// And the title it had is the title it still has, which is what says
+		// the refusal happened before the write rather than after it.
+		row, _, err := f.store.Covers(ctx, f.who, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.Title != "What it is called" {
+			t.Errorf("the advisory is called %q after a refused retitle", row.Title)
 		}
 	})
 }

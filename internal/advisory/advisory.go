@@ -110,9 +110,9 @@ type Issuer struct {
 // Tracking is the document's identity and where it is in its life.
 type Tracking struct {
 	ID string `json:"id"`
-	// Status is where the document is in its life: draft until it has gone
-	// out, final once it has and a second person agrees to what it says now,
-	// interim where it has gone out and has been edited since.
+	// Status is where the document is in its life: final where a second
+	// person agrees to what it says now, interim where it has gone out and
+	// nobody agrees to what it says now, draft before either.
 	//
 	// The one field a reader of a CSAF document checks before acting on it,
 	// so it answers what they are asking — whether this is the publisher's
@@ -683,29 +683,22 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	// what keeps it safe is the distribution label the document carries —
 	// RED while anything it covers is held back, whatever its editorial
 	// state says.
-	agreed, err := s.agreed(ctx, row)
-	if err != nil {
-		return nil, err
-	}
-	if len(agreed) == 0 {
-		return nil, ErrNotAgreed
-	}
 	// Hashed over what the document *says*, with the parts that move for
 	// reasons other than the content left out.
 	//
 	// The question this answers is "is what is published still what we would
 	// generate", and every one of these makes that unanswerable: the current
 	// release date and the generator's date change every time it is asked for;
-	// the version, the revision history and the status change *because* it
-	// was issued, so a document hashed with them can never match the digest
-	// of the issuance before it, however unchanged its substance. What is
-	// left is the title, the notes, the product tree and the vulnerability —
-	// which is the part a reader acts on and the part that must not have
-	// quietly moved.
+	// the version and the revision history change *because* it was issued, so
+	// a document hashed with them can never match the digest of the issuance
+	// before it, however unchanged its substance. What is left is the title,
+	// the notes, the product tree and the vulnerability — which is the part a
+	// reader acts on and the part that must not have quietly moved.
 	//
-	// The status leaves nothing unwatched. Its other move is to interim,
-	// which happens when the words or the flaws covered change — and both of
-	// those are hashed, so the digest reports the change that caused it.
+	// The status follows the agreement rather than the words. Taking one back
+	// moves a published document to interim with nothing a reader acts on
+	// having changed, and giving it again moves it back, so a digest carrying
+	// it would report a difference in substance where there is none.
 	settled := *doc
 	settled.Document.Tracking.CurrentReleaseDate = time.Time{}
 	settled.Document.Tracking.Generator = nil
@@ -725,8 +718,36 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// into the model and the ordinal below is read from the database. A
 		// retry of a rolled-back attempt would re-insert a model carrying both
 		// of that attempt's answers.
+		// The agreement is read here rather than before the transaction
+		// opened. A retitle or a withdrawal committing in between would
+		// otherwise leave an issuance recorded with nothing standing, which
+		// is the control this exists for.
+		//
+		// The edition is compared as well as counted: the document above was
+		// hashed against the edition this advisory pointed at, and one that
+		// moved since means the digest describes a document that is no
+		// longer what would be generated.
+		var at Advisory
+		if err := tx.NewSelect().Model(&at).
+			Where("id = ?", row.ID).Limit(1).Scan(ctx); err != nil {
+			return err
+		}
+		if at.EditionID == nil || row.EditionID == nil || *at.EditionID != *row.EditionID {
+			return ErrNotAgreed
+		}
+		var standing int
+		if err := tx.NewSelect().Model((*Approval)(nil)).
+			ColumnExpr("COUNT(*)").
+			Where("edition_id = ?", *at.EditionID).
+			Where("withdrawn_at IS NULL").
+			Scan(ctx, &standing); err != nil {
+			return err
+		}
+		if standing == 0 {
+			return ErrNotAgreed
+		}
 		recorded = &Issuance{
-			AdvisoryID: row.ID, EditionID: agreed[0].EditionID,
+			AdvisoryID: row.ID, EditionID: *at.EditionID,
 			Digest: hex.EncodeToString(sum[:]), Summary: summary,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
@@ -744,6 +765,9 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		_, err := tx.NewInsert().Model(recorded).Exec(ctx)
 		return err
 	})
+	if errors.Is(err, ErrNotAgreed) {
+		return nil, err
+	}
 	if err != nil {
 		return nil, fmt.Errorf("record that it went out: %w", err)
 	}
