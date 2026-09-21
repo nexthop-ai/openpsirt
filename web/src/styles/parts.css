@@ -903,6 +903,33 @@ button.vchip {
   }
 }
 
+/* ---------- waiting ---------- */
+
+/* The word a screen shows while it waits, with a mark that turns beside it.
+   The word alone is one faint line on a page that is otherwise still, and a
+   still page reads as a stopped one. The frame's reduced-motion rule stops
+   the turning, and a still ring beside the word is still a mark. */
+.loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.loading::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  animation: turning 0.9s linear infinite;
+}
+@keyframes turning {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* The list a bulk judgment is picked out of. Bounded, because a page here is
    five hundred rows — a kernel carries thousands and assembling one claim a
    page at a time is eighteen claims where the person meant one — and the form
@@ -1007,6 +1034,47 @@ button.vchip {
   border: 0;
   border-radius: 0;
   background: none;
+}
+/* A table wider than its box says so, at every width. It scrolls sideways,
+   which is discoverable once somebody knows it is a table and not once they
+   think the page is cut off — so the table says which it is, pinned so the
+   note stays put while the table moves.
+
+   Only the ones that are actually wider. The attribute is set by the
+   component when it measures itself past its box, because a stylesheet
+   cannot ask: saying it over a two-column table that fits is a note about
+   scrolling on something nobody can scroll, which teaches people to stop
+   reading the notes. */
+.tablewrap[data-wider]::before {
+  content: "This table scrolls sideways.";
+  display: block;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: var(--step--1);
+  position: sticky;
+  left: 0;
+}
+/* The clipped edge is shaded, so the overflow shows before the note is read.
+   Drawn as the box's own background rather than a shadow: a shadow inset on
+   a scrolling box moves with the rows, and a background does not. The rows
+   are transparent over it, which is what lets it show through. */
+.tablewrap[data-clipped="right"] {
+  background-image: linear-gradient(to left, var(--shade), transparent 28px);
+}
+.tablewrap[data-clipped="left"] {
+  background-image: linear-gradient(to right, var(--shade), transparent 28px);
+}
+.tablewrap[data-clipped="both"] {
+  background-image:
+    linear-gradient(to left, var(--shade), transparent 28px),
+    linear-gradient(to right, var(--shade), transparent 28px);
+}
+/* A box that scrolls takes a tab stop, so the arrow keys move it; the ring
+   says it has one. */
+.tablewrap[data-wider]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 table {
   border-collapse: collapse;

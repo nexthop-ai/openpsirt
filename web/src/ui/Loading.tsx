@@ -8,6 +8,12 @@
 //
 // `inline` is for waiting inside a line of text rather than in place of a
 // block, which is the one real variation the thirty-nine had between them.
+//
+// A mark that moves sits beside the word. The word alone is one line of faint
+// text on a page that is otherwise still, and a page that is still reads as a
+// page that has stopped; the eye finds movement where it does not find a
+// sentence. The mark is drawn by the stylesheet and carries no text of its
+// own, so a screen reader hears the word once.
 export function Loading({ inline = false }: { inline?: boolean }) {
   const said = "Loading…";
   // Announced politely: a reader using a screen reader otherwise hears nothing
@@ -15,13 +21,13 @@ export function Loading({ inline = false }: { inline?: boolean }) {
   // did nothing.
   if (inline) {
     return (
-      <span className="hint" role="status">
+      <span className="hint loading" role="status">
         {said}
       </span>
     );
   }
   return (
-    <p className="hint" role="status">
+    <p className="hint loading" role="status">
       {said}
     </p>
   );
