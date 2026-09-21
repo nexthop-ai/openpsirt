@@ -184,12 +184,24 @@ ingress:
           pathType: Prefix
   tls: []
 
+# Sized for two processes, not one. The server reads a document within the
+# ingest bounds, and it also execs the scanner, which is a child in the same
+# cgroup — so the scanner's own memory comes out of this number. Sized for the
+# server alone, the kernel picks the scanner as the process to kill, and the
+# scan fails as a run that failed while the pod stays up.
+#
+# The largest single draw is the scanner importing its vulnerability database,
+# which happens on every start unless the cache below is kept. Keep the cache
+# and the steady state is much lower than the ceiling here.
+#
+# Raise both together with the ingest bounds. `OPENPSIRT_INGEST_*` allows about
+# 250 MB for one document being read, and that is the server's half.
 resources:
   requests:
     cpu: 100m
-    memory: 128Mi
-  limits:
     memory: 512Mi
+  limits:
+    memory: 2Gi
 
 # Nothing here needs root, a writable filesystem, or any capability.
 podSecurityContext:
@@ -249,8 +261,31 @@ scanner:
   # changing it here without changing it there leaves the data on the
   # read-only root filesystem, where it cannot be written.
   cacheDir: /var/cache/openpsirt/grype
+  # Keeping the vulnerability database across restarts is the difference
+  # between importing it once and importing it on every start. The import is
+  # the largest thing this pod does with memory, so a deployment that restarts
+  # is a deployment that pays that peak repeatedly — which is what the
+  # resources above have to be large enough to survive.
+  #
+  # Scratch space is the default, so an install needs no storage to work.
   persistence:
-    # Empty means scratch space that lives as long as the pod: correct, and it
-    # re-downloads the database on every start. Name a claim to keep it.
+    # Have the chart create the claim. Off by default: a chart that provisions
+    # storage on an upgrade surprises an installation that had none.
+    #
+    # The access mode has to match replicaCount. ReadWriteOnce is one node, so
+    # more than one replica needs ReadWriteMany, a storage class that allows
+    # it, or a replicaCount of 1 — otherwise the pods that do not land on the
+    # volume's node stay Pending. Render-time refusals catch the pairing the
+    # chart can see.
+    enabled: false
+    # Empty takes the cluster's default class.
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi
+    # A claim made elsewhere, used instead of one this chart creates. Set this
+    # and `enabled` is not consulted.
     existingClaim: ""
-    sizeLimit: 5Gi
+    # The bound on the scratch space used when neither of the two above is
+    # set. It is node disk, so it is bounded rather than left open.
+    sizeLimit: 10Gi

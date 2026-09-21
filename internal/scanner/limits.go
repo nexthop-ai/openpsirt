@@ -11,7 +11,9 @@ package scanner
 //
 // The shape is the one `sbom.Limits` has, for the same reason and against the
 // same budget: a document being read costs several times what it measures on
-// disk, and the chart ships a 512 MiB limit.
+// disk. What bounds neither is the scanner's own memory, which is a separate
+// process in the same cgroup — so the container's limit covers a report being
+// read here and the program that produced it at the same time.
 type Limits struct {
 	// MaxOutput is how many bytes of report a run may produce. Past it the
 	// run fails rather than being read in part: half a report is a product

@@ -105,10 +105,9 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 		return Result{}, fmt.Errorf("the scanner wrote more than the %d byte report limit",
 			limits.MaxOutput)
 	}
-	// Read from the buffer rather than from a copy of it. The ceiling on a
-	// report is about half of what the chart ships for the whole process, so
-	// a second full copy taken to read from spends the other half — which is
-	// the thing the ceiling was chosen to prevent.
+	// Read from the buffer rather than from a copy of it. A second full copy
+	// taken to read from doubles the report's peak, at the moment the process
+	// that produced it may not have exited yet.
 	result, err := ParseGrype(bytes.NewReader(out.Bytes()), limits)
 	if err != nil {
 		return Result{}, err

@@ -1,0 +1,28 @@
+{{- if and .Values.scanner.persistence.enabled (not .Values.scanner.persistence.existingClaim) }}
+{{- /*
+The scanner's vulnerability database, kept across restarts.
+
+A claim of its own rather than a volume claim template, because this is a
+Deployment: every replica mounts this one claim, which is why the access mode
+has to allow as many nodes as there are replicas. A claim made elsewhere wins
+over this one, so an installation that already had storage keeps it.
+
+It outlives an uninstall. The data is re-downloadable and the claim is not
+worth deleting by surprise, so the resource policy keeps it.
+*/}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openpsirt.fullname" . }}-scanner-cache
+  labels: {{- include "openpsirt.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: {{- toYaml .Values.scanner.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.scanner.persistence.size }}
+  {{- if .Values.scanner.persistence.storageClass }}
+  storageClassName: {{ .Values.scanner.persistence.storageClass }}
+  {{- end }}
+{{- end }}

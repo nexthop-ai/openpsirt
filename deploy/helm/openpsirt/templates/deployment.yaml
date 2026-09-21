@@ -16,6 +16,12 @@
 {{- if and .Values.database.url (regexMatch "^(sqlite|sqlite3|file):" (lower .Values.database.url)) (gt (int .Values.replicaCount) 1) }}
 {{- fail (printf "database.url is SQLite and replicaCount is %d: SQLite is one file on one pod, so a second replica would start with an empty database of its own rather than share this one. Use PostgreSQL, MySQL or MariaDB, or set replicaCount to 1 for a single-pod trial" (int .Values.replicaCount)) }}
 {{- end }}
+{{- if and .Values.scanner.persistence.enabled (not .Values.scanner.persistence.existingClaim) (gt (int .Values.replicaCount) 1) (not (has "ReadWriteMany" .Values.scanner.persistence.accessModes)) }}
+{{- fail (printf "scanner.persistence is enabled with replicaCount %d and no ReadWriteMany access mode: every replica mounts the one claim this chart makes, so on storage that binds to a single node the replicas that land elsewhere stay Pending. Add ReadWriteMany, name scanner.persistence.existingClaim per replica set, or set replicaCount to 1" (int .Values.replicaCount)) }}
+{{- end }}
+{{- if and .Values.scanner.persistence.enabled .Values.scanner.persistence.existingClaim }}
+{{- fail "set scanner.persistence.enabled or scanner.persistence.existingClaim, not both: the claim this chart would make is not created when you name one of your own, so enabling it here would be silently ignored" }}
+{{- end }}
 {{- if not .Values.auth.bootstrapAdmins }}
 {{- fail "set auth.bootstrapAdmins: the process refuses to start until somebody can administer it, and a deployment nobody can administer has one route back in — editing the database by hand" }}
 {{- end }}
@@ -233,6 +239,9 @@ spec:
           {{- if .Values.scanner.persistence.existingClaim }}
           persistentVolumeClaim:
             claimName: {{ .Values.scanner.persistence.existingClaim }}
+          {{- else if .Values.scanner.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "openpsirt.fullname" . }}-scanner-cache
           {{- else }}
           emptyDir:
             sizeLimit: {{ .Values.scanner.persistence.sizeLimit }}

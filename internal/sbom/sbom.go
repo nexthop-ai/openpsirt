@@ -62,24 +62,27 @@ type Limits struct {
 // which is the right instinct and the wrong unit: measured, an edge holds
 // about half a kilobyte of heap while it is being read and a component about
 // one and a third, so the old ceilings — two million edges and a quarter of a
-// million components — accepted a document that took about 1.3 GB. The chart
-// ships a 512 MiB limit. A file nobody could have meant was therefore
-// guaranteed to kill the process, in the background reader that runs *after*
-// the upload was answered 202: the uploader is told it worked, and the
-// container restarts.
+// million components — accepted a document that took about 1.3 GB. A file
+// nobody could have meant was therefore guaranteed to kill the process, in the
+// background reader that runs *after* the upload was answered 202: the
+// uploader is told it worked, and the container restarts.
 //
-// So the budget is about half the shipped limit for one document being read,
-// which is roughly 250 MB, and these are what fits in it. They remain several
-// times the largest producer we have — tens of megabytes and tens of thousands
-// of components — and every one of them is configurable, for a deployment with
-// a bigger box and a bigger inventory.
+// So the budget is roughly 250 MB for one document being read, and these are
+// what fits in it. They remain several times the largest producer we have —
+// tens of megabytes and tens of thousands of components — and every one of
+// them is configurable, for a deployment with a bigger box and a bigger
+// inventory.
+//
+// This is the server's share of the pod rather than the whole of it. The
+// scanner is a child process in the same cgroup and its memory is not counted
+// here, so the container's limit covers both and is the larger number.
 //
 // Measured at these ceilings: 124 MB of edges, 73 MB of components and 63 MB
 // of cataloged paths, which is 260 MB if one document reached every ceiling
 // at once. No real document does — the format that catalogs paths is not the
-// one with the deepest graph — and the figure that matters is that it stays
-// well inside the 512 MiB the chart ships rather than several times past it,
-// which is where it was.
+// one with the deepest graph — and the figure that matters is that it stays a
+// share of what the chart ships rather than several times past it, which is
+// where it was.
 //
 // A file is bounded separately from a component, and measured rather than
 // assumed: a real scan catalogs 4,964 files against 89 packages on one image
