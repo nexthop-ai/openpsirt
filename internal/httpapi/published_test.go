@@ -53,6 +53,7 @@ func TestAnAdvisoryAboutAnUndisclosedFlawIsNotListedToSomebodyWhoMayNotReadIt(t 
 			t.Fatalf("something was published before anything was: %+v", rows)
 		}
 		named := advisoryOver(t, r, "private-triage", "mine", recorded.Identifier)
+		agreedTo(t, r, "/v1/advisories/"+named)
 		out := asPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/advisories/"+named+"/issuance",
 			`{"summary":"Sent to the coordinating body."}`)

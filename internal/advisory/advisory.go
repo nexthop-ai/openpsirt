@@ -110,12 +110,15 @@ type Issuer struct {
 // Tracking is the document's identity and where it is in its life.
 type Tracking struct {
 	ID string `json:"id"`
-	// Status is draft while nobody outside has been told.
+	// Status is where the document is in its life: final where a second
+	// person agrees to what it says now, interim where it has gone out and
+	// nobody agrees to what it says now, draft before either.
 	//
-	// Reaching a disclosure date discloses nothing — it escalates, and a
-	// person decides — so a document about an undisclosed flaw is prepared
-	// rather than issued, and says so in the one field a reader of a CSAF
-	// document checks before acting on it.
+	// The one field a reader of a CSAF document checks before acting on it,
+	// so it answers what they are asking — whether this is the publisher's
+	// settled word — rather than whether the flaws behind it are public.
+	// How far the document may travel is the distribution label, which is
+	// where the embargo is answered.
 	Status             string     `json:"status"`
 	Version            string     `json:"version"`
 	InitialReleaseDate time.Time  `json:"initial_release_date"`
@@ -301,6 +304,14 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	if err != nil {
 		return nil, nil, err
 	}
+	// Where the document is in its life, read from what people did about it.
+	// Published or not, and whether a second person agrees to what it says
+	// now — never from the embargo, which answers a different question and
+	// which the distribution label below still asks.
+	agreed, err := s.agreed(ctx, row)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	now := s.now().UTC()
 	assembled := &assembly{who: who, seen: map[string]bool{}}
@@ -334,7 +345,7 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 			// identifier as its own tracking identifier claims to be the
 			// authority on that issue, which a coordinator is and this
 			// deployment is not.
-			ID: row.Identifier, Status: assembled.status(),
+			ID: row.Identifier, Status: statusOf(len(gone) > 0, len(agreed) > 0),
 			// The number of the last entry in the history below, rather than
 			// a second count of the same thing. Counted separately the two
 			// disagree the moment an advisory has been issued once: the
@@ -355,7 +366,7 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 		},
 	}
 	doc.Document.References = assembled.pointers
-	doc.Document.Distribution = distributionFor(doc.Document.Tracking.Status)
+	doc.Document.Distribution = distributionFor(assembled.undisclosed)
 	doc.ProductTree = ProductTree{Branches: []Branch{{
 		Category: "vendor", Name: who.Name, Branches: assembled.products,
 	}}}
@@ -387,18 +398,6 @@ type assembly struct {
 	// any of them is still held back.
 	opened      time.Time
 	undisclosed bool
-}
-
-// status is what the document's tracking says about where it is in its life.
-//
-// Read from the disclosure of the issues it covers rather than from a decision
-// somebody made about the document. Reaching a disclosure date discloses
-// nothing, so a document about anything still held back says it is a draft.
-func (a *assembly) status() string {
-	if a.undisclosed {
-		return "draft"
-	}
-	return "final"
 }
 
 // titleOf is what the document calls itself.
@@ -627,6 +626,11 @@ type Issuance struct {
 	// document's version says, and a validator checks that a revised document
 	// carries a higher one than the last.
 	Ordinal int `bun:"ordinal,notnull"`
+	// EditionID is the edition that went out, which is a fact about a
+	// moment. The advisory moves on and what was published does not, so a
+	// record of what went out in March asked of the advisory today answers
+	// with June's title.
+	EditionID int64 `bun:"edition_id,notnull"`
 	// Digest is what went out, hashed. The document itself belongs to
 	// whoever published it; this is what makes "is what is published still
 	// what we generated" a question with a yes or no.
@@ -665,6 +669,20 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	if err != nil {
 		return nil, err
 	}
+	// A second person has agreed to what it says, checked here because this
+	// is the act of the document leaving. Generating one is reading;
+	// recording that it went out is the publication.
+	//
+	// The text is the company speaking, and an advisory that went out on one
+	// person's word is the control this deployment applies to a dismissal of
+	// a single finding not being applied to the document a customer acts on.
+	//
+	// Whether the flaws behind it are public is a separate question and is
+	// not asked here. An advisory about an embargoed flaw sent to a
+	// coordinating body is the case coordinated disclosure is made of, and
+	// what keeps it safe is the distribution label the document carries —
+	// RED while anything it covers is held back, whatever its editorial
+	// state says.
 	// Hashed over what the document *says*, with the parts that move for
 	// reasons other than the content left out.
 	//
@@ -676,10 +694,16 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	// before it, however unchanged its substance. What is left is the title,
 	// the notes, the product tree and the vulnerability — which is the part a
 	// reader acts on and the part that must not have quietly moved.
+	//
+	// The status follows the agreement rather than the words. Taking one back
+	// moves a published document to interim with nothing a reader acts on
+	// having changed, and giving it again moves it back, so a digest carrying
+	// it would report a difference in substance where there is none.
 	settled := *doc
 	settled.Document.Tracking.CurrentReleaseDate = time.Time{}
 	settled.Document.Tracking.Generator = nil
 	settled.Document.Tracking.Version = ""
+	settled.Document.Tracking.Status = ""
 	settled.Document.Tracking.RevisionHistory = nil
 	body, err := json.Marshal(settled)
 	if err != nil {
@@ -694,9 +718,37 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		// into the model and the ordinal below is read from the database. A
 		// retry of a rolled-back attempt would re-insert a model carrying both
 		// of that attempt's answers.
+		// The agreement is read here rather than before the transaction
+		// opened. A retitle or a withdrawal committing in between would
+		// otherwise leave an issuance recorded with nothing standing, which
+		// is the control this exists for.
+		//
+		// The edition is compared as well as counted: the document above was
+		// hashed against the edition this advisory pointed at, and one that
+		// moved since means the digest describes a document that is no
+		// longer what would be generated.
+		var at Advisory
+		if err := tx.NewSelect().Model(&at).
+			Where("id = ?", row.ID).Limit(1).Scan(ctx); err != nil {
+			return err
+		}
+		if at.EditionID == nil || row.EditionID == nil || *at.EditionID != *row.EditionID {
+			return ErrNotAgreed
+		}
+		var standing int
+		if err := tx.NewSelect().Model((*Approval)(nil)).
+			ColumnExpr("COUNT(*)").
+			Where("edition_id = ?", *at.EditionID).
+			Where("withdrawn_at IS NULL").
+			Scan(ctx, &standing); err != nil {
+			return err
+		}
+		if standing == 0 {
+			return ErrNotAgreed
+		}
 		recorded = &Issuance{
-			AdvisoryID: row.ID,
-			Digest:     hex.EncodeToString(sum[:]), Summary: summary,
+			AdvisoryID: row.ID, EditionID: *at.EditionID,
+			Digest: hex.EncodeToString(sum[:]), Summary: summary,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
 		// Scanned into a value rather than read through a cursor: a cursor
@@ -713,6 +765,9 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		_, err := tx.NewInsert().Model(recorded).Exec(ctx)
 		return err
 	})
+	if errors.Is(err, ErrNotAgreed) {
+		return nil, err
+	}
 	if err != nil {
 		return nil, fmt.Errorf("record that it went out: %w", err)
 	}

@@ -52,8 +52,21 @@ type fixture struct {
 	// whoever did it, which passes a refusal test for the wrong reason.
 	second *access.Account
 	who    access.Subject
-	seq    int
-	built  time.Time
+	// approver is that second person with the roles to agree to an advisory.
+	// Every issuance goes through them, because the person who wrote what a
+	// document says may not be the one who agrees to it.
+	approver access.Subject
+	seq      int
+	built    time.Time
+}
+
+// agreed has the second person agree to what the advisory says, which is what
+// an issuance asks for.
+func (f *fixture) agreed(t *testing.T, named string) {
+	t.Helper()
+	if _, err := f.store.Approve(t.Context(), f.approver, named); err != nil {
+		t.Fatalf("agreeing to %s: %v", named, err)
+	}
 }
 
 // document generates the advisory for one issue in one product, through an
@@ -123,6 +136,11 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
 				second.ID:    {access.PublicRead, access.PrivateRead, access.PrivateTriage},
 			}, 0),
+			approver: access.NewPerson(another.ID, another.Identity, false,
+				map[int64][]access.Role{
+					w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+					second.ID:    {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				}, 0),
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		}
 		f.shipped(t, f.master)
@@ -373,7 +391,9 @@ func (f *fixture) alsoIn(t *testing.T, identifier string, target int64) {
 func TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		// Disclosed, so the document is final rather than a draft.
+		// Disclosed, so the document may travel. The distribution label is
+		// RED while anything it covers is held back, whatever the document's
+		// editorial state says.
 		_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
 			TargetIDs: []int64{f.master}, Component: carrier.Name, Severity: "high",
 			Summary:   "The management socket answers before anyone authenticated.",
@@ -428,19 +448,26 @@ func TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal(t *testing.
 				minted, alias, one.IDs)
 		}
 
-		// Disclosed, so it is a document rather than a draft of one.
-		if doc.Document.Tracking.Status != "final" {
-			t.Errorf("a disclosed flaw generates a %q document", doc.Document.Tracking.Status)
+		// Nothing has gone out, so it is a draft however public the flaw
+		// behind it is.
+		if doc.Document.Tracking.Status != "draft" {
+			t.Errorf("an unpublished document says %q", doc.Document.Tracking.Status)
 		}
 
 		// Issued with no summary, so the history says what happened rather
 		// than nothing.
+		f.agreed(t, named)
 		if _, err := f.store.Issued(ctx, f.who, issuer, named, ""); err != nil {
 			t.Fatal(err)
 		}
 		doc, err = f.store.ForAdvisory(ctx, f.who, issuer, named)
 		if err != nil {
 			t.Fatal(err)
+		}
+		// Out, and a second person agrees to what it says.
+		if doc.Document.Tracking.Status != "final" {
+			t.Errorf("a published document nobody has edited says %q",
+				doc.Document.Tracking.Status)
 		}
 		var said bool
 		for _, revision := range doc.Document.Tracking.RevisionHistory {
@@ -487,10 +514,13 @@ func TestTheDocumentsVersionIsTheLastNumberItsHistoryStates(t *testing.T) {
 		}
 
 		matches(t, "before anything has gone out")
+		f.agreed(t, named)
 		if _, err := f.store.Issued(ctx, f.who, issuer, named, "First"); err != nil {
 			t.Fatal(err)
 		}
 		matches(t, "after one issuance")
+		// No second agreement, because nothing has been edited since. An
+		// issuance does not spend the one standing; an edit takes it back.
 		if _, err := f.store.Issued(ctx, f.who, issuer, named, "Second"); err != nil {
 			t.Fatal(err)
 		}

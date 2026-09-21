@@ -691,12 +691,20 @@ var tables = []string{
 	"case_collaborator",
 	// Before person, vulnerability and product, all of which it points at.
 	"flaw_report",
-	// Before advisory and person, both of which it points at.
+	// Before advisory_edition, advisory and person, all of which it points
+	// at. The edition is what went out, which is a fact about a moment.
 	"advisory_issuance",
 	// Before advisory, product, vulnerability and person, all of which it
 	// points at.
 	"advisory_issue",
-	// After the two above, which point at it, and before person.
+	// Before advisory_edition, advisory and person, all of which it points
+	// at.
+	"advisory_approval",
+	// Before advisory and person, both of which it points at. The advisory
+	// points back at an edition with no foreign key, so only this direction
+	// has an order to keep.
+	"advisory_edition",
+	// After the four above, which point at it, and before person.
 	"advisory",
 	// Before person, which it points at.
 	"outbound",

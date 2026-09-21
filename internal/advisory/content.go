@@ -331,14 +331,17 @@ var packageIdentifier = regexp.MustCompile(`^pkg:[A-Za-z.\-+][A-Za-z0-9.\-+]*/.+
 
 // distributionFor is how far the document may travel.
 //
-// It follows the same fact the tracking status does: a document about a flaw
-// nobody outside has been told about is a draft, and handing a draft to
-// somebody who may pass it on is the disclosure the embargo exists to hold.
-// The labels are the standard's four, which is why a final document is WHITE
-// rather than the word the protocol renamed it to.
-func distributionFor(status string) *Distribution {
+// The embargo, read from the issues rather than from the tracking status.
+// Handing a document about a flaw nobody outside has been told about to
+// somebody who may pass it on is the disclosure the embargo exists to hold,
+// and that is true of a document at any point in its editorial life — a
+// finished one most of all.
+//
+// The labels are the standard's four, which is why a disclosed document is
+// WHITE rather than the word the protocol renamed it to.
+func distributionFor(undisclosed bool) *Distribution {
 	label := "WHITE"
-	if status == "draft" {
+	if undisclosed {
 		label = "RED"
 	}
 	return &Distribution{TLP: &TLP{Label: label, URL: tlpURL}}

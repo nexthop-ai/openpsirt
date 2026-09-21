@@ -164,7 +164,8 @@ export function IssueAdvisory({
             <span key={one.advisory}>
               {at > 0 && ", "}
               <span className="id">{one.advisory}</span>
-              {(one.issuances ?? 0) > 0 && ` (out ${one.issuances}\u00d7)`}
+              {` (${one.status})`}
+              {(one.issuances ?? 0) > 0 && ` · out ${one.issuances}\u00d7`}
             </span>
           ))}
           . Starting another says it twice.
@@ -216,9 +217,10 @@ export function IssueAdvisory({
 
           {document && (
             <>
-              {/* The tracking block is what a reader checks first: a document
-              about an undisclosed flaw is a draft and says so, and reaching a
-              disclosure date discloses nothing. */}
+              {/* The tracking block is what a reader checks first. The status
+              says where the document is in its life; how far it may travel is
+              the distribution label, which is red while anything it covers is
+              still held back. */}
               <p className="hint">
                 <span className="id">{document.document?.tracking?.id}</span> · version{" "}
                 {document.document?.tracking?.version} · {document.document?.tracking?.status}
@@ -245,6 +247,14 @@ export function IssueAdvisory({
                   {record.isPending ? "Recording…" : "Record that it went out"}
                 </button>
               </div>
+              {/* Said rather than offered. Whoever reaches this panel is the
+              person who just named the flaw on the advisory, and they are the
+              one agreeing refuses — a button leading to a refusal is worse
+              than no button. */}
+              <p className="hint">
+                A second person agrees to what it says before it goes out, which is not you: you
+                started this one.
+              </p>
               <p className="hint">
                 Recorded here, published elsewhere. What went out cannot be rebuilt later, and a
                 revision needs the record of the first.
