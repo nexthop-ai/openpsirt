@@ -266,12 +266,33 @@ func settledDigest(doc *Statements) (string, error) {
 // a document issued between the two would be published under a name this had
 // already said nothing was published under.
 func AnyIssuedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool, error) {
+	return anyIssuedWhere(ctx, db, "tg.variant_id = ?", variantID, "variant")
+}
+
+// AnyIssuedForStream reports whether a document has gone out for any variant of
+// one release.
+//
+// The release is inside the same identifier the variant is, for the same
+// reasons AnyIssuedForVariant gives.
+func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
+	return anyIssuedWhere(ctx, db, "tg.stream_id = ?", streamID, "release")
+}
+
+// AnyIssuedForProduct reports whether a document has gone out for any build of
+// one product.
+func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool, error) {
+	return anyIssuedWhere(ctx, db,
+		`"tg"."stream_id" IN (SELECT "id" FROM "stream" WHERE "product_id" = ?)`,
+		productID, "product")
+}
+
+func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, what string) (bool, error) {
 	issued, err := db.NewSelect().Model((*Issuance)(nil)).
 		Join(`JOIN "target" AS "tg" ON tg.id = vi.target_id`).
-		Where("tg.variant_id = ?", variantID).
+		Where(where, id).
 		Exists(ctx)
 	if err != nil {
-		return false, fmt.Errorf("read whether anything has gone out for this variant: %w", err)
+		return false, fmt.Errorf("read whether anything has gone out for this %s: %w", what, err)
 	}
 	return issued, nil
 }

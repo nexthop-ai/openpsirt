@@ -1898,6 +1898,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a product
+         * @description Takes a product out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays: its findings are still open, its decisions still stand, and the documents published for it still name it.
+         *
+         *     Its releases and variants are left as they are and go out of every list with it, because they are reached through the product. Declaring the product again brings it back with them.
+         *
+         *     Not an end-of-support date, which is beside this and says something else: a date records that support ended and hides nothing, because a release is asked about long after it stops being supported.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-product"];
+        options?: never;
+        head?: never;
+        /**
+         * Amend a product
+         * @description Corrects what a product is called. Both names are left alone where the request omits them.
+         *
+         *     The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, or an advisory covering it has been published: a reader who holds one matches it by that name, and the record of what went out names no name to correct. Retire the product and declare the intended one instead.
+         *
+         *     The displayed name is what screens show and what a document names the product in prose. Nothing is identified by it, so it may be corrected at any time.
+         *
+         *     Requires: administrator
+         */
+        patch: operations["amend-product"];
+        trace?: never;
+    };
     "/v1/products/{product}/comparison": {
         parameters: {
             query?: never;
@@ -2890,6 +2926,40 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a branch or tag
+         * @description Takes a release out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays. Declaring it again brings it back.
+         *
+         *     Not an end-of-support date, which is beside this: a date records that support ended and hides nothing, because a release is asked about long after it stops being supported. This says the release is not tracked here.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-stream"];
+        options?: never;
+        head?: never;
+        /**
+         * Amend a branch or tag
+         * @description Corrects what a release is called.
+         *
+         *     Refused once a VEX document has gone out for any build of this release, or a published advisory named it: a reader who holds one matches it by that name. A release cannot be retired and declared again as a way round that, because the second one holds none of this one's history.
+         *
+         *     Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from. Both say what a release is rather than what it is called.
+         *
+         *     Requires: administrator
+         */
+        patch: operations["amend-stream"];
         trace?: never;
     };
     "/v1/products/{product}/streams/{stream}/end-of-life": {
@@ -5004,6 +5074,28 @@ export interface components {
             variant: string;
             /** @description The version that build ships under this name, where it ships more than one */
             version?: string;
+        };
+        "Amend-productRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Amend-productRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What screens and documents should show instead. Omitted leaves it alone */
+            display_name?: string;
+            /** @description What scans and paths should call it instead. Omitted leaves it alone */
+            name?: string;
+        };
+        "Amend-streamRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Amend-streamRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What to call it instead */
+            name: string;
         };
         "Amend-variantRequest": {
             /**
@@ -7927,6 +8019,8 @@ export interface components {
             open: number;
             /** Format: int64 */
             overdue: number;
+            /** @description Whether the product has been taken out of use. Nothing filed against it is affected and no new scan is accepted */
+            retired?: boolean;
             /** @description The least severity this product triages, where the product states one of its own */
             triage_floor?: string;
             /** Format: int64 */
@@ -8276,6 +8370,8 @@ export interface components {
              * @description Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
+            /** @description Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted */
+            retired?: boolean;
             /**
              * Format: int64
              * @description The number of tags declared
@@ -12802,6 +12898,68 @@ export interface operations {
             };
         };
     };
+    "retire-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "amend-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Amend-productRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "compare-releases": {
         parameters: {
             query: {
@@ -14560,6 +14718,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeclaredStreamBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "amend-stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Amend-streamRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

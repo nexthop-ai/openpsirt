@@ -21,6 +21,11 @@ export function Products({ who }: { who: Who }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
+  // The product the edit drawer is open on, by its stored name. Empty is
+  // closed, so one piece of state answers both which row and whether.
+  const [editing, setEditing] = useState("");
+  const [renameTo, setRenameTo] = useState("");
+  const [showAs, setShowAs] = useState("");
   // Counted, and keyed as counted. What is open against each row is asked for
   // rather than always done, and a read that asked shares nothing with one
   // that did not — keyed the same, the picker's uncounted answer and this
@@ -44,6 +49,36 @@ export function Products({ who }: { who: Who }) {
       void queries.invalidateQueries({ queryKey: ["products"] });
     },
   });
+
+  const amend = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.PATCH("/v1/products/{product}", {
+          params: { path: { product: editing } },
+          body: {
+            ...(renameTo.trim() && renameTo.trim() !== editing ? { name: renameTo.trim() } : {}),
+            display_name: showAs.trim(),
+          },
+        }),
+      ),
+    onSuccess: () => {
+      setEditing("");
+      void queries.invalidateQueries({ queryKey: ["products"] });
+    },
+  });
+
+  const retire = useMutation({
+    mutationFn: async (product: string) =>
+      unwrap(await api.DELETE("/v1/products/{product}", { params: { path: { product } } })),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
+  });
+
+  const edit = (product: { name?: string; display_name?: string }) => {
+    setEditing(product.name ?? "");
+    setRenameTo(product.name ?? "");
+    setShowAs(product.display_name || product.name || "");
+    amend.reset();
+  };
 
   const setEndOfLife = useMutation({
     mutationFn: async ({ product, on }: { product: string; on: string }) =>
@@ -194,6 +229,29 @@ export function Products({ who }: { who: Who }) {
                       >
                         Manage
                       </Link>
+                      {who.admin && (
+                        <>
+                          {" "}
+                          <button
+                            type="button"
+                            className="linkish"
+                            title="Correct what it is called."
+                            onClick={() => edit(product)}
+                          >
+                            Edit
+                          </button>{" "}
+                          <button
+                            type="button"
+                            className="linkish"
+                            style={{ color: "var(--muted)" }}
+                            title="Take it out of use, with its releases and variants. Findings, decisions and published documents keep naming it."
+                            disabled={retire.isPending}
+                            onClick={() => retire.mutate(product.name ?? "")}
+                          >
+                            Retire
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 );
@@ -202,6 +260,36 @@ export function Products({ who }: { who: Who }) {
           </table>
         </Wide>
       )}
+
+      <Declare
+        title={`Edit ${editing}`}
+        open={editing !== ""}
+        onClose={() => setEditing("")}
+        onSubmit={() => amend.mutate()}
+        error={amend.error}
+        busy={amend.isPending || renameTo.trim() === "" || showAs.trim() === ""}
+        ok="Save"
+        hint="The name cannot be corrected once a document naming this product has gone out: readers hold it by that name. The shown name is not in any identifier and moves freely."
+      >
+        <Field
+          label="Name"
+          value={renameTo}
+          onChange={setRenameTo}
+          placeholder="sonic"
+          hint="What scans, paths and documents call it"
+        />
+        <Field
+          label="Shown as"
+          value={showAs}
+          onChange={setShowAs}
+          placeholder="SONiC"
+          hint="What screens and reports show"
+        />
+      </Declare>
+
+      {/* A refused retirement is said. Without it the button re-enables and
+          the row stays, which reads as nothing having happened. */}
+      {retire.error != null && <Failed error={retire.error} what="That could not be retired." />}
 
       <Declare
         title="Add product"

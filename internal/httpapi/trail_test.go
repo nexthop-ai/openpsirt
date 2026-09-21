@@ -241,6 +241,41 @@ var administrativeActs = []trailedAct{
 		kind: "catalog", about: "mine lab-bench",
 	},
 	{
+		// On a release and a product nothing else here reads, for the reason
+		// the variant acts above use one nothing is built as.
+		id: "amend-stream", what: "a release renamed", method: http.MethodPatch,
+		path: "/v1/products/spare/streams/old-line", body: `{"name":"retired-line"}`,
+		kind: "catalog", about: "spare old-line",
+		drive: func(t *testing.T, r *reach, seen *seeded) *httptest.ResponseRecorder {
+			asPerson(t, r, "admin", http.MethodPost, "/v1/products", `{"name":"spare"}`)
+			asPerson(t, r, "admin", http.MethodPost, "/v1/products/spare/streams",
+				`{"name":"old-line","kind":"branch"}`)
+			return asPerson(t, r, "admin", http.MethodPatch,
+				"/v1/products/spare/streams/old-line", `{"name":"retired-line"}`)
+		},
+	},
+	{
+		id: "retire-stream", what: "a release retired", method: http.MethodDelete,
+		path: "/v1/products/spare/streams/retired-line",
+		kind: "catalog", about: "spare retired-line",
+	},
+	{
+		id: "amend-product", what: "a product renamed", method: http.MethodPatch,
+		path: "/v1/products/spare", body: `{"name":"spare-parts"}`,
+		kind: "catalog", about: "spare",
+	},
+	{
+		id: "amend-product", what: "what a product is shown as",
+		method: http.MethodPatch, path: "/v1/products/spare-parts",
+		body: `{"display_name":"Spare Parts"}`,
+		kind: "catalog", about: "spare-parts",
+	},
+	{
+		id: "retire-product", what: "a product retired", method: http.MethodDelete,
+		path: "/v1/products/spare-parts",
+		kind: "catalog", about: "spare-parts",
+	},
+	{
 		id: "record-team", what: "a team", method: http.MethodPost, path: "/v1/teams",
 		body: `{"name":"kernel"}`, kind: "team", about: "kernel",
 	},

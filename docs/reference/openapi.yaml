@@ -328,6 +328,43 @@ components:
         - stream
         - variant
       type: object
+    Amend-productRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Amend-productRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        display_name:
+          description: What screens and documents should show instead. Omitted leaves it alone
+          maxLength: 191
+          type: string
+        name:
+          description: What scans and paths should call it instead. Omitted leaves it alone
+          maxLength: 191
+          type: string
+      type: object
+    Amend-streamRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Amend-streamRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        name:
+          description: What to call it instead
+          maxLength: 191
+          minLength: 1
+          type: string
+      required:
+        - name
+      type: object
     Amend-variantRequest:
       additionalProperties: false
       properties:
@@ -5634,6 +5671,9 @@ components:
         overdue:
           format: int64
           type: integer
+        retired:
+          description: Whether the product has been taken out of use. Nothing filed against it is affected and no new scan is accepted
+          type: boolean
         triage_floor:
           description: The least severity this product triages, where the product states one of its own
           type: string
@@ -6188,6 +6228,9 @@ components:
           description: Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
+        retired:
+          description: Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted
+          type: boolean
         tags:
           description: The number of tags declared
           format: int64
@@ -13698,6 +13741,73 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
+  /v1/products/{product}:
+    delete:
+      description: |-
+        Takes a product out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays: its findings are still open, its decisions still stand, and the documents published for it still name it.
+
+        Its releases and variants are left as they are and go out of every list with it, because they are reached through the product. Declaring the product again brings it back with them.
+
+        Not an end-of-support date, which is beside this and says something else: a date records that support ended and hides nothing, because a release is asked about long after it stops being supported.
+
+        Requires: administrator
+      operationId: retire-product
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Retire a product
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
+    patch:
+      description: |-
+        Corrects what a product is called. Both names are left alone where the request omits them.
+
+        The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, or an advisory covering it has been published: a reader who holds one matches it by that name, and the record of what went out names no name to correct. Retire the product and declare the intended one instead.
+
+        The displayed name is what screens show and what a document names the product in prose. Nothing is identified by it, so it may be corrected at any time.
+
+        Requires: administrator
+      operationId: amend-product
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Amend-productRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Amend a product
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
   /v1/products/{product}/comparison:
     get:
       description: |-
@@ -17631,6 +17741,81 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Create a branch or tag
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
+  /v1/products/{product}/streams/{stream}:
+    delete:
+      description: |-
+        Takes a release out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays. Declaring it again brings it back.
+
+        Not an end-of-support date, which is beside this: a date records that support ended and hides nothing, because a release is asked about long after it stops being supported. This says the release is not tracked here.
+
+        Requires: administrator
+      operationId: retire-stream
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Retire a branch or tag
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
+    patch:
+      description: |-
+        Corrects what a release is called.
+
+        Refused once a VEX document has gone out for any build of this release, or a published advisory named it: a reader who holds one matches it by that name. A release cannot be retired and declared again as a way round that, because the second one holds none of this one's history.
+
+        Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from. Both say what a release is rather than what it is called.
+
+        Requires: administrator
+      operationId: amend-stream
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Amend-streamRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Amend a branch or tag
       tags:
         - Catalog
       x-openpsirt-requires:

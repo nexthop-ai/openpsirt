@@ -69,7 +69,15 @@ type Product struct {
 	// when the default changed.
 	TriageFloor *string   `bun:"triage_floor"`
 	CreatedAt   time.Time `bun:"created_at,notnull"`
+	// RetiredAt is when this was taken out of use, or absent while it is in
+	// use. Beside EOLOn rather than instead of it: a support date hides
+	// nothing, and this takes the product out of every list and refuses new
+	// scans while everything filed against it still resolves.
+	RetiredAt *time.Time `bun:"retired_at"`
 }
+
+// Retired reports whether this product has been taken out of use.
+func (p Product) Retired() bool { return p.RetiredAt != nil }
 
 // Stream is a branch or a tag of a product.
 //
@@ -95,7 +103,13 @@ type Stream struct {
 	// that day.
 	ReleasedOn *time.Time `bun:"released_on"`
 	CreatedAt  time.Time  `bun:"created_at,notnull"`
+	// RetiredAt is when this was taken out of use, or absent while it is in
+	// use. Beside EOLOn for the reason the product's is.
+	RetiredAt *time.Time `bun:"retired_at"`
 }
+
+// Retired reports whether this release has been taken out of use.
+func (s Stream) Retired() bool { return s.RetiredAt != nil }
 
 // Variant is one of the ways a stream is built — a chip variant, an operating
 // system, an architecture.
@@ -751,10 +765,13 @@ type Named struct {
 	Product   string
 	Stream    string
 	Variant   string
-	// VariantRetired says the variant named here is out of use. Carried
-	// rather than refused inside the lookup, because resolving the names is
-	// how a document already issued for it is still found and how its
-	// findings are still read. Filing a scan is the one act that refuses.
+	// ProductRetired, StreamRetired and VariantRetired say which part of the
+	// build named here is out of use. Carried rather than refused inside the
+	// lookup, because resolving the names is how a document already issued
+	// for it is still found and how its findings are still read. Filing a
+	// scan is the one act that refuses.
+	ProductRetired bool
+	StreamRetired  bool
 	VariantRetired bool
 }
 
@@ -803,7 +820,7 @@ func (s *Store) Locate(ctx context.Context, product, stream, variant string) (*N
 	return &Named{
 		ProductID: p.ID, StreamID: st.ID, VariantID: v.ID,
 		Product: p.Name, Stream: st.Name, Variant: v.Name,
-		VariantRetired: v.Retired(),
+		ProductRetired: p.Retired(), StreamRetired: st.Retired(), VariantRetired: v.Retired(),
 	}, nil
 }
 

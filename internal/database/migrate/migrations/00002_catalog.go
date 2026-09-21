@@ -56,6 +56,11 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 			-- would stop following it when the default changes.
 			"triage_floor" ` + t.kind + ` NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
+			-- Out of use, the way a variant and a release are. Not eol_on
+			-- above: that says support ended and hides nothing, because an
+			-- auditor asks about a product long after it stops being
+			-- supported. This says the product is not tracked here.
+			"retired_at"   ` + t.timestamp + ` NULL,
 			CONSTRAINT "product_name_unique" UNIQUE ("name")
 		)` + t.suffix,
 
@@ -77,6 +82,11 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 			-- first scan of it stands in: something was built on that day.
 			"released_on" ` + t.date + ` NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
+			-- Out of use, the way a variant is. Separate from eol_on beside
+			-- it: a date says support ended and hides nothing, because an
+			-- auditor asks about a release long after it stops being
+			-- supported. This says the release is not tracked here.
+			"retired_at" ` + t.timestamp + ` NULL,
 			CONSTRAINT "stream_name_unique" UNIQUE ("product_id", "name"),
 			CONSTRAINT "stream_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "stream_parent_fk" FOREIGN KEY ("parent_id") REFERENCES "stream"("id")

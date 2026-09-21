@@ -26,6 +26,10 @@ export function Streams() {
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"branch" | "tag">("branch");
   const [parent, setParent] = useState("");
+  // The release the edit drawer is open on, by its stored name. Empty is
+  // closed, so one piece of state answers both which row and whether.
+  const [editing, setEditing] = useState("");
+  const [renameTo, setRenameTo] = useState("");
   const streams = useQuery({
     // Keyed as counted, so this and the picker's uncounted read of the same
     // list are two cache entries rather than a race between them.
@@ -57,6 +61,36 @@ export function Streams() {
       void queries.invalidateQueries({ queryKey: ["streams", product] });
     },
   });
+
+  const amend = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.PATCH("/v1/products/{product}/streams/{stream}", {
+          params: { path: { product, stream: editing } },
+          body: { name: renameTo.trim() },
+        }),
+      ),
+    onSuccess: () => {
+      setEditing("");
+      void queries.invalidateQueries({ queryKey: ["streams", product] });
+    },
+  });
+
+  const retire = useMutation({
+    mutationFn: async (stream: string) =>
+      unwrap(
+        await api.DELETE("/v1/products/{product}/streams/{stream}", {
+          params: { path: { product, stream } },
+        }),
+      ),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["streams", product] }),
+  });
+
+  const edit = (stream: { name?: string }) => {
+    setEditing(stream.name ?? "");
+    setRenameTo(stream.name ?? "");
+    amend.reset();
+  };
 
   const setEndOfLife = useMutation({
     mutationFn: async ({ stream, on }: { stream: string; on: string }) =>
@@ -244,6 +278,29 @@ export function Streams() {
                     >
                       Variants
                     </Link>
+                    {who.data?.admin && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          className="linkish"
+                          title="Correct what it is called."
+                          onClick={() => edit(stream)}
+                        >
+                          Edit
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="linkish"
+                          style={{ color: "var(--muted)" }}
+                          title="Take it out of use. Findings, decisions and published documents keep naming it. Not the same as an end-of-support date."
+                          disabled={retire.isPending}
+                          onClick={() => retire.mutate(stream.name ?? "")}
+                        >
+                          Retire
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -251,6 +308,29 @@ export function Streams() {
           </table>
         </Wide>
       )}
+
+      <Declare
+        title={`Edit ${editing}`}
+        open={editing !== ""}
+        onClose={() => setEditing("")}
+        onSubmit={() => amend.mutate()}
+        error={amend.error}
+        busy={amend.isPending || renameTo.trim() === ""}
+        ok="Save"
+        hint="Cannot be corrected once a document naming this release has gone out: readers hold it by that name. Whether it is a branch or a tag, and what a tag was cut from, are not changed here."
+      >
+        <Field
+          label="Name"
+          value={renameTo}
+          onChange={setRenameTo}
+          placeholder="master"
+          hint="What builds and scans call it"
+        />
+      </Declare>
+
+      {/* A refused retirement is said. Without it the button re-enables and
+          the row stays, which reads as nothing having happened. */}
+      {retire.error != null && <Failed error={retire.error} what="That could not be retired." />}
 
       <Declare
         title="Add branch or tag"

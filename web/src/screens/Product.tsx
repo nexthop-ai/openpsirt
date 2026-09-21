@@ -53,6 +53,20 @@ export function Product() {
         </p>
       </div>
 
+      {/* Nothing lists a retired product, so this page is reached by a link
+          somebody kept. Unmarked it reads as a product in use whose scans have
+          quietly stopped. Out of support is a different thing and says so
+          above: that is a date, and this is not tracked here at all. */}
+      {it.retired && (
+        <div className="alert info" style={{ marginBottom: 14 }}>
+          <strong>Retired</strong>
+          <span>
+            Nothing offers this product and no scan is accepted for it. What is here stays. Declare
+            it again to bring it back.
+          </span>
+        </div>
+      )}
+
       {/* The four numbers somebody asks for, each a link to the list that
           produced it. Overdue and waiting are the two that decide whether
           anything needs doing today.

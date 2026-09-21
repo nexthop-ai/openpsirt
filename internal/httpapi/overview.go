@@ -39,9 +39,13 @@ type OverviewOutput struct {
 		// where it inherits the deployment's line. Stated rather than left out:
 		// a number somebody chose and a number nobody noticed are different
 		// facts about the same screen.
-		TriageFloor string              `json:"triage_floor,omitempty" doc:"The least severity this product triages, where the product states one of its own"`
-		EndOfLife   string              `json:"end_of_life,omitempty" doc:"The date the product goes out of support, where one is set"`
-		Builds      []BuildStandingBody `json:"builds"`
+		TriageFloor string `json:"triage_floor,omitempty" doc:"The least severity this product triages, where the product states one of its own"`
+		EndOfLife   string `json:"end_of_life,omitempty" doc:"The date the product goes out of support, where one is set"`
+		// Retired says the product is out of use. The lists stop offering it,
+		// so the page is reached by a link somebody kept — and without this it
+		// reads as a product in use whose scans have quietly stopped.
+		Retired bool                `json:"retired,omitempty" doc:"Whether the product has been taken out of use. Nothing filed against it is affected and no new scan is accepted"`
+		Builds  []BuildStandingBody `json:"builds"`
 		// Open, Overdue and Undecided are the product's own totals, counted
 		// across its builds rather than summed over them. The findings list
 		// answers for a whole product as one row per issue and component, so
@@ -123,6 +127,7 @@ func registerOverview(api huma.API, in Ingest) {
 		out.Body.DisplayName = named.DisplayName
 		out.Body.TriageFloor = stated(named.TriageFloor)
 		out.Body.EndOfLife = onDate(named.EOLOn)
+		out.Body.Retired = named.Retired()
 		out.Body.Builds = make([]BuildStandingBody, 0, len(covered)+len(held))
 
 		// Every declared build, not only the ones carrying findings: a build

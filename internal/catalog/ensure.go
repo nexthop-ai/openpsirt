@@ -58,6 +58,13 @@ func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*P
 			return nil, false, fmt.Errorf("product %q: %w: it is displayed as %q, not %q",
 				name, ErrDiffers, existing.DisplayName, displayName)
 		}
+		if existing.Retired() {
+			if err := s.restoreProduct(ctx, existing.ID); err != nil {
+				return nil, false, err
+			}
+			existing.RetiredAt = nil
+			return existing, true, nil
+		}
 		return existing, false, nil
 	case !errors.Is(err, ErrNotFound):
 		return nil, false, err
@@ -99,6 +106,17 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 			return nil, false, fmt.Errorf("%q: %w: it was not cut from the branch now being named",
 				name, ErrDiffers)
 		}
+		// Declaring a retired one brings it back, the way a product and a
+		// variant come back. A pipeline runs this on every build and the name
+		// is still spoken for while retired.
+		back := false
+		if existing.Retired() {
+			if err := s.restoreStream(ctx, existing.ID); err != nil {
+				return nil, false, err
+			}
+			existing.RetiredAt = nil
+			back = true
+		}
 		// Filling in one that was never stated is not a change. It was
 		// left out, and there was no way to supply it afterwards — so a tag
 		// declared without it stayed that way, and release readiness, which
@@ -113,9 +131,9 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 				return nil, false, fmt.Errorf("record what %q was cut from: %w", name, err)
 			}
 			existing.ParentID = parentID
-			return existing, false, nil
+			return existing, back, nil
 		}
-		return existing, false, nil
+		return existing, back, nil
 	case !errors.Is(err, ErrNotFound):
 		return nil, false, err
 	}
@@ -197,7 +215,9 @@ func (s *Store) Products(ctx context.Context, subject access.Subject) ([]Product
 	}
 
 	var rows []Product
-	query := s.db.NewSelect().Model(&rows).Order("name")
+	query := s.db.NewSelect().Model(&rows).
+		Where(`"p"."retired_at" IS NULL`).
+		Order("name")
 	if !all {
 		query = query.Where("id IN (?)", bun.List(visible))
 	}
@@ -218,7 +238,9 @@ func (s *Store) Streams(ctx context.Context, subject access.Subject, productID i
 	}
 	var rows []Stream
 	err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).Order("kind", "name").Scan(ctx)
+		Where("product_id = ?", productID).
+		Where(`"s"."retired_at" IS NULL`).
+		Order("kind", "name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list streams: %w", err)
 	}

@@ -90,6 +90,10 @@ type ProductBody struct {
 	// EndOfLife is when support ends for every release that has not stated its
 	// own. Absent means nothing has said one, which reads as supported.
 	EndOfLife string `json:"end_of_life,omitempty" doc:"The date support ends for releases that have not stated their own, as YYYY-MM-DD"`
+	// Retired is absent from every row of the lists, which stop offering what
+	// is out of use. It is answered on a single product read, where somebody
+	// arriving by a link they kept has to be told why nothing offers it.
+	Retired bool `json:"retired,omitempty" doc:"Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted"`
 }
 
 // EndOfLifeBody is when something goes out of support.
@@ -199,6 +203,7 @@ type listBody[T any] struct {
 func registerCatalog(api huma.API, d Declaring) {
 	registerDeclaring(api, d)
 	registerVariantEdits(api, d)
+	registerCatalogAmends(api, d)
 	registerCatalogPolicy(api, d)
 	registerCatalogReading(api, d)
 }

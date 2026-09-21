@@ -231,3 +231,161 @@ func TestCorrectingWhatAVariantReaches(t *testing.T) {
 		}
 	})
 }
+
+// TestARetiredProductAndReleaseLeaveTheOfferedLists pins that the two levels
+// above a variant follow the same rule: what a product declares stops offering
+// what is out of use.
+func TestARetiredProductAndReleaseLeaveTheOfferedLists(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		product, stream, _ := declared(t, ctx, s)
+		admin := access.NewPerson(1, "admin", true, nil, 0)
+
+		if err := s.RetireStream(ctx, stream.ID); err != nil {
+			t.Fatalf("retire the release: %v", err)
+		}
+		lines, err := s.Streams(ctx, admin, product.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(lines) != 0 {
+			t.Errorf("a retired release is still offered: %+v", lines)
+		}
+
+		if err := s.RetireProduct(ctx, product.ID); err != nil {
+			t.Fatalf("retire the product: %v", err)
+		}
+		products, err := s.Products(ctx, admin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(products) != 0 {
+			t.Errorf("a retired product is still offered: %+v", products)
+		}
+	})
+}
+
+// TestARetiredProductAndReleaseStillResolveByName pins that retiring the two
+// levels above a variant strands nothing either.
+func TestARetiredProductAndReleaseStillResolveByName(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		product, stream, _ := declared(t, ctx, s)
+		if err := s.RetireStream(ctx, stream.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RetireProduct(ctx, product.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		named, err := s.Locate(ctx, "SONiC", "master", "broadcom")
+		if err != nil {
+			t.Fatalf("the build no longer locates: %v", err)
+		}
+		if !named.ProductRetired || !named.StreamRetired {
+			t.Errorf("the located build does not say what is retired: %+v", named)
+		}
+		if named.VariantRetired {
+			t.Error("retiring a product retired its variants too")
+		}
+	})
+}
+
+// TestRetiringAProductLeavesItsReleasesAlone pins that nothing is written onto
+// what sits under a retired product.
+//
+// They go out of every list with it because they are reached through it, and
+// bringing the product back has nothing to remember.
+func TestRetiringAProductLeavesItsReleasesAlone(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		product, _, _ := declared(t, ctx, s)
+		if err := s.RetireProduct(ctx, product.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		back, made, err := s.EnsureProduct(ctx, "SONiC", "SONiC")
+		if err != nil {
+			t.Fatalf("declaring a retired product: %v", err)
+		}
+		if back.ID != product.ID || !made || back.Retired() {
+			t.Fatalf("it did not come back as itself: %+v made=%v", back, made)
+		}
+
+		admin := access.NewPerson(1, "admin", true, nil, 0)
+		lines, err := s.Streams(ctx, admin, product.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(lines) != 1 {
+			t.Errorf("its releases did not come back with it: %+v", lines)
+		}
+		built, err := s.Variants(ctx, admin, product.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(built) != 1 {
+			t.Errorf("its variants did not come back with it: %+v", built)
+		}
+	})
+}
+
+// TestDeclaringARetiredReleaseBringsItBack pins the same idempotency a variant
+// and a product keep.
+func TestDeclaringARetiredReleaseBringsItBack(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		product, stream, _ := declared(t, ctx, s)
+		if err := s.RetireStream(ctx, stream.ID); err != nil {
+			t.Fatal(err)
+		}
+		back, made, err := s.EnsureStream(ctx, product.ID, "master", catalog.Branch, nil)
+		if err != nil {
+			t.Fatalf("declaring a retired release: %v", err)
+		}
+		if back.ID != stream.ID || !made || back.Retired() {
+			t.Fatalf("it did not come back as itself: %+v made=%v", back, made)
+		}
+	})
+}
+
+// TestAProductsDisplayNameMovesWithoutItsName pins that the two are separate
+// acts on a product.
+//
+// The name is what a published document is identified by; the display name is
+// what a screen and a document's prose show, and nothing is identified by it.
+func TestAProductsDisplayNameMovesWithoutItsName(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		product, _, _ := declared(t, ctx, s)
+		if err := s.SetProductDisplayName(ctx, product.ID, "SONiC on Broadcom"); err != nil {
+			t.Fatalf("correct what it is shown as: %v", err)
+		}
+		found, err := s.ProductByName(ctx, "sonic")
+		if err != nil {
+			t.Fatalf("the name moved with the display name: %v", err)
+		}
+		if found.DisplayName != "SONiC on Broadcom" {
+			t.Errorf("it is shown as %q", found.DisplayName)
+		}
+	})
+}
+
+// TestRenamingAProductOntoATakenNameIsRefused pins that a retired product
+// keeps holding its name, the way a retired variant does.
+func TestRenamingAProductOntoATakenNameIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		product, _, _ := declared(t, ctx, s)
+		other, err := s.DeclareProduct(ctx, "onie", "ONIE")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RetireProduct(ctx, other.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RenameProduct(ctx, product.ID, "ONIE"); !errors.Is(err, catalog.ErrExists) {
+			t.Errorf("renaming onto a retired product's name answered %v", err)
+		}
+	})
+}

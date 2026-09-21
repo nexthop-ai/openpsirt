@@ -351,13 +351,31 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	//
 	// After authorization, so that a sender who may not file against this
 	// product cannot learn from the refusal that the name exists at all.
-	if named.VariantRetired {
-		// Spelled back as the sender sent it, which is what their
-		// configuration holds and what they have to go and change. The stored
-		// spelling is what a document is identified by and is not that.
+	// A retired product, release or variant takes no scan. It is the other
+	// half of retiring one: the lists stop offering it and this stops a
+	// pipeline still configured for it filing against it anyway. The refusal
+	// says what to do, because what has to change is a build script somebody
+	// maintains.
+	//
+	// After authorization, so that a sender who may not file against this
+	// product cannot learn from the refusal that the name exists at all.
+	//
+	// The outermost first: a product retired with its releases still in use is
+	// answered about the product, which is the thing somebody has to bring
+	// back. Spelled back as the sender sent it, because what they have to go
+	// and change is their own configuration.
+	var retired string
+	switch {
+	case named.ProductRetired:
+		retired = fmt.Sprintf("product %q", input.Product)
+	case named.StreamRetired:
+		retired = fmt.Sprintf("release %q of %q", input.Stream, input.Product)
+	case named.VariantRetired:
+		retired = fmt.Sprintf("variant %q of %q", input.Variant, input.Product)
+	}
+	if retired != "" {
 		return nil, huma.NewError(http.StatusConflict, fmt.Sprintf(
-			"variant %q of %q is retired and takes no scan; declare it again to bring it back",
-			input.Variant, input.Product))
+			"%s is retired and takes no scan; declare it again to bring it back", retired))
 	}
 
 	// Refusing before storing. Deciding costs a query; deciding afterwards
