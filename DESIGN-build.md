@@ -14,6 +14,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 - [Class-name checks](#class-name-checks)
 - [Database engines](#database-engines)
 - [Test databases](#test-databases)
+- [Commit durability](#commit-durability)
 - [Pinned pairs](#pinned-pairs)
 - [Hash pinning per ecosystem](#hash-pinning-per-ecosystem)
 - [Static analysis](#static-analysis)
@@ -97,7 +98,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make gate` | The checks this change has to pass, chosen from what it touches |
 | `make gate full` | All of them, whatever the change touches |
 | `make test` | SQLite only, packages in parallel, cached. Seconds |
-| `make test-all` | Every configured engine, nothing cached: the two runs below |
+| `make test-all` | Every configured engine, nothing cached: the two runs below, at once |
 | `make test-race` | SQLite with the race detector, tests within a package beside each other |
 | `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
@@ -341,6 +342,21 @@ SQLite spends and almost none of what a server engine does.
 The detector is a property of the binary and cannot be turned on for one
 subtest, so `test-all` is two runs: SQLite with it, the three servers without.
 
+The two run at once. They share no engine, so neither can see the other's rows,
+and they are bottlenecked on different things — the detector is in-process work
+and the server pass spends its time waiting on a socket — so each fills what the
+other leaves idle. Each takes half the cores, so the number of test binaries
+alive at once is what a single pass has, and the peak memory falls rather than
+rises: 119 s and 3.4 GB run one after another, 100 s and 1.5 GB run together,
+on twelve cores with everything warm.
+
+Each pass labels its own lines. Held and printed at the end, a run says nothing
+for the whole of it — on a slow machine a quarter of an hour of a log that looks
+stopped — and interleaved without labels, two runs of fifty packages are two
+answers to "did it pass" with no way to tell which said what. A failure in
+either fails the target, which is checked by breaking one pass at a time and
+watching it go red.
+
 `OPENPSIRT_TEST_ENGINES` narrows which engines a run touches, and `test` and
 `test-race` both set it to `sqlite`. The pool's idle reaper, the migration lock
 and the version floor open connections themselves rather than through `dbtest`,
@@ -363,6 +379,49 @@ directory — says so and runs alone.
 
 Together: one minute fifteen against warm servers and two minutes forty-five
 against cold ones, from four minutes four seconds.
+
+## Commit durability
+
+A test database is created by the harness and dropped by a later run, and a
+crash part-way through a suite is answered by running the suite again. The
+durability a commit waits for protects nothing here, and it is most of what a
+run costs.
+
+| Engine | Setting | Where it is asked for |
+|---|---|---|
+| SQLite | `synchronous` off | A pragma on every test connection `dbtest` opens; `dbtest.Racing` builds its own handle and keeps the default |
+| PostgreSQL | `synchronous_commit` off | The connection string, so the session gets it and the server is untouched |
+| MySQL, MariaDB | `innodb_flush_log_at_trx_commit` and `sync_binlog` zero | The server, once per engine per binary — both are global on this protocol, so there is no session to ask, and the change outlives the run for every database on that server |
+
+Nothing a test can observe changes. The settings govern what survives a crash,
+not what a statement returns, what a transaction sees, or which constraint an
+engine enforces.
+
+| Every package, one engine | Durable | Relaxed |
+|---|---|---|
+| PostgreSQL | 90 s | 60 s |
+| MySQL | 59 s | 12 s |
+| MariaDB | 19 s | 12 s |
+| The three together | 240 s | 77 s |
+
+The saving belongs to the storage underneath rather than to the engines.
+Containers on a workstation pay the durable figures above. The servers a
+GitHub runner starts pay little enough that the whole server pass does not
+move: 412 s against 413 s, where the variance between two runs of the same
+tree is 5 s to 10 s on each of the large packages. The configuration this
+reaches is therefore a server somebody else started, which is the one
+`make engines-up` cannot pass a command line to.
+
+The harness asks, rather than the command line the server was started with. A
+server a run meets is not always one this repository started: `make engines-up`
+passes the same intent at startup, which also reaches the settings an engine
+accepts only there, and a workflow declaring a service container has no command
+line to pass. Asking from the connection reaches both.
+
+A connection that may not set a global leaves the server as it is and the suite
+runs slower. A test reads the setting back from the session it was handed and
+fails where it is durable on a connection that could have changed it, which
+separates a harness that stopped asking from a server nobody may configure.
 
 ## Pinned pairs
 

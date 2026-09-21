@@ -175,17 +175,67 @@ test:
 # first run did not — the argument already accepted for the two-engine form of
 # a test. It runs on SQLite, which needs no server and where each test holds a
 # database of its own, so those tests also run beside each other.
-test-all: test-race test-engines
+# Half the cores, rounded down, and never below one. Each of the two passes
+# takes that, so the number of test binaries alive at once is what a single
+# pass has and the memory falls rather than rises: 1.5 GB against the 3.4 GB
+# the two reach running one after another with the whole machine each.
+# Two ways of asking, because a machine with neither would assert two cores and
+# give each pass one package at a time — fewer than either pass had alone, and
+# nothing printed to say why.
+TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2); h=$$((n / 2)); if [ $$h -lt 1 ]; then h=1; fi; echo $$h)
 
-# The detector, on the engine every checkout has.
+# One spelling of each pass. test-all adds a package count and a label; the
+# standalone targets run the same command with the whole machine. Written twice,
+# a flag added to the target somebody runs by hand never reaches the gate, which
+# runs only test-all.
+RACE_PASS    = OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1
+SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1
+
+# Both passes at once. They share no engine — the detector runs on SQLite and
+# the portability pass on the three servers — so neither can see the other's
+# rows, and the guard against two runs of one package meeting on one server
+# still holds.
+#
+# What it buys is that the two are bottlenecked on different things: the
+# detector is in-process work and the server pass spends its time waiting on a
+# socket, so each fills what the other leaves idle. 119 s to 100 s on twelve
+# cores with everything warm, and more where the two passes are further apart
+# in length than they are here.
+#
+# Each pass labels its own lines rather than being held and printed at the
+# end. Held, a run says nothing for the whole of it — which on a slow machine
+# is a quarter of an hour of a log that looks stopped — and interleaved without
+# labels, two runs of fifty packages are two answers to "did it pass" with no
+# way to tell which said what.
+#
+# The label is flushed per line. Left to its own buffering a filter holds four
+# kilobytes before writing, which on a pipe is most of a pass — so the log went
+# quiet exactly as it did when the output was held deliberately, and for a
+# reason harder to see.
+#
+# The label goes through a pipe, and the shell here runs with pipefail, so a
+# failing pass is still a failing pipeline. Watched going red one pass at a
+# time.
+test-all:
+	@( $(RACE_PASS) -p $(TEST_HALF) \
+	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$0; fflush() }' ) & detector=$$!; \
+	( $(SERVERS_PASS) -p $(TEST_HALF) \
+	    $(PACKAGES) 2>&1 | awk '{ print "[servers]      " $$0; fflush() }' ) & portability=$$!; \
+	failed=0; \
+	wait $$detector || failed=1; \
+	wait $$portability || failed=1; \
+	exit $$failed
+
+# The detector, on the engine every checkout has. Its own target, for running
+# one pass by hand; the gate runs both at once through test-all.
 test-race:
-	OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1 $(PACKAGES)
+	$(RACE_PASS) $(PACKAGES)
 
 # The three server engines, without it. Their time is spent waiting on a
 # socket, which is not where a race is found: 16.9 s against 12.0 s for the API
 # package on MariaDB, where the same package on SQLite is 73.6 s against 10.1 s.
 test-engines:
-	OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1 $(PACKAGES)
+	$(SERVERS_PASS) $(PACKAGES)
 
 # The checks this change has to pass, chosen from what it touches.
 #

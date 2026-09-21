@@ -567,7 +567,12 @@ func TestWorkStopsWhenItsJobIsTakenOver(t *testing.T) {
 	// the case that has to end the work: from that moment two workers are
 	// doing the same job, and this is the one whose ending nobody will record.
 	opts := queue.DefaultOptions()
-	opts.Heartbeat = 5 * time.Millisecond
+	// The interval is also the bound on one renewal, and the loss is only
+	// observed by a renewal that completes: one that runs out of time closes
+	// its connection, so the next begins by dialing and runs out of time
+	// there. On a busy runner a PostgreSQL round trip outlives a few
+	// milliseconds, so the interval has to clear one with room.
+	opts.Heartbeat = 200 * time.Millisecond
 	each(t, opts, func(t *testing.T, db *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		moment := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
