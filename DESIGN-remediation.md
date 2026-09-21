@@ -624,6 +624,19 @@ and could not increment its version, both of which CSAF validators check.
 | The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
 | A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |
 
+### The two hashes
+
+A published document has two, and they answer different questions.
+
+| Hash | Over | Answers |
+|---|---|---|
+| The settled digest | What the document says, with the moment it was assembled, the software that assembled it, the version and the revision history left out | Is what is published still what this would generate |
+| The delivered checksum | The bytes as published, every volatile field included | Did the file a reader fetched arrive intact |
+
+The settled digest is taken as an issuance is recorded. The delivered checksum
+belongs beside a published file and is not built; `Not built` below says what
+is missing.
+
 ## Publisher identity
 
 One record, not one per format. A VEX document and an advisory both name their
@@ -651,6 +664,11 @@ it points at. The signed outbound request is built and is described in
 Every adapter that would send an advisory somewhere, which is the whole of
 Publication above. The CSAF document is generated and served; no destination,
 no adapter and no route to one exists.
+
+The checksum over the delivered bytes. A CSAF provider directory publishes one
+beside every file it serves, and nothing here writes such a directory, so
+there are no delivered bytes to take it over. The settled digest above is the
+hash that exists and answers a different question.
 
 Prose of the deployment's own in the document beyond its title. An edition
 carries the title, and the rest of what a reader acts on is assembled from the

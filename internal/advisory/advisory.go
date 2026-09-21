@@ -683,33 +683,10 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	// what keeps it safe is the distribution label the document carries —
 	// RED while anything it covers is held back, whatever its editorial
 	// state says.
-	// Hashed over what the document *says*, with the parts that move for
-	// reasons other than the content left out.
-	//
-	// The question this answers is "is what is published still what we would
-	// generate", and every one of these makes that unanswerable: the current
-	// release date and the generator's date change every time it is asked for;
-	// the version and the revision history change *because* it was issued, so
-	// a document hashed with them can never match the digest of the issuance
-	// before it, however unchanged its substance. What is left is the title,
-	// the notes, the product tree and the vulnerability — which is the part a
-	// reader acts on and the part that must not have quietly moved.
-	//
-	// The status follows the agreement rather than the words. Taking one back
-	// moves a published document to interim with nothing a reader acts on
-	// having changed, and giving it again moves it back, so a digest carrying
-	// it would report a difference in substance where there is none.
-	settled := *doc
-	settled.Document.Tracking.CurrentReleaseDate = time.Time{}
-	settled.Document.Tracking.Generator = nil
-	settled.Document.Tracking.Version = ""
-	settled.Document.Tracking.Status = ""
-	settled.Document.Tracking.RevisionHistory = nil
-	body, err := json.Marshal(settled)
+	digest, err := settledDigest(doc)
 	if err != nil {
-		return nil, fmt.Errorf("hash what went out: %w", err)
+		return nil, err
 	}
-	sum := sha256.Sum256(body)
 
 	issuedAt := s.now().UTC().Truncate(time.Microsecond)
 	var recorded *Issuance
@@ -748,7 +725,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		}
 		recorded = &Issuance{
 			AdvisoryID: row.ID, EditionID: *at.EditionID,
-			Digest: hex.EncodeToString(sum[:]), Summary: summary,
+			Digest: digest, Summary: summary,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
 		// Scanned into a value rather than read through a cursor: a cursor
@@ -772,6 +749,41 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		return nil, fmt.Errorf("record that it went out: %w", err)
 	}
 	return recorded, nil
+}
+
+// settledDigest is what the document says, hashed.
+//
+// The settled digest, which is one of the two hashes a published document has
+// and the one taken here. It answers "is this revision still what we would
+// generate", so everything that moves for a reason other than what the
+// document says is left out of it: the current release date and the
+// generator's date change every time the document is asked for, and the
+// version and the revision history move because the document went out rather
+// than because it says something different. What is left is the title, the
+// notes, the product tree and the vulnerabilities — the part a reader acts on,
+// and the part that must not have quietly moved.
+//
+// The status follows the agreement rather than the words. Taking an agreement
+// back moves a published document to interim with nothing a reader acts on
+// having changed, and giving it again moves it back, so a digest carrying it
+// would report a difference in substance where there is none.
+//
+// The other hash is over the delivered bytes, volatile fields included, and
+// answers whether the file a reader fetched arrived intact. The two are not
+// interchangeable and neither is a duplicate of the other.
+func settledDigest(doc *Document) (string, error) {
+	settled := *doc
+	settled.Document.Tracking.CurrentReleaseDate = time.Time{}
+	settled.Document.Tracking.Generator = nil
+	settled.Document.Tracking.Version = ""
+	settled.Document.Tracking.Status = ""
+	settled.Document.Tracking.RevisionHistory = nil
+	body, err := json.Marshal(settled)
+	if err != nil {
+		return "", fmt.Errorf("hash what went out: %w", err)
+	}
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 // Issuances is what has gone out for one advisory, oldest first.
