@@ -175,7 +175,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 
 	// An embargo whose date is coming. Before the date, not on it: an
 	// approver who touches disclosure a few times a year has no reason to
-	// open the screen that would have told them, and an extension approval
+	// open the screen that would have told them, and an agreement to move a date
 	// is worthless without time to arrange it.
 	near, err := w.approachingDisclosure(ctx, admins)
 	if err != nil {

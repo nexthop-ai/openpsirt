@@ -189,8 +189,8 @@ function title(name?: string): string {
     // what is being set.
     case "disclosure.after":
       return "Default embargo period";
-    case "disclosure.extension-threshold":
-      return "Embargo extension threshold";
+    case "disclosure.movement-threshold":
+      return "Embargo movement threshold";
     case "disclosure.lead-time":
       return "Embargo expiry warning";
     default:

@@ -1090,7 +1090,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/disclosure-extensions": {
+    "/v1/disclosure-movements": {
         parameters: {
             query?: never;
             header?: never;
@@ -1098,18 +1098,18 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List extension requests waiting for a second person
-         * @description Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first.
+         * List disclosure-date movements waiting for a second person
+         * @description Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first. Both acts are here, and `act` says which each one is.
          *
-         *     Until this there was nowhere to be that second person. A request could be read on the finding it belongs to and nowhere else, so the only way to find one was to already know it existed — which is the failure the review queue exists to prevent, in the one place where what is being agreed to is how long something stays hidden.
+         *     Without this there is nowhere to be that second person. A request could be read on the finding it belongs to and nowhere else, so the only way to find one was to already know it existed — which is the failure the review queue exists to prevent, in the one place where what is being agreed to is how long something stays hidden.
          *
          *     Your own requests are here too, marked as yours. You cannot agree to one — the endpoint refuses it — but a proposer looking for what is holding a case up should not have their own request hidden from them.
          *
-         *     Agree with `POST /v1/disclosure-extensions/{id}/approval`.
+         *     Agree with `POST /v1/disclosure-movements/{id}/approval`.
          *
          *     Requires: any signed-in person, and not a pipeline key. Only where you may read undisclosed work.
          */
-        get: operations["list-pending-extensions"];
+        get: operations["list-pending-disclosure-movements"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1118,7 +1118,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/disclosure-extensions/{id}/approval": {
+    "/v1/disclosure-movements/{id}/approval": {
         parameters: {
             query?: never;
             header?: never;
@@ -1128,14 +1128,14 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve a disclosure-date extension
-         * @description Records a second person agreeing, and moves the date.
+         * Approve a disclosure-date movement
+         * @description Records a second person agreeing, and moves the date. Either act.
          *
-         *     The person who asked may not be the one who agrees. That is the control the threshold exists to reach, and an extension somebody approved for themselves is the same as one nobody approved.
+         *     The person who asked may not be the one who agrees. That is the control the threshold exists to reach, and a movement somebody approved for themselves is the same as one nobody approved.
          *
          *     Requires: private-triage on the product. Not the person who asked for it.
          */
-        post: operations["agree-to-extension"];
+        post: operations["agree-to-disclosure-movement"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2473,29 +2473,73 @@ export interface paths {
         };
         /**
          * List how an embargo has been moved
-         * @description Every time this embargo was moved, oldest first, with why and by whom.
+         * @description Every time this embargo was moved, oldest first, with which act it was, why, and by whom.
          *
-         *     Kept in full and never overwritten. One extension is a judgment and six is a policy nobody wrote down, and the difference is invisible if each replaces the last. A request still waiting for agreement is here too: what was asked for is part of how long this stayed hidden, whether or not it was granted.
+         *     Kept in full and never overwritten. One movement is a judgment and six is a policy nobody wrote down, and the difference is invisible if each replaces the last. A request still waiting for agreement is here too: what was asked for is part of how long this stayed hidden, whether or not it was granted.
          *
          *     Requires: private-read or private-triage on the product. Only where you may read undisclosed work.
          */
-        get: operations["list-disclosure-extensions"];
+        get: operations["list-disclosure-movements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/issues/{vulnerability}/disclosure/extension": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
         put?: never;
         /**
-         * Ask to move a disclosure date later
-         * @description Moves the end of an embargo, across every undisclosed finding of this issue in this product.
+         * Extend a disclosure date
+         * @description Moves the end of an embargo later, across every undisclosed finding of this issue in this product.
          *
          *     A reason is required, always, however short the extension. One with no reason is a record saying somebody moved it and nothing else.
          *
-         *     Past a threshold it needs a second person, and the threshold is measured against everything this embargo has already been moved by rather than against this request alone — measured per request, the exception swallows the rule three weeks at a time. It is the same act a deferral is, and the same shape.
+         *     Past a threshold it needs a second person, and the threshold is measured against how far this embargo's end has already been carried rather than against this request alone — measured per request, the exception swallows the rule three weeks at a time. It is the same act a deferral is, and the same shape.
          *
          *     An extension that needs agreement moves nothing until it has it. The request is on record either way; `in_force` says whether the date follows it.
          *
-         *     A date only ever moves later. Bringing one forward is disclosing sooner, which is a different act.
+         *     A date sent earlier is refused here. Ending an embargo sooner is a different act, recorded as one: `POST .../disclosure/shortening`.
          *
          *     Requires: private-triage on the product. A second person agrees past the threshold.
          */
         post: operations["extend-disclosure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/issues/{vulnerability}/disclosure/shortening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bring a disclosure date forward
+         * @description Moves the end of an embargo sooner, across every undisclosed finding of this issue in this product. What a coordinator or a peer vendor publishing on a date of their own asks for, and what a leak leaves.
+         *
+         *     Its own act rather than an extension sent a smaller date. Shortening an embargo because it leaked and extending one because a fix slipped are different events, and which of them happened is read off the record rather than inferred from the direction a date moved.
+         *
+         *     A reason is required, and the same threshold applies: how far this embargo's end has already been carried, counting a date brought forward the same distance as one pushed back. Past it a second person agrees, and until they do the date does not move.
+         *
+         *     A date sent later is refused here. Extend with `POST .../disclosure/extension`.
+         *
+         *     Requires: private-triage on the product. A second person agrees past the threshold.
+         */
+        post: operations["shorten-disclosure"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6365,32 +6409,10 @@ export interface components {
              * @example https://example.com/schemas/Extend-disclosureRequest.json
              */
             readonly $schema?: string;
-            /** @description The reason it is being extended */
+            /** @description The reason the date is moving */
             reason: string;
             /** @description The date the embargo should end */
             until: string;
-        };
-        ExtensionBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ExtensionBody.json
-             */
-            readonly $schema?: string;
-            approved_at?: string;
-            approved_by?: string;
-            asked_at: string;
-            asked_by: string;
-            /** Format: int64 */
-            id: number;
-            in_force: boolean;
-            /** @description Whether a second person had to agree */
-            needs_approval: boolean;
-            reason: string;
-            /** @description The end that was asked for */
-            until: string;
-            /** @description The embargo's previous end */
-            was: string;
         };
         FindingBody: {
             /**
@@ -7152,17 +7174,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyExtensionBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyExtensionBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["ExtensionBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         ListBodyHolderBody: {
             /**
              * Format: uri
@@ -7229,6 +7240,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyMovementBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyMovementBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["MovementBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyNoteBody: {
             /**
              * Format: uri
@@ -7251,14 +7273,14 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyPendingExtensionBody: {
+        ListBodyPendingMovementBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyPendingExtensionBody.json
+             * @example https://example.com/schemas/ListBodyPendingMovementBody.json
              */
             readonly $schema?: string;
-            items: components["schemas"]["PendingExtensionBody"][] | null;
+            items: components["schemas"]["PendingMovementBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -7588,6 +7610,33 @@ export interface components {
              */
             mode: "direct" | "group-bound";
         };
+        MovementBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/MovementBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description Which act this was. An extension ends the embargo later, a shortening ends it sooner
+             * @enum {string}
+             */
+            act: "extension" | "shortening";
+            approved_at?: string;
+            approved_by?: string;
+            asked_at: string;
+            asked_by: string;
+            /** Format: int64 */
+            id: number;
+            in_force: boolean;
+            /** @description Whether a second person had to agree */
+            needs_approval: boolean;
+            reason: string;
+            /** @description The end that was asked for */
+            until: string;
+            /** @description The embargo's previous end */
+            was: string;
+        };
         Named: {
             name: string;
             product_id: string;
@@ -7851,13 +7900,18 @@ export interface components {
              */
             share: number;
         };
-        PendingExtensionBody: {
+        PendingMovementBody: {
+            /**
+             * @description Which act is being asked for
+             * @enum {string}
+             */
+            act: "extension" | "shortening";
             asked_at: string;
             /** @description The person who asked */
             by: string;
             /**
              * Format: int64
-             * @description The distance later, in days
+             * @description How far the date moves, in days, whichever way it moves
              */
             days: number;
             /** Format: int64 */
@@ -9045,6 +9099,18 @@ export interface components {
         Shipped: {
             "@id": string;
             subcomponents?: components["schemas"]["Inside"][] | null;
+        };
+        "Shorten-disclosureRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Shorten-disclosureRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The reason the date is moving */
+            reason: string;
+            /** @description The date the embargo should end */
+            until: string;
         };
         SightingBody: {
             component: string;
@@ -11408,7 +11474,7 @@ export interface operations {
             };
         };
     };
-    "list-pending-extensions": {
+    "list-pending-disclosure-movements": {
         parameters: {
             query?: {
                 limit?: number;
@@ -11427,7 +11493,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyPendingExtensionBody"];
+                    "application/json": components["schemas"]["ListBodyPendingMovementBody"];
                 };
             };
             /** @description Error */
@@ -11441,7 +11507,7 @@ export interface operations {
             };
         };
     };
-    "agree-to-extension": {
+    "agree-to-disclosure-movement": {
         parameters: {
             query?: never;
             header?: never;
@@ -13811,7 +13877,7 @@ export interface operations {
             };
         };
     };
-    "list-disclosure-extensions": {
+    "list-disclosure-movements": {
         parameters: {
             query?: never;
             header?: never;
@@ -13829,7 +13895,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyExtensionBody"];
+                    "application/json": components["schemas"]["ListBodyMovementBody"];
                 };
             };
             /** @description Error */
@@ -13865,7 +13931,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ExtensionBody"];
+                    "application/json": components["schemas"]["MovementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "shorten-disclosure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Shorten-disclosureRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovementBody"];
                 };
             };
             /** @description Error */

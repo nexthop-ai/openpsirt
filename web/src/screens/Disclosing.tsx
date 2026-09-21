@@ -13,7 +13,7 @@ import { Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 
 // The findings approaching disclosure, and the place an embargo is moved (a
-// finding saying whether it is disclosed, an extension needing agreement).
+// finding saying whether it is disclosed, a movement needing agreement).
 //
 // Before the date, not on it. The date arriving is the last moment to act
 // rather than the first useful warning, so this lists what is running out as
@@ -34,6 +34,10 @@ export function Disclosing() {
   // an empty screen reads as "nothing is coming".
   const [days, setDays] = useState("");
   const [asking, setAsking] = useState<string | null>(null);
+  // Which act is being recorded. Chosen rather than read off the date typed:
+  // extending because a fix slipped and shortening because it leaked are
+  // different events, and the record says which without anybody inferring it.
+  const [act, setAct] = useState<"extension" | "shortening">("extension");
   const [until, setUntil] = useState("");
   const [because, setBecause] = useState("");
   const [said, setSaid] = useState<string | null>(null);
@@ -49,13 +53,18 @@ export function Disclosing() {
       ),
   });
 
-  const extend = useMutation({
+  const move = useMutation({
     mutationFn: async (at: { product: string; vulnerability: string }) =>
       unwrap(
-        await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure", {
-          params: { path: at },
-          body: { until, reason: because },
-        }),
+        act === "shortening"
+          ? await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure/shortening", {
+              params: { path: at },
+              body: { until, reason: because },
+            })
+          : await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure/extension", {
+              params: { path: at },
+              body: { until, reason: because },
+            }),
       ),
     onSuccess: (asked) => {
       setSaid(
@@ -175,6 +184,7 @@ export function Disclosing() {
                         onClick={() => {
                           setSaid(null);
                           setAsking(asking === key ? null : key);
+                          setAct("extension");
                           setUntil("");
                           setBecause("");
                         }}
@@ -183,9 +193,21 @@ export function Disclosing() {
                       </button>
                       {asking === key && (
                         <div style={{ marginTop: 8 }}>
+                          <label className="field">
+                            <span>Act</span>
+                            <select
+                              value={act}
+                              onChange={(event) =>
+                                setAct(event.target.value as "extension" | "shortening")
+                              }
+                            >
+                              <option value="extension">Extend — it ends later</option>
+                              <option value="shortening">Bring forward — it ends sooner</option>
+                            </select>
+                          </label>
                           <p className="hint">
-                            Dates only move later. Past a threshold this needs a second person,
-                            measured against everything this embargo has already been moved by.
+                            Past a threshold this needs a second person, measured against how far
+                            this embargo&rsquo;s end has already been carried either way.
                           </p>
                           <label className="field">
                             <span>Until</span>
@@ -199,26 +221,34 @@ export function Disclosing() {
                             value={because}
                             onChange={setBecause}
                             rows={3}
-                            label="The reason for the extension"
-                            placeholder="The reason the date is moving, and what has to happen before the new one."
+                            label={
+                              act === "shortening"
+                                ? "The reason it is being brought forward"
+                                : "The reason for the extension"
+                            }
+                            placeholder={
+                              act === "shortening"
+                                ? "Why the embargo ends sooner — who is publishing, or what got out."
+                                : "The reason the date is moving, and what has to happen before the new one."
+                            }
                           />
                           <div className="actions" style={{ marginTop: 8 }}>
                             <button
                               type="button"
                               className="btn"
-                              disabled={!until || !because.trim() || extend.isPending}
+                              disabled={!until || !because.trim() || move.isPending}
                               onClick={() =>
-                                extend.mutate({
+                                move.mutate({
                                   product: row.product ?? "",
                                   vulnerability: row.vulnerability ?? "",
                                 })
                               }
                             >
-                              {extend.isPending ? "Asking…" : "Ask"}
+                              {move.isPending ? "Asking…" : "Ask"}
                             </button>
                           </div>
-                          {extend.isError && (
-                            <Failed error={extend.error} what="That date was not moved." />
+                          {move.isError && (
+                            <Failed error={move.error} what="That date was not moved." />
                           )}
                         </div>
                       )}

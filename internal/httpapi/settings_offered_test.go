@@ -33,7 +33,7 @@ func TestEverySettingSomethingReadsIsOneSomebodyCanSet(t *testing.T) {
 
 		for _, name := range []string{
 			"disclosure.after",
-			"disclosure.extension-threshold",
+			"disclosure.movement-threshold",
 			"disclosure.lead-time",
 		} {
 			if !has[name] {
@@ -76,9 +76,9 @@ func TestNothingOfferedComesBackWithoutAValue(t *testing.T) {
 		}
 		// And the three that were blank carry what the readers actually use.
 		want := map[string]string{
-			"disclosure.after":               "2160h0m0s",
-			"disclosure.extension-threshold": "720h0m0s",
-			"disclosure.lead-time":           "336h0m0s",
+			"disclosure.after":              "2160h0m0s",
+			"disclosure.movement-threshold": "720h0m0s",
+			"disclosure.lead-time":          "336h0m0s",
 		}
 		for _, each := range offered.Items {
 			if expected, named := want[each.Name]; named && each.Value != expected {
