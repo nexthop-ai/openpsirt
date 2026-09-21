@@ -663,6 +663,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#memory-and-the-scanners-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory and the scanner's database
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory and the scanner&#39;s database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-exhausted-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An exhausted limit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -986,6 +1025,45 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-and-the-scanners-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory and the scanner's database
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory and the scanner&#39;s database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-exhausted-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An exhausted limit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1917,10 +1995,12 @@ does not have to restate the rest.</p>
 <p>The built-in values are set from what reading a document costs in memory, not
 from how large a document looks. An edge holds about half a kilobyte of heap
 while it is being read and a component about one and a third, so the defaults
-below allow roughly 250 MB for one document — about half the memory limit the
-chart ships with. They are still several times the largest producer we have.
-Raise them on a deployment with a bigger box and a bigger inventory, and raise
-the container's memory limit with them.</p>
+below allow roughly 250 MB for one document. They are still several times the
+largest producer we have. Raise them on a deployment with a bigger box and a
+bigger inventory, and raise the container's memory limit with them.</p>
+<p>That 250 MB is the server's share of the pod. The scanner runs as a second
+process in the same container, so the memory limit covers both — see
+<a href="#memory-and-the-scanners-database">Memory and the scanner's database</a>.</p>
 <table>
 <thead>
 <tr>
@@ -2006,6 +2086,86 @@ are dropped instead, because a scanner with a lot to say still scanned.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="memory-and-the-scanners-database">Memory and the scanner's database<a class="headerlink" href="#memory-and-the-scanners-database" title="Permanent link">&para;</a></h2>
+<p>The container runs two processes that use memory: the server, and the scanner
+it starts as a child for every scan. One memory limit covers both, and an
+excess is answered by the kernel killing the larger of the two — which is the
+scanner. The scan is then recorded as a run that failed while the pod stays up,
+so nothing in the failure points at the limit.</p>
+<p>The chart ships:</p>
+<pre><code class="language-yaml">resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 2Gi
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>What draws on it</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The server reading one scan document</td>
+<td>About 250 MB at the built-in bounds. <a href="#scan-file-limits">Scan file limits</a> sets it, and raising those raises this</td>
+</tr>
+<tr>
+<td>The server reading one scanner report</td>
+<td>Bounded by <code>OPENPSIRT_SCANNER_MAX_OUTPUT</code>. A read and a scan run in separate loops, so a pod can be doing both</td>
+</tr>
+<tr>
+<td>The scanner itself</td>
+<td>Not bounded by anything here. It is a separate program, and its report is bounded only once written</td>
+</tr>
+<tr>
+<td>The scanner importing its vulnerability database</td>
+<td>The largest single draw, and it happens on every start where the data is not kept</td>
+</tr>
+</tbody>
+</table>
+<p>Raise the limit for a bigger inventory, for raised scan-file bounds, or where
+the database is imported on every start.</p>
+<h3 id="database-persistence">Database persistence<a class="headerlink" href="#database-persistence" title="Permanent link">&para;</a></h3>
+<p>The scanner fetches its data at runtime, because a database built into an image
+is stale the day after that image is published. Where the data is not kept
+across restarts it is downloaded and imported again on every start, and that
+import is the largest thing the pod does with memory.</p>
+<p>Keeping it takes the import off the common path. The chart will make the claim:</p>
+<pre><code class="language-yaml">scanner:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: &quot;&quot;          # the cluster's default
+    accessModes:
+      - ReadWriteOnce
+</code></pre>
+<p>Every replica mounts the one claim, so the access mode has to allow as many
+nodes as there are replicas. <code>ReadWriteOnce</code> binds to a single node: with more
+than one replica, use <code>ReadWriteMany</code> on a storage class that offers it, name a
+claim per replica set through <code>scanner.persistence.existingClaim</code>, or run one
+replica. The chart refuses the combination it can see at render time rather
+than leaving a replica Pending.</p>
+<p>A claim you made yourself is named instead, and wins over the one the chart
+would make:</p>
+<pre><code class="language-yaml">scanner:
+  persistence:
+    existingClaim: grype-db
+</code></pre>
+<p>Naming both is refused. The claim the chart makes is kept when the release is
+uninstalled, because the data is re-downloadable and a claim is not worth
+deleting by surprise.</p>
+<h3 id="an-exhausted-limit">An exhausted limit<a class="headerlink" href="#an-exhausted-limit" title="Permanent link">&para;</a></h3>
+<p>The scanner is killed by the kernel rather than exiting, so the run fails with
+the signal in the message:</p>
+<pre><code>run /usr/local/bin/grype: signal: killed
+</code></pre>
+<p>The job is retried with backoff and set aside after <code>OPENPSIRT_QUEUE_MAX_ATTEMPTS</code>
+attempts, so the symptom is scans that will not complete rather than a pod that
+will not stay up. Where the pod itself is killed instead, a deployment without a
+kept database restarts into the import that exhausted it.</p>
 
 
 
