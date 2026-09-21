@@ -179,6 +179,87 @@ validation after you have sent it.
 On the Helm chart these go through `extraEnv`, since a deployment that does not
 publish needs none of them.
 
+## The published advisory directory
+
+Absent is ordinary: with none of this set, advisories are generated and handed
+to you and nothing is written anywhere.
+
+Set it and every advisory that has gone out is written as a static CSAF
+provider directory — the documents in a folder per year, a list of them, a list
+of changes, a ROLIE feed, a description of you as a provider, and a `.sha256`
+beside each document. This application serves none of it. It writes files; your
+web server serves them, at the address you give below.
+
+| Variable | What it does | Default |
+|---|---|---|
+| `OPENPSIRT_DIRECTORY_URL` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an `https` address | unset |
+| `OPENPSIRT_DIRECTORY_BUCKET` | The bucket the files are written to. Empty means no object store | unset |
+| `OPENPSIRT_DIRECTORY_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
+| `OPENPSIRT_DIRECTORY_REGION` | The region, where the store wants one | unset |
+| `OPENPSIRT_DIRECTORY_KEY` | Access key, where the environment supplies no role | unset |
+| `OPENPSIRT_DIRECTORY_SECRET` | Its secret | unset |
+| `OPENPSIRT_DIRECTORY_SESSION_TOKEN` | A session token, where the credentials are temporary ones | unset |
+| `OPENPSIRT_DIRECTORY_PATH_STYLE` | Address the bucket in the path rather than the host, which is what a self-hosted store usually wants | set when an endpoint is |
+| `OPENPSIRT_DIRECTORY_ALLOW_HTTP` | Accept a store endpoint that is not `https` and is not this machine | off |
+| `OPENPSIRT_DIRECTORY_DIR` | A directory on this machine to write the files into instead. The bucket wins where both are set | unset |
+| `OPENPSIRT_DIRECTORY_LIST` | Tell aggregators they may list you | on |
+| `OPENPSIRT_DIRECTORY_MIRROR` | Tell aggregators they may mirror your documents | off |
+
+A directory on this machine is a deployment here, unlike for attachments: a
+web server reading the same disk is the ordinary way to serve static files.
+One process writes it, so it wants a replica of its own and a volume of its
+own — on the chart's defaults, two replicas with a read-only root filesystem,
+the pass cannot create the directory at all, and on a shared volume the two
+replicas write over one another. Run one replica with a volume mounted for it,
+or use the object store.
+
+Files are written readable by whoever serves them, and folders enterable. A
+web server runs as its own user, and refused the lot it serves what looks like
+a deployment that has published nothing.
+
+Use a store of its own rather than the one attachments are in. Every file here
+is served to anybody who asks, and every attachment is authorized before it is
+handed over — one destination would have to be both.
+
+Only a document that may travel is written. An advisory covering a flaw nobody
+outside has been told about carries TLP:RED, and the directory is the freely
+accessible half of the standard's distribution, so those are held back and
+counted in the log line. Editorial state has nothing to do with it: a draft is
+not published because it has not gone out, and a published document stays
+published while it is being revised.
+
+What is written is what went out, byte for byte. Issuing an advisory is what
+puts a document in the directory, and editing one afterwards changes nothing
+there until you record that the next revision went out.
+
+Setting the address changes what advisories say, not only where they are put.
+A document states the address it is published at, so one generated before you
+set it states none and one generated after states it — and a document that has
+already gone out keeps the bytes it went out as. Set the address before you
+publish, rather than after.
+
+Three things are yours to arrange, because they are your web server's rather
+than this application's:
+
+- **TLS, and no redirects.** The standard requires the first and asks against
+  the second.
+- **One of the three ways to be found**: `/.well-known/csaf/provider-metadata.json`
+  under your main domain, a `CSAF` field in your `security.txt` pointing at the
+  description, or the `csaf.data.security.<domain>` DNS record.
+- **Directory listings**, if you want the manual navigation the standard asks
+  for.
+- **Read access to the files.** Nothing here sets an access policy on the
+  object store, which is the right default and leaves readability yours: a
+  bucket made with the usual defaults answers 403 to everybody while this
+  writes into it successfully. Give whatever serves the address a policy that
+  lets it read, or put a front end with credentials of its own in front.
+
+Nothing is signed. Signatures and a public key are what the standard's trusted
+provider role adds, and key material is configuration of a kind this deployment
+does not yet take. The layout leaves room for it: a signature sits beside the
+document under the same name, and the feed already names the file beside each
+entry that answers for it.
+
 ## Upstream currency
 
 Off unless an administrator turns it on, under Settings. It is the only thing

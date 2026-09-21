@@ -98,9 +98,15 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		return nil, err
 	}
 
-	issuedAt := s.now().UTC().Truncate(time.Microsecond)
 	var recorded *Issuance
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		// Read here, like the ordinal below and for the same reason. Taken
+		// before the transaction, a retry carries the moment the first
+		// attempt started: two people recording an issuance for one build at
+		// once leaves the loser retrying and landing the later ordinal with
+		// the earlier moment, so what went out reads as having gone out
+		// before the revision it follows.
+		issuedAt := s.now().UTC().Truncate(time.Microsecond)
 		// Built inside, because an insert writes the generated identifier
 		// back into the model and the ordinal below is read from the
 		// database. A retry of a rolled-back attempt would re-insert a model

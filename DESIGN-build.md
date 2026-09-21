@@ -56,6 +56,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/trail/` | What somebody changed about how this deployment works. See `DESIGN-access.md` |
 | `internal/saved/` | A narrowing of a list somebody kept, and the claim it prepares. See `DESIGN-remediation.md` |
 | `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `DESIGN-remediation.md` |
+| `internal/directory/` | The advisories that have gone out, written where somebody else's web server serves them. See `DESIGN-remediation.md` |
 | `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `DESIGN-remediation.md` |
 | `internal/outward/` | The one HTTP client this process reaches the internet with. See `DESIGN-access.md` |
 | `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes without splitting a character |

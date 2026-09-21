@@ -27,6 +27,7 @@ compliance rate are in `DESIGN-reporting.md`; the assignment model is in
 - [The CSAF document](#the-csaf-document)
 - [The VEX document](#the-vex-document)
 - [Issuance records](#issuance-records)
+- [The provider directory](#the-provider-directory)
 - [Publisher identity](#publisher-identity)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -411,10 +412,12 @@ on them. Saying which releases the work is meant to reach is done to the work.
 
 ## Publication
 
-Nothing here is built apart from the document. A CSAF document is generated
-and reachable at the advisory routes; nothing sends it anywhere. The rules below are
-what publication would be, kept here because the document they are about exists
-and the shape it would be published in is what makes its content right.
+One destination is built: the documents that have gone out are written as a
+static directory somebody else's web server serves, which `The provider
+directory` below describes. Nothing is sent anywhere, and no adapter to
+anybody's platform exists. The rules below are what those adapters would be,
+kept here because the document they are about exists and the shape it would be
+published in is what makes its content right.
 
 Publication covers a vulnerability in this deployment's own product. A known CVE
 in a shipped third-party component is dependency hygiene a consumer reads out of
@@ -524,7 +527,7 @@ somebody deciding whether to act.
 
 | Element | What fills it | |
 |---|---|---|
-| References | The issue's write-up and everywhere else a report points, each address once | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's |
+| References | The issue's write-up and everywhere else a report points, each address once, and last the address this document is published at | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's. Its own address is stated only where the deployment has said where its documents are reachable, because a reader's tooling follows a self reference and one pointing at nothing is worse than none — and it is built from the same rule the directory writes the file under, so the two cannot name different files |
 | Scores | The CVSS base vector, scored here | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. A vector this deployment cannot score, or one on a scheme the standard's score object has no field for — version 4, which arrives with the standard's next version — yields nothing rather than a number in the wrong place |
 | Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gives it so somebody can reply, not so it can be published, and "anonymous" is a real answer to the question the credit field asks |
 | Remediations | Stated for the releases that still carry the flaw, and the details name the releases that do not | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
@@ -632,7 +635,12 @@ and could not increment its version, both of which CSAF validators check.
 | Rule | Reason |
 |---|---|
 | It is a fact about a moment | What was published on a date cannot be worked out again once a release is added, a decision is revised or a fix lands |
+| The document that went out is kept, as the bytes that went out | It is the only copy of that moment. A directory that regenerated it would serve a different document under a date saying it had not moved, and the edit that made it different is one nobody agreed to — an edit withdraws the agreement that let the document go out |
+| Everything volatile in those bytes is dated at the moment it left | The document was assembled a little earlier and is dated when it was published, so a file written again by a later pass is the same file. A reader decides what to fetch again by what moved |
+| The version and the history are read inside the write that records the issuance | Assembled outside it, they count what had gone out when the document was built, and a second issuance committing in between leaves a number missing from the middle of the history, which a validator reports |
+| The moment it went out is read inside that write too | An attempt that is run again keeps the moment the attempt before it started, so the revision that landed second is dated before the one it follows — and every document generated afterwards lists a history whose dates run backwards. The same holds for a VEX document's issuance |
 | The digest covers what the document says, not the whole document | The current release date, the generator's date, the version and the revision history all move on generation or *because* of issuance, and the tracking status follows the agreement rather than the words. What is hashed is the title, the product tree and the vulnerabilities |
+| The address the document states for itself is outside the digest | It is where the file sits rather than what the document says. Inside it, a deployment that started writing a directory would report every issuance it already had as differing from what would be generated now, which reads as an instruction to re-issue all of them |
 | The digest is taken from the document generated here | A caller-supplied digest is a digest of whatever they say, and both sides of the comparison must come from the same place |
 | The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
 | A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |
@@ -649,8 +657,76 @@ A published document has two, and they answer different questions.
 | The delivered checksum | The bytes as published, every volatile field included | Did the file a reader fetched arrive intact |
 
 The settled digest is taken as an issuance is recorded. The delivered checksum
-belongs beside a published file and is not built; `Not built` below says what
-is missing.
+is taken by the writer of the provider directory, over the file it writes.
+
+## The provider directory
+
+Every advisory that has gone out, written as the static directory the standard
+defines for a CSAF provider. This deployment writes files into a store an
+operator configured; their web server serves them. Nothing here answers a
+request for one, and nothing in the application can reach the package that
+writes them (REQ-63).
+
+| Rule | |
+|---|---|
+| What is written is the bytes that went out | The document is kept as an issuance is recorded, so the file a reader fetches is the file that was published rather than what the record would produce today |
+| Issuing is what publishes | Editing an advisory afterwards changes nothing in the directory until the next revision is recorded as having gone out. The edit withdrew the agreement that let the last one go, so publishing it would put out words nobody agreed to |
+| Only a document that may travel | The directory is the freely accessible half of the standard's distribution. A document held back while anything it covers is undisclosed carries the label that says so, and is not written |
+| Asked of the bytes rather than of the record | The record moves and the file does not. A document that said it may be passed on says so for ever, and one that says nothing at all is not read as permission |
+| The newest revision that may travel, per advisory | An advisory whose newest revision went to a coordinating body under embargo has a revision before it that is already public. Dropping the advisory instead would take it out of every list a reader holds |
+| Everything is written every pass, unless nothing has moved | A file written again is the same file, because the bytes are the ones that went out — but writing it is not free to a reader: a versioned store keeps a version per pass, and a file rewritten on disk gets a new modified time, which is what a web server answers "has this moved" from. So a pass that would write what this process last wrote writes nothing, and a process that has just started writes once |
+| The documents first, the lists that name them last | A list naming a file that is not there is a reader fetching nothing. A file nothing names yet is a reader who has not heard of it, and the next line fixes that |
+| Nothing is dated from the clock | The feed and the provider description date themselves from the newest document in them. Dated when the pass ran, every file moves every hour and every reader fetches the whole directory again |
+| Nothing is deleted | A document that went out is out. The writer adds and replaces, and the set it writes only grows, because both what may be published and where it goes are properties of bytes that do not change |
+| A document's first release is frozen when it first goes out | The year folder is that date's year, and until publication the date is the earliest moment any flaw the advisory covers was recorded here. Naming an older flaw afterwards would move a published document into a second folder and leave the one a reader already found named by no list |
+| Held back is counted per advisory | An advisory with two revisions that may not travel over one that may is in the directory. Counted per revision, the line reports two missing from a directory that is missing none |
+| The files are readable by whoever serves them | Another process serves them, running as somebody else. Written the way an authorized download is, a web server is refused every one and the directory reads as a deployment that has published nothing |
+| A directory with nothing in it is not written | It would have to state when it was last updated, and nothing has been published for it to say |
+| A store of its own | Every file here is served to anybody, and every attachment is authorized before it is handed over (REQ-70). One destination would have to be both |
+| The address is configuration and is required | Every address the directory states about itself is built from it, and an aggregator follows those. It must be an `https` address, which the standard requires of the documents and is refused at startup otherwise |
+
+### The files
+
+| File | |
+|---|---|
+| `provider-metadata.json` | Who this publisher is, where the documents are, and whether aggregators may list and mirror them |
+| `<year>/<name>.json` | One document per advisory. The year is the one the document states the flaw was recorded in, so a document revised in January does not move; the name is the tracking identifier under the standard's rule, lower-cased first and then every sequence outside letters, digits, a plus and a hyphen replaced by one underscore |
+| `<year>/<name>.json.sha256` | The hash of the delivered bytes, the value first and the filename after it, which is both what the standard asks for and what the ordinary command-line checker reads |
+| `index.txt` | Every document's path, one per line |
+| `changes.csv` | Every document and when its revision was released, newest first, so a reader who fetched yesterday can stop reading |
+| `feed-tlp-white.json` | The same documents as a ROLIE feed, each entry naming the document, the hash file beside it, and when it was first recorded and last released |
+
+The list of changes and the feed are how somebody outside follows what this
+deployment publishes. There is no subscriber list, no per-CVE notification and
+nothing to keep in sync: a reader fetches the list, reads until the dates stop
+being new to them, and that is the whole of it. The destinations an
+administrator configures are a different thing and are for this deployment's
+own notifications, which `DESIGN-notifications.md` describes.
+
+A document states the address it is published at, and the directory writes it
+under that address. Both come from one rule, applied to what the document
+states: the tracking identifier gives the name and the initial release date
+gives the folder. Spelled separately, a document would cite a file the
+directory does not serve.
+
+A hash file sits beside each document and beside nothing else. The standard
+asks for one per CSAF document, and the feed names it in the entry for the
+document it answers for — a hash beside a list has no entry to be named in and
+nothing that reads it.
+
+Three things are the operator's, because they are their web server's: the
+transport, one of the three ways a reader finds the provider description — the
+well-known path, a `CSAF` field in `security.txt`, or the DNS record — and
+directory listings.
+
+The feed calls itself by a token rather than by its own address, which is the
+obvious unique name and is refused: the shape a reader validates a feed against
+allows letters, digits, a plus, a hyphen, an underscore and a dot.
+
+Two optional files are not written. A ROLIE service document lists the feeds
+that the provider description already lists, and a category document needs a
+categorization of the documents that nobody here has asked for. Both are
+optional in the standard, and a checker reports each absence as a warning.
 
 ## Publisher identity
 
@@ -676,14 +752,15 @@ and never fetched; what is missing is opening or updating an item in the system
 it points at. The signed outbound request is built and is described in
 `DESIGN-notifications.md`.
 
-Every adapter that would send an advisory somewhere, which is the whole of
-Publication above. The CSAF document is generated and served; no destination,
-no adapter and no route to one exists.
+Every adapter that would send an advisory to somebody's platform, which is the
+whole of Publication above. What exists is `The provider directory`: files
+written where an operator pointed, for their own web server.
 
-The checksum over the delivered bytes. A CSAF provider directory publishes one
-beside every file it serves, and nothing here writes such a directory, so
-there are no delivered bytes to take it over. The settled digest above is the
-hash that exists and answers a different question.
+Signatures, and the public key that verifies them. They are what the
+standard's trusted provider role adds on top of the directory, and key
+material is a class of configuration this deployment does not take. The layout
+leaves room: a signature sits beside the document under the same name, and the
+feed already names the file beside each entry that answers for it.
 
 Prose of the deployment's own in the document beyond its title. An edition
 carries the title, and the rest of what a reader acts on is assembled from the
@@ -696,3 +773,5 @@ flaws the advisory covers.
 | A bump is keyed on where it is going as well as where it comes from | Pending upgrades grouped on the first two fields and took the third from whichever row made the bucket, so two bundles at 5.9.0 and 5.9.2 rendered as one row saying 5.9.0. On a real image forty-two of a hundred and twenty-seven pairs carry more than one target version |
 | A fix declared for a product covers its builds without being written per build | A decision's live key names the place and not the build, so a product shipping the same component in two builds produced two identical proposals and the second collided with the unique index, rolling back the whole declaration. The proposals are made distinct before they are written |
 | A statement about a group speaks for the group | The outbound format has no place granularity, so a dismissal covering some of a group is not published as covering all of it |
+| The provider directory is read whole on every pass | Every document that has gone out is read, and the ones that may be published are written again. An advisory is the rare, deliberate document — single or low double digits a year — so the pass is a read that finds nothing new nearly every time it runs, and a record of what the store already holds would be a second copy of what the store is |
+| A document's keys are in the order the standard describes them rather than alphabetically | Sorting them is a recommendation, and the order they are written in is the order the standard introduces them, which is what makes the document readable by eye. A checker reports neither |

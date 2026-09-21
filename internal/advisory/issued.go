@@ -89,6 +89,23 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 		q = q.Where("ai.issued_at < ?", until)
 	}
 
+	var rows []Went
+	if err := narrowed(q, subject).Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what has been published: %w", err)
+	}
+	return rows, nil
+}
+
+// narrowed is what a reader of issuances may see, as the clauses a statement
+// over "advisory_issuance" joined to "advisory" adds.
+//
+// One spelling for every such statement. Two of them ask this and they are
+// the same question — what has gone out, and what may be served from what
+// went out — so spelled twice they would disagree, and the one that disagreed
+// would hand out a document about a product somebody holds nothing on.
+//
+// It takes the alias the advisory carries in both: "ad".
+func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 	// Every product it covers is one this reader holds something on. Without
 	// it the clause below asks only whether a visibility is one they may read
 	// somewhere, so a public flaw in a product they hold nothing on passes —
@@ -107,7 +124,7 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 	// Whole rather than in part, for the reason the document is: a row saying
 	// an advisory went out, about a product this reader holds nothing on, is
 	// the disclosure the narrowing exists to stop.
-	q = q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
+	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
 		WHERE ac.advisory_id = ad.id AND ac.removed_at IS NULL AND NOT EXISTS (
 			SELECT 1 FROM "finding" AS "f"
 			JOIN "target" AS "t" ON t.id = f.target_id
@@ -117,10 +134,54 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 			  AND f.kind = ?
 			  AND f.visibility IN (?)))`,
 		finding.Entered, bun.List(readable(subject)))
+}
 
-	var rows []Went
-	if err := q.Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what has been published: %w", err)
+// Sent is one document that went out, as what publishes it reads it.
+//
+// The bytes rather than the advisory they were generated from. What a
+// directory serves is what was published, and the record it came from has
+// moved on.
+type Sent struct {
+	// Advisory is the name it went out under and Ordinal which issuance this
+	// was, counting from one. The pair is what a log line names, because a
+	// file is written from one of them and the identifier alone does not say
+	// which.
+	Advisory string `bun:"advisory"`
+	Ordinal  int    `bun:"ordinal"`
+	Document string `bun:"document"`
+}
+
+// Everything that has gone out, newest issuance first within each advisory.
+//
+// Every issuance rather than the newest of each, because whether one may be
+// served is a property of the bytes: a document about a flaw nobody outside
+// has been told about travels no further, and the newest revision of an
+// advisory can be one of those while the revision before it is already
+// public. What publishes walks each advisory until it reaches one it may
+// serve.
+//
+// Narrowed the way every other read of an issuance is, which for the
+// deployment looking at itself narrows to everything.
+func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error) {
+	if subject.Kind != access.Person {
+		return nil, access.Denied("read what advisories have gone out")
+	}
+	if products, all := subject.Products(); !all && len(products) == 0 {
+		return nil, nil
+	}
+	q := s.db.NewSelect().
+		TableExpr(`"advisory_issuance" AS "ai"`).
+		Join(`JOIN "advisory" AS "ad" ON ad.id = ai.advisory_id`).
+		ColumnExpr(`ad.identifier AS "advisory"`).
+		ColumnExpr(`ai.ordinal AS "ordinal"`).
+		ColumnExpr(`ai.document AS "document"`).
+		// By name and then newest first, so that what is written is decided
+		// by the record rather than by the order an engine chose.
+		OrderExpr("ad.identifier ASC, ai.ordinal DESC")
+
+	var rows []Sent
+	if err := narrowed(q, subject).Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read the documents that went out: %w", err)
 	}
 	return rows, nil
 }

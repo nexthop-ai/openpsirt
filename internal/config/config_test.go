@@ -61,6 +61,15 @@ func TestLoadRejectsBadValues(t *testing.T) {
 		{"PUBLISHER_CATEGORY", "vendo"},
 		{"PUBLISHER_CATEGORY", "Vendor"},
 		{"PUBLISHER_CATEGORY", ""},
+		// The address published documents state about themselves. It reaches
+		// a document and the provider description verbatim, and a reader
+		// outside this deployment is the only one who ever notices it is
+		// wrong — so a relative one, or one over a transport that does not
+		// authenticate the server, is refused here.
+		{"DIRECTORY_URL", "http://psirt.example.test/csaf"},
+		{"DIRECTORY_URL", "/csaf"},
+		{"DIRECTORY_URL", "psirt.example.test/csaf"},
+		{"DIRECTORY_URL", "https://"},
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)
@@ -70,6 +79,31 @@ func TestLoadRejectsBadValues(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), envPrefix+tc.key) {
 				t.Errorf("the refusal does not name the variable: %v", err)
+			}
+		})
+	}
+}
+
+// The address is given one trailing slash, so that everything below joins a
+// name to it rather than parsing it again.
+//
+// Both ways round: an operator who wrote the slash and one who did not
+// configured the same directory, and a document that stated the address two
+// ways would cite files the directory does not serve.
+func TestThePublishedAddressIsNormalizedWhicheverWayItWasWritten(t *testing.T) {
+	for _, given := range []string{
+		"https://psirt.example.test/.well-known/csaf",
+		"https://psirt.example.test/.well-known/csaf/",
+	} {
+		t.Run(given, func(t *testing.T) {
+			t.Setenv(envPrefix+"DIRECTORY_URL", given)
+			cfg, err := Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			const want = "https://psirt.example.test/.well-known/csaf/"
+			if cfg.DirectoryURL != want {
+				t.Errorf("read as %q, want %q", cfg.DirectoryURL, want)
 			}
 		})
 	}

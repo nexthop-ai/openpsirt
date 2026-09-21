@@ -27,6 +27,15 @@ type Named struct {
 	// is the one thing in a document that has to match what the organization
 	// already calls its advisories.
 	Prefix string
+	// Published is where a document this deployment publishes is reachable:
+	// the directory an operator serves, ending in a slash.
+	//
+	// Checked and given its slash where the setting is read, so that
+	// everything below here joins a name to it and nothing parses it a second
+	// time. A document states its own address and the directory states every
+	// file's, and two spellings of one join are two answers to "where is this
+	// document" the first time either moves.
+	Published string
 }
 
 // Stated reports whether enough is configured to name a publisher.
@@ -35,6 +44,19 @@ type Named struct {
 // document. An unconfigured deployment is told so rather than handed something
 // that fails validation wherever it is taken next.
 func (n Named) Stated() bool { return n.Name != "" && n.Namespace != "" }
+
+// Publishes reports whether this deployment knows where its documents are
+// reachable.
+//
+// A document states its own address only where there is one. An address that
+// answers nothing is worse than none, because a reader's tooling follows it.
+func (n Named) Publishes() bool { return n.Published != "" }
+
+// At is where a file in the published directory is reachable.
+//
+// The one place a name is joined to the address, for the reason the field
+// above gives.
+func (n Named) At(path string) string { return n.Published + path }
 
 // Mints reports whether enough is configured to mint an advisory identifier.
 //
