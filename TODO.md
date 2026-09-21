@@ -28,6 +28,7 @@ Mandatory, and wrong to do earlier.
 | | |
 |---|---|
 | Adapters that deliver an advisory | The document is generated and handed over; where it goes next differs completely by product (REQ-39) |
+| No screen records that a VEX document went out, and none shows what has | The two routes are an API act, as recording an advisory issuance was before its screen landed |
 | Being a CVE Numbering Authority | A direction rather than a commitment, and recorded as one: this is likely after 1.0, because filing by hand through a web page does not scale past a handful of flaws of our own. It sequences after the advisory becomes an entity with its own identity, where a CVE record is another serializer over what is stored rather than a second assembly path — and the credentials it needs are the same new class of configuration that signing a published advisory needs. It was in `REQUIREMENTS.md` § 4 with no reason beside it, which read as a decision never to |
 | The VEX profile of the CSAF document | Needs the mapping from a decision to the releases it covers. The dismissal vocabulary was aligned to VEX from the start, so no new words are needed |
 | Server-side PDF rendering for reports | Printing is the browser's and the stylesheet is the record's, which covers what a report is taken away as today |

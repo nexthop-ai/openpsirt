@@ -3681,6 +3681,8 @@ export interface paths {
          *
          *     The published document itself belongs to whoever published it. The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same.
          *
+         *     Answered whether or not a publisher is configured for this deployment. Nothing here is assembled and no author is named.
+         *
          *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
          */
         get: operations["list-vex-issuances"];
@@ -9584,6 +9586,8 @@ export interface components {
             /** @description A digest of what the document said, so that what is published and what we would generate stay answerable against each other */
             digest: string;
             issued_at: string;
+            /** @description Who published it. The act leaves this row and nothing else, so the row names them */
+            issued_by: string;
             /**
              * Format: int64
              * @description Which revision went out, counting from one. It is the version that document carries

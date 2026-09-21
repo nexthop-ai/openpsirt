@@ -357,6 +357,16 @@ func TestADeploymentThatHasNotSaidWhoItPublishesAsAnswersAConflict(t *testing.T)
 		if !strings.Contains(strings.ToLower(got.Body.String()), "publish") {
 			t.Errorf("the refusal does not say what is unconfigured: %s", got.Body.String())
 		}
+
+		// Reading what has gone out is answered all the same. It assembles
+		// nothing and names no author, so the sentence about an unconfigured
+		// publisher answers a question it was never asked.
+		if gone := asPerson(t, r, "triager", http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom/vex/issuance",
+			""); gone.Code != http.StatusOK {
+			t.Errorf("reading what has gone out answered %d: %s",
+				gone.Code, gone.Body.String())
+		}
 	})
 }
 

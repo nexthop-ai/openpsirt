@@ -8571,6 +8571,9 @@ components:
           type: string
         issued_at:
           type: string
+        issued_by:
+          description: Who published it. The act leaves this row and nothing else, so the row names them
+          type: string
         version:
           description: Which revision went out, counting from one. It is the version that document carries
           format: int64
@@ -8578,6 +8581,7 @@ components:
       required:
         - version
         - digest
+        - issued_by
         - issued_at
       type: object
     VariantBody:
@@ -19538,6 +19542,8 @@ paths:
         Readable without generating a document. Somebody deciding whether to publish a revision is asking before they generate anything, and the digest beside each entry is what answers whether the last one still describes what this would produce.
 
         The published document itself belongs to whoever published it. The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same.
+
+        Answered whether or not a publisher is configured for this deployment. Nothing here is assembled and no author is named.
 
         Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
       operationId: list-vex-issuances

@@ -78,7 +78,10 @@ type Issuance struct {
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
 	product, stream, variant string) (*Issuance, error) {
 
-	named, target, err := s.locate(ctx, subject, who, product, stream, variant)
+	if !who.Stated() {
+		return nil, errNoPublisher
+	}
+	named, target, err := s.locate(ctx, subject, product, stream, variant)
 	if err != nil {
 		return nil, err
 	}
@@ -106,9 +109,6 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			TargetID: target.ID, Digest: digest,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
-		// Read and used in one transaction, so two people recording at the
-		// same moment cannot be handed the same number.
-		//
 		// Scanned into a value rather than read through a cursor: a cursor
 		// left open while the insert runs is two statements interleaved on one
 		// connection, which one engine tolerates and another refuses.
@@ -120,8 +120,19 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			return err
 		}
 		recorded.Ordinal = highest + 1
-		_, err := tx.NewInsert().Model(recorded).Exec(ctx)
-		return err
+		// The number is read and used here, and two people recording at the
+		// same moment still read the same one — what stops them sharing it is
+		// the unique constraint, whose answer is an error. Said as a lost
+		// race, the helper re-runs the whole closure and the second reads the
+		// number the first wrote; reported as it arrives, it is a fault
+		// nobody can act on.
+		if _, err := tx.NewInsert().Model(recorded).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				return database.ErrGoAgain
+			}
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("record that it went out: %w", err)
@@ -129,28 +140,47 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	return recorded, nil
 }
 
+// Went is one issuance as a reader of the record gets it.
+//
+// The person is named rather than numbered. A record of an act that says only
+// that somebody did it answers half the question, and the row is the whole of
+// what this act leaves behind — there is no trail entry beside it.
+type Went struct {
+	Ordinal  int       `bun:"ordinal"`
+	Digest   string    `bun:"digest"`
+	IssuedBy string    `bun:"issued_by"`
+	IssuedAt time.Time `bun:"issued_at"`
+}
+
 // Issuances is what has gone out for one build, oldest first.
 //
-// Readable without generating a document. Somebody deciding whether to publish
-// a revision is asking before they generate anything, and the digest beside
-// each entry is what answers whether the last one still describes what this
-// would produce.
+// Readable without generating a document, and without a publisher configured:
+// it names no author and assembles nothing. Somebody deciding whether to
+// publish a revision is asking before they generate anything, and the digest
+// beside each entry is what answers whether the last one still describes what
+// this would produce.
 //
 // Narrowed the way the document is: a build in a product this reader may not
 // see is one they are told does not exist, and a row saying a document about
 // it went out is as much a disclosure as the document.
-func (s *Store) Issuances(ctx context.Context, subject access.Subject, who publisher.Named,
-	product, stream, variant string) ([]Issuance, error) {
+func (s *Store) Issuances(ctx context.Context, subject access.Subject,
+	product, stream, variant string) ([]Went, error) {
 
-	_, target, err := s.locate(ctx, subject, who, product, stream, variant)
+	_, target, err := s.locate(ctx, subject, product, stream, variant)
 	if err != nil {
 		return nil, err
 	}
-	var rows []Issuance
-	err = s.db.NewSelect().Model(&rows).
-		Where("target_id = ?", target.ID).
+	var rows []Went
+	err = s.db.NewSelect().
+		TableExpr(`"vex_issuance" AS "vi"`).
+		Join(`JOIN "person" AS "pe" ON pe.id = vi.issued_by`).
+		ColumnExpr(`vi.ordinal AS "ordinal"`).
+		ColumnExpr(`vi.digest AS "digest"`).
+		ColumnExpr(`pe.identity AS "issued_by"`).
+		ColumnExpr(`vi.issued_at AS "issued_at"`).
+		Where("vi.target_id = ?", target.ID).
 		OrderExpr("vi.ordinal ASC").
-		Scan(ctx)
+		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what has gone out: %w", err)
 	}

@@ -179,7 +179,10 @@ func (s *Store) carrying() int {
 func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.Named,
 	product, stream, variant string, undisclosed bool) (*Statements, error) {
 
-	named, target, err := s.locate(ctx, subject, who, product, stream, variant)
+	if !who.Stated() {
+		return nil, errNoPublisher
+	}
+	named, target, err := s.locate(ctx, subject, product, stream, variant)
 	if err != nil {
 		return nil, err
 	}
@@ -193,20 +196,24 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 	return s.document(ctx, who, named, target, visible)
 }
 
+// errNoPublisher says the deployment has not been told who it publishes as.
+//
+// Asked by the two acts that build a document, and not by the read of what has
+// gone out. That read names no author and assembles nothing, so refusing it
+// answers a question nobody asked with a sentence about a field the answer
+// does not carry.
+var errNoPublisher = errors.New("this deployment has not said who it publishes as, " +
+	"so a document has nobody to name as its author")
+
 // locate resolves the build a document is asked for and refuses anybody who
 // may not read it.
 //
-// One place, because generating a document and recording that one went out ask
-// the same question of the same names, and the second of them goes on to
-// generate the first. Asked again it is a second set of round trips for an
-// answer already in hand.
-func (s *Store) locate(ctx context.Context, subject access.Subject, who publisher.Named,
+// One place, because generating a document, recording that one went out and
+// reading what has all ask the same question of the same names. Asked again it
+// is a second set of round trips for an answer already in hand.
+func (s *Store) locate(ctx context.Context, subject access.Subject,
 	product, stream, variant string) (*catalog.Named, *catalog.Target, error) {
 
-	if !who.Stated() {
-		return nil, nil, fmt.Errorf("this deployment has not said who it publishes as, " +
-			"so a document has nobody to name as its author")
-	}
 	names := catalog.NewStore(s.db)
 	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
 	if err != nil {
@@ -466,13 +473,10 @@ func statusOf(outcome string) string {
 // identify is what the document calls itself, which is the same string every
 // time it is generated for one build.
 //
-// The publisher's own namespace and the build, and nothing that moves. An
-// identifier carrying the moment made every fetch a document in its own right:
-// a reader holding two of them has no way to say that the second supersedes
-// the first, which is the whole of what an identifier is for here. It also
-// answered the wrong question — two fetches inside one second minted the same
-// name for two different documents, because seconds is as fine as the format
-// it was written in.
+// The publisher's own namespace and the build, and nothing that moves. A
+// reader holding two documents tells a revision of one from a second document
+// by whether the identifier matches, so an identifier carrying the moment
+// answers that question wrongly however finely it is formatted.
 //
 // The names are the stored ones rather than the ones the request spelled. A
 // name people type is matched without regard to capitals, so the same build

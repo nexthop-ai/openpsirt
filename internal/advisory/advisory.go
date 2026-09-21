@@ -654,8 +654,9 @@ type Issuance struct {
 // whether what is published is still what we would generate, which only means
 // something if both sides come from here.
 //
-// The ordinal is read and used in one transaction, so two people recording an
-// issuance at the same moment cannot be handed the same number.
+// The ordinal is read and used in one transaction, and the unique constraint
+// is what refuses two people the same number — a refusal this reports as a
+// lost race, so the second attempt reads the number the first wrote.
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
 	identifier, summary string) (*Issuance, error) {
 
@@ -745,8 +746,18 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			return err
 		}
 		recorded.Ordinal = highest + 1
-		_, err := tx.NewInsert().Model(recorded).Exec(ctx)
-		return err
+		// Two people recording at the same moment read the same number, and
+		// what stops them sharing it is the unique constraint, whose answer
+		// is an error. Said as a lost race, the helper re-runs the whole
+		// closure and the second reads the number the first wrote; reported
+		// as it arrives, it is a fault nobody can act on.
+		if _, err := tx.NewInsert().Model(recorded).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				return database.ErrGoAgain
+			}
+			return err
+		}
+		return nil
 	})
 	if errors.Is(err, ErrNotAgreed) {
 		return nil, err

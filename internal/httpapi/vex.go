@@ -66,7 +66,9 @@ func registerVEX(api huma.API, in Ingest) {
 			"The published document itself belongs to whoever published it. The digest is " +
 			"over what the document says, with the moment it was generated, the version and " +
 			"the build of OpenPSIRT that wrote it left out, so a document regenerated " +
-			"unchanged hashes the same.",
+			"unchanged hashes the same.\n\n" +
+			"Answered whether or not a publisher is configured for this deployment. Nothing " +
+			"here is assembled and no author is named.",
 		Tags: []string{"Findings"},
 	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
 		"a row saying a document about this build went out is as much a disclosure as the "+
@@ -83,7 +85,7 @@ func registerVEX(api huma.API, in Ingest) {
 			if in.DB == nil {
 				return nil, noDatabase(in.Logger)
 			}
-			gone, err := vex.NewStore(in.DB.DB).Issuances(ctx, subject, in.Publisher,
+			gone, err := vex.NewStore(in.DB.DB).Issuances(ctx, subject,
 				input.Product, input.Stream, input.Variant)
 			if err != nil {
 				return nil, vexRefused(in, err, "what has gone out could not be read")
@@ -92,7 +94,7 @@ func registerVEX(api huma.API, in Ingest) {
 			out.Body.Items = make([]VEXIssuanceBody, 0, len(gone))
 			for _, one := range gone {
 				out.Body.Items = append(out.Body.Items, VEXIssuanceBody{
-					Version: one.Ordinal, Digest: one.Digest,
+					Version: one.Ordinal, Digest: one.Digest, IssuedBy: one.IssuedBy,
 					IssuedAt: one.IssuedAt.Format(time.RFC3339),
 				})
 			}
@@ -144,6 +146,7 @@ func registerVEX(api huma.API, in Ingest) {
 				Body   VEXIssuanceBody
 			}{Status: http.StatusCreated, Body: VEXIssuanceBody{
 				Version: recorded.Ordinal, Digest: recorded.Digest,
+				IssuedBy: subject.Identity,
 				IssuedAt: recorded.IssuedAt.Format(time.RFC3339),
 			}}, nil
 		})
@@ -153,6 +156,7 @@ func registerVEX(api huma.API, in Ingest) {
 type VEXIssuanceBody struct {
 	Version  int    `json:"version" doc:"Which revision went out, counting from one. It is the version that document carries"`
 	Digest   string `json:"digest" doc:"A digest of what the document said, so that what is published and what we would generate stay answerable against each other"`
+	IssuedBy string `json:"issued_by" doc:"Who published it. The act leaves this row and nothing else, so the row names them"`
 	IssuedAt string `json:"issued_at"`
 }
 

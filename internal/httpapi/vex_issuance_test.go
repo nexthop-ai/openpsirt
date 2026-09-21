@@ -92,8 +92,9 @@ func TestASecondVEXDocumentIsARevisionOfTheFirst(t *testing.T) {
 		// revision is asking.
 		var gone struct {
 			Items []struct {
-				Version int    `json:"version"`
-				Digest  string `json:"digest"`
+				Version  int    `json:"version"`
+				Digest   string `json:"digest"`
+				IssuedBy string `json:"issued_by"`
 			} `json:"items"`
 		}
 		read(t, r, "triager", aBuild+"/issuance", &gone)
@@ -107,6 +108,14 @@ func TestASecondVEXDocumentIsARevisionOfTheFirst(t *testing.T) {
 		}
 		if gone.Items[2].Digest != moved.Digest {
 			t.Errorf("the last entry is not what was last recorded")
+		}
+		// Who published it, by name. The act leaves this row and nothing
+		// else — no trail entry sits beside it — so a row that named nobody
+		// would leave "who published this" unanswerable.
+		for _, one := range gone.Items {
+			if one.IssuedBy != "triager" {
+				t.Errorf("an entry says %q published it", one.IssuedBy)
+			}
 		}
 	})
 }
@@ -211,9 +220,10 @@ func recordedIssuance(t *testing.T, r *reach, who string) struct {
 // validator a customer runs, which drops the document — the failure that looks
 // like nothing happening.
 //
-// Over every field whose name ends in the standard's suffix rather than over
-// the one that was wrong, because the next field added carries the same rule
-// and nobody will remember it.
+// Over every field the standard names as a date rather than over the one that
+// was wrong, because the next field added carries the same rule and nobody
+// will remember it. The standard spells some of them plainly — a revision's
+// and an involvement's — so the suffix alone reaches neither.
 func TestEveryDateTheDocumentStatesIsOneTheStandardParses(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
@@ -229,7 +239,8 @@ func TestEveryDateTheDocumentStatesIsOneTheStandardParses(t *testing.T) {
 			switch held := node.(type) {
 			case map[string]any:
 				for key, value := range held {
-					if text, is := value.(string); is && strings.HasSuffix(key, "_date") {
+					if text, is := value.(string); is &&
+						(key == "date" || strings.HasSuffix(key, "_date")) {
 						checked++
 						if _, err := time.Parse(time.RFC3339, text); err != nil {
 							t.Errorf("%s/%s is %q, which the standard cannot parse as a "+
@@ -249,7 +260,7 @@ func TestEveryDateTheDocumentStatesIsOneTheStandardParses(t *testing.T) {
 		// A sweep that reached nothing looks exactly like a sweep that found
 		// nothing wrong. The document states when the flaw was recorded, when
 		// it was released and when each revision happened.
-		if checked < 3 {
+		if checked < 4 {
 			t.Fatalf("only %d dates were reached, so this proves little", checked)
 		}
 	})
