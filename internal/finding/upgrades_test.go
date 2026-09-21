@@ -524,80 +524,120 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 	})
 }
 
-func TestADistributionSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
-	// Two things at once, because the second only means something if the first
-	// holds. An RPM component now has a scheme, so the per-version check in
-	// the planner runs for it rather than stopping at "this ecosystem has no
-	// ordering", which is what makes the conservative rule reachable here —
-	// and a rule nothing reaches is a rule nobody has tested.
-	for _, one := range []struct {
-		what    string
-		fixedIn []string
-		ordered bool
+func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
+	// Two things at once, because the second only means something if the
+	// first holds. An ecosystem with a scheme reaches the per-version check in
+	// the planner rather than stopping at "this ecosystem has no ordering",
+	// which is what makes the conservative rule reachable for it — and a rule
+	// nothing reaches is a rule nobody has tested. So every scheme runs this,
+	// because what each one refuses is its own.
+	for _, ecosystem := range []struct {
+		name     string
+		purl     string
+		at       string
+		places   []string
+		furthest string
 	}{
-		// Ranked: every version places, so the newest leads and reaching it
-		// reaches what the earlier one fixed.
-		{"versions that all place", []string{"3.2.1-2.fc39", "3.2.1-3.fc39"}, true},
-		// And unranked: one entry nobody can place is not a list ordered
-		// except for that entry, it is a list that is not ordered.
-		{"one entry nobody can place", []string{"3.2.1-2.fc39", "unfixed"}, false},
+		{
+			name:   "rpm",
+			purl:   "pkg:rpm/fedora/openssl@3.2.1-1.fc39",
+			at:     "3.2.1-1.fc39",
+			places: []string{"3.2.1-2.fc39", "3.2.1-3.fc39"}, furthest: "3.2.1-3.fc39",
+		},
+		{
+			name:   "apk",
+			purl:   "pkg:apk/alpine/openssl@3.3.2-r0",
+			at:     "3.3.2-r0",
+			places: []string{"3.3.2-r1", "3.3.2-r2"}, furthest: "3.3.2-r2",
+		},
+		{
+			name:   "deb",
+			purl:   "pkg:deb/debian/openssl@3.0.11-1",
+			at:     "3.0.11-1",
+			places: []string{"3.0.11-2", "3.0.14-1"}, furthest: "3.0.14-1",
+		},
+		{
+			name:   "pypi",
+			purl:   "pkg:pypi/cryptography@41.0.0",
+			at:     "41.0.0",
+			places: []string{"41.0.1", "41.0.2"}, furthest: "41.0.2",
+		},
+		{
+			name:   "maven",
+			purl:   "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+			at:     "2.14.1",
+			places: []string{"2.16.0", "2.17.1"}, furthest: "2.17.1",
+		},
 	} {
-		t.Run(one.what, func(t *testing.T) {
-			each(t, func(t *testing.T, f *fixture) {
-				pkg := graph.Described{
-					Purl:    "pkg:rpm/fedora/openssl@3.2.1-1.fc39",
-					Name:    "openssl",
-					Version: "3.2.1-1.fc39",
-				}
-				f.shipped(t, graph.Snapshot{
-					Root:         root,
-					Components:   []graph.Described{root, pkg},
-					Dependencies: []graph.Dependency{{Parent: root, Child: pkg}},
-				})
-				reported := make([]finding.Reported, 0, len(one.fixedIn))
-				for i, fixed := range one.fixedIn {
-					reported = append(reported, finding.Reported{
-						Issue: finding.Named{
-							Identifier: fmt.Sprintf("CVE-2026-90%d", i), Severity: "high",
-						},
-						Component: pkg,
-						FixState:  finding.FixedUpstream, FixedIn: fixed,
-					})
-				}
-				if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
-					t.Fatal(err)
-				}
-
-				who := f.holding(t, access.PublicTriage)
-				builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), pkg.Name)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if len(builds) != 1 {
-					t.Fatalf("%d builds carry it", len(builds))
-				}
-				up := builds[0].Upgrades
-				if len(up) != len(one.fixedIn) {
-					t.Fatalf("%d candidates, want %d", len(up), len(one.fixedIn))
-				}
-				for _, each := range up {
-					if each.Ordered != one.ordered {
-						t.Errorf("%q reads as ordered=%v, want %v",
-							each.To, each.Ordered, one.ordered)
+		for _, one := range []struct {
+			what    string
+			fixedIn []string
+			ordered bool
+		}{
+			// Ranked: every version places, so the newest leads and reaching it
+			// reaches what the earlier one fixed.
+			{"versions that all place", ecosystem.places, true},
+			// And unranked: one entry nobody can place is not a list ordered
+			// except for that entry, it is a list that is not ordered.
+			{"one entry nobody can place", []string{ecosystem.places[0], "unfixed"}, false},
+		} {
+			t.Run(ecosystem.name+"/"+one.what, func(t *testing.T) {
+				each(t, func(t *testing.T, f *fixture) {
+					pkg := graph.Described{
+						Purl:    ecosystem.purl,
+						Name:    "openssl",
+						Version: ecosystem.at,
 					}
-				}
-				if !one.ordered {
-					return
-				}
-				// Ranked means the furthest along leads, and that it reaches
-				// what the earlier release fixed as well as its own.
-				if up[0].To != "3.2.1-3.fc39" {
-					t.Errorf("the list leads with %q, want the furthest along", up[0].To)
-				}
-				if up[0].Reached != 2 {
-					t.Errorf("%q reaches %d issues, want both", up[0].To, up[0].Reached)
-				}
+					f.shipped(t, graph.Snapshot{
+						Root:         root,
+						Components:   []graph.Described{root, pkg},
+						Dependencies: []graph.Dependency{{Parent: root, Child: pkg}},
+					})
+					reported := make([]finding.Reported, 0, len(one.fixedIn))
+					for i, fixed := range one.fixedIn {
+						reported = append(reported, finding.Reported{
+							Issue: finding.Named{
+								Identifier: fmt.Sprintf("CVE-2026-90%d", i), Severity: "high",
+							},
+							Component: pkg,
+							FixState:  finding.FixedUpstream, FixedIn: fixed,
+						})
+					}
+					if _, err := f.store.Apply(t.Context(), f.target, f.run(t), reported); err != nil {
+						t.Fatal(err)
+					}
+
+					who := f.holding(t, access.PublicTriage)
+					builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), pkg.Name)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(builds) != 1 {
+						t.Fatalf("%d builds carry it", len(builds))
+					}
+					up := builds[0].Upgrades
+					if len(up) != len(one.fixedIn) {
+						t.Fatalf("%d candidates, want %d", len(up), len(one.fixedIn))
+					}
+					for _, each := range up {
+						if each.Ordered != one.ordered {
+							t.Errorf("%q reads as ordered=%v, want %v",
+								each.To, each.Ordered, one.ordered)
+						}
+					}
+					if !one.ordered {
+						return
+					}
+					// Ranked means the furthest along leads, and that it reaches
+					// what the earlier release fixed as well as its own.
+					if up[0].To != ecosystem.furthest {
+						t.Errorf("the list leads with %q, want the furthest along", up[0].To)
+					}
+					if up[0].Reached != 2 {
+						t.Errorf("%q reaches %d issues, want both", up[0].To, up[0].Reached)
+					}
+				})
 			})
-		})
+		}
 	}
 }

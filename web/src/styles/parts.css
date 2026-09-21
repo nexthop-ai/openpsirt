@@ -574,14 +574,14 @@ a.kpi:hover {
 /* What a count is made of, as one bar rather than a chip per band.
    
    Widths are the counts, so the shape is the answer: a bar that is mostly one
-   colour says where the weight is before any number is read. Chips of equal
+   color says where the weight is before any number is read. Chips of equal
    width say only which bands are present, which is the fact a reader least
    needs.
    
-   The key is not optional. Two of the severity colours are close enough that a
-   colourblind reader cannot separate them — measured at a perceptual distance
+   The key is not optional. Two of the severity colors are close enough that a
+   colorblind reader cannot separate them — measured at a perceptual distance
    of 9.6 where 15 is the floor — so the labels beside the bar are what carries
-   the identity, and the colour only reinforces it. */
+   the identity, and the color only reinforces it. */
 .sevbar {
   display: flex;
   gap: 2px;

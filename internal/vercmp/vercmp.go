@@ -40,6 +40,15 @@ const (
 	// revision — and the suffix decides whether it leads to a release or
 	// follows one.
 	APK
+	// PyPI is PEP 440: an optional epoch, a release of dotted numbers, and up
+	// to three suffixes — a pre-release, a post-release and a development
+	// release — followed by an optional local version.
+	PyPI
+	// Maven is the algorithm Maven's own comparison uses, where a version is a
+	// tree rather than a list: a hyphen opens a level, so does the boundary
+	// between digits and letters, and a word decides whether the level it sits
+	// in leads to a release or follows one.
+	Maven
 )
 
 // SchemeOf says how an ecosystem spells versions, given the type read out of a
@@ -59,6 +68,10 @@ func SchemeOf(ecosystem string) Scheme {
 		return RPM
 	case "apk":
 		return APK
+	case "pypi":
+		return PyPI
+	case "maven":
+		return Maven
 	default:
 		// Every other ecosystem, including ones that plainly do have an
 		// ordering. Adding one is adding its algorithm and the tests that show
@@ -67,6 +80,24 @@ func SchemeOf(ecosystem string) Scheme {
 		return Unordered
 	}
 }
+
+// longest is how long a string may be and still be a version.
+//
+// Two of the schemes build a structure proportional to what they are given
+// rather than walking it: a Maven version is a tree with a level per hyphen,
+// and a PEP 440 release segment is a part per dot. Measured, two megabytes of
+// "1-1-1-…" allocates 393 MB, and both operands are read before either is
+// compared. A scan document may be hundreds of megabytes, the fixed-in field
+// it carries is free text, and nothing between there and here cuts it up — so
+// without this a version nobody meant is a request for memory.
+//
+// Checked here rather than in the two schemes that need it, because the next
+// scheme added is the one where somebody forgets. The four that stream are
+// unaffected by the check and would be unaffected by its absence.
+//
+// The bound is far above every real version and far below any size worth
+// allocating for. The longest in the taken suites is 30 bytes.
+const longest = 4096
 
 // Order reports whether a sorts before, with, or after b, and whether the two
 // could be ordered at all.
@@ -79,6 +110,9 @@ func Order(scheme Scheme, a, b string) (int, bool) {
 	if a == "" || b == "" {
 		return 0, false
 	}
+	if len(a) > longest || len(b) > longest {
+		return 0, false
+	}
 	switch scheme {
 	case Debian:
 		return debianOrder(a, b)
@@ -88,6 +122,10 @@ func Order(scheme Scheme, a, b string) (int, bool) {
 		return rpmOrder(a, b)
 	case APK:
 		return apkOrder(a, b)
+	case PyPI:
+		return pypiOrder(a, b)
+	case Maven:
+		return mavenOrder(a, b)
 	default:
 		return 0, false
 	}

@@ -1,3 +1,4 @@
+import { rankedWhy, upgradeCount } from "../ui/ranked";
 import { ROLLED } from "../ui/severities";
 // The findings list's other ways of looking at the same rows.
 //
@@ -272,8 +273,8 @@ export function ByComponent({
                       (row.upgrades ?? []).slice(0, 2).map((up, i) => (
                         <div key={up.to}>
                           <span className="id">{up.to}</span>{" "}
-                          <span className="hint">
-                            {up.ordered ? `closes ${up.reached}` : `fixed ${up.fixed_here}`}
+                          <span className="hint" title={rankedWhy(up.ordered ?? false)}>
+                            {upgradeCount(up)}
                             {i === 0 && (row.upgrades ?? []).length > 2 && (
                               <> · {(row.upgrades ?? []).length - 2} more</>
                             )}

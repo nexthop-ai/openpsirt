@@ -11,8 +11,8 @@ import "strings"
 // Transcribed from Alpine's own reader rather than derived. The suffix
 // order, a leading zero turning a number into text, and an unfinished version
 // being the greater unless it stops on a pre-release suffix are each a decision
-// somebody made. `testdata/apk-version.data` is the project's own suite, which
-// is what says whether a reading of them is right.
+// somebody made. Alpine's own suite is GPL-licensed and is not taken, so the
+// cases beside this are written here, one per rule the suite taught.
 type apkToken int
 
 // The tokens, in the order a version may hold them. The order is the value:
