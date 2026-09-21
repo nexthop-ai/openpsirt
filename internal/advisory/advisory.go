@@ -2,12 +2,13 @@
 // document somebody can publish.
 //
 // We own the triage record; whoever publishes owns the published advisory.
-// The document is never sent anywhere and nothing here goes out over the
-// network: it is assembled from what is held and handed over. What is kept is
-// the record that one went out and the digest of what was generated, which is
-// what makes "is what is published still what we would generate" answerable.
-// That is the question that decides whether an integration works or rots, and
-// keeping both ends as the source of truth is how it rots.
+// Nothing here goes out over the network: a document is assembled from what is
+// held and handed over. What is kept is the record that one went out, the
+// bytes that went out, and the digest of the part of them that says what the
+// document states — which is what makes "is what is published still what we
+// would generate" answerable. That is the question that decides whether an
+// integration works or rots, and keeping both ends as the source of truth is
+// how it rots.
 //
 // Only a flaw in what we ship. A known issue in a third-party component is
 // dependency hygiene that a consumer can already read out of the
@@ -637,9 +638,18 @@ type Issuance struct {
 	// record of what went out in March asked of the advisory today answers
 	// with June's title.
 	EditionID int64 `bun:"edition_id,notnull"`
-	// Digest is what went out, hashed. The document itself belongs to
-	// whoever published it; this is what makes "is what is published still
-	// what we generated" a question with a yes or no.
+	// Document is what went out, as the bytes that went out.
+	//
+	// Kept because it cannot be worked out again. A release is added, a
+	// decision is revised, a fix lands, and the document generated from the
+	// record today is a different document — so a directory of published
+	// advisories that regenerated them would move a file whose own date says
+	// it has not moved.
+	Document string `bun:"document,notnull"`
+	// Digest is the part of those bytes that says what the document states,
+	// hashed. It answers "is what is published still what we generate" where
+	// the document answers "what was published", and both are written from
+	// one document in one statement.
 	Digest   string    `bun:"digest,notnull"`
 	Summary  string    `bun:"summary"`
 	IssuedBy int64     `bun:"issued_by,notnull"`
@@ -735,17 +745,37 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			Digest: digest, Summary: summary,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
-		// Scanned into a value rather than read through a cursor: a cursor
+		// What has gone out already, read here rather than carried in from
+		// the document above. The document was assembled outside this
+		// transaction, so a second writer that committed in between left its
+		// count of issuances one behind — and that count is the version the
+		// document states and the history it lists. Read here they agree with
+		// the record under any order the two writers arrive in.
+		//
+		// Scanned into values rather than read through a cursor: a cursor
 		// left open while the insert runs is two statements interleaved on one
 		// connection, which one engine tolerates and another refuses.
-		var highest int
-		if err := tx.NewSelect().Model((*Issuance)(nil)).
-			ColumnExpr("COALESCE(MAX(ordinal), 0)").
+		var gone []Issuance
+		if err := tx.NewSelect().Model(&gone).
+			Column("ordinal", "issued_at", "summary").
 			Where("advisory_id = ?", row.ID).
-			Scan(ctx, &highest); err != nil {
+			OrderExpr("ordinal ASC").
+			Scan(ctx); err != nil {
 			return err
 		}
-		recorded.Ordinal = highest + 1
+		recorded.Ordinal = 1
+		if len(gone) > 0 {
+			recorded.Ordinal = gone[len(gone)-1].Ordinal + 1
+		}
+		// The bytes that go out, which are the only copy of this moment. What
+		// would be generated tomorrow is a different document, so a reader
+		// handed the regenerated one would be handed something nobody
+		// published.
+		body, err := json.Marshal(issuedDocument(doc, gone, recorded.Ordinal, issuedAt, summary))
+		if err != nil {
+			return fmt.Errorf("write down what went out: %w", err)
+		}
+		recorded.Document = string(body)
 		// Two people recording at the same moment read the same number, and
 		// what stops them sharing it is the unique constraint, whose answer
 		// is an error. Said as a lost race, the helper re-runs the whole
@@ -836,6 +866,10 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 func (s *Store) issuances(ctx context.Context, row *Advisory) ([]Issuance, error) {
 	var rows []Issuance
 	err := s.db.NewSelect().Model(&rows).
+		// Without the documents. This answers the revision history and the
+		// list of what went out, neither of which reads one, and a document
+		// is the largest column here by a wide margin.
+		ExcludeColumn("document").
 		Where("advisory_id = ?", row.ID).
 		OrderExpr("ai.ordinal ASC").
 		Scan(ctx)
@@ -845,21 +879,72 @@ func (s *Store) issuances(ctx context.Context, row *Advisory) ([]Issuance, error
 	return rows, nil
 }
 
-func revisions(opened time.Time, gone []Issuance, now time.Time) []Revision {
+// issuedDocument is the document as it goes out.
+//
+// A copy rather than the document in hand. The transaction this is called in
+// may run again, and a retry has to find what it was given as it was.
+//
+// Everything volatile is dated at the moment it left. The document was
+// assembled a little earlier, and a file whose date says when it was generated
+// is one a reader re-fetches because the bytes moved while the advisory did
+// not.
+//
+// The history is rebuilt from what has gone out rather than taken from the
+// document, for the reason the ordinal is read inside the transaction: the
+// assembled one lists what had gone out when it was assembled, and an issuance
+// that committed in between leaves a number missing from the middle of it,
+// which a validator reports.
+func issuedDocument(doc *Document, gone []Issuance, ordinal int,
+	at time.Time, summary string) *Document {
+
+	out := *doc
+	version := strconv.Itoa(ordinal + 1)
+	out.Document.Tracking.Version = version
+	out.Document.Tracking.CurrentReleaseDate = at
+	if doc.Document.Tracking.Generator != nil {
+		generator := *doc.Document.Tracking.Generator
+		generator.Date = at
+		out.Document.Tracking.Generator = &generator
+	}
+	out.Document.Tracking.RevisionHistory = append(
+		history(doc.Document.Tracking.InitialReleaseDate, gone),
+		Revision{Number: version, Date: at, Summary: summaryOrIssued(summary)})
+	return &out
+}
+
+// history is what has gone out, as the document lists it.
+//
+// The first entry is the flaw being recorded here, which is what the document
+// dates itself from, and one entry per issuance after it. A revision is
+// numbered one past its ordinal because the recording is the first.
+func history(opened time.Time, gone []Issuance) []Revision {
 	out := make([]Revision, 0, len(gone)+2)
 	out = append(out, Revision{Number: "1", Date: opened, Summary: "Recorded in OpenPSIRT"})
 	for _, one := range gone {
-		summary := one.Summary
-		if summary == "" {
-			summary = "Issued"
-		}
 		out = append(out, Revision{
-			Number: strconv.Itoa(one.Ordinal + 1), Date: one.IssuedAt.UTC(), Summary: summary,
+			Number: strconv.Itoa(one.Ordinal + 1), Date: one.IssuedAt.UTC(),
+			Summary: summaryOrIssued(one.Summary),
 		})
 	}
-	// Only where something has gone out before. A document nobody has
-	// published is not a revision of anything: its newest entry is the flaw
-	// being recorded, which is what it describes.
+	return out
+}
+
+// summaryOrIssued is what a revision says about itself. A history whose every
+// entry reads the same is one nobody reads, and one entry with nothing at all
+// is an entry a validator refuses.
+func summaryOrIssued(summary string) string {
+	if summary == "" {
+		return "Issued"
+	}
+	return summary
+}
+
+func revisions(opened time.Time, gone []Issuance, now time.Time) []Revision {
+	out := history(opened, gone)
+	// The document in hand, named as what it is. Only where something has
+	// gone out before: a document nobody has published is not a revision of
+	// anything, and its newest entry is the flaw being recorded, which is
+	// what it describes.
 	//
 	// It is also the one case where counting the version separately agrees
 	// with the history by accident, which is why the disagreement shows only

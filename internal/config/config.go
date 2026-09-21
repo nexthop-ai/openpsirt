@@ -204,6 +204,39 @@ type Config struct {
 	// worse than refusing to mint: the refusal is fixed once by an operator,
 	// and the identifier is in every document that went out.
 	AdvisoryPrefix string
+	// The static directory of advisories that have gone out, which somebody
+	// else's web server serves. Absent is ordinary: with none of this set,
+	// documents are generated and handed over and nothing is written
+	// anywhere.
+	//
+	// DirectoryURL is where the files are reachable, which only the operator
+	// knows — every address the directory states about itself is built from
+	// it. The rest is where the files are put, and mirrors the attachment
+	// store because it is the same store with a different destination: the
+	// bucket is what turns the object store on, credentials are optional
+	// where the environment supplies a role, and the directory on disk is
+	// the one a web server on this machine reads.
+	//
+	// A store of its own rather than the attachment bucket. Attachments are
+	// in no public bucket and every fetch of one is authorized (REQ-70);
+	// these files are served to anybody, so putting them in one place would
+	// mean a bucket that is both.
+	DirectoryURL       string
+	DirectoryBucket    string
+	DirectoryEndpoint  string
+	DirectoryRegion    string
+	DirectoryKey       string
+	DirectorySecret    string
+	DirectoryToken     string
+	DirectoryPathStyle bool
+	DirectoryAllowHTTP bool
+	DirectoryDir       string
+	// DirectoryList and DirectoryMirror are what the deployment tells
+	// aggregators it is content with. The standard reads an answer it cannot
+	// get as listed and not mirrored, which is what these default to.
+	DirectoryList   bool
+	DirectoryMirror bool
+
 	// UpstreamInternal are names this deployment never sends to a public
 	// package index, on top of the ones derived from the publisher's
 	// namespace and from what the scans were about.
@@ -296,7 +329,25 @@ func Load() (Config, error) {
 			env("ATTACHMENT_ENDPOINT", "") != ""),
 		// No default of its own, and it follows nothing: what it allows has to
 		// be somebody's decision rather than a consequence of another setting.
-		AttachmentAllowHTTP:    r.boolean("ATTACHMENT_ALLOW_HTTP", false),
+		AttachmentAllowHTTP: r.boolean("ATTACHMENT_ALLOW_HTTP", false),
+		DirectoryURL:        env("DIRECTORY_URL", ""),
+		DirectoryBucket:     env("DIRECTORY_BUCKET", ""),
+		DirectoryEndpoint:   env("DIRECTORY_ENDPOINT", ""),
+		DirectoryRegion:     env("DIRECTORY_REGION", ""),
+		DirectoryKey:        env("DIRECTORY_KEY", ""),
+		DirectorySecret:     env("DIRECTORY_SECRET", ""),
+		DirectoryToken:      env("DIRECTORY_SESSION_TOKEN", ""),
+		DirectoryDir:        env("DIRECTORY_DIR", ""),
+		// Both follow the endpoint the way the attachment store's do, and
+		// for the same reasons: path style is what a self-hosted store
+		// usually wants, and accepting a plaintext one has to be somebody's
+		// decision rather than a consequence of another setting.
+		DirectoryPathStyle: r.boolean("DIRECTORY_PATH_STYLE",
+			env("DIRECTORY_ENDPOINT", "") != ""),
+		DirectoryAllowHTTP: r.boolean("DIRECTORY_ALLOW_HTTP", false),
+		// The standard's own reading of an answer nobody gave.
+		DirectoryList:          r.boolean("DIRECTORY_LIST", true),
+		DirectoryMirror:        r.boolean("DIRECTORY_MIRROR", false),
 		PublisherName:          env("PUBLISHER_NAME", ""),
 		PublisherNamespace:     env("PUBLISHER_NAMESPACE", ""),
 		PublisherCategory:      env("PUBLISHER_CATEGORY", "vendor"),

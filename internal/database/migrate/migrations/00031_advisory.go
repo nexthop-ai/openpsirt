@@ -38,11 +38,12 @@ func init() {
 // why the agreement names the edition rather than the advisory. Editing opens
 // a new edition and takes back every approval standing on the one it replaced.
 //
-// The published advisory itself stays the platform's rather than ours: this
-// records the act, not the document. The digest is what makes the two
-// answerable against each other — "is what is published still what we
-// generated" is a question with a yes or no, rather than a comparison of two
-// documents nobody kept.
+// The document that went out is kept beside the act. Whoever publishes owns
+// the published advisory; what is held here is the bytes this deployment
+// generated and handed over, which is the only copy of a moment that has
+// passed. The digest beside it is over the part of those bytes that says what
+// the document states, so "is what is published still what we generate" stays
+// a question with a yes or no.
 func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -155,9 +156,21 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 			-- does not, so asked of the advisory today a record of what went
 			-- out in March answers with June's title.
 			"edition_id"  ` + t.ref + ` NOT NULL,
-			-- What went out, hashed. The document is not kept here — it
-			-- belongs to whoever published it — and the digest is what makes
-			-- "is what is published still what we generated" answerable.
+			-- What went out, and the same bytes hashed.
+			--
+			-- The document is kept because it cannot be worked out again: a
+			-- release is added, a decision is revised, a fix lands, and what
+			-- would be generated today is a different document. A directory
+			-- of published advisories serves the bytes that went out, and
+			-- regenerating them would move a file whose date says it has not
+			-- moved.
+			--
+			-- The digest is over the part of those bytes that says what the
+			-- document states, so it answers "is what is published still
+			-- what we generated" while the document answers "what was
+			-- published". Both are written from the one document in the one
+			-- statement.
+			"document"    ` + t.free + ` NOT NULL,
 			"digest"      ` + t.hash + ` NOT NULL,
 			-- What somebody wants said about this revision, where they said
 			-- anything. A revision history whose every entry reads the same is

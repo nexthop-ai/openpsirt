@@ -314,9 +314,8 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"generate\" a question you had to build a CSAF document to answer, and " +
 			"somebody deciding whether to publish a revision is asking before they " +
 			"generate anything.\n\n" +
-			"The published document itself belongs to whoever published it. The digest is " +
-			"what makes the comparison possible, and it was taken from the document " +
-			"generated here rather than from anything sent.",
+			"The digest is what makes the comparison possible, and it was taken from " +
+			"the document generated here rather than from anything sent.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
@@ -454,8 +453,9 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"cannot carry a revision history or a higher version, and both are things CSAF " +
 			"validators check; a document that fails validation is one a customer's tooling " +
 			"drops.\n\n" +
-			"The published advisory itself stays with whoever published it. The digest is " +
-			"what makes \"is what is published still what we generate\" a question with an " +
+			"The document as it goes out is kept, because it cannot be worked out again: " +
+			"what would be generated tomorrow is a different document. The digest beside " +
+			"it makes \"is what is published still what we generate\" a question with an " +
 			"answer, and it is taken from the document generated here rather than from " +
 			"anything sent — a digest of whatever a caller says answers nothing.\n\n" +
 			"Answers 409 where nobody has agreed to what the advisory says.",
