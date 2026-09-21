@@ -188,6 +188,34 @@ rather than for tidiness.
 | Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
 | Documentation builds | The documentation site built | Python, and nothing else needs it |
 
+### CI caches
+
+| Cache | Holds | Keyed on | Saved |
+|---|---|---|---|
+| Go modules | Every module the tree and the pinned tools need, extracted and as downloaded | `go.sum` | When the key is new |
+| Go build | The tree compiled plain and race-instrumented, its test binaries' objects, and the five tools built from source | The run, restored by prefix so a run starts from the newest | On `main` |
+| Image layers | Every stage's layers | The buildkit scope | On `main` |
+
+A pull request's run restores all three and writes none of them: what its
+build would save is keyed to its own commit, which no later run builds, and a
+branch's scope is read by nothing but that branch. The store holds 10 GB and
+evicts what was used least recently, so a cache written for nobody is a cache
+that pushes out one somebody reads.
+
+A fresh Go build cache for this tree is 2.1 GB, 470 MB as stored; the race
+flavor is 640 MB of it and the tools 840 MB. Saved on `main` alone and trimmed
+by Go of anything unused for five days, it carries that many days of compiled
+versions besides.
+
+A layer written after the source is copied is keyed to the commit, so nothing
+a later commit builds reuses it. The image's Go steps mount the Go build cache
+rather than writing it into their layers, and the bill-of-materials tool is
+fetched before the source is copied, beside `go mod download`, so its modules
+sit in a layer every commit reuses. With the cache inside the layers, the
+compile step's layer was 441 MB and the bill-of-materials step's 499 MB per
+commit, and each run exported about 420 MB of blobs no later run read; the
+same two steps are 39 MB and 131 kB, the binary and the document.
+
 Dependency review is not a fourth job. The action needs GitHub Advanced
 Security on a private repository — a paid add-on, per active committer, that
 nothing else in this organization buys. Targets cover what it checks, and cover
