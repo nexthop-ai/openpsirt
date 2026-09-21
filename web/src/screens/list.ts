@@ -138,6 +138,10 @@ export function widened(path: string, params: URLSearchParams): string {
   const rest = new URLSearchParams(params);
   rest.delete("stream");
   rest.delete("variant");
+  // What is specific to a variant goes with the variant it was about. Left
+  // standing, the chip says "only this variant" over a list narrowed by no
+  // such thing, and the control offering it no longer has the value it holds.
+  if (rest.get("variants") === "only") rest.delete("variants");
   const cut = path.indexOf("?");
   const base = cut < 0 ? path : path.slice(0, cut);
   const own = cut < 0 ? "" : path.slice(cut + 1);

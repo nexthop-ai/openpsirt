@@ -217,6 +217,79 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 			issuedAll/measured, per(total, issuedAll))
 		t.Logf("%d component versions moved across the year", moved)
 		report("after a year")
+
+		// What the two questions about variants cost. They are the only reads
+		// here that correlate a subquery per row, and the branch is given a
+		// second build first: a filter comparing a row with the other
+		// variants of its branch has nothing to reach where the branch holds
+		// one.
+		//
+		// Taken after the counts above so that the year's table describes the
+		// same one build it always did.
+		second, err := cat.DeclareVariant(ctx, product.ID, "mellanox", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		beside, err := cat.TargetFor(ctx, branch.ID, second.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		versionOf := func(i int) string { return version[i] }
+		scan, _, err := scans.Record(ctx, ingest.Arriving{
+			TargetID: beside.ID, ContentHash: "beside", BuiltAt: built,
+			ParserVersion: "measure",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := graphs.Apply(ctx, beside.ID, scan.ID, shape(versionOf)); err != nil {
+			t.Fatal(err)
+		}
+		run, err := store.Begin(ctx, finding.Run{
+			TargetID: beside.ID, Scanner: "measure",
+			ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Apply(ctx, beside.ID, run.ID,
+			reports(versionOf, (nights-1)*arriving)); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
+			t.Fatal(err)
+		}
+
+		onBranch := finding.Scope{ProductID: &product.ID, StreamID: &branch.ID}
+		start := time.Now()
+		_, common, err := store.Groups(ctx, who, onBranch, 50, 0,
+			finding.Filter{AcrossVariants: finding.EveryVariant})
+		if err != nil {
+			t.Fatalf("common to every variant: %v", err)
+		}
+		everyTook := time.Since(start)
+
+		ofOne := finding.Scope{
+			ProductID: &product.ID, StreamID: &branch.ID, VariantID: &second.ID,
+		}
+		start = time.Now()
+		_, specific, err := store.Groups(ctx, who, ofOne, 50, 0,
+			finding.Filter{AcrossVariants: finding.OnlyThisVariant})
+		if err != nil {
+			t.Fatalf("specific to one variant: %v", err)
+		}
+		onlyTook := time.Since(start)
+
+		start = time.Now()
+		_, all, err := store.Groups(ctx, who, onBranch, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatalf("the same list unnarrowed: %v", err)
+		}
+		plain := time.Since(start)
+		t.Logf("    two builds of one branch: list %s (%d rows) · every %s (%d) · only %s (%d)",
+			plain.Round(time.Millisecond), all,
+			everyTook.Round(time.Millisecond), common,
+			onlyTook.Round(time.Millisecond), specific)
 	})
 }
 

@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 func TestTheFiltersATriagerReachesFor(t *testing.T) {
@@ -340,9 +343,29 @@ func TestSpreadAcrossVariantsIsAskedOfOneVariantOrOfAll(t *testing.T) {
 	// it of a selection naming none is refused in words; "common to every
 	// variant" is a question about the branch and needs none.
 	twoReach(t, func(t *testing.T, r *reach) {
-		r.scannedWithEvidence(t)
+		// One issue on both builds of the branch and one on the first alone.
+		// Without the second, the product holds a single group and every
+		// answer here is 1 — including the one a deleted arm gives.
+		r.scan(t, "two-variants", graph.Snapshot{
+			Root:       seededRoot,
+			Components: []graph.Described{seededConsumer, seededLib},
+			Dependencies: []graph.Dependency{
+				{Parent: seededRoot, Child: seededConsumer},
+				{Parent: seededConsumer, Child: seededLib},
+			},
+		}, []finding.Reported{
+			{
+				Issue:     finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+				Component: seededLib,
+				FixState:  finding.FixedUpstream, FixedIn: "3.9.0",
+			},
+			{
+				Issue:     finding.Named{Identifier: "CVE-2026-1111", Severity: "high"},
+				Component: seededLib,
+			},
+		})
 		// The same issue at the same version, so the two builds of master
-		// hold one group between them.
+		// hold one group between them, and the other build holds one more.
 		r.scannedAlso(t, "mellanox", "3.7.0")
 
 		const at = "/v1/products/mine/findings"
@@ -355,11 +378,18 @@ func TestSpreadAcrossVariantsIsAskedOfOneVariantOrOfAll(t *testing.T) {
 			read(t, r, "triager", at+"?"+query, &page)
 			return page.Total
 		}
+		if all := count(t, ""); all != 2 {
+			t.Fatalf("the unnarrowed list is %d groups, want the two seeded", all)
+		}
 		if got := count(t, "across_variants=every"); got != 1 {
-			t.Errorf("an issue both variants hold is common to %d groups, want 1", got)
+			t.Errorf("one of the two issues is on both variants, and %d came back", got)
 		}
 		if got := count(t, "variant=mellanox&across_variants=only"); got != 0 {
 			t.Errorf("an issue both variants hold is specific to mellanox in %d groups, want 0", got)
+		}
+		if got := count(t, "variant=broadcom&across_variants=only"); got != 1 {
+			t.Errorf("the issue only the first build holds is specific to it in %d groups, want 1",
+				got)
 		}
 		if got := count(t, "variant=mellanox&across_variants=every"); got != 1 {
 			t.Errorf("asked from one variant, what every variant holds is %d groups, want 1", got)

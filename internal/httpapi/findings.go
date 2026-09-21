@@ -378,7 +378,7 @@ type Paging struct {
 type AtOneBuild struct {
 	Beneath        string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused"`
 	Differs        bool   `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
-	AcrossVariants string `query:"across_variants" enum:"only,every" doc:"Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held"`
+	AcrossVariants string `query:"across_variants" enum:"only,every" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
 }
 
 func registerFindings(api huma.API, in Ingest) {

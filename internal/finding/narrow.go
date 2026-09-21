@@ -393,17 +393,17 @@ type Filter struct {
 	// DiffersBetweenBuilds is measured against. Set by whoever resolved the
 	// selection, because the filter cannot see it.
 	Builds int
-	// AcrossVariants keeps groups by how they are spread over the variants
-	// of the selection's branches: only the named variant holds them, or
-	// every variant does. Compared within a branch, so a fix a newer branch
-	// landed everywhere does not read as specific to the variant being
+	// AcrossVariants keeps rows by how they are spread over the variants of
+	// the branch they sit on: only the named variant holds them there, or
+	// every variant does. Compared on that branch, so a fix a newer branch
+	// landed on every variant does not read as specific to the variant being
 	// looked at.
 	AcrossVariants VariantSpread
-	// Targets is the builds the selection holds, and VariantID the variant
-	// it names, where it names one. Both set by whoever resolved the
-	// selection, for the reason Builds is: AcrossVariants compares against
-	// the other builds on the same branches, and the filter cannot see
-	// which those are.
+	// VariantID is the variant the selection names, where it names one.
+	// Targets is the builds it holds, which AcrossVariants reads as the
+	// signal that a selection was resolved at all: applied to a filter
+	// nobody resolved, its comparison would find nothing anywhere and keep
+	// every row as though it were unique.
 	Targets   []int64
 	VariantID *int64
 	// Visible is what the reader may see, set with the two above. A finding
@@ -759,48 +759,52 @@ type VariantSpread string
 const (
 	// AnyVariants is no narrowing by spread.
 	AnyVariants VariantSpread = ""
-	// OnlyThisVariant keeps groups no other variant on the same branches
-	// holds open — what is specific to the variant the selection names.
+	// OnlyThisVariant keeps rows no other variant of the same branch holds
+	// open — what is specific to the variant the selection names.
 	OnlyThisVariant VariantSpread = "only"
-	// EveryVariant keeps groups every build on the same branches holds open
-	// — what is common to the product rather than to how it was built.
+	// EveryVariant keeps rows every build of the same branch holds open —
+	// what is common to the product rather than to how it was built.
 	EveryVariant VariantSpread = "every"
 )
 
-// acrossVariants keeps groups by how the variants of the selection's branches
-// share them.
+// onThisRowsBranch is the branch the row's own build sits on.
 //
-// The comparison population is every build on the branches the selection
-// holds, whatever its variant, less the selection's own variant for "only".
-// Compared on the branch rather than across the product: a finding on every
-// variant of one branch and none of the next is a fact about the branches,
-// and asked of the whole product it would read as specific to a variant.
+// Spelled as a scalar subquery, which is how the other five lookups of this
+// shape here are written, rather than as a join correlated outward from
+// inside a subquery.
+const onThisRowsBranch = `(SELECT tg0.stream_id FROM "target" AS "tg0"` +
+	` WHERE tg0.id = f.target_id)`
+
+// acrossVariants keeps rows by how the variants of a branch share them.
 //
-// A group is held elsewhere where the same issue is open at the same fold,
-// which is the grain the list groups by. Correlated on the row's component
-// through a join of its own rather than on the fold column of the outer
-// query, because not every query this narrows has the component joined.
+// The comparison is against the other builds on the row's own branch, whatever
+// the selection holds. Taken over the selection's branches together, a
+// selection naming a variant and leaving the branch at all compares each row
+// against every other variant on either branch: an issue open on one branch's
+// variant and on a different variant of another branch is dropped from "only",
+// though on its own branch nothing else has it.
+//
+// A row is held elsewhere where the same issue is open at the same fold, which
+// is the grain the list groups by. The fold is looked up from the row's
+// component rather than read off the outer query, because not every query this
+// narrows has the component joined under a known name.
 //
 // Both conditions are placed on the rows rather than as a HAVING, because the
-// answer depends only on the group's key and so is the same for every row in
-// it — and the queries this narrows do not all group at the same grain.
+// question is about a place: a group open on two branches keeps the places
+// where its variant is alone with it and drops the places where it is not.
 func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 	if f.AcrossVariants == AnyVariants || len(f.Targets) == 0 {
 		return q
 	}
-	// The branches the selection holds, as the builds on them.
-	branches := q.NewSelect().TableExpr(`"target" AS "tg1"`).
-		ColumnExpr("tg1.stream_id").
-		Where("tg1.id IN (?)", bun.List(f.Targets))
 	// The same issue at the same fold, open and seen by this reader; which
 	// build is added by the caller.
 	heldElsewhere := func() *bun.SelectQuery {
 		return q.NewSelect().TableExpr(`"finding" AS "f2"`).
 			Join(`JOIN "component" AS "c2" ON c2.id = f2.component_id`).
-			Join(`JOIN "component" AS "c1" ON c1.id = f.component_id`).
 			ColumnExpr("1").
 			Where("f2.vulnerability_id = f.vulnerability_id").
-			Where("c2.fold_key = c1.fold_key").
+			Where(`c2.fold_key = (SELECT c1.fold_key FROM "component" AS "c1"`+
+				` WHERE c1.id = f.component_id)`).
 			Where("f2.closed_at IS NULL").
 			Where("f2.visibility IN (?)", bun.List(f.Visible))
 	}
@@ -814,15 +818,15 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 		}
 		others := q.NewSelect().TableExpr(`"target" AS "tg2"`).
 			ColumnExpr("tg2.id").
-			Where("tg2.stream_id IN (?)", branches).
+			Where("tg2.stream_id = "+onThisRowsBranch).
 			Where("tg2.variant_id <> ?", *f.VariantID)
 		return q.Where("NOT EXISTS (?)", heldElsewhere().
 			Where("f2.target_id IN (?)", others))
 	case EveryVariant:
-		// No build on those branches lacks it.
+		// No build on the row's own branch lacks it.
 		lacking := q.NewSelect().TableExpr(`"target" AS "tg2"`).
 			ColumnExpr("tg2.id").
-			Where("tg2.stream_id IN (?)", branches).
+			Where("tg2.stream_id = "+onThisRowsBranch).
 			Where("NOT EXISTS (?)", heldElsewhere().Where("f2.target_id = tg2.id"))
 		return q.Where("NOT EXISTS (?)", lacking)
 	}

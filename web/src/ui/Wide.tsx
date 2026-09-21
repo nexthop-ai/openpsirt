@@ -66,7 +66,12 @@ export function Wide({
       data-wider={wider ? "yes" : undefined}
       data-clipped={clipped || undefined}
       // Focusable only while there is somewhere to scroll to: a tab stop on
-      // a box that does not move is a stop for nothing.
+      // a box that does not move is a stop for nothing. Named with it,
+      // because a reader who tabs onto a bare container is told nothing about
+      // what took focus — the note above the table is generated content and
+      // is not a name.
+      role={wider ? "region" : undefined}
+      aria-label={wider ? "Table, scrolls sideways" : undefined}
       tabIndex={wider ? 0 : undefined}
       style={style}
     >
