@@ -4,12 +4,7 @@ import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
-import {
-  JUSTIFICATIONS,
-  JUSTIFICATIONS_CORRECTING,
-  labeled,
-  type Justification,
-} from "./Outcome";
+import { JUSTIFICATIONS, JUSTIFICATIONS_CORRECTING, labeled, type Justification } from "./Outcome";
 import { Covering, type Sitting } from "./Covering";
 import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";

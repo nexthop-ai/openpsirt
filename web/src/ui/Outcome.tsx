@@ -16,7 +16,8 @@ const said: Record<string, { label: string; color: string; means: string }> = {
   mismatched: {
     label: "Wrong match",
     color: "var(--ok)",
-    means: "the scanner matched this against something that is not here, and no version bump makes that right",
+    means:
+      "the scanner matched this against something that is not here, and no version bump makes that right",
   },
   deferred: {
     label: "Deferred",
@@ -142,8 +143,7 @@ export const JUSTIFICATIONS = [
 // endpoint refuses them; offering them here would be a refusal somebody meets
 // after writing the reasoning.
 export const JUSTIFICATIONS_CORRECTING = JUSTIFICATIONS.filter(
-  (each) =>
-    each.value === "component_not_present" || each.value === "vulnerable_code_not_present",
+  (each) => each.value === "component_not_present" || each.value === "vulnerable_code_not_present",
 );
 
 // The exchange format's own vocabulary, named as it is stored.
