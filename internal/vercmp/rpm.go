@@ -8,8 +8,9 @@ import "strings"
 // something to reason out from a description — the tilde and caret rules, a
 // numeric run outranking an alphabetic one, and separators being skipped
 // wholesale are each a decision somebody made, and the published test vectors
-// are what say whether a reading of them is right. `testdata/rpmvercmp.at` is
-// that suite, taken from the project's own tests.
+// are what say whether a reading of them is right. That suite is GPL-licensed
+// and is not taken, so the cases beside this are written here, one per rule
+// the suite taught.
 //
 // The refusal is this package's and not rpm's. rpm orders any two strings,
 // which reads as a scheme that never fails: an advisory stating its fixed

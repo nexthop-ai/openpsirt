@@ -580,7 +580,7 @@ coordinator's. Keyed on the fold, so packages built from one source are one row.
 | Rule | |
 |---|---|
 | **No action column** | That is what the By fix view was deleted for. The package name opens the component, where the upgrade is planned; a source package that builds three binaries is one upgrade and three links |
-| Versions are listed, not ordered | This view does not rank them: an ordering exists for four ecosystems and not for the rest, and a list ordered for some packages and not others reads as one ordering somebody can trust. So one package appears once per version upstream released, and there is no nearest and no latest |
+| Versions are listed, not ordered | This view does not rank them: an ordering exists per ecosystem rather than in general, and a list ordered for some packages and not others reads as one ordering somebody can trust. So one package appears once per version upstream released, and there is no nearest and no latest |
 | The filters it cannot apply are named on the screen | It takes six of the list's thirty-odd; the rest ask about a place, a deadline or an assignee, and an upgrade has none of those. Dropping them quietly widens the list back out while the chips go on saying they are on |
 | Nothing here counts places | An upgrade is a fold. What it says is the packages it moves, the issues it would close, and the builds that hold it |
 | **The word on screen is "upgrade"** | It read "bump", which is not the word the decisions use. A vocabulary a screen and a document share reads as two things when it is spelled two ways, which is the rule the product name is already held to |

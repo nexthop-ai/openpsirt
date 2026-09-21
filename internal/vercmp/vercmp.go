@@ -40,6 +40,15 @@ const (
 	// revision — and the suffix decides whether it leads to a release or
 	// follows one.
 	APK
+	// PyPI is PEP 440: an optional epoch, a release of dotted numbers, and up
+	// to three suffixes — a pre-release, a post-release and a development
+	// release — followed by an optional local version.
+	PyPI
+	// Maven is the algorithm Maven's own comparison uses, where a version is a
+	// tree rather than a list: a hyphen opens a level, so does the boundary
+	// between digits and letters, and a word decides whether the level it sits
+	// in leads to a release or follows one.
+	Maven
 )
 
 // SchemeOf says how an ecosystem spells versions, given the type read out of a
@@ -59,6 +68,10 @@ func SchemeOf(ecosystem string) Scheme {
 		return RPM
 	case "apk":
 		return APK
+	case "pypi":
+		return PyPI
+	case "maven":
+		return Maven
 	default:
 		// Every other ecosystem, including ones that plainly do have an
 		// ordering. Adding one is adding its algorithm and the tests that show
@@ -88,6 +101,10 @@ func Order(scheme Scheme, a, b string) (int, bool) {
 		return rpmOrder(a, b)
 	case APK:
 		return apkOrder(a, b)
+	case PyPI:
+		return pypiOrder(a, b)
+	case Maven:
+		return mavenOrder(a, b)
 	default:
 		return 0, false
 	}

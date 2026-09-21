@@ -122,6 +122,16 @@ func TestOrderingIsAntisymmetric(t *testing.T) {
 		{vercmp.APK, "1.2.0-r1", "1.2.0-r2"},
 		{vercmp.APK, "8.2.0015", "8.2.002"},
 		{vercmp.APK, "1.2.0_alpha", "1.2.0_beta"},
+		{vercmp.PyPI, "1.0.dev1", "1.0a1"},
+		{vercmp.PyPI, "1.0", "1.0.post1"},
+		{vercmp.PyPI, "1.0", "1.0+local"},
+		{vercmp.PyPI, "1.0+abc", "1.0+1"},
+		{vercmp.PyPI, "1!0.1", "2.0"},
+		{vercmp.Maven, "1-alpha-1", "1"},
+		{vercmp.Maven, "1", "1-sp"},
+		{vercmp.Maven, "1.0.0.rc1", "1.0.0-rc2"},
+		{vercmp.Maven, "1-snapshot", "1"},
+		{vercmp.Maven, "1", "1-abc"},
 	} {
 		forward, ok := vercmp.Order(each.scheme, each.a, each.b)
 		if !ok {
@@ -158,11 +168,11 @@ func TestAnEcosystemIsOrderedByTheSchemeItsIdentifierNames(t *testing.T) {
 		{"cargo", vercmp.Semantic},
 		{"rpm", vercmp.RPM},
 		{"apk", vercmp.APK},
+		{"pypi", vercmp.PyPI},
+		{"maven", vercmp.Maven},
 		// Ecosystems that plainly do have an ordering, and whose algorithm is
 		// not written here. Claiming one is the confident wrong answer this
 		// package exists to refuse.
-		{"pypi", vercmp.Unordered},
-		{"maven", vercmp.Unordered},
 		{"gem", vercmp.Unordered},
 		{"generic", vercmp.Unordered},
 		{"oci", vercmp.Unordered},
@@ -245,7 +255,9 @@ func TestTheSchemeFollowsThePackageIdentifierARealScanCarries(t *testing.T) {
 		{"pkg:apk/alpine/busybox@1.37.0-r14?arch=x86_64", vercmp.APK},
 		{"pkg:deb/debian/libc6@2.41", vercmp.Debian},
 		{"pkg:golang/github.com/example/mod@v1.2.3", vercmp.Semantic},
-		{"pkg:pypi/requests@2.31.0", vercmp.Unordered},
+		{"pkg:pypi/requests@2.31.0", vercmp.PyPI},
+		{"pkg:maven/org.apache.logging.log4j/log4j-core@2.17.1", vercmp.Maven},
+		{"pkg:gem/rack@3.1.8", vercmp.Unordered},
 	} {
 		if got := vercmp.SchemeOf(graph.EcosystemOf(each.purl)); got != each.want {
 			t.Errorf("%s is ordered as %v, want %v", each.purl, got, each.want)
