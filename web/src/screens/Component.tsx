@@ -13,6 +13,7 @@ import { on } from "../ui/when";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Pace } from "../ui/Charts";
+import { ranked, rankedLabel, rankedWhy, upgradeCount } from "../ui/ranked";
 import { ROLLED } from "../ui/severities";
 import { Severity } from "../ui/Severity";
 import { Shape } from "../ui/Shape";
@@ -509,7 +510,7 @@ function Sits({
 // are equal and the panel says so.
 function Landed({ here }: { here: Build }) {
   const landed = here.upgrades ?? [];
-  const ordered = landed[0]?.ordered ?? false;
+  const ordered = ranked(landed);
   const total = here.fixable ?? 0;
 
   return (
@@ -751,9 +752,7 @@ function Upgrade({
                 >
                   <span className="id">{each.to}</span>
                   <span className="why">
-                    {each.ordered
-                      ? `closes ${(each.reached ?? 0).toLocaleString()}`
-                      : `fixed ${(each.fixed_here ?? 0).toLocaleString()} of its own`}
+                    {upgradeCount(each, " of its own")}
                     {i === 0 && each.ordered && " · furthest along"}
                   </span>
                 </button>
@@ -763,15 +762,8 @@ function Upgrade({
               <li className="hint">{landed.length - SHOWN} more, in the table beside this</li>
             )}
           </ul>
-          <span
-            className="hint"
-            title={
-              landed[0]?.ordered
-                ? "A later release carries the earlier fixes too, so the first closes the most."
-                : "Each count is what that release fixed itself, because these versions could not be put in order."
-            }
-          >
-            {landed[0]?.ordered ? "Furthest along first" : "Not ranked"}
+          <span className="hint" title={rankedWhy(ranked(landed))}>
+            {rankedLabel(ranked(landed))}
           </span>
         </div>
 
