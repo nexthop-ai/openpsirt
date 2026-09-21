@@ -370,12 +370,14 @@ and what is running out anywhere" with the weaker of the two lists. The server
 has no such split: both routes take the same filters from one definition.
 
 What is absent without a product is what has no meaning without one. A subtree
-is a walk over one build's edges and "differs between builds" is a statement
-about a selection, so neither is offered and neither is sent — dropped from the
-query rather than left in the address, because a filter somebody can no longer
-see or clear is one that narrows a list for reasons it does not show. Saved
-filters, deciding from the list and the export are a product's own and come back
-the moment a product is picked.
+is a walk over one build's edges, and "differs between builds" and the spread
+across variants are statements about a selection, so none is offered and none
+is sent — dropped from the query rather than left in the address, because a
+filter somebody can no longer see or clear is one that narrows a list for
+reasons it does not show. "Only this variant" is likewise offered and sent only
+where the selection names a variant, because it is a question about that one.
+Saved filters, deciding from the list and the export are a product's own and
+come back the moment a product is picked.
 
 The product becomes a column where it varies, and the row links to that product's
 list.

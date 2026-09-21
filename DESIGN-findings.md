@@ -771,6 +771,7 @@ the day a second variant was seeded, and the list went from 7,354 items to
 | An item still names a build | A screen has to link somewhere. It is one of the builds rather than the only one, chosen stably, with the count of builds beside it |
 | Acting on it acts on all of it | Assigning covers every build of the product holding the component. Assigning one build would leave the identical work unassigned beside it |
 | Counted in pieces of work | Counted in findings, one kernel flaw assigned to one person read as forty-eight held against her on the summary and as the single item it is in her own list. Late is counted the same way: a piece of work is late when any of its places is |
+| The spread over variants is asked within a branch | A group is specific to a variant when no other variant on the same branches holds the issue at the same fold, and common when every build on those branches holds it. Compared across the product, a branch whose one variant holds an issue would make it read as variant-specific on every other branch. A group held at another version elsewhere is a different row and counts as not held, which is the rule above that genuine differences break out by themselves |
 
 Measured on two variants of one switch image: 7,587 rows on one and 7,610 on the
 other, which is 15,197 rows read one build at a time. Across the product it is

@@ -334,3 +334,40 @@ func TestEveryRowIsReachableBySomeFixState(t *testing.T) {
 		}
 	})
 }
+
+func TestSpreadAcrossVariantsIsAskedOfOneVariantOrOfAll(t *testing.T) {
+	// "Specific to this variant" is a question about one variant, so asking
+	// it of a selection naming none is refused in words; "common to every
+	// variant" is a question about the branch and needs none.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		// The same issue at the same version, so the two builds of master
+		// hold one group between them.
+		r.scannedAlso(t, "mellanox", "3.7.0")
+
+		const at = "/v1/products/mine/findings"
+		count := func(t *testing.T, query string) int {
+			t.Helper()
+			var page struct {
+				Items []struct{} `json:"items"`
+				Total int        `json:"total"`
+			}
+			read(t, r, "triager", at+"?"+query, &page)
+			return page.Total
+		}
+		if got := count(t, "across_variants=every"); got != 1 {
+			t.Errorf("an issue both variants hold is common to %d groups, want 1", got)
+		}
+		if got := count(t, "variant=mellanox&across_variants=only"); got != 0 {
+			t.Errorf("an issue both variants hold is specific to mellanox in %d groups, want 0", got)
+		}
+		if got := count(t, "variant=mellanox&across_variants=every"); got != 1 {
+			t.Errorf("asked from one variant, what every variant holds is %d groups, want 1", got)
+		}
+		refused := asPerson(t, r, "triager", http.MethodGet, at+"?across_variants=only", "")
+		if refused.Code != http.StatusUnprocessableEntity {
+			t.Errorf("specific to no variant answered %d, want 422: %s",
+				refused.Code, refused.Body.String())
+		}
+	})
+}

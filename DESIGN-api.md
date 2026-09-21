@@ -266,10 +266,15 @@ rather than from one number chosen for the page. `severity` raises the line for
 the whole page and never lowers it below what a product decided; `below_floor`
 turns every line off.
 
-The filters belonging to one build are not offered rather than answered from
-whichever build sorted first: `beneath` walks one build's edges, and `differs` is
-a statement about a selection of builds. Everything else is one struct shared by
-both endpoints.
+The filters belonging to one product's builds are not offered across products
+rather than answered from whichever build sorted first: `beneath` walks one
+build's edges, and `differs` and `across_variants` are statements about a
+selection of builds. Everything else is one struct shared by both endpoints.
+
+`across_variants` compares the selection's builds with the other builds on the
+same branches. `only` keeps what no other variant on the branch holds and is
+refused unless the selection names a variant; `every` keeps what every build on
+those branches holds and needs none.
 
 Still per product: the dependency tree, the inventories, and the list of work
 nobody owns.

@@ -12922,6 +12922,8 @@ export interface operations {
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
+                /** @description Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held */
+                across_variants?: "only" | "every";
                 /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only issues somebody is known to be exploiting */
@@ -13071,6 +13073,8 @@ export interface operations {
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
+                /** @description Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held */
+                across_variants?: "only" | "every";
                 /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only issues somebody is known to be exploiting */
@@ -13182,6 +13186,8 @@ export interface operations {
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
+                /** @description Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held */
+                across_variants?: "only" | "every";
                 /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only issues somebody is known to be exploiting */
@@ -13296,6 +13302,8 @@ export interface operations {
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
+                /** @description Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held */
+                across_variants?: "only" | "every";
                 /** @description Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating */
                 severity?: "low" | "medium" | "high" | "critical";
                 /** @description Keep only issues somebody is known to be exploiting */

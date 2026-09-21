@@ -373,10 +373,12 @@ type Paging struct {
 
 // AtOneBuild narrows a list within a single product's builds, and has no
 // meaning across products: a subtree is a walk over one build's edges, and
-// "differs between builds" is a statement about a selection.
+// "differs between builds" and the spread across variants are statements
+// about a selection.
 type AtOneBuild struct {
-	Beneath string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused"`
-	Differs bool   `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
+	Beneath        string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused"`
+	Differs        bool   `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
+	AcrossVariants string `query:"across_variants" enum:"only,every" doc:"Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held"`
 }
 
 func registerFindings(api huma.API, in Ingest) {

@@ -71,9 +71,10 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	filter.Across = true
 	filter.ProductID = 0
 	filter.HeldBy = subject.Mine()
-	// Both are statements about a selection of builds, which this is not.
+	// All three are statements about a selection of builds, which this is not.
 	filter.Builds = 0
 	filter.DiffersBetweenBuilds = false
+	filter.AcrossVariants = AnyVariants
 	// The line is applied per product below rather than from the filter's one
 	// word, so the filter's own is turned off — including its inverse, which
 	// would otherwise ask for what is beneath a line that is not in the query.

@@ -14045,6 +14045,16 @@ paths:
           schema:
             description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
             type: boolean
+        - description: Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held
+          explode: false
+          in: query
+          name: across_variants
+          schema:
+            description: Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held
+            enum:
+              - only
+              - every
+            type: string
         - description: Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating
           explode: false
           in: query
@@ -14578,6 +14588,16 @@ paths:
           schema:
             description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
             type: boolean
+        - description: Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held
+          explode: false
+          in: query
+          name: across_variants
+          schema:
+            description: Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held
+            enum:
+              - only
+              - every
+            type: string
         - description: Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating
           explode: false
           in: query
@@ -15035,6 +15055,16 @@ paths:
           schema:
             description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
             type: boolean
+        - description: Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held
+          explode: false
+          in: query
+          name: across_variants
+          schema:
+            description: Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held
+            enum:
+              - only
+              - every
+            type: string
         - description: Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating
           explode: false
           in: query
@@ -15518,6 +15548,16 @@ paths:
           schema:
             description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
             type: boolean
+        - description: Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held
+          explode: false
+          in: query
+          name: across_variants
+          schema:
+            description: Keep only groups spread over the variants of the selection's branches one of these ways. 'only' keeps what no other variant on the same branch holds open — what is specific to the variant named — and is refused unless a variant is named. 'every' keeps what every build on those branches holds open, which is what is common to the product rather than to how it was built. Compared within a branch, so a fix one branch landed on every variant does not make the older branch's rows read as variant-specific. The same issue held at another version elsewhere is a different row and counts as not held
+            enum:
+              - only
+              - every
+            type: string
         - description: Keep only issues rated this badly or worse. 'low' excludes nothing, including issues carrying no rating
           explode: false
           in: query

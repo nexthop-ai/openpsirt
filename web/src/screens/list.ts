@@ -341,6 +341,9 @@ export function listQuery(params: URLSearchParams) {
     ...(dueWithin !== undefined ? { due_within: dueWithin } : {}),
     ...(params.get("sent_back") === "1" ? { sent_back: true } : {}),
     ...(params.get("differs") === "1" ? { differs: true } : {}),
+    ...(params.get("variants") === "only" || params.get("variants") === "every"
+      ? { across_variants: params.get("variants") as "only" | "every" }
+      : {}),
     ...(publishers.length > 0 ? { vex_publisher: publishers } : {}),
     ...(vexStatus.length > 0
       ? {
@@ -367,12 +370,25 @@ export function listQuery(params: URLSearchParams) {
 // left in the address, so switching a product off does not silently narrow by
 // something the reader can no longer see or clear.
 export function acrossProducts(query: ReturnType<typeof listQuery>) {
-  const { beneath, differs, ...rest } = query as ReturnType<typeof listQuery> & {
+  const { beneath, differs, across_variants, ...rest } = query as ReturnType<typeof listQuery> & {
     beneath?: string;
     differs?: boolean;
+    across_variants?: string;
   };
   void beneath;
   void differs;
+  void across_variants;
+  return rest;
+}
+
+// What is specific to a variant is a question about one of them, so the
+// server refuses it where the selection names none. Dropped here for the
+// same reason the two above are: a filter left in the address after the
+// variant it was about is widened away narrows nothing and refuses the list.
+export function withinVariant(query: ReturnType<typeof listQuery>, named: boolean) {
+  if (named || query.across_variants !== "only") return query;
+  const { across_variants, ...rest } = query;
+  void across_variants;
   return rest;
 }
 
