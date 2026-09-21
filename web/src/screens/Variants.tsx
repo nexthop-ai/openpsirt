@@ -174,7 +174,7 @@ export function Variants() {
                     </span>
                   </td>
                   <td className="num">{(variant.open ?? 0).toLocaleString()}</td>
-                  <td className="actions">
+                  <td>
                     {stream ? (
                       <Link
                         to={`${buildPath({ product, stream, variant: variant.name ?? "" })}/findings`}
@@ -185,7 +185,12 @@ export function Variants() {
                     ) : (
                       who.data?.admin && (
                         <>
-                          <button type="button" className="linkish" onClick={() => edit(variant)}>
+                          <button
+                            type="button"
+                            className="linkish"
+                            title="Correct its name, or whether it ships to customers."
+                            onClick={() => edit(variant)}
+                          >
                             Edit
                           </button>{" "}
                           <button
@@ -217,7 +222,7 @@ export function Variants() {
         error={amend.error}
         busy={amend.isPending || renameTo.trim() === ""}
         ok="Save"
-        hint="A name cannot be corrected once a VEX document has gone out for this variant: readers already hold the document by it. Retire it and declare the intended name instead."
+        hint="A name cannot be corrected once a VEX document has gone out: readers hold the document by it."
       >
         <Field
           label="Name"
