@@ -204,6 +204,41 @@ type Config struct {
 	// worse than refusing to mint: the refusal is fixed once by an operator,
 	// and the identifier is in every document that went out.
 	AdvisoryPrefix string
+	// The static directory of advisories that have gone out, which somebody
+	// else's web server serves. Absent is ordinary: with none of this set,
+	// documents are generated and handed over and nothing is written
+	// anywhere.
+	//
+	// DirectoryURL is where the files are reachable, which only the operator
+	// knows — every address the directory states about itself, and the
+	// address each document states for itself, is built from it. Checked and
+	// given its trailing slash here, so that nothing below joins a name to it
+	// twice over. The rest is where the files are put, and mirrors the attachment
+	// store because it is the same store with a different destination: the
+	// bucket is what turns the object store on, credentials are optional
+	// where the environment supplies a role, and the directory on disk is
+	// the one a web server on this machine reads.
+	//
+	// A store of its own rather than the attachment bucket. Attachments are
+	// in no public bucket and every fetch of one is authorized (REQ-70);
+	// these files are served to anybody, so putting them in one place would
+	// mean a bucket that is both.
+	DirectoryURL       string
+	DirectoryBucket    string
+	DirectoryEndpoint  string
+	DirectoryRegion    string
+	DirectoryKey       string
+	DirectorySecret    string
+	DirectoryToken     string
+	DirectoryPathStyle bool
+	DirectoryAllowHTTP bool
+	DirectoryDir       string
+	// DirectoryList and DirectoryMirror are what the deployment tells
+	// aggregators it is content with. The standard reads an answer it cannot
+	// get as listed and not mirrored, which is what these default to.
+	DirectoryList   bool
+	DirectoryMirror bool
+
 	// UpstreamInternal are names this deployment never sends to a public
 	// package index, on top of the ones derived from the publisher's
 	// namespace and from what the scans were about.
@@ -296,7 +331,25 @@ func Load() (Config, error) {
 			env("ATTACHMENT_ENDPOINT", "") != ""),
 		// No default of its own, and it follows nothing: what it allows has to
 		// be somebody's decision rather than a consequence of another setting.
-		AttachmentAllowHTTP:    r.boolean("ATTACHMENT_ALLOW_HTTP", false),
+		AttachmentAllowHTTP: r.boolean("ATTACHMENT_ALLOW_HTTP", false),
+		DirectoryURL:        env("DIRECTORY_URL", ""),
+		DirectoryBucket:     env("DIRECTORY_BUCKET", ""),
+		DirectoryEndpoint:   env("DIRECTORY_ENDPOINT", ""),
+		DirectoryRegion:     env("DIRECTORY_REGION", ""),
+		DirectoryKey:        env("DIRECTORY_KEY", ""),
+		DirectorySecret:     env("DIRECTORY_SECRET", ""),
+		DirectoryToken:      env("DIRECTORY_SESSION_TOKEN", ""),
+		DirectoryDir:        env("DIRECTORY_DIR", ""),
+		// Both follow the endpoint the way the attachment store's do, and
+		// for the same reasons: path style is what a self-hosted store
+		// usually wants, and accepting a plaintext one has to be somebody's
+		// decision rather than a consequence of another setting.
+		DirectoryPathStyle: r.boolean("DIRECTORY_PATH_STYLE",
+			env("DIRECTORY_ENDPOINT", "") != ""),
+		DirectoryAllowHTTP: r.boolean("DIRECTORY_ALLOW_HTTP", false),
+		// The standard's own reading of an answer nobody gave.
+		DirectoryList:          r.boolean("DIRECTORY_LIST", true),
+		DirectoryMirror:        r.boolean("DIRECTORY_MIRROR", false),
 		PublisherName:          env("PUBLISHER_NAME", ""),
 		PublisherNamespace:     env("PUBLISHER_NAMESPACE", ""),
 		PublisherCategory:      env("PUBLISHER_CATEGORY", "vendor"),
@@ -390,6 +443,49 @@ func Load() (Config, error) {
 	if c.AdvisoryPrefix != "" && !advisoryPrefix.MatchString(c.AdvisoryPrefix) {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADVISORY_PREFIX: want a letter followed by up "+
 			"to nineteen letters, digits or hyphens, got %q", c.AdvisoryPrefix)
+	}
+	// The address published documents state about themselves, refused at
+	// startup beside the three above and for the reason those are: it reaches
+	// a document and the directory verbatim, and a reader outside this
+	// deployment is the only one who ever notices it is wrong. Over TLS,
+	// because the standard requires the documents to be retrievable over a
+	// transport that authenticates the server.
+	//
+	// Checked whether or not a store is configured to write into. The
+	// documents state it too, so an address that answers nothing is in every
+	// document generated while it is set.
+	if where := strings.TrimSpace(c.DirectoryURL); where != "" {
+		at, err := url.Parse(where)
+		if err != nil {
+			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: %w", err)
+		}
+		// An address and nothing else. A name is joined to the end of this, so
+		// anything the address carries after its path lands in the middle of
+		// the result: a query becomes part of the filename in every document's
+		// own address, and a password in the address is published in every one
+		// of them and kept in the bytes that went out.
+		if at.Scheme != "https" || at.Host == "" || at.User != nil ||
+			at.RawQuery != "" || at.Fragment != "" {
+			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: want an https address "+
+				"with no query, fragment or credentials, got %q", where)
+		}
+		// One trailing slash, so that a name joined to it is a file inside the
+		// directory rather than a sibling of it. Every trailing slash, because
+		// an operator who wrote two configured the same directory.
+		at.Path = strings.TrimRight(at.Path, "/") + "/"
+		c.DirectoryURL = at.String()
+	}
+	// A store to write into and nowhere it is served from is the
+	// half-configuration the mail pair above is refused for, and it fails the
+	// same way: the files are written, every address in them is a name with
+	// nothing in front of it, and nothing says so. The other way round writes
+	// nothing anywhere.
+	if (strings.TrimSpace(c.DirectoryBucket) != "" || strings.TrimSpace(c.DirectoryDir) != "") &&
+		strings.TrimSpace(c.DirectoryURL) == "" {
+		return Config{}, fmt.Errorf(
+			"OPENPSIRT_DIRECTORY_URL: set it alongside OPENPSIRT_DIRECTORY_BUCKET or " +
+				"OPENPSIRT_DIRECTORY_DIR — a directory written with no address it is " +
+				"served from states addresses nobody can resolve")
 	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")

@@ -21,6 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/config"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/directory"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -208,6 +209,14 @@ func run(args []string, stdout, stderr *os.File) error {
 		return err
 	}
 
+	// Where the advisories that have gone out are written for somebody else
+	// to serve. Nothing configured is the ordinary case: documents are
+	// generated and handed over, and no directory is written.
+	published, err := directoryStore(ctx, cfg, logger)
+	if err != nil {
+		return err
+	}
+
 	// An API-only build serves no page and says so once; a binary whose
 	// embedded interface cannot be read at all is broken and refuses to
 	// start. Two different states, told apart here, because serving nothing
@@ -277,12 +286,9 @@ func run(args []string, stdout, stderr *os.File) error {
 		BaseURL:         cfg.BaseURL,
 		PlainHTTP:       cfg.PlainHTTP,
 		SessionLifetime: cfg.SessionLifetime,
-		Publisher: publisher.Named{
-			Name: cfg.PublisherName, Namespace: cfg.PublisherNamespace,
-			Category: cfg.PublisherCategory, Prefix: cfg.AdvisoryPrefix,
-		},
-		Mode:  roleMode(settings),
-		Files: files,
+		Publisher:       publishesAs(cfg),
+		Mode:            roleMode(settings),
+		Files:           files,
 		// The names that never leave, derived once here and read by the pass
 		// that asks and by the report saying what it held back. Two
 		// derivations of one boundary would be two boundaries the first time
@@ -344,11 +350,41 @@ func run(args []string, stdout, stderr *os.File) error {
 	// moment to notice: a worker that was killed reports nothing, so the row
 	// would sit claimed for ever and read everywhere else as work in progress.
 	undertaker := queue.NewUndertaker(work, queue.NewLeases(db.DB), name, logger)
+	// Writes the advisories that have gone out where somebody else's web
+	// server can serve them. Nil where this deployment publishes no
+	// directory, which is ordinary.
+	writer := directory.New(db.DB, published, publishesAs(cfg), directory.Config{
+		List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror,
+	}, logger)
+	// A store configured and nothing written to it. The address is refused
+	// where it is read if a store is configured without one, so what is left
+	// is the publisher, which is configured elsewhere and is what every
+	// document in the directory names. Said here rather than left as a
+	// directory that stays empty for ever.
+	if published != nil && writer == nil {
+		logger.Warn("a store for published advisories is configured and nothing is " +
+			"written to it: set OPENPSIRT_PUBLISHER_NAME and OPENPSIRT_PUBLISHER_NAMESPACE")
+	}
 	return serve(cfg, logger, handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
-		undertaker: undertaker,
+		undertaker: undertaker, publish: writer,
 	})
+}
+
+// publishesAs is the identity this deployment publishes under, and where what
+// it publishes is reachable.
+//
+// One value rather than one per reader of it. A document names the publisher
+// and states its own address, and the directory names the publisher and states
+// every file's, so two constructions of this are two deployments the first
+// time either grows a field.
+func publishesAs(cfg config.Config) publisher.Named {
+	return publisher.Named{
+		Name: cfg.PublisherName, Namespace: cfg.PublisherNamespace,
+		Category: cfg.PublisherCategory, Prefix: cfg.AdvisoryPrefix,
+		Published: cfg.DirectoryURL,
+	}
 }
 
 // readInterval is how long an idle reader waits before asking for work again.
@@ -571,6 +607,9 @@ type passes struct {
 	// undertaker sets aside work whose worker never came back, which is the
 	// only pass that observes a worker having died at all.
 	undertaker *queue.Undertaker
+	// publish writes the advisories that have gone out as a directory
+	// somebody else serves. Nil where this deployment writes none.
+	publish *directory.Writer
 }
 
 // background starts every pass that has something to work on, and answers
@@ -627,6 +666,11 @@ func (p passes) loops() []loop {
 	}
 	if p.keeper != nil {
 		all = append(all, loop{"sweep unattached files", p.keeper.Run, 0})
+	}
+	// And the third: directory.New answers nil where no address or no store
+	// for it is configured.
+	if p.publish != nil {
+		all = append(all, loop{"write the published advisory directory", p.publish.Run, 0})
 	}
 	return all
 }
@@ -895,6 +939,69 @@ func noteStoreInTheClear(bucket *attach.Bucket, logger *slog.Logger) {
 	}
 	logger.Warn("attachment links cross the network in the clear",
 		"endpoint", bucket.Endpoint())
+}
+
+// directoryStore is where the published advisory directory is written, or
+// nothing where an operator configured nowhere.
+//
+// Its own store rather than the attachment one. Every file here is served to
+// anybody who asks and every attachment is authorized before it is handed
+// over (REQ-70), so one destination would have to be both — and a bucket that
+// is public because half of what it holds must be is the shape that leaks the
+// other half.
+//
+// The local directory is a deployment here, unlike for attachments: a web
+// server on this machine reading the same disk is the ordinary way to serve
+// static files. It is written by one process, so it wants a replica of its
+// own and a volume of its own, and the configuration page says so.
+//
+// Its files are made readable by whoever serves them. Written the way
+// attachments are, a web server running as its own user is refused every file
+// and the directory looks empty.
+func directoryStore(ctx context.Context, cfg config.Config,
+	logger *slog.Logger) (attach.Storage, error) {
+
+	bucket, err := attach.NewBucket(ctx, attach.BucketConfig{
+		Endpoint:  cfg.DirectoryEndpoint,
+		Bucket:    cfg.DirectoryBucket,
+		Region:    cfg.DirectoryRegion,
+		Key:       cfg.DirectoryKey,
+		Secret:    cfg.DirectorySecret,
+		Token:     cfg.DirectoryToken,
+		PathStyle: cfg.DirectoryPathStyle,
+		AllowHTTP: cfg.DirectoryAllowHTTP,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if bucket != nil {
+		// Asked now rather than at the first pass. A bucket that does not
+		// answer is a configuration mistake, and the moment to report one is
+		// while whoever made it is still watching the logs.
+		if err := bucket.Reachable(ctx); err != nil {
+			return nil, err
+		}
+		logger.Info("published advisories are written to an object store",
+			"bucket", cfg.DirectoryBucket)
+		return bucket, nil
+	}
+	local, err := attach.NewServedFiles(cfg.DirectoryDir)
+	// Named with the setting the operator typed. The store says "file
+	// directory" for either of the two it backs, so an operator who has just
+	// pointed this at a mount they cannot write would otherwise go and check
+	// attachment settings that are fine.
+	if err != nil {
+		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.DirectoryDir, err)
+	}
+	if local == nil {
+		return nil, nil
+	}
+	if err := local.Reachable(ctx); err != nil {
+		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.DirectoryDir, err)
+	}
+	logger.Info("published advisories are written to a directory on this machine",
+		"directory", cfg.DirectoryDir)
+	return local, nil
 }
 
 // attachmentStore is where attachments go, or nothing where an operator

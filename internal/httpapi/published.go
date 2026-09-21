@@ -26,7 +26,7 @@ type WentBody struct {
 	Summary  string `json:"summary,omitempty"`
 	IssuedBy string `json:"issued_by"`
 	IssuedAt string `json:"issued_at"`
-	Digest   string `json:"digest" doc:"The document's digest when it went out. The published document belongs to whoever published it; this is what makes comparing it possible"`
+	Digest   string `json:"digest" doc:"The digest of what the document stated when it went out, which is what makes comparing it against what would be generated now possible"`
 }
 
 // registerPublished answers what advisories went out over a period.

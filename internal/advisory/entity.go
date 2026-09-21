@@ -64,6 +64,15 @@ type Advisory struct {
 	// at one edition rather than at the advisory, so this moving is exactly
 	// what withdraws an approval.
 	EditionID *int64 `bun:"edition_id"`
+	// ReleasedFrom is the moment the document dates itself from, written
+	// when it first goes out and never again.
+	//
+	// Until then it is worked out from the flaws the advisory covers, which
+	// is the earliest moment this deployment knew about any of them. Left to
+	// move, naming an older flaw after publication would change what a
+	// published document says its first release was — and the year folder a
+	// reader already found it in is that date's year.
+	ReleasedFrom *time.Time `bun:"released_from"`
 	// Title is what somebody called it, read from that edition rather than
 	// stored here. Absent until anybody says otherwise, and the document
 	// falls back to naming the issues it covers.

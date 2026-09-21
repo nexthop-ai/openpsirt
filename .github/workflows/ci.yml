@@ -230,7 +230,11 @@ jobs:
             COMMIT=${{ github.sha }}
             DATE=${{ github.event.repository.updated_at }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Exported from main alone. A pull request's run reads main's layers
+          # and writes none: what its build would export is keyed to its own
+          # commit, which no later run builds, and a branch's scope is read by
+          # nothing but that branch.
+          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max' || '' }}
       # The same checks the local target runs, against the image just built.
       # Written twice they drifted: the image's scanner was checked here and
       # not there, the chart's refusal to render without a database there and

@@ -13,6 +13,11 @@
 // Packages therefore share nothing and can run in parallel; tests within a
 // package share the database and empty it between them with Reset, as before.
 //
+// A package whose tests start from the same rows declares them once as a
+// Seeded template. On SQLite the seed is applied to the template before the
+// first copy, so the rows cost nothing per test; on a server it is applied per
+// test, after the database is emptied.
+//
 // Tests within a package run beside each other when SQLite is the only engine
 // in the run, because SQLite is the only engine where each test already holds
 // a database of its own. See the note at run.
@@ -98,7 +103,7 @@ func candidates() []candidate {
 // closed afterwards.
 func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 	t.Helper()
-	run(t, fn, nil, beside)
+	run(t, plain(fn), nil, beside, nil)
 }
 
 // Alone is Each for a test that cannot run beside another in its package.
@@ -116,7 +121,7 @@ func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 // needs a fixture of its own instead.
 func Alone(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 	t.Helper()
-	run(t, fn, nil, alone)
+	run(t, plain(fn), nil, alone, nil)
 }
 
 // Two runs fn against SQLite and PostgreSQL only.
@@ -137,7 +142,7 @@ func Alone(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 // handler test that pins what a query returns, hides, conflicts on or spells.
 func Two(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 	t.Helper()
-	run(t, fn, map[database.Engine]bool{database.SQLite: true, database.Postgres: true}, beside)
+	run(t, plain(fn), map[database.Engine]bool{database.SQLite: true, database.Postgres: true}, beside, nil)
 }
 
 // Servers runs fn against the three server engines and not SQLite.
@@ -159,7 +164,7 @@ func Servers(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 			servers[engine] = true
 		}
 	}
-	run(t, fn, servers, beside)
+	run(t, plain(fn), servers, beside, nil)
 }
 
 // Only runs fn against one engine.
@@ -182,7 +187,7 @@ func Servers(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 // something no engine varies.
 func Only(t *testing.T, engine database.Engine, fn func(t *testing.T, db *database.DB)) {
 	t.Helper()
-	run(t, fn, map[database.Engine]bool{engine: true}, beside)
+	run(t, plain(fn), map[database.Engine]bool{engine: true}, beside, nil)
 }
 
 // company is whether a test may run beside the others in its package.
@@ -193,7 +198,28 @@ const (
 	alone  company = false
 )
 
-func run(t *testing.T, fn func(t *testing.T, db *database.DB), only map[database.Engine]bool, keep company) {
+// body is what run drives: a test, its database, and what a seed made, which
+// is nil where nothing was seeded.
+type body = func(t *testing.T, db *database.DB, made any)
+
+// plain adapts a test body that takes no seed.
+func plain(fn func(t *testing.T, db *database.DB)) body {
+	return func(t *testing.T, db *database.DB, _ any) {
+		t.Helper()
+		fn(t, db)
+	}
+}
+
+// seeder is a Seeded template of any type, which is what run needs of one.
+type seeder interface {
+	// sqlite is the seeded template's bytes and what the seed made, built
+	// once per binary.
+	sqlite() ([]byte, any, error)
+	// server seeds an emptied server database for one test.
+	server(ctx context.Context, db *database.DB) (any, error)
+}
+
+func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, seed seeder) {
 	t.Helper()
 	wanted := enginesWanted()
 	running := runnable(only, wanted)
@@ -228,7 +254,37 @@ func run(t *testing.T, fn func(t *testing.T, db *database.DB), only map[database
 					t.Skipf("%s is not set, so %s is untested here", c.env, c.name)
 				}
 			}
-			fn(t, Open(t, prepared(t, c.name, base)))
+			if c.name == database.SQLite {
+				var made any
+				template, err := sqliteTemplate()
+				if seed != nil {
+					template, made, err = seed.sqlite()
+				}
+				if err != nil {
+					t.Fatalf("build the SQLite template: %v", err)
+				}
+				fn(t, Open(t, sqliteCopy(t, template)), made)
+				return
+			}
+			own, err := serverDatabase(c.name, base)
+			if err != nil {
+				t.Fatalf("prepare a %s database for this package: %v", c.name, err)
+			}
+			db := Open(t, own)
+			var made any
+			if seed != nil {
+				// The package's one database on this server holds whatever
+				// the previous test left, so it is emptied and seeded again
+				// for each test: the copy that makes the seed free on SQLite
+				// has no counterpart on a server.
+				if err := clear(t.Context(), db); err != nil {
+					t.Fatalf("empty the %s database before seeding it: %v", c.name, err)
+				}
+				if made, err = seed.server(t.Context(), db); err != nil {
+					t.Fatalf("seed the %s database: %v", c.name, err)
+				}
+			}
+			fn(t, db, made)
 		})
 	}
 	if len(running) == 0 {
@@ -283,32 +339,17 @@ func Open(t *testing.T, url string) *database.DB {
 	return db
 }
 
-// prepared returns the URL of a migrated database for this test.
-//
-// SQLite: a copy of a template migrated once per binary, in a directory of
-// the test's own. A file rather than :memory:, because every pooled
-// connection to an in-memory database gets its own empty database, which
-// makes migrations appear to vanish between statements.
-//
-// Servers: the binary's own database, created and migrated on first use.
-func prepared(t *testing.T, engine database.Engine, base string) string {
+// sqliteCopy returns the URL of a copy of template, in a directory of the
+// test's own. A file rather than :memory:, because every pooled connection to
+// an in-memory database gets its own empty database, which makes migrations
+// appear to vanish between statements.
+func sqliteCopy(t *testing.T, template []byte) string {
 	t.Helper()
-	if engine == database.SQLite {
-		template, err := sqliteTemplate()
-		if err != nil {
-			t.Fatalf("build the SQLite template: %v", err)
-		}
-		path := filepath.Join(sqliteDir(t), "test.db")
-		if err := os.WriteFile(path, template, 0o600); err != nil {
-			t.Fatalf("copy the SQLite template: %v", err)
-		}
-		return "sqlite://" + path + sqliteTestPragmas
+	path := filepath.Join(sqliteDir(t), "test.db")
+	if err := os.WriteFile(path, template, 0o600); err != nil {
+		t.Fatalf("copy the SQLite template: %v", err)
 	}
-	own, err := serverDatabase(engine, base)
-	if err != nil {
-		t.Fatalf("prepare a %s database for this package: %v", engine, err)
-	}
-	return own
+	return "sqlite://" + path + sqliteTestPragmas
 }
 
 var (

@@ -73,58 +73,66 @@ func (f *fixture) agreed(t *testing.T, at triage.Place) *triage.Decision {
 	return claimed
 }
 
+// cast is what the seeded world hands a test: a product, an issue and the
+// three people. The subjects they act as are resolved per test rather than
+// seeded, because a subject carries maps that every test would then share.
+type cast struct {
+	product, issue, proposer, approver int64
+}
+
+// castSeed is the world every test here starts from, seeded once per binary
+// on SQLite and per test on a server.
+var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, error) {
+	product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
+	if err != nil {
+		return cast{}, err
+	}
+	interned, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
+		{Identifier: "CVE-2026-1", Severity: "high"},
+	})
+	if err != nil {
+		return cast{}, err
+	}
+	rights := access.NewStore(db.DB)
+	one, err := rights.Ensure(ctx, "proposer", "Proposer", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	two, err := rights.Ensure(ctx, "approver", "Approver", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	none, err := rights.Ensure(ctx, "onlooker", "Onlooker", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	for _, who := range []int64{one.ID, two.ID} {
+		if err := rights.GrantRole(ctx, who, product.ID, access.PublicTriage); err != nil {
+			return cast{}, err
+		}
+	}
+	// Reading is not deciding: this one may see the product and may argue
+	// about nothing on it.
+	if err := rights.GrantRole(ctx, none.ID, product.ID, access.PublicRead); err != nil {
+		return cast{}, err
+	}
+	return cast{product: product.ID, issue: interned["CVE-2026-1"], proposer: one.ID, approver: two.ID}, nil
+})
+
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		interned, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
-			{Identifier: "CVE-2026-1", Severity: "high"},
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		issue := interned["CVE-2026-1"]
+	castSeed.Each(t, func(t *testing.T, db *database.DB, c cast) {
 		rights := access.NewStore(db.DB)
-		one, err := rights.Ensure(ctx, "proposer", "Proposer", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		two, err := rights.Ensure(ctx, "approver", "Approver", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		none, err := rights.Ensure(ctx, "onlooker", "Onlooker", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, who := range []int64{one.ID, two.ID} {
-			if err := rights.GrantRole(ctx, who, product.ID, access.PublicTriage); err != nil {
-				t.Fatal(err)
-			}
-		}
-		// Reading is not deciding: this one may see the product and may argue
-		// about nothing on it.
-		if err := rights.GrantRole(ctx, none.ID, product.ID, access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-
 		subject := func(identity string) access.Subject {
-			resolved, err := rights.Resolve(ctx, identity)
+			resolved, err := rights.Resolve(t.Context(), identity)
 			if err != nil {
 				t.Fatal(err)
 			}
 			return resolved
 		}
-
 		fn(t, &fixture{
-			db: db, store: triage.NewStore(db.DB), product: product.ID, issue: issue,
-			proposer: one.ID, approver: two.ID,
+			db: db, store: triage.NewStore(db.DB), product: c.product, issue: c.issue,
+			proposer: c.proposer, approver: c.approver,
 			triager: subject("proposer"), reviewer: subject("approver"), onlooker: subject("onlooker"),
 		})
 	})

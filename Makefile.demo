@@ -395,6 +395,19 @@ demo-seed:
 	@echo "  once they have, make demo-vex, make demo-triage and make demo-flaw"
 	@echo "  fill in the rest"
 
+# The findings export names its columns in a header row, after a preamble
+# saying what the export is and what it was narrowed by. The seeders below
+# read the columns they want by name through this prelude.
+#
+# By name rather than by position: a column added to the export moves every
+# one after it, and a seeder reading the field that moved fills the demo with
+# rows that look right and mean nothing — a VEX document about a package
+# called "true", and an assignment refused because the component it names is
+# a severity.
+DEMO_CSV = { gsub(/"/, "") } \
+           $$1 == "issue" && !named { for (i = 1; i <= NF; i++) at[$$i] = i; named = 1; next } \
+           !named { next }
+
 # What a distribution has published, as a VEX document (REL-10, ING-42).
 #
 # Separate from the seed rather than part of it, because it is derived from
@@ -408,7 +421,7 @@ demo-seed:
 # distribution saying "affected, not fixing it here" is not a distribution
 # saying "not affected", and only the second offers a dismissal.
 demo-vex:
-	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); 	rows=$$(curl -sS --noproxy '*' 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=none&limit=6" 	  | awk -F',' 'NR>1 { gsub(/"/,""); if ($$1 ~ /^CVE-/ && $$5 != "") print $$1 "|" $$5 }'); 	if [ -z "$$rows" ]; then 	  echo "  no findings to speak about yet — run make demo-status and try again"; exit 0; 	fi; 	{ printf '{"@context":"https://openvex.dev/ns/v0.2.0",'; 	  printf '"@id":"https://demo.openpsirt.invalid/vex/debian-1",'; 	  printf '"author":"Debian Security Team","version":1,'; 	  printf '"timestamp":"%s","statements":[' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)"; 	  n=0; 	  while IFS='|' read -r cve name; do 	    [ -n "$$cve" ] || continue; 	    [ $$n -gt 0 ] && printf ','; 	    if [ $$((n % 2)) -eq 0 ]; then 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"affected","action_statement":"Minor issue in %s; no update planned for this release. Will be fixed in a later point release."}' "$$name"; 	    else 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"not_affected","justification":"vulnerable_code_not_in_execute_path",'; 	      printf '"impact_statement":"The affected code path is not built in the Debian package of %s."}' "$$name"; 	    fi; 	    n=$$((n + 1)); 	  done <<< "$$rows"; 	  printf ']}'; } > $(DEMO_DIR)/debian.vex.json; 	curl -sS --noproxy '*' -o /dev/null -w "  VEX from debian %{http_code}\n" 	  -X POST -H "Origin: $(DEMO_URL)" 	  -F "statements=@$(DEMO_DIR)/debian.vex.json" 	  "$(DEMO_URL)/v1/products/$$product/vex-statements?publisher=debian"
+	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); 	rows=$$(curl -sS --noproxy '*' 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=none&limit=6" 	  | awk -F',' '$(DEMO_CSV) { if ($$1 ~ /^CVE-/ && $$at["component"] != "") print $$1 "|" $$at["component"] }');	if [ -z "$$rows" ]; then 	  echo "  no findings to speak about yet — run make demo-status and try again"; exit 0; 	fi; 	{ printf '{"@context":"https://openvex.dev/ns/v0.2.0",'; 	  printf '"@id":"https://demo.openpsirt.invalid/vex/debian-1",'; 	  printf '"author":"Debian Security Team","version":1,'; 	  printf '"timestamp":"%s","statements":[' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)"; 	  n=0; 	  while IFS='|' read -r cve name; do 	    [ -n "$$cve" ] || continue; 	    [ $$n -gt 0 ] && printf ','; 	    if [ $$((n % 2)) -eq 0 ]; then 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"affected","action_statement":"Minor issue in %s; no update planned for this release. Will be fixed in a later point release."}' "$$name"; 	    else 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"not_affected","justification":"vulnerable_code_not_in_execute_path",'; 	      printf '"impact_statement":"The affected code path is not built in the Debian package of %s."}' "$$name"; 	    fi; 	    n=$$((n + 1)); 	  done <<< "$$rows"; 	  printf ']}'; } > $(DEMO_DIR)/debian.vex.json; 	curl -sS --noproxy '*' -o /dev/null -w "  VEX from debian %{http_code}\n" 	  -X POST -H "Origin: $(DEMO_URL)" 	  -F "statements=@$(DEMO_DIR)/debian.vex.json" 	  "$(DEMO_URL)/v1/products/$$product/vex-statements?publisher=debian"
 
 # A few judgments, so the screens that report on triage have something to
 # report.
@@ -446,11 +459,13 @@ demo-triage:
 	agrees="http://$(DEMO_HOST):$$approver"; \
 	rows=$$(curl -sS --noproxy '*' \
 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=fixed&limit=60&stream=$$stream&variant=$$variant" \
-	  | awk -F',' 'NR>1 { gsub(/"/,""); \
-	      if ($$1 !~ /^CVE-/ || $$5 == "" || $$5 ~ /\//) next; \
-	      keep[++k] = $$1 "|" $$5 "|" $$8; at[k] = $$5; \
-	      if (!($$5 SUBSEP $$6 in seen)) { seen[$$5 SUBSEP $$6] = 1; versions[$$5]++ } } \
-	    END { for (i = 1; i <= k; i++) if (versions[at[i]] == 1) print keep[i] }'); \
+	  | awk -F',' '$(DEMO_CSV) \
+	    { part = $$at["component"]; \
+	      if ($$1 !~ /^CVE-/ || part == "" || part ~ /\//) next; \
+	      keep[++k] = $$1 "|" part "|" $$at["upstream fix"]; named_by[k] = part; \
+	      if (!(part SUBSEP $$at["version"] in seen)) { \
+	        seen[part SUBSEP $$at["version"]] = 1; versions[part]++ } } \
+	    END { for (i = 1; i <= k; i++) if (versions[named_by[i]] == 1) print keep[i] }'); \
 	if [ -z "$$rows" ]; then \
 	  echo "  nothing to decide yet — run make demo-status and try again"; exit 0; \
 	fi; \
@@ -508,7 +523,9 @@ demo-triage:
 	  "$(DEMO_URL)/v1/people"; \
 	rows=$$(curl -sS --noproxy '*' \
 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?limit=40&stream=$$stream&variant=$$variant" \
-	  | awk -F',' 'NR>2 { gsub(/"/,""); if ($$1 ~ /^CVE-/ && $$5 != "" && $$5 !~ /\//) print $$1 "|" $$5 }'); \
+	  | awk -F',' '$(DEMO_CSV) \
+	    { part = $$at["component"]; \
+	      if ($$1 ~ /^CVE-/ && part != "" && part !~ /\//) print $$1 "|" part }'); \
 	row=$$(echo "$$rows" | awk 'NR == 1'); \
 	cve=$$(echo "$$row" | cut -d'|' -f1); component=$$(echo "$$row" | cut -d'|' -f2); \
 	if [ -n "$$cve" ] && [ -n "$$component" ]; then \

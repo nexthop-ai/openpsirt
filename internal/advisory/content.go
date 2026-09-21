@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
@@ -25,9 +27,10 @@ import (
 // Reference is somewhere a reader can go about the flaw.
 //
 // Category is the standard's: "external" for somebody else's page, "self" for
-// this document at its published address. Nothing here publishes, so nothing
-// states a self reference — a self reference to an address that answers
-// nothing is worse than none, because a reader's tooling follows it.
+// this document at its published address. A self reference is stated only
+// where a deployment has said where its documents are reachable: one pointing
+// at an address that answers nothing is worse than none, because a reader's
+// tooling follows it.
 type Reference struct {
 	Category string `json:"category,omitempty"`
 	Summary  string `json:"summary"`
@@ -48,6 +51,45 @@ type TLP struct {
 // tlpURL is where the labels are defined. The standard asks for the URL of the
 // definition the label is taken from rather than assuming one.
 const tlpURL = "https://www.first.org/tlp/"
+
+// notFilename is every character sequence a document's filename may not carry.
+//
+// The standard's rule, and its own expression of it. The value of the tracking
+// identifier is lower-cased first and then every sequence outside lower-case
+// letters, digits, a plus and a hyphen becomes one underscore — applied in
+// that order, because applied the other way round each capital would become an
+// underscore of its own.
+var notFilename = regexp.MustCompile(`[^+\-a-z0-9]+`)
+
+// PathFor is where a document sits among published documents, as the path
+// under the address they are published at.
+//
+// A folder per year, named by the year the document says the flaw was first
+// recorded here, and the filename the standard's rule gives. The year comes
+// from the initial release date rather than from when it was published, so a
+// document revised in January of the next year does not move.
+//
+// Here rather than beside whatever writes the files, because it is a property
+// of the document: the standard derives it from what the document states, and
+// the document states its own address from it. Spelled in two places, a
+// document would cite an address the directory does not serve.
+func PathFor(doc *Document) string {
+	name := notFilename.ReplaceAllString(strings.ToLower(doc.Document.Tracking.ID), "_")
+	return strconv.Itoa(doc.Document.Tracking.InitialReleaseDate.UTC().Year()) +
+		"/" + name + ".json"
+}
+
+// selfReference is where this document is published, as the document states
+// it.
+//
+// Last among the references, because the ones before it are where a reader
+// goes to read about the flaw and this one is where they are already.
+func selfReference(who publisher.Named, doc *Document) Reference {
+	return Reference{
+		Category: "self", Summary: doc.Document.Tracking.ID,
+		URL: who.At(PathFor(doc)),
+	}
+}
 
 // Score is one rating of the flaw and which releases it was rated for.
 type Score struct {
