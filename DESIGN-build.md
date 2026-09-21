@@ -313,6 +313,22 @@ on each engine, so packages share nothing and run in parallel.
 | SQLite | A copy of a template migrated once per binary | Not needed — each test holds its own file |
 | The three servers | The package's own database on the server | By deleting from the tables that hold rows |
 
+A package whose tests start from the same rows declares them once, as a seeded
+template: a function that fills a migrated, empty database and returns what a
+test needs to reach the rows, such as an identifier or a secret shown once.
+
+| Engine | When the seed runs |
+|---|---|
+| SQLite | Once per binary, against the template, before the first copy |
+| The three servers | Per test, after the package's database is emptied |
+
+What the seed returns on SQLite is one value shared by every test copying the
+template, and those tests run beside each other, so a test reads it and does
+not write to it. The API package's fixture is two products and eighteen people
+with their claims and grants, about sixty transactions; run per test that was
+27% of the package's processor time under the race detector on two cores, and
+as a seeded template it is a file write.
+
 A server database is kept between runs and reused. Applying the migrations is
 nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
 MariaDB, once per package per engine, which is 475 s of server work in a run

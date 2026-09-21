@@ -16,7 +16,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 )
 
@@ -333,9 +332,9 @@ func TestAnUploadLeavesNothingBehindOnDisk(t *testing.T) {
 	// the container. A refused upload leaked them as readily as an accepted
 	// one, which is a disk anybody with a credential fills by repeating a
 	// request that fails.
-	// dbtest.Alone rather than the usual fixture: TMPDIR is read by the whole
+	// castSeed.Alone rather than the usual fixture: TMPDIR is read by the whole
 	// process, so a test that changes it cannot run beside another.
-	reachOn(t, dbtest.Alone, func(t *testing.T, r *reach) {
+	reachOn(t, castSeed.Alone, func(t *testing.T, r *reach) {
 		spool := t.TempDir()
 		t.Setenv("TMPDIR", spool)
 
