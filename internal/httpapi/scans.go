@@ -352,9 +352,12 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 	// After authorization, so that a sender who may not file against this
 	// product cannot learn from the refusal that the name exists at all.
 	if named.VariantRetired {
+		// Spelled back as the sender sent it, which is what their
+		// configuration holds and what they have to go and change. The stored
+		// spelling is what a document is identified by and is not that.
 		return nil, huma.NewError(http.StatusConflict, fmt.Sprintf(
 			"variant %q of %q is retired and takes no scan; declare it again to bring it back",
-			named.Variant, named.Product))
+			input.Variant, input.Product))
 	}
 
 	// Refusing before storing. Deciding costs a query; deciding afterwards

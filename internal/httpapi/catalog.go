@@ -141,6 +141,10 @@ type VariantBody struct {
 	// which means the default is yes and silence must not read as a denial.
 	CustomerFacing *bool `json:"customer_facing,omitempty" doc:"Whether this reaches customers. Defaults to yes"`
 	Open           *int  `json:"open,omitempty" doc:"Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for"`
+	// Retired is absent while a variant is in use, which is every row of the
+	// product's own list. It is set on a release's list, which keeps naming
+	// what the release was built as after the variant is taken out of use.
+	Retired bool `json:"retired,omitempty" doc:"Whether it has been taken out of use. A release still lists what it was built as"`
 }
 
 // declaredOutput reports what a declaration did.
@@ -205,7 +209,9 @@ func variantList(rows []catalog.Variant) *listOutput[VariantBody] {
 	out.Body.Items = make([]VariantBody, 0, len(rows))
 	for _, row := range rows {
 		facing := row.CustomerFacing
-		out.Body.Items = append(out.Body.Items, VariantBody{Name: row.Name, CustomerFacing: &facing})
+		out.Body.Items = append(out.Body.Items, VariantBody{
+			Name: row.Name, CustomerFacing: &facing, Retired: row.Retired(),
+		})
 	}
 	return out
 }

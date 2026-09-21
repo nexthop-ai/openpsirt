@@ -24,6 +24,11 @@ export function Variants() {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [facing, setFacing] = useState(true);
+  // The variant the edit drawer is open on, by its stored name. Empty is
+  // closed, so one piece of state answers both which row and whether.
+  const [editing, setEditing] = useState("");
+  const [renameTo, setRenameTo] = useState("");
+  const [editFacing, setEditFacing] = useState(true);
 
   const ofRelease = useQuery({
     queryKey: ["variants", product, stream, "counts"],
@@ -47,6 +52,13 @@ export function Variants() {
   });
   const variants = stream ? ofRelease : ofProduct;
 
+  // Both lists, because the two answer different questions about the same
+  // variant: what the product declares, and what a release was built as.
+  const invalidate = () => {
+    void queries.invalidateQueries({ queryKey: ["variants", product] });
+    void queries.invalidateQueries({ queryKey: ["variants", product, stream] });
+  };
+
   const declare = useMutation({
     mutationFn: async () =>
       unwrap(
@@ -58,10 +70,43 @@ export function Variants() {
     onSuccess: () => {
       setName("");
       setAdding(false);
-      void queries.invalidateQueries({ queryKey: ["variants", product] });
-      void queries.invalidateQueries({ queryKey: ["variants", product, stream] });
+      invalidate();
     },
   });
+
+  const amend = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.PATCH("/v1/products/{product}/variants/{variant}", {
+          params: { path: { product, variant: editing } },
+          body: {
+            ...(renameTo.trim() && renameTo.trim() !== editing ? { name: renameTo.trim() } : {}),
+            customer_facing: editFacing,
+          },
+        }),
+      ),
+    onSuccess: () => {
+      setEditing("");
+      invalidate();
+    },
+  });
+
+  const retire = useMutation({
+    mutationFn: async (variant: string) =>
+      unwrap(
+        await api.DELETE("/v1/products/{product}/variants/{variant}", {
+          params: { path: { product, variant } },
+        }),
+      ),
+    onSuccess: invalidate,
+  });
+
+  const edit = (variant: { name?: string; customer_facing?: boolean }) => {
+    setEditing(variant.name ?? "");
+    setRenameTo(variant.name ?? "");
+    setEditFacing(variant.customer_facing !== false);
+    amend.reset();
+  };
 
   if (variants.isPending) return <Loading />;
   if (variants.isError) {
@@ -113,7 +158,11 @@ export function Variants() {
               {items.map((variant) => (
                 <tr key={variant.name} className="row">
                   <td>
-                    <span className="id">{variant.name}</span>
+                    <span className="id">{variant.name}</span>{" "}
+                    {/* Only a release's list carries one: the product's own
+                        list stops offering a variant that is retired, and this
+                        one keeps naming what the release was built as. */}
+                    {variant.retired && <span className="state lapsed">Retired</span>}
                   </td>
                   {/* Absent reads as yes: an unclassified build ranks as though
                       it ships, so silence must not look like a denial. */}
@@ -125,14 +174,32 @@ export function Variants() {
                     </span>
                   </td>
                   <td className="num">{(variant.open ?? 0).toLocaleString()}</td>
-                  <td>
-                    {stream && (
+                  <td className="actions">
+                    {stream ? (
                       <Link
                         to={`${buildPath({ product, stream, variant: variant.name ?? "" })}/findings`}
                         className="linkish"
                       >
                         Findings →
                       </Link>
+                    ) : (
+                      who.data?.admin && (
+                        <>
+                          <button type="button" className="linkish" onClick={() => edit(variant)}>
+                            Edit
+                          </button>{" "}
+                          <button
+                            type="button"
+                            className="linkish"
+                            style={{ color: "var(--muted)" }}
+                            title="Take it out of use. Findings, decisions and published documents keep naming it."
+                            disabled={retire.isPending}
+                            onClick={() => retire.mutate(variant.name ?? "")}
+                          >
+                            Retire
+                          </button>
+                        </>
+                      )
                     )}
                   </td>
                 </tr>
@@ -141,6 +208,41 @@ export function Variants() {
           </table>
         </Wide>
       )}
+
+      <Declare
+        title={`Edit ${editing}`}
+        open={editing !== ""}
+        onClose={() => setEditing("")}
+        onSubmit={() => amend.mutate()}
+        error={amend.error}
+        busy={amend.isPending || renameTo.trim() === ""}
+        ok="Save"
+        hint="A name cannot be corrected once a VEX document has gone out for this variant: readers already hold the document by it. Retire it and declare the intended name instead."
+      >
+        <Field
+          label="Name"
+          value={renameTo}
+          onChange={setRenameTo}
+          placeholder="broadcom"
+          hint="What builds and scans call it"
+        />
+        <div className="field">
+          <label htmlFor="edit-facing">Ships to customers</label>
+          <select
+            id="edit-facing"
+            value={editFacing ? "yes" : "no"}
+            onChange={(event) => setEditFacing(event.target.value === "yes")}
+          >
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+          <span className="hint">Feeds how urgent a finding here is</span>
+        </div>
+      </Declare>
+
+      {/* A refused retirement is said. Without it the button re-enables and
+          the row stays, which reads as nothing having happened. */}
+      {retire.error != null && <Failed error={retire.error} what="That could not be retired." />}
 
       <Declare
         title="Add variant"

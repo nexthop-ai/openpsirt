@@ -99,6 +99,29 @@ func TestARetiredVariantTakesNoScan(t *testing.T) {
 		if len(open.Items) == 0 {
 			t.Error("retiring a variant took its findings with it")
 		}
+
+		// Gone from what the product declares, which is the list every picker
+		// offers from, and still named by what the release was built as —
+		// where the findings above sit.
+		var declares, built struct {
+			Items []struct {
+				Name string `json:"name"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/products/mine/variants", &declares)
+		for _, item := range declares.Items {
+			if item.Name == "broadcom" {
+				t.Error("a retired variant is still offered as a way the product is built")
+			}
+		}
+		read(t, r, "admin", "/v1/products/mine/streams/master/variants", &built)
+		named := false
+		for _, item := range built.Items {
+			named = named || item.Name == "broadcom"
+		}
+		if !named {
+			t.Error("the release stopped naming what it was built as")
+		}
 	})
 }
 

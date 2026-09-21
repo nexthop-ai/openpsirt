@@ -9,14 +9,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// ErrRetired is returned where an act is refused because the variant it names
-// has been taken out of use.
-var ErrRetired = errors.New("retired")
-
-// ErrPublished is returned where a name cannot be corrected because a document
-// naming it has gone out.
-var ErrPublished = errors.New("named by a published document")
-
 // RenameVariant corrects what a variant is called.
 //
 // The stored name is what a scan is matched against and what a published
@@ -120,22 +112,4 @@ func counted(res sql.Result, what string, id int64, doing string) error {
 		return fmt.Errorf("%s %d: %w", what, id, ErrNotFound)
 	}
 	return nil
-}
-
-// TargetsOfVariant lists the builds filed against a variant, newest first.
-//
-// What a rename has to be checked against: a document is issued for a build
-// rather than for a variant, so the question of whether anything has been
-// published under this name is asked of these.
-func (s *Store) TargetsOfVariant(ctx context.Context, variantID int64) ([]int64, error) {
-	var ids []int64
-	err := s.db.NewSelect().Model((*Target)(nil)).
-		Column("id").
-		Where("variant_id = ?", variantID).
-		Order("id DESC").
-		Scan(ctx, &ids)
-	if err != nil {
-		return nil, fmt.Errorf("look up what variant %d was built into: %w", variantID, err)
-	}
-	return ids, nil
 }

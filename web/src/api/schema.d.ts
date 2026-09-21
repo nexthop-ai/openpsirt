@@ -9726,6 +9726,8 @@ export interface components {
              * @description Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
+            /** @description Whether it has been taken out of use. A release still lists what it was built as */
+            retired?: boolean;
         };
         VexSaidBody: {
             /** @description The moment it was uploaded here */

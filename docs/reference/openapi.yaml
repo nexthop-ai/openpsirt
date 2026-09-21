@@ -8675,6 +8675,9 @@ components:
           description: Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
+        retired:
+          description: Whether it has been taken out of use. A release still lists what it was built as
+          type: boolean
       required:
         - name
       type: object
