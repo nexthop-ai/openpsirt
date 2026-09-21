@@ -14,11 +14,17 @@ and published in every advisory that states what kind of flaw it is about.
 This product includes version-ordering test cases from the Python Packaging
 Authority's "packaging" project, the reference implementation of PEP 440,
 licensed under the Apache License, Version 2.0 or the 2-clause BSD License at
-the recipient's option. See https://github.com/pypa/packaging
+the recipient's option. Copyright (c) Donald Stufft and individual
+contributors. See https://github.com/pypa/packaging
 
 This product includes version-ordering test cases from Apache Maven, licensed
-under the Apache License, Version 2.0. Copyright The Apache Software
-Foundation. See https://maven.apache.org
+under the Apache License, Version 2.0. See https://maven.apache.org
+
+Apache Maven
+Copyright 2001-2019 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
 
 Both are in internal/vercmp, as the cases each project's own suite uses to
 check the ordering its ecosystem defines.

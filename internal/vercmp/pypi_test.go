@@ -349,3 +349,26 @@ func TestAPyPILocalVersionSpelledLikeASuffixIsStillLocal(t *testing.T) {
 		bothWays(t, vercmp.PyPI, each.a, each.b, each.want)
 	}
 }
+
+func TestAPyPIReleaseReadsTheSameWithTrailingZerosOrWithout(t *testing.T) {
+	// The taken suite never compares a release against a shorter spelling of
+	// itself, so nothing in it reaches the trim. What turns on it: an advisory
+	// saying "fixed in 2.0" against an index publishing "2" would be two
+	// releases rather than one, and the planner would offer an upgrade that is
+	// already installed.
+	for _, each := range []struct {
+		a, b string
+		want int
+	}{
+		{"1.0", "1", 0},
+		{"1.0.0", "1.0", 0},
+		{"2.0.0.0", "2", 0},
+		{"1!2.0.0", "1!2", 0},
+		// And the trim stops at a part that says something, so a release is
+		// not flattened into the one before it.
+		{"1.0.0", "1.0.1", -1},
+		{"1.0", "1.1", -1},
+	} {
+		bothWays(t, vercmp.PyPI, each.a, each.b, each.want)
+	}
+}

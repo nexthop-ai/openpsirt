@@ -564,6 +564,7 @@ data, different subject.
 |---|---|
 | Each row carries the issues by severity and the worst among them | Ranking by count alone answers the view's own question backwards: a package with forty-four issues outranks one with three criticals |
 | The weight stays the order | Where the volume is is what the view is for. Making urgency the default would reproduce the by-issue list at worse resolution. "Which of these is worst" is the other question people read it for, so the column is sortable |
+| The count beside a version says which count it is | Ranked, it is everything reaching that version would close; unranked, it is what that release fixed on its own. The two are the same shape and often the same number, so the word in front of it changes with the flag and the reason is on hover. Drawn as one number under one heading, the column changes question without saying so |
 
 The By fix view is gone. It listed one row per version pair with an action in
 the last column — the thing somebody does presented apart from the thing it is
@@ -581,7 +582,6 @@ coordinator's. Keyed on the fold, so packages built from one source are one row.
 |---|---|
 | **No action column** | That is what the By fix view was deleted for. The package name opens the component, where the upgrade is planned; a source package that builds three binaries is one upgrade and three links |
 | Versions are listed, not ordered | This view does not rank them: an ordering exists per ecosystem rather than in general, and a list ordered for some packages and not others reads as one ordering somebody can trust. So one package appears once per version upstream released, and there is no nearest and no latest |
-| The count beside a version says which count it is | Ranked, it is everything reaching that version would close; unranked, it is what that release fixed on its own. The two are the same shape and often the same number, so the word in front of it changes with the flag and the reason is on hover. Drawn as one number under one heading, the column changes question without saying so |
 | The filters it cannot apply are named on the screen | It takes six of the list's thirty-odd; the rest ask about a place, a deadline or an assignee, and an upgrade has none of those. Dropping them quietly widens the list back out while the chips go on saying they are on |
 | Nothing here counts places | An upgrade is a fold. What it says is the packages it moves, the issues it would close, and the builds that hold it |
 | **The word on screen is "upgrade"** | It read "bump", which is not the word the decisions use. A vocabulary a screen and a document share reads as two things when it is spelled two ways, which is the rule the product name is already held to |

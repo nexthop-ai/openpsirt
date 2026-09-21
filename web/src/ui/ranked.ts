@@ -6,8 +6,8 @@
 // which. The two read alike on screen, so the screen has to say which one it
 // is drawing.
 //
-// Kept here rather than beside each table, because three places draw this and
-// a wording that differs between them reads as three different facts.
+// Kept here rather than beside each table, because a wording that differs
+// between the tables that draw it reads as several different facts.
 
 // An ordering held by a set of candidates. An answer that has not arrived is
 // not a ranking: a count drawn as though it were ordered, off a list that

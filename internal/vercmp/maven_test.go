@@ -1,6 +1,7 @@
 package vercmp_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/vercmp"
@@ -310,5 +311,42 @@ func TestReachingAMavenReleaseReachesTheEarlierOnes(t *testing.T) {
 		if got := vercmp.Reaches(vercmp.Maven, each.candidate, each.wanted); got != each.want {
 			t.Errorf("%q reaching %q is %v, want %v", each.candidate, each.wanted, got, each.want)
 		}
+	}
+}
+
+func TestTheMavenOrderIsNotTotal(t *testing.T) {
+	// Recorded rather than fixed. Maven's own comparison answers this way and
+	// this is transcribed from it, so the three answers below are correct and
+	// the set they describe still cannot be sorted into an order. A list
+	// holding such a triple comes back stable rather than ranked, which is
+	// what the ranking is allowed to be and what nothing else says.
+	below, _ := vercmp.Order(vercmp.Maven, "1", "1-1")
+	alsoBelow, _ := vercmp.Order(vercmp.Maven, "1-1", "1.0.alpha.1")
+	above, _ := vercmp.Order(vercmp.Maven, "1", "1.0.alpha.1")
+	if below != -1 || alsoBelow != -1 || above != 1 {
+		t.Errorf("the triple answers %d, %d, %d — want -1, -1, 1, which is what Maven answers",
+			below, alsoBelow, above)
+	}
+}
+
+func TestAVersionTooLongToBeOneIsRefused(t *testing.T) {
+	// A version is a tree with a level per hyphen, so what arrives decides
+	// what is allocated. Two megabytes of this allocates 393 MB, and both
+	// operands are read before either is compared.
+	long := "1" + strings.Repeat("-1", 64<<10)
+	for _, scheme := range []vercmp.Scheme{
+		vercmp.Maven, vercmp.PyPI, vercmp.Debian, vercmp.RPM, vercmp.APK, vercmp.Semantic,
+	} {
+		if _, ok := vercmp.Order(scheme, long, "1.0"); ok {
+			t.Errorf("%v ordered a version of %d bytes", scheme, len(long))
+		}
+		if _, ok := vercmp.Order(scheme, "1.0", long); ok {
+			t.Errorf("%v ordered a version of %d bytes on the other side", scheme, len(long))
+		}
+	}
+	// And a version of an ordinary length still orders, so the bound is not
+	// simply refusing everything.
+	if _, ok := vercmp.Order(vercmp.Maven, "1.0.0-alpha-1", "1.0.0"); !ok {
+		t.Error("an ordinary version was refused")
 	}
 }

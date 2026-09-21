@@ -235,13 +235,17 @@ func mavenRank(word string) string {
 
 // mavenCompare compares two items, where b may be absent.
 //
-// A level nests inside the level that opened it, so the depth of this is the
-// number of hyphens in the version and a version is not bounded in length.
-// Measured rather than guarded: 200 KB of nothing but hyphens and ones is
-// 100,000 levels deep and compares in 192 ms, on a growable stack that never
-// came close to its ceiling. The other schemes cannot be driven this way at
-// all — a hyphen is not a character a Debian or RPM version may hold, so a
-// second one refuses the string.
+// This is not a total order, and a sort over a set holding a triple that shows
+// it is stable rather than ordered. A level compared against a version that
+// ran out answers by its own contents, while a zero answers that it is equal
+// and reveals the word behind it a position later, so "1" is below "1-1",
+// "1-1" is below "1.0.alpha.1", and "1" is above "1.0.alpha.1" — all three at
+// once. Maven's own comparison does the same and this is transcribed from it.
+//
+// A level nests inside the level that opened it, so the depth is the number of
+// hyphens and the structure is proportional to the input. What keeps that from
+// being a way to spend the container's memory is the bound on how long a
+// version may be, which every scheme is held to.
 //
 // Absent is not the same as empty. A version that has run out is compared
 // against what the other one still holds, and what that holds decides which is

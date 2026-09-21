@@ -564,16 +564,8 @@ function Landed({ here }: { here: Build }) {
               </tbody>
             </table>
           </Wide>
-          <p
-            className="hint"
-            style={{ marginTop: 8 }}
-            title={
-              ordered
-                ? "A later release carries the earlier fixes too."
-                : "Each count is what that release fixed itself, because these versions could not be put in order."
-            }
-          >
-            {ordered ? "Furthest along first" : "Not ranked"}
+          <p className="hint" style={{ marginTop: 8 }} title={rankedWhy(ordered)}>
+            {rankedLabel(ordered)}
           </p>
         </>
       )}

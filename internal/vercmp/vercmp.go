@@ -81,6 +81,24 @@ func SchemeOf(ecosystem string) Scheme {
 	}
 }
 
+// longest is how long a string may be and still be a version.
+//
+// Two of the schemes build a structure proportional to what they are given
+// rather than walking it: a Maven version is a tree with a level per hyphen,
+// and a PEP 440 release segment is a part per dot. Measured, two megabytes of
+// "1-1-1-…" allocates 393 MB, and both operands are read before either is
+// compared. A scan document may be hundreds of megabytes, the fixed-in field
+// it carries is free text, and nothing between there and here cuts it up — so
+// without this a version nobody meant is a request for memory.
+//
+// Checked here rather than in the two schemes that need it, because the next
+// scheme added is the one where somebody forgets. The four that stream are
+// unaffected by the check and would be unaffected by its absence.
+//
+// The bound is far above every real version and far below any size worth
+// allocating for. The longest in the taken suites is 30 bytes.
+const longest = 4096
+
 // Order reports whether a sorts before, with, or after b, and whether the two
 // could be ordered at all.
 //
@@ -90,6 +108,9 @@ func SchemeOf(ecosystem string) Scheme {
 func Order(scheme Scheme, a, b string) (int, bool) {
 	a, b = strings.TrimSpace(a), strings.TrimSpace(b)
 	if a == "" || b == "" {
+		return 0, false
+	}
+	if len(a) > longest || len(b) > longest {
 		return 0, false
 	}
 	switch scheme {
