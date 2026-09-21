@@ -62,9 +62,15 @@ FROM golang:1.27.1-alpine AS build
 
 WORKDIR /src
 
-# Dependencies first, so a source-only change does not re-download them.
+# Dependencies first, so a source-only change does not re-download them. The
+# bill-of-materials tool's are fetched here for the same reason: what "go run"
+# downloads lands in the layer of the step that runs it, and a step after the
+# source is copied is run again for every commit.
 COPY go.mod go.sum ./
 RUN go mod download
+ARG CDXGOMOD_VERSION=v1.12.0
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@${CDXGOMOD_VERSION} version
 
 COPY . .
 
@@ -82,7 +88,15 @@ ARG DATE=unknown
 # CGO off gives a static binary, which is what lets the runtime image be this
 # small — and is why the pure-Go SQLite driver was chosen.
 ENV CGO_ENABLED=0
-RUN go build -trimpath \
+# The Go build cache is a mount rather than part of the layer. A layer written
+# after the source is copied is keyed to the commit, so nothing a later commit
+# builds reuses it, and a layer holding the compile cache is exported to the
+# layer store for a run that never comes: 441 MB for this step and 499 MB for
+# the bill of materials below, against the binaries alone with the cache
+# mounted. The mount is kept by the daemon that ran the build, which on a
+# developer's machine is the next build's cache.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    go build -trimpath \
       -ldflags "-s -w \
         -X 'github.com/nexthop-ai/openpsirt/internal/version.version=${VERSION}' \
         -X 'github.com/nexthop-ai/openpsirt/internal/version.commit=${COMMIT}' \
@@ -102,9 +116,10 @@ RUN go build -trimpath \
 # main module as "(devel)" and the document went out describing a component
 # with no version at all — the one field a scanner needs to answer whether a
 # release is affected.
-ARG CDXGOMOD_VERSION=v1.12.0
-RUN CGO_ENABLED=0 go build -trimpath -o /out/compose ./internal/tools/compose
-RUN go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@${CDXGOMOD_VERSION} \
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -o /out/compose ./internal/tools/compose
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@${CDXGOMOD_VERSION} \
       bin -json -version "${VERSION}" -output /out/openpsirt.cdx.json /out/openpsirt
 
 # Run.
