@@ -10,6 +10,7 @@ requires.
 - [Image structure](#image-structure)
 - [Base version](#base-version)
 - [Bundled scanner](#bundled-scanner)
+- [Pod sizing](#pod-sizing)
 - [Image and archive checks](#image-and-archive-checks)
 - [Chart probes](#chart-probes)
 - [Starting and stopping](#starting-and-stopping)
@@ -82,9 +83,36 @@ Its vulnerability data is fetched at runtime rather than built in. A database
 baked into an image is stale the day after that image is published.
 
 That data requires a writable path and the root filesystem is read-only, so the
-chart mounts a volume. The default is scratch space living as long as the pod,
-which re-downloads on every start; a deployment that restarts often points it at
-a claim. The image and the chart read the directory from one value in the chart.
+chart mounts a volume. The image and the chart read the directory from one
+value in the chart.
+
+| Where the data lives | |
+|---|---|
+| Scratch space lasting as long as the pod | The default, so an install needs no storage to work. It is downloaded and imported again on every start |
+| A claim the chart makes | Off unless asked for. A chart that provisions storage on an upgrade surprises an installation that had none |
+| A claim made elsewhere | Named instead, and it wins over the one the chart makes. Naming both is refused rather than silently ignoring one |
+
+Every replica mounts the one claim, because this is a Deployment rather than a
+set with a volume per pod. So the access mode has to allow as many nodes as
+there are replicas, and the pairing the chart can see it refuses at render time.
+
+## Pod sizing
+
+The container holds two processes that use memory: the server, and the scanner
+it starts as a child. A cgroup limit covers both, and the kernel answers an
+excess by killing the larger of the two.
+
+| Rule | |
+|---|---|
+| The limit is sized for both processes | Sized for the server alone, a scan is what dies. The failure reads as a run that failed while the pod stays up, so nothing points at the limit |
+| The server's share is the ingest budget | About 250 MB for one document being read, which `DESIGN-ingest.md` sets and every bound of it is configurable. Raising those bounds raises the limit |
+| The scanner's share is not bounded by anything here | It is somebody else's program, and its report is bounded only once it has been written. What it needs to produce one is a number this project has not measured |
+| Importing the vulnerability database is the largest single draw | It happens on every start where the data is not kept, so a deployment that restarts pays that peak repeatedly. Keeping the data is what takes it off the common path |
+
+Neither default is measured. Both are set from the shape of the problem —
+two processes, one of them unmeasured, and a peak paid at start — and the
+number that would settle them is the scanner's own memory against a real
+inventory.
 
 ## Image and archive checks
 
@@ -169,6 +197,9 @@ cannot work moves the failure to a crash-looping pod and a message nobody reads.
 | A sign-in provider with no client secret | The process refuses to start without one, so the install would render cleanly and never come up |
 | An OIDC provider with no username claim | The same, and there is no default: what an authorization is redeemed against is a question only the deployment's operator can answer |
 | A secret given both ways at once | The chart writes no Secret when one is named, so the value in the values file would be ignored without a word — the rule the database URL already follows |
+| SQLite behind more than one replica | SQLite is one file on one pod, so a second replica starts with an empty database of its own |
+| A chart-made scanner cache claim that every replica mounts and only one node can | The replicas that land elsewhere stay Pending, which is a deployment that never becomes ready rather than one that fails |
+| A scanner cache claim given both ways at once | The same rule as a secret given twice: the claim the chart would make is not created when one is named |
 
 Mail is opt-in, so refusing half of it costs a deployment that wants none of it
 nothing (REQ-49).

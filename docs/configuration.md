@@ -520,10 +520,13 @@ does not have to restate the rest.
 The built-in values are set from what reading a document costs in memory, not
 from how large a document looks. An edge holds about half a kilobyte of heap
 while it is being read and a component about one and a third, so the defaults
-below allow roughly 250 MB for one document — about half the memory limit the
-chart ships with. They are still several times the largest producer we have.
-Raise them on a deployment with a bigger box and a bigger inventory, and raise
-the container's memory limit with them.
+below allow roughly 250 MB for one document. They are still several times the
+largest producer we have. Raise them on a deployment with a bigger box and a
+bigger inventory, and raise the container's memory limit with them.
+
+That 250 MB is the server's share of the pod. The scanner runs as a second
+process in the same container, so the memory limit covers both — see
+[Memory and the scanner's database](#memory-and-the-scanners-database).
 
 | Variable | What it does | Default |
 |---|---|---|
@@ -552,3 +555,85 @@ are dropped instead, because a scanner with a lot to say still scanned.
 | `OPENPSIRT_SCANNER_MAX_COMPLAINT` | How much of what a scanner said while running is kept | 1 MB |
 | `OPENPSIRT_SCANNER_MAX_MATCHES` | How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that | 500,000 |
 | `OPENPSIRT_SCANNER_MAX_REFERENCES` | How many addresses one match may point at. Bounded separately because the two multiply | 1,000 |
+
+## Memory and the scanner's database
+
+The container runs two processes that use memory: the server, and the scanner
+it starts as a child for every scan. One memory limit covers both, and an
+excess is answered by the kernel killing the larger of the two — which is the
+scanner. The scan is then recorded as a run that failed while the pod stays up,
+so nothing in the failure points at the limit.
+
+The chart ships:
+
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 2Gi
+```
+
+| What draws on it | |
+|---|---|
+| The server reading one scan document | About 250 MB at the built-in bounds. [Scan file limits](#scan-file-limits) sets it, and raising those raises this |
+| The server reading one scanner report | Bounded by `OPENPSIRT_SCANNER_MAX_OUTPUT`. A read and a scan run in separate loops, so a pod can be doing both |
+| The scanner itself | Not bounded by anything here. It is a separate program, and its report is bounded only once written |
+| The scanner importing its vulnerability database | The largest single draw, and it happens on every start where the data is not kept |
+
+Raise the limit for a bigger inventory, for raised scan-file bounds, or where
+the database is imported on every start.
+
+### Database persistence
+
+The scanner fetches its data at runtime, because a database built into an image
+is stale the day after that image is published. Where the data is not kept
+across restarts it is downloaded and imported again on every start, and that
+import is the largest thing the pod does with memory.
+
+Keeping it takes the import off the common path. The chart will make the claim:
+
+```yaml
+scanner:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""          # the cluster's default
+    accessModes:
+      - ReadWriteOnce
+```
+
+Every replica mounts the one claim, so the access mode has to allow as many
+nodes as there are replicas. `ReadWriteOnce` binds to a single node: with more
+than one replica, use `ReadWriteMany` on a storage class that offers it, name a
+claim per replica set through `scanner.persistence.existingClaim`, or run one
+replica. The chart refuses the combination it can see at render time rather
+than leaving a replica Pending.
+
+A claim you made yourself is named instead, and wins over the one the chart
+would make:
+
+```yaml
+scanner:
+  persistence:
+    existingClaim: grype-db
+```
+
+Naming both is refused. The claim the chart makes is kept when the release is
+uninstalled, because the data is re-downloadable and a claim is not worth
+deleting by surprise.
+
+### An exhausted limit
+
+The scanner is killed by the kernel rather than exiting, so the run fails with
+the signal in the message:
+
+```
+run /usr/local/bin/grype: signal: killed
+```
+
+The job is retried with backoff and set aside after `OPENPSIRT_QUEUE_MAX_ATTEMPTS`
+attempts, so the symptom is scans that will not complete rather than a pod that
+will not stay up. Where the pod itself is killed instead, a deployment without a
+kept database restarts into the import that exhausted it.
