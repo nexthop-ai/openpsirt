@@ -26,6 +26,10 @@ type Judged = Body<"JudgedBody">;
 // empty set rather than a value somebody picks.
 const OUTCOMES = [
   ["not-applicable", "dismissed — not applicable"],
+  // A claim that the scanner matched something that is not here. It hides risk
+  // the way the other dismissals do and, unlike them, nothing expires it — so
+  // it is the one an auditor most wants to be able to list on its own.
+  ["mismatched", "dismissed — wrong match"],
   ["wont-fix", "dismissed — will not fix"],
   // The fifth outcome, and the one an auditor most wants to check: a claim
   // that a distribution already backported the fix is checkable against the
@@ -44,7 +48,7 @@ const OUTCOMES = [
 // The dismissals, which are the outcomes that require a second person. The
 // exception report is asked of one of these, because asked of everything it
 // returns a large and entirely legitimate population.
-const DISMISSALS = new Set(["not-applicable", "wont-fix", "already-fixed"]);
+const DISMISSALS = new Set(["not-applicable", "mismatched", "wont-fix", "already-fixed"]);
 
 const STATES = [
   ["approved", "agreed"],
@@ -76,6 +80,12 @@ export function Audit() {
   const from = params.get("from") ?? "";
   const to = params.get("to") ?? "";
   const alone = params.get("alone") === "true";
+  // What applies now, rather than what was once agreed to. Not the same
+  // question the state filter asks: a judgment is approved and lapses when the
+  // code moves out from under it, and a list of approved judgments is a list
+  // of history. It is what the standing-corrections view is built on, where
+  // the whole point is that nothing expires them.
+  const inForce = params.get("in_force") === "true";
   // A page of the record rather than a cap on it. It asked for five hundred
   // and said "narrow the dates to print the rest", which is a search dressed
   // as an answer: an auditor reading a year cannot narrow to something they
@@ -116,7 +126,7 @@ export function Audit() {
     queryFn: async () => unwrap(await api.GET("/v1/products", {})),
   });
   const record = useQuery({
-    queryKey: ["audit", products, outcomes, states, from, to, alone, offset],
+    queryKey: ["audit", products, outcomes, states, from, to, alone, inForce, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/audit", {
@@ -130,6 +140,7 @@ export function Audit() {
                     outcome: outcomes as (
                       | "affected"
                       | "not-applicable"
+                      | "mismatched"
                       | "deferred"
                       | "wont-fix"
                       | "already-fixed"
@@ -139,6 +150,7 @@ export function Audit() {
                   }
                 : {}),
               ...(alone ? { alone: true } : {}),
+              ...(inForce ? { in_force: true } : {}),
               ...(states.length > 0
                 ? { state: states as ("proposed" | "approved" | "withdrawn" | "lapsed")[] }
                 : {}),
@@ -237,6 +249,16 @@ export function Audit() {
           >
             <option value="">Any</option>
             <option value="alone">No second person agreed</option>
+          </select>
+        </label>
+        <label className="field">
+          <span>Applies</span>
+          <select
+            value={inForce ? "in-force" : ""}
+            onChange={(e) => set("in_force", e.target.value ? "true" : "")}
+          >
+            <option value="">Any</option>
+            <option value="in-force">Still standing</option>
           </select>
         </label>
         <label className="field">

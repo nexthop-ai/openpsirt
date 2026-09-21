@@ -146,7 +146,8 @@ func registerTriageReading(api huma.API, in Ingest) {
 		Summary: "List triage decisions",
 		Description: "Returns triage decisions on products you may triage, newest first, with " +
 			"the justification text for each.\n\n" +
-			"Filter by `outcome` to list dismissals (`not-applicable`, `wont-fix`) or " +
+			"Filter by `outcome` to list dismissals (`not-applicable`, `mismatched`, " +
+			"`wont-fix`, `already-fixed`) or " +
 			"postponements (`deferred`), by `state` to separate what is approved from what is " +
 			"still waiting or has been withdrawn, and by `product` to limit to one product.\n\n" +
 			"Set `expired=true` to list deferrals whose date has passed — the findings that have " +

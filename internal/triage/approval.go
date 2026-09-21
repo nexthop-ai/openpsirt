@@ -133,7 +133,7 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 			PlaceIdentity:     row.PlaceIdentity,
 			ComponentUpstream: orEmpty(row.ComponentUpstreamVersion),
 			ConsumerUpstream:  orEmpty(row.ConsumerUpstreamVersion),
-		})
+		}, row.StandsAtAnyVersion)
 		if _, err := s.db.NewUpdate().Model((*Decision)(nil)).
 			Set("state = ?", Proposed).
 			Set("live_key = ?", key).

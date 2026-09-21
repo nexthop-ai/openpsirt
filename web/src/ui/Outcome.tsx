@@ -13,6 +13,11 @@ const said: Record<string, { label: string; color: string; means: string }> = {
     color: "var(--ok)",
     means: "this does not affect us, for one of the recognized reasons",
   },
+  mismatched: {
+    label: "Wrong match",
+    color: "var(--ok)",
+    means: "the scanner matched this against something that is not here, and no version bump makes that right",
+  },
   deferred: {
     label: "Deferred",
     color: "var(--wait)",
@@ -127,6 +132,19 @@ export const JUSTIFICATIONS = [
     means: "a control elsewhere in the product prevents it, and saying which is required",
   },
 ] as const;
+
+// The reasons a correction may state: the two that say something is not there.
+//
+// Derived rather than written out again. The other three describe how code is
+// reached or what already stops it, and a version bump changes both — a
+// correction carries past every bump, so one of those recorded as a correction
+// would put a judgment about risk beyond the rule that re-examines it. The
+// endpoint refuses them; offering them here would be a refusal somebody meets
+// after writing the reasoning.
+export const JUSTIFICATIONS_CORRECTING = JUSTIFICATIONS.filter(
+  (each) =>
+    each.value === "component_not_present" || each.value === "vulnerable_code_not_present",
+);
 
 // The exchange format's own vocabulary, named as it is stored.
 //

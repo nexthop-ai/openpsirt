@@ -523,7 +523,9 @@ export interface paths {
          *
          *     Narrowed by what you may see, like every other list here. Nothing about this view is exempt from the visibility rules — a report showing more than the screens it summarizes would be a way around them.
          *
-         *     `alone=true` returns judgments no second person has a standing agreement on. That population is large and legitimate on its own — an outcome that hides nothing needs no second person, and a short deferral stands alone — so ask it with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, `wont-fix` and `already-fixed` all require approval, so a row in that answer is a control that failed.
+         *     `alone=true` returns judgments no second person has a standing agreement on. That population is large and legitimate on its own — an outcome that hides nothing needs no second person, and a short deferral stands alone — so ask it with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, `mismatched`, `wont-fix` and `already-fixed` all require approval, so a row in that answer is a control that failed.
+         *
+         *     `in_force=true` returns what applies now rather than what was once agreed to. With `outcome=mismatched` that is the set of standing corrections: the matches this deployment has recorded as wrong, which no version bump expires.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -969,7 +971,7 @@ export interface paths {
          * List triage decisions
          * @description Returns triage decisions on products you may triage, newest first, with the justification text for each.
          *
-         *     Filter by `outcome` to list dismissals (`not-applicable`, `wont-fix`) or postponements (`deferred`), by `state` to separate what is approved from what is still waiting or has been withdrawn, and by `product` to limit to one product.
+         *     Filter by `outcome` to list dismissals (`not-applicable`, `mismatched`, `wont-fix`, `already-fixed`) or postponements (`deferred`), by `state` to separate what is approved from what is still waiting or has been withdrawn, and by `product` to limit to one product.
          *
          *     Set `expired=true` to list deferrals whose date has passed — the findings that have come back and need judging again.
          *
@@ -3353,15 +3355,17 @@ export interface paths {
         put?: never;
         /**
          * Record a triage decision for a finding
-         * @description Records how a finding was triaged: `affected`, `not-applicable`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.
+         * @description Records how a finding was triaged: `affected`, `not-applicable`, `mismatched`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.
          *
-         *     `not-applicable` requires a `justification` from the standard VEX vocabulary. `deferred` requires `deferred_until` as a date. `already-fixed` requires `fixed_version`, the version whoever packages the component states the fix arrived in — it is recorded for a reader and never compared against what ships.
+         *     `not-applicable` and `mismatched` require a `justification` from the standard VEX vocabulary. `deferred` requires `deferred_until` as a date. `already-fixed` requires `fixed_version`, the version whoever packages the component states the fix arrived in — it is recorded for a reader and never compared against what ships.
          *
          *     `patch-needed` is the backport case: a fix is being carried into this build and the version does not move. It requires `committed_to`, the date the work lands, and it closes the only way a backport can — the next inventory declares the patch it carries and says what that patch resolves, so the finding goes while the version stays where it was.
          *
          *     `upgrade-needed` is not recorded here. An upgrade answers a component rather than one finding, so it is recorded from the component and covers everything open on it.
          *
          *     The decision applies to every build running the same component and consumer upstream versions, including future releases — it is matched by code, not copied between releases. It stops applying automatically when either upstream version changes.
+         *
+         *     `mismatched` is the exception, and the only one: it says the scanner matched this against something it is not, which is a claim about identity rather than about risk. It covers the place at whatever versions the place holds, and no version change expires it — a bump does not make a wrong match right. Its `justification` is limited to the two reasons that say something is not there, `component_not_present` and `vulnerable_code_not_present`; the three that describe how code is reached or what stops it are refused, because a version bump changes those and this outcome would carry them past it.
          *
          *     The response says whether a second person must approve it. Most outcomes require approval; a deferral shorter than the configured threshold does not.
          *
@@ -5485,7 +5489,7 @@ export interface components {
              * @description The decision, where every standing one over its places says the same thing
              * @enum {string}
              */
-            outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             severity?: string;
             /**
              * @description The decision state in this build. Only on a still-present entry. Absent where some places are agreed and the rest were never decided, which is none of the four
@@ -5851,7 +5855,7 @@ export interface components {
              */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed";
             /** @description The reasoning, holding for every issue named */
             reasoning: string;
             /** @description The narrowing, in your own words. Recorded, and never part of the claim */
@@ -5949,7 +5953,7 @@ export interface components {
              * @description The outcome
              * @enum {string}
              */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /**
              * Format: int64
              * @description The number of findings this decision covers
@@ -6091,7 +6095,7 @@ export interface components {
             met?: boolean;
             opened: string;
             /** @enum {string} */
-            outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The place in the build, derived from content. It correlates two rows and names no location — consumer is the readable half */
             place: string;
             proposed_at?: string;
@@ -6140,7 +6144,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             proposed_at: string;
             proposed_by: string;
             /** @description The reasoning as it last stood, in markdown, offered back rather than thrown away */
@@ -6175,7 +6179,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The product it was decided in */
             product: string;
             reasoning: string;
@@ -6567,7 +6571,7 @@ export interface components {
             /** @description The mitigation that stops it — the rule, the setting, the service that is not exposed. Required when the reason is that mitigations already exist, optional when the outcome is that this will not be fixed, and refused otherwise */
             mitigation?: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "patch-needed";
             /** @description The places this covers, as the finding names them. Omit for all of them */
             places?: string[] | null;
             /** @description The reasoning */
@@ -6684,7 +6688,7 @@ export interface components {
              */
             covers_now: number;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
         };
         "Hand-back-assignmentsRequest": {
             /**
@@ -6800,7 +6804,7 @@ export interface components {
             /** @description The new line's contents */
             now: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The old words, to start from rather than start without */
             reasoning: string;
             vulnerability: string;
@@ -6898,7 +6902,7 @@ export interface components {
             /** @description The mitigation a holder can apply. Recorded where the reason is that mitigations already exist, or the outcome is that this will not be fixed, and refused otherwise. Nothing here notices a control being removed, so this is the record somebody checks */
             mitigation?: string;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             product: string;
             proposed_at: string;
             proposed_by: string;
@@ -6944,7 +6948,7 @@ export interface components {
             /** Format: int64 */
             claim_id: number;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             product: string;
             /** Format: int64 */
             rows: number;
@@ -8197,7 +8201,7 @@ export interface components {
              * @description The outcome it offers
              * @enum {string}
              */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed";
             /** @description The words it offers. Required: this is what whoever submits it is putting their name to */
             reasoning: string;
         };
@@ -9299,7 +9303,7 @@ export interface components {
             kind: "finding" | "together" | "extension" | "returned";
             needs_approval?: boolean;
             /** @enum {string} */
-            outcome: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /**
              * Format: int64
              * @description The number of this finding's places the claim covers
@@ -9513,7 +9517,7 @@ export interface components {
              */
             claims: number;
             /** @enum {string} */
-            outcome: "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            outcome: "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /**
              * Format: int64
              * @description The number of decisions those acts wrote
@@ -10650,7 +10654,7 @@ export interface operations {
                 /** @description Limit to these products, by name. Repeatable; any of them matches */
                 product?: string[] | null;
                 /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Limit to these states. Repeatable; any of them matches */
                 state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
@@ -10659,6 +10663,8 @@ export interface operations {
                 to?: string;
                 /** @description Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing */
                 alone?: boolean;
+                /** @description Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state */
+                in_force?: boolean;
                 /** @description Only judgments this person proposed, by sign-in identity */
                 proposed_by?: string;
                 /** @description Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match */
@@ -10706,7 +10712,7 @@ export interface operations {
                 /** @description Limit to these products, by name. Repeatable; any of them matches */
                 product?: string[] | null;
                 /** @description Limit to these kinds of judgment. Repeatable; any of them matches */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Limit to these states. Repeatable; any of them matches */
                 state?: ("proposed" | "approved" | "withdrawn" | "lapsed")[] | null;
                 /** @description Only judgments proposed on or after this date, as YYYY-MM-DD */
@@ -10715,6 +10721,8 @@ export interface operations {
                 to?: string;
                 /** @description Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing */
                 alone?: boolean;
+                /** @description Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state */
+                in_force?: boolean;
                 /** @description Only judgments this person proposed, by sign-in identity */
                 proposed_by?: string;
                 /** @description Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match */
@@ -11295,7 +11303,7 @@ export interface operations {
                 /** @description Limit to one product, by name */
                 product?: string;
                 /** @description Limit to one outcome */
-                outcome?: "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+                outcome?: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
                 /** @description Limit to one state */
                 state?: "proposed" | "approved" | "withdrawn" | "lapsed";
                 /** @description Only deferrals whose date has passed */
@@ -11609,7 +11617,7 @@ export interface operations {
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
                 state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
                 /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
                 assigned?: ("me" | "somebody" | "nobody")[] | null;
                 /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
@@ -11715,7 +11723,7 @@ export interface operations {
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
                 state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
                 /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
                 assigned?: ("me" | "somebody" | "nobody")[] | null;
                 /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
@@ -13017,7 +13025,7 @@ export interface operations {
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
                 state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
                 /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
                 assigned?: ("me" | "somebody" | "nobody")[] | null;
                 /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
@@ -13166,7 +13174,7 @@ export interface operations {
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
                 state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
                 /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
                 assigned?: ("me" | "somebody" | "nobody")[] | null;
                 /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
@@ -13277,7 +13285,7 @@ export interface operations {
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
                 state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
                 /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
                 assigned?: ("me" | "somebody" | "nobody")[] | null;
                 /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
@@ -13391,7 +13399,7 @@ export interface operations {
                 /** @description Keep only groups this far decided. A group covers every place an issue sits at in one component, so this is a statement about all of them: undecided means nothing stands, waits or has lapsed at any place, agreed means every place is answered */
                 state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
                 /** @description Keep only groups a standing judgment of this kind covers — how to ask what has been dismissed, which state cannot answer: agreed says a judgment stands, not which one. Every place must be answered the same way, and only the claim standing now counts */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep only groups by who is dealing with them. 'me' means mine or a team I am on. A group whose places are held by different parties is none of these. Several answers hold together: mine and whatever nobody has picked up is one question */
                 assigned?: ("me" | "somebody" | "nobody")[] | null;
                 /** @description Keep only issues the published estimate rates at least this likely to be exploited, 0 to 1 */
@@ -15444,7 +15452,7 @@ export interface operations {
                 /** @description Keep rows standing in any of these. Repeatable; any of them matches */
                 state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
                 /** @description Keep rows whose standing judgment is one of these. Repeatable */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep one component, by name */
                 component?: string;
                 /** @description Keep one vulnerability, under the name it is filed here */
@@ -15490,7 +15498,7 @@ export interface operations {
                 /** @description Keep rows standing in any of these. Repeatable; any of them matches */
                 state?: ("undecided" | "waiting" | "agreed" | "lapsed")[] | null;
                 /** @description Keep rows whose standing judgment is one of these. Repeatable */
-                outcome?: ("affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
+                outcome?: ("affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed")[] | null;
                 /** @description Keep one component, by name */
                 component?: string;
                 /** @description Keep one vulnerability, under the name it is filed here */

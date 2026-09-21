@@ -40,6 +40,13 @@ type Decision struct {
 	// itself — whose version changes every build and is excluded from expiry.
 	ComponentUpstreamVersion *string `bun:"component_upstream_version"`
 	ConsumerUpstreamVersion  *string `bun:"consumer_upstream_version"`
+	// StandsAtAnyVersion says the two above are a record of what the claim was
+	// made against rather than what it is matched on, which is true of the one
+	// outcome that is a claim about identity. Stored on the row because every
+	// query asking whether a decision applies to a finding reads the two
+	// columns above, and reaching the claim for each of them would put a join
+	// on every screen that draws a finding.
+	StandsAtAnyVersion bool `bun:"stands_at_any_version,notnull"`
 	// SeverityCenti is what the claim says is on the claim: the outcome,
 	// the justification, the mitigation, the dates, the version an upgrade
 	// moves to. One act is one argument, and a copy per place is a copy
@@ -438,7 +445,8 @@ func (s *Store) proposeAll(ctx context.Context, claim *Claim, proposals []Propos
 // row is one decision as it will be stored: where the judgment lands, and
 // nothing about what it says.
 func (s *Store) row(claim *Claim, p Proposal, now time.Time) Decision {
-	key := liveKeyFor(p.Place)
+	anyVersion := claim.Outcome.StandsAtAnyVersion()
+	key := liveKeyFor(p.Place, anyVersion)
 	liveKey := &key
 	decision := Decision{
 		ClaimID: claim.ID,
@@ -450,6 +458,7 @@ func (s *Store) row(claim *Claim, p Proposal, now time.Time) Decision {
 		Visibility:               visibilityOf(p.Place),
 		ComponentUpstreamVersion: text(p.Place.ComponentUpstream),
 		ConsumerUpstreamVersion:  text(p.Place.ConsumerUpstream),
+		StandsAtAnyVersion:       anyVersion,
 		State:                    Proposed,
 		NeedsApproval:            p.NeedsApproval,
 		FromStatement:            p.FromStatement,
@@ -542,10 +551,22 @@ func Reasons(outcome Outcome, justification Justification, mitigation string) er
 	// recognized reasons applies, so it is not optional there — and it is
 	// meaningless on the others, which are claims about priority rather than
 	// about applicability.
-	switch outcome {
-	case NotApplicable:
+	switch {
+	case outcome.NeedsJustification():
 		if !justification.Valid() {
 			return fmt.Errorf("%q is not a recognized reason for something not applying", justification)
+		}
+		// A correction keeps applying however far the code moves, so the
+		// reason behind one has to be a reason no version bump can answer.
+		// That something is absent is such a reason; that it is unreachable
+		// or already stopped is a claim about surroundings and configuration,
+		// which a bump changes all the time — accepted here it would put a
+		// judgment about risk beyond the rule that re-examines it.
+		if outcome.StandsAtAnyVersion() && !justification.AboutIdentity() {
+			return fmt.Errorf(
+				"%q says how the code is reached or what stops it, which a version bump "+
+					"changes. A claim that the match is wrong states that something is not "+
+					"there: %v", justification, JustificationsCorrecting())
 		}
 		// Named, because the tool cannot notice this one going away.
 		// Every other reason is a claim about code and lapses when the
@@ -739,23 +760,40 @@ func text(s string) *string {
 }
 
 // liveKeyFor is what a decision is a claim about: the place, and both upstream
-// versions it was made against.
+// versions it was made against — or the place alone, where the claim stands at
+// any version.
 //
 // Hashed rather than stored as its parts, because it exists to be compared for
 // equality under a unique index and nothing ever reads it back. The versions
 // are normalized the same way they are everywhere else, so a claim written with
 // spaces around a version collides with one written without — which is the
 // whole point of a uniqueness rule.
-func liveKeyFor(at Place) string {
-	basis := strings.Join([]string{
+//
+// The two shapes cannot collide. A key over three fields and a key over five
+// are different strings before they are hashed, so a correction and a claim
+// about a place that states no version at all stay apart.
+func liveKeyFor(at Place, anyVersion bool) string {
+	parts := []string{
 		strconv.FormatInt(at.ProductID, 10),
 		strconv.FormatInt(at.VulnerabilityID, 10),
 		at.PlaceIdentity,
-		version(at.ComponentUpstream),
-		version(at.ConsumerUpstream),
-	}, "\x00")
-	sum := sha256.Sum256([]byte(basis))
+	}
+	if !anyVersion {
+		parts = append(parts, version(at.ComponentUpstream), version(at.ConsumerUpstream))
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
 	return hex.EncodeToString(sum[:])
+}
+
+// liveKeysFor is every key a live claim covering this place could be held
+// under: the one keyed on its versions, and the one keyed on the place alone.
+//
+// Both, wherever the question is whether anything stands here. Asked with the
+// versioned key alone, a correction covering the place answers as absent, and
+// the answer to "may somebody claim something here" would be yes at a place
+// already answered.
+func liveKeysFor(at Place) []string {
+	return []string{liveKeyFor(at, false), liveKeyFor(at, true)}
 }
 
 // ErrAlreadyDecided is returned when a live claim already covers this exact
@@ -797,7 +835,7 @@ func (s *Store) alreadyDecided(ctx context.Context, err error, places []Place) e
 		where = "at one of these places"
 	}
 	for _, place := range places {
-		standing, found := s.liveAt(ctx, liveKeyFor(place))
+		standing, found := s.liveAt(ctx, liveKeysFor(place)...)
 		if !found {
 			continue
 		}
@@ -849,9 +887,9 @@ func (s *Store) Undecided(ctx context.Context, places []Place) ([]Place, error) 
 	if len(places) == 0 {
 		return nil, nil
 	}
-	keys := make([]string, 0, len(places))
+	keys := make([]string, 0, len(places)*2)
 	for _, at := range places {
-		keys = append(keys, liveKeyFor(at))
+		keys = append(keys, liveKeysFor(at)...)
 	}
 	var standing []string
 	if err := s.db.NewSelect().Model((*Decision)(nil)).
@@ -865,20 +903,28 @@ func (s *Store) Undecided(ctx context.Context, places []Place) ([]Place, error) 
 		covered[key] = true
 	}
 	left := make([]Place, 0, len(places))
-	for i, at := range places {
-		if !covered[keys[i]] {
+	for _, at := range places {
+		held := false
+		for _, key := range liveKeysFor(at) {
+			held = held || covered[key]
+		}
+		if !held {
 			left = append(left, at)
 		}
 	}
 	return left, nil
 }
 
-// liveAt reads the claim currently standing over a combination of code, if
-// there is one. Used to explain a refusal rather than to prevent one.
-func (s *Store) liveAt(ctx context.Context, key string) (*Decision, bool) {
+// liveAt reads a claim currently standing over a place, under any of the keys
+// one could be held under. Used to explain a refusal rather than to prevent
+// one.
+func (s *Store) liveAt(ctx context.Context, keys ...string) (*Decision, bool) {
 	standing := new(Decision)
 	if err := s.db.NewSelect().Model(standing).
-		Where("live_key = ?", key).Scan(ctx); err != nil {
+		Where("live_key IN (?)", bun.List(keys)).
+		// Deterministic, because two claims can stand at one place and the
+		// message names one of them.
+		Order("id").Limit(1).Scan(ctx); err != nil {
 		return nil, false
 	}
 	return standing, true

@@ -143,9 +143,20 @@ export const CATALOG: Report[] = [
     // to one — a different population under the same name.
     to: (at) =>
       withProduct(
-        "/audit?alone=true&outcome=not-applicable&outcome=wont-fix&outcome=already-fixed",
+        "/audit?alone=true&outcome=not-applicable&outcome=mismatched&outcome=wont-fix" +
+          "&outcome=already-fixed",
         at,
       ),
+  },
+  {
+    // The record again, asked the other question it was built to answer.
+    // Every other judgment lapses when the code moves; these do not, so
+    // nothing brings them back round to anybody and the only way to read
+    // them is to ask for them.
+    name: "Standing corrections",
+    answers:
+      "The matches recorded as wrong, and still standing: what each is about, who proposed it, who agreed, and on what grounds. Nothing expires one, so this is the list nobody is shown unless they ask.",
+    to: (at) => withProduct("/audit?in_force=true&outcome=mismatched", at),
   },
   {
     name: "Administrative changes",

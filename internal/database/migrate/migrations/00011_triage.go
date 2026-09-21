@@ -201,6 +201,17 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			"visibility"                 ` + t.kind + ` NOT NULL,
 			"component_upstream_version" ` + t.name + ` NULL,
 			"consumer_upstream_version"  ` + t.name + ` NULL,
+			-- Whether this claim keeps applying when the code under it moves,
+			-- which one outcome does: a claim that the scanner matched
+			-- something that is not here is about identity rather than about
+			-- risk, and no version bump makes a wrong match right.
+			--
+			-- On the row rather than read from the claim it belongs to. Every
+			-- query asking whether a decision applies to a finding compares
+			-- the two version columns beside this one, and a join to the claim
+			-- for each of them would be a join on every screen that draws a
+			-- finding.
+			"stands_at_any_version"      ` + t.boolean + ` NOT NULL,
 			-- How bad this was judged to be when the claim was made, in
 			-- hundredths. Kept with the decision rather than read from the
 			-- issue later, because the question a re-affirmation asks is
@@ -238,7 +249,9 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			-- its own.
 			"selected_by"                ` + t.free + ` NULL,
 			-- What this decision is a claim about, while it is still a live
-			-- claim: the place and both upstream versions, hashed. Set to null
+			-- claim: the place and both upstream versions, hashed — and the
+			-- place alone where the claim stands at any version, because the
+			-- versions are not what it is about. Set to null
 			-- the moment it is withdrawn or lapses, because a decision that no
 			-- longer applies is history and must not block a fresh one.
 			--

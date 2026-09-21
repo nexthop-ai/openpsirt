@@ -218,7 +218,7 @@ func (s *Store) newClaimNarrowed(ctx context.Context, kind ClaimKind, by int64,
 		moving := strings.TrimSpace(p.UpgradeTo)
 		claim.UpgradeTo = &moving
 	}
-	if p.Outcome == NotApplicable {
+	if p.Outcome.NeedsJustification() {
 		stated := string(p.Justification)
 		claim.Justification = &stated
 	}

@@ -64,12 +64,12 @@ func (s *Store) StandingAt(ctx context.Context, subject access.Subject, productI
 	if len(at) == 0 {
 		return nil, nil
 	}
-	keys := make([]string, 0, len(at))
+	keys := make([]string, 0, len(at)*2)
 	for _, place := range at {
-		keys = append(keys, liveKeyFor(Place{
+		keys = append(keys, liveKeysFor(Place{
 			ProductID: productID, VulnerabilityID: issueID, PlaceIdentity: place.PlaceIdentity,
 			ComponentUpstream: place.ComponentUpstream, ConsumerUpstream: place.ConsumerUpstream,
-		}))
+		})...)
 	}
 	var rows []Decision
 	// With the argument each row applies, which is the whole of what a reader

@@ -14,6 +14,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Decision identity](#decision-identity)
 - [Expiry](#expiry)
 - [Outcomes](#outcomes)
+- [Corrections](#corrections)
 - [Approval](#approval)
 - [Rights](#rights)
 - [Readback](#readback)
@@ -86,6 +87,7 @@ sweeps and nothing runs on a timer.
 | A carried patch does not lapse a decision | A producer that fixes by patching moves no version this can see. For one that patches heavily, a decision may never be automatically re-examined however much the code moves |
 | A decision's age travels with it everywhere it appears | The compensating control for the line above. An eight-year-old judgment should look like one |
 | A deferral runs out on a date, not on a version | A bump does not change a judgment about priority, and a calendar does not change one about applicability. The finding returns to the queue marked as deferred rather than as new |
+| A claim that the match is wrong runs out on neither | It is a claim about identity, and § Corrections holds it |
 
 Identity is structural and expiry is version-based, and neither reaches into the
 other. Overlapping them is how a bump at the top of a build invalidates a
@@ -97,6 +99,7 @@ judgment made about a leaf.
 |---|---|
 | **Affected** | It applies, and goes to remediation |
 | **Not applicable** | It does not affect this product here |
+| **Wrong match** | The scanner matched this against something that is not here |
 | **Deferred** | It affects us, and is not being worked on until a date |
 | **Will not fix** | It affects us, and will not be addressed |
 | **Already fixed** | The version shipping here carries the fix, and nothing here can see that it does |
@@ -106,7 +109,7 @@ judgment made about a leaf.
 | Rule | |
 |---|---|
 | A deferral publishes as affected, never as not-affected | Deferring is an internal scheduling judgment. Published as not-affected it would tell the world we assessed something as harmless when we had only put it off |
-| Only not-applicable carries a reason, and it is required there | The claim that something does not affect us *is* which recognized reason applies |
+| Not-applicable and a wrong match carry a reason, and it is required on both | Each of those claims *is* which recognized reason applies |
 | The reason vocabulary is the exchange format's | A private one needs a mapping nobody maintains and loses meaning at every step |
 
 Two outcomes would not be enough: with only "affects us" and "does not" there is
@@ -136,6 +139,41 @@ scan reports, and this scan keeps reporting it at every later revision.
 The word already existed on the way in and only on the way in — a build's
 suppressions may say `fixed` — so this fills the gap where nobody upstream can
 make the claim, using the same word.
+
+## Corrections
+
+A correction says the scanner matched this against something it is not. The
+outcome is **wrong match**, and it is the one claim here about identity rather
+than about risk.
+
+The case is a distribution-heavy inventory, where a package name matched
+against a vulnerability database's naming for an unrelated upstream project
+recurs at every point release.
+
+| Rule | |
+|---|---|
+| No version expires it | A bump does not make a wrong match right. It is keyed on the product, the issue and the place, without the versions, and the sweep that lapses judgments about risk passes over it |
+| A second person agrees, always | A dismissal hides risk until the next bump; a correction hides it with nothing scheduled to look again, so the control applies here more rather than less. The earlier argument that a correction is not a dismissal and so needs no second person reads the semantics; the control attaches to the effect, which is a component that never appears again with nothing saying it was suppressed rather than clean |
+| The reason is one of the two that say something is not there | What the inventory named is not in what ships, or what ships is not the code the issue is about. The other three describe how the code is reached or what already stops it, and a bump changes both — carried past every bump, one of those would be a judgment about risk that nothing re-examines |
+| It stands beside whatever was claimed at the place, and answers for it | Two live claims at one place is what the record already holds whenever two builds ship different versions. What is new is that both can answer one finding, and there the correction is the answer: a judgment about risk at a place the match does not describe is a judgment about something that is not there |
+| Withdrawing is what ends one | Nothing else does, which is why the set in force has to be readable |
+| Published, it is not-affected, carrying the reason it states | Both reasons are the exchange format's own, so nothing about the match being ours to correct has to be explained to a reader outside |
+
+### The standing set
+
+Corrections in force are read from the record with its filters set: the
+outcome, and what applies now. `DESIGN-reporting.md` holds the record and the
+one other question it is asked this way.
+
+Asking for what applies now is not asking for what was approved. A judgment is
+approved and lapses later when the code moves out from under it, so a list of
+approved judgments is a list of what was once agreed.
+
+### Not read
+
+Curated correction data published elsewhere. The objection is not the size of
+such a file but where it comes from, what regenerates it and under what terms —
+the same objection `TODO.md` records against the full weakness catalog.
 
 ## Approval
 

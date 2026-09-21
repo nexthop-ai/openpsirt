@@ -1219,6 +1219,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -1830,6 +1831,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -1990,6 +1992,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -2248,6 +2251,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -2353,6 +2357,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -2433,6 +2438,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3066,6 +3072,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3288,6 +3295,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3489,6 +3497,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3707,6 +3716,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3809,6 +3819,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -6111,6 +6122,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -7953,6 +7965,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -8379,6 +8392,7 @@ components:
         outcome:
           enum:
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -10088,7 +10102,9 @@ paths:
 
         Narrowed by what you may see, like every other list here. Nothing about this view is exempt from the visibility rules — a report showing more than the screens it summarizes would be a way around them.
 
-        `alone=true` returns judgments no second person has a standing agreement on. That population is large and legitimate on its own — an outcome that hides nothing needs no second person, and a short deferral stands alone — so ask it with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, `wont-fix` and `already-fixed` all require approval, so a row in that answer is a control that failed.
+        `alone=true` returns judgments no second person has a standing agreement on. That population is large and legitimate on its own — an outcome that hides nothing needs no second person, and a short deferral stands alone — so ask it with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, `mismatched`, `wont-fix` and `already-fixed` all require approval, so a row in that answer is a control that failed.
+
+        `in_force=true` returns what applies now rather than what was once agreed to. With `outcome=mismatched` that is the set of standing corrections: the matches this deployment has recorded as wrong, which no version bump expires.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-audit
@@ -10114,6 +10130,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -10159,6 +10176,13 @@ paths:
           name: alone
           schema:
             description: Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing
+            type: boolean
+        - description: "Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state"
+          explode: false
+          in: query
+          name: in_force
+          schema:
+            description: "Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state"
             type: boolean
         - description: Only judgments this person proposed, by sign-in identity
           explode: false
@@ -10274,6 +10298,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -10319,6 +10344,13 @@ paths:
           name: alone
           schema:
             description: Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing
+            type: boolean
+        - description: "Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state"
+          explode: false
+          in: query
+          name: in_force
+          schema:
+            description: "Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state"
             type: boolean
         - description: Only judgments this person proposed, by sign-in identity
           explode: false
@@ -11094,7 +11126,7 @@ paths:
       description: |-
         Returns triage decisions on products you may triage, newest first, with the justification text for each.
 
-        Filter by `outcome` to list dismissals (`not-applicable`, `wont-fix`) or postponements (`deferred`), by `state` to separate what is approved from what is still waiting or has been withdrawn, and by `product` to limit to one product.
+        Filter by `outcome` to list dismissals (`not-applicable`, `mismatched`, `wont-fix`, `already-fixed`) or postponements (`deferred`), by `state` to separate what is approved from what is still waiting or has been withdrawn, and by `product` to limit to one product.
 
         Set `expired=true` to list deferrals whose date has passed — the findings that have come back and need judging again.
 
@@ -11119,6 +11151,7 @@ paths:
             enum:
               - affected
               - not-applicable
+              - mismatched
               - deferred
               - wont-fix
               - already-fixed
@@ -11778,6 +11811,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -12234,6 +12268,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -14252,6 +14287,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -14785,6 +14821,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -15242,6 +15279,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -15725,6 +15763,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -18671,15 +18710,17 @@ paths:
         note: Answers only what you may see.
     post:
       description: |-
-        Records how a finding was triaged: `affected`, `not-applicable`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.
+        Records how a finding was triaged: `affected`, `not-applicable`, `mismatched`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.
 
-        `not-applicable` requires a `justification` from the standard VEX vocabulary. `deferred` requires `deferred_until` as a date. `already-fixed` requires `fixed_version`, the version whoever packages the component states the fix arrived in — it is recorded for a reader and never compared against what ships.
+        `not-applicable` and `mismatched` require a `justification` from the standard VEX vocabulary. `deferred` requires `deferred_until` as a date. `already-fixed` requires `fixed_version`, the version whoever packages the component states the fix arrived in — it is recorded for a reader and never compared against what ships.
 
         `patch-needed` is the backport case: a fix is being carried into this build and the version does not move. It requires `committed_to`, the date the work lands, and it closes the only way a backport can — the next inventory declares the patch it carries and says what that patch resolves, so the finding goes while the version stays where it was.
 
         `upgrade-needed` is not recorded here. An upgrade answers a component rather than one finding, so it is recorded from the component and covers everything open on it.
 
         The decision applies to every build running the same component and consumer upstream versions, including future releases — it is matched by code, not copied between releases. It stops applying automatically when either upstream version changes.
+
+        `mismatched` is the exception, and the only one: it says the scanner matched this against something it is not, which is a claim about identity rather than about risk. It covers the place at whatever versions the place holds, and no version change expires it — a bump does not make a wrong match right. Its `justification` is limited to the two reasons that say something is not there, `component_not_present` and `vulnerable_code_not_present`; the three that describe how code is reached or what stops it are refused, because a version bump changes those and this outcome would carry them past it.
 
         The response says whether a second person must approve it. Most outcomes require approval; a deferral shorter than the configured threshold does not.
 
@@ -19132,6 +19173,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -19257,6 +19299,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed

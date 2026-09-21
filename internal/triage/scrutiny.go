@@ -428,9 +428,10 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 // person behind them, and the decisions they wrote.
 //
 // This should answer zero, and a number is a control that did not hold. The
-// three outcomes that claim something needs no further work — it does not
-// apply, it will not be fixed, the fix is already here — each require a second
-// person, so a claim of one of them standing alone is not a backlog item. It is
+// outcomes that claim something needs no further work — it does not apply, the
+// match is wrong, it will not be fixed, the fix is already here — each require
+// a second person, so a claim of one of them standing alone is not a backlog
+// item. It is
 // the write path having been got around, and it is the one failure the record
 // cannot find on its own afterwards.
 //
@@ -452,7 +453,7 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 //
 // The gate's verdict is a flag, and it is read for the opposite half on
 // purpose. Nothing a caller passes reaches it: a proposal's own answer is
-// re-worked against the policy in force when the write lands. And the three
+// re-worked against the policy in force when the write lands. And the ones
 // that dismiss are counted whatever it says, so a write path that got around
 // the gate by clearing it is still caught — the flag only ever widens the
 // question and never narrows it.

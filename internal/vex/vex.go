@@ -267,10 +267,11 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 			AND de.product_id = ?
 			AND de.state = 'approved'
 			AND de.live_key IS NOT NULL
-			AND COALESCE(de.component_upstream_version, '') =
-				COALESCE(NULLIF(c.upstream_version, ''), c.version, '')
-			AND COALESCE(de.consumer_upstream_version, '') =
-				COALESCE(NULLIF(uc.upstream_version, ''), uc.version, '')`, named.ProductID).
+			AND (de.stands_at_any_version = TRUE
+				OR (COALESCE(de.component_upstream_version, '') =
+					COALESCE(NULLIF(c.upstream_version, ''), c.version, '')
+				AND COALESCE(de.consumer_upstream_version, '') =
+					COALESCE(NULLIF(uc.upstream_version, ''), uc.version, '')))`, named.ProductID).
 		// The argument, which is where the outcome lives. The outcome test is
 		// part of the join rather than a filter, as it was on the decision:
 		// what the counting below asks is whether *every* open place is
@@ -281,7 +282,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		// left out it falls through to silence, which already reads as
 		// affected and is the honest answer.
 		Join(`LEFT JOIN "claim" AS "cl" ON cl.id = de.claim_id
-			AND (cl.outcome IN ('not-applicable', 'already-fixed')
+			AND (cl.outcome IN ('not-applicable', 'mismatched', 'already-fixed')
 				OR (cl.outcome = 'wont-fix' AND COALESCE(cl.mitigation, '') <> ''))`).
 		ColumnExpr(`v.id AS "vulnerability_id"`).
 		ColumnExpr(`v.identifier AS "identifier"`).
@@ -449,10 +450,16 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 
 // statusOf turns an outcome into what the format calls it.
 //
-// Only the three a VEX document per build names arrive here. A deferral never
+// Only the four a VEX document per build names arrive here. A deferral never
 // does: publishing it as not-affected would tell the world we assessed
 // something as harmless when we had only postponed it, and silence already
 // reads as affected.
+//
+// A claim that the scanner matched something that is not here publishes as
+// not-affected, carrying the reason it states: that the component is absent,
+// or that what ships is not the vulnerable code. Both are what the format's
+// vocabulary already says, so nothing about the match being ours to correct
+// has to be explained to a reader outside.
 //
 // A claim that will not be fixed is affected rather than dismissed, which is
 // what it says: the flaw is there and is staying. It reaches a customer only

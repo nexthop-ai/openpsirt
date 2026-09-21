@@ -75,6 +75,7 @@ type Auditing struct {
 	From      string    `query:"from" doc:"Only judgments proposed on or after this date, as YYYY-MM-DD"`
 	To        string    `query:"to" doc:"Only judgments proposed before this date, as YYYY-MM-DD"`
 	Alone     bool      `query:"alone" doc:"Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing"`
+	InForce   bool      `query:"in_force" doc:"Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state"`
 	Proposer  string    `query:"proposed_by" doc:"Only judgments this person proposed, by sign-in identity"`
 	Approver  string    `query:"approved_by" doc:"Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match"`
 	Issue     string    `query:"issue" doc:"Only judgments about this vulnerability, under the name it is filed here"`
@@ -94,6 +95,7 @@ func (a Auditing) narrow(ctx context.Context, in Ingest,
 
 	filter := triage.Filter{
 		Alone:     a.Alone,
+		InForce:   a.InForce,
 		Proposer:  a.Proposer,
 		Approver:  a.Approver,
 		Issue:     a.Issue,
@@ -181,8 +183,11 @@ func registerAudit(api huma.API, in Ingest) {
 			"That population is large and legitimate on its own — an outcome that hides " +
 			"nothing needs no second person, and a short deferral stands alone — so ask it " +
 			"with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, " +
-			"`wont-fix` and `already-fixed` all require approval, so a row in that answer is a " +
-			"control that failed.",
+			"`mismatched`, `wont-fix` and `already-fixed` all require approval, so a row in " +
+			"that answer is a control that failed.\n\n" +
+			"`in_force=true` returns what applies now rather than what was once agreed to. " +
+			"With `outcome=mismatched` that is the set of standing corrections: the matches " +
+			"this deployment has recorded as wrong, which no version bump expires.",
 		Tags: []string{"Reports"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Auditing

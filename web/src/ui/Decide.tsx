@@ -4,7 +4,12 @@ import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
-import { JUSTIFICATIONS, labeled, type Justification } from "./Outcome";
+import {
+  JUSTIFICATIONS,
+  JUSTIFICATIONS_CORRECTING,
+  labeled,
+  type Justification,
+} from "./Outcome";
 import { Covering, type Sitting } from "./Covering";
 import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
@@ -127,6 +132,7 @@ type OneAtATime = Body<"FindingDecisionBody">["outcome"];
 const OFFERS: Record<OneAtATime, true> = {
   affected: true,
   "not-applicable": true,
+  mismatched: true,
   deferred: true,
   "wont-fix": true,
   "already-fixed": true,
@@ -281,7 +287,11 @@ export function Decide({
   const open = useMemo(() => places.filter((p) => p.decision == null), [places]);
   const answered = places.length - open.length;
   const covering = open.filter((p) => !excluded.has(p.place ?? ""));
-  const needsJustification = outcome === "not-applicable";
+  const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
+  // A correction carries past every version bump, so the reasons it may state
+  // are the two that say something is not there. The other three are about how
+  // code is reached or what stops it, which a bump changes.
+  const reasons = outcome === "mismatched" ? JUSTIFICATIONS_CORRECTING : JUSTIFICATIONS;
   const needsDate = outcome === "deferred";
   // A claim that the fix is already here is a fact somebody can check against
   // whoever packages the component, and it is required for that reason . The
@@ -584,7 +594,7 @@ export function Decide({
                 what ships to a customer as our claim about their exposure
 . The token itself is on the title, for whoever is
                 checking what will be exported. */}
-            {JUSTIFICATIONS.map((each) => (
+            {reasons.map((each) => (
               <option key={each.value} value={each.value} title={each.value}>
                 {each.label} — {each.means}
               </option>
