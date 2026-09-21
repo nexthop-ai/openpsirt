@@ -213,6 +213,12 @@ type Vulnerability struct {
 	Acknowledgments []Acknowledgment `json:"acknowledgments,omitempty"`
 	// DiscoveryDate is when this deployment first recorded it, which is what
 	// it knows. When somebody outside found it is not something it holds.
+	//
+	// A timestamp rather than a day. The standard asks every date it defines
+	// for a date and a time, and a validator refuses a bare day — which is a
+	// document a customer's tooling drops. A string rather than a moment,
+	// because a moment nothing recorded has to be absent rather than stated
+	// as the zero one, and an empty struct is not omitted.
 	DiscoveryDate string `json:"discovery_date,omitempty"`
 }
 
@@ -648,8 +654,9 @@ type Issuance struct {
 // whether what is published is still what we would generate, which only means
 // something if both sides come from here.
 //
-// The ordinal is read and used in one transaction, so two people recording an
-// issuance at the same moment cannot be handed the same number.
+// The ordinal is read and used in one transaction, and the unique constraint
+// is what refuses two people the same number — a refusal this reports as a
+// lost race, so the second attempt reads the number the first wrote.
 func (s *Store) Issued(ctx context.Context, subject access.Subject, who publisher.Named,
 	identifier, summary string) (*Issuance, error) {
 
@@ -683,33 +690,10 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	// what keeps it safe is the distribution label the document carries —
 	// RED while anything it covers is held back, whatever its editorial
 	// state says.
-	// Hashed over what the document *says*, with the parts that move for
-	// reasons other than the content left out.
-	//
-	// The question this answers is "is what is published still what we would
-	// generate", and every one of these makes that unanswerable: the current
-	// release date and the generator's date change every time it is asked for;
-	// the version and the revision history change *because* it was issued, so
-	// a document hashed with them can never match the digest of the issuance
-	// before it, however unchanged its substance. What is left is the title,
-	// the notes, the product tree and the vulnerability — which is the part a
-	// reader acts on and the part that must not have quietly moved.
-	//
-	// The status follows the agreement rather than the words. Taking one back
-	// moves a published document to interim with nothing a reader acts on
-	// having changed, and giving it again moves it back, so a digest carrying
-	// it would report a difference in substance where there is none.
-	settled := *doc
-	settled.Document.Tracking.CurrentReleaseDate = time.Time{}
-	settled.Document.Tracking.Generator = nil
-	settled.Document.Tracking.Version = ""
-	settled.Document.Tracking.Status = ""
-	settled.Document.Tracking.RevisionHistory = nil
-	body, err := json.Marshal(settled)
+	digest, err := settledDigest(doc)
 	if err != nil {
-		return nil, fmt.Errorf("hash what went out: %w", err)
+		return nil, err
 	}
-	sum := sha256.Sum256(body)
 
 	issuedAt := s.now().UTC().Truncate(time.Microsecond)
 	var recorded *Issuance
@@ -748,7 +732,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		}
 		recorded = &Issuance{
 			AdvisoryID: row.ID, EditionID: *at.EditionID,
-			Digest: hex.EncodeToString(sum[:]), Summary: summary,
+			Digest: digest, Summary: summary,
 			IssuedBy: subject.ID, IssuedAt: issuedAt,
 		}
 		// Scanned into a value rather than read through a cursor: a cursor
@@ -762,8 +746,18 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			return err
 		}
 		recorded.Ordinal = highest + 1
-		_, err := tx.NewInsert().Model(recorded).Exec(ctx)
-		return err
+		// Two people recording at the same moment read the same number, and
+		// what stops them sharing it is the unique constraint, whose answer
+		// is an error. Said as a lost race, the helper re-runs the whole
+		// closure and the second reads the number the first wrote; reported
+		// as it arrives, it is a fault nobody can act on.
+		if _, err := tx.NewInsert().Model(recorded).Exec(ctx); err != nil {
+			if database.IsDuplicate(err) {
+				return database.ErrGoAgain
+			}
+			return err
+		}
+		return nil
 	})
 	if errors.Is(err, ErrNotAgreed) {
 		return nil, err
@@ -772,6 +766,41 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		return nil, fmt.Errorf("record that it went out: %w", err)
 	}
 	return recorded, nil
+}
+
+// settledDigest is what the document says, hashed.
+//
+// The settled digest, which is one of the two hashes a published document has
+// and the one taken here. It answers "is this revision still what we would
+// generate", so everything that moves for a reason other than what the
+// document says is left out of it: the current release date and the
+// generator's date change every time the document is asked for, and the
+// version and the revision history move because the document went out rather
+// than because it says something different. What is left is the title, the
+// notes, the product tree and the vulnerabilities — the part a reader acts on,
+// and the part that must not have quietly moved.
+//
+// The status follows the agreement rather than the words. Taking an agreement
+// back moves a published document to interim with nothing a reader acts on
+// having changed, and giving it again moves it back, so a digest carrying it
+// would report a difference in substance where there is none.
+//
+// The other hash is over the delivered bytes, volatile fields included, and
+// answers whether the file a reader fetched arrived intact. The two are not
+// interchangeable and neither is a duplicate of the other.
+func settledDigest(doc *Document) (string, error) {
+	settled := *doc
+	settled.Document.Tracking.CurrentReleaseDate = time.Time{}
+	settled.Document.Tracking.Generator = nil
+	settled.Document.Tracking.Version = ""
+	settled.Document.Tracking.Status = ""
+	settled.Document.Tracking.RevisionHistory = nil
+	body, err := json.Marshal(settled)
+	if err != nil {
+		return "", fmt.Errorf("hash what went out: %w", err)
+	}
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 // Issuances is what has gone out for one advisory, oldest first.
@@ -916,7 +945,7 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		}
 	}
 	if !entered.OpenedAt.IsZero() {
-		vulnerability.DiscoveryDate = opened.Format("2006-01-02")
+		vulnerability.DiscoveryDate = opened.UTC().Format(time.RFC3339)
 	}
 	if vulnerability.CWE, err = weaknessOf(ctx, s.db, issue.ID); err != nil {
 		return err

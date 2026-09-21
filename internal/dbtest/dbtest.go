@@ -683,6 +683,8 @@ var tables = []string{
 	"role_grant",
 	// Before person and product, which they point at.
 	"vex_statement",
+	// Before target and person, both of which it points at.
+	"vex_issuance",
 	// Before person, which they point at.
 	"admin_change",
 	// Before team, person and product, all of which it points at.

@@ -510,6 +510,7 @@ Nothing is sent anywhere.
 | A document about an undisclosed flaw travels no further, whatever its editorial state | Reaching a disclosure date discloses nothing (REQ-37), so generating a document does not either. The distribution label is what carries this; the tracking status says where the document is in its life |
 | Releases are named by stream and variant together | Every release a status refers to is named in the product tree, and the list is ordered here rather than by the engine, so two documents generated from the same facts are the same bytes |
 | A release that fixed the flaw is named as fixed rather than omitted | Omission reads identically to a release that never shipped the thing. What fills that list is somebody saying so (REQ-19), because for a recorded flaw no scan will |
+| Every date the document states is a date and a time | The standard defines each of them that way, and a validator run with format assertions refuses a bare day — which is a document a customer's tooling drops, the failure that looks like nothing happening. A schema check run without them passes it, so the two disagree about a document nobody would accept. A settled digest taken while a date was spelled as a bare day does not match again, which REQ-76 is what covers |
 | The document's version is the last number its own revision history states | Counted separately the two disagree the moment an advisory has been issued once, and a validator compares them. They agree by accident for a document nobody has published, which is where the disagreement hides |
 | The publisher's category is one of the six the standard names, refused at startup otherwise | The value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them — which is the one use a generated advisory has |
 | The document declares the profile it satisfies, worked out from what it turned out to carry | Declared unconditionally, a document missing a profile-mandatory element fails that profile's own tests and is dropped by the tooling that reads it |
@@ -608,11 +609,23 @@ control that protects it. That is a composite no record ever held, going to
 every customer running a scanner. The group answers with the earliest
 decision's identifier, and its words are read by that identifier.
 
+### Identity and revisions
+
+| Rule | |
+|---|---|
+| The identifier names the build and nothing that moves | A reader keeps documents by it and tells a revision of one document from a second document by whether it matches. Anything in it that moves between generations makes every fetch a document in its own right |
+| The build is named by the stored names | A name people type is matched without regard to capitals, so one build asked for two ways carries one name |
+| The version is one past what has gone out | A document nobody has published is the first revision, and the next one generated after an issuance is the second. It says so before it goes out, because the bytes an operator sends carry the number they will be known by |
+| Two generations with nothing published in between are one revision | The document is assembled from what stands now, and a change nobody has published is a revision no reader can hold |
+| The moment the document was assembled sits in its own field | The format carries it there, and an identifier is an identity |
+
 ## Issuance records
 
-An issuance records when an advisory went out, by whom, and a digest of what
-went out. It is keyed on the advisory, which is what makes a revision of a
-document covering two issues one record rather than two.
+An issuance records when a document went out, by whom, and a digest of what
+went out. An advisory's is keyed on the advisory, which is what makes a
+revision of a document covering two issues one record rather than two; a VEX
+document's is keyed on the build it describes, which is what its identifier
+names.
 Without it a second document for the same advisory could carry no revision history
 and could not increment its version, both of which CSAF validators check.
 
@@ -623,6 +636,21 @@ and could not increment its version, both of which CSAF validators check.
 | The digest is taken from the document generated here | A caller-supplied digest is a digest of whatever they say, and both sides of the comparison must come from the same place |
 | The version and history are derived from it | The next document is one past what has gone out. The last history entry is the document in hand, which has not gone out and says so |
 | A revision is of the advisory, not of a flaw | An advisory covering two flaws that goes out once is one issuance, so the next document's history does not depend on which flaw is asked about |
+| Recording that a VEX document went out asks for the triage role on the product | The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved, so no further agreement is asked for |
+| The public document is what is recorded, never the preview | The preview carries work nobody has announced, and a record of it going out would say this deployment published that work |
+
+### The two hashes
+
+A published document has two, and they answer different questions.
+
+| Hash | Over | Answers |
+|---|---|---|
+| The settled digest | What the document says, with the moment it was assembled, the software that assembled it, the version, the revision history and the tracking status left out | Is what is published still what this would generate |
+| The delivered checksum | The bytes as published, every volatile field included | Did the file a reader fetched arrive intact |
+
+The settled digest is taken as an issuance is recorded. The delivered checksum
+belongs beside a published file and is not built; `Not built` below says what
+is missing.
 
 ## Publisher identity
 
@@ -651,6 +679,11 @@ it points at. The signed outbound request is built and is described in
 Every adapter that would send an advisory somewhere, which is the whole of
 Publication above. The CSAF document is generated and served; no destination,
 no adapter and no route to one exists.
+
+The checksum over the delivered bytes. A CSAF provider directory publishes one
+beside every file it serves, and nothing here writes such a directory, so
+there are no delivered bytes to take it over. The settled digest above is the
+hash that exists and answers a different question.
 
 Prose of the deployment's own in the document beyond its title. An edition
 carries the title, and the rest of what a reader acts on is assembled from the
