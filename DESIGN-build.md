@@ -342,6 +342,14 @@ SQLite spends and almost none of what a server engine does.
 The detector is a property of the binary and cannot be turned on for one
 subtest, so `test-all` is two runs: SQLite with it, the three servers without.
 
+A race-instrumented binary sleeps before it exits, so that a goroutine still
+running can report a race first. The race pass sets that sleep to 100 ms. The
+default of one second is paid by every test binary: 1.02 s against 0.015 s for
+a package whose tests take milliseconds, and the better part of a minute across
+the tree on a runner that runs the pass one package at a time. 100 ms keeps a
+window for a goroutine mid-operation; nothing in the tests leaves one running
+on purpose.
+
 The two run at once. They share no engine, so neither can see the other's rows,
 and they are bottlenecked on different things — the detector is in-process work
 and the server pass spends its time waiting on a socket — so each fills what the

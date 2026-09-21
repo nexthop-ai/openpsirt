@@ -188,7 +188,14 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/
 # standalone targets run the same command with the whole machine. Written twice,
 # a flag added to the target somebody runs by hand never reaches the gate, which
 # runs only test-all.
-RACE_PASS    = OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1
+#
+# A race-instrumented binary sleeps before it exits, so that a goroutine still
+# running can report a race first. The default is a second, and every test
+# binary pays it: 1.02 s against 0.015 s for a package whose tests take
+# milliseconds, and the better part of a minute across the tree on a runner
+# that runs the pass one package at a time. 100 ms keeps a window for a
+# goroutine mid-operation; nothing in the tests leaves one running on purpose.
+RACE_PASS    = GORACE=atexit_sleep_ms=100 OPENPSIRT_TEST_ENGINES=sqlite $(GO) test -race -count=1
 SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1
 
 # Both passes at once. They share no engine — the detector runs on SQLite and
