@@ -459,14 +459,33 @@ func Load() (Config, error) {
 		if err != nil {
 			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: %w", err)
 		}
-		if at.Scheme != "https" || at.Host == "" {
-			return Config{}, fmt.Errorf(
-				"OPENPSIRT_DIRECTORY_URL: want an https address, got %q", where)
+		// An address and nothing else. A name is joined to the end of this, so
+		// anything the address carries after its path lands in the middle of
+		// the result: a query becomes part of the filename in every document's
+		// own address, and a password in the address is published in every one
+		// of them and kept in the bytes that went out.
+		if at.Scheme != "https" || at.Host == "" || at.User != nil ||
+			at.RawQuery != "" || at.Fragment != "" {
+			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: want an https address "+
+				"with no query, fragment or credentials, got %q", where)
 		}
 		// One trailing slash, so that a name joined to it is a file inside the
-		// directory rather than a sibling of it.
-		at.Path = strings.TrimSuffix(at.Path, "/") + "/"
+		// directory rather than a sibling of it. Every trailing slash, because
+		// an operator who wrote two configured the same directory.
+		at.Path = strings.TrimRight(at.Path, "/") + "/"
 		c.DirectoryURL = at.String()
+	}
+	// A store to write into and nowhere it is served from is the
+	// half-configuration the mail pair above is refused for, and it fails the
+	// same way: the files are written, every address in them is a name with
+	// nothing in front of it, and nothing says so. The other way round writes
+	// nothing anywhere.
+	if (strings.TrimSpace(c.DirectoryBucket) != "" || strings.TrimSpace(c.DirectoryDir) != "") &&
+		strings.TrimSpace(c.DirectoryURL) == "" {
+		return Config{}, fmt.Errorf(
+			"OPENPSIRT_DIRECTORY_URL: set it alongside OPENPSIRT_DIRECTORY_BUCKET or " +
+				"OPENPSIRT_DIRECTORY_DIR — a directory written with no address it is " +
+				"served from states addresses nobody can resolve")
 	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")

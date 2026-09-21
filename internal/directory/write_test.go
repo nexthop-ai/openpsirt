@@ -372,8 +372,11 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		roles := map[int64][]access.Role{
 			w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
 		}
-		where := t.TempDir()
-		files, err := attach.NewFiles(where)
+		// Made by the store rather than by the test, and through the
+		// constructor the deployment uses: what mode the files land at is
+		// the property this cannot afford to read back through its own user.
+		where := filepath.Join(t.TempDir(), "csaf")
+		files, err := attach.NewServedFiles(where)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -554,3 +557,38 @@ var (
 		Purl: "pkg:deb/debian/libswsscommon@1.0.0", Name: "libswsscommon", Version: "1.0.0",
 	}
 )
+
+// Everything written is readable by whoever serves it.
+//
+// The one property a test that reads its own files back cannot notice: this
+// process wrote them, so it reads them at any mode. A web server runs as
+// somebody else, and refused the lot it serves an empty directory — which
+// looks exactly like a deployment that has published nothing.
+func TestWhatIsWrittenIsReadableByWhoeverServesIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.issued(t, "A flaw in the recovery console")
+		f.write(t)
+		for _, at := range f.every(t) {
+			held, err := os.Stat(filepath.Join(f.where, filepath.FromSlash(at)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if held.Mode().Perm()&0o004 == 0 {
+				t.Errorf("%s is %v, which the process serving it cannot read",
+					at, held.Mode().Perm())
+			}
+		}
+		// And the folders they sit in, which refuse a reader just as
+		// completely.
+		for _, at := range []string{".", time.Now().UTC().Format("2006")} {
+			held, err := os.Stat(filepath.Join(f.where, at))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if held.Mode().Perm()&0o005 != 0o005 {
+				t.Errorf("the %s folder is %v, which cannot be entered or listed",
+					at, held.Mode().Perm())
+			}
+		}
+	})
+}

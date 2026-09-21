@@ -1,6 +1,7 @@
 package advisory_test
 
 import (
+	"encoding/json"
 	"path"
 	"strings"
 	"testing"
@@ -121,4 +122,184 @@ func selfReferenceIn(doc *advisory.Document) string {
 		}
 	}
 	return ""
+}
+
+// A second issuance landing between a document being assembled and the
+// issuance being recorded leaves the stored bytes agreeing with the record.
+//
+// The defect this is written against, and the one every test here otherwise
+// misses: issuing in sequence is the single case where what was read to build
+// the document equals what is read to write it down, so those tests pass
+// against a version and a history taken straight off the assembled document.
+//
+// What goes wrong without it is what a validator checks. The document claims
+// a version one past what it saw, its history lists the revisions it saw, and
+// the issuance it is stored against is numbered past both — so the history
+// has a number missing from the middle of it and the version disagrees with
+// its own last entry.
+func TestAnIssuanceThatLandsWhileAnotherIsBeingBuiltIsStillNumberedRight(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		f.agreed(t, named)
+		if _, err := f.store.Issued(t.Context(), f.who, issuer, named, "First."); err != nil {
+			t.Fatalf("the first issuance: %v", err)
+		}
+
+		// A second writer, landing once, while the document for the third is
+		// being assembled.
+		competing := advisory.NewStore(f.db.DB)
+		advisory.Between(f.store, func() {
+			if _, err := competing.Issued(t.Context(), f.approver, issuer,
+				named, "Landed in between."); err != nil {
+				t.Fatalf("the competing issuance: %v", err)
+			}
+		})
+		recorded, err := f.store.Issued(t.Context(), f.who, issuer, named, "Third.")
+		if err != nil {
+			t.Fatalf("the third issuance: %v", err)
+		}
+		if recorded.Ordinal != 3 {
+			t.Fatalf("recorded as issuance %d, want the third", recorded.Ordinal)
+		}
+
+		var doc advisory.Document
+		if err := json.Unmarshal([]byte(recorded.Document), &doc); err != nil {
+			t.Fatal(err)
+		}
+		// One entry for the recording and one per issuance, numbered without
+		// a gap, and the version is the number the history ends at.
+		history := doc.Document.Tracking.RevisionHistory
+		want := []string{"1", "2", "3", "4"}
+		if len(history) != len(want) {
+			t.Fatalf("the stored history is %+v, want an entry per revision", history)
+		}
+		for at := range want {
+			if history[at].Number != want[at] {
+				t.Errorf("entry %d is numbered %q, want %q", at, history[at].Number, want[at])
+			}
+		}
+		if doc.Document.Tracking.Version != "4" {
+			t.Errorf("the stored document is version %q, want %q",
+				doc.Document.Tracking.Version, "4")
+		}
+	})
+}
+
+// An attempt that has to be re-run is dated when it landed, not when it first
+// tried.
+//
+// The arm a retry reaches. Everything the closure reads it must read again:
+// the moment taken before it began belongs to the attempt that was rolled
+// back, so the revision that went out is dated earlier than it happened — and
+// where the attempt was rolled back because somebody else took the number,
+// that is a revision dated before the one it follows, in a history a
+// validator compares.
+//
+// Driven rather than raced. Losing the race for real needs another connection
+// to commit inside this transaction's window, which one of the four engines
+// will not allow.
+func TestAnAttemptThatIsRunAgainIsDatedWhenItLanded(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		named := f.covering(t, [2]string{"sonic", f.recorded(t, f.master)})
+		f.agreed(t, named)
+
+		handed := advisory.Ticking(f.store, time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC))
+		// What the clock had last answered when the attempt that was rolled
+		// back reached the write. Recorded here rather than counted
+		// afterwards, because what is being pinned is that the attempt which
+		// landed read the clock again rather than keeping this.
+		var rolledBack time.Time
+		advisory.Stumble(f.store, func() {
+			rolledBack = (*handed)[len(*handed)-1]
+		})
+		recorded, err := f.store.Issued(t.Context(), f.who, issuer, named, "Published.")
+		if err != nil {
+			t.Fatalf("issuing: %v", err)
+		}
+		if rolledBack.IsZero() {
+			t.Fatal("no attempt was rolled back, so this pinned nothing")
+		}
+		last := (*handed)[len(*handed)-1]
+		if recorded.IssuedAt.Equal(rolledBack) {
+			t.Errorf("recorded at %s, which is the moment the rolled-back attempt held",
+				recorded.IssuedAt)
+		}
+		if !recorded.IssuedAt.Equal(last) {
+			t.Errorf("recorded at %s, want the moment the attempt that landed read, %s",
+				recorded.IssuedAt, last)
+		}
+		// And the document that went out carries the same moment, since it
+		// is dated from when it left.
+		var doc advisory.Document
+		if err := json.Unmarshal([]byte(recorded.Document), &doc); err != nil {
+			t.Fatal(err)
+		}
+		if !doc.Document.Tracking.CurrentReleaseDate.Equal(last) {
+			t.Errorf("the stored document is dated %s, want %s",
+				doc.Document.Tracking.CurrentReleaseDate, last)
+		}
+	})
+}
+
+// A flaw named on an advisory after it has gone out does not move the
+// document's first release, and so does not move the file.
+//
+// The year folder is that date's year. Left to move, a published document
+// would be written under a second path and the one a reader already found
+// would stay where it was, named by no list — which is also what makes "the
+// set only grows" true.
+func TestNamingAnOlderFlawAfterPublicationDoesNotMoveTheDocument(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		named := f.covering(t, [2]string{"sonic", f.recorded(t, f.master)})
+		f.agreed(t, named)
+		first, err := f.store.Issued(t.Context(), f.who, issuer, named, "Published.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var was advisory.Document
+		if err := json.Unmarshal([]byte(first.Document), &was); err != nil {
+			t.Fatal(err)
+		}
+
+		// A flaw this deployment knew about long before the ones it covers.
+		older := f.openedLongAgo(t)
+		if _, err := f.store.Add(t.Context(), f.who, named, "sonic", older); err != nil {
+			t.Fatal(err)
+		}
+		doc, err := f.store.ForAdvisory(t.Context(), f.who, issuer, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !doc.Document.Tracking.InitialReleaseDate.Equal(
+			was.Document.Tracking.InitialReleaseDate) {
+			t.Errorf("the document now dates itself from %s, want the moment it went out, %s",
+				doc.Document.Tracking.InitialReleaseDate,
+				was.Document.Tracking.InitialReleaseDate)
+		}
+		if advisory.PathFor(doc) != advisory.PathFor(&was) {
+			t.Errorf("the document moved to %q from %q",
+				advisory.PathFor(doc), advisory.PathFor(&was))
+		}
+	})
+}
+
+// openedLongAgo records a flaw and backdates when this deployment knew about
+// it, which is what a document dates itself from.
+//
+// Written to the row rather than recorded at a moved clock: what is being
+// pinned is a document generated from flaws of different ages, and the age is
+// the only part of the flaw this needs.
+func (f *fixture) openedLongAgo(t *testing.T) string {
+	t.Helper()
+	identifier := f.recorded(t, f.master)
+	if _, err := f.db.DB.NewUpdate().
+		TableExpr(`"finding" AS "f"`).
+		Set("opened_at = ?", time.Date(2019, 5, 1, 0, 0, 0, 0, time.UTC)).
+		Where(`f.vulnerability_id = (SELECT v.id FROM "vulnerability" AS "v"
+			WHERE v.identifier = ?)`, identifier).
+		Exec(t.Context()); err != nil {
+		t.Fatalf("backdating when the flaw was recorded: %v", err)
+	}
+	return identifier
 }

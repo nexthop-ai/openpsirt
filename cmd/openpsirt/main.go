@@ -356,6 +356,15 @@ func run(args []string, stdout, stderr *os.File) error {
 	writer := directory.New(db.DB, published, publishesAs(cfg), directory.Config{
 		List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror,
 	}, logger)
+	// A store configured and nothing written to it. The address is refused
+	// where it is read if a store is configured without one, so what is left
+	// is the publisher, which is configured elsewhere and is what every
+	// document in the directory names. Said here rather than left as a
+	// directory that stays empty for ever.
+	if published != nil && writer == nil {
+		logger.Warn("a store for published advisories is configured and nothing is " +
+			"written to it: set OPENPSIRT_PUBLISHER_NAME and OPENPSIRT_PUBLISHER_NAMESPACE")
+	}
 	return serve(cfg, logger, handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
@@ -941,9 +950,14 @@ func noteStoreInTheClear(bucket *attach.Bucket, logger *slog.Logger) {
 // is public because half of what it holds must be is the shape that leaks the
 // other half.
 //
-// The local directory is a real deployment here, unlike for attachments: a
-// web server on this machine reading the same disk is the ordinary way to
-// serve static files, and the store is only ever written by this process.
+// The local directory is a deployment here, unlike for attachments: a web
+// server on this machine reading the same disk is the ordinary way to serve
+// static files. It is written by one process, so it wants a replica of its
+// own and a volume of its own, and the configuration page says so.
+//
+// Its files are made readable by whoever serves them. Written the way
+// attachments are, a web server running as its own user is refused every file
+// and the directory looks empty.
 func directoryStore(ctx context.Context, cfg config.Config,
 	logger *slog.Logger) (attach.Storage, error) {
 
@@ -971,15 +985,19 @@ func directoryStore(ctx context.Context, cfg config.Config,
 			"bucket", cfg.DirectoryBucket)
 		return bucket, nil
 	}
-	local, err := attach.NewFiles(cfg.DirectoryDir)
+	local, err := attach.NewServedFiles(cfg.DirectoryDir)
+	// Named with the setting the operator typed. The store says "file
+	// directory" for either of the two it backs, so an operator who has just
+	// pointed this at a mount they cannot write would otherwise go and check
+	// attachment settings that are fine.
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.DirectoryDir, err)
 	}
 	if local == nil {
 		return nil, nil
 	}
 	if err := local.Reachable(ctx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("OPENPSIRT_DIRECTORY_DIR %s: %w", cfg.DirectoryDir, err)
 	}
 	logger.Info("published advisories are written to a directory on this machine",
 		"directory", cfg.DirectoryDir)

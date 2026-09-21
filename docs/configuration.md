@@ -205,9 +205,17 @@ web server serves them, at the address you give below.
 | `OPENPSIRT_DIRECTORY_LIST` | Tell aggregators they may list you | on |
 | `OPENPSIRT_DIRECTORY_MIRROR` | Tell aggregators they may mirror your documents | off |
 
-A directory on this machine is a real deployment here, unlike for attachments:
-a web server reading the same disk is the ordinary way to serve static files,
-and nothing but this process writes them.
+A directory on this machine is a deployment here, unlike for attachments: a
+web server reading the same disk is the ordinary way to serve static files.
+One process writes it, so it wants a replica of its own and a volume of its
+own — on the chart's defaults, two replicas with a read-only root filesystem,
+the pass cannot create the directory at all, and on a shared volume the two
+replicas write over one another. Run one replica with a volume mounted for it,
+or use the object store.
+
+Files are written readable by whoever serves them, and folders enterable. A
+web server runs as its own user, and refused the lot it serves what looks like
+a deployment that has published nothing.
 
 Use a store of its own rather than the one attachments are in. Every file here
 is served to anybody who asks, and every attachment is authorized before it is
@@ -240,6 +248,11 @@ than this application's:
   description, or the `csaf.data.security.<domain>` DNS record.
 - **Directory listings**, if you want the manual navigation the standard asks
   for.
+- **Read access to the files.** Nothing here sets an access policy on the
+  object store, which is the right default and leaves readability yours: a
+  bucket made with the usual defaults answers 403 to everybody while this
+  writes into it successfully. Give whatever serves the address a policy that
+  lets it read, or put a front end with credentials of its own in front.
 
 Nothing is signed. Signatures and a public key are what the standard's trusted
 provider role adds, and key material is configuration of a kind this deployment

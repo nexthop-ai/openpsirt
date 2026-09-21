@@ -260,6 +260,13 @@ type Status struct {
 type Store struct {
 	db  *bun.DB
 	now func() time.Time
+	// beforeWrite runs between the ordinal being read and the row being
+	// written, and what it answers is returned from the closure. Set by a
+	// test that has to lose that race on purpose; nil everywhere else,
+	// because losing it for real needs a second writer committing inside
+	// this transaction's window, which one engine will not let another
+	// connection do.
+	beforeWrite func() error
 }
 
 // NewStore returns a store over db.
@@ -331,7 +338,16 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	// The earliest recording among the issues it covers. A document dates
 	// itself from when this deployment first knew about what it is about, and
 	// an advisory about several flaws first knew about the oldest of them.
+	//
+	// Once it has gone out, the moment recorded then. What a published
+	// document says its first release was is not something a later edit may
+	// move: naming an older flaw would take the document into a different
+	// year folder, leaving the file a reader already found where it was and
+	// named by no list.
 	opened := assembled.opened
+	if row.ReleasedFrom != nil {
+		opened = row.ReleasedFrom.UTC()
+	}
 	history := revisions(opened, gone, now)
 
 	doc := &Document{}
@@ -712,9 +728,15 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 		return nil, err
 	}
 
-	issuedAt := s.now().UTC().Truncate(time.Microsecond)
 	var recorded *Issuance
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		// Read here, like the ordinal below and for the same reason. Taken
+		// before the transaction, a retry carries the moment the first
+		// attempt started: two people issuing one advisory at once leaves the
+		// loser retrying and landing the later ordinal with the earlier
+		// moment, and every document generated after that lists a revision
+		// history whose dates run backwards — which a validator compares.
+		issuedAt := s.now().UTC().Truncate(time.Microsecond)
 		// Built inside, because an insert writes the generated identifier back
 		// into the model and the ordinal below is read from the database. A
 		// retry of a rolled-back attempt would re-insert a model carrying both
@@ -783,6 +805,23 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			return fmt.Errorf("write down what went out: %w", err)
 		}
 		recorded.Document = string(body)
+		// The first issuance freezes the moment the document dates itself
+		// from, and no later one touches it. An affected-row count means rows
+		// matched, so the clause is what decides it rather than the count:
+		// two writers reaching here together both find it unset, and the
+		// second writes the same value the first did.
+		if _, err := tx.NewUpdate().Model((*Advisory)(nil)).
+			Set("released_from = ?", doc.Document.Tracking.InitialReleaseDate).
+			Where("id = ?", row.ID).
+			Where("released_from IS NULL").
+			Exec(ctx); err != nil {
+			return err
+		}
+		if s.beforeWrite != nil {
+			if err := s.beforeWrite(); err != nil {
+				return err
+			}
+		}
 		// Two people recording at the same moment read the same number, and
 		// what stops them sharing it is the unique constraint, whose answer
 		// is an error. Said as a lost race, the helper re-runs the whole
@@ -827,6 +866,13 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 // interchangeable and neither is a duplicate of the other.
 func settledDigest(doc *Document) (string, error) {
 	settled := *doc
+	// Where the document is published is left out with them. It is a
+	// property of where the file sits rather than of what the document says,
+	// so a deployment that starts writing a directory would otherwise report
+	// every issuance it already had as differing from what would be
+	// generated now — which reads as "re-issue all of them" and is not what
+	// the record is asking.
+	settled.Document.References = without(doc.Document.References, "self")
 	settled.Document.Tracking.CurrentReleaseDate = time.Time{}
 	settled.Document.Tracking.Generator = nil
 	settled.Document.Tracking.Version = ""
@@ -838,6 +884,20 @@ func settledDigest(doc *Document) (string, error) {
 	}
 	sum := sha256.Sum256(body)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// without is the references less the ones of a category.
+//
+// A copy, because the document it came from is the one being generated and a
+// digest may not edit it.
+func without(references []Reference, category string) []Reference {
+	out := make([]Reference, 0, len(references))
+	for _, one := range references {
+		if one.Category != category {
+			out = append(out, one)
+		}
+	}
+	return out
 }
 
 // Issuances is what has gone out for one advisory, oldest first.

@@ -79,6 +79,13 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 			-- points back here, and neither engine that enforces order during
 			-- a bulk delete would accept the cycle.
 			"edition_id" ` + t.refNull + ` NULL,
+			-- The moment the document dates itself from, frozen when the
+			-- advisory first went out. Until then it is the earliest
+			-- recording among the flaws it covers, worked out each time the
+			-- document is generated; naming an older flaw afterwards would
+			-- otherwise move a published document's first-release date, and
+			-- with it the year folder a reader already found it in.
+			"released_from" ` + t.timestamp + ` NULL,
 			"minted_at"  ` + t.timestamp + ` NOT NULL,
 			"minted_by"  ` + t.ref + ` NOT NULL,
 			CONSTRAINT "advisory_identifier_once" UNIQUE ("identifier_folded"),

@@ -37,7 +37,6 @@ var (
 		"../../cmd/openpsirt/main.go",
 		"../attach/s3.go",
 		"../advisory/advisory.go",
-		"../directory/directory.go",
 	}
 )
 
@@ -62,8 +61,8 @@ func TestEverySettingIsWrittenDown(t *testing.T) {
 	// A variable named in a refusal is one an operator is being told to set,
 	// so it is held to the documented set exactly as one that is read here is.
 	//
-	// Four packages name them: this one, and the three below it that carry
-	// the prefix of their own because importing back would cycle. Named one by one
+	// Three packages name them: this one, and the two below it that carry the
+	// prefix of their own because importing back would cycle. Named one by one
 	// like the sources above, and counted, because a path that stops resolving
 	// is a file this stops reading and nothing else says so.
 	named := regexp.MustCompile(`OPENPSIRT_([A-Z0-9_]+)`)

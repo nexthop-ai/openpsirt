@@ -130,6 +130,7 @@ func (w *Writer) feed(published []entry, newest time.Time) rolieFeed {
 				// that answers for it.
 				{Rel: "hash", Href: w.who.At(one.Path + hashSuffix)},
 			},
+			released:  one.Released,
 			Published: stamp(one.Opened),
 			Updated:   stamp(one.Released),
 			Summary:   summary{Content: one.Summary},
@@ -137,9 +138,13 @@ func (w *Writer) feed(published []entry, newest time.Time) rolieFeed {
 			Format:    format{Schema: documentSchema, Version: documentVersion},
 		})
 	}
+	// On the moment rather than on the way it is written. The spelling trims
+	// trailing zeros, so a half second and fifty-one hundredths differ first
+	// at a digit against the letter that ends the one without it, and the
+	// later of the two sorts first.
 	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].Updated != entries[j].Updated {
-			return entries[i].Updated > entries[j].Updated
+		if !entries[i].released.Equal(entries[j].released) {
+			return entries[i].released.After(entries[j].released)
 		}
 		return entries[i].ID < entries[j].ID
 	})
@@ -268,6 +273,9 @@ type category struct {
 }
 
 type feedEntry struct {
+	// released is the moment Updated spells, kept so that the order is
+	// decided by the moment rather than by its spelling.
+	released  time.Time
 	ID        string  `json:"id"`
 	Title     string  `json:"title"`
 	Links     []link  `json:"link"`

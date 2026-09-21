@@ -58,8 +58,11 @@ func TestAHeldBackRevisionIsNotPublishedAndTheOneBeforeItStillIs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if held != 1 {
-		t.Errorf("held back %d, want the one that may not travel", held)
+	// Nothing is held back: the advisory is in the directory, under the
+	// revision that may travel. Counted per revision walked past, this would
+	// say one is missing from a directory that is missing none.
+	if held != 0 {
+		t.Errorf("held back %d, want none — the advisory is published", held)
 	}
 	if len(published) != 1 {
 		t.Fatalf("published %d documents, want the revision that may travel", len(published))
@@ -78,8 +81,11 @@ func TestADocumentWithNoLabelIsNotPublished(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Held back, and counted: this advisory has gone out and the directory
+	// carries no revision of it.
 	if len(published) != 0 || held != 1 {
-		t.Errorf("published %d and held %d, want none published", len(published), held)
+		t.Errorf("published %d and held %d, want none published and one held",
+			len(published), held)
 	}
 }
 

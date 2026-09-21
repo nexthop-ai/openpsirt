@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -85,6 +86,10 @@ type Writer struct {
 	who        publisher.Named
 	settings   Config
 	logger     *slog.Logger
+	// wrote is the set this process last wrote, so that a pass finding it
+	// unmoved leaves the store alone. Read and written by the one goroutine
+	// the pass runs in.
+	wrote string
 }
 
 // New returns the writer, or nil where this deployment publishes no directory.
@@ -118,9 +123,13 @@ func New(db *bun.DB, files attach.Storage, who publisher.Named, settings Config,
 // Written is what one pass wrote.
 type Written struct {
 	// Documents is how many advisories the directory holds, and Held how
-	// many went out under a label this directory may not carry.
+	// many have gone out and carry no revision this directory may serve.
+	// Both count advisories.
 	Documents int
 	Held      int
+	// Unchanged says the pass found the directory already holding what it
+	// would have written, and wrote nothing.
+	Unchanged bool
 }
 
 // Run writes the directory until the context ends.
@@ -134,6 +143,7 @@ func (w *Writer) Run(ctx context.Context, interval time.Duration) {
 		case err != nil:
 			w.logger.ErrorContext(ctx, "writing the published advisory directory",
 				"error", err)
+		case written.Unchanged:
 		case written.Held > 0:
 			w.logger.InfoContext(ctx, "wrote the published advisory directory",
 				"documents", written.Documents, "held back", written.Held)
@@ -176,6 +186,22 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 		return Written{Held: held}, nil
 	}
 
+	// What the store already holds, where this process put it there. Writing
+	// the same bytes again is not free to a reader: a versioned store keeps
+	// a version per pass, and a file rewritten on disk gets a new modified
+	// time, which is what a web server builds the answer to "has this moved"
+	// from — so a mirror revalidating hourly fetches the whole directory
+	// hourly, which is what dating nothing from the clock was for.
+	//
+	// Held in memory rather than read back from the store: what is in the
+	// store is the record, and a second record of it is one to keep true. A
+	// process that has just started knows nothing and writes once, which is
+	// also what makes a store somebody emptied fill again.
+	fingerprinted := fingerprint(published)
+	if fingerprinted == w.wrote {
+		return Written{Documents: len(published), Held: held, Unchanged: true}, nil
+	}
+
 	for _, one := range published {
 		if err := w.document(ctx, one); err != nil {
 			return Written{}, err
@@ -184,7 +210,22 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 	if err := w.listings(ctx, published); err != nil {
 		return Written{}, err
 	}
+	w.wrote = fingerprinted
 	return Written{Documents: len(published), Held: held}, nil
+}
+
+// fingerprint is the set of files a pass would write, as one value.
+//
+// Over the paths and the bytes at them, in the order they are written, so two
+// passes over an unmoved record answer alike and any difference at all answers
+// differently.
+func fingerprint(published []entry) string {
+	sum := sha256.New()
+	for _, one := range published {
+		// A hash writer answers no error, and the bytes are ours.
+		_, _ = fmt.Fprintf(sum, "%s %x\n", one.Path, sha256.Sum256(one.Body))
+	}
+	return hex.EncodeToString(sum.Sum(nil))
 }
 
 // entry is one published document, as every file that names it reads it.
@@ -219,17 +260,22 @@ type entry struct {
 // rather than dropping the advisory out of every list it is in.
 func publishable(sent []advisory.Sent) (out []entry, held int, err error) {
 	seen := map[string]bool{}
+	// Counted per advisory rather than per revision walked past. An advisory
+	// with two revisions that may not travel over one that may is in the
+	// directory, so counting the revisions reports two missing from a
+	// directory that is missing none.
+	walked := map[string]bool{}
 	for _, one := range sent {
 		if seen[one.Advisory] {
 			continue
 		}
+		walked[one.Advisory] = true
 		var doc advisory.Document
 		if err := json.Unmarshal([]byte(one.Document), &doc); err != nil {
 			return nil, 0, fmt.Errorf(
 				"read what %s issuance %d published: %w", one.Advisory, one.Ordinal, err)
 		}
 		if !mayTravel(&doc) {
-			held++
 			continue
 		}
 		seen[one.Advisory] = true
@@ -242,6 +288,11 @@ func publishable(sent []advisory.Sent) (out []entry, held int, err error) {
 			ID:       doc.Document.Tracking.ID,
 			Summary:  newestRevision(&doc),
 		})
+	}
+	for name := range walked {
+		if !seen[name] {
+			held++
+		}
 	}
 	return out, held, nil
 }
