@@ -4,13 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
-
-	"github.com/nexthop-ai/openpsirt/internal/advisory"
 )
 
 // The addresses the standard defines rather than leaves to a publisher: the
@@ -29,28 +25,6 @@ const (
 	// nothing here holds a key.
 	role = "csaf_provider"
 )
-
-// notFilename is every character sequence a document's filename may not
-// carry.
-//
-// The standard's rule, and its own expression of it. The value of the
-// tracking identifier is lower-cased first and then every sequence outside
-// lower-case letters, digits, a plus and a hyphen becomes one underscore —
-// applied in that order, because applied the other way round each capital
-// would become an underscore of its own.
-var notFilename = regexp.MustCompile(`[^+\-a-z0-9]+`)
-
-// pathFor is where a document sits in the directory.
-//
-// A folder per year, named by the year the document says the flaw was first
-// recorded here, and the filename the standard's rule gives. The year comes
-// from the initial release date rather than from when it was published, so a
-// document revised in January of the next year does not move.
-func pathFor(doc *advisory.Document) string {
-	name := notFilename.ReplaceAllString(strings.ToLower(doc.Document.Tracking.ID), "_")
-	return strconv.Itoa(doc.Document.Tracking.InitialReleaseDate.UTC().Year()) +
-		"/" + name + ".json"
-}
 
 // listings writes the three files that say what the directory holds and the
 // one that says what the directory is.
@@ -144,7 +118,7 @@ func stamp(at time.Time) string { return at.UTC().Format(time.RFC3339Nano) }
 func (w *Writer) feed(published []entry, newest time.Time) rolieFeed {
 	entries := make([]feedEntry, 0, len(published))
 	for _, one := range published {
-		address := w.addressOf(one.Path)
+		address := w.who.At(one.Path)
 		entries = append(entries, feedEntry{
 			ID:    one.ID,
 			Title: one.Title,
@@ -154,7 +128,7 @@ func (w *Writer) feed(published []entry, newest time.Time) rolieFeed {
 				// the feed to name wherever one exists. A reader checking
 				// integrity should not have to guess the address of the file
 				// that answers for it.
-				{Rel: "hash", Href: w.addressOf(one.Path + hashSuffix)},
+				{Rel: "hash", Href: w.who.At(one.Path + hashSuffix)},
 			},
 			Published: stamp(one.Opened),
 			Updated:   stamp(one.Released),
@@ -169,7 +143,7 @@ func (w *Writer) feed(published []entry, newest time.Time) rolieFeed {
 		}
 		return entries[i].ID < entries[j].ID
 	})
-	where := w.addressOf(feedFile)
+	where := w.who.At(feedFile)
 	return rolieFeed{Feed: feedBody{
 		ID:         w.feedName(),
 		Title:      w.who.Name + " CSAF advisories (TLP:" + travels + ")",
@@ -206,13 +180,13 @@ func (w *Writer) feedName() string {
 // naming the same documents — and they describe one set of files.
 func (w *Writer) described(newest time.Time) providerMetadata {
 	return providerMetadata{
-		CanonicalURL: w.addressOf(metadataFile),
+		CanonicalURL: w.who.At(metadataFile),
 		Distributions: []distribution{{
-			DirectoryURL: w.at.String(),
+			DirectoryURL: w.who.Published,
 			ROLIE: &rolie{Feeds: []feedDescription{{
 				Summary:  "Advisories " + w.who.Name + " has published, TLP:" + travels + ".",
 				TLPLabel: travels,
-				URL:      w.addressOf(feedFile),
+				URL:      w.who.At(feedFile),
 			}}},
 		}},
 		LastUpdated: stamp(newest),

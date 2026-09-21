@@ -527,7 +527,7 @@ somebody deciding whether to act.
 
 | Element | What fills it | |
 |---|---|---|
-| References | The issue's write-up and everywhere else a report points, each address once | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's |
+| References | The issue's write-up and everywhere else a report points, each address once, and last the address this document is published at | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's. Its own address is stated only where the deployment has said where its documents are reachable, because a reader's tooling follows a self reference and one pointing at nothing is worse than none — and it is built from the same rule the directory writes the file under, so the two cannot name different files |
 | Scores | The CVSS base vector, scored here | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. A vector this deployment cannot score, or one on a scheme the standard's score object has no field for — version 4, which arrives with the standard's next version — yields nothing rather than a number in the wrong place |
 | Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gives it so somebody can reply, not so it can be published, and "anonymous" is a real answer to the question the credit field asks |
 | Remediations | Stated for the releases that still carry the flaw, and the details name the releases that do not | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
@@ -697,6 +697,12 @@ nothing to keep in sync: a reader fetches the list, reads until the dates stop
 being new to them, and that is the whole of it. The destinations an
 administrator configures are a different thing and are for this deployment's
 own notifications, which `DESIGN-notifications.md` describes.
+
+A document states the address it is published at, and the directory writes it
+under that address. Both come from one rule, applied to what the document
+states: the tracking identifier gives the name and the initial release date
+gives the folder. Spelled separately, a document would cite a file the
+directory does not serve.
 
 A hash file sits beside each document and beside nothing else. The standard
 asks for one per CSAF document, and the feed names it in the entry for the

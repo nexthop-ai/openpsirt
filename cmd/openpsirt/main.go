@@ -286,12 +286,9 @@ func run(args []string, stdout, stderr *os.File) error {
 		BaseURL:         cfg.BaseURL,
 		PlainHTTP:       cfg.PlainHTTP,
 		SessionLifetime: cfg.SessionLifetime,
-		Publisher: publisher.Named{
-			Name: cfg.PublisherName, Namespace: cfg.PublisherNamespace,
-			Category: cfg.PublisherCategory, Prefix: cfg.AdvisoryPrefix,
-		},
-		Mode:  roleMode(settings),
-		Files: files,
+		Publisher:       publishesAs(cfg),
+		Mode:            roleMode(settings),
+		Files:           files,
 		// The names that never leave, derived once here and read by the pass
 		// that asks and by the report saying what it held back. Two
 		// derivations of one boundary would be two boundaries the first time
@@ -356,20 +353,29 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Writes the advisories that have gone out where somebody else's web
 	// server can serve them. Nil where this deployment publishes no
 	// directory, which is ordinary.
-	writer, err := directory.New(db.DB, published, publisher.Named{
-		Name: cfg.PublisherName, Namespace: cfg.PublisherNamespace,
-		Category: cfg.PublisherCategory, Prefix: cfg.AdvisoryPrefix,
-	}, directory.Config{
-		URL: cfg.DirectoryURL, List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror,
+	writer := directory.New(db.DB, published, publishesAs(cfg), directory.Config{
+		List: cfg.DirectoryList, Mirror: cfg.DirectoryMirror,
 	}, logger)
-	if err != nil {
-		return err
-	}
 	return serve(cfg, logger, handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
 		undertaker: undertaker, publish: writer,
 	})
+}
+
+// publishesAs is the identity this deployment publishes under, and where what
+// it publishes is reachable.
+//
+// One value rather than one per reader of it. A document names the publisher
+// and states its own address, and the directory names the publisher and states
+// every file's, so two constructions of this are two deployments the first
+// time either grows a field.
+func publishesAs(cfg config.Config) publisher.Named {
+	return publisher.Named{
+		Name: cfg.PublisherName, Namespace: cfg.PublisherNamespace,
+		Category: cfg.PublisherCategory, Prefix: cfg.AdvisoryPrefix,
+		Published: cfg.DirectoryURL,
+	}
 }
 
 // readInterval is how long an idle reader waits before asking for work again.

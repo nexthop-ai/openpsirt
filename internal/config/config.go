@@ -210,8 +210,10 @@ type Config struct {
 	// anywhere.
 	//
 	// DirectoryURL is where the files are reachable, which only the operator
-	// knows — every address the directory states about itself is built from
-	// it. The rest is where the files are put, and mirrors the attachment
+	// knows — every address the directory states about itself, and the
+	// address each document states for itself, is built from it. Checked and
+	// given its trailing slash here, so that nothing below joins a name to it
+	// twice over. The rest is where the files are put, and mirrors the attachment
 	// store because it is the same store with a different destination: the
 	// bucket is what turns the object store on, credentials are optional
 	// where the environment supplies a role, and the directory on disk is
@@ -441,6 +443,30 @@ func Load() (Config, error) {
 	if c.AdvisoryPrefix != "" && !advisoryPrefix.MatchString(c.AdvisoryPrefix) {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADVISORY_PREFIX: want a letter followed by up "+
 			"to nineteen letters, digits or hyphens, got %q", c.AdvisoryPrefix)
+	}
+	// The address published documents state about themselves, refused at
+	// startup beside the three above and for the reason those are: it reaches
+	// a document and the directory verbatim, and a reader outside this
+	// deployment is the only one who ever notices it is wrong. Over TLS,
+	// because the standard requires the documents to be retrievable over a
+	// transport that authenticates the server.
+	//
+	// Checked whether or not a store is configured to write into. The
+	// documents state it too, so an address that answers nothing is in every
+	// document generated while it is set.
+	if where := strings.TrimSpace(c.DirectoryURL); where != "" {
+		at, err := url.Parse(where)
+		if err != nil {
+			return Config{}, fmt.Errorf("OPENPSIRT_DIRECTORY_URL: %w", err)
+		}
+		if at.Scheme != "https" || at.Host == "" {
+			return Config{}, fmt.Errorf(
+				"OPENPSIRT_DIRECTORY_URL: want an https address, got %q", where)
+		}
+		// One trailing slash, so that a name joined to it is a file inside the
+		// directory rather than a sibling of it.
+		at.Path = strings.TrimSuffix(at.Path, "/") + "/"
+		c.DirectoryURL = at.String()
 	}
 	if strings.TrimSpace(c.Addr) == "" {
 		return Config{}, fmt.Errorf("OPENPSIRT_ADDR: must not be empty")

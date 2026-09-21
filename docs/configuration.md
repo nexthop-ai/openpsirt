@@ -192,7 +192,7 @@ web server serves them, at the address you give below.
 
 | Variable | What it does | Default |
 |---|---|---|
-| `OPENPSIRT_DIRECTORY_URL` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, so nothing is written without it | unset |
+| `OPENPSIRT_DIRECTORY_URL` | The `https` address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an `https` address | unset |
 | `OPENPSIRT_DIRECTORY_BUCKET` | The bucket the files are written to. Empty means no object store | unset |
 | `OPENPSIRT_DIRECTORY_ENDPOINT` | The address of a self-hosted store. A cloud provider needs none | unset |
 | `OPENPSIRT_DIRECTORY_REGION` | The region, where the store wants one | unset |
@@ -223,6 +223,12 @@ published while it is being revised.
 What is written is what went out, byte for byte. Issuing an advisory is what
 puts a document in the directory, and editing one afterwards changes nothing
 there until you record that the next revision went out.
+
+Setting the address changes what advisories say, not only where they are put.
+A document states the address it is published at, so one generated before you
+set it states none and one generated after states it — and a document that has
+already gone out keeps the bytes it went out as. Set the address before you
+publish, rather than after.
 
 Three things are yours to arrange, because they are your web server's rather
 than this application's:

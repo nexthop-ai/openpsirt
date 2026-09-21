@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"strings"
 	"time"
 
@@ -66,18 +65,12 @@ const (
 	hashSuffix = ".sha256"
 )
 
-// Config is where the directory is served from and what it says about itself.
+// Config is what the directory says about itself beyond who wrote it.
 //
-// A struct rather than a parameter list, because two of these are booleans
-// sitting beside one another: positional, an operator's answer about being
-// listed becomes their answer about being mirrored.
+// A struct rather than two arguments, because they are booleans sitting beside
+// one another: positional, an operator's answer about being listed becomes
+// their answer about being mirrored.
 type Config struct {
-	// URL is the address the files are reachable at, which the operator's
-	// web server decides and this cannot know. Every address the directory
-	// states about itself is built from it, so with none configured nothing
-	// is written: a provider description pointing at addresses that answer
-	// nothing is worse than none, because an aggregator follows them.
-	URL string
 	// List and Mirror are what the deployment tells aggregators it is
 	// content with. The standard reads a missing answer as listed and not
 	// mirrored, which is what these default to.
@@ -90,7 +83,6 @@ type Writer struct {
 	advisories *advisory.Store
 	files      attach.Storage
 	who        publisher.Named
-	at         *url.URL
 	settings   Config
 	logger     *slog.Logger
 }
@@ -101,44 +93,26 @@ type Writer struct {
 // files is: a worker started for something a deployment did not configure is a
 // goroutine and a log line an operator has to work out the meaning of.
 //
-// Both halves are needed and neither implies the other. A store with no
-// address writes files that describe themselves by addresses nobody can
-// resolve; an address with no store describes files nothing wrote.
+// Three things are needed and none implies the others. A store with no address
+// writes files that describe themselves by addresses nobody can resolve; an
+// address with no store describes files nothing wrote; and the description the
+// directory writes about itself names the publisher, as does every document in
+// it, so one configured without a publisher describes an organization nobody
+// can identify.
+//
+// The address is not checked here. It is checked and given its trailing slash
+// where the setting is read, because a document states it too and reaches that
+// without passing through here.
 func New(db *bun.DB, files attach.Storage, who publisher.Named, settings Config,
-	logger *slog.Logger) (*Writer, error) {
+	logger *slog.Logger) *Writer {
 
-	where := strings.TrimSpace(settings.URL)
-	if files == nil || where == "" {
-		return nil, nil
+	if files == nil || !who.Publishes() || !who.Stated() {
+		return nil
 	}
-	at, err := url.Parse(where)
-	if err != nil {
-		return nil, fmt.Errorf("advisory directory address: %w", err)
-	}
-	// Absolute and over TLS. Every address in the provider description is
-	// built from this one and is read by somebody else's tooling, and the
-	// standard requires the documents to be retrievable over a transport
-	// that authenticates the server. A relative or plaintext address is a
-	// directory that fails the first check made of it, which is a failure an
-	// operator meets long after configuring it.
-	if at.Scheme != "https" || at.Host == "" {
-		return nil, fmt.Errorf(
-			"OPENPSIRT_DIRECTORY_URL must be an https address: %s", where)
-	}
-	// The description the directory writes about itself names the publisher,
-	// and so does every document in it. A directory configured without one
-	// describes an organization nobody can identify.
-	if !who.Stated() {
-		return nil, fmt.Errorf("an advisory directory names its publisher: %w",
-			advisory.ErrNoPublisher)
-	}
-	// One trailing slash, so that a name resolved against it is a file inside
-	// the directory rather than a sibling of it.
-	at.Path = strings.TrimSuffix(at.Path, "/") + "/"
 	return &Writer{
 		advisories: advisory.NewStore(db), files: files, who: who,
-		at: at, settings: settings, logger: logger,
-	}, nil
+		settings: settings, logger: logger,
+	}
 }
 
 // Written is what one pass wrote.
@@ -261,7 +235,7 @@ func publishable(sent []advisory.Sent) (out []entry, held int, err error) {
 		seen[one.Advisory] = true
 		out = append(out, entry{
 			Body:     []byte(one.Document),
-			Path:     pathFor(&doc),
+			Path:     advisory.PathFor(&doc),
 			Released: doc.Document.Tracking.CurrentReleaseDate,
 			Opened:   doc.Document.Tracking.InitialReleaseDate,
 			Title:    doc.Document.Title,
@@ -325,11 +299,6 @@ func (w *Writer) put(ctx context.Context, key string, body []byte, kind string) 
 		return fmt.Errorf("write %s into the advisory directory: %w", key, err)
 	}
 	return nil
-}
-
-// addressOf is where a file in the directory is reachable.
-func (w *Writer) addressOf(key string) string {
-	return w.at.JoinPath(key).String()
 }
 
 // split is a path's folder and its filename.

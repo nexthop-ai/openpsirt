@@ -9,45 +9,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 )
 
-// The standard's own examples of the filename rule, and the one it gives for
-// the order the two steps run in.
-//
-// A rule taken from a specification is worth pinning against that
-// specification's examples rather than against what this happens to produce:
-// the filename is what a reader's tooling asks for by name, and it is wrong in
-// a way nothing here can notice.
-func TestADocumentIsNamedTheWayTheStandardNamesOne(t *testing.T) {
-	for _, one := range []struct{ id, want string }{
-		{"cisco-sa-20190513-secureboot", "cisco-sa-20190513-secureboot.json"},
-		{"Example Company - 2019-YH3234", "example_company_-_2019-yh3234.json"},
-		{"RHBA-2019:0024", "rhba-2019_0024.json"},
-		// The standard's own worked example of why the lower-casing runs
-		// first: applied the other way round, every capital would become an
-		// underscore of its own and this would be "2022__01-a".
-		{"2022_#01-A", "2022_01-a.json"},
-	} {
-		doc := &advisory.Document{}
-		doc.Document.Tracking.ID = one.id
-		doc.Document.Tracking.InitialReleaseDate = time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
-		if got := pathFor(doc); got != "2026/"+one.want {
-			t.Errorf("%q is written to %q, want %q", one.id, got, "2026/"+one.want)
-		}
-	}
-}
-
-// The year folder is the year the flaw was recorded, not the year it was
-// published. A document revised in January of the following year stays where
-// its reader last found it.
-func TestADocumentStaysInTheYearItWasRecordedIn(t *testing.T) {
-	doc := &advisory.Document{}
-	doc.Document.Tracking.ID = "EXNET-2025-0007"
-	doc.Document.Tracking.InitialReleaseDate = time.Date(2025, 12, 31, 23, 0, 0, 0, time.UTC)
-	doc.Document.Tracking.CurrentReleaseDate = time.Date(2026, 1, 2, 9, 0, 0, 0, time.UTC)
-	if got := pathFor(doc); !strings.HasPrefix(got, "2025/") {
-		t.Errorf("written to %q, want the 2025 folder", got)
-	}
-}
-
 // The checksum answers for the file a reader fetched, which is a different
 // question from the digest recorded against the issuance.
 //

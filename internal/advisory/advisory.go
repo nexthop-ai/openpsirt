@@ -373,6 +373,13 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 		},
 	}
 	doc.Document.References = assembled.pointers
+	// Where this document is published, stated last and only where the
+	// deployment has said where that is. It is built from what the document
+	// already carries, so the address it states and the file the directory
+	// writes are one rule rather than two.
+	if who.Publishes() {
+		doc.Document.References = append(doc.Document.References, selfReference(who, doc))
+	}
 	doc.Document.Distribution = distributionFor(assembled.undisclosed)
 	doc.ProductTree = ProductTree{Branches: []Branch{{
 		Category: "vendor", Name: who.Name, Branches: assembled.products,

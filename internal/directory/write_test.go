@@ -26,12 +26,12 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 )
 
+const served = "https://psirt.example.test/.well-known/csaf/"
+
 var issuer = publisher.Named{
 	Name: "Example Networks", Namespace: "https://example.test",
-	Category: "vendor", Prefix: "EXNET",
+	Category: "vendor", Prefix: "EXNET", Published: served,
 }
-
-const served = "https://psirt.example.test/.well-known/csaf"
 
 // TestWhatWentOutIsWhatIsWritten walks the whole of it: an advisory is
 // recorded, agreed to and issued, and the directory that comes out is the
@@ -198,7 +198,7 @@ func TestTheFeedNamesEachDocumentAndTheHashBesideIt(t *testing.T) {
 		for _, link := range one.Link {
 			links[link.Rel] = link.Href
 		}
-		at := served + "/" + time.Now().UTC().Format("2006") + "/" + strings.ToLower(named) + ".json"
+		at := served + time.Now().UTC().Format("2006") + "/" + strings.ToLower(named) + ".json"
 		if links["self"] != at {
 			t.Errorf("the entry points at %q, want %q", links["self"], at)
 		}
@@ -250,7 +250,7 @@ func TestTheProviderDescriptionSaysWhoThisIsAndWhereTheDocumentsAre(t *testing.T
 		if err := json.Unmarshal(f.read(t, "provider-metadata.json"), &described); err != nil {
 			t.Fatalf("the provider description is not readable: %v", err)
 		}
-		if described.CanonicalURL != served+"/provider-metadata.json" {
+		if described.CanonicalURL != served+"provider-metadata.json" {
 			t.Errorf("it calls itself %q", described.CanonicalURL)
 		}
 		if described.Version != "2.0" || described.Role != "csaf_provider" {
@@ -270,11 +270,11 @@ func TestTheProviderDescriptionSaysWhoThisIsAndWhereTheDocumentsAre(t *testing.T
 			t.Fatalf("%d distributions", len(described.Distributions))
 		}
 		at := described.Distributions[0]
-		if at.DirectoryURL != served+"/" {
-			t.Errorf("the directory is at %q, want %q", at.DirectoryURL, served+"/")
+		if at.DirectoryURL != served {
+			t.Errorf("the directory is at %q, want %q", at.DirectoryURL, served)
 		}
 		if len(at.ROLIE.Feeds) != 1 || at.ROLIE.Feeds[0].TLPLabel != "WHITE" ||
-			at.ROLIE.Feeds[0].URL != served+"/feed-tlp-white.json" {
+			at.ROLIE.Feeds[0].URL != served+"feed-tlp-white.json" {
 			t.Errorf("the feed is described as %+v", at.ROLIE.Feeds)
 		}
 	})
@@ -327,60 +327,23 @@ func TestWritingTwiceWritesTheSameBytes(t *testing.T) {
 // nothing every hour.
 func TestNoAddressAndNoStoreIsNoWriter(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
+		bare := issuer
+		bare.Published = ""
+		anonymous := issuer
+		anonymous.Name, anonymous.Namespace = "", ""
 		for _, one := range []struct {
-			what     string
-			store    attach.Storage
-			settings directory.Config
+			what  string
+			store attach.Storage
+			who   publisher.Named
 		}{
-			{"no store", nil, directory.Config{URL: served}},
-			{"no address", f.files, directory.Config{}},
+			{"no store", nil, issuer},
+			{"no address", f.files, bare},
+			{"no publisher", f.files, anonymous},
 		} {
-			writer, err := directory.New(f.db, one.store, issuer, one.settings, f.logger)
-			if err != nil {
-				t.Errorf("%s: %v", one.what, err)
-			}
-			if writer != nil {
+			if writer := directory.New(f.db, one.store, one.who,
+				directory.Config{}, f.logger); writer != nil {
 				t.Errorf("%s: a writer was started anyway", one.what)
 			}
-		}
-	})
-}
-
-// An address the documents could not be fetched over is refused where it is
-// configured, rather than producing a directory that fails the first check
-// anybody makes of it.
-func TestAnAddressThatIsNotOverTLSIsRefused(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		for _, where := range []string{
-			"http://psirt.example.test/csaf",
-			"/csaf",
-		} {
-			writer, err := directory.New(f.db, f.files, issuer,
-				directory.Config{URL: where}, f.logger)
-			if err == nil {
-				t.Errorf("%q was accepted", where)
-			}
-			if writer != nil {
-				t.Errorf("%q started a writer", where)
-			}
-			if err != nil && !strings.Contains(err.Error(), "OPENPSIRT_DIRECTORY_URL") {
-				t.Errorf("%q: the refusal does not name the setting: %v", where, err)
-			}
-		}
-	})
-}
-
-// A deployment that has not been told who it publishes as writes no
-// directory: every document in it and the description of it name a publisher.
-func TestADirectoryNamesItsPublisher(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		writer, err := directory.New(f.db, f.files, publisher.Named{Prefix: "EXNET"},
-			directory.Config{URL: served}, f.logger)
-		if err == nil {
-			t.Error("a directory was configured with no publisher")
-		}
-		if writer != nil {
-			t.Error("a writer was started with no publisher")
 		}
 	})
 }
@@ -434,12 +397,8 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 // write runs one pass.
 func (f *fixture) write(t *testing.T) directory.Written {
 	t.Helper()
-	writer, err := directory.New(f.db, f.files, issuer, directory.Config{
-		URL: served, List: true, Mirror: false,
-	}, f.logger)
-	if err != nil {
-		t.Fatalf("configuring the directory: %v", err)
-	}
+	writer := directory.New(f.db, f.files, issuer,
+		directory.Config{List: true, Mirror: false}, f.logger)
 	if writer == nil {
 		t.Fatal("no writer was started")
 	}
@@ -505,8 +464,15 @@ func (f *fixture) checksums(t *testing.T, at string, body []byte) {
 // agree, and publishes it. The name it went out under comes back.
 func (f *fixture) issued(t *testing.T, title string) string {
 	t.Helper()
+	return f.issuedAs(t, issuer, title)
+}
+
+// issuedAs is the same under a named publisher, for a deployment that states
+// where its documents are reachable.
+func (f *fixture) issuedAs(t *testing.T, who publisher.Named, title string) string {
+	t.Helper()
 	identifier := f.recorded(t)
-	named := f.minted(t, title)
+	named := f.mintedAs(t, who, title)
 	if _, err := f.store.Add(t.Context(), f.who, named,
 		fixtures.ProductName, identifier); err != nil {
 		t.Fatalf("naming the flaw on the advisory: %v", err)
@@ -514,7 +480,7 @@ func (f *fixture) issued(t *testing.T, title string) string {
 	if _, err := f.store.Approve(t.Context(), f.agrees, named); err != nil {
 		t.Fatalf("agreeing to the advisory: %v", err)
 	}
-	if _, err := f.store.Issued(t.Context(), f.who, issuer, named,
+	if _, err := f.store.Issued(t.Context(), f.who, who, named,
 		"Published."); err != nil {
 		t.Fatalf("recording that it went out: %v", err)
 	}
@@ -523,7 +489,12 @@ func (f *fixture) issued(t *testing.T, title string) string {
 
 func (f *fixture) minted(t *testing.T, title string) string {
 	t.Helper()
-	made, err := f.store.Mint(t.Context(), f.who, issuer, title)
+	return f.mintedAs(t, issuer, title)
+}
+
+func (f *fixture) mintedAs(t *testing.T, who publisher.Named, title string) string {
+	t.Helper()
+	made, err := f.store.Mint(t.Context(), f.who, who, title)
 	if err != nil {
 		t.Fatalf("starting an advisory: %v", err)
 	}
