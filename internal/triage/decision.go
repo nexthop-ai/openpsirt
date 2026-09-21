@@ -40,13 +40,6 @@ type Decision struct {
 	// itself — whose version changes every build and is excluded from expiry.
 	ComponentUpstreamVersion *string `bun:"component_upstream_version"`
 	ConsumerUpstreamVersion  *string `bun:"consumer_upstream_version"`
-	// StandsAtAnyVersion says the two above are a record of what the claim was
-	// made against rather than what it is matched on, which is true of the one
-	// outcome that is a claim about identity. Stored on the row because every
-	// query asking whether a decision applies to a finding reads the two
-	// columns above, and reaching the claim for each of them would put a join
-	// on every screen that draws a finding.
-	StandsAtAnyVersion bool `bun:"stands_at_any_version,notnull"`
 	// SeverityCenti is what the claim says is on the claim: the outcome,
 	// the justification, the mitigation, the dates, the version an upgrade
 	// moves to. One act is one argument, and a copy per place is a copy
@@ -445,8 +438,7 @@ func (s *Store) proposeAll(ctx context.Context, claim *Claim, proposals []Propos
 // row is one decision as it will be stored: where the judgment lands, and
 // nothing about what it says.
 func (s *Store) row(claim *Claim, p Proposal, now time.Time) Decision {
-	anyVersion := claim.Outcome.StandsAtAnyVersion()
-	key := liveKeyFor(p.Place, anyVersion)
+	key := liveKeyFor(p.Place, claim.Outcome.StandsAtAnyVersion())
 	liveKey := &key
 	decision := Decision{
 		ClaimID: claim.ID,
@@ -458,7 +450,6 @@ func (s *Store) row(claim *Claim, p Proposal, now time.Time) Decision {
 		Visibility:               visibilityOf(p.Place),
 		ComponentUpstreamVersion: text(p.Place.ComponentUpstream),
 		ConsumerUpstreamVersion:  text(p.Place.ConsumerUpstream),
-		StandsAtAnyVersion:       anyVersion,
 		State:                    Proposed,
 		NeedsApproval:            p.NeedsApproval,
 		FromStatement:            p.FromStatement,

@@ -142,6 +142,22 @@ export const JUSTIFICATIONS = [
 // would put a judgment about risk beyond the rule that re-examines it. The
 // endpoint refuses them; offering them here would be a refusal somebody meets
 // after writing the reasoning.
+// The reasons an outcome may state, and what is left of a choice when the
+// outcome moves under it.
+//
+// A form that narrows the list and keeps the old value sends a reason the
+// endpoint refuses, and a select whose value matches no option draws blank —
+// so nobody sees what is about to be sent. Dropped rather than replaced: which
+// reason applies is a claim a reader takes literally, and a form that picks
+// one when the last became unavailable has answered for somebody.
+export function reasonsFor(outcome?: string) {
+  return outcome === "mismatched" ? JUSTIFICATIONS_CORRECTING : JUSTIFICATIONS;
+}
+
+export function reasonOffered(outcome: string | undefined, chosen: string): string {
+  return reasonsFor(outcome).some((each) => each.value === chosen) ? chosen : "";
+}
+
 export const JUSTIFICATIONS_CORRECTING = JUSTIFICATIONS.filter(
   (each) => each.value === "component_not_present" || each.value === "vulnerable_code_not_present",
 );

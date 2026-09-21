@@ -315,7 +315,7 @@ func TestOnlyADecisionThatAppliesTakesAFindingOffTheClock(t *testing.T) {
 				"product_id": f.productID, "vulnerability_id": issueID,
 				"place_identity": place, "visibility": "public",
 				"state":          state,
-				"needs_approval": needsApproval, "stands_at_any_version": false, "proposed_by": somebody.ID,
+				"needs_approval": needsApproval, "proposed_by": somebody.ID,
 				"proposed_at":                time.Now().UTC(),
 				"component_upstream_version": version,
 				"live_key":                   "the-live-key",

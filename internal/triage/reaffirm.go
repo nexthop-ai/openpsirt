@@ -471,7 +471,8 @@ func (s *Store) Lapse(ctx context.Context, targetID int64) (Lapsed, error) {
 			// stop applying when the version moves. A bump does not make a
 			// wrong match right, and lapsing one would hand the same wrong
 			// match back at every point release.
-			Where("de.stands_at_any_version = ?", false).
+			Where(`NOT EXISTS (SELECT 1 FROM "claim" AS "lc"`+
+				` WHERE lc.id = de.claim_id AND lc.outcome = ?)`, Mismatched).
 			Where("de.product_id = (?)", db.NewSelect().
 				ColumnExpr("st.product_id").
 				TableExpr(`"target" AS "tg"`).

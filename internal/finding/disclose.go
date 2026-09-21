@@ -334,26 +334,11 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 
 	var out *Movement
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
-		// was is where it ends now, read inside the transaction: a
-		// retry re-runs this against a database another movement may
-		// have moved.
-		var was time.Time
-		err := tx.NewSelect().
-			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
-			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
-			ColumnExpr("MAX(f.disclose_at)").
-			Where("st.product_id = ?", productID).
-			Where("f.vulnerability_id = ?", vulnerabilityID).
-			Where("f.visibility = ?", access.Private).
-			Where("f.closed_at IS NULL").
-			Where("f.disclose_at IS NOT NULL").
-			Scan(ctx, &was)
-		if database.IsNoRows(err) || (err == nil && was.IsZero()) {
-			return ErrNotEmbargoed
-		}
+		// Where it ends now, read inside the transaction: a retry re-runs
+		// this against a database another movement may have moved.
+		was, err := endsAt(ctx, tx, productID, vulnerabilityID)
 		if err != nil {
-			return fmt.Errorf("read where the embargo ends: %w", err)
+			return err
 		}
 		// The act has to be the one that moves the date the way it is being
 		// asked to move. An act taken as whichever way the dates happen to
@@ -395,6 +380,34 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 	return out, nil
 }
 
+// endsAt reads where an embargo ends now.
+//
+// Read again by whoever is about to move it, rather than carried from when the
+// movement was asked for. A request sits in the queue while other movements
+// take effect, so the date it was measured against is not the date it would
+// move.
+func endsAt(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (time.Time, error) {
+	var was time.Time
+	err := db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr("MAX(f.disclose_at)").
+		Where("st.product_id = ?", productID).
+		Where("f.vulnerability_id = ?", vulnerabilityID).
+		Where("f.visibility = ?", access.Private).
+		Where("f.closed_at IS NULL").
+		Where("f.disclose_at IS NOT NULL").
+		Scan(ctx, &was)
+	if database.IsNoRows(err) || (err == nil && was.IsZero()) {
+		return time.Time{}, ErrNotEmbargoed
+	}
+	if err != nil {
+		return time.Time{}, fmt.Errorf("read where the embargo ends: %w", err)
+	}
+	return was, nil
+}
+
 // AgreeToMovement records a second person agreeing, and moves the date.
 //
 // The person who asked may not be the one who agrees. That is the control the
@@ -422,6 +435,27 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 		}
 		if asked.ApprovedAt != nil {
 			return ErrAlreadyAgreed
+		}
+		// One that needed nobody already moved the date when it was asked
+		// for. Agreeing to it would write its old date over whatever has
+		// happened since, and there is no agreement to record: the record
+		// says it needed none.
+		if !asked.NeedsApproval {
+			return ErrAlreadyAgreed
+		}
+
+		// Where the embargo ends now, rather than where it ended when this
+		// was asked for. A request waits in the queue while other movements
+		// take effect, so the date it was measured against is not the date it
+		// would move — and an extension agreed to after a later one already
+		// landed would carry the date backwards, which is the act recorded as
+		// doing the one thing it never does.
+		was, err := endsAt(ctx, tx, asked.ProductID, asked.VulnerabilityID)
+		if err != nil {
+			return err
+		}
+		if !asked.Act.moves(was, asked.Until) {
+			return wrongWay(asked.Act)
 		}
 
 		// The count is read, because the WHERE below is what decides the

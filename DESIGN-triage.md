@@ -171,9 +171,8 @@ approved judgments is a list of what was once agreed.
 
 ### Not read
 
-Curated correction data published elsewhere. The objection is not the size of
-such a file but where it comes from, what regenerates it and under what terms —
-the same objection `TODO.md` records against the full weakness catalog.
+Curated correction data published elsewhere. The objection is where such a
+file comes from, what regenerates it, and under what terms.
 
 ## Approval
 

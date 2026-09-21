@@ -323,7 +323,7 @@ export function listQuery(params: URLSearchParams) {
     ...(outcomes.length > 0
       ? {
           outcome: outcomes as (
-            "affected" | "not-applicable" | "deferred" | "wont-fix" | "already-fixed"
+            "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed"
           )[],
         }
       : {}),

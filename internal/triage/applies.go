@@ -63,7 +63,7 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	// versions are not what it is about. Grouped, so the two halves are one
 	// condition rather than two that a later clause could come between.
 	query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.WhereOr("de.stands_at_any_version = ?", true).
+		return q.WhereOr("claim.outcome = ?", Mismatched).
 			WhereGroup(" OR ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				q = matchVersion(q, "de.component_upstream_version", at.ComponentUpstream)
 				return matchVersion(q, "de.consumer_upstream_version", at.ConsumerUpstream)
@@ -76,8 +76,8 @@ func (s *Store) Applying(ctx context.Context, at Place) (*Decision, error) {
 	// identifier alone let a newer unapproved claim shadow an approved one,
 	// which is a way for one person to overturn a decision two people made.
 	if err := query.OrderExpr(
-		"CASE WHEN de.stands_at_any_version = ? THEN 0 ELSE 1 END, "+
-			"CASE WHEN de.state = ? THEN 0 ELSE 1 END, de.id DESC", true, Approved).
+		"CASE WHEN claim.outcome = ? THEN 0 ELSE 1 END, "+
+			"CASE WHEN de.state = ? THEN 0 ELSE 1 END, de.id DESC", Mismatched, Approved).
 		Limit(1).Scan(ctx); err != nil {
 		// No decision standing is an answer. Anything else is a fault, and
 		// reporting it as "nothing stands" would turn a lost race or a lock
@@ -251,7 +251,8 @@ type Filter struct {
 	// entirely legitimate — an outcome that hides nothing needs no second
 	// person, and a short deferral stands on its own — so it is asked together
 	// with an outcome. What it is for is showing that no *dismissal* sits in
-	// it: not-applicable, will-not-fix and already-fixed all require approval, so
+	// it: not-applicable, wrong match, will-not-fix and already-fixed all
+	// require approval, so
 	// that query should return nothing, and a row in it is a control that
 	// failed.
 	//

@@ -364,6 +364,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		Where("tm.retired_at IS NULL").
 		Where("NOT EXISTS (?)", w.db.NewSelect().
 			TableExpr(`"decision" AS "de"`).
+			Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 			ColumnExpr("1").
 			Where("de.product_id = st.product_id").
 			Where("de.vulnerability_id = f.vulnerability_id").

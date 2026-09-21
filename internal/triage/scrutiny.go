@@ -406,12 +406,12 @@ func (s *Store) coveringEach(ctx context.Context, subject access.Subject,
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id AND st.product_id = de.product_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`COUNT(*) AS "covers"`).
 		Where("de.id IN (?)", bun.List(ids)).
 		Where("f.closed_at IS NULL").
-		Where("COALESCE(de.component_upstream_version, '') = "+finding.ComponentUpstreamExpr).
-		Where("COALESCE(de.consumer_upstream_version, '') = "+finding.ConsumerUpstreamExpr).
+		Where(finding.KeyMatches).
 		Where("f.visibility IN (?)", bun.List(readable)).
 		GroupExpr("de.claim_id").
 		Scan(ctx, &rows)

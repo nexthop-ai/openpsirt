@@ -4,7 +4,7 @@ import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
-import { JUSTIFICATIONS, JUSTIFICATIONS_CORRECTING, labeled, type Justification } from "./Outcome";
+import { labeled, reasonOffered, reasonsFor, type Justification } from "./Outcome";
 import { Covering, type Sitting } from "./Covering";
 import { waitingFor } from "./awaiting";
 import { nothingToReview } from "./reach";
@@ -285,8 +285,10 @@ export function Decide({
   const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
   // A correction carries past every version bump, so the reasons it may state
   // are the two that say something is not there. The other three are about how
-  // code is reached or what stops it, which a bump changes.
-  const reasons = outcome === "mismatched" ? JUSTIFICATIONS_CORRECTING : JUSTIFICATIONS;
+  // code is reached or what stops it, which a bump changes — and one chosen
+  // under another outcome is clamped rather than carried into a refusal.
+  const reasons = reasonsFor(outcome);
+  const reason = reasonOffered(outcome, justification) as Justification | "";
   const needsDate = outcome === "deferred";
   // A claim that the fix is already here is a fact somebody can check against
   // whoever packages the component, and it is required for that reason . The
@@ -314,8 +316,8 @@ export function Decide({
     return () => document.removeEventListener("keydown", pressed);
   }, []);
 
-  const needsMitigation = mustMitigate(outcome, justification);
-  const offerMitigation = mayMitigate(outcome, justification);
+  const needsMitigation = mustMitigate(outcome, reason);
+  const offerMitigation = mayMitigate(outcome, reason);
 
   // A judgment's reach beyond this build, answered whole by the
   // server rather than sampled here.
@@ -401,7 +403,7 @@ export function Decide({
   const waiting = waitingFor({
     outcome,
     needsJustification,
-    justification,
+    justification: reason,
     needsMitigation,
     mitigation,
     needsFixedVersion,
@@ -420,7 +422,7 @@ export function Decide({
       outcome: outcome as OneAtATime,
       // Narrowed rather than asserted: submit is disabled until one is
       // chosen, so the empty case cannot reach here.
-      ...(needsJustification && justification !== "" ? { justification } : {}),
+      ...(needsJustification && reason !== "" ? { justification: reason } : {}),
       ...(offerMitigation && mitigation.trim() !== "" ? { mitigation } : {}),
       ...(needsDate ? { deferred_until: until } : {}),
       ...(needsFixedVersion ? { fixed_version: fixedVersion.trim() } : {}),
@@ -483,7 +485,7 @@ export function Decide({
     },
     onSuccess: (recorded) => {
       // The choice, kept for the next one — offered there and never applied.
-      rememberUsed({ outcome, justification });
+      rememberUsed({ outcome, justification: reason });
       forget(draftKey);
       setReviewing(false);
       void queries.invalidateQueries({ queryKey: ["finding"] });
@@ -577,7 +579,7 @@ export function Decide({
           <label htmlFor={`${draftKey}-just`}>Justification</label>
           <select
             id={`${draftKey}-just`}
-            value={justification}
+            value={reason}
             onChange={(event) => setJustification(event.target.value as Justification)}
           >
             {/* An unchosen state, so the first justification in the list is

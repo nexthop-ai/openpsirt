@@ -73,6 +73,7 @@ export const OUTCOMES: readonly (readonly [string, string])[] = [
     [
       "affected",
       "not-applicable",
+      "mismatched",
       "wont-fix",
       "deferred",
       "already-fixed",

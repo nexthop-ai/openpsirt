@@ -75,7 +75,7 @@ type Auditing struct {
 	From      string    `query:"from" doc:"Only judgments proposed on or after this date, as YYYY-MM-DD"`
 	To        string    `query:"to" doc:"Only judgments proposed before this date, as YYYY-MM-DD"`
 	Alone     bool      `query:"alone" doc:"Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing"`
-	InForce   bool      `query:"in_force" doc:"Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state"`
+	InForce   bool      `query:"in_force" doc:"Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to"`
 	Proposer  string    `query:"proposed_by" doc:"Only judgments this person proposed, by sign-in identity"`
 	Approver  string    `query:"approved_by" doc:"Only judgments this person has a standing agreement on, by sign-in identity. An agreement later taken back does not match"`
 	Issue     string    `query:"issue" doc:"Only judgments about this vulnerability, under the name it is filed here"`

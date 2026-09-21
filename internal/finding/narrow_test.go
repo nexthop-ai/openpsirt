@@ -174,13 +174,13 @@ func TestAClaimInAnotherProductDoesNotDecideThisOne(t *testing.T) {
 		place := finding.PlaceIdentity(swss.Name, "")
 		if _, err := f.db.DB.NewInsert().
 			Model(&map[string]any{
-				"claim_id":         claimBy(t, f.db, somebody.ID),
-				"product_id":       elsewhere.ID,
-				"vulnerability_id": issueID,
-				"place_identity":   place,
-				"visibility":       "public",
-				"state":            "proposed",
-				"needs_approval":   true, "stands_at_any_version": false,
+				"claim_id":                   claimBy(t, f.db, somebody.ID),
+				"product_id":                 elsewhere.ID,
+				"vulnerability_id":           issueID,
+				"place_identity":             place,
+				"visibility":                 "public",
+				"state":                      "proposed",
+				"needs_approval":             true,
 				"proposed_by":                somebody.ID,
 				"proposed_at":                time.Now().UTC(),
 				"component_upstream_version": swss.Version,
@@ -373,7 +373,7 @@ func (f *fixture) decided(t *testing.T, by, issueID int64, place, state, compone
 		"product_id": f.productID, "vulnerability_id": issueID,
 		"place_identity": place, "visibility": "public",
 		"state":          state,
-		"needs_approval": true, "stands_at_any_version": false, "proposed_by": by,
+		"needs_approval": true, "proposed_by": by,
 		"proposed_at":                time.Now().UTC(),
 		"component_upstream_version": componentVersion,
 	}
@@ -428,7 +428,7 @@ func TestEachDecisionStateSelectsWhatItNames(t *testing.T) {
 				"product_id": f.productID, "vulnerability_id": issueID,
 				"place_identity": place, "visibility": "public",
 				"state":          state,
-				"needs_approval": true, "stands_at_any_version": false, "proposed_by": somebody.ID,
+				"needs_approval": true, "proposed_by": somebody.ID,
 				"proposed_at": time.Now().UTC(),
 			}
 			if live {
@@ -978,7 +978,7 @@ func TestWhatIsWithItsAuthorIsTheSameQuestionTheRowAnswers(t *testing.T) {
 				"product_id": productID, "vulnerability_id": issueID,
 				"place_identity": place, "visibility": "public",
 				"state":          "proposed",
-				"needs_approval": true, "stands_at_any_version": false, "proposed_by": somebody.ID,
+				"needs_approval": true, "proposed_by": somebody.ID,
 				"proposed_at":                time.Now().UTC(),
 				"component_upstream_version": version,
 				"live_key":                   "the-live-key",

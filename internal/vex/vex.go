@@ -267,7 +267,8 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 			AND de.product_id = ?
 			AND de.state = 'approved'
 			AND de.live_key IS NOT NULL
-			AND (de.stands_at_any_version = TRUE
+			AND (EXISTS (SELECT 1 FROM "claim" AS "mc"
+					WHERE mc.id = de.claim_id AND mc.outcome = 'mismatched')
 				OR (COALESCE(de.component_upstream_version, '') =
 					COALESCE(NULLIF(c.upstream_version, ''), c.version, '')
 				AND COALESCE(de.consumer_upstream_version, '') =

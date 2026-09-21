@@ -10663,7 +10663,7 @@ export interface operations {
                 to?: string;
                 /** @description Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing */
                 alone?: boolean;
-                /** @description Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state */
+                /** @description Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to */
                 in_force?: boolean;
                 /** @description Only judgments this person proposed, by sign-in identity */
                 proposed_by?: string;
@@ -10721,7 +10721,7 @@ export interface operations {
                 to?: string;
                 /** @description Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing */
                 alone?: boolean;
-                /** @description Only judgments that apply now: agreed to, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state */
+                /** @description Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to */
                 in_force?: boolean;
                 /** @description Only judgments this person proposed, by sign-in identity */
                 proposed_by?: string;

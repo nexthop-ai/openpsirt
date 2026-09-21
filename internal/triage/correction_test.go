@@ -244,8 +244,10 @@ func TestACorrectionAnswersForThePlaceAJudgmentAboutRiskWasMadeAt(t *testing.T) 
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		at := f.at()
-		dismissed := f.agreed(t, at)
-
+		// The correction first, so the dismissal is the newer row. What
+		// decides between them at a place is then the ordering this test is
+		// named for and nothing else: the tie-break beside it is newest
+		// first, and it would answer with the dismissal.
 		corrected, err := f.corrects(t, at, triage.ComponentNotPresent)
 		if err != nil {
 			t.Fatal(err)
@@ -253,8 +255,14 @@ func TestACorrectionAnswersForThePlaceAJudgmentAboutRiskWasMadeAt(t *testing.T) 
 		if err := agreeTo(ctx, f.store, f.reviewer, corrected.ClaimID, ""); err != nil {
 			t.Fatal(err)
 		}
+		dismissed := f.agreed(t, at)
+		if dismissed.ID <= corrected.ID {
+			t.Fatalf("the dismissal is row %d and the correction %d, so the newest-first "+
+				"tie-break would pick the correction and this checks nothing",
+				dismissed.ID, corrected.ID)
+		}
 		if state := f.stateOf(t, dismissed.ID); state != triage.Approved {
-			t.Errorf("the earlier judgment is %q, want it left where it was", state)
+			t.Errorf("the later judgment is %q, want it standing", state)
 		}
 
 		standing, err := f.store.Applying(ctx, at)

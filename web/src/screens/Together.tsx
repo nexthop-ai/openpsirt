@@ -14,7 +14,7 @@ import { Crumbs } from "../ui/Crumbs";
 import { Severity, Exploited } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
-import { JUSTIFICATIONS, type Justification } from "../ui/Outcome";
+import { JUSTIFICATIONS, reasonOffered, reasonsFor, type Justification } from "../ui/Outcome";
 import { Editor, forget } from "../ui/Editor";
 import { Paged } from "../ui/Paged";
 
@@ -398,7 +398,15 @@ function Claim({
   const [fixedVersion, setFixedVersion] = useState("");
   const [reasoning, setReasoning] = useState("");
 
-  const needsJustification = outcome === "not-applicable";
+  const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
+  // A correction carries past every version bump, so it takes only the two
+  // reasons that say something is not there. The endpoint refuses the rest,
+  // and a reason chosen under another outcome is clamped rather than sent.
+  const reasons = reasonsFor(outcome);
+  // This form starts with a reason already selected, so an outcome that no
+  // longer takes it falls back to the first the outcome does take rather than
+  // to nothing.
+  const reason = (reasonOffered(outcome, justification) || reasons[0].value) as Justification;
   // The evidence the two bulk outcomes need beside a reasoning. Asked for here
   // rather than discovered as a refusal after the reasoning is typed.
   const needsDate = outcome === "deferred";
@@ -424,6 +432,7 @@ function Claim({
             onChange={(event) => setOutcome(event.target.value as Claimed["outcome"])}
           >
             <option value="not-applicable">Not applicable</option>
+            <option value="mismatched">Wrong match</option>
             <option value="wont-fix">Will not fix</option>
             <option value="affected">Affected</option>
             {/* The two bulk cases that were missing: a bump scheduled for the
@@ -460,13 +469,13 @@ function Claim({
           <label className="field">
             <span className="l">Justification</span>
             <select
-              value={justification}
+              value={reason}
               // The options are the vocabulary, so what comes back is one of
               // it. The type is read out of that list now rather than written
               // beside it.
               onChange={(event) => setJustification(event.target.value as Justification)}
             >
-              {JUSTIFICATIONS.map((each) => (
+              {reasons.map((each) => (
                 <option key={each.value} value={each.value} title={each.value}>
                   {each.label} — {each.means}
                 </option>
@@ -520,7 +529,7 @@ function Claim({
             onClick={() => {
               onClaim({
                 outcome,
-                ...(needsJustification ? { justification } : {}),
+                ...(needsJustification ? { justification: reason } : {}),
                 ...(needsDate ? { deferred_until: until } : {}),
                 ...(needsVersion ? { fixed_version: fixedVersion.trim() } : {}),
                 selected_by: selectedBy,

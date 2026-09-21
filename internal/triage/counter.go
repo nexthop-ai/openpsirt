@@ -118,6 +118,7 @@ func (s *Store) counters(ctx context.Context, subject access.Subject,
 		Where("f.place_identity IN (?)", bun.List(places)).
 		Where("st.product_id IN (?)", bun.List(products)).
 		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "de"
+			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE de.product_id = st.product_id
 			  AND de.vulnerability_id = f.vulnerability_id
 			  AND de.place_identity = f.place_identity

@@ -1,4 +1,4 @@
-import { JUSTIFICATIONS, JUSTIFICATIONS_CORRECTING } from "./Outcome";
+import { reasonOffered, reasonsFor } from "./Outcome";
 import { notACredential } from "./noautofill";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -104,9 +104,14 @@ export function Saved({
   const [days, setDays] = useState("");
   // The two outcomes whose claim is which recognized reason applies, and the
   // reasons each may state. A correction carries past every version bump, so
-  // the three reasons a bump can change are not among its.
+  // the three reasons a bump can change are not among the ones it offers.
   const needsJustification = outcome === "not-applicable" || outcome === "mismatched";
-  const reasons = outcome === "mismatched" ? JUSTIFICATIONS_CORRECTING : JUSTIFICATIONS;
+  const reasons = reasonsFor(outcome);
+  // Dropped rather than carried when the outcome moves under it: a correction
+  // takes only the reasons no version bump can answer, and a rule prepared
+  // with one the endpoint refuses fails when somebody presses the button
+  // rather than when they saved the thing that fills it in.
+  const reason = reasonOffered(outcome, justification);
 
   const kept = useKept(product);
   const save = useMutation({
@@ -125,8 +130,8 @@ export function Saved({
                     // hides the Because select and would otherwise keep what
                     // was chosen in it, storing a reason the decision endpoint
                     // refuses.
-                    ...(needsJustification && justification
-                      ? { justification: justification as Prepared["justification"] }
+                    ...(needsJustification && reason
+                      ? { justification: reason as Prepared["justification"] }
                       : {}),
                     reasoning: reasoning.trim(),
                     ...(outcome === "deferred" ? { defer_days: Number(days) } : {}),
@@ -242,10 +247,7 @@ export function Saved({
               {needsJustification && (
                 <label className="field">
                   <span>Because</span>
-                  <select
-                    value={justification}
-                    onChange={(event) => setJustification(event.target.value)}
-                  >
+                  <select value={reason} onChange={(event) => setJustification(event.target.value)}>
                     <option value="">Select one</option>
                     {/* From the one list rather than typed out again, so the
                         same claim reads the same way where it is chosen and

@@ -78,6 +78,7 @@ func standsAs(product string, state decisionState) string {
 			LEFT JOIN "component" AS "uc" ON uc.id = f2.consumer_id
 			JOIN "decision" AS "de" ON de.vulnerability_id = f2.vulnerability_id
 			  AND de.place_identity = f2.place_identity
+			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE f2.id = f.id
 			  AND de.product_id = ` + product + `
 			  AND ` + coversHere + state.condition + `)`
@@ -93,6 +94,7 @@ func standsAs(product string, state decisionState) string {
 // checks.
 func decidedAs(product string, state decisionState) string {
 	return `SUM(CASE WHEN EXISTS (SELECT 1 FROM "decision" AS "de"
+			JOIN "claim" AS "cl" ON cl.id = de.claim_id
 			WHERE de.product_id = ` + product + `
 			  AND de.vulnerability_id = f.vulnerability_id
 			  AND de.place_identity = f.place_identity

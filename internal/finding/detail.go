@@ -465,19 +465,30 @@ type evidenceRow struct {
 }
 
 // standingHere is the body of the subquery that picks the one decision
-// standing at a finding's place: the correction if there is one, and otherwise
-// the oldest claim keyed on the versions the place holds. The caller supplies
-// the product and reads one column off it.
+// standing at a finding's place: the correction in force if there is one, and
+// otherwise the oldest claim keyed on the versions the place holds. The caller
+// supplies the product and reads one column off it.
+//
+// A claim waiting for a second person is in the list, because the screen says
+// what has been claimed here as well as what governs. It does not outrank an
+// agreement: a correction nobody has agreed to governs nothing, and put first
+// it named a decision on the screen that every other reader of the same place
+// — what suppresses a finding, what a published document says — disagreed
+// with.
 //
 // Ordered rather than aggregated, so that every column read through it names
 // the same row.
 const standingHere = `FROM "decision" AS "de"
+	JOIN "claim" AS "cl" ON cl.id = de.claim_id
 	WHERE de.product_id = ?
 	  AND de.vulnerability_id = f.vulnerability_id
 	  AND de.place_identity = f.place_identity
 	  AND de.live_key IS NOT NULL
 	  AND ` + KeyMatches + `
-	ORDER BY CASE WHEN de.stands_at_any_version = TRUE THEN 0 ELSE 1 END, de.id
+	ORDER BY CASE WHEN cl.outcome = '` + Mismatched + `'
+	                   AND (de.state = 'approved'
+	                        OR (de.needs_approval = FALSE AND de.sent_back_at IS NULL))
+	              THEN 0 ELSE 1 END, de.id
 	LIMIT 1`
 
 // Detail reads everything held about one issue in one component of a build.

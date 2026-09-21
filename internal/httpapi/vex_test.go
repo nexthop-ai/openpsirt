@@ -602,3 +602,70 @@ func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing
 		}
 	})
 }
+
+func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *testing.T) {
+	// The one change a correction makes that reaches somebody outside the
+	// deployment. The format has words for both reasons a correction may
+	// state, so nothing about the match being ours to correct has to be
+	// explained to a reader — and the statement has to survive the bump,
+	// because surviving the bump is the whole of what a correction is.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		const at = "/v1/products/mine/streams/master/variants/broadcom/vex"
+
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image",
+			`{"outcome":"mismatched","justification":"component_not_present",`+
+				`"reasoning":"The advisory is about an unrelated project of a similar name."}`)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var doc struct {
+			Statements []struct {
+				Vulnerability struct {
+					Name string `json:"name"`
+				} `json:"vulnerability"`
+				Status        string `json:"status"`
+				Justification string `json:"justification"`
+			} `json:"statements"`
+		}
+		read(t, r, "triager", at, &doc)
+		if len(doc.Statements) != 1 {
+			t.Fatalf("the document carries %d statements, want the correction: %+v",
+				len(doc.Statements), doc.Statements)
+		}
+		if doc.Statements[0].Status != "not_affected" {
+			t.Errorf("a wrong match publishes as %q", doc.Statements[0].Status)
+		}
+		if doc.Statements[0].Justification != "component_not_present" {
+			t.Errorf("the statement carries %q, want the reason the claim stated",
+				doc.Statements[0].Justification)
+		}
+
+		// The component moves to a version nobody decided anything about. A
+		// judgment about risk would be gone from this document; this one is
+		// a claim about the match, and the match is as wrong as it was.
+		if _, err := r.db.DB.NewUpdate().Table("component").
+			Set("version = ?", "5.11").
+			Set("upstream_version = ?", "5.11").
+			Where("name = ?", "linux-image").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		var after struct {
+			Statements []struct {
+				Status        string `json:"status"`
+				Justification string `json:"justification"`
+			} `json:"statements"`
+		}
+		read(t, r, "triager", at, &after)
+		if len(after.Statements) != 1 {
+			t.Fatalf("after the version moved the document carries %d statements, "+
+				"want the correction still there: %+v", len(after.Statements), after.Statements)
+		}
+		if after.Statements[0].Status != "not_affected" ||
+			after.Statements[0].Justification != "component_not_present" {
+			t.Errorf("after the version moved the statement reads as %+v", after.Statements[0])
+		}
+	})
+}

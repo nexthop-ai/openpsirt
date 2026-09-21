@@ -179,6 +179,7 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		Where("f.vulnerability_id = de.vulnerability_id AND f.place_identity = de.place_identity").
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
+		Join(`JOIN "claim" AS "cl" ON cl.id = de.claim_id`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		ColumnExpr("COUNT(DISTINCT "+finding.FoldedOn+`) AS "folds"`).
@@ -191,8 +192,7 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, claimID int
 		Where("de.claim_id = ?", claimID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
-		Where("COALESCE(de.component_upstream_version, '') = " + finding.ComponentUpstreamExpr).
-		Where("COALESCE(de.consumer_upstream_version, '') = " + finding.ConsumerUpstreamExpr)
+		Where(finding.KeyMatches)
 	if err := readableFindings(query, subject, "f", "st.product_id").
 		Scan(ctx, &counted); err != nil {
 		return Reach{}, fmt.Errorf("count what that claim covers: %w", err)

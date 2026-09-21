@@ -964,16 +964,24 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 //
 // A claim that the scanner matched something that is not here covers the place
 // whatever it now holds, because the versions are not what it is about. Its
-// own columns record what it was made against and are not compared.
+// own version columns record what it was made against and are not compared.
 //
-// The three aliases are the caller's to join: a finding's own row carries
-// only the identifiers, and the versions are on the components.
+// The four aliases are the caller's to join: a finding's own row carries only
+// the identifiers, the versions are on the components, and the outcome is on
+// the claim. Which outcome it is, rather than a copy of the answer on the
+// decision row: the outcome never moves once a claim is written — revising
+// changes reasoning — so it is derivable at any moment, and a derived value is
+// stored here only where a measurement asks for it.
 // Exported because the same question is asked outside this package: what is
 // undecided is what the notification sweep means by work sitting still, and a
 // second spelling of it would be a second definition of "decided".
-const KeyMatches = "(de.stands_at_any_version = TRUE OR (" +
+const KeyMatches = "(cl.outcome = '" + Mismatched + "' OR (" +
 	"COALESCE(de.component_upstream_version, '') = " + ComponentUpstreamExpr +
 	" AND COALESCE(de.consumer_upstream_version, '') = " + ConsumerUpstreamExpr + "))"
+
+// Mismatched is the outcome whose claim is about identity, named here so the
+// expression above and the triage package cannot drift on the spelling.
+const Mismatched = "mismatched"
 
 // PlannedFilter is whether a promised upgrade covers a finding.
 type PlannedFilter string
