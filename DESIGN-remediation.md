@@ -691,6 +691,18 @@ writes them (REQ-63).
 | `changes.csv` | Every document and when its revision was released, newest first, so a reader who fetched yesterday can stop reading |
 | `feed-tlp-white.json` | The same documents as a ROLIE feed, each entry naming the document, the hash file beside it, and when it was first recorded and last released |
 
+The list of changes and the feed are how somebody outside follows what this
+deployment publishes. There is no subscriber list, no per-CVE notification and
+nothing to keep in sync: a reader fetches the list, reads until the dates stop
+being new to them, and that is the whole of it. The destinations an
+administrator configures are a different thing and are for this deployment's
+own notifications, which `DESIGN-notifications.md` describes.
+
+A hash file sits beside each document and beside nothing else. The standard
+asks for one per CSAF document, and the feed names it in the entry for the
+document it answers for — a hash beside a list has no entry to be named in and
+nothing that reads it.
+
 Three things are the operator's, because they are their web server's: the
 transport, one of the three ways a reader finds the provider description — the
 well-known path, a `CSAF` field in `security.txt`, or the DNS record — and
