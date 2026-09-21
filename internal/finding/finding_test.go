@@ -9,6 +9,7 @@ package finding_test
 // This file is what they all share, and nothing else.
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -214,35 +215,43 @@ func (f *fixture) open(t *testing.T) []finding.Finding {
 	return rows
 }
 
+// seededCatalog is what the seeded catalog hands a test: one product, built
+// once, as identifiers.
+type seededCatalog struct {
+	product, stream, variant, target int64
+}
+
+// catalogSeed is the catalog every test here starts from, seeded once per
+// binary on SQLite and per test on a server.
+var catalogSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (seededCatalog, error) {
+	cat := catalog.NewStore(db.DB)
+	product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
+	if err != nil {
+		return seededCatalog{}, err
+	}
+	stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
+	if err != nil {
+		return seededCatalog{}, err
+	}
+	variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
+	if err != nil {
+		return seededCatalog{}, err
+	}
+	target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
+	if err != nil {
+		return seededCatalog{}, err
+	}
+	return seededCatalog{product: product.ID, stream: stream.ID, variant: variant.ID, target: target.ID}, nil
+})
+
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		product, err := cat.DeclareProduct(ctx, "sonic", "SONiC")
-		if err != nil {
-			t.Fatal(err)
-		}
-		stream, err := cat.DeclareStream(ctx, product.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		variant, err := cat.DeclareVariant(ctx, product.ID, "broadcom", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-
+	catalogSeed.Each(t, func(t *testing.T, db *database.DB, c seededCatalog) {
 		fn(t, &fixture{
 			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
-			target: target.ID, productID: product.ID, scans: ingest.NewStore(db.DB),
+			target: c.target, productID: c.product, scans: ingest.NewStore(db.DB),
 			scope: finding.Scope{
-				ProductID: &product.ID, StreamID: &stream.ID, VariantID: &variant.ID,
+				ProductID: &c.product, StreamID: &c.stream, VariantID: &c.variant,
 			},
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		})

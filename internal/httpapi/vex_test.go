@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
@@ -346,7 +345,7 @@ func TestADeploymentThatHasNotSaidWhoItPublishesAsAnswersAConflict(t *testing.T)
 	// That distinction is one line in the handler and nothing executed it: the
 	// fixture every other test here uses is configured, and the predicate the
 	// line reads had a wrapper of its own that no test called either.
-	reachAs(t, dbtest.Two, publisher.Named{}, func(t *testing.T, r *reach) {
+	reachAs(t, castSeed.Two, publisher.Named{}, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 		got := asPerson(t, r, "triager", http.MethodGet,
 			"/v1/products/mine/streams/master/variants/broadcom/vex", "")

@@ -145,6 +145,9 @@ func (r *reach) asKey(t *testing.T, method, path string) int {
 // engines is dbtest.Each or dbtest.Two.
 type engines = func(t *testing.T, fn func(t *testing.T, db *database.DB))
 
+// withCast is castSeed.Each or castSeed.Two: engines, from the seeded world.
+type withCast = func(t *testing.T, fn func(t *testing.T, db *database.DB, made cast))
+
 // The four-engine form and the two-engine form of the same fixture. Which
 // one a test uses is decided by the rule at dbtest.Two: a test that pins what
 // a query does — what a list contains, what a filter hides, what a conflict
@@ -152,15 +155,15 @@ type engines = func(t *testing.T, fn func(t *testing.T, db *database.DB))
 // pins routing, who may reach what, or the shape of a response runs on two.
 func eachReach(t *testing.T, fn func(t *testing.T, r *reach)) {
 	t.Helper()
-	reachOn(t, dbtest.Each, fn)
+	reachOn(t, castSeed.Each, fn)
 }
 
 func twoReach(t *testing.T, fn func(t *testing.T, r *reach)) {
 	t.Helper()
-	reachOn(t, dbtest.Two, fn)
+	reachOn(t, castSeed.Two, fn)
 }
 
-func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
+func reachOn(t *testing.T, on withCast, fn func(t *testing.T, r *reach)) {
 	t.Helper()
 	reachAs(t, on, publisher.Named{
 		Name: "Example Networks", Namespace: "https://example.test",
@@ -171,230 +174,242 @@ func reachOn(t *testing.T, on engines, fn func(t *testing.T, r *reach)) {
 	}, fn)
 }
 
+// cast is what the seeded world hands a test: the secrets of the two API
+// keys it minted, which are shown once and so travel with the rows.
+type cast struct {
+	key, revoked string
+}
+
+// castSeed is the world every test here reaches into — two products, one of
+// them built, and one person per way of holding rights — seeded once per
+// binary on SQLite and per test on a server.
+var castSeed = dbtest.Seed(seedCast)
+
+func seedCast(ctx context.Context, db *database.DB) (cast, error) {
+	cat := catalog.NewStore(db.DB)
+	mine, err := cat.DeclareProduct(ctx, "mine", "Mine")
+	if err != nil {
+		return cast{}, err
+	}
+	if _, err := cat.DeclareStream(ctx, mine.ID, "master", catalog.Branch, nil); err != nil {
+		return cast{}, err
+	}
+	if _, err := cat.DeclareVariant(ctx, mine.ID, "broadcom", true); err != nil {
+		return cast{}, err
+	}
+	theirs, err := cat.DeclareProduct(ctx, "theirs", "Theirs")
+	if err != nil {
+		return cast{}, err
+	}
+	theirBranch, err := cat.DeclareStream(ctx, theirs.ID, "master", catalog.Branch, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	theirVariant, err := cat.DeclareVariant(ctx, theirs.ID, "mellanox", true)
+	if err != nil {
+		return cast{}, err
+	}
+
+	// A build under each product, so that anything answering "what exists
+	// here" has something to answer with. Without these the catalog has
+	// products and no builds, and every test of what a reader may see is
+	// satisfied by an empty list — which is also what a missing visibility
+	// filter looks like.
+	mineBranch, err := cat.StreamByName(ctx, mine.ID, "master")
+	if err != nil {
+		return cast{}, err
+	}
+	mineVariant, err := cat.VariantByName(ctx, mine.ID, "broadcom")
+	if err != nil {
+		return cast{}, err
+	}
+	if _, err := cat.TargetFor(ctx, mineBranch.ID, mineVariant.ID); err != nil {
+		return cast{}, err
+	}
+	if _, err := cat.TargetFor(ctx, theirBranch.ID, theirVariant.ID); err != nil {
+		return cast{}, err
+	}
+
+	// Everybody here is seeded with no display name, which is a
+	// degeneracy rather than a choice. access.Store.Names answers a
+	// display name where one is known and the identity otherwise, so with
+	// none set every read of a name in this package comes back as the
+	// identity — and a field publishing the wrong one of the two cannot be
+	// told from a field publishing the right one. Four routes in this
+	// package publish the wrong one, which `TODO.md` records under Known
+	// gaps: giving these people names is what makes that visible, and it
+	// belongs with the change that decides, field by field, which of the
+	// two each should carry.
+	rights := access.NewStore(db.DB)
+	administrator, err := rights.Ensure(ctx, "admin", "", access.Stated(true), nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Claim(ctx, administrator.ID, "admin"); err != nil {
+		return cast{}, err
+	}
+	// An administrator who granted themselves reading, which is
+	// how one reaches findings since an administrator stopped
+	// reading by administering — and the point of the pair is that
+	// the grant is visible in the same record as everybody else's
+	// rather than implied by the flag.
+	adminReader, err := rights.Ensure(ctx, "admin-reader", "", access.Stated(true), nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Claim(ctx, adminReader.ID, "admin-reader"); err != nil {
+		return cast{}, err
+	}
+	if err := rights.GrantRole(ctx, adminReader.ID, mine.ID, access.PrivateRead); err != nil {
+		return cast{}, err
+	}
+	// Somebody holding the audit permission and no role at all: the
+	// whole of what it is for is a reader of the deployment's own records
+	// who reaches no product, so the identity that tests it holds nothing
+	// else.
+	auditor, err := rights.Ensure(ctx, "auditor", "", nil, access.Stated(true))
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Claim(ctx, auditor.ID, "auditor"); err != nil {
+		return cast{}, err
+	}
+	// One entry per identity, and more than one role where the
+	// point of the identity is what holding both allows. "triager"
+	// deliberately holds triage alone: taking unowned work is
+	// theirs and giving work to somebody else is not, and a cast
+	// where everybody could do both would test neither.
+	for who, roles := range map[string][]access.Role{
+		"reader":   {access.PublicRead},
+		"private":  {access.PrivateRead},
+		"triager":  {access.PublicTriage},
+		"assigner": {access.PublicTriage, access.Assigner},
+		// The capability without the triage right it sits on, plus enough
+		// to see the product — otherwise the conjunction is untestable,
+		// since a subject who reaches nothing is refused before any role
+		// is consulted. Assigning is triage *and* assigner, and this is
+		// the identity that shows it.
+		"dispatcher":     {access.PublicRead, access.Assigner},
+		"private-triage": {access.PrivateTriage},
+		// Private triage plus the right to hand work to somebody else,
+		// for the tests about what a recipient is told.
+		"private-dispatcher": {access.PrivateTriage, access.Assigner},
+		"approver":           {access.Approver},
+		// Assigning is the other capability that grants
+		// nothing on its own, and the dispatcher above holds
+		// it alongside a read role, so this is the identity
+		// that holds it bare.
+		"assigner-only": {access.Assigner},
+	} {
+		person, err := rights.Ensure(ctx, who, "", nil, nil)
+		if err != nil {
+			return cast{}, err
+		}
+		// Recording somebody is not the same as recording how they sign
+		// in. The proxy path matches on what the proxy asserts, so that
+		// has to be claimed for them or they are somebody with access and
+		// no door to come through.
+		if err := rights.Claim(ctx, person.ID, who); err != nil {
+			return cast{}, err
+		}
+		for _, role := range roles {
+			if err := rights.GrantRole(ctx, person.ID, mine.ID, role); err != nil {
+				return cast{}, err
+			}
+		}
+	}
+	// A capability plus the visibility it acts on, which is what an
+	// approver is actually granted in a deployment. The approver above
+	// holds the capability alone, and reaches nothing — that is the rule
+	// being pinned, not an oversight.
+	reviewer, err := rights.Ensure(ctx, "reviewer", "", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Claim(ctx, reviewer.ID, "reviewer"); err != nil {
+		return cast{}, err
+	}
+	for _, role := range []access.Role{access.PublicRead, access.Approver} {
+		if err := rights.GrantRole(ctx, reviewer.ID, mine.ID, role); err != nil {
+			return cast{}, err
+		}
+	}
+
+	// A role held across every product rather than against one, which is
+	// how a security team holds the estate. Granted disclosed reading
+	// deliberately: the hazard is that "every product" is read as "no
+	// narrowing at all", which would hand this identity the undisclosed
+	// findings in both products (REQ-42 and REQ-43).
+	estate, err := rights.Ensure(ctx, "estate-reader", "", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Claim(ctx, estate.ID, "estate-reader"); err != nil {
+		return cast{}, err
+	}
+	if err := rights.GrantEstateRole(ctx, estate.ID, access.PublicRead); err != nil {
+		return cast{}, err
+	}
+
+	// The same shape holding triage rather than reading, so that "holds
+	// the role everywhere" and "may act on this issue here" can be told
+	// apart: an issue a product does not carry is not one anybody rates
+	// through it, however widely they are trusted.
+	estateTriage, err := rights.Ensure(ctx, "wide-triager", "", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Claim(ctx, estateTriage.ID, "wide-triager"); err != nil {
+		return cast{}, err
+	}
+	if err := rights.GrantEstateRole(ctx, estateTriage.ID, access.PublicTriage); err != nil {
+		return cast{}, err
+	}
+
+	// Somebody holding a role on the other product and nothing on this
+	// one. Not "nothing": a subject granted nothing anywhere is refused at
+	// the door, so a case grant is untestable through them — and a case is
+	// exactly what somebody outside a product is brought into.
+	outsider, err := rights.Ensure(ctx, "outsider", "", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Claim(ctx, outsider.ID, "outsider"); err != nil {
+		return cast{}, err
+	}
+	if err := rights.GrantRole(ctx, outsider.ID, theirs.ID, access.PublicRead); err != nil {
+		return cast{}, err
+	}
+
+	// Somebody who exists and was granted nothing at all.
+	ungranted, err := rights.Ensure(ctx, "nothing", "", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Claim(ctx, ungranted.ID, "nothing"); err != nil {
+		return cast{}, err
+	}
+	_, secret, err := rights.NewKey(ctx, "nightly", access.Scope{ProductID: mine.ID})
+	if err != nil {
+		return cast{}, err
+	}
+	withdrawn, revokedSecret, err := rights.NewKey(ctx, "retired", access.Scope{ProductID: mine.ID})
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.Revoke(ctx, withdrawn.ID); err != nil {
+		return cast{}, err
+	}
+	return cast{key: secret, revoked: revokedSecret}, nil
+}
+
 // reachAs is reachOn for a test that needs the deployment configured
 // differently — the one that has not been told who it publishes as.
-func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T, r *reach)) {
+func reachAs(t *testing.T, on withCast, as publisher.Named, fn func(t *testing.T, r *reach)) {
 	t.Helper()
-	on(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
+	on(t, func(t *testing.T, db *database.DB, made cast) {
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		dbtest.Reset(t, db)
-
-		cat := catalog.NewStore(db.DB)
-		mine, err := cat.DeclareProduct(ctx, "mine", "Mine")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareStream(ctx, mine.ID, "master", catalog.Branch, nil); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.DeclareVariant(ctx, mine.ID, "broadcom", true); err != nil {
-			t.Fatal(err)
-		}
-		theirs, err := cat.DeclareProduct(ctx, "theirs", "Theirs")
-		if err != nil {
-			t.Fatal(err)
-		}
-		theirBranch, err := cat.DeclareStream(ctx, theirs.ID, "master", catalog.Branch, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		theirVariant, err := cat.DeclareVariant(ctx, theirs.ID, "mellanox", true)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// A build under each product, so that anything answering "what exists
-		// here" has something to answer with. Without these the catalog has
-		// products and no builds, and every test of what a reader may see is
-		// satisfied by an empty list — which is also what a missing visibility
-		// filter looks like.
-		mineBranch, err := cat.StreamByName(ctx, mine.ID, "master")
-		if err != nil {
-			t.Fatal(err)
-		}
-		mineVariant, err := cat.VariantByName(ctx, mine.ID, "broadcom")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.TargetFor(ctx, mineBranch.ID, mineVariant.ID); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := cat.TargetFor(ctx, theirBranch.ID, theirVariant.ID); err != nil {
-			t.Fatal(err)
-		}
-
-		// Everybody here is seeded with no display name, which is a
-		// degeneracy rather than a choice. access.Store.Names answers a
-		// display name where one is known and the identity otherwise, so with
-		// none set every read of a name in this package comes back as the
-		// identity — and a field publishing the wrong one of the two cannot be
-		// told from a field publishing the right one. Four routes in this
-		// package publish the wrong one, which `TODO.md` records under Known
-		// gaps: giving these people names is what makes that visible, and it
-		// belongs with the change that decides, field by field, which of the
-		// two each should carry.
 		rights := access.NewStore(db.DB)
-		administrator, err := rights.Ensure(ctx, "admin", "", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, administrator.ID, "admin"); err != nil {
-			t.Fatal(err)
-		}
-		// An administrator who granted themselves reading, which is
-		// how one reaches findings since an administrator stopped
-		// reading by administering — and the point of the pair is that
-		// the grant is visible in the same record as everybody else's
-		// rather than implied by the flag.
-		adminReader, err := rights.Ensure(ctx, "admin-reader", "", access.Stated(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, adminReader.ID, "admin-reader"); err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.GrantRole(ctx, adminReader.ID, mine.ID, access.PrivateRead); err != nil {
-			t.Fatal(err)
-		}
-		// Somebody holding the audit permission and no role at all: the
-		// whole of what it is for is a reader of the deployment's own records
-		// who reaches no product, so the identity that tests it holds nothing
-		// else.
-		auditor, err := rights.Ensure(ctx, "auditor", "", nil, access.Stated(true))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, auditor.ID, "auditor"); err != nil {
-			t.Fatal(err)
-		}
-		// One entry per identity, and more than one role where the
-		// point of the identity is what holding both allows. "triager"
-		// deliberately holds triage alone: taking unowned work is
-		// theirs and giving work to somebody else is not, and a cast
-		// where everybody could do both would test neither.
-		for who, roles := range map[string][]access.Role{
-			"reader":   {access.PublicRead},
-			"private":  {access.PrivateRead},
-			"triager":  {access.PublicTriage},
-			"assigner": {access.PublicTriage, access.Assigner},
-			// The capability without the triage right it sits on, plus enough
-			// to see the product — otherwise the conjunction is untestable,
-			// since a subject who reaches nothing is refused before any role
-			// is consulted. Assigning is triage *and* assigner, and this is
-			// the identity that shows it.
-			"dispatcher":     {access.PublicRead, access.Assigner},
-			"private-triage": {access.PrivateTriage},
-			// Private triage plus the right to hand work to somebody else,
-			// for the tests about what a recipient is told.
-			"private-dispatcher": {access.PrivateTriage, access.Assigner},
-			"approver":           {access.Approver},
-			// Assigning is the other capability that grants
-			// nothing on its own, and the dispatcher above holds
-			// it alongside a read role, so this is the identity
-			// that holds it bare.
-			"assigner-only": {access.Assigner},
-		} {
-			person, err := rights.Ensure(ctx, who, "", nil, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			// Recording somebody is not the same as recording how they sign
-			// in. The proxy path matches on what the proxy asserts, so that
-			// has to be claimed for them or they are somebody with access and
-			// no door to come through.
-			if err := rights.Claim(ctx, person.ID, who); err != nil {
-				t.Fatal(err)
-			}
-			for _, role := range roles {
-				if err := rights.GrantRole(ctx, person.ID, mine.ID, role); err != nil {
-					t.Fatal(err)
-				}
-			}
-		}
-		// A capability plus the visibility it acts on, which is what an
-		// approver is actually granted in a deployment. The approver above
-		// holds the capability alone, and reaches nothing — that is the rule
-		// being pinned, not an oversight.
-		reviewer, err := rights.Ensure(ctx, "reviewer", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, reviewer.ID, "reviewer"); err != nil {
-			t.Fatal(err)
-		}
-		for _, role := range []access.Role{access.PublicRead, access.Approver} {
-			if err := rights.GrantRole(ctx, reviewer.ID, mine.ID, role); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		// A role held across every product rather than against one, which is
-		// how a security team holds the estate. Granted disclosed reading
-		// deliberately: the hazard is that "every product" is read as "no
-		// narrowing at all", which would hand this identity the undisclosed
-		// findings in both products (REQ-42 and REQ-43).
-		estate, err := rights.Ensure(ctx, "estate-reader", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, estate.ID, "estate-reader"); err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.GrantEstateRole(ctx, estate.ID, access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-
-		// The same shape holding triage rather than reading, so that "holds
-		// the role everywhere" and "may act on this issue here" can be told
-		// apart: an issue a product does not carry is not one anybody rates
-		// through it, however widely they are trusted.
-		estateTriage, err := rights.Ensure(ctx, "wide-triager", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, estateTriage.ID, "wide-triager"); err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.GrantEstateRole(ctx, estateTriage.ID, access.PublicTriage); err != nil {
-			t.Fatal(err)
-		}
-
-		// Somebody holding a role on the other product and nothing on this
-		// one. Not "nothing": a subject granted nothing anywhere is refused at
-		// the door, so a case grant is untestable through them — and a case is
-		// exactly what somebody outside a product is brought into.
-		outsider, err := rights.Ensure(ctx, "outsider", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, outsider.ID, "outsider"); err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.GrantRole(ctx, outsider.ID, theirs.ID, access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-
-		// Somebody who exists and was granted nothing at all.
-		ungranted, err := rights.Ensure(ctx, "nothing", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, ungranted.ID, "nothing"); err != nil {
-			t.Fatal(err)
-		}
-		_, secret, err := rights.NewKey(ctx, "nightly", access.Scope{ProductID: mine.ID})
-		if err != nil {
-			t.Fatal(err)
-		}
-		withdrawn, revokedSecret, err := rights.NewKey(ctx, "retired", access.Scope{ProductID: mine.ID})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Revoke(ctx, withdrawn.ID); err != nil {
-			t.Fatal(err)
-		}
-
 		sources, err := access.ParseSources("192.0.2.1")
 		if err != nil {
 			t.Fatal(err)
@@ -418,7 +433,7 @@ func reachAs(t *testing.T, on engines, as publisher.Named, fn func(t *testing.T,
 			// moves.
 			Ours: currency.Ourselves(as.Namespace, nil),
 		})
-		fn(t, &reach{handler: handler, key: secret, revoked: revokedSecret,
+		fn(t, &reach{handler: handler, key: made.key, revoked: made.revoked,
 			rights: rights, db: db, api: api})
 	})
 }
