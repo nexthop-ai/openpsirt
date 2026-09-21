@@ -1961,3 +1961,24 @@ textarea:disabled {
 .scopebox input[type="checkbox"] {
   margin: 0;
 }
+
+/* The controls at the end of a catalog row: open it, correct it, retire it.
+   Kept on one line, because wrapped they read as one phrase — "Manage Edit"
+   above "Retire" is three controls that look like two. */
+td.rowacts {
+  white-space: nowrap;
+}
+td.rowacts button,
+td.rowacts a {
+  margin-right: 10px;
+}
+td.rowacts > :last-child {
+  margin-right: 0;
+}
+
+/* The triage line, which is the widest word in the catalog table and the one
+   the table squeezes first. Narrower than its longest option it reads as a
+   different word — "deploy" where the value is the deployment's own line. */
+select.triageline {
+  min-width: 13ch;
+}

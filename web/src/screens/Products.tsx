@@ -222,7 +222,7 @@ export function Products({ who }: { who: Who }) {
                         "never"
                       )}
                     </td>
-                    <td>
+                    <td className="rowacts">
                       <Link
                         to={`/products/${encodeURIComponent(product.name)}/streams`}
                         className="linkish"
@@ -231,7 +231,6 @@ export function Products({ who }: { who: Who }) {
                       </Link>
                       {who.admin && (
                         <>
-                          {" "}
                           <button
                             type="button"
                             className="linkish"
@@ -239,7 +238,7 @@ export function Products({ who }: { who: Who }) {
                             onClick={() => edit(product)}
                           >
                             Edit
-                          </button>{" "}
+                          </button>
                           <button
                             type="button"
                             className="linkish"
@@ -350,6 +349,7 @@ function Floor({
   }
   return (
     <select
+      className="triageline"
       value={stated}
       aria-label={`What ${product} considers worth triaging`}
       onChange={(event) => onSet(event.target.value as Line)}

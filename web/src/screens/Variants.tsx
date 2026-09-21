@@ -174,7 +174,7 @@ export function Variants() {
                     </span>
                   </td>
                   <td className="num">{(variant.open ?? 0).toLocaleString()}</td>
-                  <td>
+                  <td className="rowacts">
                     {stream ? (
                       <Link
                         to={`${buildPath({ product, stream, variant: variant.name ?? "" })}/findings`}
@@ -192,7 +192,7 @@ export function Variants() {
                             onClick={() => edit(variant)}
                           >
                             Edit
-                          </button>{" "}
+                          </button>
                           <button
                             type="button"
                             className="linkish"

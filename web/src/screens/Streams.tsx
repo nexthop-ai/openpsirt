@@ -271,7 +271,7 @@ export function Streams() {
                       "never"
                     )}
                   </td>
-                  <td>
+                  <td className="rowacts">
                     <Link
                       to={`/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream.name ?? "")}`}
                       className="linkish"
@@ -280,7 +280,6 @@ export function Streams() {
                     </Link>
                     {who.data?.admin && (
                       <>
-                        {" "}
                         <button
                           type="button"
                           className="linkish"
@@ -288,7 +287,7 @@ export function Streams() {
                           onClick={() => edit(stream)}
                         >
                           Edit
-                        </button>{" "}
+                        </button>
                         <button
                           type="button"
                           className="linkish"
