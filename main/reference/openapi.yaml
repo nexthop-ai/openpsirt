@@ -1219,6 +1219,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -1830,6 +1831,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -1990,6 +1992,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -2248,6 +2251,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -2353,6 +2357,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -2433,6 +2438,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -2845,7 +2851,7 @@ components:
           readOnly: true
           type: string
         reason:
-          description: The reason it is being extended
+          description: The reason the date is moving
           maxLength: 65536
           minLength: 1
           type: string
@@ -2855,50 +2861,6 @@ components:
       required:
         - until
         - reason
-      type: object
-    ExtensionBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ExtensionBody.json
-          format: uri
-          readOnly: true
-          type: string
-        approved_at:
-          type: string
-        approved_by:
-          type: string
-        asked_at:
-          type: string
-        asked_by:
-          type: string
-        id:
-          format: int64
-          type: integer
-        in_force:
-          type: boolean
-        needs_approval:
-          description: Whether a second person had to agree
-          type: boolean
-        reason:
-          type: string
-        until:
-          description: The end that was asked for
-          type: string
-        was:
-          description: The embargo's previous end
-          type: string
-      required:
-        - id
-        - was
-        - until
-        - reason
-        - asked_by
-        - asked_at
-        - needs_approval
-        - in_force
       type: object
     FindingBody:
       additionalProperties: false
@@ -3110,6 +3072,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3332,6 +3295,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3533,6 +3497,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3751,6 +3716,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -3853,6 +3819,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -4328,28 +4295,6 @@ components:
       required:
         - items
       type: object
-    ListBodyExtensionBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyExtensionBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/ExtensionBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
     ListBodyHolderBody:
       additionalProperties: false
       properties:
@@ -4482,6 +4427,28 @@ components:
       required:
         - items
       type: object
+    ListBodyMovementBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyMovementBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/MovementBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyNoteBody:
       additionalProperties: false
       properties:
@@ -4526,19 +4493,19 @@ components:
       required:
         - items
       type: object
-    ListBodyPendingExtensionBody:
+    ListBodyPendingMovementBody:
       additionalProperties: false
       properties:
         $schema:
           description: A URL to the JSON Schema for this object.
           examples:
-            - https://example.com/schemas/ListBodyPendingExtensionBody.json
+            - https://example.com/schemas/ListBodyPendingMovementBody.json
           format: uri
           readOnly: true
           type: string
         items:
           items:
-            $ref: "#/components/schemas/PendingExtensionBody"
+            $ref: "#/components/schemas/PendingMovementBody"
           type:
             - array
             - "null"
@@ -5176,6 +5143,57 @@ components:
       required:
         - mode
       type: object
+    MovementBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/MovementBody.json
+          format: uri
+          readOnly: true
+          type: string
+        act:
+          description: Which act this was. An extension ends the embargo later, a shortening ends it sooner
+          enum:
+            - extension
+            - shortening
+          type: string
+        approved_at:
+          type: string
+        approved_by:
+          type: string
+        asked_at:
+          type: string
+        asked_by:
+          type: string
+        id:
+          format: int64
+          type: integer
+        in_force:
+          type: boolean
+        needs_approval:
+          description: Whether a second person had to agree
+          type: boolean
+        reason:
+          type: string
+        until:
+          description: The end that was asked for
+          type: string
+        was:
+          description: The embargo's previous end
+          type: string
+      required:
+        - id
+        - act
+        - was
+        - until
+        - reason
+        - asked_by
+        - asked_at
+        - needs_approval
+        - in_force
+      type: object
     Named:
       additionalProperties: false
       properties:
@@ -5639,16 +5657,22 @@ components:
         - rows
         - share
       type: object
-    PendingExtensionBody:
+    PendingMovementBody:
       additionalProperties: false
       properties:
+        act:
+          description: Which act is being asked for
+          enum:
+            - extension
+            - shortening
+          type: string
         asked_at:
           type: string
         by:
           description: The person who asked
           type: string
         days:
-          description: The distance later, in days
+          description: How far the date moves, in days, whichever way it moves
           format: int64
           type: integer
         id:
@@ -5673,6 +5697,7 @@ components:
         - id
         - product
         - vulnerability
+        - act
         - was
         - until
         - days
@@ -6097,6 +6122,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -7606,6 +7632,28 @@ components:
       required:
         - "@id"
       type: object
+    Shorten-disclosureRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Shorten-disclosureRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        reason:
+          description: The reason the date is moving
+          maxLength: 65536
+          minLength: 1
+          type: string
+        until:
+          description: The date the embargo should end
+          type: string
+      required:
+        - until
+        - reason
+      type: object
     SightingBody:
       additionalProperties: false
       properties:
@@ -7917,6 +7965,7 @@ components:
           enum:
             - affected
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -8343,6 +8392,7 @@ components:
         outcome:
           enum:
             - not-applicable
+            - mismatched
             - deferred
             - wont-fix
             - already-fixed
@@ -10052,7 +10102,9 @@ paths:
 
         Narrowed by what you may see, like every other list here. Nothing about this view is exempt from the visibility rules — a report showing more than the screens it summarizes would be a way around them.
 
-        `alone=true` returns judgments no second person has a standing agreement on. That population is large and legitimate on its own — an outcome that hides nothing needs no second person, and a short deferral stands alone — so ask it with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, `wont-fix` and `already-fixed` all require approval, so a row in that answer is a control that failed.
+        `alone=true` returns judgments no second person has a standing agreement on. That population is large and legitimate on its own — an outcome that hides nothing needs no second person, and a short deferral stands alone — so ask it with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, `mismatched`, `wont-fix` and `already-fixed` all require approval, so a row in that answer is a control that failed.
+
+        `in_force=true` returns what applies now rather than what was once agreed to. With `outcome=mismatched` that is the set of standing corrections: the matches this deployment has recorded as wrong, which no version bump expires.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-audit
@@ -10078,6 +10130,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -10123,6 +10176,13 @@ paths:
           name: alone
           schema:
             description: Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing
+            type: boolean
+        - description: "Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to"
+          explode: false
+          in: query
+          name: in_force
+          schema:
+            description: "Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to"
             type: boolean
         - description: Only judgments this person proposed, by sign-in identity
           explode: false
@@ -10238,6 +10298,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -10283,6 +10344,13 @@ paths:
           name: alone
           schema:
             description: Only judgments no second person has a standing agreement on. Asked of a dismissal this should answer nothing
+            type: boolean
+        - description: "Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to"
+          explode: false
+          in: query
+          name: in_force
+          schema:
+            description: "Only judgments that apply now: agreed to, or standing without needing agreement, and still holding the place they were made about. A judgment can be approved and have lapsed since, which is why this is not the same as asking for the approved state. Every outcome that dismisses needs agreement, so asked of one of those this is what has been agreed to"
             type: boolean
         - description: Only judgments this person proposed, by sign-in identity
           explode: false
@@ -11058,7 +11126,7 @@ paths:
       description: |-
         Returns triage decisions on products you may triage, newest first, with the justification text for each.
 
-        Filter by `outcome` to list dismissals (`not-applicable`, `wont-fix`) or postponements (`deferred`), by `state` to separate what is approved from what is still waiting or has been withdrawn, and by `product` to limit to one product.
+        Filter by `outcome` to list dismissals (`not-applicable`, `mismatched`, `wont-fix`, `already-fixed`) or postponements (`deferred`), by `state` to separate what is approved from what is still waiting or has been withdrawn, and by `product` to limit to one product.
 
         Set `expired=true` to list deferrals whose date has passed — the findings that have come back and need judging again.
 
@@ -11083,6 +11151,7 @@ paths:
             enum:
               - affected
               - not-applicable
+              - mismatched
               - deferred
               - wont-fix
               - already-fixed
@@ -11391,19 +11460,19 @@ paths:
           - private-triage
         note: A product you may not read undisclosed work in contributes nothing, not even a count.
         narrowed: true
-  /v1/disclosure-extensions:
+  /v1/disclosure-movements:
     get:
       description: |-
-        Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first.
+        Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first. Both acts are here, and `act` says which each one is.
 
-        Until this there was nowhere to be that second person. A request could be read on the finding it belongs to and nowhere else, so the only way to find one was to already know it existed — which is the failure the review queue exists to prevent, in the one place where what is being agreed to is how long something stays hidden.
+        Without this there is nowhere to be that second person. A request could be read on the finding it belongs to and nowhere else, so the only way to find one was to already know it existed — which is the failure the review queue exists to prevent, in the one place where what is being agreed to is how long something stays hidden.
 
         Your own requests are here too, marked as yours. You cannot agree to one — the endpoint refuses it — but a proposer looking for what is holding a case up should not have their own request hidden from them.
 
-        Agree with `POST /v1/disclosure-extensions/{id}/approval`.
+        Agree with `POST /v1/disclosure-movements/{id}/approval`.
 
         Requires: any signed-in person, and not a pipeline key. Only where you may read undisclosed work.
-      operationId: list-pending-extensions
+      operationId: list-pending-disclosure-movements
       parameters:
         - explode: false
           in: query
@@ -11428,7 +11497,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyPendingExtensionBody"
+                $ref: "#/components/schemas/ListBodyPendingMovementBody"
           description: OK
         default:
           content:
@@ -11436,21 +11505,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List extension requests waiting for a second person
+      summary: List disclosure-date movements waiting for a second person
       tags:
         - Findings
       x-openpsirt-requires:
         scope: person
         note: Only where you may read undisclosed work.
-  /v1/disclosure-extensions/{id}/approval:
+  /v1/disclosure-movements/{id}/approval:
     post:
       description: |-
-        Records a second person agreeing, and moves the date.
+        Records a second person agreeing, and moves the date. Either act.
 
-        The person who asked may not be the one who agrees. That is the control the threshold exists to reach, and an extension somebody approved for themselves is the same as one nobody approved.
+        The person who asked may not be the one who agrees. That is the control the threshold exists to reach, and a movement somebody approved for themselves is the same as one nobody approved.
 
         Requires: private-triage on the product. Not the person who asked for it.
-      operationId: agree-to-extension
+      operationId: agree-to-disclosure-movement
       parameters:
         - in: path
           name: id
@@ -11467,7 +11536,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Approve a disclosure-date extension
+      summary: Approve a disclosure-date movement
       tags:
         - Findings
       x-openpsirt-requires:
@@ -11742,6 +11811,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -12198,6 +12268,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -14226,6 +14297,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -14769,6 +14841,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -15236,6 +15309,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -15729,6 +15803,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -16711,12 +16786,12 @@ paths:
   /v1/products/{product}/issues/{vulnerability}/disclosure:
     get:
       description: |-
-        Every time this embargo was moved, oldest first, with why and by whom.
+        Every time this embargo was moved, oldest first, with which act it was, why, and by whom.
 
-        Kept in full and never overwritten. One extension is a judgment and six is a policy nobody wrote down, and the difference is invisible if each replaces the last. A request still waiting for agreement is here too: what was asked for is part of how long this stayed hidden, whether or not it was granted.
+        Kept in full and never overwritten. One movement is a judgment and six is a policy nobody wrote down, and the difference is invisible if each replaces the last. A request still waiting for agreement is here too: what was asked for is part of how long this stayed hidden, whether or not it was granted.
 
         Requires: private-read or private-triage on the product. Only where you may read undisclosed work.
-      operationId: list-disclosure-extensions
+      operationId: list-disclosure-movements
       parameters:
         - in: path
           name: product
@@ -16733,7 +16808,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyExtensionBody"
+                $ref: "#/components/schemas/ListBodyMovementBody"
           description: OK
         default:
           content:
@@ -16750,17 +16825,18 @@ paths:
           - private-read
           - private-triage
         note: Only where you may read undisclosed work.
+  /v1/products/{product}/issues/{vulnerability}/disclosure/extension:
     post:
       description: |-
-        Moves the end of an embargo, across every undisclosed finding of this issue in this product.
+        Moves the end of an embargo later, across every undisclosed finding of this issue in this product.
 
         A reason is required, always, however short the extension. One with no reason is a record saying somebody moved it and nothing else.
 
-        Past a threshold it needs a second person, and the threshold is measured against everything this embargo has already been moved by rather than against this request alone — measured per request, the exception swallows the rule three weeks at a time. It is the same act a deferral is, and the same shape.
+        Past a threshold it needs a second person, and the threshold is measured against how far this embargo's end has already been carried rather than against this request alone — measured per request, the exception swallows the rule three weeks at a time. It is the same act a deferral is, and the same shape.
 
         An extension that needs agreement moves nothing until it has it. The request is on record either way; `in_force` says whether the date follows it.
 
-        A date only ever moves later. Bringing one forward is disclosing sooner, which is a different act.
+        A date sent earlier is refused here. Ending an embargo sooner is a different act, recorded as one: `POST .../disclosure/shortening`.
 
         Requires: private-triage on the product. A second person agrees past the threshold.
       operationId: extend-disclosure
@@ -16786,7 +16862,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ExtensionBody"
+                $ref: "#/components/schemas/MovementBody"
           description: Created
         default:
           content:
@@ -16794,7 +16870,58 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Ask to move a disclosure date later
+      summary: Extend a disclosure date
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+        note: A second person agrees past the threshold.
+  /v1/products/{product}/issues/{vulnerability}/disclosure/shortening:
+    post:
+      description: |-
+        Moves the end of an embargo sooner, across every undisclosed finding of this issue in this product. What a coordinator or a peer vendor publishing on a date of their own asks for, and what a leak leaves.
+
+        Its own act rather than an extension sent a smaller date. Shortening an embargo because it leaked and extending one because a fix slipped are different events, and which of them happened is read off the record rather than inferred from the direction a date moved.
+
+        A reason is required, and the same threshold applies: how far this embargo's end has already been carried, counting a date brought forward the same distance as one pushed back. Past it a second person agrees, and until they do the date does not move.
+
+        A date sent later is refused here. Extend with `POST .../disclosure/extension`.
+
+        Requires: private-triage on the product. A second person agrees past the threshold.
+      operationId: shorten-disclosure
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: vulnerability
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Shorten-disclosureRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MovementBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Bring a disclosure date forward
       tags:
         - Findings
       x-openpsirt-requires:
@@ -18623,15 +18750,17 @@ paths:
         note: Answers only what you may see.
     post:
       description: |-
-        Records how a finding was triaged: `affected`, `not-applicable`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.
+        Records how a finding was triaged: `affected`, `not-applicable`, `mismatched`, `deferred`, `wont-fix`, `already-fixed` or `patch-needed`.
 
-        `not-applicable` requires a `justification` from the standard VEX vocabulary. `deferred` requires `deferred_until` as a date. `already-fixed` requires `fixed_version`, the version whoever packages the component states the fix arrived in — it is recorded for a reader and never compared against what ships.
+        `not-applicable` and `mismatched` require a `justification` from the standard VEX vocabulary. `deferred` requires `deferred_until` as a date. `already-fixed` requires `fixed_version`, the version whoever packages the component states the fix arrived in — it is recorded for a reader and never compared against what ships.
 
         `patch-needed` is the backport case: a fix is being carried into this build and the version does not move. It requires `committed_to`, the date the work lands, and it closes the only way a backport can — the next inventory declares the patch it carries and says what that patch resolves, so the finding goes while the version stays where it was.
 
         `upgrade-needed` is not recorded here. An upgrade answers a component rather than one finding, so it is recorded from the component and covers everything open on it.
 
         The decision applies to every build running the same component and consumer upstream versions, including future releases — it is matched by code, not copied between releases. It stops applying automatically when either upstream version changes.
+
+        `mismatched` is the exception, and the only one: it says the scanner matched this against something it is not, which is a claim about identity rather than about risk. It covers the place at whatever versions the place holds, and no version change expires it — a bump does not make a wrong match right. Its `justification` is limited to the two reasons that say something is not there, `component_not_present` and `vulnerable_code_not_present`; the three that describe how code is reached or what stops it are refused, because a version bump changes those and this outcome would carry them past it.
 
         The response says whether a second person must approve it. Most outcomes require approval; a deferral shorter than the configured threshold does not.
 
@@ -19084,6 +19213,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
@@ -19209,6 +19339,7 @@ paths:
               enum:
                 - affected
                 - not-applicable
+                - mismatched
                 - deferred
                 - wont-fix
                 - already-fixed
