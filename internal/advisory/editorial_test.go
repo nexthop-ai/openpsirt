@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 )
 
@@ -306,6 +307,54 @@ func TestWhatWentOutKeepsTheTitleItWentOutWith(t *testing.T) {
 		}
 		if rows[0].Title != "What it said then" {
 			t.Errorf("what went out is recorded as %q", rows[0].Title)
+		}
+	})
+}
+
+// TestChangingWhatAnAdvisorySaysNeedsTheRoleOnEveryProductItCovers is the
+// authorization half.
+//
+// An advisory is read whole or not at all, and what it says about one product
+// is part of the same document as what it says about another. Somebody who
+// triages one of two would otherwise retitle a document published about both,
+// or agree to it on behalf of a product they only read.
+func TestChangingWhatAnAdvisorySaysNeedsTheRoleOnEveryProductItCovers(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		here := f.recorded(t, f.master)
+		there := f.recorded(t, f.other)
+		named := f.covering(t,
+			[2]string{"sonic", here}, [2]string{"switchd", there})
+
+		// Reading both, so the advisory resolves and nothing but the missing
+		// role refuses what follows. Triage on one of the two, which is the
+		// rule being pinned.
+		partly := access.NewPerson(f.second.ID, f.second.Identity, false,
+			map[int64][]access.Role{
+				f.product:      {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				f.otherProduct: {access.PublicRead, access.PrivateRead},
+			}, 0)
+
+		// They may read it, which is what makes the refusals below about the
+		// role rather than about the advisory being out of reach.
+		if _, _, err := f.store.Covers(ctx, partly, named); err != nil {
+			t.Fatalf("reading an advisory they hold both products on: %v", err)
+		}
+		if _, err := f.store.Approve(ctx, partly, named); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("agreeing with triage on one of two products answered %v", err)
+		}
+		if _, _, err := f.store.Retitle(ctx, partly, named, "Something else"); !errors.Is(
+			err, access.ErrDenied) {
+			t.Errorf("retitling with triage on one of two products answered %v", err)
+		}
+		if err := f.store.Withdraw(ctx, partly, named); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("taking an agreement back with triage on one of two answered %v", err)
+		}
+
+		// And somebody holding it on both may, which says the refusals are
+		// the missing role rather than the path being shut.
+		if _, err := f.store.Approve(ctx, f.approver, named); err != nil {
+			t.Errorf("somebody triaging both products could not agree: %v", err)
 		}
 	})
 }

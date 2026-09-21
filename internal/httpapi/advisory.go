@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
@@ -48,6 +49,12 @@ func advisoryRefused(in Ingest, err error, what string) error {
 		return huma.Error409Conflict(err.Error())
 	case errors.Is(err, advisory.ErrNoSuchAdvisory):
 		return huma.Error404NotFound(advisory.ErrNoSuchAdvisory.Error())
+	case errors.Is(err, access.ErrDenied):
+		// An authorization refusal is not somebody having asked for the
+		// impossible. Left to the default arm it answers 422 carrying the
+		// denial's own sentence, which names the internal product identifier
+		// — a number nothing else publishes.
+		return huma.Error403Forbidden("not authorized")
 	case errors.Is(err, advisory.ErrNoSuchIssue), errors.Is(err, catalog.ErrNotFound):
 		// The same answer for a product nobody holds and an issue that is not
 		// there. Telling them apart turns a lookup into a directory of what

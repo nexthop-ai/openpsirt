@@ -329,11 +329,17 @@ func TestAProductYouCannotSeeAnswersLikeOneNobodyDeclared(t *testing.T) {
 		}
 
 		// And the same pair one level up: an advisory somebody may not see
-		// and one nobody minted.
-		for _, at := range []string{"", "/document", "/issuance"} {
-			unseeable := asPerson(t, r, "outsider", http.MethodGet,
+		// and one nobody minted. The agreement is on this list because it is
+		// a write against a name, which is the shape that turns a lookup
+		// into a directory of what exists.
+		for _, at := range []string{"", "/document", "/issuance", "/approval"} {
+			method := http.MethodGet
+			if at == "/approval" {
+				method = http.MethodPost
+			}
+			unseeable := asPerson(t, r, "outsider", method,
 				"/v1/advisories/"+named+at, "")
-			nonexistent := asPerson(t, r, "outsider", http.MethodGet,
+			nonexistent := asPerson(t, r, "outsider", method,
 				"/v1/advisories/EXNET-1999-0001"+at, "")
 			if unseeable.Code != nonexistent.Code ||
 				unseeable.Body.String() != nonexistent.Body.String() {

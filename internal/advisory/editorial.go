@@ -94,8 +94,8 @@ func (s *Store) Retitle(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, nil, err
 	}
-	if !s.mayWrite(ctx, subject, row) {
-		return nil, nil, ErrNoSuchAdvisory
+	if err := s.mayWrite(ctx, subject, row, "retitle an advisory"); err != nil {
+		return nil, nil, err
 	}
 	title = strings.TrimSpace(title)
 	// The same submission policy a justification goes through, before the
@@ -211,8 +211,8 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	if !s.mayWrite(ctx, subject, row) {
-		return nil, ErrNoSuchAdvisory
+	if err := s.mayWrite(ctx, subject, row, "agree to an advisory"); err != nil {
+		return nil, err
 	}
 	// An advisory covering nothing states nothing, so there is nothing to
 	// agree to. Refused here rather than at the document, so the refusal
@@ -298,8 +298,8 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return err
 	}
-	if !s.mayWrite(ctx, subject, row) {
-		return ErrNoSuchAdvisory
+	if err := s.mayWrite(ctx, subject, row, "take back an agreement"); err != nil {
+		return err
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	var taken int64
@@ -423,9 +423,15 @@ func statusOf(issued, agreed bool) string {
 // One covering nothing is its minter's alone, which is the rule reading it by
 // name applies: byName has already refused anybody else, and the role
 // somewhere is what minting asked for.
-func (s *Store) mayWrite(ctx context.Context, subject access.Subject, row *Advisory) bool {
+//
+// The refusal is a denial rather than the answer a name nobody minted gets.
+// Whoever reaches this has already been handed the advisory by name, so
+// telling them it does not exist contradicts the read they just performed.
+func (s *Store) mayWrite(ctx context.Context, subject access.Subject, row *Advisory,
+	what string) error {
+
 	if subject.Kind != access.Person || subject.ID == 0 {
-		return false
+		return access.Denied(what)
 	}
 	var products []int64
 	err := s.db.NewSelect().
@@ -435,15 +441,18 @@ func (s *Store) mayWrite(ctx context.Context, subject access.Subject, row *Advis
 		Where("ac.removed_at IS NULL").
 		Scan(ctx, &products)
 	if err != nil {
-		return false
+		return fmt.Errorf("read what the advisory covers: %w", err)
 	}
 	if len(products) == 0 {
-		return subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage)
+		if !subject.HoldsAnywhere(access.PublicTriage, access.PrivateTriage) {
+			return access.Denied(what)
+		}
+		return nil
 	}
 	for _, id := range products {
 		if !triages(subject, id) {
-			return false
+			return access.Denied(what)
 		}
 	}
-	return true
+	return nil
 }
