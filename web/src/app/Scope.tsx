@@ -67,7 +67,13 @@ export function Scope() {
   // of anything — a variant picked from it is a build this release was never
   // built as, which is the selection this panel is not allowed to send. Both
   // reads are left to arrive empty for that reason.
-  const offered = stream ? (variants.data?.items ?? declared.data?.items) : declared.data?.items;
+  // What a release was built as keeps its retired variants, because the
+  // findings filed against them are still open and the release is where they
+  // sit. A picker is a list of choices, and a retired variant is not one — so
+  // they come out here rather than out of the answer.
+  const offered = (
+    stream ? (variants.data?.items ?? declared.data?.items) : declared.data?.items
+  )?.filter((one) => !one.retired);
 
   // Applied as soon as it is chosen, at whatever level. A partial selection is
   // a real answer now — every level offers "all" — so there is nothing to wait

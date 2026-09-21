@@ -110,7 +110,11 @@ type TriageFloorBody struct {
 // StreamBody is a branch or a tag.
 type StreamBody struct {
 	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this branch or tag"`
-	Kind string `json:"kind" enum:"branch,tag" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
+	// DisplayName is the same name as it was typed. It is stored beside the
+	// matched one at every level, and absent here a correction that moved only
+	// the capitals wrote a value nothing could read.
+	DisplayName string `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
+	Kind        string `json:"kind" enum:"branch,tag" doc:"Whether this line moves. A branch is rebuilt; a tag never changes"`
 	// Parent is the branch a tag was cut from, which is what lets a branch be
 	// compared against its last release.
 	Parent string `json:"parent,omitempty" doc:"For a tag, the branch it was cut from"`
@@ -118,6 +122,9 @@ type StreamBody struct {
 	// orders the release-over-release chart, because the day a release was
 	// recorded here is an accident of administration.
 	ReleasedOn string `json:"released_on,omitempty" doc:"For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in"`
+	// Retired appears only where the list was asked for retired rows, which
+	// is a caller resolving a name rather than offering a choice.
+	Retired bool `json:"retired,omitempty" doc:"Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted"`
 	// Open and LastScanAt, for the same reason the product list carries them:
 	// a line that has stopped being built looks identical to a healthy one
 	// until somebody opens it.
@@ -136,11 +143,18 @@ type StreamBody struct {
 // VariantBody is one of the ways a stream is built.
 type VariantBody struct {
 	Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name scans use for this build of the stream"`
+	// DisplayName is the same name as it was typed, for the reason the stream
+	// body carries one.
+	DisplayName string `json:"display_name,omitempty" doc:"The same name as it was spelled. Absent where it is the name itself"`
 	// CustomerFacing is a pointer so that leaving it out is not the same as
 	// saying no. An unclassified artifact should rank as though it ships,
 	// which means the default is yes and silence must not read as a denial.
 	CustomerFacing *bool `json:"customer_facing,omitempty" doc:"Whether this reaches customers. Defaults to yes"`
 	Open           *int  `json:"open,omitempty" doc:"Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for"`
+	// Retired is absent while a variant is in use, which is every row of the
+	// product's own list. It is set on a release's list, which keeps naming
+	// what the release was built as after the variant is taken out of use.
+	Retired bool `json:"retired,omitempty" doc:"Whether it has been taken out of use. A release still lists what it was built as"`
 }
 
 // declaredOutput reports what a declaration did.
@@ -194,6 +208,8 @@ type listBody[T any] struct {
 // what the tool reports — the hardest of the three to find.
 func registerCatalog(api huma.API, d Declaring) {
 	registerDeclaring(api, d)
+	registerVariantEdits(api, d)
+	registerCatalogAmends(api, d)
 	registerCatalogPolicy(api, d)
 	registerCatalogReading(api, d)
 }
@@ -204,9 +220,23 @@ func variantList(rows []catalog.Variant) *listOutput[VariantBody] {
 	out.Body.Items = make([]VariantBody, 0, len(rows))
 	for _, row := range rows {
 		facing := row.CustomerFacing
-		out.Body.Items = append(out.Body.Items, VariantBody{Name: row.Name, CustomerFacing: &facing})
+		out.Body.Items = append(out.Body.Items, VariantBody{
+			Name: row.Name, DisplayName: spelled(row.Name, row.DisplayName),
+			CustomerFacing: &facing, Retired: row.Retired(),
+		})
 	}
 	return out
+}
+
+// spelled is the display name where it says something the name does not.
+//
+// Absent where the two are the same string, so a reader is not handed the
+// same word twice and a client has one thing to fall back to.
+func spelled(name, display string) string {
+	if display == name {
+		return ""
+	}
+	return display
 }
 
 // refused turns a refusal from the data layer into one the caller sees as a

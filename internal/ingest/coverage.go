@@ -53,16 +53,26 @@ type Coverage struct {
 	Since time.Duration
 	// Quiet is whether Since has passed the threshold asked for.
 	//
-	// Never true for a build out of support: a release that stopped being
-	// scanned because it stopped being supported is expected rather than a
-	// fault, and coverage that filled with those would stop catching the
-	// product that dropped out silently.
+	// Never true for a build out of support, nor for one taken out of use: a
+	// release that stopped being scanned because it stopped being supported
+	// is expected rather than a fault, and a build nothing may be filed
+	// against cannot stop being silent — the scan that would is refused.
+	// Coverage that filled with either would stop catching the product that
+	// dropped out silently.
 	Quiet bool
-	// Retired says this build's release has gone out of support. It is
+	// OutOfSupport says this build's release has gone out of support. It is
 	// reported rather than left out, because "not scanned, and that is
 	// fine" and "not listed" are different answers and only one of them is
 	// true .
-	Retired bool
+	//
+	// Not the same as taken out of use, which is RetiredFromUse below. A date
+	// says support ended and hides nothing; retiring says the build is not
+	// tracked here at all.
+	OutOfSupport bool
+	// RetiredFromUse says the product, the release or the variant has been
+	// taken out of use. Nothing may be filed against such a build, so it is
+	// never quiet: the one act that would end the silence is refused.
+	RetiredFromUse bool
 }
 
 // Scanning reports when each build in scope was last scanned, quietest first.
@@ -105,6 +115,8 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 		// refused. Null where nothing has been.
 		LastRefused *time.Time `bun:"last_refused"`
 		RefusedWhy  *string    `bun:"refused_why"`
+		// RetiredFromUse is whether any of the three levels is out of use.
+		RetiredFromUse bool `bun:"retired_from_use"`
 	}
 
 	// One row per declared build, with the newest arrival against it as a
@@ -123,6 +135,12 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 		ColumnExpr(`st.kind AS "stream_kind"`).
 		ColumnExpr(`va.name AS "variant"`).
 		ColumnExpr(`tg.created_at AS "declared_at"`).
+		// Out of use at any of the three levels. A build is a product, a
+		// release and a variant together, and retiring any one of them stops
+		// a scan being filed against it.
+		ColumnExpr(`(CASE WHEN p.retired_at IS NULL AND st.retired_at IS NULL `+
+			`AND va.retired_at IS NULL THEN ? ELSE ? END) AS "retired_from_use"`,
+			false, true).
 		// Only a scan that could be read counts as having been heard from. A
 		// build whose upload is taken nightly and fails to parse nightly is
 		// the failure this report exists for, and counting the arrival drew
@@ -152,13 +170,13 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 	// life" is spelled in the catalog and nowhere else, because the same fact
 	// decides whether a finding carries a deadline and what this list says
 	// about a build.
-	past, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, now)
+	ended, err := catalog.NewStore(s.db).StreamsPastEndOfLife(ctx, now)
 	if err != nil {
 		return nil, err
 	}
-	retired := make(map[int64]bool, len(past))
-	for _, id := range past {
-		retired[id] = true
+	past := make(map[int64]bool, len(ended))
+	for _, id := range ended {
+		past[id] = true
 	}
 
 	out := make([]Coverage, 0, len(rows))
@@ -184,8 +202,10 @@ func (s *Store) Scanning(ctx context.Context, subject access.Subject, scope find
 			LastRefusedAt:  r.LastRefused,
 			RefusedBecause: r.RefusedWhy,
 			Since:          since,
-			Retired:        retired[r.StreamID],
-			Quiet:          quietAfter > 0 && since > quietAfter && !retired[r.StreamID],
+			OutOfSupport:   past[r.StreamID],
+			RetiredFromUse: r.RetiredFromUse,
+			Quiet: quietAfter > 0 && since > quietAfter &&
+				!past[r.StreamID] && !r.RetiredFromUse,
 		})
 	}
 

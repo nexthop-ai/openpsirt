@@ -377,7 +377,12 @@ func productNames(ctx context.Context, a Administering) (map[int64]named, error)
 	// Every product, because this is naming the ones bindings already refer
 	// to rather than answering anybody about them. The caller is administering
 	// group bindings and was authorized for that before reaching here.
-	products, err := names.Products(ctx, access.Everything("naming products for bindings"))
+	//
+	// Retired ones included: a role held against one is still held, and the
+	// offered list leaves them out — so read from that, a binding on a retired
+	// product came back with an empty name, which is how this same table
+	// spells a binding that names no product at all.
+	products, err := names.EveryProduct(ctx)
 	if err != nil {
 		return nil, wentWrong(a.Logger, "cannot read the products roles are held against", err)
 	}

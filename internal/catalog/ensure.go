@@ -58,6 +58,13 @@ func (s *Store) ensureProduct(ctx context.Context, name, displayName string) (*P
 			return nil, false, fmt.Errorf("product %q: %w: it is displayed as %q, not %q",
 				name, ErrDiffers, existing.DisplayName, displayName)
 		}
+		if existing.Retired() {
+			if err := s.restoreProduct(ctx, existing.ID); err != nil {
+				return nil, false, err
+			}
+			existing.RetiredAt = nil
+			return existing, true, nil
+		}
 		return existing, false, nil
 	case !errors.Is(err, ErrNotFound):
 		return nil, false, err
@@ -99,6 +106,17 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 			return nil, false, fmt.Errorf("%q: %w: it was not cut from the branch now being named",
 				name, ErrDiffers)
 		}
+		// Declaring a retired one brings it back, the way a product and a
+		// variant come back. A pipeline runs this on every build and the name
+		// is still spoken for while retired.
+		back := false
+		if existing.Retired() {
+			if err := s.restoreStream(ctx, existing.ID); err != nil {
+				return nil, false, err
+			}
+			existing.RetiredAt = nil
+			back = true
+		}
 		// Filling in one that was never stated is not a change. It was
 		// left out, and there was no way to supply it afterwards — so a tag
 		// declared without it stayed that way, and release readiness, which
@@ -113,9 +131,9 @@ func (s *Store) ensureStream(ctx context.Context, productID int64, name string, 
 				return nil, false, fmt.Errorf("record what %q was cut from: %w", name, err)
 			}
 			existing.ParentID = parentID
-			return existing, false, nil
+			return existing, back, nil
 		}
-		return existing, false, nil
+		return existing, back, nil
 	case !errors.Is(err, ErrNotFound):
 		return nil, false, err
 	}
@@ -150,6 +168,17 @@ func (s *Store) ensureVariant(ctx context.Context, productID int64, name string,
 		if existing.CustomerFacing != customerFacing {
 			return nil, false, fmt.Errorf("variant %q: %w: it was declared as %s",
 				name, ErrDiffers, facing(existing.CustomerFacing))
+		}
+		// Declaring a retired one brings it back, which is how retiring is
+		// undone. A pipeline runs this on every build and the name is still
+		// spoken for while retired, so the alternative is a build script that
+		// starts failing because an administrator tidied a list.
+		if existing.Retired() {
+			if err := s.restoreVariant(ctx, existing.ID); err != nil {
+				return nil, false, err
+			}
+			existing.RetiredAt = nil
+			return existing, true, nil
 		}
 		return existing, false, nil
 	case !errors.Is(err, ErrNotFound):
@@ -186,7 +215,9 @@ func (s *Store) Products(ctx context.Context, subject access.Subject) ([]Product
 	}
 
 	var rows []Product
-	query := s.db.NewSelect().Model(&rows).Order("name")
+	query := s.db.NewSelect().Model(&rows).
+		Where(`"p"."retired_at" IS NULL`).
+		Order("name")
 	if !all {
 		query = query.Where("id IN (?)", bun.List(visible))
 	}
@@ -201,13 +232,22 @@ func (s *Store) Products(ctx context.Context, subject access.Subject) ([]Product
 // Guarded here rather than by whoever asked. Somebody who cannot see a product
 // cannot see what releases it has either, and finding that out endpoint by
 // endpoint is how the second one gets forgotten.
-func (s *Store) Streams(ctx context.Context, subject access.Subject, productID int64) ([]Stream, error) {
+//
+// retired says whether to include what is out of use. Off is what a list
+// offers and what a picker picks from; on is for a caller resolving a name it
+// was given rather than choosing one — a release reached by a link somebody
+// kept has to resolve to what it is, and a tag that resolves to nothing is
+// drawn as a branch.
+func (s *Store) Streams(ctx context.Context, subject access.Subject, productID int64, retired bool) ([]Stream, error) {
 	if !subject.Sees(productID) {
 		return nil, access.Denied("list the releases of a product")
 	}
 	var rows []Stream
-	err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).Order("kind", "name").Scan(ctx)
+	query := s.db.NewSelect().Model(&rows).Where("product_id = ?", productID)
+	if !retired {
+		query = query.Where(`"s"."retired_at" IS NULL`)
+	}
+	err := query.Order("kind", "name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list streams: %w", err)
 	}
@@ -215,13 +255,20 @@ func (s *Store) Streams(ctx context.Context, subject access.Subject, productID i
 }
 
 // Variants lists the ways a product is built.
+//
+// What the product declares, which is what a scan may name and what every
+// picker offers. A retired one is left out: it is offered nowhere, and this is
+// the list the offers are made from. What a release was actually built as is
+// BuiltAs, and that keeps them.
 func (s *Store) Variants(ctx context.Context, subject access.Subject, productID int64) ([]Variant, error) {
 	if !subject.Sees(productID) {
 		return nil, access.Denied("list the variants of a product")
 	}
 	var rows []Variant
 	err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).Order("name").Scan(ctx)
+		Where("product_id = ?", productID).
+		Where(`"v"."retired_at" IS NULL`).
+		Order("name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list variants: %w", err)
 	}
@@ -231,6 +278,9 @@ func (s *Store) Variants(ctx context.Context, subject access.Subject, productID 
 // BuiltAs lists the variants a release has actually been built as, which is a
 // subset of what the product builds: a release predating a variant has no row
 // for it, and one that stopped being built as something keeps its history.
+// A retired variant is still listed here, for that reason — the findings filed
+// against it are still open and still somewhere, and a release that stopped
+// naming where they are reads as a release that does not hold them.
 // The product the release belongs to is read here rather than accepted, for
 // the reason its counterpart over findings gives: a caller that can name the
 // product can name a different one, and then the check is answering a question
@@ -308,6 +358,10 @@ type Shape struct {
 // already narrowed, which is why nothing leaked — but "the filtering is in the
 // handler" is the arrangement the non-negotiable exists to prevent, and it is
 // one careless caller from being a count of products somebody cannot see.
+//
+// It counts what the lists beside it offer, so retired rows are left out of
+// both. Counted unfiltered, a product says three variants above a screen
+// showing two.
 func (s *Store) Shapes(ctx context.Context, subject access.Subject,
 	productIDs []int64) (map[int64]Shape, error) {
 
@@ -334,6 +388,7 @@ func (s *Store) Shapes(ctx context.Context, subject access.Subject,
 		ColumnExpr(`st.kind AS "kind"`).
 		ColumnExpr(`COUNT(*) AS "count"`).
 		Where("st.product_id IN (?)", bun.List(productIDs)).
+		Where(`"st"."retired_at" IS NULL`).
 		GroupExpr("st.product_id, st.kind").
 		Scan(ctx, &streams); err != nil {
 		return nil, fmt.Errorf("count branches and tags: %w", err)
@@ -357,6 +412,7 @@ func (s *Store) Shapes(ctx context.Context, subject access.Subject,
 		ColumnExpr(`va.product_id AS "product_id"`).
 		ColumnExpr(`COUNT(*) AS "count"`).
 		Where("va.product_id IN (?)", bun.List(productIDs)).
+		Where(`"va"."retired_at" IS NULL`).
 		GroupExpr("va.product_id").
 		Scan(ctx, &variants); err != nil {
 		return nil, fmt.Errorf("count variants: %w", err)

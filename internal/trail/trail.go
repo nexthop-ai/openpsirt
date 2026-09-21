@@ -53,6 +53,13 @@ const (
 	// release notes say, so who moved them is the same question as who moved
 	// an end-of-life date.
 	Release Kind = "release"
+	// Catalog is a product, a release or a variant renamed or retired, and
+	// what a variant reaches corrected. What the catalog holds decides what a
+	// scan may name, what every picker offers and how a finding ranks, so
+	// moving one moves what the tool reports. Not a Release: that is a tag's
+	// ship date and what it was cut from, which are facts about one release
+	// rather than about what the catalog holds.
+	Catalog Kind = "catalog"
 	// Case is somebody brought into one undisclosed case, or taken off it
 	// . An access change like the rest of these: it is the one way
 	// somebody reaches an embargoed finding without holding private
@@ -60,6 +67,19 @@ const (
 	// is asked afterwards.
 	Case Kind = "case"
 )
+
+// Kinds is every kind there is, in the order the API offers them.
+//
+// Named here rather than written out wherever one is offered. The set is
+// small and grows one at a time, and a kind added to the constants above and
+// missed in a list somewhere else is a kind nothing can be filtered by —
+// which shows up as an empty screen rather than as a failure.
+func Kinds() []Kind {
+	return []Kind{
+		Setting, Role, Routing, Support, Release,
+		Credential, Account, Team, Case, Alias, Catalog,
+	}
+}
 
 // Change is one administrative act.
 type Change struct {

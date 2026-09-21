@@ -210,6 +210,72 @@ var administrativeActs = []trailedAct{
 		body: `{"released_on":"2026-03-31"}`, kind: "release", about: "mine master",
 	},
 	{
+		// Renamed, reclassified and retired in that order, on the variant
+		// nothing else here is built as. Each is one row, so each is its own
+		// act: a single request doing both leaves two and the newest is only
+		// half of what it did.
+		id: "amend-variant", what: "a variant renamed", method: http.MethodPatch,
+		path: "/v1/products/mine/variants/lab-only", body: `{"name":"lab-bench"}`,
+		kind: "catalog", about: "mine lab-only",
+		drive: func(t *testing.T, r *reach, seen *seeded) *httptest.ResponseRecorder {
+			// Declared here rather than relied on, and on a variant nothing
+			// is built as: the three acts below rename and then retire it,
+			// and doing that to the one the world scanned would take the
+			// build every act after this reads out from under them.
+			// Declaring leaves no row of its own, so the newest row after
+			// this is still the rename's.
+			asPerson(t, r, "admin", http.MethodPost, "/v1/products/mine/variants",
+				`{"name":"lab-only","customer_facing":false}`)
+			return asPerson(t, r, "admin", http.MethodPatch,
+				"/v1/products/mine/variants/lab-only", `{"name":"lab-bench"}`)
+		},
+	},
+	{
+		id: "amend-variant", what: "a variant's reach to customers",
+		method: http.MethodPatch, path: "/v1/products/mine/variants/lab-bench",
+		body: `{"customer_facing":true}`, kind: "catalog", about: "mine lab-bench",
+	},
+	{
+		id: "retire-variant", what: "a variant retired", method: http.MethodDelete,
+		path: "/v1/products/mine/variants/lab-bench",
+		kind: "catalog", about: "mine lab-bench",
+	},
+	{
+		// On a release and a product nothing else here reads, for the reason
+		// the variant acts above use one nothing is built as.
+		id: "amend-stream", what: "a release renamed", method: http.MethodPatch,
+		path: "/v1/products/spare/streams/old-line", body: `{"name":"retired-line"}`,
+		kind: "catalog", about: "spare old-line",
+		drive: func(t *testing.T, r *reach, seen *seeded) *httptest.ResponseRecorder {
+			asPerson(t, r, "admin", http.MethodPost, "/v1/products", `{"name":"spare"}`)
+			asPerson(t, r, "admin", http.MethodPost, "/v1/products/spare/streams",
+				`{"name":"old-line","kind":"branch"}`)
+			return asPerson(t, r, "admin", http.MethodPatch,
+				"/v1/products/spare/streams/old-line", `{"name":"retired-line"}`)
+		},
+	},
+	{
+		id: "retire-stream", what: "a release retired", method: http.MethodDelete,
+		path: "/v1/products/spare/streams/retired-line",
+		kind: "catalog", about: "spare retired-line",
+	},
+	{
+		id: "amend-product", what: "a product renamed", method: http.MethodPatch,
+		path: "/v1/products/spare", body: `{"name":"spare-parts"}`,
+		kind: "catalog", about: "spare",
+	},
+	{
+		id: "amend-product", what: "what a product is shown as",
+		method: http.MethodPatch, path: "/v1/products/spare-parts",
+		body: `{"display_name":"Spare Parts"}`,
+		kind: "catalog", about: "spare-parts",
+	},
+	{
+		id: "retire-product", what: "a product retired", method: http.MethodDelete,
+		path: "/v1/products/spare-parts",
+		kind: "catalog", about: "spare-parts",
+	},
+	{
 		id: "record-team", what: "a team", method: http.MethodPost, path: "/v1/teams",
 		body: `{"name":"kernel"}`, kind: "team", about: "kernel",
 	},

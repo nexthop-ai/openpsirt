@@ -133,7 +133,52 @@ target for it.
 
 Each variant records whether it is customer-facing, which feeds ranking. It
 defaults to customer-facing, so an unclassified artifact ranks as though it
-ships.
+ships. An administrator corrects it; a pipeline declaring the variant again
+with the other value is refused, because it moves what everybody is told to
+work on first.
+
+### Catalog corrections
+
+A product, a release and a variant are each named once and everything
+downstream points at them, so what one is called can be wrong and stay wrong.
+The rules below hold at all three levels, except where a row says otherwise.
+
+| Rule | |
+|---|---|
+| The matching name and the spelling shown move together | A name people type is matched without regard to capitals, and both halves are derived from one string. Moved apart, a variant is matched as one thing and shown as another |
+| A name another variant of the product holds is refused, retired ones included | The name stays spoken for while a variant is retired, which is what lets declaring it again bring that variant back rather than making a second |
+| A name is refused once a document naming it has been published | A published OpenVEX document is identified by the build it describes, and a published advisory names each affected release in its product tree the same way. The product, the release and the variant are all inside that identifier. Renamed afterwards, the next document names the same thing differently: a reader holding the first reads it as a second document rather than as a revision of theirs, and one matching the identifier against an advisory finds it absent, which reads as no longer affected about a customer who still is. What went out is not rewritten, so nothing there can be corrected to match: an issued document is kept as the bytes that were sent, and a record that keeps only the build and the revision number names no name at all |
+| A release is asked about the advisories that named it, rather than about its product | A release reaches an advisory's product tree by holding one of the issues that advisory covers, so that is the question. Asked of the product, a release no advisory ever named would be refused because a sibling release was named once — and a release cannot be retired and declared again to get round it, because the second one holds none of the first one's history |
+| An issue taken back off an advisory still counts | It was on the document that went out, which is the document readers hold |
+| A product's displayed name moves freely | It is what a screen shows, what a report is titled with, and what a published document names the product in prose. Nothing is identified by it. A release and a variant have no displayed name set apart from their name, so for those the two move together |
+| Whether a variant reaches customers stays correctable | It is in no document and is not what anything is identified by. It feeds ranking, so correcting it is worth doing and is an administrator's act |
+| What a release is does not move here | Whether it is a branch or a tag, and the branch a tag was cut from, say what a release is rather than what it is called |
+
+### Catalog retirement
+
+A product, a release and a variant are retired rather than deleted, the way a
+team is retired and a person deactivated. The row stays and everything filed
+against it stays with it.
+
+Retiring is not an end-of-support date, and the two sit beside each other. A
+date records that support ended, takes the deadline off what is open, and hides
+nothing — an auditor asks about a release long after it stops being supported.
+Retiring says the thing is not tracked here.
+
+| Rule | |
+|---|---|
+| It is offered nowhere | The list of what a product is built as stops naming it, and so does every picker reading that list |
+| A release still names it among what it was built as | The findings filed against it are still open and still somewhere, and a release that stopped naming where they are reads as a release that does not hold them |
+| No scan may be filed against it | Declaration before use decides what a scan may name, and a retired variant is no longer declared. The refusal says to declare it again, because what has to change is a build script somebody maintains |
+| Everything already filed against it still resolves by name | Its findings, its decisions and the documents published for it are all reached by resolving the name |
+| Declaring it again brings it back | A pipeline runs the declaration on every build and the name is still spoken for, so the alternative is a build script that starts failing because an administrator tidied a list. What it reaches has to match, the way any declaration of something already declared does |
+| Retiring a product writes nothing onto its releases and variants | They are reached through the product, so they leave every list with it. A date written onto each of them would be a bulk write whose only effect is to make bringing the product back a second bulk write that has to remember exactly what it changed |
+| A retired variant is still named by the releases built as it, and a retired product or release is named by nothing | Only the variant has a second list that answers a different question — what a release was actually built as, where the findings filed against it sit. A retired product is reached by a link somebody kept, and the page for it says it is retired |
+| Retiring one already retired is refused | Answered as done, two administrators retiring it at once would both record having done it |
+
+Renaming, correcting what a variant reaches and retiring anything are
+administrative acts, and each leaves a record of who did it and what it held
+before.
 
 ## Declaration before use
 
