@@ -319,10 +319,17 @@ commitment the project is held to, and one that arrives as a side effect of
 building something is a commitment nobody made. Propose it; do not append it.
 Removing one is the same conversation in reverse.
 
-`REQUIREMENTS.md` is never edited while implementing something. Not to
-record what was just built, not to add the row a new behavior seems to want, not
-to reword one that reads awkwardly next to the code. A change to that file is
-its own change, asked for on its own.
+`REQUIREMENTS.md` is not iterated on. A design document is edited as the
+code that satisfies it is written, and this file is not: not to record what was
+just built, not to add the row a new behavior seems to want, not to reword one
+that reads awkwardly next to the code. Every change to it is one somebody asked
+for in those words and agreed to before it was written.
+
+The rule is about who decides. A requirement and the work that implements
+it may land in one commit and one pull request, and usually should: a row and
+the behavior it commits to are one thing to review. An agent proposes a
+requirement and never settles one — ask, quote the wording, wait for a yes, and
+then write both.
 
 Agreement to build something is not agreement to record a decision. They are
 different questions and the second is asked separately: "yes, do that" is a yes
