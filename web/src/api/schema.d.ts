@@ -3666,6 +3666,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the times a VEX document went out
+         * @description What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
+         *
+         *     Readable without generating a document. Somebody deciding whether to publish a revision is asking before they generate anything, and the digest beside each entry is what answers whether the last one still describes what this would produce.
+         *
+         *     The published document itself belongs to whoever published it. The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
+         */
+        get: operations["list-vex-issuances"];
+        put?: never;
+        /**
+         * Record that a VEX document went out
+         * @description Records that the document for this build was published: when, by whom, and a digest of the document as it stands now.
+         *
+         *     A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once a claim is withdrawn, a decision is revised or a scan closes a finding.
+         *
+         *     It is what the document's version counts. A document is assembled from what stands now and holds no history of its own, so without this every generation is the first revision of something, and a reader keeping documents by their identifier cannot tell which supersedes which.
+         *
+         *     The digest is taken from the document generated here rather than from anything sent: a digest of whatever a caller says answers nothing. The public document, never the preview that includes work nobody has announced.
+         *
+         *     Requires: public-triage or private-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
+         */
+        post: operations["record-vex-issued"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/tags": {
         parameters: {
             query?: never;
@@ -7398,6 +7436,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyVEXIssuanceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyVEXIssuanceBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["VEXIssuanceBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyVariantBody: {
             /**
              * Format: uri
@@ -9524,6 +9573,22 @@ export interface components {
             /** @description False for a component the inventory put nowhere. Those sit at the end with no chain */
             placed: boolean;
             version: string;
+        };
+        VEXIssuanceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/VEXIssuanceBody.json
+             */
+            readonly $schema?: string;
+            /** @description A digest of what the document said, so that what is published and what we would generate stay answerable against each other */
+            digest: string;
+            issued_at: string;
+            /**
+             * Format: int64
+             * @description Which revision went out, counting from one. It is the version that document carries
+             */
+            version: number;
         };
         VariantBody: {
             /**
@@ -15531,6 +15596,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Statements"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-vex-issuances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyVEXIssuanceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "record-vex-issued": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VEXIssuanceBody"];
                 };
             };
             /** @description Error */

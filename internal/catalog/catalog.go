@@ -732,10 +732,18 @@ func (s *Store) Resolve(ctx context.Context, product, stream, variant string) (*
 
 // Named is what an upload said it was for, resolved to rows but not yet
 // recorded as a target.
+//
+// The three names are the stored ones rather than the ones that were typed. A
+// name people type is matched without regard to capitals, so two callers
+// naming one build spell it two ways, and anything a document is identified by
+// has to be the same string both times.
 type Named struct {
 	ProductID int64
 	StreamID  int64
 	VariantID int64
+	Product   string
+	Stream    string
+	Variant   string
 }
 
 // LocateVisible is Locate for one sender, reporting anything they may not file
@@ -780,7 +788,10 @@ func (s *Store) Locate(ctx context.Context, product, stream, variant string) (*N
 	if err != nil {
 		return nil, fmt.Errorf("product %q: %w", product, err)
 	}
-	return &Named{ProductID: p.ID, StreamID: st.ID, VariantID: v.ID}, nil
+	return &Named{
+		ProductID: p.ID, StreamID: st.ID, VariantID: v.ID,
+		Product: p.Name, Stream: st.Name, Variant: v.Name,
+	}, nil
 }
 
 // TargetFor returns the row for a release built as a variant, recording it the

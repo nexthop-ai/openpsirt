@@ -4900,6 +4900,28 @@ components:
       required:
         - items
       type: object
+    ListBodyVEXIssuanceBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyVEXIssuanceBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/VEXIssuanceBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyVariantBody:
       additionalProperties: false
       properties:
@@ -8533,6 +8555,30 @@ components:
         - findings
         - beneath
         - placed
+      type: object
+    VEXIssuanceBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/VEXIssuanceBody.json
+          format: uri
+          readOnly: true
+          type: string
+        digest:
+          description: A digest of what the document said, so that what is published and what we would generate stay answerable against each other
+          type: string
+        issued_at:
+          type: string
+        version:
+          description: Which revision went out, counting from one. It is the version that document carries
+          format: int64
+          type: integer
+      required:
+        - version
+        - digest
+        - issued_at
       type: object
     VariantBody:
       additionalProperties: false
@@ -19484,6 +19530,107 @@ paths:
           - private-read
           - private-triage
         note: "Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue."
+  /v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance:
+    get:
+      description: |-
+        What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
+
+        Readable without generating a document. Somebody deciding whether to publish a revision is asking before they generate anything, and the digest beside each entry is what answers whether the last one still describes what this would produce.
+
+        The published document itself belongs to whoever published it. The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same.
+
+        Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
+      operationId: list-vex-issuances
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyVEXIssuanceBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List the times a VEX document went out
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
+          - private-triage
+        note: "Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document."
+    post:
+      description: |-
+        Records that the document for this build was published: when, by whom, and a digest of the document as it stands now.
+
+        A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once a claim is withdrawn, a decision is revised or a scan closes a finding.
+
+        It is what the document's version counts. A document is assembled from what stands now and holds no history of its own, so without this every generation is the first revision of something, and a reader keeping documents by their identifier cannot tell which supersedes which.
+
+        The digest is taken from the document generated here rather than from anything sent: a digest of whatever a caller says answers nothing. The public document, never the preview that includes work nobody has announced.
+
+        Requires: public-triage or private-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
+      operationId: record-vex-issued
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VEXIssuanceBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Record that a VEX document went out
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
   /v1/products/{product}/tags:
     get:
       description: |-

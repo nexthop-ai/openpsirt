@@ -58,14 +58,19 @@ var ErrTooLarge = errors.New("more dismissals than one document carries")
 // as a panic at start-up rather than as a compile error.
 type Statements struct {
 	Context string `json:"@context"`
-	// ID names this document. A reader keeps documents by it, so it carries
-	// the build and the moment rather than being a bare number.
+	// ID names this document, and names it the same way every time it is
+	// generated for one build. A reader keeps documents by it and tells two
+	// revisions of one document from two documents by whether it matches, so
+	// it carries the build and nothing that moves.
 	ID     string `json:"@id"`
 	Author string `json:"author"`
 	// Tooling says what wrote it, read from the binary rather than held in a
 	// variable something has to remember to set.
-	Tooling    string      `json:"tooling"`
-	Timestamp  time.Time   `json:"timestamp"`
+	Tooling   string    `json:"tooling"`
+	Timestamp time.Time `json:"timestamp"`
+	// Version is which revision of this document this is, counting from one.
+	// It is one past what has gone out: a document nobody has published is
+	// the first, and the next one generated after an issuance is the second.
 	Version    int         `json:"version"`
 	Statements []Statement `json:"statements"`
 }
@@ -171,27 +176,10 @@ func (s *Store) carrying() int {
 // as anything: a deferred item exports as affected and never as not-affected,
 // and silence already reads as affected in this format, which is the honest
 // answer for something we have only postponed.
-func (s *Store) For(ctx context.Context, subject access.Subject, publisher publisher.Named,
+func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.Named,
 	product, stream, variant string, undisclosed bool) (*Statements, error) {
 
-	if !publisher.Stated() {
-		return nil, fmt.Errorf("this deployment has not said who it publishes as, " +
-			"so a document has nobody to name as its author")
-	}
-	names := catalog.NewStore(s.db)
-	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
-	if err != nil {
-		return nil, err
-	}
-	// The document is about the whole build, so asking for it is a
-	// product-wide question. The lookup above admits somebody brought into one
-	// case here — the names their own issue sits at have to resolve, or the
-	// grant refuses them the one thing it gave — and that is not an answer to
-	// this one. Asked before the build is resolved any further.
-	if !subject.Reads(access.Public, named.ProductID) {
-		return nil, access.Denied(fmt.Sprintf("read findings in product %d", named.ProductID))
-	}
-	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+	named, target, err := s.locate(ctx, subject, who, product, stream, variant)
 	if err != nil {
 		return nil, err
 	}
@@ -202,6 +190,48 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		}
 		visible = append(visible, access.Private)
 	}
+	return s.document(ctx, who, named, target, visible)
+}
+
+// locate resolves the build a document is asked for and refuses anybody who
+// may not read it.
+//
+// One place, because generating a document and recording that one went out ask
+// the same question of the same names, and the second of them goes on to
+// generate the first. Asked again it is a second set of round trips for an
+// answer already in hand.
+func (s *Store) locate(ctx context.Context, subject access.Subject, who publisher.Named,
+	product, stream, variant string) (*catalog.Named, *catalog.Target, error) {
+
+	if !who.Stated() {
+		return nil, nil, fmt.Errorf("this deployment has not said who it publishes as, " +
+			"so a document has nobody to name as its author")
+	}
+	names := catalog.NewStore(s.db)
+	named, err := names.LocateVisible(ctx, subject, product, stream, variant)
+	if err != nil {
+		return nil, nil, err
+	}
+	// The document is about the whole build, so asking for it is a
+	// product-wide question. The lookup above admits somebody brought into one
+	// case here — the names their own issue sits at have to resolve, or the
+	// grant refuses them the one thing it gave — and that is not an answer to
+	// this one. Asked before the build is resolved any further.
+	if !subject.Reads(access.Public, named.ProductID) {
+		return nil, nil, access.Denied(
+			fmt.Sprintf("read findings in product %d", named.ProductID))
+	}
+	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return named, target, nil
+}
+
+// document assembles what stands about one build, at the visibilities asked
+// for.
+func (s *Store) document(ctx context.Context, who publisher.Named, named *catalog.Named,
+	target *catalog.Target, visible []access.Visibility) (*Statements, error) {
 
 	var rows []struct {
 		VulnerabilityID int64     `bun:"vulnerability_id"`
@@ -219,7 +249,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 	// a decision is a claim about a product's code and reaches every build
 	// whose versions match it, so what belongs in this document is what this
 	// build ships rather than everything the product has ever decided.
-	err = s.db.NewSelect().
+	err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
@@ -314,7 +344,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed claims: a "+
 			"document that stopped at the limit would say nothing is claimed about "+
 			"everything past it",
-			ErrTooLarge, product, stream, variant, s.carrying())
+			ErrTooLarge, named.Product, named.Stream, named.Variant, s.carrying())
 	}
 
 	// The words each of those decisions rests on, read off the decision the
@@ -334,13 +364,17 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		rows[i].DecidedAt = said[rows[i].DecidedBy].proposedAt
 	}
 
-	moment := s.now().UTC()
-	id := fmt.Sprintf("%s/vex/%s-%s-%s-%s", publisher.Namespace,
-		product, stream, variant, moment.Format("20060102150405"))
+	// Which revision this is, read from what has gone out for this build.
+	// A document generated twice with nothing published in between is the
+	// same revision, which is what its identifier staying still says.
+	revision, err := s.revision(ctx, target.ID)
+	if err != nil {
+		return nil, err
+	}
 	doc := &Statements{
-		Context: namespace, ID: id, Author: publisher.Name,
+		Context: namespace, ID: identify(who, named), Author: who.Name,
 		Tooling:   "OpenPSIRT " + version.Get().Version,
-		Timestamp: moment, Version: 1,
+		Timestamp: s.now().UTC(), Version: revision,
 		Statements: make([]Statement, 0, len(rows)),
 	}
 	// The other names each issue goes by. The whole point of the field is that
@@ -359,7 +393,7 @@ func (s *Store) For(ctx context.Context, subject access.Subject, publisher publi
 		return nil, err
 	}
 
-	shipped := product + ":" + stream + ":" + variant
+	shipped := build(named)
 	for _, row := range rows {
 		about := row.Purl
 		if about == "" {
@@ -427,6 +461,29 @@ func statusOf(outcome string) string {
 	default:
 		return "not_affected"
 	}
+}
+
+// identify is what the document calls itself, which is the same string every
+// time it is generated for one build.
+//
+// The publisher's own namespace and the build, and nothing that moves. An
+// identifier carrying the moment made every fetch a document in its own right:
+// a reader holding two of them has no way to say that the second supersedes
+// the first, which is the whole of what an identifier is for here. It also
+// answered the wrong question — two fetches inside one second minted the same
+// name for two different documents, because seconds is as fine as the format
+// it was written in.
+//
+// The names are the stored ones rather than the ones the request spelled. A
+// name people type is matched without regard to capitals, so the same build
+// asked for two ways is one document and has to be called one thing.
+func identify(who publisher.Named, named *catalog.Named) string {
+	return fmt.Sprintf("%s/vex/%s", who.Namespace, build(named))
+}
+
+// build is how the thing somebody holds is named in the document.
+func build(named *catalog.Named) string {
+	return named.Product + ":" + named.Stream + ":" + named.Variant
 }
 
 // namesOf is what each of these issues is also called, keyed by issue.
