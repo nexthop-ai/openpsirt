@@ -68,6 +68,13 @@ One record stands per issue and product, held by the database rather than by a
 check. A cleared record stays readable beside it, and clearing releases the key
 so the next one may be kept: what happened once may happen again.
 
+The records are read for one issue in one product, never across the
+deployment. Whether somebody may be told of that pair is one question with one
+answer, which is what makes the narrowing exact; a list spanning products
+carries a total, and a total says how many records exist to somebody shown
+none of them. The surface that watches these across a deployment is § Not
+built, and it answers that question there.
+
 Recording one and clearing one both ask for triage on that product, and both
 land in the administrative trail. That is the layer the record belongs to — it
 decides what the triage record may say, which is what a setting, a grant or an

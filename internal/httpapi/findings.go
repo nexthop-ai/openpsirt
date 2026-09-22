@@ -675,10 +675,14 @@ type EvidenceBody struct {
 	ScoreKind    string  `json:"score_kind,omitempty" doc:"The rating's rank: primary or secondary"`
 	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
-	// ExploitedHere is the record kept in this product, where one stands. Not
-	// the flag above: that is a feed's word about the world, and this is
-	// somebody here saying this product was the thing attacked.
-	ExploitedHere *ExploitedHereBody `json:"exploited_here,omitempty" doc:"The standing record that this product was exploited through this issue, where one is kept"`
+	// ExploitedHere is what has been recorded in this product about being
+	// exploited through the issue, newest first. Not the flag above: that is a
+	// feed's word about the world, and this is somebody here saying this
+	// product was the thing attacked.
+	//
+	// Cleared records are among them rather than hidden. What was said and
+	// then taken back is part of the answer to what was known and when.
+	ExploitedHere []ExploitedHereBody `json:"exploited_here,omitempty" doc:"What has been recorded about this product being exploited through this issue, newest first. At most one of them stands; the rest were cleared"`
 	// LikelihoodPercentile ranks the estimate against every other published
 	// one, and the day beside it dates the forecast. The probability alone is
 	// unreadable — nobody acts on 0.00042 — and it is a thirty-day forecast
@@ -898,7 +902,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		// carries — the moment something became known, the grounds, who wrote
 		// them — is what a reader of the finding is asking about when the row
 		// is at the top of the list and nothing on the page says why.
-		if body.ExploitedHere, err = standingExploitedHere(ctx, in, subject,
+		if body.ExploitedHere, err = exploitedHereAt(ctx, in, subject,
 			named.ProductID, issue, input.Vulnerability); err != nil {
 			return nil, wentWrong(in.Logger,
 				"what this product was exploited through could not be read", err)

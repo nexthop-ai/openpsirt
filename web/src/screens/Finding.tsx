@@ -461,7 +461,8 @@ export function Finding() {
           </Link>{" "}
           in <span className="id">{it.component}</span>{" "}
           <Severity word={it.assessed || it.severity} />{" "}
-          <ExploitedHereBadge when={!!it.exploited_here} /> {it.exploited && <Exploited when />}{" "}
+          <ExploitedHereBadge when={(it.exploited_here ?? []).some((each) => each.standing)} />{" "}
+          {it.exploited && <Exploited when />}{" "}
           <span className={`state ${state.cls}`}>{state.label}</span>
         </h2>
         <p>
@@ -732,7 +733,7 @@ export function Finding() {
           <ExploitedHere
             product={product}
             vulnerability={vulnerability}
-            record={it.exploited_here}
+            records={it.exploited_here ?? undefined}
             mayTriage={mayTriage}
           />
         </div>

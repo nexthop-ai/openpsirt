@@ -1172,32 +1172,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/exploited-here": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List records of being exploited
-         * @description Every record you may be told about, newest first, cleared ones among them — a record that was cleared is part of the answer to what happened and when, so it is not hidden.
-         *
-         *     A record belongs to one product, so a row says which, and two products may record the same issue with neither reaching the other.
-         *
-         *     Narrowed to issues you may read a finding of in the record's own product. A record carries what somebody wrote about an attack, and an issue this deployment minted for a flaw nobody has announced is not public knowledge.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Narrowed to issues you may read a finding of in the product the record belongs to.
-         */
-        get: operations["list-exploited-here"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/exploited-here/{id}": {
         parameters: {
             query?: never;
@@ -6616,8 +6590,8 @@ export interface components {
             elsewhere: components["schemas"]["ElsewhereBody"][] | null;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
-            /** @description The standing record that this product was exploited through this issue, where one is kept */
-            exploited_here?: components["schemas"]["ExploitedHereBody"];
+            /** @description What has been recorded about this product being exploited through this issue, newest first. At most one of them stands; the rest were cleared */
+            exploited_here?: components["schemas"]["ExploitedHereBody"][] | null;
             /** @enum {string} */
             fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
             /** @description The date that version became available */
@@ -7543,17 +7517,6 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["EmbargoedBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
-        ListBodyExploitedHereBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyExploitedHereBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["ExploitedHereBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -11972,42 +11935,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OverPeriodSpentBodyBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "list-exploited-here": {
-        parameters: {
-            query?: {
-                /** @description Limit to one product, by name */
-                product?: string;
-                /** @description The number returned */
-                limit?: number;
-                /** @description The number skipped */
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ListBodyExploitedHereBody"];
                 };
             };
             /** @description Error */

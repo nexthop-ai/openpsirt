@@ -2792,8 +2792,12 @@ components:
           description: Somebody is known to be exploiting this
           type: boolean
         exploited_here:
-          $ref: "#/components/schemas/ExploitedHereBody"
-          description: The standing record that this product was exploited through this issue, where one is kept
+          description: What has been recorded about this product being exploited through this issue, newest first. At most one of them stands; the rest were cleared
+          items:
+            $ref: "#/components/schemas/ExploitedHereBody"
+          type:
+            - array
+            - "null"
         fix_state:
           enum:
             - fixed
@@ -4509,28 +4513,6 @@ components:
         items:
           items:
             $ref: "#/components/schemas/EmbargoedBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
-    ListBodyExploitedHereBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyExploitedHereBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/ExploitedHereBody"
           type:
             - array
             - "null"
@@ -11904,64 +11886,6 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
-  /v1/exploited-here:
-    get:
-      description: |-
-        Every record you may be told about, newest first, cleared ones among them — a record that was cleared is part of the answer to what happened and when, so it is not hidden.
-
-        A record belongs to one product, so a row says which, and two products may record the same issue with neither reaching the other.
-
-        Narrowed to issues you may read a finding of in the record's own product. A record carries what somebody wrote about an attack, and an issue this deployment minted for a flaw nobody has announced is not public knowledge.
-
-        Requires: any signed-in person, and not a pipeline key. Narrowed to issues you may read a finding of in the product the record belongs to.
-      operationId: list-exploited-here
-      parameters:
-        - description: Limit to one product, by name
-          explode: false
-          in: query
-          name: product
-          schema:
-            description: Limit to one product, by name
-            type: string
-        - description: The number returned
-          explode: false
-          in: query
-          name: limit
-          schema:
-            default: 50
-            description: The number returned
-            format: int64
-            maximum: 200
-            minimum: 1
-            type: integer
-        - description: The number skipped
-          explode: false
-          in: query
-          name: offset
-          schema:
-            description: The number skipped
-            format: int64
-            minimum: 0
-            type: integer
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListBodyExploitedHereBody"
-          description: OK
-        default:
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ErrorModel"
-          description: Error
-      summary: List records of being exploited
-      tags:
-        - Triage
-      x-openpsirt-requires:
-        scope: person
-        note: Narrowed to issues you may read a finding of in the product the record belongs to.
   /v1/exploited-here/{id}:
     delete:
       description: |-
