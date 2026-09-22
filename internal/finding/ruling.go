@@ -116,15 +116,28 @@ var (
 	ErrNotADuplicate     = errors.New("only a duplicate names an issue")
 	// ErrDuplicateOfClosed is a duplicate of work that is no longer open. It
 	// would bury the report, because nothing is left to work on.
-	ErrDuplicateOfClosed = errors.New("that issue is not open here, so calling this a " +
-		"duplicate would leave nothing to work on — reject it instead, which a second " +
-		"person agrees to")
+	ErrDuplicateOfClosed = errors.New("that issue is closed, dismissed or suppressed at " +
+		"every place here, so a duplicate of it leaves nothing to work on; reject it " +
+		"instead, which a second person agrees to")
 	ErrTooManyReports = errors.New("that would rule on more reports than one action may")
 	ErrNoSuchRuling   = errors.New("no ruling here goes by that number")
 	ErrOwnRuling      = errors.New("the person who proposed a ruling may not approve it")
 	ErrNotWaiting     = errors.New("that ruling is not waiting for anybody")
 	ErrWithdrawn      = errors.New("that ruling has already been withdrawn")
 )
+
+// NotHere is a ruling naming references this product does not hold, or holds
+// where the proposer may not read them. It is ErrNoSuchReport, carrying which.
+type NotHere struct {
+	References []string
+}
+
+func (e *NotHere) Error() string {
+	return ErrNoSuchReport.Error() + ": " + strings.Join(e.References, ", ")
+}
+
+// Is makes it ErrNoSuchReport to errors.Is.
+func (e *NotHere) Is(target error) bool { return target == ErrNoSuchReport }
 
 // Rule proposes a ruling on one or more reports.
 //
@@ -188,18 +201,34 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 			}
 		}
 
-		var ids []int64
+		var found []struct {
+			ID        int64  `bun:"id"`
+			Reference string `bun:"reference"`
+		}
 		if err := tx.NewSelect().Model((*FlawReport)(nil)).
-			Column("fr.id").
+			Column("fr.id", "fr.reference").
 			Where("fr.product_id = ?", productID).
 			Where("fr.reference IN (?)", bun.List(named)).
-			Scan(ctx, &ids); err != nil {
+			Scan(ctx, &found); err != nil {
 			return fmt.Errorf("read the reports named: %w", err)
 		}
+		ids := make([]int64, 0, len(found))
+		here := map[string]bool{}
+		for _, row := range found {
+			ids = append(ids, row.ID)
+			here[row.Reference] = true
+		}
 		// One answer for a name nobody minted and one in another product,
-		// as reading a report gives.
+		// as reading a report gives. The caller typed every name, so saying
+		// which stopped it tells them nothing they did not send.
 		if len(ids) != len(named) {
-			return ErrNoSuchReport
+			var missing []string
+			for _, each := range named {
+				if !here[each] {
+					missing = append(missing, each)
+				}
+			}
+			return &NotHere{References: missing}
 		}
 
 		// Built inside, because an insert writes the generated identifier
@@ -239,7 +268,16 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 			return fmt.Errorf("rule on those reports: %w", err)
 		}
 		if changed != int64(len(ids)) {
-			return ErrAlreadyJudged
+			var held []string
+			if err := tx.NewSelect().Model((*FlawReport)(nil)).
+				Column("fr.reference").
+				Where("fr.id IN (?)", bun.List(ids)).
+				Where("fr.ruling_id IS NULL OR fr.ruling_id <> ?", ruling.ID).
+				OrderExpr("fr.reference").
+				Scan(ctx, &held); err != nil {
+				return fmt.Errorf("read which reports are already answered: %w", err)
+			}
+			return fmt.Errorf("%w: %s", ErrAlreadyJudged, strings.Join(held, ", "))
 		}
 
 		covered := make([]reportRuled, 0, len(ids))
@@ -254,8 +292,9 @@ func (s *Store) Rule(ctx context.Context, subject access.Subject, productID int6
 	if err != nil {
 		return nil, err
 	}
-	ruling.References = named
-	return ruling, nil
+	// Read back rather than returned as built, so it carries what the other
+	// acts' answers carry: the product's name and the reports as stored.
+	return s.RulingBy(ctx, subject, productID, ruling.ID)
 }
 
 // openHere refuses a duplicate target that is not an open issue this subject
@@ -274,14 +313,33 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 	if !told {
 		return ErrNoSuchIssueHere
 	}
+	// Open is work somebody still has in front of them: not closed, not
+	// argued away by the build, and not dismissed by a decision in force at
+	// that place. A dismissal and a suppression leave the row open and close
+	// the question, so a duplicate of one sends the new claim somewhere
+	// nobody is looking. A deferral or a promised upgrade leaves work that
+	// comes back, so those count as open.
+	standing, held := InForce()
 	open, err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Join(`JOIN "component" AS "c" ON c.id = f.component_id`).
+		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr("f.id").
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("st.product_id = ?", productID).
 		Where("f.closed_at IS NULL").
+		Where("f.suppressed_by IS NULL").
+		Where(`NOT EXISTS (SELECT 1 FROM "decision" AS "de"
+			JOIN "claim" AS "cl" ON cl.id = de.claim_id
+			WHERE de.product_id = st.product_id
+			  AND de.vulnerability_id = f.vulnerability_id
+			  AND de.place_identity = f.place_identity
+			  AND de.live_key IS NOT NULL
+			  AND `+KeyMatches+`
+			  AND `+standing+`
+			  AND cl.outcome IN (?))`, append(held, bun.List(Dismissing))...).
 		Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("read whether that issue is open here: %w", err)
@@ -291,6 +349,12 @@ func openHere(ctx context.Context, tx bun.IDB, subject access.Subject,
 	}
 	return nil
 }
+
+// Dismissing is the outcomes that close the question at a place: it does not
+// apply, the match is wrong, it will not be fixed, the fix is already here.
+// The triage package owns the outcomes and a test there holds this list to
+// its own.
+var Dismissing = []string{"not-applicable", Mismatched, "wont-fix", "already-fixed"}
 
 // distinctReferences folds and de-duplicates the names given, in a stable
 // order.

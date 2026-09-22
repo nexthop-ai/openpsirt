@@ -47,6 +47,8 @@ describe("a ruling ready to send", () => {
     expect(ready({ disposition: "duplicate", reasoning: "", duplicateOf: "CVE-1" })).toBe(true);
   });
   it("needs a reason for everything else", () => {
+    expect(needsReason("rejected")).toBe(true);
+    expect(needsReason("not-reproducible")).toBe(true);
     expect(ready({ disposition: "rejected", reasoning: "  ", duplicateOf: "" })).toBe(false);
     expect(ready({ disposition: "rejected", reasoning: "Slop.", duplicateOf: "" })).toBe(true);
   });

@@ -186,7 +186,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 		}
 		holds := Holds{
 			About: identify(fmt.Sprintf("ruling-waiting %d", row.RulingID)),
-			Body: fmt.Sprintf("A ruling in %s that %s %s has been waiting %s for a "+
+			Body: fmt.Sprintf("A ruling in %s calling %s %s has been waiting %s for a "+
 				"second person. It takes effect only once somebody agrees to it.",
 				row.Product, reports, strings.ReplaceAll(row.Disposition, "-", " "),
 				plainly(days)),
@@ -594,9 +594,9 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 			ProductID:       &row.ProductID,
 			VulnerabilityID: &row.VulnerabilityID,
 		}
-		// A claim nobody has judged has no issue to name and nobody on a
-		// case. It is named by the reference it was minted with, and points
-		// at the report.
+		// A report with no issue — unjudged, or ruled something other than
+		// one — has no issue to name and nobody on a case. It is named by the
+		// reference it was minted with, and points at the report.
 		if row.VulnerabilityID == 0 {
 			holds.About = identify(fmt.Sprintf("unanswered report %d", row.ReportID))
 			holds.Body = fmt.Sprintf("%s sent %s in %s%s and has not been answered. "+

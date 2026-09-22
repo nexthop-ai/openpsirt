@@ -247,15 +247,6 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               label="Pending upgrades"
               needs={whole}
             />
-            {/* Recording a flaw is an act rather than a place, so it opens a
-              drawer instead of going anywhere — the same shape as Upload. It
-              lives here rather than on the findings list because it is not a
-              sub-action of reading one: a flaw nobody has reported is exactly
-              what is *not* in that list. */}
-            {/* Its own screen rather than an action on the findings list: what is
-              being recorded is precisely what is *not* in that list, and it asks
-              more than a control beside a table has room for. It needs no
-              product picked, because the screen asks for one. */}
             {/* What people outside have sent a product. Only for somebody who may
               work reports somewhere, and it needs a product picked because an
               inbox belongs to one. */}
@@ -268,6 +259,15 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                 why={product ? "You don't work reports in this product" : "Pick a product"}
               />
             )}
+            {/* Recording a flaw is an act rather than a place, so it opens a
+              drawer instead of going anywhere — the same shape as Upload. It
+              lives here rather than on the findings list because it is not a
+              sub-action of reading one: a flaw nobody has reported is exactly
+              what is *not* in that list. */}
+            {/* Its own screen rather than an action on the findings list: what is
+              being recorded is precisely what is *not* in that list, and it asks
+              more than a control beside a table has room for. It needs no
+              product picked, because the screen asks for one. */}
             <Rail to="/record" icon="record" label="Record a flaw" />
             {/* What is running out of embargo. The list is itself a disclosure,
               so a product somebody may not read undisclosed work in contributes

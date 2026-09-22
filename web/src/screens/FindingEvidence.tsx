@@ -380,7 +380,19 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
 // Reports ruled duplicates of this issue, where somebody triaging it finds the
 // screenshot one of them carried. Read under the report rule, so somebody who
 // may not work reports sees nothing here.
-function Duplicates({ product, vulnerability }: { product: string; vulnerability: string }) {
+//
+// Inside the reporter card where the flaw was recorded here, and a card of its
+// own on an issue a scanner found, which has no reporter card and is the usual
+// thing a claim duplicates.
+export function Duplicates({
+  product,
+  vulnerability,
+  card = false,
+}: {
+  product: string;
+  vulnerability: string;
+  card?: boolean;
+}) {
   const duplicates = useDuplicates(product, vulnerability);
   if (duplicates.isPending) return null;
   if (duplicates.isError) {
@@ -392,8 +404,8 @@ function Duplicates({ product, vulnerability }: { product: string; vulnerability
   if (rows.length === 0) return null;
   const inbox = `/products/${encodeURIComponent(product)}/inbox`;
   return (
-    <div style={{ marginTop: 10 }}>
-      <h4 style={{ margin: "0 0 4px" }}>Duplicates</h4>
+    <div className={card ? "card" : undefined} style={{ marginTop: card ? 14 : 10 }}>
+      {card ? <h3>Duplicates</h3> : <h4 style={{ margin: "0 0 4px" }}>Duplicates</h4>}
       <ul className="files">
         {rows.map((row) => (
           <li key={row.reference}>

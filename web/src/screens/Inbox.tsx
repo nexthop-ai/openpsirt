@@ -10,7 +10,7 @@ import { Paged } from "../ui/Paged";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { rulable, standing } from "./inbox";
-import { RuleForm, RulingCard } from "./InboxRuling";
+import { RuleForm, RulingCard, useBackOff } from "./InboxRuling";
 
 // One product's reports: what arrived, what it was judged to be, and the
 // rulings waiting on a second person.
@@ -188,10 +188,11 @@ function Reports({ product }: { product: string }) {
 function Waiting({ product }: { product: string }) {
   const [offset, setOffset] = useState(0);
   const listed = useRulings(product, true, offset);
+  useBackOff(listed.data?.items?.length, offset, setOffset);
   if (listed.isPending) return <Loading />;
   if (listed.isError) return <Failed error={listed.error} what="The rulings could not be read." />;
   const rows = listed.data?.items ?? [];
-  if (rows.length === 0) {
+  if ((listed.data?.total ?? 0) === 0) {
     return <Empty title="Nothing waiting." />;
   }
   return (

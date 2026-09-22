@@ -98,7 +98,7 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		if len(told) != 1 {
 			t.Fatalf("somebody who may approve was told %d things, want 1", len(told))
 		}
-		if !strings.Contains(told[0].Body, "2 reports rejected") {
+		if !strings.Contains(told[0].Body, "calling 2 reports rejected") {
 			t.Errorf("the alert reads %q", told[0].Body)
 		}
 		if told[0].Link != "/products/sonic/inbox?waiting=1" {
@@ -109,6 +109,36 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 				t.Errorf("%s was told %d things about a ruling they may not approve",
 					who.Identity, n)
 			}
+		}
+
+		// A second ruling, withdrawn while it waits, is not raised at all: nobody
+		// can approve it.
+		other, err := store.Record(ctx, proposing, product.ID,
+			finding.Claimed{Summary: "Taken back before anybody agreed."})
+		if err != nil {
+			t.Fatal(err)
+		}
+		taken, err := store.Rule(ctx, proposing, product.ID, finding.Ruled{
+			References: []string{other.Reference}, Disposition: finding.OutOfScope,
+			Reasoning: "Not ours.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.DB.NewUpdate().Model((*finding.ReportRuling)(nil)).
+			Set("proposed_at = ?", time.Now().UTC().Add(-8*24*time.Hour)).
+			Where("id = ?", taken.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.WithdrawRuling(ctx, proposing, product.ID, taken.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := watch.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if told := waitingOn(second); len(told) != 1 {
+			t.Errorf("with one ruling waiting and one withdrawn, the approver was told %d things",
+				len(told))
 		}
 
 		// Approving it clears the condition, with nobody dismissing anything.

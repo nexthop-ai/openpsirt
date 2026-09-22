@@ -3041,7 +3041,7 @@ export interface paths {
          *
          *     `reasoning` is required on everything but a duplicate. `duplicate_of` is required on a duplicate and refused on anything else, and names an issue open in this product. A duplicate of an issue that is not open here is refused: reject the report instead.
          *
-         *     Every report named has to be in this product and unanswered, or nothing is written. The number of reports is bounded by `triage.together-cap`, the setting that bounds every bulk judgment.
+         *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.together-cap`, the setting that bounds every bulk judgment.
          *
          *     Requires: private-triage on the product
          */
@@ -3109,7 +3109,7 @@ export interface paths {
         put?: never;
         /**
          * Withdraw a ruling on reports
-         * @description Takes a ruling back, waiting or in force, and returns every report it covered to the inbox unanswered. Sending a waiting ruling back and undoing one in force are this one act.
+         * @description Takes a ruling back, waiting or in force, and returns every report it covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
          *
          *     Needs nobody else, and the proposer may withdraw their own. The ruling stays on record as withdrawn.
          *
@@ -3258,7 +3258,7 @@ export interface paths {
          *
          *     The issue is one that already exists here. Recording a flaw is its own act, because it carries the builds the flaw ships in, the severity and the embargo — so agreeing that a claim is real is not the same keystroke as declaring where it lives.
          *
-         *     Refused where the report has already been judged, and where another report is already the record of that issue: one report is one issue's record, and a second pointed at the same issue is a duplicate rather than this.
+         *     Refused where the report has already been judged, where a ruling holds it — withdraw a waiting ruling first — and where another report is already the record of that issue: one report is one issue's record, and a second pointed at the same issue is a duplicate rather than this.
          *
          *     An issue this product does not hold, and one you may not be told of, answer alike — otherwise this route says which identifiers are open here.
          *
@@ -10020,7 +10020,7 @@ export interface components {
             approved_by?: string;
             /** @enum {string} */
             disposition: "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
-            /** @description The open issue a duplicate points at */
+            /** @description The issue a duplicate points at */
             duplicate_of?: string;
             /** Format: int64 */
             id: number;
@@ -10028,7 +10028,7 @@ export interface components {
             product: string;
             proposed_at: string;
             proposed_by: string;
-            /** @description Why, as markdown. Never edited, so an approval is of these words */
+            /** @description Why, as markdown. Never edited */
             reasoning?: string;
             /** @description The references of the reports it covers, including after it was withdrawn */
             reports: string[] | null;

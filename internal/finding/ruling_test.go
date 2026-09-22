@@ -2,6 +2,7 @@ package finding_test
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -397,7 +399,9 @@ func TestARulingNamingOneReportItCannotWriteWritesNothing(t *testing.T) {
 		if _, err := f.store.Rule(t.Context(), who, f.productID, finding.Ruled{
 			References: []string{named[0], "SONIC-R-2026-1"}, Disposition: finding.Rejected,
 			Reasoning: "Slop.",
-		}); !errors.Is(err, finding.ErrNoSuchReport) {
+		}); !errors.Is(err, finding.ErrNoSuchReport) ||
+			!strings.Contains(err.Error(), "SONIC-R-2026-1") ||
+			strings.Contains(err.Error(), named[0]) {
 			t.Errorf("a ruling naming a report nobody minted was answered %v", err)
 		}
 
@@ -429,8 +433,9 @@ func TestARulingNamingOneReportItCannotWriteWritesNothing(t *testing.T) {
 		}
 		if _, err := f.store.Rule(t.Context(), who, f.productID, finding.Ruled{
 			References: named, Disposition: finding.Rejected, Reasoning: "Slop.",
-		}); !errors.Is(err, finding.ErrAlreadyJudged) {
-			t.Errorf("a ruling covering an accepted report was answered %v", err)
+		}); !errors.Is(err, finding.ErrAlreadyJudged) ||
+			!strings.HasSuffix(err.Error(), ": "+named[1]) {
+			t.Errorf("a ruling covering an accepted report was answered %v, want it named", err)
 		}
 		if row := f.reportNamed(t, who, named[0]); row.RulingID != nil {
 			t.Errorf("the other report in a refused ruling was written: ruling %d", *row.RulingID)
@@ -493,4 +498,166 @@ func (f *fixture) anIssueHereShipped(t *testing.T, who access.Subject) int64 {
 	t.Helper()
 	f.shipped(t, twoConsumers())
 	return f.anIssueHere(t, who, "The management socket accepts a request nobody authenticated.")
+}
+
+func TestADuplicateOfAnIssueDismissedOrSuppressedEverywhereIsRefused(t *testing.T) {
+	// A dismissal and a suppression leave the row open and close the
+	// question. A new claim pointed at one as a duplicate reaches nobody who
+	// is looking, which is the burying the closed-issue rule stops.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.RecordClaims(ctx, f.target, f.lastScan,
+			[]sbom.Suppression{aClaim("CVE-2026-1", sbom.NotAffected, libnl, sbom.FromStatement)},
+			everyOrigin); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Apply(ctx, f.target, f.run(t), []finding.Reported{
+			found("CVE-2026-1", libnl), found("CVE-2026-2", swss), found("CVE-2026-3", swss),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PrivateTriage)
+		named := f.claims(t, who, 3)
+		duplicate := func(reference, issue string) error {
+			t.Helper()
+			_, err := f.store.Rule(ctx, who, f.productID, finding.Ruled{
+				References: []string{reference}, Disposition: finding.Duplicate,
+				DuplicateOf: f.issueID(t, issue),
+			})
+			return err
+		}
+
+		// Suppressed at both places by what the build said.
+		if err := duplicate(named[0], "CVE-2026-1"); !errors.Is(err, finding.ErrDuplicateOfClosed) {
+			t.Errorf("a duplicate of an issue suppressed everywhere was answered %v", err)
+		}
+
+		// Dismissed at its one place by a decision in force.
+		place := finding.PlaceIdentity(swss.Name, "")
+		dismissed := map[string]any{
+			"claim_id":   claimSaying(t, f.db, who.ID, "not-applicable"),
+			"product_id": f.productID, "vulnerability_id": f.issueID(t, "CVE-2026-2"),
+			"place_identity": place, "visibility": "public", "state": "approved",
+			"needs_approval": true, "proposed_by": who.ID, "proposed_at": time.Now().UTC(),
+			"live_key": "dismissed-key", "component_upstream_version": swss.Version,
+		}
+		if _, err := f.db.DB.NewInsert().Model(&dismissed).TableExpr(`"decision"`).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := duplicate(named[1], "CVE-2026-2"); !errors.Is(err, finding.ErrDuplicateOfClosed) {
+			t.Errorf("a duplicate of an issue dismissed everywhere was answered %v", err)
+		}
+
+		// Deferred is work that comes back, so it is still open.
+		deferred := map[string]any{
+			"claim_id":   claimSaying(t, f.db, who.ID, "deferred"),
+			"product_id": f.productID, "vulnerability_id": f.issueID(t, "CVE-2026-3"),
+			"place_identity": place, "visibility": "public", "state": "approved",
+			"needs_approval": true, "proposed_by": who.ID, "proposed_at": time.Now().UTC(),
+			"live_key": "deferred-key", "component_upstream_version": swss.Version,
+		}
+		if _, err := f.db.DB.NewInsert().Model(&deferred).TableExpr(`"decision"`).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := duplicate(named[2], "CVE-2026-3"); err != nil {
+			t.Errorf("a duplicate of a deferred issue was refused: %v", err)
+		}
+	})
+}
+
+func TestRulingsAcrossProductsReachOnlyTheProductsTheReaderWorksReportsIn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		other, err := catalog.NewStore(f.db.DB).DeclareProduct(ctx, "other", "Other")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// One person working reports in both, who records a ruling in each.
+		both := access.NewPerson(f.planner(t).ID, "them@example.com", false,
+			map[int64][]access.Role{
+				f.productID: {access.PrivateTriage}, other.ID: {access.PrivateTriage},
+			}, 0)
+		rule := func(productID int64) *finding.ReportRuling {
+			t.Helper()
+			row, err := f.store.Record(ctx, both, productID,
+				finding.Claimed{Summary: "Generated text."})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ruling, err := f.store.Rule(ctx, both, productID, finding.Ruled{
+				References: []string{row.Reference}, Disposition: finding.Rejected,
+				Reasoning: "Slop.",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return ruling
+		}
+		here := rule(f.productID)
+		there := rule(other.ID)
+		withdrawn := rule(f.productID)
+		if _, err := f.store.WithdrawRuling(ctx, both, f.productID, withdrawn.ID); err != nil {
+			t.Fatal(err)
+		}
+		if here.Product != "sonic" || there.Product != "other" {
+			t.Errorf("proposed, the rulings name %q and %q", here.Product, there.Product)
+		}
+
+		ids := func(rows []finding.ReportRuling) []int64 {
+			out := make([]int64, 0, len(rows))
+			for _, row := range rows {
+				out = append(out, row.ID)
+			}
+			return out
+		}
+		across := func(who access.Subject, asked finding.RulingsAsked) ([]int64, int) {
+			t.Helper()
+			asked.Limit = 50
+			rows, total, err := f.store.RulingsAcross(ctx, who, asked)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return ids(rows), total
+		}
+
+		// Somebody working reports in one product reads and counts that
+		// product's alone.
+		one := f.somebody(t, "one@example.com", access.PrivateTriage)
+		if got, total := across(one, finding.RulingsAsked{}); total != 2 ||
+			slices.Contains(got, there.ID) {
+			t.Errorf("a reader of one product reads %v of %d", got, total)
+		}
+		// Naming the other product asks for nothing they may read.
+		if got, total := across(one, finding.RulingsAsked{ProductIDs: []int64{other.ID}}); total != 0 {
+			t.Errorf("naming a product they do not work reports in reads %v of %d", got, total)
+		}
+		// Somebody working both reads both, narrowed when they name one.
+		if _, total := across(both, finding.RulingsAsked{}); total != 3 {
+			t.Errorf("a reader of both products counts %d, want 3", total)
+		}
+		if got, _ := across(both, finding.RulingsAsked{ProductIDs: []int64{other.ID}}); len(got) != 1 ||
+			got[0] != there.ID {
+			t.Errorf("narrowed to the other product, it reads %v", got)
+		}
+		// Waiting leaves out the withdrawn one.
+		if got, total := across(both, finding.RulingsAsked{Waiting: true}); total != 2 ||
+			slices.Contains(got, withdrawn.ID) {
+			t.Errorf("waiting reads %v of %d", got, total)
+		}
+		// The period is when it was proposed, the end exclusive.
+		now := time.Now().UTC()
+		later, earlier := now.Add(time.Hour), now.Add(-time.Hour)
+		if _, total := across(both, finding.RulingsAsked{Since: &earlier, Until: &later}); total != 3 {
+			t.Errorf("the hour around now holds %d, want 3", total)
+		}
+		if _, total := across(both, finding.RulingsAsked{Until: &earlier}); total != 0 {
+			t.Errorf("before an hour ago holds %d, want 0", total)
+		}
+		if _, total := across(both, finding.RulingsAsked{Since: &later}); total != 0 {
+			t.Errorf("after an hour from now holds %d, want 0", total)
+		}
+	})
 }

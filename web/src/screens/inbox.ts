@@ -57,6 +57,6 @@ export function ready(ruling: {
   duplicateOf: string;
 }): boolean {
   if (!ruling.disposition) return false;
-  if (ruling.disposition === "duplicate") return ruling.duplicateOf.trim() !== "";
-  return ruling.reasoning.trim() !== "";
+  if (ruling.disposition === "duplicate" && ruling.duplicateOf.trim() === "") return false;
+  return !needsReason(ruling.disposition) || ruling.reasoning.trim() !== "";
 }

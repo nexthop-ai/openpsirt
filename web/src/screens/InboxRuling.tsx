@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   PAGE,
@@ -10,6 +10,7 @@ import {
   useWithdrawRuling,
 } from "../api/intake";
 import { Paged } from "../ui/Paged";
+import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Failed } from "../ui/Failed";
@@ -37,6 +38,9 @@ export function RuleForm({
   const rule = useRule(product);
   const asTyped = { disposition, reasoning, duplicateOf };
   const many = references.length > 1;
+  // The server refuses a ruling past what one act may write, so the button is
+  // held back and the reason said rather than met as a refusal.
+  const { cap, over } = useBulkCap(references.length);
 
   return (
     <div>
@@ -92,7 +96,7 @@ export function RuleForm({
         <button
           type="button"
           className="btn"
-          disabled={!ready(asTyped) || rule.isPending}
+          disabled={!ready(asTyped) || over || rule.isPending}
           onClick={() =>
             disposition &&
             rule.mutate(
@@ -117,6 +121,11 @@ export function RuleForm({
           {many ? ` for ${references.length}` : ""}
         </button>
       </div>
+      {over && (
+        <p className="alert" role="status">
+          {overCapNotice(cap)}
+        </p>
+      )}
       {rule.error != null && <Failed error={rule.error} what="Nothing was ruled." />}
     </div>
   );
@@ -229,6 +238,7 @@ export function WaitingRulings({ product }: { product?: string }) {
     products: product ? [product] : [],
     offset,
   });
+  useBackOff(listed.data?.items?.length, offset, setOffset);
   if (listed.isError) {
     return (
       <div style={{ marginTop: 22 }}>
@@ -237,8 +247,8 @@ export function WaitingRulings({ product }: { product?: string }) {
     );
   }
   const rows = listed.data?.items ?? [];
-  if (rows.length === 0) return null;
   const total = listed.data?.total ?? rows.length;
+  if (total === 0) return null;
   return (
     <>
       <div className="screen-head" id="rulings" style={{ marginTop: 22 }}>
@@ -253,4 +263,17 @@ export function WaitingRulings({ product }: { product?: string }) {
       <Paged shown={rows.length} total={total} offset={offset} limit={PAGE} onGo={setOffset} />
     </>
   );
+}
+
+// useBackOff steps a paged list back a page when the page it is on has
+// emptied under it — approving or withdrawing the last row on a later page —
+// so a list with rows still in it never reads as empty.
+export function useBackOff(
+  shown: number | undefined,
+  offset: number,
+  setOffset: (offset: number) => void,
+) {
+  useEffect(() => {
+    if (shown === 0 && offset > 0) setOffset(Math.max(0, offset - PAGE));
+  }, [shown, offset, setOffset]);
 }

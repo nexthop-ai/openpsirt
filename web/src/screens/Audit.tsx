@@ -15,7 +15,7 @@ import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
 import { coveringPeriod, stated } from "./reports/Window";
 import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
-import { RulingCard } from "./InboxRuling";
+import { RulingCard, useBackOff } from "./InboxRuling";
 
 // The share of the record one page holds. The server's own ceiling is five
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -344,7 +344,9 @@ export function Audit() {
         </>
       )}
 
-      <Ruled />
+      {/* Keyed on what narrows it, so a narrowed period starts on its
+          first page rather than on a page it no longer has. */}
+      <Ruled key={[...products, from, to].join("|")} />
       <Administered />
     </>
   );
@@ -363,6 +365,7 @@ function Ruled() {
   const to = params.get("to") ?? "";
   const [offset, setOffset] = useState(0);
   const ruled = useRulingsAcross({ products, from, to, offset });
+  useBackOff(ruled.data?.items?.length, offset, setOffset);
   if (ruled.isError) {
     return (
       <div style={{ marginTop: 24 }}>
@@ -372,8 +375,8 @@ function Ruled() {
     );
   }
   const rows = ruled.data?.items ?? [];
-  if (rows.length === 0) return null;
   const total = ruled.data?.total ?? rows.length;
+  if (total === 0) return null;
   return (
     <div style={{ marginTop: 24 }} id="rulings">
       <div className="screen-head">

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -18,8 +19,8 @@ type RulingBody struct {
 	ID          int64    `json:"id"`
 	Product     string   `json:"product" doc:"The product it was made in"`
 	Disposition string   `json:"disposition" enum:"duplicate,not-reproducible,out-of-scope,rejected"`
-	Reasoning   string   `json:"reasoning,omitempty" doc:"Why, as markdown. Never edited, so an approval is of these words"`
-	DuplicateOf string   `json:"duplicate_of,omitempty" doc:"The open issue a duplicate points at"`
+	Reasoning   string   `json:"reasoning,omitempty" doc:"Why, as markdown. Never edited"`
+	DuplicateOf string   `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
 	Reports     []string `json:"reports" doc:"The references of the reports it covers, including after it was withdrawn"`
 	State       string   `json:"state" enum:"waiting,in-force,withdrawn" doc:"Waiting for a second person, what its reports currently are, or taken back"`
 	ProposedBy  string   `json:"proposed_by"`
@@ -59,7 +60,8 @@ func registerRulings(api huma.API, in Ingest) {
 			"on a duplicate and refused on anything else, and names an issue open in this " +
 			"product. A duplicate of an issue that is not open here is refused: reject the " +
 			"report instead.\n\n" +
-			"Every report named has to be in this product and unanswered, or nothing is " +
+			"Every report named has to be in this product, not accepted as an issue, and " +
+			"under no ruling, or nothing is " +
 			"written. The number of reports is bounded by `triage.together-cap`, the setting " +
 			"that bounds every bulk judgment.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
@@ -229,7 +231,7 @@ func registerRulings(api huma.API, in Ingest) {
 		OperationID: "withdraw-report-ruling", Method: http.MethodPost, Path: one + "/withdrawal",
 		Summary: "Withdraw a ruling on reports",
 		Description: "Takes a ruling back, waiting or in force, and returns every report it " +
-			"covered to the inbox unanswered. Sending a waiting ruling back and undoing one in " +
+			"covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in " +
 			"force are this one act.\n\n" +
 			"Needs nobody else, and the proposer may withdraw their own. The ruling stays on " +
 			"record as withdrawn.",
@@ -372,9 +374,14 @@ func rulingState(row finding.ReportRuling) string {
 // caller sees.
 func refusedRuling(in Ingest, err error, what string) error {
 	var faults markdown.Faults
+	var missing *finding.NotHere
 	switch {
 	case errors.Is(err, finding.ErrNoSuchRuling):
 		return huma.Error404NotFound(finding.ErrNoSuchRuling.Error())
+	case errors.As(err, &missing):
+		// Names what was not found, which the caller sent.
+		return huma.Error404NotFound(finding.ErrNoSuchReport.Error() + ": " +
+			strings.Join(missing.References, ", "))
 	case errors.Is(err, finding.ErrNoSuchReport):
 		return huma.Error404NotFound(finding.ErrNoSuchReport.Error())
 	case errors.Is(err, finding.ErrNoSuchIssueHere):
