@@ -631,7 +631,7 @@ A product may record that it was exploited through an issue.
 | Rule | |
 |---|---|
 | A claim that the issue does not apply is refused while a record stands | The two say opposite things about one product, and the one that arrived from a person who watched it happen is not the one to give way |
-| A bulk act that sets the issue aside or puts it off is refused while a record stands | A standing record is an obligation somebody may be answering to, and one sentence over a selection is not how that leaves anybody's list. Every outcome that hides a finding without promising work counts: not applicable, a wrong match, a deferral, won't fix, already fixed |
+| A bulk act that sets the issue aside or puts it off is refused while a record stands | A standing record is an obligation somebody may be answering to, and one sentence over a selection is not how that leaves anybody's list. Every outcome that hides a finding without promising work counts: not applicable, a wrong match, a deferral, a decision not to fix, already fixed |
 | A bulk act saying the issues apply, or promising work, is not refused | Neither sets anything aside, and the next scan checks every row a promise names |
 | Rows set aside from a bulk act are still a bulk act | Setting rows aside makes a claim of its own, followed back to where it began. Otherwise the rule ends one step from where it started |
 | An approver may set the attacked issue aside and agree to the rest | The refusal is asked of the rows being agreed to. One attacked issue does not make a selection of hundreds unanswerable, and what is set aside meets the rule again with its author |
