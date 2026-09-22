@@ -40,6 +40,7 @@ before anything may target them.
 | Place | A component and what directly pulled it in |
 | Finding | One component at one place in one build. Twelve places is twelve findings (REQ-17) |
 | Group | One issue at one component across every place it sits at. The row the findings list returns, and the thing somebody decides about |
+| Report | A claim somebody sent us, and the record that it arrived. It exists before anybody has judged it, and it points at an issue only once somebody has (`DESIGN-findings.md` § Reports) |
 
 Each word names one thing, and the unit a scan is filed against is called a
 build wherever it is named. The finding-versus-group distinction is the

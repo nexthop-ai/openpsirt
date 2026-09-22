@@ -2920,6 +2920,156 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what was reported
+         * @description Every claim recorded against this product, newest first, judged or not.
+         *
+         *     A report already turned into an issue stays in the list, because it is the evidence that the issue came from outside.
+         *
+         *     Requires: private-triage on the product
+         */
+        get: operations["list-reports"];
+        put?: never;
+        /**
+         * Record a report
+         * @description Records a claim that arrived, and returns the reference it is reached by.
+         *
+         *     No issue is minted. What arrived is a claim, and whether it is a flaw is a judgment somebody makes afterwards — so a report nobody believes is answered and filed rather than either minting a flaw nobody believes or going unrecorded.
+         *
+         *     `summary` is required and everything else is optional: a claim arriving anonymously is an ordinary claim, and a report with nothing in it records only that a mail arrived. The summary is stored as markdown and goes through the same submission policy a justification does, so raw HTML and link schemes outside http, https and mailto are refused naming the line they are on.
+         *
+         *     `received` is the day it arrived, which is what an embargo would be counted from. A date that cannot be read is treated as one nobody gave.
+         *
+         *     Requires: private-triage on the product
+         */
+        post: operations["record-report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show a report
+         * @description What was claimed, who claimed it, when it arrived, when somebody answered them, and what it turned out to be.
+         *
+         *     A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
+         *
+         *     Requires: private-triage on the product
+         */
+        get: operations["get-recorded-report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}/acknowledgement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that a reporter was answered
+         * @description Records that somebody replied to whoever sent this, and when.
+         *
+         *     It records that it happened rather than doing it. What reaches a researcher is a mail somebody sends from an address they already have; recording it is what turns "somebody probably replied" into a date the timeline can be evidenced from, and what clears the condition an unanswered report opens.
+         *
+         *     Acknowledging twice keeps the first date: when somebody was answered is a fact about the past, and the second person to press it did not change it.
+         *
+         *     Requires: private-triage on the product
+         */
+        post: operations["acknowledge-recorded-report"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List files that arrived with a report
+         * @description What arrived with this report, and what text about it refers to. An upload nothing refers to yet is not listed, because it is not attached to anything.
+         *
+         *     A file an administrator removed is still listed, saying so, because the text that pointed at it still does.
+         *
+         *     Requires: private-triage on the product
+         */
+        get: operations["list-report-attachments"];
+        put?: never;
+        /**
+         * Attach a file to a report
+         * @description Stores one file against a report and returns the reference to put in text. A claim that has not been judged has no issue to hang a screenshot on, and the screenshot is often the whole of what was sent.
+         *
+         *     The file stays with the report once the report gains an issue, and stays as readable as the report: saying a claim is a disclosed issue does not publish what somebody sent with it. Attach it to the issue to put it there.
+         *
+         *     The content type is decided here from the bytes and is never the one that was uploaded. Everything outside a small allowlist of raster images is served as an attachment download whatever it is.
+         *
+         *     Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings.
+         *
+         *     Requires: private-triage on the product
+         */
+        post: operations["upload-report-attachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/reports/{reference}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Record what a report turned out to be
+         * @description Points a report at the issue it turned out to be, and records who said so and when.
+         *
+         *     The issue is one that already exists here. Recording a flaw is its own act, because it carries the builds the flaw ships in, the severity and the embargo — so agreeing that a claim is real is not the same keystroke as declaring where it lives.
+         *
+         *     Refused where the report has already been judged, and where another report is already the record of that issue: one report is one issue's record, and a second pointed at the same issue is a duplicate rather than this.
+         *
+         *     An issue this product does not hold, and one you may not be told of, answer alike — otherwise this route says which identifiers are open here.
+         *
+         *     Requires: private-triage on the product
+         */
+        put: operations["judge-report"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/routing-rules": {
         parameters: {
             query?: never;
@@ -6013,6 +6163,22 @@ export interface components {
             /** @description The moment it became that. Absent while it is waiting: nothing has happened to it */
             when?: string;
         };
+        ClaimedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ClaimedBody.json
+             */
+            readonly $schema?: string;
+            contact?: string;
+            /** @description The credit they asked for in an advisory */
+            credit?: string;
+            /** @description The day it arrived, as YYYY-MM-DD, which the embargo is counted from */
+            received?: string;
+            reported_by?: string;
+            /** @description What was claimed, in the words it was claimed in */
+            summary: string;
+        };
         "Clear-exploited-hereRequest": {
             /**
              * Format: uri
@@ -7590,6 +7756,15 @@ export interface components {
             readonly $schema?: string;
             items: components["schemas"]["ObligationBody"][] | null;
         };
+        "List-report-attachmentsResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-report-attachmentsResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AttachmentBody"][] | null;
+        };
         "List-set-aside-workResponse": {
             /**
              * Format: uri
@@ -7907,6 +8082,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["RepeatBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyReportBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyReportBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ReportBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -9277,10 +9463,33 @@ export interface components {
             contact?: string;
             /** @description The credit they asked for in an advisory */
             credit?: string;
+            /** @description When somebody said what it turned out to be */
+            evaluated?: string;
+            /** @description Who said so */
+            evaluated_by?: string;
+            /** @description The issue the claim turned out to be */
+            issue?: string;
             /** @description The day it arrived, which the embargo is counted from */
             received?: string;
+            /** @description When it was written down, which is not when it arrived */
+            recorded_at: string;
+            /** @description Who wrote it down */
             recorded_by: string;
+            /** @description The name this report is reached by */
+            reference: string;
             reported_by?: string;
+            /** @description What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it */
+            summary?: string;
+        };
+        ReportIssueBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ReportIssueBody.json
+             */
+            readonly $schema?: string;
+            /** @description The issue it turned out to be, under any identifier it goes by */
+            vulnerability: string;
         };
         "Repromise-upgradeRequest": {
             /**
@@ -15219,6 +15428,245 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListBodyReleaseBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-reports": {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "record-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimedBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-recorded-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The reference this deployment minted */
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "acknowledge-recorded-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-report-attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-report-attachmentsResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "upload-report-attachment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "judge-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                reference: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportIssueBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportBody"];
                 };
             };
             /** @description Error */

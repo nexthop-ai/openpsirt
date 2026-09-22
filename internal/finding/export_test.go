@@ -26,3 +26,12 @@ func WordAt(rank int) string { return wordAt(rank) }
 // agree. It says nothing about which of the two signals is on — the number
 // cannot, which is why the columns beside it exist.
 func Exploiting(urgency int64) bool { return urgency >= exploiting }
+
+// JudgingAfter puts fn between a judgment reading the report and writing to
+// it, for the test.
+//
+// Exported for the test alone: the condition on the write exists for two
+// people judging one claim at the same moment, and the read above it answers
+// every input a single caller can produce — so without a way into that window
+// the condition can be deleted with the suite green.
+func (s *Store) JudgingAfter(fn func()) { s.afterReadingReport = fn }

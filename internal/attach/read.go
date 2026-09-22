@@ -35,7 +35,7 @@ func (s *Store) Find(ctx context.Context, subject access.Subject, token string) 
 	if err != nil {
 		return nil, fmt.Errorf("read an attachment: %w", err)
 	}
-	if err := mayReach(ctx, s.db, subject, row.ProductID, row.VulnerabilityID); err != nil {
+	if err := mayHold(ctx, s.db, subject, row); err != nil {
 		if errors.Is(err, access.ErrDenied) {
 			// The same words as a token nobody minted, and deliberately
 			// not the ones mayReach produces: those name the product, which a
@@ -47,6 +47,25 @@ func (s *Store) Find(ctx context.Context, subject access.Subject, token string) 
 		return nil, err
 	}
 	return row, nil
+}
+
+// mayHold asks the reach question of whichever thing this file hangs off.
+//
+// A row naming neither is refused rather than read. Nothing writes one — the
+// upload path refuses it — and a file nothing can answer "who may read this"
+// about is one nobody may read, which is the safe direction for a row that
+// should not exist.
+func mayHold(ctx context.Context, db bun.IDB, subject access.Subject,
+	row *Attachment) error {
+
+	switch {
+	case row.VulnerabilityID != nil:
+		return mayReach(ctx, db, subject, row.ProductID, *row.VulnerabilityID)
+	case row.FlawReportID != nil:
+		return mayReachReport(ctx, db, subject, row.ProductID, *row.FlawReportID)
+	default:
+		return access.Denied("reach an attachment")
+	}
 }
 
 // Fetch says how one attachment should be served.
@@ -103,6 +122,31 @@ func (s *Store) ForIssue(ctx context.Context, subject access.Subject,
 		Order("uploaded_at DESC", "id DESC").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what hangs off an issue: %w", err)
+	}
+	return rows, nil
+}
+
+// ForReport is what arrived with one report, newest first.
+//
+// It stays with the report once the report gains an issue. What was sent is a
+// fact about the report, and moving it to the issue would lose which of two
+// reports the screenshot came in.
+func (s *Store) ForReport(ctx context.Context, subject access.Subject,
+	productID, reportID int64) ([]Attachment, error) {
+
+	if !s.Configured() {
+		return nil, nil
+	}
+	if err := mayReachReport(ctx, s.db, subject, productID, reportID); err != nil {
+		return nil, err
+	}
+	var rows []Attachment
+	if err := s.db.NewSelect().Model(&rows).
+		Where("flaw_report_id = ?", reportID).
+		Where("attached_at IS NOT NULL").
+		Order("uploaded_at DESC", "id DESC").
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read what arrived with a report: %w", err)
 	}
 	return rows, nil
 }

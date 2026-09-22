@@ -1,7 +1,7 @@
 # Attachments
 
-Files hanging off a finding: storage, references, authorization, limits,
-redaction and the reaper.
+Files hanging off an issue or a report: storage, references, authorization,
+limits, redaction and the reaper.
 
 Satisfies REQ-70.
 
@@ -34,11 +34,21 @@ This is the one scheme added to what a link may use beside `http`, `https` and
 
 ## Attachment subjects
 
-An attachment hangs off the issue in the product — the unit a decision, an
-embargo and a comment already use. Not the finding row: text is written against
-a decision, a decision covers every place an issue sits at, and binding a file to
-one of forty-eight rows would make it unreachable the day that row closed while
-its siblings stayed open.
+A file hangs off the product, and off one of two things in it: an issue, or a
+report nobody has judged. Exactly one, and a file naming both or neither is
+refused at upload.
+
+An issue in the product is the unit a decision, an embargo and a comment
+already use. Not the finding row: text is written against a decision, a
+decision covers every place an issue sits at, and binding a file to one of
+forty-eight rows would make it unreachable the day that row closed while its
+siblings stayed open.
+
+A report is the other thing a file arrives with. A claim that has not been
+judged has no issue to hang a screenshot on, and the screenshot is often the
+whole of what was sent. The file stays with the report once the report gains
+an issue, because what was sent is a fact about the report — moved to the
+issue, it would no longer say which of two reports it came in.
 
 Visibility is the issue's and is never stored on the attachment. A visibility
 stored at upload freezes it, and an embargo ends: the file documenting one
@@ -48,12 +58,15 @@ becomes readable along with the words describing it.
 |---|---|
 | Attached to text | The ordinary case. A file attached while composing is bound to the issue alone until that text is saved |
 | Attached to the issue | Evidence for a recorded flaw. Attached the moment it arrives. The caller requests this; it is not the default |
+| Attached to the report | What arrived with a claim. Attached the moment it arrives, and it stays on the report when the claim is judged |
 | Attached to nothing | Collected by the reaper |
 
 ## Fetch authorization
 
-Every fetch is authorized against the visibility of the issue the attachment
-hangs off, before anything is served, in this order:
+Every fetch is authorized against the visibility of the thing the attachment
+hangs off, before anything is served.
+
+For a file on an issue, in this order:
 
 1. Is the issue in this product at all?
 2. Is it disclosed, or may this reader see undisclosed work here?
@@ -63,6 +76,20 @@ Asking only the second collapses "no undisclosed findings in this product" and
 "no findings in this product at all" into one answer, so an issue filed against
 another product reads as public here. Any reader of any product could then
 confirm whether a name exists anywhere in the deployment, one request at a time.
+
+For a file on a report, the report's own answer, which `DESIGN-findings.md`
+§ Report visibility holds: the right to triage work nobody has announced in
+that product, whether or not the claim has been judged. The record and what
+arrived with it have one answer rather than two.
+
+A file on a report does not follow the issue the claim turned out to be. What
+a stranger sent is reviewed by nobody, so judging the claim to be a disclosed
+issue must not publish it; anything meant to be read there is attached to the
+issue instead.
+
+Reaching a file on a report and attaching one to it are the same right.
+Reaching a claim already asks for a role that writes, so there is nothing
+narrower for a writer to be refused by.
 
 A file the reader may not see and a file that does not exist answer identically,
 in the same words (REQ-42).

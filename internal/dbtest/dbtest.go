@@ -673,7 +673,8 @@ func Tables() []string { return slices.Clone(tables) }
 // that enforce foreign keys during a bulk delete — which is not all of them,
 // so it will look engine-specific rather than like the ordering mistake it is.
 var tables = []string{
-	// Before person, product and vulnerability, all of which it points at.
+	// Before person, product, vulnerability and flaw_report, all of which it
+	// points at.
 	"attachment",
 	// Points at nothing, so its position says nothing.
 	"lease",

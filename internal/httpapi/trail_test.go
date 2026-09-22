@@ -506,13 +506,17 @@ var outsideTheTrail = map[string]string{
 
 	// Recorded on the thing it changed, with who and when. A second row in
 	// the trail would be a copy that can disagree with it.
-	"acknowledge-report":         "recorded on the report, which names who answered it and when",
-	"withdraw-advisory-approval": "recorded on the agreement, which names who took it back and when",
-	"redact-attachment":          "recorded on the attachment",
-	"upload-attachment":          "recorded on the attachment, which names who uploaded it",
-	"upload-scan":                "recorded as the scan's provenance",
-	"record-vex-issued":          "recorded as the issuance, which names who published it and when",
-	"record-told-outside":        "recorded as the notice, which names who recorded it and when",
+	"acknowledge-report":          "recorded on the report, which names who answered it and when",
+	"acknowledge-recorded-report": "recorded on the report, which names who answered it and when",
+	"record-report":               "recorded on the report, which names who wrote it down and when",
+	"judge-report":                "recorded on the report, which names who judged it and when",
+	"upload-report-attachment":    "recorded on the attachment, which names who uploaded it",
+	"withdraw-advisory-approval":  "recorded on the agreement, which names who took it back and when",
+	"redact-attachment":           "recorded on the attachment",
+	"upload-attachment":           "recorded on the attachment, which names who uploaded it",
+	"upload-scan":                 "recorded as the scan's provenance",
+	"record-vex-issued":           "recorded as the issuance, which names who published it and when",
+	"record-told-outside":         "recorded as the notice, which names who recorded it and when",
 
 	// One person's own, and nothing anybody else reads changes.
 	"acknowledge-all-notifications": "their own notifications",
