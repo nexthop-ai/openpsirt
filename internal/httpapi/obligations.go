@@ -62,6 +62,16 @@ type ObligationBody struct {
 	Windows     []DueBody `json:"windows" doc:"Every window in force, shortest first, as it runs from when the attack became known"`
 }
 
+// ObligationsBody is every standing attack a reader may be told of.
+type ObligationsBody struct {
+	Items []ObligationBody `json:"items"`
+}
+
+// WindowsBody is every window in force.
+type WindowsBody struct {
+	Items []WindowBody `json:"items"`
+}
+
 func registerObligations(api huma.API, in Ingest) {
 	huma.Register(api, answering(huma.Operation{
 		OperationID: "list-obligations", Method: http.MethodGet, Path: "/v1/obligations",
@@ -75,11 +85,7 @@ func registerObligations(api huma.API, in Ingest) {
 			"Unpaged. A record you may not be told of is left out and counted nowhere.",
 		Tags: []string{"Obligations"},
 	}, perProduct, "A product you may not read contributes nothing, not even a count.",
-		readRights()...), func(ctx context.Context, _ *struct{}) (*struct {
-		Body struct {
-			Items []ObligationBody `json:"items"`
-		}
-	}, error) {
+		readRights()...), func(ctx context.Context, _ *struct{}) (*struct{ Body ObligationsBody }, error) {
 		subject, err := reading(ctx)
 		if err != nil {
 			return nil, err
@@ -106,11 +112,7 @@ func registerObligations(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the windows could not be read", err)
 		}
-		out := &struct {
-			Body struct {
-				Items []ObligationBody `json:"items"`
-			}
-		}{}
+		out := &struct{ Body ObligationsBody }{}
 		out.Body.Items = make([]ObligationBody, 0, len(shelf))
 		for _, entry := range shelf {
 			body := ObligationBody{
@@ -140,11 +142,7 @@ func registerObligations(api huma.API, in Ingest) {
 			"attack on a product became known. None ships: a deployment declares the windows " +
 			"it answers to.",
 		Tags: []string{"Obligations"},
-	}, anyPerson, ""), func(ctx context.Context, _ *struct{}) (*struct {
-		Body struct {
-			Items []WindowBody `json:"items"`
-		}
-	}, error) {
+	}, anyPerson, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body WindowsBody }, error) {
 		if _, err := reading(ctx); err != nil {
 			return nil, err
 		}
@@ -155,11 +153,7 @@ func registerObligations(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the windows could not be read", err)
 		}
-		out := &struct {
-			Body struct {
-				Items []WindowBody `json:"items"`
-			}
-		}{}
+		out := &struct{ Body WindowsBody }{}
 		out.Body.Items = make([]WindowBody, 0, len(windows))
 		for _, window := range windows {
 			out.Body.Items = append(out.Body.Items, windowBody(window))

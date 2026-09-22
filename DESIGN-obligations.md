@@ -170,6 +170,7 @@ against a recorded attack holds the rules.
 | No bulk dismissal and no bulk deferral | A bulk act that sets an attacked issue aside or puts it off is refused, and one already standing when the record arrives goes back to the queue |
 | No vanishing under a triage floor | The record puts its findings in a band above everything a feed can say, and the line admits either exploitation signal. `DESIGN-findings.md` § Urgency |
 | No bulk clearing | A record is cleared one at a time, with a reason and a name |
+| The list a bulk judgment is picked from marks an attacked issue | A selection reaching one is refused whole, so the list says which issue that is before anything is sent |
 
 ## Limits
 

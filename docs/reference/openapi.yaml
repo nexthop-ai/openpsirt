@@ -593,6 +593,9 @@ components:
         exploited:
           description: Somebody is known to be exploiting this
           type: boolean
+        exploited_here:
+          description: This product records being exploited through it. A judgment over several issues that sets this one aside or puts it off is refused
+          type: boolean
         fixed_in:
           description: The version the report says fixes it, where it names one
           type: string
@@ -4384,44 +4387,6 @@ components:
         - findings
         - cap
       type: object
-    List-obligation-windowsResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-obligation-windowsResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/WindowBody"
-          type:
-            - array
-            - "null"
-      required:
-        - items
-      type: object
-    List-obligationsResponse:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/List-obligationsResponse.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/ObligationBody"
-          type:
-            - array
-            - "null"
-      required:
-        - items
-      type: object
     List-report-attachmentsResponse:
       additionalProperties: false
       properties:
@@ -5940,6 +5905,25 @@ components:
         - known_at
         - grounds
         - standing
+      type: object
+    ObligationsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ObligationsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/ObligationBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
       type: object
     OursOutputBody:
       additionalProperties: false
@@ -9653,6 +9637,25 @@ components:
       required:
         - name
         - hours
+      type: object
+    WindowsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/WindowsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/WindowBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
       type: object
     Withdraw-estate-roleResponse:
       additionalProperties: false
@@ -13792,7 +13795,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-obligation-windowsResponse"
+                $ref: "#/components/schemas/WindowsBody"
           description: OK
         default:
           content:
@@ -13916,7 +13919,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/List-obligationsResponse"
+                $ref: "#/components/schemas/ObligationsBody"
           description: OK
         default:
           content:

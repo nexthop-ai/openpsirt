@@ -67,6 +67,10 @@ type Deciding struct {
 	Summary       string
 	Exploited     bool
 	LikelihoodPPM int
+	// ExploitedHere is this product's own standing record of being attacked
+	// through the issue. A bulk act that sets such an issue aside is refused,
+	// so the screen building one says which they are before it is sent.
+	ExploitedHere bool
 	// Consumer is what pulls the component in here, for naming the place to
 	// somebody choosing which of them a judgment covers. Empty where that is
 	// the product itself.

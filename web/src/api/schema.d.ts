@@ -5613,6 +5613,8 @@ export interface components {
             due?: string;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
+            /** @description This product records being exploited through it. A judgment over several issues that sets this one aside or puts it off is refused */
+            exploited_here?: boolean;
             /** @description The version the report says fixes it, where it names one */
             fixed_in?: string;
             /**
@@ -7738,24 +7740,6 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
-        "List-obligation-windowsResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-obligation-windowsResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["WindowBody"][] | null;
-        };
-        "List-obligationsResponse": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/List-obligationsResponse.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["ObligationBody"][] | null;
-        };
         "List-report-attachmentsResponse": {
             /**
              * Format: uri
@@ -8553,6 +8537,15 @@ export interface components {
             vulnerability?: string;
             /** @description Every window in force, shortest first, as it runs from when the attack became known */
             windows: components["schemas"]["DueBody"][] | null;
+        };
+        ObligationsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ObligationsBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ObligationBody"][] | null;
         };
         OursOutputBody: {
             /**
@@ -10746,6 +10739,15 @@ export interface components {
             hours: number;
             /** @description What the window is called here. Unique among the windows in force, without regard to capitals */
             name: string;
+        };
+        WindowsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WindowsBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["WindowBody"][] | null;
         };
         "Withdraw-estate-roleResponse": {
             /**
@@ -13152,7 +13154,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-obligation-windowsResponse"];
+                    "application/json": components["schemas"]["WindowsBody"];
                 };
             };
             /** @description Error */
@@ -13278,7 +13280,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["List-obligationsResponse"];
+                    "application/json": components["schemas"]["ObligationsBody"];
                 };
             };
             /** @description Error */

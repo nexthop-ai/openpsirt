@@ -11,7 +11,7 @@ import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Crumbs } from "../ui/Crumbs";
-import { Severity, Exploited } from "../ui/Severity";
+import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { JUSTIFICATIONS, reasonOffered, reasonsFor, type Justification } from "../ui/Outcome";
@@ -319,6 +319,7 @@ export function Together() {
                           <Link to={`/issues/${encodeURIComponent(name)}`} className="id">
                             {name}
                           </Link>{" "}
+                          <ExploitedHere when={issue.exploited_here} />{" "}
                           <Exploited when={issue.exploited} />
                           {/* What the issue says about itself. The screen
                               narrows on this text and showed none of it, so a

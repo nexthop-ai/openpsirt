@@ -3,6 +3,7 @@ package obligation_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -306,6 +307,159 @@ func TestAClearedRecordLeavesTheShelf(t *testing.T) {
 		}
 		if len(shelf) != 0 {
 			t.Errorf("a cleared record is still on the shelf: %+v", shelf)
+		}
+	})
+}
+
+func TestChangingAWindowMovesEveryIncidentsEnd(t *testing.T) {
+	// An end is worked out from the window as it stands, so changing the
+	// window is what moves it; nothing stored holds the old end.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		early := f.window(t, "Early warning", 24)
+		f.attacked(t)
+
+		changed, err := f.store.ChangeWindow(ctx, f.admin, early.ID, "Early notice", 36)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if changed.Name != "Early notice" || changed.Hours != 36 {
+			t.Errorf("the window reads as %+v after changing it", changed)
+		}
+		shelf, err := f.store.Shelf(ctx, f.triager)
+		if err != nil {
+			t.Fatal(err)
+		}
+		due := shelf[0].Windows[0]
+		if want := knownAt.Add(36 * time.Hour); !due.EndsAt.Equal(want) {
+			t.Errorf("after changing the window it ends %s, want %s", due.EndsAt, want)
+		}
+	})
+}
+
+func TestAWindowIsChangedOnlyByAnAdministratorIntoANameNobodyHolds(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		early := f.window(t, "Early warning", 24)
+		f.window(t, "Notification", 72)
+
+		if _, err := f.store.ChangeWindow(ctx, f.triager, early.ID, "Early", 24); !errors.Is(err,
+			access.ErrDenied) {
+			t.Errorf("a triager changing a window answered %v", err)
+		}
+		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, "NOTIFICATION", 24); !errors.Is(err,
+			obligation.ErrWindowNamed) {
+			t.Errorf("renaming onto a window in force answered %v", err)
+		}
+		// Its own name, in other capitals, is not somebody else's.
+		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, "early warning", 30); err != nil {
+			t.Errorf("changing a window's length under its own name answered %v", err)
+		}
+		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, "Early", 0); err == nil {
+			t.Error("a window was changed to run for no time at all")
+		}
+	})
+}
+
+func TestARetiredWindowIsNeitherChangedNorAnswered(t *testing.T) {
+	// Nobody counts it any more, so there is nothing to change and nothing a
+	// new notice can answer. Notices already naming it keep naming it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		early := f.window(t, "Early warning", 24)
+		record := f.attacked(t)
+		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &early.ID, "ENISA",
+			knownAt.Add(time.Hour), "An attack."); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.RetireWindow(ctx, f.admin, early.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := f.store.ChangeWindow(ctx, f.admin, early.ID, "Early", 24); !errors.Is(err,
+			obligation.ErrNoSuchWindow) {
+			t.Errorf("changing a retired window answered %v", err)
+		}
+		if err := f.store.RetireWindow(ctx, f.admin, early.ID); !errors.Is(err,
+			obligation.ErrNoSuchWindow) {
+			t.Errorf("retiring a window twice answered %v", err)
+		}
+		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, &early.ID, "ENISA",
+			knownAt.Add(2*time.Hour), "More."); !errors.Is(err, obligation.ErrNoSuchWindow) {
+			t.Errorf("a notice naming a retired window answered %v", err)
+		}
+
+		told, err := f.store.ToldAbout(ctx, []int64{record.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		named, err := f.store.WindowsNamed(ctx, told)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if named[early.ID] != "Early warning" {
+			t.Errorf("a notice lost the name of the window it answered: %v", named)
+		}
+	})
+}
+
+func TestANoticeSaysWhoWhenAndWhat(t *testing.T) {
+	// Each part is refused on its own, because a notice missing any of them
+	// is one nobody can answer for later.
+	each(t, func(t *testing.T, f *fixture) {
+		record := f.attacked(t)
+		when := knownAt.Add(time.Hour)
+		for _, tc := range []struct {
+			name, recipient, said string
+			at                    time.Time
+		}{
+			{"nobody named", "  ", "An attack.", when},
+			{"a recipient longer than a name", strings.Repeat("x", obligation.RecipientLimit+1),
+				"An attack.", when},
+			{"nothing said", "ENISA", "  ", when},
+			{"no moment", "ENISA", "An attack.", time.Time{}},
+		} {
+			if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil,
+				tc.recipient, tc.at, tc.said); err == nil {
+				t.Errorf("a notice with %s was recorded", tc.name)
+			}
+		}
+	})
+}
+
+func TestANoticeAboutAnUndisclosedIssueIsRefusedToWhoMayNotReadIt(t *testing.T) {
+	// Triage on the product is not enough where the issue is undisclosed:
+	// the record is answered as one that is not there.
+	each(t, func(t *testing.T, f *fixture) {
+		record := f.attacked(t)
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"finding"`).
+			Set("visibility = ?", access.Private).Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		_, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil, "ENISA",
+			knownAt.Add(time.Hour), "An attack.")
+		if !errors.Is(err, obligation.ErrNoSuchRecord) {
+			t.Fatalf("a public triager recording a notice of an undisclosed attack answered %v", err)
+		}
+	})
+}
+
+func TestAWindowNeedsANameThatFits(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		for _, name := range []string{"  ", strings.Repeat("x", database.NameWidth+1)} {
+			if _, err := f.store.DeclareWindow(t.Context(), f.admin, name, 24); err == nil {
+				t.Errorf("a window named %.20q was declared", name)
+			}
+		}
+	})
+}
+
+func TestAWindowIsRetiredOnlyByAnAdministrator(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		early := f.window(t, "Early warning", 24)
+		if err := f.store.RetireWindow(t.Context(), f.triager, early.ID); !errors.Is(err,
+			access.ErrDenied) {
+			t.Errorf("a triager retiring a window answered %v", err)
 		}
 	})
 }
