@@ -426,8 +426,15 @@ a comparison in time.
 
 The names a scan opened or closed a row of are the whole of what it can have
 moved, and narrowing to them is speed rather than meaning: a name none of them
-touched stands at the same versions on both sides, which is classified as
-nothing.
+touched stands at the same versions on both sides, or on neither side where it
+reached the build later, and both are counted as no change.
+
+Rows that stood on neither side of any scan being compared are dropped before
+the comparison, which is what keeps the cost proportional to the page rather
+than to the history behind it. Over a year of nightly scans a page of fifty
+uploads takes 73 ms on SQLite behind 73 nights and 102 ms behind 365, 51 to
+62 ms on PostgreSQL, 38 to 50 ms on MySQL and 107 to 200 ms on MariaDB.
+Without the bound, measured on SQLite, the same page takes 78 ms and 264 ms.
 
 ## Place identity
 
