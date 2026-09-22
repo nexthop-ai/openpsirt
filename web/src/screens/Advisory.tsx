@@ -120,10 +120,7 @@ function Title({ advisory, title }: { advisory: string; title: string }) {
           {retitle.isPending ? "Saving…" : "Save"}
         </button>
       </div>
-      <p className="hint">
-        Different words are a document nobody has agreed to. Saving takes back every agreement
-        standing.
-      </p>
+      <p className="hint">Saving takes back every agreement standing.</p>
       {retitle.isError && <Failed error={retitle.error} what="The title was not changed." />}
     </>
   );
@@ -317,8 +314,8 @@ function Says({
         />
       )}
       <p className="hint">
-        Only a flaw recorded here. A scanner&rsquo;s report about somebody else&rsquo;s component is
-        refused. Naming one, and taking one off, each take back every agreement standing.
+        Only a flaw recorded here. Naming one, and taking one off, each take back every agreement
+        standing.
       </p>
       {name.isError && (
         <Failed error={name.error} what="That flaw was not named on this advisory." />
@@ -356,16 +353,16 @@ function Document({
               label, red while anything it covers is still held back. */}
           <p className="hint">
             <span className="id">{tracking?.id}</span> · version {tracking?.version} ·{" "}
-            {tracking?.status} · {read.data?.document?.distribution?.tlp?.label} ·{" "}
-            <a href={`/v1/advisories/${encodeURIComponent(advisory)}/document`}>JSON</a>
+            {tracking?.status} ·{" "}
+            <span title="How far the document may travel. Red while anything it covers is still held back">
+              {read.data?.document?.distribution?.tlp?.label}
+            </span>{" "}
+            · <a href={`/v1/advisories/${encodeURIComponent(advisory)}/document`}>JSON</a>
           </p>
           <pre className="asis" style={{ maxHeight: 420, overflow: "auto", marginBottom: 10 }}>
             {written}
           </pre>
-          <p className="hint">
-            Generated, never sent. How far it may travel is its distribution label, red while
-            anything it covers is still held back.
-          </p>
+          <p className="hint">Generated, never sent.</p>
         </>
       )}
     </div>
@@ -385,6 +382,7 @@ function Agreement({ advisory, agreed }: { advisory: string; agreed: number }) {
         <button
           type="button"
           className="btn"
+          title="Not the person who started it, and not whoever wrote what it says now. There is no override"
           disabled={agree.isPending}
           onClick={() => agree.mutate({ advisory })}
         >
@@ -393,16 +391,13 @@ function Agreement({ advisory, agreed }: { advisory: string; agreed: number }) {
         <button
           type="button"
           className="btn quiet"
+          title="Everybody's, not only your own"
           disabled={agreed === 0 || back.isPending}
           onClick={() => back.mutate({ advisory })}
         >
           {back.isPending ? "Taking back…" : "Take every agreement back"}
         </button>
       </div>
-      <p className="hint">
-        Not the person who started it, and not whoever wrote what it says now. There is no override.
-        Taking agreement back takes back everybody&rsquo;s.
-      </p>
       {agree.isError && <Failed error={agree.error} what="That was not agreed to." />}
       {back.isError && <Failed error={back.error} what="Nothing was taken back." />}
     </div>
@@ -482,11 +477,7 @@ function Issued({
           {record.isPending ? "Recording…" : "Record that it went out"}
         </button>
       </div>
-      <p className="hint">
-        Recorded here, published elsewhere. The bytes are kept as the record is written: what went
-        out cannot be rebuilt once a release is added or a decision is revised, and a second
-        document is a revision only where the first was recorded.
-      </p>
+      <p className="hint">Recorded here, published elsewhere.</p>
       {record.isError && <Failed error={record.error} what="That was not recorded." />}
     </div>
   );
