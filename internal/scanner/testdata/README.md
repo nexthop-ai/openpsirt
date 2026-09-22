@@ -21,8 +21,6 @@ own run. It exists for the one signal the corpus above carries none of: not a
 match in it is listed in the exploitation catalog, so the arm that sets the
 flag was reached by nothing.
 
-What that hid is worth keeping. The reader decoded the catalog entry's issue
-under `id`, which the scanner has never emitted — the entries state it as
-`cve` — and because only the presence of an entry is read, nothing was wrong
-and nothing said so. A field nobody reads, naming a key that does not exist,
-reads to the next person as a fact about the format.
+The entries state the issue under `cve`, and only whether an entry is present
+is read. A named field here would be a claim about the scanner's format that
+nothing checks.
