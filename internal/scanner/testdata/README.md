@@ -14,3 +14,15 @@ fields mean and wrong about where one of them lives: the database describes
 itself under a status, not directly, so the version of
 the data a finding was matched against read as empty. The lesson is the ordinary
 one — a fixture assembled from a description agrees with the description.
+
+`grype-known-exploited.json` is one match, recorded from grype 0.119.0 against
+the switch image this project keeps, with its own descriptor because it is its
+own run. It exists for the one signal the corpus above carries none of: not a
+match in it is listed in the exploitation catalog, so the arm that sets the
+flag was reached by nothing.
+
+What that hid is worth keeping. The reader decoded the catalog entry's issue
+under `id`, which the scanner has never emitted — the entries state it as
+`cve` — and because only the presence of an entry is read, nothing was wrong
+and nothing said so. A field nobody reads, naming a key that does not exist,
+reads to the next person as a fact about the format.

@@ -651,3 +651,33 @@ func TestWhichWeaknessTheDataCallsTheRootCauseIsRead(t *testing.T) {
 		})
 	}
 }
+
+func TestAKnownExploitedIssueIsReadAsExploited(t *testing.T) {
+	// The flag a deadline and a ranking both turn on, and nothing recorded
+	// ever carried one: every match in the other fixture has no catalog entry
+	// at all, so the arm that sets this was reached by no test and the field
+	// it decoded was a key the scanner has never emitted.
+	f, err := os.OpenInRoot("testdata", "grype-known-exploited.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	result, err := scanner.ParseGrype(f, scanner.Limits{})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(result.Reported) != 1 {
+		t.Fatalf("read %d matches, want the one", len(result.Reported))
+	}
+	if !result.Reported[0].Issue.Exploited {
+		t.Error("an issue the catalog lists reads as not exploited")
+	}
+	// The other direction, so the flag is not simply always on: nothing in
+	// the recorded corpus carries a catalog entry.
+	for _, one := range parse(t).Reported {
+		if one.Issue.Exploited {
+			t.Errorf("%s reads as exploited and the scanner said nothing of the kind",
+				one.Issue.Identifier)
+		}
+	}
+}

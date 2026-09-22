@@ -174,9 +174,18 @@ type grypeMatch struct {
 			Date       string  `json:"date"`
 		} `json:"epss"`
 		Risk float64 `json:"risk"`
-		KEV  []struct {
-			ID string `json:"id"`
-		} `json:"knownExploited"`
+		// KEV is the catalog entries saying this is exploited in the
+		// world. Whether there is one is the whole of what is read —
+		// the entry states a vendor, a product, a due date and the
+		// action a federal agency is required to take, none of which
+		// is a fact about this deployment.
+		//
+		// Decoded as an empty element so that the count is what it
+		// depends on. A named field here would have to be the
+		// scanner's, and it was one the scanner has never emitted:
+		// the entries carry the issue under `cve`, so nothing read it
+		// and nothing noticed.
+		KEV  []struct{}        `json:"knownExploited"`
 		CVSS []publishedRating `json:"cvss"`
 		// CWEs is what kind of weakness this is. Several entries
 		// usually say the same thing from different sources, and the
