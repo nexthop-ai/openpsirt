@@ -412,9 +412,9 @@ func (s *Store) Reached(ctx context.Context, id int64, at time.Time, mark string
 		// engine.
 		update = update.
 			Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
-				moment, mark, moment, moment).
+				moment, moment, mark, moment).
 			Set(`"caught_up_mark" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_mark" END`,
-				moment, mark, moment, mark)
+				moment, moment, mark, mark)
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return fmt.Errorf("record what came back from that supplier: %w", err)
@@ -436,9 +436,9 @@ func (s *Store) CaughtUp(ctx context.Context, id int64, at time.Time, mark strin
 	moment := at.UTC().Truncate(time.Microsecond)
 	_, err := s.db.NewUpdate().Model((*Source)(nil)).
 		Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
-			moment, mark, moment, moment).
+			moment, moment, mark, moment).
 		Set(`"caught_up_mark" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_mark" END`,
-			moment, mark, moment, mark).
+			moment, moment, mark, mark).
 		Set("reached_at = ?", s.now().UTC().Truncate(time.Microsecond)).
 		Set("failed = ?", "").
 		Where("id = ?", id).Exec(ctx)
@@ -453,6 +453,11 @@ func (s *Store) CaughtUp(ctx context.Context, id int64, at time.Time, mark strin
 // Written once because the two assignments above have to ask exactly the same
 // question: one of them moving without the other leaves a mark that is half of
 // one pass and half of another, which orders against neither.
+//
+// It binds three values, in this order: the moment twice, then the digest. A
+// caller passing them in another order is not caught by SQLite, which compares
+// a hexadecimal digest against a date as text and answers; the other three
+// refuse the statement.
 const ahead = `"caught_up_to" IS NULL OR "caught_up_to" < ? ` +
 	`OR ("caught_up_to" = ? AND "caught_up_mark" < ?)`
 
