@@ -61,13 +61,45 @@ export function useRulings(
   product: string,
   waiting: boolean,
   offset: number,
+  enabled = true,
 ): UseQueryResult<{ items: Ruling[] | null; total?: number }> {
   return useQuery({
+    enabled,
     queryKey: ["rulings", product, waiting, offset],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/report-rulings", {
           params: { path: { product }, query: { waiting, limit: PAGE, offset } },
+        }),
+      ),
+  });
+}
+
+// Rulings in every product the reader may work reports in, narrowed the way
+// the review queue and the record narrow what they list.
+export function useRulingsAcross(asked: {
+  waiting?: boolean;
+  products?: string[];
+  from?: string;
+  to?: string;
+  offset?: number;
+  limit?: number;
+}): UseQueryResult<{ items: Ruling[] | null; total?: number }> {
+  return useQuery({
+    queryKey: ["rulings", "across", asked],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/report-rulings", {
+          params: {
+            query: {
+              limit: asked.limit ?? PAGE,
+              offset: asked.offset ?? 0,
+              ...(asked.waiting ? { waiting: true } : {}),
+              ...(asked.products && asked.products.length > 0 ? { product: asked.products } : {}),
+              ...(asked.from ? { from: asked.from } : {}),
+              ...(asked.to ? { to: asked.to } : {}),
+            },
+          },
         }),
       ),
   });

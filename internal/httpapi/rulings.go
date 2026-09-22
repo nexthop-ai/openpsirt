@@ -16,6 +16,7 @@ import (
 // RulingBody is one act of saying what one or more reports are.
 type RulingBody struct {
 	ID          int64    `json:"id"`
+	Product     string   `json:"product" doc:"The product it was made in"`
 	Disposition string   `json:"disposition" enum:"duplicate,not-reproducible,out-of-scope,rejected"`
 	Reasoning   string   `json:"reasoning,omitempty" doc:"Why, as markdown. Never edited, so an approval is of these words"`
 	DuplicateOf string   `json:"duplicate_of,omitempty" doc:"The open issue a duplicate points at"`
@@ -95,6 +96,58 @@ func registerRulings(api huma.API, in Ingest) {
 			return nil, refusedRuling(in, err, "that ruling could not be recorded")
 		}
 		return rulingOutput(ctx, in, subject, ruling)
+	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "list-rulings-across", Method: http.MethodGet, Path: "/v1/report-rulings",
+		Summary: "List rulings on reports across products",
+		Description: "Every ruling in the products you may work reports in, newest first, " +
+			"including withdrawn ones. A product you may not work reports in contributes " +
+			"nothing, not even to the count.\n\n" +
+			"`waiting` narrows to those waiting for a second person. `from` and `to` narrow " +
+			"to those proposed in a period, `to` exclusive, as the record's own period is.",
+		Tags: []string{"Findings"},
+	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
+		Product []string `query:"product,explode" doc:"Limit to these products, by name. Repeatable; any of them matches"`
+		Waiting bool     `query:"waiting" doc:"Only rulings waiting for a second person"`
+		From    string   `query:"from" doc:"Only rulings proposed on or after this date, as YYYY-MM-DD"`
+		To      string   `query:"to" doc:"Only rulings proposed before this date, as YYYY-MM-DD"`
+		Limit   int      `query:"limit" minimum:"1" maximum:"500" default:"50"`
+		Offset  int      `query:"offset" minimum:"0" default:"0"`
+	}) (*listOutput[RulingBody], error) {
+		subject, err := reading(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if in.DB == nil {
+			return nil, noDatabase(in.Logger)
+		}
+		asked := finding.RulingsAsked{Waiting: input.Waiting, Limit: input.Limit,
+			Offset: input.Offset}
+		for _, name := range input.Product {
+			named, err := productNamedVisibly(ctx, in, subject, name)
+			if err != nil {
+				return nil, err
+			}
+			asked.ProductIDs = append(asked.ProductIDs, named.ID)
+		}
+		if asked.Since, err = aDate(input.From); err != nil {
+			return nil, err
+		}
+		if asked.Until, err = aDate(input.To); err != nil {
+			return nil, err
+		}
+		rows, total, err := finding.NewStore(in.DB.DB).RulingsAcross(ctx, subject, asked)
+		if err != nil {
+			return nil, refusedRuling(in, err, "the rulings could not be read")
+		}
+		out := &listOutput[RulingBody]{}
+		out.Body.Items, err = rulingBodies(ctx, in, subject, rows)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "the rulings could not be read", err)
+		}
+		out.Body.Total = total
+		return out, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -275,7 +328,8 @@ func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
 	out := make([]RulingBody, 0, len(rows))
 	for _, row := range rows {
 		body := RulingBody{
-			ID: row.ID, Disposition: string(row.Disposition), Reasoning: row.Reasoning,
+			ID: row.ID, Product: row.Product,
+			Disposition: string(row.Disposition), Reasoning: row.Reasoning,
 			Reports: row.References, State: rulingState(row),
 			ProposedBy: names[row.ProposedBy], ProposedAt: row.ProposedAt.Format(time.RFC3339),
 			Yours: row.ProposedBy == subject.ID,

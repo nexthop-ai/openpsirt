@@ -70,6 +70,9 @@ type ReportRuling struct {
 	WithdrawnBy *int64     `bun:"withdrawn_by"`
 	WithdrawnAt *time.Time `bun:"withdrawn_at"`
 
+	// Product is the name of the product it was made in.
+	Product string `bun:"product,scanonly"`
+
 	// References are the reports it covers, by the names they are reached
 	// by. Read from the permanent record of what it covered, so a withdrawn
 	// ruling still says what it was about.
@@ -419,7 +422,7 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 // rulingIn reads one ruling in one product.
 func rulingIn(ctx context.Context, db bun.IDB, productID, rulingID int64) (*ReportRuling, error) {
 	ruling := new(ReportRuling)
-	err := db.NewSelect().Model(ruling).
+	err := named(db.NewSelect().Model(ruling)).
 		Where("rr.id = ?", rulingID).
 		Where("rr.product_id = ?", productID).
 		Scan(ctx)
@@ -452,6 +455,13 @@ func (s *Store) RulingBy(ctx context.Context, subject access.Subject,
 	return ruling, nil
 }
 
+// named selects a ruling with the name of its product.
+func named(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.ColumnExpr("rr.*").
+		ColumnExpr(`p.name AS "product"`).
+		Join(`JOIN "product" AS "p" ON p.id = rr.product_id`)
+}
+
 // RulingsIn is one product's rulings, newest first, with how many there are.
 // Waiting narrows to those waiting for a second person.
 func (s *Store) RulingsIn(ctx context.Context, subject access.Subject, productID int64,
@@ -460,17 +470,53 @@ func (s *Store) RulingsIn(ctx context.Context, subject access.Subject, productID
 	if err := mayHandle(subject, productID); err != nil {
 		return nil, 0, err
 	}
+	return s.RulingsAcross(ctx, subject, RulingsAsked{
+		ProductIDs: []int64{productID}, Waiting: waiting, Limit: limit, Offset: offset,
+	})
+}
+
+// RulingsAsked narrows a list of rulings across products.
+type RulingsAsked struct {
+	// ProductIDs keeps these products. Empty is every product.
+	ProductIDs []int64
+	// Waiting keeps those waiting for a second person.
+	Waiting bool
+	// Since and Until keep those proposed in a period, Until exclusive.
+	Since, Until *time.Time
+	Limit        int
+	Offset       int
+}
+
+// RulingsAcross is the rulings in every product this subject may work reports
+// in, newest first, with how many there are.
+//
+// A product somebody may not work reports in contributes nothing, not even to
+// the count: a ruling says what a stranger's claim is, and reading it reads
+// the claim.
+func (s *Store) RulingsAcross(ctx context.Context, subject access.Subject,
+	asked RulingsAsked) ([]ReportRuling, int, error) {
+
+	products := reportProducts(subject, asked.ProductIDs)
+	if len(products) == 0 {
+		return []ReportRuling{}, 0, nil
+	}
 	var rows []ReportRuling
-	q := s.db.NewSelect().Model(&rows).
-		Where("rr.product_id = ?", productID)
-	if waiting {
+	q := named(s.db.NewSelect().Model(&rows)).
+		Where("rr.product_id IN (?)", bun.List(products))
+	if asked.Waiting {
 		q = q.Where("rr.settled_at IS NULL").Where("rr.withdrawn_at IS NULL")
 	}
+	if asked.Since != nil {
+		q = q.Where("rr.proposed_at >= ?", *asked.Since)
+	}
+	if asked.Until != nil {
+		q = q.Where("rr.proposed_at < ?", *asked.Until)
+	}
 	total, err := q.Order("rr.proposed_at DESC", "rr.id DESC").
-		Limit(limit).Offset(offset).
+		Limit(asked.Limit).Offset(asked.Offset).
 		ScanAndCount(ctx)
 	if err != nil {
-		return nil, 0, fmt.Errorf("read a product's rulings: %w", err)
+		return nil, 0, fmt.Errorf("read the rulings on reports: %w", err)
 	}
 	page := make([]*ReportRuling, 0, len(rows))
 	for i := range rows {
@@ -480,6 +526,27 @@ func (s *Store) RulingsIn(ctx context.Context, subject access.Subject, productID
 		return nil, 0, err
 	}
 	return rows, total, nil
+}
+
+// reportProducts is the products this subject may work reports in, kept to
+// those asked for where any were.
+func reportProducts(subject access.Subject, asked []int64) []int64 {
+
+	// The products read from, which include every product the subject
+	// triages undisclosed work in. An estate-wide role is one grant per
+	// product by the time it is asked here, and the one subject that reads
+	// every product unnarrowed holds no role and triages nothing.
+	candidates, _ := subject.Products()
+	if len(asked) > 0 {
+		candidates = asked
+	}
+	out := make([]int64, 0, len(candidates))
+	for _, id := range candidates {
+		if subject.Triages(access.Private, id) {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 // coveredBy fills in the references each ruling covered, in one read.

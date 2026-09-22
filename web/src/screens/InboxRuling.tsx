@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  PAGE,
   type Rulable,
   type Ruling,
   useApproveRuling,
   useRule,
+  useRulingsAcross,
   useWithdrawRuling,
 } from "../api/intake";
+import { Paged } from "../ui/Paged";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Failed } from "../ui/Failed";
@@ -75,7 +78,6 @@ export function RuleForm({
             onChange={setReasoning}
             rows={4}
             draftKey={`ruling:${product}:${references.join(",")}`}
-            mentions={{ product, visibility: "private" }}
           />
         </div>
       )}
@@ -121,7 +123,20 @@ export function RuleForm({
 }
 
 // One ruling: what it says, about which reports, and where it stands.
-export function RulingCard({ product, ruling }: { product: string; ruling: Ruling }) {
+//
+// Named by its product wherever it is read outside that product's inbox, and
+// without its controls in the record, which is read and printed rather than
+// worked.
+export function RulingCard({
+  ruling,
+  named = false,
+  record = false,
+}: {
+  ruling: Ruling;
+  named?: boolean;
+  record?: boolean;
+}) {
+  const product = ruling.product;
   const approve = useApproveRuling(product);
   const withdraw = useWithdrawRuling(product);
   const at = `/products/${encodeURIComponent(product)}/inbox`;
@@ -135,6 +150,11 @@ export function RulingCard({ product, ruling }: { product: string; ruling: Rulin
   return (
     <div className="card" style={{ marginBottom: 10 }}>
       <p style={{ margin: 0 }}>
+        {named && (
+          <>
+            <Link to={`/products/${encodeURIComponent(product)}/inbox`}>{product}</Link> ·{" "}
+          </>
+        )}
         <b>{dispositionSaid(ruling.disposition)}</b>{" "}
         <span className={`state ${state.tone}`}>{state.said}</span>
         {ruling.duplicate_of && (
@@ -171,7 +191,7 @@ export function RulingCard({ product, ruling }: { product: string; ruling: Rulin
         ))}
       </p>
 
-      {ruling.state !== "withdrawn" && (
+      {!record && ruling.state !== "withdrawn" && (
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           {ruling.state === "waiting" && !ruling.yours && (
             <button
@@ -197,5 +217,40 @@ export function RulingCard({ product, ruling }: { product: string; ruling: Rulin
       {approve.error != null && <Failed error={approve.error} what="It was not approved." />}
       {withdraw.error != null && <Failed error={withdraw.error} what="It was not withdrawn." />}
     </div>
+  );
+}
+
+// The rulings waiting for a second person, across every product the reader
+// may work reports in, for the review queue.
+export function WaitingRulings({ product }: { product?: string }) {
+  const [offset, setOffset] = useState(0);
+  const listed = useRulingsAcross({
+    waiting: true,
+    products: product ? [product] : [],
+    offset,
+  });
+  if (listed.isError) {
+    return (
+      <div style={{ marginTop: 22 }}>
+        <Failed error={listed.error} what="The rulings on reports could not be read." />
+      </div>
+    );
+  }
+  const rows = listed.data?.items ?? [];
+  if (rows.length === 0) return null;
+  const total = listed.data?.total ?? rows.length;
+  return (
+    <>
+      <div className="screen-head" id="rulings" style={{ marginTop: 22 }}>
+        <h2>
+          Rulings on reports <span className="n">{total.toLocaleString()}</span>
+        </h2>
+        <p>Reports proposed as rejected or out of scope.</p>
+      </div>
+      {rows.map((ruling) => (
+        <RulingCard key={ruling.id} ruling={ruling} named />
+      ))}
+      <Paged shown={rows.length} total={total} offset={offset} limit={PAGE} onGo={setOffset} />
+    </>
   );
 }

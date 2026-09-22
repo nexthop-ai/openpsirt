@@ -197,7 +197,7 @@ function Waiting({ product }: { product: string }) {
   return (
     <>
       {rows.map((ruling) => (
-        <RulingCard key={ruling.id} product={product} ruling={ruling} />
+        <RulingCard key={ruling.id} ruling={ruling} />
       ))}
       <Paged
         shown={rows.length}
@@ -231,7 +231,6 @@ function RecordReport({ product }: { product: string }) {
           onChange={setSummary}
           rows={6}
           draftKey={`report:${product}`}
-          mentions={{ product, visibility: "private" }}
         />
       </div>
       <div
@@ -246,6 +245,7 @@ function RecordReport({ product }: { product: string }) {
           <input
             {...notACredential}
             id="reported-by"
+            type="text"
             value={reportedBy}
             onChange={(e) => setReportedBy(e.target.value)}
           />
@@ -255,6 +255,7 @@ function RecordReport({ product }: { product: string }) {
           <input
             {...notACredential}
             id="contact"
+            type="text"
             value={contact}
             onChange={(e) => setContact(e.target.value)}
           />
@@ -264,6 +265,7 @@ function RecordReport({ product }: { product: string }) {
           <input
             {...notACredential}
             id="credit"
+            type="text"
             value={credit}
             onChange={(e) => setCredit(e.target.value)}
           />

@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 // rulingRead is what the ruling routes answer, as a test reads it.
@@ -182,6 +185,97 @@ func TestADuplicateIsListedOnTheIssueItDuplicates(t *testing.T) {
 			fmt.Sprintf(`{"reports":[%q],"disposition":"duplicate","duplicate_of":"CVE-1999-0001"}`,
 				r.claim(t, "Another."))); got.Code != http.StatusNotFound {
 			t.Errorf("a duplicate of an issue not here answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestRulingsAcrossProductsAreThoseInProductsTheReaderWorksReportsIn(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		claimed := r.claim(t, "Generated text about a function this does not have.")
+		if got := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/report-rulings",
+			fmt.Sprintf(`{"reports":[%q],"disposition":"rejected","reasoning":"Slop."}`,
+				claimed)); got.Code != http.StatusCreated {
+			t.Fatalf("proposing answered %d: %s", got.Code, got.Body.String())
+		}
+
+		type across struct {
+			Items []rulingRead `json:"items"`
+			Total int          `json:"total"`
+		}
+		var seen across
+		read(t, r, "private-dispatcher", "/v1/report-rulings?waiting=true", &seen)
+		if seen.Total != 1 || len(seen.Items) != 1 {
+			t.Fatalf("somebody who works reports reads %+v", seen)
+		}
+		var named struct {
+			Items []struct {
+				Product string `json:"product"`
+			} `json:"items"`
+		}
+		read(t, r, "private-dispatcher", "/v1/report-rulings", &named)
+		if len(named.Items) != 1 || named.Items[0].Product != "mine" {
+			t.Errorf("a ruling across products names its product as %+v", named.Items)
+		}
+
+		// Nothing from a product the reader may not work reports in, not
+		// even the count: a public triager, a private reader, and a reader
+		// of the whole estate who may triage nothing undisclosed.
+		for _, who := range []string{"triager", "private", "estate-reader"} {
+			var none across
+			read(t, r, who, "/v1/report-rulings", &none)
+			if none.Total != 0 || len(none.Items) != 0 {
+				t.Errorf("%s reads %+v", who, none)
+			}
+		}
+
+		// The period is the day it was proposed, the end exclusive.
+		today := time.Now().UTC().Format(time.DateOnly)
+		tomorrow := time.Now().UTC().AddDate(0, 0, 1).Format(time.DateOnly)
+		var within, before across
+		read(t, r, "private-triage", "/v1/report-rulings?from="+today+"&to="+tomorrow, &within)
+		read(t, r, "private-triage", "/v1/report-rulings?to="+today, &before)
+		if within.Total != 1 || before.Total != 0 {
+			t.Errorf("proposed today, it is %d in today and %d before it",
+				within.Total, before.Total)
+		}
+
+		// Approved, it is no longer waiting.
+		if got := asPerson(t, r, "private-dispatcher", http.MethodPost,
+			fmt.Sprintf("/v1/products/mine/report-rulings/%d/approval", seen.Items[0].ID),
+			""); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		var still across
+		read(t, r, "private-dispatcher", "/v1/report-rulings?waiting=true", &still)
+		if still.Total != 0 {
+			t.Errorf("an approved ruling is still listed as waiting: %+v", still)
+		}
+
+		// Somebody holding private triage across the whole estate reaches it
+		// too, through the products that exist rather than a list of grants.
+		holder, err := r.rights.Ensure(t.Context(), "estate-triager", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.Claim(t.Context(), holder.ID, "estate-triager"); err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.GrantEstateRole(t.Context(), holder.ID,
+			access.PrivateTriage); err != nil {
+			t.Fatal(err)
+		}
+		var estate across
+		read(t, r, "estate-triager", "/v1/report-rulings", &estate)
+		if estate.Total != 1 {
+			t.Errorf("private triage across the estate reads %+v", estate)
+		}
+
+		// A product the reader holds nothing on answers as one never declared.
+		if code := r.as(t, "private-triage", http.MethodGet,
+			"/v1/report-rulings?product=theirs"); code != http.StatusNotFound {
+			t.Errorf("naming a product the reader cannot see answered %d", code)
 		}
 	})
 }

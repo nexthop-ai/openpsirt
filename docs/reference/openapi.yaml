@@ -7660,6 +7660,9 @@ components:
         id:
           format: int64
           type: integer
+        product:
+          description: The product it was made in
+          type: string
         proposed_at:
           type: string
         proposed_by:
@@ -7690,6 +7693,7 @@ components:
           type: boolean
       required:
         - id
+        - product
         - disposition
         - reports
         - state
@@ -21877,6 +21881,84 @@ paths:
       summary: Report how fast findings are being fixed
       tags:
         - Reports
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
+  /v1/report-rulings:
+    get:
+      description: |-
+        Every ruling in the products you may work reports in, newest first, including withdrawn ones. A product you may not work reports in contributes nothing, not even to the count.
+
+        `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: list-rulings-across
+      parameters:
+        - description: Limit to these products, by name. Repeatable; any of them matches
+          explode: true
+          in: query
+          name: product
+          schema:
+            description: Limit to these products, by name. Repeatable; any of them matches
+            items:
+              type: string
+            type:
+              - array
+              - "null"
+        - description: Only rulings waiting for a second person
+          explode: false
+          in: query
+          name: waiting
+          schema:
+            description: Only rulings waiting for a second person
+            type: boolean
+        - description: Only rulings proposed on or after this date, as YYYY-MM-DD
+          explode: false
+          in: query
+          name: from
+          schema:
+            description: Only rulings proposed on or after this date, as YYYY-MM-DD
+            type: string
+        - description: Only rulings proposed before this date, as YYYY-MM-DD
+          explode: false
+          in: query
+          name: to
+          schema:
+            description: Only rulings proposed before this date, as YYYY-MM-DD
+            type: string
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 500
+            minimum: 1
+            type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            default: 0
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyRulingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List rulings on reports across products
+      tags:
+        - Findings
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.

@@ -4454,6 +4454,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/report-rulings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List rulings on reports across products
+         * @description Every ruling in the products you may work reports in, newest first, including withdrawn ones. A product you may not work reports in contributes nothing, not even to the count.
+         *
+         *     `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-rulings-across"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/review-queue": {
         parameters: {
             query?: never;
@@ -9638,6 +9662,8 @@ export interface components {
             duplicate_of?: string;
             /** Format: int64 */
             id: number;
+            /** @description The product it was made in */
+            product: string;
             proposed_at: string;
             proposed_by: string;
             /** @description Why, as markdown. Never edited, so an approval is of these words */
@@ -17688,6 +17714,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RemediationOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-rulings-across": {
+        parameters: {
+            query?: {
+                /** @description Limit to these products, by name. Repeatable; any of them matches */
+                product?: string[] | null;
+                /** @description Only rulings waiting for a second person */
+                waiting?: boolean;
+                /** @description Only rulings proposed on or after this date, as YYYY-MM-DD */
+                from?: string;
+                /** @description Only rulings proposed before this date, as YYYY-MM-DD */
+                to?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyRulingBody"];
                 };
             };
             /** @description Error */

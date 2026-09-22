@@ -116,7 +116,7 @@ export function InboxReport() {
           ) : ruling.isError ? (
             <Failed error={ruling.error} what="The ruling could not be read." />
           ) : (
-            ruling.data && <RulingCard product={product} ruling={ruling.data} />
+            ruling.data && <RulingCard ruling={ruling.data} />
           )
         ) : (
           <Judge product={product} reference={reference} />

@@ -9,6 +9,7 @@ import { UNNARROWED } from "../app/scope";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
 import { mayOf, useWho } from "../app/session";
+import { useRulings } from "../api/intake";
 
 // One product's own page.
 //
@@ -27,6 +28,7 @@ export function Product() {
   const who = useWho();
   // The inbox asks what reading a report asks: triage of undisclosed work.
   const mayWorkReports = !!mayOf(who.data, product)?.may_hide;
+  const waitingRulings = useRulings(product, true, 0, mayWorkReports);
   const overview = useQuery({
     queryKey: ["overview", product],
     queryFn: async () =>
@@ -58,6 +60,16 @@ export function Product() {
             <>
               {" "}
               · <Link to={`/products/${encodeURIComponent(product)}/inbox`}>Inbox</Link>
+              {(waitingRulings.data?.total ?? 0) > 0 && (
+                <>
+                  {" "}
+                  (
+                  <Link to={`/products/${encodeURIComponent(product)}/inbox?waiting=1`}>
+                    {(waitingRulings.data?.total ?? 0).toLocaleString()} waiting for approval
+                  </Link>
+                  )
+                </>
+              )}
             </>
           )}
         </p>

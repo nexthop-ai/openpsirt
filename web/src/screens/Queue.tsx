@@ -1,4 +1,5 @@
 import { notACredential } from "../ui/noautofill";
+import { WaitingRulings } from "./InboxRuling";
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useEffect, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -435,6 +436,11 @@ export function Queue() {
         offset={embargoAt}
         onGo={setEmbargoAt}
       />
+
+      {/* A ruling setting reports aside waits for a second person the way a
+          dismissal does, and this is where somebody goes to be one. Narrowed
+          to the products the reader may work reports in. */}
+      <WaitingRulings product={product || undefined} />
 
       <div className="screen-head" id="lapsed" style={{ marginTop: 22 }}>
         <h2>Lapsed decisions</h2>
