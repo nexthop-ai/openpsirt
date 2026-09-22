@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -62,10 +63,13 @@ type Source struct {
 	RetiredAt *time.Time `bun:"retired_at"`
 }
 
-// MostName and MostURL are the widths a source is stored in.
+// MostName and MostURL are the widths a source is recorded in.
 //
-// Refused rather than shortened. A shortened name collides with another
-// supplier's, and a shortened address is a request somewhere nobody meant.
+// Refused rather than shortened. The name is half of what identifies a source,
+// so two shortened to one length become one supplier and withdrawing either
+// withdraws both; a shortened address is a request somewhere nobody meant. The
+// name is the width the column holds, and on two of the four engines a value
+// past it is truncated rather than refused outside strict mode.
 const (
 	MostName = database.NameWidth
 	MostURL  = 1000
@@ -165,6 +169,14 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 	address = strings.TrimSpace(address)
 	if name == "" || address == "" {
 		return nil, fmt.Errorf("a supplier needs a name and an address")
+	}
+	if utf8.RuneCountInString(name) > MostName {
+		return nil, fmt.Errorf("that name is longer than the %d characters this records",
+			MostName)
+	}
+	if utf8.RuneCountInString(address) > MostURL {
+		return nil, fmt.Errorf("that address is longer than the %d characters this records",
+			MostURL)
 	}
 	// Judged here as well as at the request, so a second caller cannot store
 	// an address the pass will refuse only when it comes to fetch.

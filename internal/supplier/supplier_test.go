@@ -176,6 +176,32 @@ func TestAnAddressThatIsNotAPublishersDirectoryIsRefused(t *testing.T) {
 	})
 }
 
+func TestANameOrAddressPastWhatIsRecordedIsRefused(t *testing.T) {
+	// Refused rather than shortened. Two names shortened to one length are one
+	// supplier, and withdrawing either withdraws both — and on two of the four
+	// engines an over-long value is truncated rather than refused outside
+	// strict mode, so the refusal has to be here.
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+
+		long := strings.Repeat("s", supplier.MostName+1)
+		if _, err := store.Add(ctx, f.admin, f.product, long, described); err == nil {
+			t.Error("a name past the width it is recorded in was stored")
+		}
+		far := "https://supplier.example/" + strings.Repeat("p", supplier.MostURL)
+		if _, err := store.Add(ctx, f.admin, f.product, "SUSE", far); err == nil {
+			t.Error("an address past the width it is recorded in was stored")
+		}
+		// And the widths themselves are accepted, so the refusal is a bound
+		// rather than a rejection of anything long.
+		fits := strings.Repeat("s", supplier.MostName)
+		if _, err := store.Add(ctx, f.admin, f.product, fits, described); err != nil {
+			t.Errorf("a name of exactly the width recorded was refused: %v", err)
+		}
+	})
+}
+
 func TestASupplierNeverReadIsDueAndOneJustReadIsNot(t *testing.T) {
 	// A supplier named this morning is read this afternoon rather than
 	// tomorrow, and one read an hour ago is not read again every cycle.
