@@ -1,5 +1,5 @@
-// Package attach holds files that hang off an issue, and the rules about what
-// may be stored and what may be served back.
+// Package attach holds files that hang off an issue or a report, and the
+// rules about what may be stored and what may be served back.
 //
 // The bytes never live in the database. What lives here is the record of them
 // — what the text refers to, what the file is, and what happened to it — and
@@ -27,9 +27,14 @@ type Attachment struct {
 	ID int64 `bun:"id,pk,autoincrement"`
 	// Token is what the text refers to and the only identifier that leaves
 	// this deployment.
-	Token           string `bun:"token,notnull"`
-	ProductID       int64  `bun:"product_id,notnull"`
-	VulnerabilityID int64  `bun:"vulnerability_id,notnull"`
+	Token     string `bun:"token,notnull"`
+	ProductID int64  `bun:"product_id,notnull"`
+	// One of the two things a file hangs off. An issue, or a report nobody
+	// has turned into one — a claim that has not been judged has no issue to
+	// hang a screenshot on, and the screenshot is often the whole of what was
+	// sent.
+	VulnerabilityID *int64 `bun:"vulnerability_id"`
+	FlawReportID    *int64 `bun:"flaw_report_id"`
 	Filename        string `bun:"filename,notnull"`
 	// ContentType is what we decided, never what was uploaded.
 	ContentType string    `bun:"content_type,notnull"`
@@ -45,6 +50,45 @@ type Attachment struct {
 	RedactedAt     *time.Time `bun:"redacted_at"`
 	RedactedBy     *int64     `bun:"redacted_by"`
 	RedactedReason *string    `bun:"redacted_reason"`
+}
+
+// Against is what an upload hangs off.
+//
+// The product always, because an issue is only an issue somewhere and a
+// report is made against one. Then exactly one of the other two: a file
+// belonging to both, or to neither, is a row nothing can answer "who may read
+// this" for.
+type Against struct {
+	ProductID       int64
+	VulnerabilityID int64
+	FlawReportID    int64
+}
+
+// Issue and Report are the two things an upload may hang off, absent where it
+// does not.
+func (a Against) Issue() *int64 {
+	if a.VulnerabilityID == 0 {
+		return nil
+	}
+	return &a.VulnerabilityID
+}
+
+func (a Against) Report() *int64 {
+	if a.FlawReportID == 0 {
+		return nil
+	}
+	return &a.FlawReportID
+}
+
+// named reports whether this says one thing and one thing only.
+func (a Against) named() error {
+	if a.ProductID == 0 {
+		return fmt.Errorf("an attachment has to be about a product")
+	}
+	if (a.VulnerabilityID == 0) == (a.FlawReportID == 0) {
+		return fmt.Errorf("an attachment hangs off an issue or off a report, and not both")
+	}
+	return nil
 }
 
 // Redacted reports whether the bytes have been removed.

@@ -174,6 +174,69 @@ func mayAttach(ctx context.Context, db bun.IDB, subject access.Subject,
 	return nil
 }
 
+// mayAttachTo is mayAttach asked of whichever of the two a file hangs off.
+func mayAttachTo(ctx context.Context, db bun.IDB, subject access.Subject,
+	at Against) error {
+
+	if err := at.named(); err != nil {
+		return err
+	}
+	if issue := at.Issue(); issue != nil {
+		return mayAttach(ctx, db, subject, at.ProductID, *issue)
+	}
+	// Reaching a report and writing to one are the same right. What a report
+	// carries has not been judged, so reaching it already asks for the right
+	// to triage work nobody has announced — which is a writing role.
+	return mayReachReport(ctx, db, subject, at.ProductID, *at.Report())
+}
+
+// mayReachReport reports whether a subject may read what arrived with one
+// report.
+//
+// A report that became an issue is as readable as the issue, asked at the
+// moment of the request: an embargo ending carries the evidence with the
+// words. One nobody has judged is undisclosed — there is no issue to be
+// public about, and nobody has decided the claim is safe to repeat — so it
+// takes the right to triage work nobody has announced.
+//
+// The product is the one the request named, and a report filed against
+// another product answers as one that is not here. Told apart, the pair of
+// answers says which products hold claims.
+func mayReachReport(ctx context.Context, db bun.IDB, subject access.Subject,
+	productID, reportID int64) error {
+
+	if subject.Kind != access.Person {
+		return access.Denied("reach an attachment without being a person")
+	}
+	var row struct {
+		ProductID int64  `bun:"product_id"`
+		Issue     *int64 `bun:"vulnerability_id"`
+	}
+	err := db.NewSelect().
+		TableExpr(`"flaw_report" AS "fr"`).
+		ColumnExpr("fr.product_id").
+		ColumnExpr("fr.vulnerability_id").
+		Where("fr.id = ?", reportID).
+		Where("fr.product_id = ?", productID).
+		Scan(ctx, &row)
+	if database.IsNoRows(err) {
+		return access.Denied(fmt.Sprintf("reach attachments in product %d", productID))
+	}
+	if err != nil {
+		return fmt.Errorf("read what a report is about: %w", err)
+	}
+	if row.Issue != nil {
+		return mayReach(ctx, db, subject, row.ProductID, *row.Issue)
+	}
+	if !subject.Triages(access.Private, row.ProductID) {
+		// The same answer as a report that is not here, for the reason an
+		// issue's files give the same answer twice: telling somebody a file
+		// exists but is not theirs tells them the claim exists.
+		return access.Denied(fmt.Sprintf("reach attachments in product %d", productID))
+	}
+	return nil
+}
+
 // Upload stores a file against an issue and records it.
 //
 // The bytes are streamed rather than held (the file-size limit bounds one
@@ -189,13 +252,13 @@ func mayAttach(ctx context.Context, db bun.IDB, subject access.Subject,
 // arrives, and waiting for text that will never be written would mean the
 // sweep took it a day later.
 func (s *Store) Upload(ctx context.Context, subject access.Subject,
-	productID, vulnerabilityID int64, filename string, body io.Reader, size int64,
+	at Against, filename string, body io.Reader, size int64,
 	maxSize, quota, share int64, hangsOffTheIssue bool) (*Attachment, error) {
 
 	if !s.Configured() {
 		return nil, ErrNotConfigured
 	}
-	if err := mayAttach(ctx, s.db, subject, productID, vulnerabilityID); err != nil {
+	if err := mayAttachTo(ctx, s.db, subject, at); err != nil {
 		return nil, err
 	}
 	if size <= 0 {
@@ -253,7 +316,8 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 		// into the model. A retry of a rolled-back attempt would re-insert a
 		// model already carrying the key that attempt was given.
 		row = &Attachment{
-			Token: token, ProductID: productID, VulnerabilityID: vulnerabilityID,
+			Token: token, ProductID: at.ProductID,
+			VulnerabilityID: at.Issue(), FlawReportID: at.Report(),
 			Filename: SafeName(filename), ContentType: contentType, SizeBytes: size,
 			Digest: hex.EncodeToString(digest.Sum(nil)), ObjectKey: key,
 			UploadedBy: subject.ID, UploadedAt: now,

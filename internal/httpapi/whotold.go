@@ -14,8 +14,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// ReportBody is who told us about a flaw, and when.
+// ReportBody is what somebody told us, and what became of it.
 type ReportBody struct {
+	Reference  string `json:"reference" doc:"The name this report is reached by"`
+	Summary    string `json:"summary,omitempty" doc:"What was claimed, as markdown. Absent where the issue's own description carries it"`
 	ReportedBy string `json:"reported_by,omitempty"`
 	Contact    string `json:"contact,omitempty"`
 	Credit     string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
@@ -25,7 +27,14 @@ type ReportBody struct {
 	// of coordinated disclosure a reporter actually judges.
 	Acknowledged   string `json:"acknowledged,omitempty"`
 	AcknowledgedBy string `json:"acknowledged_by,omitempty"`
-	RecordedBy     string `json:"recorded_by"`
+	// Issue is what the claim turned out to be, where somebody has said, with
+	// when they said it and who they were. Absent is a claim nobody has
+	// judged, which is the state every report arrives in.
+	Issue       string `json:"issue,omitempty"`
+	Evaluated   string `json:"evaluated,omitempty"`
+	EvaluatedBy string `json:"evaluated_by,omitempty"`
+	RecordedBy  string `json:"recorded_by"`
+	RecordedAt  string `json:"recorded_at"`
 }
 
 // registerWhoTold is the record of who told us, and the act of saying we
@@ -169,28 +178,74 @@ func registerWhoTold(api huma.API, in Ingest) {
 	})
 }
 
-// reportBody names the people a report refers to.
-func reportBody(ctx context.Context, in Ingest, told finding.WhoTold) (ReportBody, error) {
-	people := []int64{told.RecordedBy}
-	if told.AcknowledgedBy != nil {
-		people = append(people, *told.AcknowledgedBy)
-	}
-	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
+// reportBody names the people and the issue one report refers to.
+func reportBody(ctx context.Context, in Ingest, told finding.FlawReport) (ReportBody, error) {
+	bodies, err := reportBodies(ctx, in, []finding.FlawReport{told})
 	if err != nil {
 		return ReportBody{}, err
 	}
-	body := ReportBody{
-		ReportedBy: told.ReportedBy, Contact: told.Contact, Credit: told.Credit,
-		RecordedBy: names[told.RecordedBy],
+	return bodies[0], nil
+}
+
+// reportBodies renders a page of reports, naming the people and the issues
+// they refer to in one read each.
+//
+// Two reads for the page rather than two per row: a page of fifty reports is
+// a hundred round trips asked one at a time, and the names are the same
+// handful of people over and over.
+func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
+	[]ReportBody, error) {
+
+	people := make([]int64, 0, len(rows))
+	issues := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		people = append(people, row.RecordedBy)
+		if row.AcknowledgedBy != nil {
+			people = append(people, *row.AcknowledgedBy)
+		}
+		if row.EvaluatedBy != nil {
+			people = append(people, *row.EvaluatedBy)
+		}
+		if row.VulnerabilityID != nil {
+			issues = append(issues, *row.VulnerabilityID)
+		}
 	}
-	if told.ReceivedOn != nil {
-		body.Received = told.ReceivedOn.Format(time.DateOnly)
+	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
+	if err != nil {
+		return nil, err
 	}
-	if told.AcknowledgedAt != nil {
-		body.Acknowledged = told.AcknowledgedAt.Format(time.RFC3339)
+	identifiers, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, issues)
+	if err != nil {
+		return nil, err
 	}
-	if told.AcknowledgedBy != nil {
-		body.AcknowledgedBy = names[*told.AcknowledgedBy]
+
+	out := make([]ReportBody, 0, len(rows))
+	for _, row := range rows {
+		body := ReportBody{
+			Reference: row.Reference, Summary: row.Summary,
+			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
+			RecordedBy: names[row.RecordedBy],
+			RecordedAt: row.RecordedAt.Format(time.RFC3339),
+		}
+		if row.ReceivedOn != nil {
+			body.Received = row.ReceivedOn.Format(time.DateOnly)
+		}
+		if row.AcknowledgedAt != nil {
+			body.Acknowledged = row.AcknowledgedAt.Format(time.RFC3339)
+		}
+		if row.AcknowledgedBy != nil {
+			body.AcknowledgedBy = names[*row.AcknowledgedBy]
+		}
+		if row.VulnerabilityID != nil {
+			body.Issue = identifiers[*row.VulnerabilityID]
+		}
+		if row.EvaluatedAt != nil {
+			body.Evaluated = row.EvaluatedAt.Format(time.RFC3339)
+		}
+		if row.EvaluatedBy != nil {
+			body.EvaluatedBy = names[*row.EvaluatedBy]
+		}
+		out = append(out, body)
 	}
-	return body, nil
+	return out, nil
 }

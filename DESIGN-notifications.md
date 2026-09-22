@@ -163,6 +163,15 @@ the work again before it lapses, and a queue is nobody's turn at all. An
 unanswered report carries no period — the answer to how long that may go
 unanswered is "not at all".
 
+A claim nobody has judged is raised the same way and named differently. It has
+no issue to name and no finding screen to point at, so the alert carries the
+reference it was minted with and points at the report. It is narrowed to
+whoever may triage work nobody has announced, which is exactly who may open
+it — an alert about a letter somebody cannot read is one they can do nothing
+with. A report about an issue long closed is history rather than an unanswered
+letter, so those stop being raised; a claim nobody has judged has no issue to
+be closed and goes on being raised until it is answered.
+
 Every one is bounded by what the person may read. An alert is not a way back in
 to something somebody has lost the reading of.
 

@@ -141,7 +141,8 @@ func registerAttachments(api huma.API, in Ingest) {
 		// waiting for the text that will refer to it, and is swept if that
 		// text never arrives.
 		evidence := input.RawBody.Data().Evidence
-		stored, err := files.Upload(ctx, subject, productID, vulnerabilityID,
+		stored, err := files.Upload(ctx, subject,
+			attach.Against{ProductID: productID, VulnerabilityID: vulnerabilityID},
 			part.Filename, part, part.Size, maxSize, quota, share, evidence)
 		switch {
 		case errors.Is(err, attach.ErrTooLarge):

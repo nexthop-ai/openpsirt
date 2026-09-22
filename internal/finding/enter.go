@@ -317,10 +317,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return err
 		}
-		// Minted inside the transaction. The number is one past the
-		// highest this product has issued this year, and reading it
-		// before the transaction began would describe a world another
-		// writer has since moved.
+		// Minted inside the transaction, so that a name drawn and found
+		// free is still free when the row carrying it is written.
 		identifier, err = mint(ctx, tx, product, now.Year())
 		if err != nil {
 			return err
@@ -419,8 +417,13 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// rather than through the store, because the store holds a
 		// database and this is inside one of its transactions.
 		if told := in.Told; told.Stated() {
-			row := &WhoTold{
-				VulnerabilityID: vulnerabilityID,
+			reference, err := mintReference(ctx, tx, product, now.Year())
+			if err != nil {
+				return err
+			}
+			row := &FlawReport{
+				Reference:       reference,
+				VulnerabilityID: &vulnerabilityID,
 				// The product it was reported against, which is what decides
 				// who may read the reporter's name and address later.
 				ProductID:  productID,
@@ -428,6 +431,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				Contact:    strings.TrimSpace(told.Contact),
 				Credit:     strings.TrimSpace(told.Credit),
 				ReceivedOn: told.When(),
+				// Judged at the moment it was recorded: whoever typed this in
+				// said what the flaw is in the same act.
+				EvaluatedAt: &now, EvaluatedBy: &subject.ID,
 				RecordedBy: subject.ID,
 				RecordedAt: now,
 			}
@@ -552,34 +558,57 @@ func mint(ctx context.Context, tx bun.IDB, product string, year int) (string, er
 	if prefix == "" {
 		return "", fmt.Errorf("a product with no name cannot issue an identifier")
 	}
-	// Six digits, kept to a fixed width so every identifier this
-	// deployment issues reads the same length. The width is not what makes
-	// it unguessable — the routes answer a name somebody holds and a name
-	// nobody holds identically — it is what stops the sequence from being
-	// readable.
+	return drawIdentifier(ctx, fmt.Sprintf("%s in %d", prefix, year),
+		func(number int64) string {
+			return fmt.Sprintf("%s-%d-%d", prefix, year, number)
+		},
+		func(ctx context.Context, candidate string) (bool, error) {
+			taken, err := tx.NewSelect().
+				TableExpr(`"vulnerability" AS "v"`).
+				Where("v.identifier = ?", candidate).
+				Count(ctx)
+			if err != nil {
+				return false, fmt.Errorf(
+					"read whether that identifier is spoken for: %w", err)
+			}
+			return taken > 0, nil
+		})
+}
+
+// drawIdentifier draws a number nobody can guess and builds a name from it,
+// drawing again where that name is spoken for.
+//
+// Six digits, kept to a fixed width so every identifier this deployment
+// issues reads the same length. The width is not what makes it unguessable —
+// the routes answer a name somebody holds and a name nobody holds identically
+// — it is what stops the sequence from being readable.
+//
+// A collision is answered by drawing again inside the same transaction, so
+// two people recording at the same moment cannot be handed the same name: the
+// second waits, sees the first's row, and draws once more. Eight collisions in
+// a row against a space this size is not luck, and carrying on would be a loop
+// nobody is watching.
+func drawIdentifier(ctx context.Context, issuer string, name func(number int64) string,
+	taken func(ctx context.Context, candidate string) (bool, error)) (string, error) {
+
 	const lowest, span = 100000, 900000
 	for attempt := 0; attempt < 8; attempt++ {
 		drawn, err := rand.Int(rand.Reader, big.NewInt(span))
 		if err != nil {
 			return "", fmt.Errorf("draw an identifier: %w", err)
 		}
-		candidate := fmt.Sprintf("%s-%d-%d", prefix, year, drawn.Int64()+lowest)
-		taken, err := tx.NewSelect().
-			TableExpr(`"vulnerability" AS "v"`).
-			Where("v.identifier = ?", candidate).
-			Count(ctx)
+		candidate := name(drawn.Int64() + lowest)
+		held, err := taken(ctx, candidate)
 		if err != nil {
-			return "", fmt.Errorf("read whether that identifier is spoken for: %w", err)
+			return "", err
 		}
-		if taken == 0 {
+		if !held {
 			return candidate, nil
 		}
 	}
-	// Eight collisions in a row against a space this size is not luck, and
-	// carrying on would be a loop nobody is watching.
 	return "", fmt.Errorf(
-		"no identifier could be drawn for %s in %d — the ones it issues are nearly all taken",
-		prefix, year)
+		"no identifier could be drawn for %s — the ones it issues are nearly all taken",
+		issuer)
 }
 
 // productNameOf reads what a product is called, for the identifiers it issues.

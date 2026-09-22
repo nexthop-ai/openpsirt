@@ -19,7 +19,7 @@ REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
 - [Declared dependency scope](#declared-dependency-scope)
 - [Component interning](#component-interning)
 - [Recorded flaws](#recorded-flaws)
-- [Reporter details](#reporter-details)
+- [Reports](#reports)
 - [Scoring](#scoring)
 - [Affected build sets](#affected-build-sets)
 - [Closure by a person](#closure-by-a-person)
@@ -372,23 +372,99 @@ in a comparison exactly as a reported one does.
 | Recorded against the build itself, the place is the build's root, which has no name of its own | The product's name differs per variant, so a place keyed on it is a different place in each of them: one flaw across three variants was three places and three decisions. The scan path collapses a root parent for the same reason |
 | A name the build holds more than once is refused with the choices | A name is not unique within a build and not rarely: a real switch image ships three vendored copies of one library, and thirteen names in it are held at one version by two components. The resolution goes through the same lookup every other component reference takes — it did not, and took the first row a name matched |
 
-## Reporter details
+## Reports
 
-The name, how to reach them, when it arrived, when it was acknowledged, and how
-they wish to be credited (REQ-19). Without these the coordinated-disclosure
-timeline cannot be evidenced, and the advisory's acknowledgments section is
-empty, which is the part a researcher reads first.
+A report is the record that a claim arrived. It stands whether or not the claim
+turns out to be a flaw, because the evidence that it was received and answered
+is the record itself.
+
+Recorded only by minting an issue, a claim nobody believes either fills the
+findings with a flaw nobody believes or goes unrecorded — and an unrecorded
+claim destroys the evidence the record exists for. Slop reports are generated
+and arrive in greater numbers than real ones, so this holds before a security
+contact address is published rather than at some volume of them.
 
 | Rule | Reason |
 |---|---|
-| Every field is optional | A flaw found by whoever is typing has no reporter, and a form demanding one asks them to invent an answer. Nothing said reads as "we found it" |
+| A report exists without an issue | Whether a claim is a flaw is a judgment somebody makes afterwards, and the record has to stand before it is made |
+| It carries what was claimed | A report holding only who wrote in records that a mail arrived, which nobody can evaluate, answer or find again. The issue's own description carries the claim once there is one |
+| Everything about the reporter is optional | A claim arriving anonymously is an ordinary claim, and a flaw found by whoever is typing has no reporter at all. A form demanding one asks them to invent an answer |
 | One row per issue, not per finding | A flaw recorded against four builds is one report from one person, and four copies of their address is four places for it to be wrong |
 | **It records the product it was reported against, and that is who may read it** | An issue's identity spans its aliases, so the moment a CVE is recorded the same issue is open in every product a scan reports it in. Keyed on the issue alone, the reporter's name, address and received date were readable by anybody holding triage rights in any of those — and acknowledging from one of them cleared the unanswered condition out of another product's queue. The unanswered list stops fanning one letter out across every product the name reaches |
 | Credit preference is kept apart from the name reported under | "Anonymous" is a real answer, and so is a handle that is not the name on the mail |
 | The received date is what the embargo runs from (REQ-37) | A report that arrived a fortnight before anybody typed it in no longer puts this clock behind the reporter's. It falls back to when the record was made, and a date nobody can read is treated as one nobody gave |
 | The acknowledged date records that somebody answered, rather than answering | What reaches a researcher is a mail from an address somebody already has. Acknowledging twice keeps the first date, and the condition it raises fires at once rather than after a period |
+| What was claimed goes through the submission policy typed text does | It is rendered as markdown where it is read back and it quotes somebody outside this deployment, which is the case the policy exists for (REQ-67) |
 
 A public intake form is out of scope. This is the inside half.
+
+### Report references
+
+Minted here: the product, an `R`, the year and a six-digit number drawn at
+random. The letter is what keeps the two namespaces apart, so a reference and
+a recorded flaw's identifier cannot be read for each other.
+
+Drawn rather than counted, for the reason a recorded flaw's identifier is:
+counted from one it is a running total of how many claims this product has
+received and when the last one arrived, which is a disclosure made by the name
+alone. A collision draws again inside the same transaction.
+
+A reference is a name people type, so it is matched without regard to capitals
+— the stored form is the minted one and the typed one is folded to it, which
+compares the same under any engine.
+
+### Three roles
+
+The person who transcribes a mail is not the person who answers the reporter,
+and neither is the person who decides what the claim is worth. A record that
+cannot tell them apart evidences none of them.
+
+| Recorded | Written by |
+|---|---|
+| Who wrote it down, and when | Recording the report |
+| Who answered the reporter, and when | Acknowledging it |
+| Who judged the claim, and when | Saying what it turned out to be |
+
+A flaw recorded by hand carries all three at once, because whoever typed it in
+said what the flaw is in the same act.
+
+### Judgment
+
+A report is pointed at an issue that already exists here. Recording a flaw is
+its own act and carries the builds it ships in, the severity and the embargo,
+so agreeing that a claim is real is not the same keystroke as declaring where
+it lives.
+
+| Refusal | Reason |
+|---|---|
+| The report has already been judged | Two people judging at once would both succeed, and the second would overwrite who decided and when. Asked in the write as well as before it |
+| Another report is already that issue's record | One report is one issue's record. A second pointed at the same issue is a duplicate, which is a judgment of its own |
+| The issue is not one the judge may be told of here | Resolving first and refusing after makes the refusal informative: an identifier nobody has filed and one filed on work this person cannot see would come back differently, which turns this into a way to ask which identifiers are open here |
+
+### Report visibility
+
+A claim nobody has judged is undisclosed: there is no issue to be public
+about, and nobody has decided the claim is safe to repeat. So recording one,
+reading one and listing a product's reports all ask for the right to triage
+work nobody has announced in that product.
+
+A report that became an issue is as readable as the issue, asked at the moment
+of the request.
+
+A reference is reached in the product it was recorded against and nowhere
+else. A reference nobody minted, one recorded against another product, and one
+the reader may not see all answer alike — told apart, the pair of answers says
+which products hold claims.
+
+Somebody brought onto a single case reaches no reports. A case grant is about
+one issue, and a product's claims are not.
+
+### Not built
+
+The five dispositions a judged report can carry — accepted, duplicate, out of
+scope, not reproducible, rejected — and the second person that rejecting or
+declaring something out of scope requires. Pointing a report at an issue is
+the whole of what a report can be judged as today.
 
 ## Scoring
 

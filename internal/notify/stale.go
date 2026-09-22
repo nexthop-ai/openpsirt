@@ -479,6 +479,11 @@ func itemsWaiting(n int) string {
 // nobody has announced is whoever may triage undisclosed work in that product.
 // A report is about somebody outside this deployment and the reply goes to
 // them from a person, so this reaches the people who could be that person.
+//
+// A claim nobody has judged is narrowed further, to whoever may triage work
+// nobody has announced. It is who may open the report at all, and telling
+// somebody about a letter they cannot read is an alert they can do nothing
+// with.
 func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 	rows, err := finding.NewStore(w.db).Unacknowledged(ctx)
 	if err != nil {
@@ -516,9 +521,27 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 			ProductID:       &row.ProductID,
 			VulnerabilityID: &row.VulnerabilityID,
 		}
+		// A claim nobody has judged has no issue to name, no finding screen
+		// to point at and nobody on a case. It is named by the reference it
+		// was minted with, and reaches whoever may triage work nobody has
+		// announced in that product — which is exactly who may open it.
+		unjudged := row.VulnerabilityID == 0
+		if unjudged {
+			holds.About = identify(fmt.Sprintf("unanswered report %d", row.ReportID))
+			holds.Body = fmt.Sprintf("%s sent %s in %s%s and has not been answered. "+
+				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
+				"and it is what starts the timeline the record has to evidence.",
+				who, row.Reference, row.Product, when)
+			holds.Link = fmt.Sprintf("/products/%s/reports/%s",
+				url.QueryEscape(row.Product), url.QueryEscape(row.Reference))
+			holds.VulnerabilityID = nil
+		}
 		for personID, per := range reach {
 			at := per[row.ProductID]
-			if !at.public() || (row.Undisclosed && !at.private()) {
+			switch {
+			case unjudged && !at.triages(true):
+				continue
+			case !unjudged && (!at.public() || (row.Undisclosed && !at.private())):
 				continue
 			}
 			out[personID] = append(out[personID], holds)

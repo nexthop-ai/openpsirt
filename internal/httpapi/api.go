@@ -409,6 +409,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	})
 	// The record of who told us, and the names an issue goes by.
 	registerWhoTold(api, in)
+	registerIntake(api, in)
 	// Standing claims about the third-party components a build ships.
 	registerVEX(api, in)
 	// One issue, everywhere it sits, across products.
