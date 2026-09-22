@@ -230,6 +230,44 @@ func TestEachScanOnAPageIsAnsweredAgainstTheOneBeforeIt(t *testing.T) {
 	})
 }
 
+func TestAScanIsAnsweredTheSameAloneAsItIsBesideItsSuccessors(t *testing.T) {
+	// One statement answers a whole page, so every name any scan on the page
+	// moved is looked at against every scan on it. A name that stood on
+	// neither side of a scan is not that scan's arrival, and counting it as
+	// one makes an upload's answer depend on which other uploads were asked
+	// about beside it.
+	each(t, func(t *testing.T, f *fixture) {
+		applied(t, f, tree())
+
+		// Two nights, each adding one name and leaving the other's alone.
+		first := tree()
+		first.Components = append(first.Components, zlib)
+		first.Dependencies = append(first.Dependencies, graph.Dependency{Parent: curl, Child: zlib})
+		second := applied(t, f, first)
+
+		next := first
+		arriving := at("libxml2", "2.12.0")
+		next.Components = append(next.Components, arriving)
+		next.Dependencies = append(next.Dependencies, graph.Dependency{Parent: curl, Child: arriving})
+		third := applied(t, f, next)
+
+		page, err := f.store.Deltas(t.Context(), everyone(f), f.targetID, []int64{second, third})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := map[int64]graph.Delta{second: {Added: 1}, third: {Added: 1}}
+		for scanID, expected := range want {
+			if got := page[scanID]; got != expected {
+				t.Errorf("on a page of two, scan %d reports %+v, want %+v", scanID, got, expected)
+			}
+		}
+		// The same scan, asked about by itself.
+		if got, want := delta(t, f, second), (graph.Delta{Added: 1}); got != want {
+			t.Errorf("asked alone, the earlier scan reports %+v, want %+v", got, want)
+		}
+	})
+}
+
 func TestAScanOfAnotherBuildIsAnsweredForByNothing(t *testing.T) {
 	// The scans asked about are read from the scan table under this build, so
 	// an identifier that belongs elsewhere is absent from the answer. Counted

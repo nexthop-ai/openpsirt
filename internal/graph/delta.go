@@ -106,13 +106,15 @@ func (s *Store) Deltas(ctx context.Context, subject access.Subject, targetID int
 		}
 	}
 
-	// A name is here because the scan wrote a row of it, so it stood on at
-	// least one side: a row the scan opened is present at it, and a row it
-	// closed was present before it.
+	// One statement answers the whole page, so every name any scan on the
+	// page moved is looked at against every scan on it. A name that stood on
+	// neither side of this one belongs to another upload.
 	for at, seen := range names {
 		delta := out[at]
 		for _, name := range seen {
 			switch {
+			case name.before == 0 && name.after == 0:
+				// Another scan on the page moved this name; this one did not.
 			case name.before == 0:
 				delta.Added++
 			case name.after == 0:
@@ -172,10 +174,13 @@ type movedRow struct {
 // The names are narrowed to what these scans opened or closed a row of, which
 // is the whole of what any of them can have moved: a scan stamps its own
 // identifier on both ends of an interval, so a name none of them touched
-// stands identically on both sides of every one of them. That narrowing is
-// speed and not meaning — a name evaluated against a scan that did not touch
-// it is present on both sides at the same versions, which is classified as
-// nothing at all.
+// stands identically on both sides of every one of them.
+//
+// The narrowing is per page rather than per scan, so a name comes back against
+// every scan on the page and not only against the one that moved it. Against
+// the others it stands the same on both sides, or on neither side where the
+// name reached this build after them — and the caller counts both as no
+// change.
 func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]movedRow, error) {
 	earliest, latest := scanIDs[0], scanIDs[0]
 	for _, id := range scanIDs {
