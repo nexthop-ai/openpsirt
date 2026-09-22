@@ -2,11 +2,14 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -493,6 +496,93 @@ func TestAKeyThatReadsNoFindingsIsToldNothingAboutWhatARunChanged(t *testing.T) 
 		if got.Opened != nil || got.Closed != nil {
 			t.Errorf("a key that reads no findings is told the run opened %s and closed %s",
 				shown(got.Opened), shown(got.Closed))
+		}
+	})
+}
+
+// carrying is an inventory of however many components, each hung off the
+// root, so one upload can be compared against another.
+func carrying(builtAt time.Time, components map[string]string) string {
+	names := make([]string, 0, len(components))
+	for name := range components {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	rows := make([]string, 0, len(names))
+	refs := make([]string, 0, len(names))
+	for _, name := range names {
+		version := components[name]
+		rows = append(rows, fmt.Sprintf(
+			`{"bom-ref": %q, "name": %q, "version": %q, "purl": "pkg:deb/debian/%s@%s"}`,
+			name, name, version, name, version))
+		refs = append(refs, strconv.Quote(name))
+	}
+	return fmt.Sprintf(`{
+	  "bomFormat": "CycloneDX", "specVersion": "1.6",
+	  "serialNumber": "urn:uuid:%x",
+	  "metadata": {"timestamp": %q,
+	    "component": {"bom-ref": "root", "name": "sonic-broadcom.bin", "version": "1.0"}},
+	  "components": [%s],
+	  "dependencies": [{"ref": "root", "dependsOn": [%s]}]
+	}`, builtAt.UnixNano(), builtAt.UTC().Format(time.RFC3339),
+		strings.Join(rows, ","), strings.Join(refs, ","))
+}
+
+func TestAReceiptSaysWhatItsUploadChangedAboutTheInventory(t *testing.T) {
+	// The pipeline sent the document, so what it did to the build's contents
+	// is the pipeline's own answer to read back — a build that expected to
+	// move three dependencies and moved two hundred has something wrong with
+	// it, and nothing else says so.
+	eachIngest(t, queue.DefaultOptions(), func(t *testing.T, f *ingestFixture) {
+		read := func() {
+			t.Helper()
+			quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+			reader := ingest.NewReader(f.db, f.queue, sbom.Limits{}, quiet, "test")
+			if _, err := reader.Once(t.Context()); err != nil {
+				t.Fatalf("reading: %v", err)
+			}
+		}
+
+		first := nowish()
+		if code, _ := f.send(t, upload(t, f.path, carrying(first,
+			map[string]string{"libc6": "2.41", "zlib1g": "1.3"}))); code != http.StatusAccepted {
+			t.Fatal("the first upload was not taken")
+		}
+		read()
+
+		// The first inventory a build ever had read is a picture rather than
+		// a change to one, and there is nothing behind it to compare against.
+		_, out := receipts(t, f, f.key, f.path)
+		if len(out.Body.Items) != 1 {
+			t.Fatalf("got %d receipts, want 1", len(out.Body.Items))
+		}
+		if got := out.Body.Items[0].Inventory; got != nil {
+			t.Errorf("the first upload claims it changed %+v", got)
+		}
+
+		// zlib1g moves, curl arrives, libc6 stays where it was.
+		if code, _ := f.send(t, upload(t, f.path, carrying(first.Add(time.Minute),
+			map[string]string{"libc6": "2.41", "zlib1g": "1.4", "curl": "8.4.0"}))); code != http.StatusAccepted {
+			t.Fatal("the second upload was not taken")
+		}
+		read()
+
+		_, out = receipts(t, f, f.key, f.path)
+		if len(out.Body.Items) != 2 {
+			t.Fatalf("got %d receipts, want 2", len(out.Body.Items))
+		}
+		// Newest first, so the second upload is the first row.
+		got := out.Body.Items[0].Inventory
+		if got == nil {
+			t.Fatalf("the second upload says nothing about what it changed: %+v", out.Body.Items[0])
+		}
+		want := httpapi.InventoryBody{Added: 1, Removed: 0, Changed: 1}
+		if *got != want {
+			t.Errorf("the second upload reports %+v, want %+v", *got, want)
+		}
+		if older := out.Body.Items[1].Inventory; older != nil {
+			t.Errorf("the first upload reports %+v once a second one exists", older)
 		}
 	})
 }

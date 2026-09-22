@@ -6956,6 +6956,23 @@ export interface components {
         Inside: {
             "@id": string;
         };
+        InventoryBody: {
+            /**
+             * Format: int64
+             * @description Names this upload's inventory holds and the one before it did not
+             */
+            added: number;
+            /**
+             * Format: int64
+             * @description Names both hold at a different set of versions
+             */
+            changed: number;
+            /**
+             * Format: int64
+             * @description Names the one before it held and this one does not
+             */
+            removed: number;
+        };
         IssuanceBody: {
             /**
              * Format: uri
@@ -8558,6 +8575,8 @@ export interface components {
             components?: number;
             /** @description The reason it could not be used, where it could not */
             failure?: string;
+            /** @description What this upload changed about the build's inventory. Absent on the first upload read for a build, and until this one has been read */
+            inventory?: components["schemas"]["InventoryBody"];
             /** @description The tools the run answering this upload was measured with. Absent until a run has covered it */
             measured?: components["schemas"]["MeasuredBody"];
             /**

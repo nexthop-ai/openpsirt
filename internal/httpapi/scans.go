@@ -24,6 +24,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -684,6 +685,14 @@ type ReceiptBody struct {
 	// and nothing else on this screen tells the two apart.
 	Components *int `json:"components,omitempty" doc:"The number of components the inventory described"`
 	Placed     *int `json:"placed,omitempty" doc:"The number of them something placed in the graph"`
+	// Inventory is what this upload made of the inventory the one before it
+	// described. A fact about the documents rather than about what is wrong
+	// with them, which is why a key that reads no findings still gets it:
+	// the pipeline that sent the document is who the answer is for.
+	//
+	// Absent on the first upload a build ever had read, which is a picture
+	// rather than a change to one, and absent until this one has been read.
+	Inventory *InventoryBody `json:"inventory,omitempty" doc:"What this upload changed about the build's inventory. Absent on the first upload read for a build, and until this one has been read"`
 	// Measured is what the run answering *this* upload was made with,
 	// rather than what the newest run was. On every receipt the run
 	// answers, unlike opened and closed: the versions are a property of
@@ -695,6 +704,18 @@ type ReceiptBody struct {
 	// asked for. On every receipt that run answers, like the versions beside
 	// it — the counts above are the thing that belongs to one upload only.
 	RunID int64 `json:"run_id,omitempty" doc:"The run that answered this upload. Absent until one has"`
+}
+
+// InventoryBody is what one upload changed about what a build is made of.
+//
+// Counted by name rather than by component: an upgrade is one dependency that
+// moved, and counted as components it would be one arrival and one departure.
+// A name shipped at two versions at once is one entry however many of them
+// move.
+type InventoryBody struct {
+	Added   int `json:"added" doc:"Names this upload's inventory holds and the one before it did not"`
+	Removed int `json:"removed" doc:"Names the one before it held and this one does not"`
+	Changed int `json:"changed" doc:"Names both hold at a different set of versions"`
 }
 
 // SentBody is one document an upload was made of, as a record rather than as
@@ -864,6 +885,19 @@ func registerReceipts(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what the scans arrived with could not be read", err)
 		}
 
+		// What each upload made of the build's inventory, for the page at
+		// once. Worked out from the intervals the scan already wrote rather
+		// than stored beside them: the rows that answer it are the rows
+		// applying the scan produced.
+		deltas, err := graph.NewStore(in.DB.DB).Deltas(ctx, subject, target.ID, ids)
+		switch {
+		case errors.Is(err, access.ErrDenied):
+			return nil, nothingScannedThere()
+		case err != nil:
+			return nil, wentWrong(in.Logger,
+				"what the scans changed about the inventory could not be read", err)
+		}
+
 		for _, r := range receipts {
 			body := ReceiptBody{
 				ScanID:     r.Scan.ID,
@@ -885,6 +919,16 @@ func registerReceipts(api huma.API, in Ingest) {
 				}
 			}
 			body.Components, body.Placed = r.Scan.Components, r.Scan.Placed
+			// Only for an upload that has been read. Until then there is no
+			// inventory to have changed anything, and a run of zeros would
+			// say this one changed nothing.
+			if r.Scan.Components != nil {
+				if moved, answered := deltas[r.Scan.ID]; answered {
+					body.Inventory = &InventoryBody{
+						Added: moved.Added, Removed: moved.Removed, Changed: moved.Changed,
+					}
+				}
+			}
 			if r.Measured != nil {
 				body.RunID = r.Measured.ID
 				body.Measured = &MeasuredBody{

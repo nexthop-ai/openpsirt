@@ -757,6 +757,18 @@ pair, not either alone — a component nothing places is ordinary, but a documen
 that places *none* is a list rather than a graph, whose every finding will be
 individually correct and unable to answer "why is this here".
 
+Three more are worked out when a receipt is read: how many names the inventory
+gained, lost and holds at different versions since the upload before it.
+`DESIGN-data-model.md` § Inventory delta holds what is compared. A build that
+expected to move three dependencies and moved two hundred has had a base image
+change under it or a lockfile regenerated, and nothing else on a receipt says
+so.
+
+A key that reads no findings is told this. It is arithmetic over the documents
+that key sent, in the same class as the two numbers above it. The comparison is
+against what the build held before that upload, whoever sent it: two keys
+sending for one variant are describing one artifact.
+
 ## Document retrieval
 
 A tag's documents are retained so a release can be re-scanned later. With
