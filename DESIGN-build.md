@@ -51,6 +51,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/triage/`, `internal/advisory/` | Judgments, approvals, and the CSAF document. See `DESIGN-triage.md` |
 | `internal/access/`, `internal/signin/` | Subjects and sign-in. See `DESIGN-access.md` |
 | `internal/notify/` | Notifications. See `DESIGN-notifications.md` |
+| `internal/obligation/` | The windows a deployment counts after an attack, the notices given, and the shelf over both. See `DESIGN-obligations.md` |
 | `internal/markdown/`, `internal/setting/`, `internal/currency/` | Text policy, administrator settings, and upstream version lookups |
 | `internal/attach/` | Files that hang off an issue, and what may be served back. See `DESIGN-attachments.md` |
 | `internal/trail/` | What somebody changed about how this deployment works. See `DESIGN-access.md` |

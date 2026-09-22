@@ -141,6 +141,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 		FixedIn         string     `bun:"fixed_in"`
 		Description     string     `bun:"description"`
 		Exploited       int        `bun:"exploited"`
+		ExploitedHere   int        `bun:"exploited_here"`
 		LikelihoodPPM   int        `bun:"likelihood_ppm"`
 		DueAt           *time.Time `bun:"due_at"`
 	}
@@ -163,6 +164,9 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			// number on the other two; a number comes back as a number on
 			// all four.
 			ColumnExpr(`MAX(CASE WHEN v.exploited THEN 1 ELSE 0 END) AS "exploited"`).
+			// Read off the finding, where a standing record of this product
+			// being attacked is already written for ranking.
+			ColumnExpr(`MAX(CASE WHEN f.urgency_exploited_here THEN 1 ELSE 0 END) AS "exploited_here"`).
 			// The earliest deadline among this issue's places here, which is
 			// the one that makes it late. Read with the rest of what a row
 			// shows rather than off the places: the places are read for what
@@ -202,6 +206,7 @@ func (s *Store) atComponent(ctx context.Context, subject access.Subject, targetI
 			place.FixedIn = row.FixedIn
 			place.Summary = firstLineOf(row.Description)
 			place.Exploited = row.Exploited == 1
+			place.ExploitedHere = row.ExploitedHere == 1
 			place.LikelihoodPPM = row.LikelihoodPPM
 			place.DueAt = row.DueAt
 			place.Places = head.Places

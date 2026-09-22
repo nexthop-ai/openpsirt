@@ -2,7 +2,7 @@
 
 What a person is told, through which channel, and when.
 
-Satisfies REQ-46, REQ-47, REQ-48, REQ-49.
+Satisfies REQ-46, REQ-47, REQ-48, REQ-49, REQ-77.
 
 ## Contents
 
@@ -24,6 +24,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49.
 - [Mail](#mail)
 - [Outbound HTTP](#outbound-http)
 - [Embargo notices](#embargo-notices)
+- [Obligation notices](#obligation-notices)
 - [Ownership of a notification](#ownership-of-a-notification)
 - [Not built](#not-built)
 - [Limits](#limits)
@@ -53,7 +54,7 @@ true is cleared, and running the same pass twice changes nothing.
 | Work arriving | event | The category that deserves interrupting somebody for |
 | A claim sent back | event | It goes straight back into its author's queue, so silence leaves it sitting |
 | Somebody named you | event | A name after an `@`, resolved when the text is saved |
-| An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue taking back the agreement under a claim that it does not apply. The second reaches somebody who was not in the exchange at all, so without it the claim simply reappears in their queue with no explanation |
+| An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue returning a claim that sets it aside to the queue. The second reaches somebody who was not in the exchange at all, so without it the claim simply reappears in their queue with no explanation |
 | A decision the code moved under | event | It hands work back to somebody who did nothing to cause it |
 | An approval an edit withdrew | event | **Not built.** The people who granted it should be told, so it does not quietly stop counting |
 | A build that stopped being scanned | condition | A sweep derives every declared build with when it was last scanned and reconciles |
@@ -68,6 +69,8 @@ true is cleared, and running the same pass twice changes nothing.
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
+| A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
+| The same window passed | condition | Described under obligation notices below |
 
 A new build notifies nobody. A build arriving is the ordinary state of a tool
 scanned nightly. What a build changed is on the receipts and in the trend, and
@@ -491,6 +494,22 @@ evidence.
 statement carries which statement that was. Inferring it from the issue and the
 component would raise an alert about every decision at a place a publisher
 happens to have spoken about.
+
+## Obligation notices
+
+A window a deployment declares runs from the moment a record says its product
+was attacked (REQ-77). `DESIGN-obligations.md` holds the windows and the
+notices; what is said about them is here.
+
+| Rule | Reason |
+|---|---|
+| Two conditions, running and passed | They clear differently, the way the two embargo conditions do. The running one clears when the end arrives, and the passed one opens |
+| Raised from the moment the record stands, with no lead time | The windows in force anywhere are a day to a fortnight and an incident is rare, so a warning that waits gives back the hours it exists to save |
+| One per record and window | Each window is answered separately, so each is said separately |
+| Cleared by a notice naming the window, by clearing the record, or by retiring the window | The same way every condition here clears: by the thing happening. Nobody dismisses it |
+| To whoever may triage the product, at the issue's visibility | The people who may record the notice. An undisclosed issue reaches nobody who may not read undisclosed work there, and what leaves the deployment about it is a link |
+| No window declared, nothing said | None ships. A deployment under no obligation hears nothing |
+| The sentence says the time and that nothing is recorded | Both are facts. Whether anybody owed anything is not the tool's answer to give |
 
 ## Ownership of a notification
 

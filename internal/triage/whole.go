@@ -146,7 +146,11 @@ func (s *Store) Whole(ctx context.Context, subject access.Subject, claimID int64
 		return nil, err
 	}
 
-	if claim.Kind == TogetherClaim {
+	many, err := s.overMany(ctx, *claim)
+	if err != nil {
+		return nil, err
+	}
+	if many {
 		outliers, err := s.outliersFor(ctx, subject, []Claim{*claim})
 		if err != nil {
 			return nil, err

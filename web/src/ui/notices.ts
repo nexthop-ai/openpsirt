@@ -23,6 +23,13 @@ export function label(kind?: string): string {
     // base image moved or the pipeline broke.
     case "inventory-moved":
       return "a build's contents changed sharply";
+    // A window after an attack, counted from when it became known, with
+    // nobody outside recorded as told. Said as the fact; whether anybody owed
+    // anything is not the tool's answer to give.
+    case "obligation-open":
+      return "window after an attack running";
+    case "obligation-passed":
+      return "window after an attack passed";
     // The two conditions about the deployment rather than about anybody's
     // work. Both go to administrators, and both said their own slug here —
     // which is the one place the fallthrough below reads as a tool that was

@@ -191,6 +191,31 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		cleared += c
 	}
 
+	// A window after an attack on a product, running and then passed, with
+	// nobody outside recorded as told. Per person for the reason the
+	// embargo conditions are: each names an issue in a product.
+	for _, window := range []struct {
+		kind Kind
+		of   func(context.Context) (map[int64][]Holds, error)
+		what string
+	}{
+		{ObligationOpen, w.windowsOpen, "which windows after an attack are running"},
+		{ObligationPassed, w.windowsPassed, "which windows after an attack have passed"},
+	} {
+		holding, err := window.of(ctx)
+		if err != nil {
+			return opened, cleared, err
+		}
+		for person, each := range holding {
+			o, c, err := NewStore(w.db).Reconcile(ctx, person, window.kind, each)
+			if err != nil {
+				return opened, cleared, fmt.Errorf("tell %d %s: %w", person, window.what, err)
+			}
+			opened += o
+			cleared += c
+		}
+	}
+
 	// A VEX publisher changing what they said about something a standing
 	// decision cited. Per person for the reason the two below are: it
 	// names an issue at a component, which is finding content, so who

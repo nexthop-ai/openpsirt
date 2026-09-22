@@ -172,7 +172,7 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many |
+| **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, what is disclosing, the advisories and the standing attacks sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 A build-only entry declines rather than opening on a scope that means nothing.

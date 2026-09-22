@@ -14,7 +14,7 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Markdown } from "../ui/Markdown";
 import { Editor, forget } from "../ui/Editor";
-import { Severity, Exploited } from "../ui/Severity";
+import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Paged } from "../ui/Paged";
 import { Because, called, labeled } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
@@ -808,13 +808,22 @@ function Card({
         </div>
       )}
 
-      {bulk && claim.outliers && (
+      {/* Every act over many issues carries this, including rows set aside
+          from one and one re-made after it lapsed: agreeing to any of them is
+          refused over an issue this product was attacked through, and this
+          table is where that issue is set aside. */}
+      {claim.outliers && (
         <div className="outliers">
           <header>
             <h5>Outliers</h5>
             <span className="hint">Rows that do not match the shape of the claim.</span>
           </header>
           <div className="ostats">
+            {claim.outliers.exploited_here > 0 && (
+              <span className="o bad">
+                <b>{claim.outliers.exploited_here}</b> attacked here
+              </span>
+            )}
             <span className={`o${claim.outliers.exploited ? " bad" : ""}`}>
               <b>{claim.outliers.exploited}</b> known exploited
             </span>
@@ -844,14 +853,18 @@ function Card({
                   {(claim.outliers.rows ?? []).map((row) => (
                     <tr key={row.decision_id}>
                       <td>
+                        {/* Every place of the issue, not one: agreeing to any
+                            of them is agreeing to the issue. */}
                         <input
                           type="checkbox"
                           aria-label="Set aside"
                           checked={aside.has(row.decision_id)}
                           onChange={(event) => {
                             const next = new Set(aside);
-                            if (event.target.checked) next.add(row.decision_id);
-                            else next.delete(row.decision_id);
+                            for (const id of row.decision_ids ?? [row.decision_id]) {
+                              if (event.target.checked) next.add(id);
+                              else next.delete(id);
+                            }
                             setAside(next);
                           }}
                         />
@@ -861,6 +874,7 @@ function Card({
                       </td>
                       <td>
                         <span className="id">{row.vulnerability}</span>{" "}
+                        <ExploitedHere when={row.exploited_here} />{" "}
                         <Exploited when={row.exploited} />
                       </td>
                       <td className="hint">{(row.description ?? "").slice(0, 120)}</td>

@@ -59,25 +59,34 @@ type Waiting struct {
 // Outliers is what an approver of a bulk claim checks instead of reading every
 // row: the handful that contradict the shape of the claim.
 type Outliers struct {
-	// Exploited, Severe, Fixable and Unmatched count the distinct issues in
-	// the claim with that property. Severe is critical or high; Unmatched is
-	// an issue whose description does not contain the term the set was
-	// narrowed by, where that term is known.
-	Exploited, Severe, Fixable, Unmatched int
-	// Rows are the issues that stood out, exploited first and then by
-	// severity, capped.
+	// ExploitedHere, Exploited, Severe, Fixable and Unmatched count the
+	// distinct issues in the claim with that property. ExploitedHere is this
+	// product's own standing record of being attacked through the issue;
+	// Severe is critical or high; Unmatched is an issue whose description
+	// does not contain the term the set was narrowed by, where that term is
+	// known.
+	ExploitedHere, Exploited, Severe, Fixable, Unmatched int
+	// Rows are the issues that stood out, attacked here first, then
+	// exploited, then by severity. Capped, except that no issue this product
+	// was attacked through is ever left off: agreeing to the claim is refused
+	// while one is in it, so it is the row an approver has to set aside.
 	Rows []Outlier
 }
 
 // Outlier is one issue in a bulk claim that does not look like the rest.
 type Outlier struct {
-	DecisionID    int64
+	DecisionID int64
+	// DecisionIDs is every row of the claim about this issue: one per place.
+	// Setting the issue aside sets aside all of them, because agreeing to any
+	// one of its places is agreeing to the issue.
+	DecisionIDs   []int64
 	Vulnerability string
 	Severity      string
+	ExploitedHere bool
 	Exploited     bool
 	FixedIn       string
 	Description   string
-	// Why names which of the four things made it stand out.
+	// Why names which of the things made it stand out.
 	Why []string
 }
 
@@ -210,9 +219,17 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
 	if err != nil {
 		return nil, 0, err
 	}
+	// Every claim that is an act over many issues, including rows set aside
+	// from one and one re-made after it lapsed: each is refused over an
+	// attacked issue the same way, so each needs the table to set it aside.
 	var bulk []Claim
 	for _, id := range ids {
-		if claim := byID[id]; claim.Kind == TogetherClaim {
+		claim := byID[id]
+		many, err := s.overMany(ctx, claim)
+		if err != nil {
+			return nil, 0, err
+		}
+		if many {
 			bulk = append(bulk, claim)
 		}
 	}
@@ -247,9 +264,9 @@ func (s *Store) Queue(ctx context.Context, subject access.Subject, mine bool,
 			Builds:             builds[id],
 			Counter:            against[representative.ID],
 		}
-		if claim.Kind == TogetherClaim {
-			one.Outliers = outliers[claim.ID]
-		}
+		// Present for every claim read as an act over many issues above,
+		// and absent otherwise.
+		one.Outliers = outliers[claim.ID]
 		out = append(out, one)
 	}
 	return out, total, nil
@@ -330,10 +347,10 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 		TableExpr(`"decision" AS "de"`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
 		ColumnExpr(`de.vulnerability_id AS "vulnerability_id"`).
-		ColumnExpr(`MIN(de.id) AS "decision_id"`).
+		ColumnExpr(`de.id AS "decision_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
 		Where("de.claim_id IN (?)", bun.List(claimIDs)).
-		GroupExpr("de.claim_id, de.vulnerability_id, de.product_id").
+		OrderExpr("de.claim_id, de.vulnerability_id, de.id").
 		Scan(ctx, &heads); err != nil {
 		return nil, fmt.Errorf("read what a bulk claim covers: %w", err)
 	}
@@ -342,16 +359,30 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 	}
 	issueIDs := make([]int64, 0, len(heads))
 	productIDs := make([]int64, 0, len(heads))
-	covers := map[int64]map[int64]int64{}
+	// Every row per issue, earliest first: the first stands for the issue
+	// and all of them are what setting it aside sets aside.
+	covers := map[int64]map[int64][]int64{}
 	within := map[int64]int64{}
+	byProduct := map[int64][]int64{}
 	for _, head := range heads {
 		issueIDs = append(issueIDs, head.VulnerabilityID)
 		productIDs = append(productIDs, head.ProductID)
 		within[head.ClaimID] = head.ProductID
+		byProduct[head.ProductID] = append(byProduct[head.ProductID], head.VulnerabilityID)
 		if covers[head.ClaimID] == nil {
-			covers[head.ClaimID] = map[int64]int64{}
+			covers[head.ClaimID] = map[int64][]int64{}
 		}
-		covers[head.ClaimID][head.VulnerabilityID] = head.DecisionID
+		covers[head.ClaimID][head.VulnerabilityID] = append(
+			covers[head.ClaimID][head.VulnerabilityID], head.DecisionID)
+	}
+	// Which of these issues each product records being attacked through.
+	attacked := map[int64]map[int64]bool{}
+	for productID, issues := range byProduct {
+		standing, err := finding.ExploitedHere(ctx, s.db, productID, issues)
+		if err != nil {
+			return nil, err
+		}
+		attacked[productID] = standing
 	}
 
 	var issues []finding.Vulnerability
@@ -413,16 +444,16 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, claims 
 
 	for _, claim := range claims {
 		out[claim.ID] = outliersOf(claim, within[claim.ID], covers[claim.ID], byIssue,
-			rated, fixedIn[claim.ID])
+			rated, fixedIn[claim.ID], attacked[within[claim.ID]])
 	}
 	return out, nil
 }
 
 // outliersOf picks, from the issues one bulk claim covers, the rows that do
 // not look like the rest.
-func outliersOf(claim Claim, productID int64, decisionOf map[int64]int64,
+func outliersOf(claim Claim, productID int64, decisionsOf map[int64][]int64,
 	byIssue map[int64]finding.Vulnerability, rated map[finding.RatedKey]string,
-	fixedIn map[int64]string) *Outliers {
+	fixedIn map[int64]string, attacked map[int64]bool) *Outliers {
 
 	// The term the list was actually narrowed by, where the act recorded one,
 	// and the claimant's prose only where it did not.
@@ -436,11 +467,11 @@ func outliersOf(claim Claim, productID int64, decisionOf map[int64]int64,
 		term = narrowingTerm(orEmpty(claim.SelectedBy))
 	}
 	out := &Outliers{Rows: []Outlier{}}
-	candidates := make([]Outlier, 0, len(decisionOf))
+	candidates := make([]Outlier, 0, len(decisionsOf))
 	// Walked in issue order so the result is the same on every engine and
 	// every run, whatever order a map hands them out in.
-	issueIDs := make([]int64, 0, len(decisionOf))
-	for id := range decisionOf {
+	issueIDs := make([]int64, 0, len(decisionsOf))
+	for id := range decisionsOf {
 		issueIDs = append(issueIDs, id)
 	}
 	sort.Slice(issueIDs, func(i, j int) bool { return issueIDs[i] < issueIDs[j] })
@@ -458,9 +489,14 @@ func outliersOf(claim Claim, productID int64, decisionOf map[int64]int64,
 			word = finding.SeverityWord(*issue.ScoreCenti)
 		}
 		one := Outlier{
-			DecisionID: decisionOf[issue.ID], Vulnerability: issue.Identifier,
-			Severity: word, Exploited: issue.Exploited, FixedIn: fixedIn[issue.ID],
-			Description: clip(issue.Description, 200),
+			DecisionID: decisionsOf[issue.ID][0], DecisionIDs: decisionsOf[issue.ID],
+			Vulnerability: issue.Identifier, Severity: word,
+			ExploitedHere: attacked[issue.ID], Exploited: issue.Exploited,
+			FixedIn: fixedIn[issue.ID], Description: clip(issue.Description, 200),
+		}
+		if one.ExploitedHere {
+			out.ExploitedHere++
+			one.Why = append(one.Why, "this product was attacked through it")
 		}
 		if issue.Exploited {
 			out.Exploited++
@@ -482,10 +518,13 @@ func outliersOf(claim Claim, productID int64, decisionOf map[int64]int64,
 			candidates = append(candidates, one)
 		}
 	}
-	// Exploited first, then the worst rated, then by name so the order is the
-	// same on every engine.
+	// Attacked here first, then exploited, then the worst rated, then by name
+	// so the order is the same on every engine.
 	sort.SliceStable(candidates, func(i, j int) bool {
 		a, b := candidates[i], candidates[j]
+		if a.ExploitedHere != b.ExploitedHere {
+			return a.ExploitedHere
+		}
 		if a.Exploited != b.Exploited {
 			return a.Exploited
 		}
@@ -494,8 +533,11 @@ func outliersOf(claim Claim, productID int64, decisionOf map[int64]int64,
 		}
 		return a.Vulnerability < b.Vulnerability
 	})
-	if len(candidates) > outlierRows {
-		candidates = candidates[:outlierRows]
+	// Past the cap only where the rows past it are attacked here, which sort
+	// first: those are the ones agreeing is refused over.
+	keep := max(outlierRows, out.ExploitedHere)
+	if len(candidates) > keep {
+		candidates = candidates[:keep]
 	}
 	out.Rows = candidates
 	return out

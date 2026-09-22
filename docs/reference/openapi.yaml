@@ -652,6 +652,9 @@ components:
         exploited:
           description: Somebody is known to be exploiting this
           type: boolean
+        exploited_here:
+          description: This product records being exploited through it. A judgment over several issues that sets this one aside or puts it off is refused
+          type: boolean
         fixed_in:
           description: The version the report says fixes it, where it names one
           type: string
@@ -2527,6 +2530,27 @@ components:
         - product_tree
         - vulnerabilities
       type: object
+    DueBody:
+      additionalProperties: false
+      properties:
+        answered:
+          description: Whether a notice recorded against this incident names this window
+          type: boolean
+        ends_at:
+          description: When the attack became known, plus the window
+          format: date-time
+          type: string
+        passed:
+          description: Whether that moment has gone
+          type: boolean
+        window:
+          $ref: "#/components/schemas/WindowBody"
+      required:
+        - window
+        - ends_at
+        - passed
+        - answered
+      type: object
     EarlierBody:
       additionalProperties: false
       properties:
@@ -3101,8 +3125,15 @@ components:
         standing:
           description: Whether this is the record in force. One stands at a time per issue and product
           type: boolean
+        told:
+          description: Who outside was told about this, when, and what they were told
+          items:
+            $ref: "#/components/schemas/NoticeBody"
+          type:
+            - array
+            - "null"
         undone:
-          description: Approved claims that the issue does not apply whose agreement this took back, returning them to the review queue
+          description: "Decisions this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off"
           format: int64
           type: integer
         vulnerability:
@@ -5753,6 +5784,82 @@ components:
       required:
         - id
       type: object
+    NoticeBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/NoticeBody.json
+          format: uri
+          readOnly: true
+          type: string
+        id:
+          format: int64
+          type: integer
+        recipient:
+          description: Who was told
+          type: string
+        recorded_at:
+          format: date-time
+          type: string
+        recorded_by:
+          description: Who recorded the notice
+          type: string
+        said:
+          description: What they were told
+          type: string
+        told_at:
+          description: When they were told
+          format: date-time
+          type: string
+        window:
+          description: That window's name
+          type: string
+        window_id:
+          description: The window this notice answers, where whoever recorded it named one. A retired window's name may be declared again, so this is what tells the two apart
+          format: int64
+          type: integer
+      required:
+        - id
+        - recipient
+        - told_at
+        - said
+        - recorded_at
+      type: object
+    NoticeSaid:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/NoticeSaid.json
+          format: uri
+          readOnly: true
+          type: string
+        recipient:
+          description: "Who was told: a regulator, a customer, a response team"
+          maxLength: 200
+          minLength: 1
+          type: string
+        said:
+          description: What they were told
+          maxLength: 65536
+          minLength: 1
+          type: string
+        told_at:
+          description: When they were told. Not before the attack became known, and not in the future
+          format: date-time
+          type: string
+        window:
+          description: The window in force this notice answers. Left off, it answers none
+          format: int64
+          type: integer
+      required:
+        - recipient
+        - told_at
+        - said
+      type: object
     NotificationBody:
       additionalProperties: false
       properties:
@@ -5811,6 +5918,97 @@ components:
       required:
         - items
         - total
+      type: object
+    ObligationBody:
+      additionalProperties: false
+      properties:
+        cleared_at:
+          format: date-time
+          type: string
+        cleared_because:
+          description: Why it was cleared
+          type: string
+        cleared_by:
+          description: Who cleared it
+          type: string
+        grounds:
+          description: What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has
+          type: string
+        id:
+          format: int64
+          type: integer
+        known_at:
+          description: When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+          format: date-time
+          type: string
+        may_tell:
+          description: Whether you may record a notice about this record
+          type: boolean
+        product:
+          description: The product this record belongs to, by the name an address takes
+          type: string
+        product_name:
+          description: That product's spelling on screen
+          type: string
+        recorded_at:
+          format: date-time
+          type: string
+        recorded_by:
+          description: Who recorded it
+          type: string
+        standing:
+          description: Whether this is the record in force. One stands at a time per issue and product
+          type: boolean
+        told:
+          description: Who outside was told about this, when, and what they were told
+          items:
+            $ref: "#/components/schemas/NoticeBody"
+          type:
+            - array
+            - "null"
+        undisclosed:
+          description: Whether the issue is undisclosed somewhere in this product
+          type: boolean
+        undone:
+          description: "Decisions this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off"
+          format: int64
+          type: integer
+        vulnerability:
+          description: The issue this is about
+          type: string
+        windows:
+          description: Every window in force, shortest first, as it runs from when the attack became known
+          items:
+            $ref: "#/components/schemas/DueBody"
+          type:
+            - array
+            - "null"
+      required:
+        - undisclosed
+        - may_tell
+        - windows
+        - known_at
+        - grounds
+        - standing
+      type: object
+    ObligationsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ObligationsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/ObligationBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
       type: object
     OursOutputBody:
       additionalProperties: false
@@ -5875,13 +6073,24 @@ components:
       additionalProperties: false
       properties:
         decision_id:
-          description: A row of the claim about this issue, to set aside when approving
+          description: A representative row of the claim about this issue
           format: int64
           type: integer
+        decision_ids:
+          description: Every row of the claim about this issue, one per place. Name all of them to set the issue aside when approving
+          items:
+            format: int64
+            type: integer
+          type:
+            - array
+            - "null"
         description:
           description: The first two hundred characters of what the report says
           type: string
         exploited:
+          type: boolean
+        exploited_here:
+          description: This product records being attacked through it
           type: boolean
         fixed_in:
           type: string
@@ -5898,6 +6107,7 @@ components:
             - "null"
       required:
         - decision_id
+        - decision_ids
         - vulnerability
         - why
       type: object
@@ -5908,12 +6118,16 @@ components:
           description: Issues in the set known to be exploited
           format: int64
           type: integer
+        exploited_here:
+          description: Issues this product records being attacked through. Agreeing to the claim is refused while any is in it; set them aside
+          format: int64
+          type: integer
         fixable:
           description: Issues a fix is available for
           format: int64
           type: integer
         rows:
-          description: The issues that stood out, exploited first and then by severity, at most twenty
+          description: "The issues that stood out: attacked here first, then exploited, then by severity. At most twenty, except that every issue this product was attacked through is listed"
           items:
             $ref: "#/components/schemas/OutlierBody"
           type:
@@ -5928,6 +6142,7 @@ components:
           format: int64
           type: integer
       required:
+        - exploited_here
         - exploited
         - severe
         - fixable
@@ -9471,6 +9686,79 @@ components:
         - kind
         - reach
       type: object
+    WindowBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/WindowBody.json
+          format: uri
+          readOnly: true
+          type: string
+        declared_at:
+          format: date-time
+          type: string
+        hours:
+          description: How long the window runs, in hours, from the moment an attack became known
+          format: int64
+          type: integer
+        id:
+          format: int64
+          type: integer
+        name:
+          description: What the window is called here
+          type: string
+      required:
+        - id
+        - name
+        - hours
+        - declared_at
+      type: object
+    WindowSaid:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/WindowSaid.json
+          format: uri
+          readOnly: true
+          type: string
+        hours:
+          description: How long the window runs, in hours, from the moment an attack became known
+          format: int64
+          maximum: 8784
+          minimum: 1
+          type: integer
+        name:
+          description: What the window is called here. Unique among the windows in force, without regard to capitals
+          maxLength: 191
+          minLength: 1
+          type: string
+      required:
+        - name
+        - hours
+      type: object
+    WindowsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/WindowsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/WindowBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
+      type: object
     Withdraw-estate-roleResponse:
       additionalProperties: false
       properties:
@@ -12181,6 +12469,52 @@ paths:
           - public-triage
           - private-triage
         note: The product is the record's own, not one in the path.
+  /v1/exploited-here/{id}/told:
+    post:
+      description: |-
+        Records who was told about an attack, when, and what they were told. Append-only: a notice recorded in error is corrected by recording another beside it.
+
+        Name a window to say this notice answers it. The window then stops raising its notification for this incident.
+
+        Allowed on a cleared record, because a notice given before the clearing still happened.
+
+        Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+      operationId: record-told-outside
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoticeSaid"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NoticeBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Record that somebody outside was told
+      tags:
+        - Obligations
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: The product is the record's own, not one in the path.
   /v1/findings:
     get:
       description: |-
@@ -13551,6 +13885,168 @@ paths:
         - Notifications
       x-openpsirt-requires:
         scope: self
+  /v1/obligation-windows:
+    get:
+      description: |-
+        Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
+
+        Requires: any signed-in person, and not a pipeline key
+      operationId: list-obligation-windows
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WindowsBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List obligation windows
+      tags:
+        - Obligations
+      x-openpsirt-requires:
+        scope: person
+    post:
+      description: |-
+        Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
+
+        A name already in force, in any capitals, is refused with 409: retire that window or pick another name.
+
+        Requires: administrator
+      operationId: declare-obligation-window
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WindowSaid"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WindowBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Declare an obligation window
+      tags:
+        - Obligations
+      x-openpsirt-requires:
+        scope: deployment
+  /v1/obligation-windows/{id}:
+    delete:
+      description: |-
+        Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
+
+        A window already retired, or never declared, answers 404.
+
+        Requires: administrator
+      operationId: retire-obligation-window
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Retire an obligation window
+      tags:
+        - Obligations
+      x-openpsirt-requires:
+        scope: deployment
+    put:
+      description: |-
+        Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+
+        A name another window in force holds is refused with 409. A retired or unknown window answers 404.
+
+        Requires: administrator
+      operationId: change-obligation-window
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WindowSaid"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WindowBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Change an obligation window
+      tags:
+        - Obligations
+      x-openpsirt-requires:
+        scope: deployment
+  /v1/obligations:
+    get:
+      description: |-
+        Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs from the moment the attack became known, and every notice recorded about it.
+
+        A window is answered where a notice names it. Nothing here says whether a notice met anything.
+
+        Unpaged. A record you may not be told of is left out and counted nowhere.
+
+        Requires: public-read or public-triage or private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
+      operationId: list-obligations
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObligationsBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List standing attacks and their windows
+      tags:
+        - Obligations
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
+          - private-triage
+        note: A product you may not read contributes nothing, not even a count.
+        narrowed: true
   /v1/outbound:
     get:
       description: |-
@@ -17679,7 +18175,7 @@ paths:
 
         Say when it became known rather than when you are typing. Any window a deployment is under counts from the first of those, and the gap between the two is what such a window measures.
 
-        Nothing refuses this. Where a claim that the issue does not apply is standing and agreed to in this product, the record is kept and that agreement is taken back, returning those claims to the review queue and telling whoever wrote them; the count comes back as `undone`. A claim of that kind made while a record stands is refused instead, because a judgment gives way to a fact and not the other way round.
+        Nothing refuses this. Where a claim that the issue does not apply stands in this product, or a claim over many issues that sets this one aside or puts it off, the record is kept and that claim goes back to waiting for a second person, telling whoever wrote it; the count comes back as `undone`. A claim of either kind made while a record stands is refused instead.
 
         One record stands per issue and product. Clear the one standing before recording another.
 

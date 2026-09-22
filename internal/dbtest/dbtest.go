@@ -711,9 +711,12 @@ var tables = []string{
 	"issue_note_revision",
 	// Before person, product and vulnerability, all of which it points at.
 	"issue_note",
-	// Before person, product and vulnerability, all of which it points at.
-	// Nothing points at it: a record of being exploited is referenced by
-	// nobody, which is what makes it safe anywhere above those three.
+	// Before the record of being exploited and the window it points at.
+	"told_outside",
+	// Before person, which it points at.
+	"obligation_window",
+	// Before person, product and vulnerability, all of which it points at,
+	// and after the notices that point at it.
 	"exploited_here",
 	// Before person, product and vulnerability, which it points at.
 	"assessment",

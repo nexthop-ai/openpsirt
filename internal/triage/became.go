@@ -179,7 +179,14 @@ func (s *Store) Became(ctx context.Context, subject access.Subject,
 	var bulk []Claim
 	for _, id := range ids {
 		entry, ok := gathered[id]
-		if !ok || entry.Claim.Kind != TogetherClaim {
+		if !ok {
+			continue
+		}
+		many, err := s.overMany(ctx, entry.Claim)
+		if err != nil {
+			return nil, 0, err
+		}
+		if !many {
 			continue
 		}
 		if entry.Happened == StillWaiting || entry.Happened == SentBackFor ||

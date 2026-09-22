@@ -1,11 +1,9 @@
 // The form a stored moment takes on screen.
 //
-// Two forms and no others. There were four in use at once, two of them
-// machine-shaped: a date cut out of the stored string, the whole stored string
-// interpolated with its time and offset, that string with the `T` replaced by a
-// space, and nothing relative anywhere. A list somebody reads down and a list
-// they read back stop agreeing the moment those differ, and the machine-shaped
-// ones are the tool showing its storage rather than answering the question.
+// The absolute forms and the relative one, and nothing machine-shaped: never
+// the stored string with its time and offset, and never that string with the
+// `T` replaced by a space. Those are the tool showing its storage rather than
+// answering the question.
 //
 // Deliberately not localized. The stored form is UTC and the absolute form is
 // the same everywhere, because these are dates people quote to each other
@@ -32,6 +30,23 @@ export function on(moment: string | null | undefined): string {
   }
   const day = moment.slice(0, 10);
   return Number.isNaN(new Date(day).getTime()) ? "" : day;
+}
+
+// at is the absolute form to the minute, in UTC and saying so.
+//
+// For a moment a window of hours counts from, where the day alone is not an
+// answer: a window of a day that opened at 23:00 and one that opened at 01:00
+// end on different days. UTC for the reason the day is: people quote these to
+// each other across time zones.
+export function at(moment: string | null | undefined): string {
+  if (!moment || !STORED.test(moment)) {
+    return "";
+  }
+  const then = new Date(moment);
+  if (Number.isNaN(then.getTime())) {
+    return "";
+  }
+  return `${then.toISOString().slice(0, 10)} ${then.toISOString().slice(11, 16)} UTC`;
 }
 
 // since is the relative form: how long ago, in the coarsest unit that still

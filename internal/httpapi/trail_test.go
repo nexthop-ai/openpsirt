@@ -32,12 +32,14 @@ type seeded struct {
 	issue  string
 	rule   string
 	record string
+	window string
 }
 
 // fill puts what has been seeded into a path, a body or an expected name.
 func (s *seeded) fill(text string) string {
 	text = strings.ReplaceAll(text, "{issue}", s.issue)
 	text = strings.ReplaceAll(text, "{record}", s.record)
+	text = strings.ReplaceAll(text, "{window}", s.window)
 	return strings.ReplaceAll(text, "{rule}", s.rule)
 }
 
@@ -424,6 +426,35 @@ var administrativeActs = []trailedAct{
 		kind: "exploited-here", about: "CVE-2026-9999 on mine",
 	},
 	{
+		// A window decides what every standing attack is watched against,
+		// which is the layer a setting sits in.
+		id: "declare-obligation-window", what: "a window after an attack",
+		method: http.MethodPost, path: "/v1/obligation-windows",
+		body: `{"name":"Early warning","hours":24}`,
+		kind: "setting", about: "Obligation window Early warning",
+		keep: func(t *testing.T, seen *seeded, answered []byte) {
+			t.Helper()
+			var declared struct {
+				ID int64 `json:"id"`
+			}
+			if err := json.Unmarshal(answered, &declared); err != nil {
+				t.Fatal(err)
+			}
+			seen.window = strconv.FormatInt(declared.ID, 10)
+		},
+	},
+	{
+		id: "change-obligation-window", what: "a window after an attack changed",
+		method: http.MethodPut, path: "/v1/obligation-windows/{window}",
+		body: `{"name":"Early warning","hours":36}`,
+		kind: "setting", about: "Obligation window Early warning",
+	},
+	{
+		id: "retire-obligation-window", what: "a window after an attack retired",
+		method: http.MethodDelete, path: "/v1/obligation-windows/{window}",
+		kind: "setting", about: "Obligation window Early warning",
+	},
+	{
 		id: "deactivate-person", what: "somebody deactivated", method: http.MethodPut,
 		path: "/v1/people/newcomer/deactivation", kind: "account", about: "newcomer",
 	},
@@ -497,6 +528,7 @@ var outsideTheTrail = map[string]string{
 	"upload-attachment":           "recorded on the attachment, which names who uploaded it",
 	"upload-scan":                 "recorded as the scan's provenance",
 	"record-vex-issued":           "recorded as the issuance, which names who published it and when",
+	"record-told-outside":         "recorded as the notice, which names who recorded it and when",
 
 	// One person's own, and nothing anybody else reads changes.
 	"acknowledge-all-notifications": "their own notifications",

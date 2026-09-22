@@ -186,16 +186,19 @@ type CounterBody struct {
 // OutliersBody is what an approver of a bulk claim checks instead of reading
 // every row.
 type OutliersBody struct {
-	Exploited int           `json:"exploited" doc:"Issues in the set known to be exploited"`
-	Severe    int           `json:"severe" doc:"Issues rated critical or high"`
-	Fixable   int           `json:"fixable" doc:"Issues a fix is available for"`
-	Unmatched int           `json:"unmatched" doc:"Issues whose description does not carry the term the set was narrowed by"`
-	Rows      []OutlierBody `json:"rows" doc:"The issues that stood out, exploited first and then by severity, at most twenty"`
+	ExploitedHere int           `json:"exploited_here" doc:"Issues this product records being attacked through. Agreeing to the claim is refused while any is in it; set them aside"`
+	Exploited     int           `json:"exploited" doc:"Issues in the set known to be exploited"`
+	Severe        int           `json:"severe" doc:"Issues rated critical or high"`
+	Fixable       int           `json:"fixable" doc:"Issues a fix is available for"`
+	Unmatched     int           `json:"unmatched" doc:"Issues whose description does not carry the term the set was narrowed by"`
+	Rows          []OutlierBody `json:"rows" doc:"The issues that stood out: attacked here first, then exploited, then by severity. At most twenty, except that every issue this product was attacked through is listed"`
 }
 
 // OutlierBody is one issue in a bulk claim that does not look like the rest.
 type OutlierBody struct {
-	DecisionID    int64    `json:"decision_id" doc:"A row of the claim about this issue, to set aside when approving"`
+	DecisionID    int64    `json:"decision_id" doc:"A representative row of the claim about this issue"`
+	DecisionIDs   []int64  `json:"decision_ids" doc:"Every row of the claim about this issue, one per place. Name all of them to set the issue aside when approving"`
+	ExploitedHere bool     `json:"exploited_here,omitempty" doc:"This product records being attacked through it"`
 	Vulnerability string   `json:"vulnerability"`
 	Severity      string   `json:"severity,omitempty"`
 	Exploited     bool     `json:"exploited,omitempty"`

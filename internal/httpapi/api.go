@@ -369,6 +369,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerFindingDecision(api, in)
 	registerAssessment(api, in)
 	registerExploitedHere(api, in)
+	registerObligations(api, in)
 	registerTriageReading(api, in)
 	registerComments(api, in)
 	registerIssueNotes(api, in)
