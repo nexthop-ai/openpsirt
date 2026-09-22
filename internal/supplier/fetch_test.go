@@ -163,6 +163,7 @@ const vexDocument = `{
 type ships struct {
 	db      *database.DB
 	product int64
+	target  int64
 	by      access.Subject
 }
 
@@ -209,10 +210,45 @@ func shipping(t *testing.T, fn func(t *testing.T, f *ships)) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fn(t, &ships{db: db, product: product.ID, by: access.Subject{
+		fn(t, &ships{db: db, product: product.ID, target: target.ID, by: access.Subject{
 			Kind: access.Person, ID: who.ID, Identity: who.Email, Admin: true,
 		}})
 	})
+}
+
+// reported leaves one finding open at a component this product ships, the way
+// a scan does, and answers which row it is.
+func (f *ships) reported(t *testing.T, issue, component, version string) int64 {
+	t.Helper()
+	ctx := t.Context()
+	store := finding.NewStore(f.db.DB)
+	run, err := store.Begin(ctx, finding.Run{
+		TargetID: f.target, Scanner: "test",
+		ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Apply(ctx, f.target, run.ID, []finding.Reported{{
+		Issue: finding.Named{Identifier: issue, Severity: "high"},
+		Component: graph.Described{
+			Purl: "pkg:deb/debian/" + component + "@" + version,
+			Name: component, Version: version,
+		},
+		FixState: finding.NoFix,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	var id int64
+	if err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
+		ColumnExpr("f.id").Where("f.target_id = ?", f.target).
+		Limit(1).Scan(ctx, &id); err != nil {
+		t.Fatal(err)
+	}
+	return id
 }
 
 // fetching is a fetcher pointed at one publisher, with the politeness pause
@@ -279,6 +315,48 @@ func TestAnAdvisoryAboutSomethingThisProductShipsIsRecordedAsEvidence(t *testing
 		}
 		if said[0].Identifier != "EL-2026-0001" {
 			t.Errorf("it is recorded under %q", said[0].Identifier)
+		}
+	})
+}
+
+func TestWhatAPublisherSaysIsFixedDecidesNothingHere(t *testing.T) {
+	// A third party's judgment is evidence and a prefill, never a decision
+	// (REQ-31). A pass on a timer makes that easier to violate by accident than
+	// an upload does, because nobody is watching each document arrive — so this
+	// asks the one question that would show it: a publisher announcing a fix
+	// must not close, suppress or re-state the finding at that place.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		open := f.reported(t, "CVE-2026-1111", "libnl-3-200", "3.7.0")
+
+		p := serving(t)
+		p.publishes("/2026/EL-11.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0011", "libnl-3-200", "3.7.1", "CVE-2026-1111"))
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if took.Recorded != 1 {
+			t.Fatalf("the claim was not recorded at all, so this asks nothing: %+v", took)
+		}
+
+		var after finding.Finding
+		if err := f.db.DB.NewSelect().Model(&after).
+			Where("id = ?", open).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if after.ClosedAt != nil {
+			t.Errorf("a publisher's fix closed the finding at %v", after.ClosedAt)
+		}
+		if after.SuppressedBy != nil {
+			t.Errorf("a publisher's fix suppressed the finding")
+		}
+		// The finding's own fix state is still what the scan reported. A
+		// publisher naming the version that carries the fix is a claim about
+		// their product, and writing it here would make it ours.
+		if after.FixState != finding.NoFix || after.FixedIn != "" {
+			t.Errorf("a publisher's version reached the finding's own fix state: %q at %q",
+				after.FixState, after.FixedIn)
 		}
 	})
 }
