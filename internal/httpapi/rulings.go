@@ -70,6 +70,11 @@ func registerRulings(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
+		// Authorized before the duplicate's issue is resolved, so a refusal
+		// says nothing about which identifiers are here.
+		if err := finding.MayWorkReports(subject, product.ID); err != nil {
+			return nil, asked(in.Logger, err)
+		}
 		var target int64
 		if input.Body.DuplicateOf != "" {
 			// Resolved here and asked again inside the write. An issue this
@@ -208,6 +213,9 @@ func registerRulings(api huma.API, in Ingest) {
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
+		}
+		if err := finding.MayWorkReports(subject, product.ID); err != nil {
+			return nil, asked(in.Logger, err)
 		}
 		issue, err := issueHere(ctx, in, subject, product.ID, input.Vulnerability)
 		if err != nil {

@@ -195,6 +195,12 @@ func registerIntake(api huma.API, in Ingest) {
 		// issue that is not here and one this subject may not be told of,
 		// which is what this operation promises — and it answers a lookup
 		// that failed as a fault, logged, instead of as a name nobody holds.
+		// Authorized before the issue's name is resolved. Resolved first, an
+		// issue nobody filed and one filed here came back in different words
+		// to somebody who may not judge a report at all.
+		if err := finding.MayWorkReports(subject, product.ID); err != nil {
+			return nil, huma.Error404NotFound(finding.ErrNoSuchReport.Error())
+		}
 		issue, err := issueHere(ctx, in, subject, product.ID, input.Body.Vulnerability)
 		if err != nil {
 			return nil, err

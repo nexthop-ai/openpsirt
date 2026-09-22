@@ -55,6 +55,13 @@ func mayHandle(subject access.Subject, productID int64) error {
 	return nil
 }
 
+// MayWorkReports reports whether this subject may work a product's reports,
+// for a caller that has a name to resolve before it reaches the store and
+// has to authorize first.
+func MayWorkReports(subject access.Subject, productID int64) error {
+	return mayHandle(subject, productID)
+}
+
 // Record writes down a claim that arrived.
 //
 // It mints no issue. What arrived is a claim, and whether it is a flaw is a

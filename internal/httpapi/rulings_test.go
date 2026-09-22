@@ -147,6 +147,35 @@ func TestADuplicateIsListedOnTheIssueItDuplicates(t *testing.T) {
 			t.Errorf("a private reader reading duplicates answered %d", code)
 		}
 
+		// Somebody who may not work reports is refused alike whether the
+		// issue named is here or not, so the route is not a way to ask.
+		for _, name := range []string{"CVE-2026-9999", "CVE-1999-0001"} {
+			for _, path := range []string{
+				"/v1/products/mine/issues/" + name + "/duplicates",
+			} {
+				got := asPerson(t, r, "triager", http.MethodGet, path, "")
+				if got.Code != http.StatusForbidden {
+					t.Errorf("GET %s as a public triager answered %d: %s",
+						path, got.Code, got.Body.String())
+				}
+			}
+			got := asPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/report-rulings",
+				fmt.Sprintf(`{"reports":[%q],"disposition":"duplicate","duplicate_of":%q}`,
+					claimed, name))
+			if got.Code != http.StatusForbidden {
+				t.Errorf("a public triager naming %s answered %d: %s", name, got.Code,
+					got.Body.String())
+			}
+			got = asPerson(t, r, "triager", http.MethodPut,
+				"/v1/products/mine/reports/"+claimed+"/issue",
+				fmt.Sprintf(`{"vulnerability":%q}`, name))
+			if got.Code != http.StatusNotFound ||
+				!strings.Contains(got.Body.String(), "no report here goes by that name") {
+				t.Errorf("a public triager accepting as %s answered %d: %s", name, got.Code,
+					got.Body.String())
+			}
+		}
+
 		// An issue that is not here answers as one nobody may be told of.
 		if got := asPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/report-rulings",
