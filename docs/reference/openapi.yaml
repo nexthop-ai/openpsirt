@@ -121,12 +121,12 @@ components:
           readOnly: true
           type: string
         name:
-          description: What to call this supplier
+          description: The name this supplier is configured under
           maxLength: 191
           minLength: 1
           type: string
         url:
-          description: The supplier's CSAF provider description. https only
+          description: The address of the supplier's CSAF provider description
           maxLength: 1000
           minLength: 1
           type: string
@@ -291,14 +291,18 @@ components:
           description: The reason the last attempt stopped, where one did
           type: string
         caught_up_to:
-          description: The newest moment in their feed that has been read
+          description: The newest moment in what they list that has been read
           format: date-time
           type: string
         name:
           description: The name this supplier is configured under
           type: string
         read:
-          description: When this supplier was last reached
+          description: When a read of this supplier last succeeded
+          format: date-time
+          type: string
+        tried:
+          description: When this supplier was last tried
           format: date-time
           type: string
         url:
@@ -14297,9 +14301,9 @@ paths:
   /v1/products/{product}/advisory-sources:
     get:
       description: |-
-        The suppliers configured for this product, when each was last reached, and how far through what they publish this deployment has read.
+        The suppliers configured for this product, when each was last tried, when one last succeeded, and how far through what they publish this deployment has read.
 
-        A supplier that cannot be reached is not a failure anything else reports. The moment of the last attempt is what says so, and the reason the last one stopped is returned beside it.
+        Two moments rather than one. An attempt that failed still happened, so how long a supplier has been unreachable is the gap between them; the reason the last attempt stopped is returned beside them.
 
         Requires: administrator
       operationId: list-advisory-sources
@@ -14329,17 +14333,21 @@ paths:
         scope: deployment
     post:
       description: |-
-        Records a supplier whose published security advisories are read on the scan schedule, and lands them where an uploaded one lands: as evidence beside a finding and a prefill for a decision, never as a judgment of ours.
+        Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision, and is never applied.
 
-        The address is the supplier's CSAF provider description, the document naming the feeds their advisories are listed in. https only, on the host it names, and a redirect is refused rather than followed.
+        The address is the supplier's CSAF provider description, which names where their advisories are listed. Both shapes the format defines are read: a ROLIE feed and a directory of documents. Only the listings a publisher labels TLP:WHITE or TLP:CLEAR are read.
 
-        Only what this product ships is kept. A publisher's feed is about their whole catalog, so a claim naming a component no build here contains is read and not recorded.
+        Only claims naming a component this product ships are recorded.
 
-        Reading starts from the moment the supplier is added, not from the beginning of what they have published. A publisher's feed lists everything they have ever issued, and taking it would be tens of thousands of requests for evidence about issues already reported. Upload an older advisory to take one.
+        Reading starts from the moment the supplier is added. To take an advisory published before that, upload it.
 
-        A VEX document in the same feed is left alone. It replaces a publisher's whole answer for a product, which is not something a scheduled pass decides; upload it to take it.
+        A VEX document listed beside the advisories is not read here. Upload it to the VEX endpoint to take it.
 
-        A supplier taken out of use and added again under the same name starts from today, the way a new one does.
+        A supplier withdrawn and added again under the same name starts from today, the way a new one does.
+
+        The name is matched without regard to capitals. A name already in use for this product is refused with 409; withdraw the supplier first to change its address.
+
+        The address must be https and carry no user information. A product that is out of use takes no supplier.
 
         Requires: administrator
       operationId: add-advisory-source
@@ -14376,7 +14384,9 @@ paths:
   /v1/products/{product}/advisory-sources/{name}:
     delete:
       description: |-
-        Takes a supplier out of use. What they have already said stays standing: their claims are evidence somebody may have granted an approval on the strength of, and no longer reading them does not make them unsaid.
+        Stops reading a supplier. What they have already said stays standing, because an approval may have been granted on the strength of it.
+
+        The name is matched without regard to capitals. A name no supplier is configured under is refused with 404.
 
         Requires: administrator
       operationId: withdraw-advisory-source

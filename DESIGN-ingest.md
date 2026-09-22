@@ -872,8 +872,10 @@ document has been read.
 
 | Rule | Reason |
 |---|---|
-| Off unless a supplier is configured | Naming one is the switch. A second setting beside an empty list would be two ways to say the same thing, and a deployment that cannot reach out loses this evidence and nothing else |
-| A supplier is configured against one product | That is what a claim is recorded against, so a supplier feeding two products is two rows — and withdrawing one leaves the other's claims standing |
+| Off unless a supplier is configured | Naming one is the switch. A second setting beside an empty list would be two ways to say the same thing, and a deployment that cannot reach out loses a publisher's judgment as evidence; what a scan reports is unaffected |
+| A supplier is configured against one product | That is what a claim is recorded against, so a supplier feeding two products is two rows, each read and withdrawn on its own |
+| Withdrawing a supplier removes nothing they said | Their claims are evidence an approval may have been granted on the strength of. What withdrawal stops is the reading |
+| A supplier is matched by name without regard to capitals, and a product out of use takes none | Two spellings of one name are one supplier, on every engine, because the stored value is lowered rather than an engine asked to fold. A product taken out of use accepts no scan, so what a supplier would be read against is a build list nothing adds to — and nothing lists the product, so nothing could withdraw the supplier either |
 | Only claims naming a component the product ships are recorded | A publisher's feed is about their whole catalog. One real advisory about a kernel carries 95,139 claims, so a deployment taking them whole would store a supplier's catalog rather than evidence about its own |
 | What the product ships is read as the pass runs, so a component that arrives later has no evidence behind it | An advisory read before a build first shipped the component it names is not read again: the mark has passed it. The evidence for that component arrives with the publisher's next advisory about it, and the one already issued is taken by uploading it |
 | Reading starts at the moment the supplier was configured | A distribution's feed lists every advisory they have ever issued. Taking that history is tens of thousands of requests at somebody else's service, draining over months, for evidence about issues a scan reported long ago. One older document is taken by uploading it |
@@ -881,16 +883,28 @@ document has been read.
 | A VEX document in the same feed is left alone | A publisher's statement set replaces their whole answer for a product. Setting that aside is a judgment, and a pass on a timer makes none — it is taken by uploading it |
 | One replica reaches out, settled by a lease | The politeness the pass keeps to is a rate per deployment rather than per replica, and three replicas each keeping to it would be three times the traffic at a publisher's expense |
 | The lease is taken again as the pass runs | A supplier is up to twenty requests with a timeout each, and a slow publisher handing the pass to a second replica mid-flight is what a lease exists to prevent |
-| Bounded per supplier per cycle | A publisher having a busy week is not a reason to make a hundred requests of them in a minute. What is not taken this cycle is taken next |
-| The mark stops where a failure is | Moved past a document that could not be read, a publisher with one bad file would lose everything they issued after it |
+| Bounded per supplier per wake, and a supplier that filled its bound stays due | A publisher having a busy week is not a reason to make a hundred requests of them in a minute. Left to the interval instead, the bound would be per day, and a publisher issuing more in a day than one pass takes would fall further behind every day |
+| Both shapes the format defines are read, at the labels that travel | A publisher serves a feed or a directory of documents, and the largest publisher of these serves only the second — so a reader that knows one takes the other's description, finds nothing, and reports that it worked. Only the labels a publisher serves to everybody are read: one that has to be arranged answers a refusal on every pass |
+| How many places a publisher may point at is bounded | Nothing in the format bounds it, and a description within the size bound can name tens of thousands of addresses — which is a pass running for hours and outliving the lease that says it is the one reading |
+| A listing that cannot be read does not stop the others | A publisher serving a restricted label beside a public one is ordinary, and failing the supplier on the first means the public one is never reached |
+| A stamp far in the future is not read | The mark moves forward only, so one entry stamped in 2099 would carry it past everything issued between now and then — and the fetch succeeds, so the supplier reads as healthy while it takes nothing |
+| A document that cannot be read is stepped over; a publisher that cannot be reached holds the mark | The two are different facts. A document refused the same way every time — withdrawn and answering 404, larger than what is read, malformed — would otherwise stop the supplier for ever, and the only way out would be to withdraw it and add it again, which starts from today and loses the gap. A publisher that cannot be reached has not shown what is behind the mark, so the mark stays |
+| The mark is a moment and the address read at it | A publisher stamps a batch with one moment, and a date-only stamp gives a whole day the same one. On the moment alone, a pass that stopped inside such a group would skip the rest of it for ever |
+| What identifies a recording is the document and what was kept of it | The store treats a document whose digest it already holds as one that changes nothing. For a fetched document the bytes are not the whole of what decides which claims get written — what the product ships that day is the other half — so keyed on the bytes alone, uploading the same advisory once a build ships a component the fetch narrowed away writes nothing and reports success |
+| A document is recorded even where nothing was kept | That write is the only thing that sets aside what an earlier revision of the same advisory said. Skipped, a publisher correcting one by dropping the component we ship leaves the old claim standing as evidence |
+| Whether a supplier is still configured is asked inside the write | A pass takes minutes, and one withdrawn during it would go on fetching and recording — which is the request leaving this deployment that withdrawing it was meant to stop |
 | A supplier that could not be read does not stop the next | One publisher unreachable says nothing about another, and a pass that stopped at the first would leave every supplier after it unread for as long as that one stayed down |
-| When a supplier was last reached is recorded whether or not anything came back | "This publisher has been unreachable for a week" is only visible as a moment that has stopped moving. Nothing else reports it |
+| Two moments are recorded: the last attempt, and the last one that worked | An attempt that failed still happened. One moment moving on every attempt reads as a supplier answering fine right up to the failure it is reporting, so how long one has been unreachable is the gap between them. Nothing else reports it |
+| What stopped an attempt is kept bounded | The text carries a publisher's own address and a server's own reason phrase, neither of which they have agreed to bound. Unbounded, the write fails on two of the four engines, which leaves the attempt unrecorded and the supplier fetched again on every wake |
 | A feed entry nobody can date is left alone | It cannot be placed against the mark, so taking it would mean taking it again on every pass for ever |
 | A claim is recorded as the administrator who configured the supplier | Configuring one is the act that admitted this publisher's judgment, and it is the only decision anybody made. Nothing chose the individual document, which is the whole difference from an upload |
 
 Every request is the guarded client's: https only, to the host the
 configured address names, refusing a redirect and refusing an address inside
-this network (REQ-69). The addresses inside a publisher's directory come from
+this network (REQ-69). It carries a budget of its own rather than the
+interactive one, which is sized for somebody watching a blank page: at ten
+seconds a document too large to arrive inside it could not be fetched at all,
+however many times it was tried. The addresses inside a publisher's directory come from
 outside, so a feed or a document served from anywhere but the configured host
 is refused rather than followed — a publisher that genuinely moved is
 reconfigured, which is visible.

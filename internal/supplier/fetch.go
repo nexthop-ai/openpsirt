@@ -3,6 +3,7 @@ package supplier
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -25,22 +26,40 @@ import (
 )
 
 // MostPerPass bounds how many documents are taken from one supplier in one
-// cycle.
+// wake.
 //
-// A publisher's feed lists everything they have ever issued, and a supplier
+// A publisher's listing holds everything they have ever issued, and a supplier
 // having a busy week is not a reason to make a hundred requests of them in a
-// minute. What is not taken this cycle is taken next: the mark only moves past
-// documents that were read, so a backlog drains rather than being skipped.
+// minute. What is not taken this time is taken on the next wake rather than
+// waiting for the interval: a pass that filled its bound leaves the supplier
+// due, so a backlog drains at this rate instead of at this rate per day.
 const MostPerPass = 20
 
-// mostListingBytes bounds the two documents that describe what a publisher
-// offers.
+// MostFeeds bounds how many listings one publisher may point at.
 //
-// Separate from the bound on a document, because they are different shapes of
-// thing. A feed is one entry per advisory a publisher has ever issued, so a
+// Nothing in the format bounds it, and a description within the size bound can
+// name tens of thousands of addresses on the pinned host — which is a pass
+// running for hours, holding every entry it has read, and outliving the lease
+// that says it is the one reading (REQ-69). A publisher serves one listing per
+// label they publish under, so this is far above any real directory.
+const MostFeeds = 16
+
+// mostListingBytes bounds each document that describes what a publisher offers.
+//
+// Separate from the bound on an advisory, because they are different shapes of
+// thing. A listing is one entry per advisory a publisher has ever issued, so a
 // distribution's runs to tens of thousands of entries; an advisory is one
 // announcement. Neither bound protects the other.
 const mostListingBytes = 64 << 20
+
+// fetchTimeout bounds one request to a publisher.
+//
+// Scaled to what is being fetched rather than to somebody watching a page. The
+// interactive budget the guarded client ships with is ten seconds, and a
+// document bound at hundreds of megabytes cannot arrive inside it over an
+// ordinary egress — which would make a large advisory one that fails on every
+// pass for ever rather than one that is slow.
+const fetchTimeout = 5 * time.Minute
 
 // betweenAsks is the pause between one request to a supplier and the next.
 //
@@ -48,6 +67,22 @@ const mostListingBytes = 64 << 20
 // serves their directory as a courtesy, and a tool that walks it as fast as it
 // can is the reason such things end up behind an authenticating proxy.
 const betweenAsks = 250 * time.Millisecond
+
+// aheadBy is how far past now a publisher's stamp may be and still be read.
+//
+// A clock that is a little out is ordinary and a stamp in 2099 is not. The mark
+// moves forward only, so one entry stamped far ahead would carry it past
+// everything the publisher issues between now and then — and because the fetch
+// itself succeeds, the supplier goes on reading as healthy while it takes
+// nothing.
+const aheadBy = time.Hour
+
+// travels are the labels a publisher serves to everybody.
+//
+// One listing per label, and only these two have to be reachable without
+// arranging access. A publisher listing a restricted one beside a public one is
+// ordinary, and reading it answers a refusal on every pass.
+var travels = map[string]bool{"WHITE": true, "CLEAR": true}
 
 // Reachable refuses an address that is not a supplier's published directory.
 //
@@ -76,11 +111,19 @@ type Taken struct {
 	// catalog is about components no product here ships.
 	Documents int
 	Recorded  int
-	// Skipped is how many documents in the feed were not security advisories.
+	// Skipped is how many documents were not security advisories, and Refused
+	// how many could not be read at all. A refusal is about one document and
+	// the pass steps over it; what holds the mark is a failure to reach the
+	// publisher.
 	Skipped int
-	// CaughtUpTo is the newest feed moment this pass reached, which is where
-	// the next one starts.
+	Refused int
+	// Filled says the pass stopped at its bound rather than because there was
+	// nothing left, which is what leaves the supplier due for the next wake.
+	Filled bool
+	// CaughtUpTo and Mark are how far this pass read, which is where the next
+	// one starts.
 	CaughtUpTo time.Time
+	Mark       string
 }
 
 // Fetcher reads what a supplier publishes and records it as evidence.
@@ -95,25 +138,47 @@ type Fetcher struct {
 	// Pause is how long to wait between one request and the next. A field so
 	// a test does not spend real seconds being polite to a fake.
 	Pause time.Duration
-	Now   func() time.Time
+	// Now is the clock a publisher's own stamps are judged against, so a test
+	// can hand one a date in the future without waiting for the future.
+	Now func() time.Time
 }
 
 // NewFetcher returns a fetcher over db, reaching real suppliers.
 func NewFetcher(db bun.IDB, limits sbom.Limits) *Fetcher {
 	return &Fetcher{
 		db: db, limits: limits.OrDefault(),
-		Client: func(host string) *http.Client { return outward.Guarded(host) },
-		Pause:  betweenAsks,
-		Now:    func() time.Time { return time.Now().UTC() },
+		Client: func(host string) *http.Client {
+			return outward.GuardedWithin(fetchTimeout, host)
+		},
+		Pause: betweenAsks,
+		Now:   func() time.Time { return time.Now().UTC() },
 	}
 }
+
+// unreadable says a document could not be read, as against the publisher
+// serving it could not be reached.
+//
+// The two are different facts and the pass does different things with them. A
+// document that is refused the same way every time — withdrawn and answering
+// 404, larger than what is read, malformed, naming a publisher longer than a
+// claim records — is stepped over and the mark moves past it. A publisher that
+// cannot be reached holds the mark, because what is behind it has not been
+// seen.
+//
+// Read the other way round, one permanently unreadable document stops a
+// supplier for ever and the only way out is to withdraw it and add it again,
+// which starts from today and loses the gap.
+type unreadable struct{ err error }
+
+func (u unreadable) Error() string { return u.err.Error() }
+func (u unreadable) Unwrap() error { return u.err }
 
 // From reads one supplier and records what is about a component this product
 // ships.
 //
 // The whole pass is bounded twice over: at most MostPerPass documents, and only
-// those the publisher stamped after the last one taken. What comes back is
-// evidence and a prefill and decides nothing (REQ-31).
+// those the publisher listed past the mark. What comes back is evidence and a
+// prefill and decides nothing (REQ-31).
 func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (Taken, error) {
 	var took Taken
 	if err := Reachable(source.URL); err != nil {
@@ -124,26 +189,27 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 		return took, err
 	}
 	// One client per supplier, pinned to the host their directory is served
-	// from. A feed or a document somewhere else is refused rather than
+	// from. A listing or a document somewhere else is refused rather than
 	// followed: the addresses inside a publisher's directory come from
 	// outside, and fetching whatever they name is the request-forgery
 	// primitive the guarded client exists to refuse (REQ-69).
 	client := f.Client(at.Hostname())
 
-	feeds, err := f.feeds(ctx, client, source.URL)
+	listed, err := f.listings(ctx, client, source.URL)
 	if err != nil {
 		return took, err
 	}
-	if len(feeds) == 0 {
-		return took, fmt.Errorf("that publisher's directory describes no feed of " +
-			"advisories, so there is nothing at it to read")
+	if len(listed) == 0 {
+		return took, fmt.Errorf("that publisher's directory names nothing to read: it " +
+			"describes neither a feed of advisories nor a directory of them")
 	}
 
-	from := source.From()
-	due, err := f.due(ctx, client, feeds, from)
+	at2, mark := source.From()
+	due, filled, err := f.due(ctx, client, listed, at2, mark)
 	if err != nil {
 		return took, err
 	}
+	took.Filled = filled
 	if len(due) == 0 {
 		return took, nil
 	}
@@ -156,32 +222,42 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 		return took, err
 	}
 
-	for _, entry := range due {
+	for _, one := range due {
 		if ctx.Err() != nil {
 			return took, nil
 		}
 		if err := f.wait(ctx); err != nil {
 			return took, nil
 		}
-		recorded, err := f.document(ctx, client, by, source, entry, ships)
+		recorded, err := f.document(ctx, client, by, source, one, ships)
 		switch {
+		case errors.Is(err, errWithdrawn):
+			// The supplier was withdrawn while this pass was running. Nothing
+			// after it is fetched, and the mark stays where the last recorded
+			// document left it.
+			return took, nil
 		case errors.Is(err, sbom.ErrWrongProfile):
 			// A publisher issues more than one kind of document and lists them
-			// in one feed. A VEX statement set is read by the upload path and
-			// not here: it replaces a publisher's whole answer for a product,
-			// and a pass on a timer setting that aside is a judgment nobody
-			// made.
+			// in one directory. A VEX statement set is read by the upload path
+			// and not here: it replaces a publisher's whole answer for a
+			// product, and a pass on a timer setting that aside is a judgment
+			// nobody made.
 			took.Skipped++
+		case errors.As(err, &unreadable{}):
+			// About this document rather than about the publisher, so the pass
+			// steps over it. Held instead, one withdrawn advisory still listed
+			// would stop everything issued after it, for ever.
+			took.Refused++
 		case err != nil:
-			// The mark stops where the failure is. Moved past a document that
-			// could not be read, a publisher having one bad file would lose
-			// everything they issued after it.
-			return took, fmt.Errorf("read %s: %w", entry.address, err)
+			// The publisher could not be reached. The mark stops here: moved
+			// past, everything behind it would be skipped without having been
+			// seen.
+			return took, fmt.Errorf("read %s: %w", one.address, err)
 		default:
 			took.Documents++
 			took.Recorded += recorded
 		}
-		took.CaughtUpTo = entry.updated
+		took.CaughtUpTo, took.Mark = one.updated, Mark(one.address)
 	}
 	return took, nil
 }
@@ -201,25 +277,57 @@ func (f *Fetcher) wait(ctx context.Context) error {
 	}
 }
 
-// feeds is where a publisher says their advisories are listed.
-func (f *Fetcher) feeds(ctx context.Context, client *http.Client, address string) ([]string, error) {
+// listing is one place a publisher lists what they have issued.
+//
+// The format offers two shapes and a publisher may serve either: a ROLIE feed,
+// which is JSON and carries a stamp per entry, and a directory, which is a list
+// of changes beside the documents. Both are read, because the largest publisher
+// of these documents serves only the second and a reader that knows one takes
+// the other's description, finds nothing, and reports that it worked.
+type listing struct {
+	address string
+	// feed says which of the two shapes this is.
+	feed bool
+}
+
+// listings is where a publisher says their advisories are listed.
+//
+// Only what travels to everybody. The format has one listing per label, and a
+// publisher offering a restricted one beside a public one is ordinary — read,
+// it answers a refusal on every pass and the public one beside it is never
+// reached.
+func (f *Fetcher) listings(ctx context.Context, client *http.Client,
+	address string) ([]listing, error) {
+
 	var described providerMetadata
 	if err := f.json(ctx, client, address, &described); err != nil {
 		return nil, fmt.Errorf("read what that publisher offers: %w", err)
 	}
-	var feeds []string
+	var out []listing
 	for _, one := range described.Distributions {
-		if one.ROLIE == nil {
+		if one.ROLIE != nil {
+			for _, feed := range one.ROLIE.Feeds {
+				if strings.TrimSpace(feed.URL) == "" ||
+					!travels[strings.ToUpper(strings.TrimSpace(feed.TLPLabel))] {
+					continue
+				}
+				out = append(out, listing{address: feed.URL, feed: true})
+			}
 			continue
 		}
-		for _, feed := range one.ROLIE.Feeds {
-			if strings.TrimSpace(feed.URL) != "" {
-				feeds = append(feeds, feed.URL)
-			}
+		if where := strings.TrimSpace(one.DirectoryURL); where != "" {
+			out = append(out, listing{address: strings.TrimRight(where, "/") + "/" + changesFile})
 		}
 	}
-	return feeds, nil
+	if len(out) > MostFeeds {
+		return nil, fmt.Errorf("that publisher lists %d places to read from, past the %d "+
+			"this reads", len(out), MostFeeds)
+	}
+	return out, nil
 }
+
+// changesFile is what a directory calls its list of what moved and when.
+const changesFile = "changes.csv"
 
 // entry is one advisory a publisher lists, and when they last stamped it.
 type entry struct {
@@ -227,56 +335,172 @@ type entry struct {
 	updated time.Time
 }
 
-// due is the entries stamped after the last one taken, oldest first and
-// bounded.
+// due is the entries the publisher listed past the mark, oldest first and
+// bounded, and whether the bound is what stopped it.
 //
 // Oldest first, because the mark moves as each is read: taken newest first, a
 // pass that stopped at its bound would leave the mark past everything it had
 // not read.
-func (f *Fetcher) due(ctx context.Context, client *http.Client, feeds []string,
-	from time.Time) ([]entry, error) {
+//
+// A listing that cannot be read is stepped over rather than failing the
+// supplier. A publisher serves one per label and only the public ones are read,
+// but a label being unreadable today is not a reason to read none of the
+// others.
+func (f *Fetcher) due(ctx context.Context, client *http.Client, listed []listing,
+	from time.Time, mark string) ([]entry, bool, error) {
 
 	var due []entry
+	var refused error
+	read := 0
 	seen := map[string]bool{}
-	for _, address := range feeds {
+	ceiling := f.now().Add(aheadBy)
+	for _, one := range listed {
 		if err := f.wait(ctx); err != nil {
-			return nil, err
+			return nil, false, err
 		}
-		var feed rolieFeed
-		if err := f.json(ctx, client, address, &feed); err != nil {
-			return nil, fmt.Errorf("read that publisher's feed: %w", err)
+		entries, err := f.entries(ctx, client, one)
+		if err != nil {
+			refused = err
+			continue
 		}
-		for _, one := range feed.Feed.Entries {
-			stamped, err := time.Parse(time.RFC3339, strings.TrimSpace(one.Updated))
-			if err != nil {
-				// An entry nobody can date cannot be placed against the mark,
-				// so taking it would mean taking it again on every pass for
-				// ever. Left alone rather than failing the feed: one
-				// malformed entry is not a reason to stop reading a
-				// publisher.
+		read++
+		for _, listedAt := range entries {
+			// A stamp far in the future would carry the forward-only mark past
+			// everything the publisher issues between now and then, and the
+			// fetch itself succeeds — so the supplier reads as healthy while
+			// it takes nothing.
+			if listedAt.updated.After(ceiling) {
 				continue
 			}
-			if !stamped.After(from) {
+			// Past the mark, where the mark is the pair the entries are
+			// ordered by. On the moment alone, a publisher who stamps a batch
+			// with one moment — or dates to the day — would have the rest of
+			// that group skipped for ever by a pass that stopped inside it.
+			where := Mark(listedAt.address)
+			if listedAt.updated.Before(from) ||
+				(listedAt.updated.Equal(from) && where <= mark) {
 				continue
 			}
-			where := documentIn(one)
-			if where == "" || seen[where] {
+			if seen[listedAt.address] {
 				continue
 			}
-			seen[where] = true
-			due = append(due, entry{address: where, updated: stamped})
+			seen[listedAt.address] = true
+			due = append(due, listedAt)
 		}
+	}
+	if read == 0 && refused != nil {
+		return nil, false, fmt.Errorf("read what that publisher lists: %w", refused)
 	}
 	sort.Slice(due, func(i, j int) bool {
 		if !due[i].updated.Equal(due[j].updated) {
 			return due[i].updated.Before(due[j].updated)
 		}
-		return due[i].address < due[j].address
+		return Mark(due[i].address) < Mark(due[j].address)
 	})
 	if len(due) > MostPerPass {
-		due = due[:MostPerPass]
+		return due[:MostPerPass], true, nil
 	}
-	return due, nil
+	return due, false, nil
+}
+
+// now is the clock, defaulting where a caller built a fetcher by hand.
+func (f *Fetcher) now() time.Time {
+	if f.Now == nil {
+		return time.Now().UTC()
+	}
+	return f.Now().UTC()
+}
+
+// entries is what one listing says a publisher has issued.
+func (f *Fetcher) entries(ctx context.Context, client *http.Client,
+	one listing) ([]entry, error) {
+
+	if one.feed {
+		return f.fromFeed(ctx, client, one.address)
+	}
+	return f.fromChanges(ctx, client, one.address)
+}
+
+// fromFeed reads a ROLIE feed.
+func (f *Fetcher) fromFeed(ctx context.Context, client *http.Client,
+	address string) ([]entry, error) {
+
+	var feed rolieFeed
+	if err := f.json(ctx, client, address, &feed); err != nil {
+		return nil, err
+	}
+	out := make([]entry, 0, len(feed.Feed.Entries))
+	for _, one := range feed.Feed.Entries {
+		stamped, err := time.Parse(time.RFC3339, strings.TrimSpace(one.Updated))
+		if err != nil {
+			// An entry nobody can date cannot be placed against the mark, so
+			// taking it would mean taking it again on every pass for ever.
+			// Left alone rather than failing the listing: one malformed entry
+			// is not a reason to stop reading a publisher.
+			continue
+		}
+		where := documentIn(one)
+		if !listable(where) {
+			continue
+		}
+		out = append(out, entry{address: where, updated: stamped})
+	}
+	return out, nil
+}
+
+// fromChanges reads a directory's list of what moved and when.
+//
+// Two columns, the path of a document relative to the directory and the moment
+// it was released. The path is resolved against the list's own address rather
+// than joined as text, because a publisher writes it the way a link on their
+// own page is written.
+func (f *Fetcher) fromChanges(ctx context.Context, client *http.Client,
+	address string) ([]entry, error) {
+
+	body, err := f.fetch(ctx, client, address, mostListingBytes)
+	if err != nil {
+		return nil, err
+	}
+	base, err := url.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+	rows := csv.NewReader(strings.NewReader(string(body)))
+	// A publisher writing a header, a comment or a third column is writing a
+	// file this still reads: what is needed is the first two fields.
+	rows.FieldsPerRecord = -1
+	var out []entry
+	for {
+		row, err := rows.Read()
+		switch {
+		case errors.Is(err, io.EOF):
+			return out, nil
+		case err != nil:
+			return nil, fmt.Errorf("read that publisher's list of changes: %w", err)
+		case len(row) < 2:
+			continue
+		}
+		stamped, err := time.Parse(time.RFC3339, strings.TrimSpace(row[1]))
+		if err != nil {
+			continue
+		}
+		where, err := base.Parse(strings.TrimSpace(row[0]))
+		if err != nil || !listable(where.String()) {
+			continue
+		}
+		out = append(out, entry{address: where.String(), updated: stamped})
+	}
+}
+
+// listable refuses an address a claim could not be recorded against.
+//
+// The address is stored on every claim the document leaves behind, and it comes
+// from a listing a publisher writes. One past the width a claim records would
+// fail that write on two of the four engines, after the document had been
+// fetched and read (REQ-69).
+func listable(address string) bool {
+	address = strings.TrimSpace(address)
+	return address != "" && len(address) <= MostURL
 }
 
 // documentIn is where one feed entry says the document itself is.
@@ -296,59 +520,51 @@ func documentIn(one feedEntry) string {
 	return ""
 }
 
+// errWithdrawn says the supplier stopped being configured while a pass ran.
+var errWithdrawn = errors.New("that supplier is no longer read from")
+
 // document reads one advisory and records what it says about a component this
 // product ships.
 func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.Subject,
 	source Source, one entry, ships map[string]bool) (int, error) {
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, one.address, nil)
+	body, err := f.fetch(ctx, client, one.address, f.limits.OrDefault().MaxBytes)
 	if err != nil {
 		return 0, err
 	}
-	res, err := client.Do(req)
+	sum := sha256.Sum256(body)
+	advisory, err := sbom.ReadAdvisory(strings.NewReader(string(body)), f.limits)
 	if err != nil {
-		return 0, err
+		// A document that cannot be parsed is refused the same way every time,
+		// including the one this reader refuses on purpose — a statement set,
+		// which is told apart above so it can be counted as what it is.
+		if errors.Is(err, sbom.ErrWrongProfile) {
+			return 0, err
+		}
+		return 0, unreadable{err}
 	}
-	defer func() { _ = res.Body.Close() }()
-	if res.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("that publisher answered %s", res.Status)
-	}
-
-	most := f.limits.OrDefault().MaxBytes
-	digest := sha256.New()
-	counted := &counting{r: io.TeeReader(io.LimitReader(res.Body, most+1), digest)}
-	advisory, err := sbom.ReadAdvisory(counted, f.limits)
-	if counted.n > most {
-		return 0, fmt.Errorf("that document is larger than the %d bytes this reads", most)
-	}
-	if err != nil {
-		return 0, err
-	}
-	// The digest is the whole document by definition, so whatever the parser
-	// left is read past exactly once. Drained into nothing, because the reader
-	// above already tees into the digest.
-	if _, err := io.Copy(io.Discard, counted); err != nil {
-		return 0, fmt.Errorf("that document could not be read whole: %w", err)
-	}
-	if counted.n > most {
-		return 0, fmt.Errorf("that document is larger than the %d bytes this reads", most)
+	if err := shaped(advisory); err != nil {
+		return 0, unreadable{err}
 	}
 
 	statements := ours(advisory, ships)
-	if len(statements) == 0 {
-		// Nothing this product ships. Not recorded and not an error: most of
-		// what a publisher issues is about the rest of their catalog, and a
-		// row per claim would store a supplier's catalog rather than evidence
-		// about ours.
-		return 0, nil
-	}
-	if err := shaped(advisory); err != nil {
-		return 0, err
-	}
-
 	var recorded int
 	err = database.Within(ctx, f.db, func(ctx context.Context, tx bun.IDB) error {
-		var err error
+		// Asked inside the transaction rather than trusted from before it. A
+		// pass takes minutes, and a supplier withdrawn during one goes on
+		// fetching and recording — which is the request leaving this
+		// deployment that withdrawing it was meant to stop.
+		standing, err := NewStore(tx).Standing(ctx, tx, source.ID)
+		if err != nil {
+			return err
+		}
+		if standing == nil {
+			return errWithdrawn
+		}
+		// Recorded even where nothing was kept. The write is the only thing
+		// that sets aside what an earlier revision of this same advisory said,
+		// so a publisher who corrects one by dropping the component we ship
+		// would otherwise leave the old claim standing as evidence.
 		recorded, _, err = finding.NewStore(tx).RecordStatements(ctx, by, source.ProductID,
 			finding.Supplied{
 				Source:     finding.FromAdvisory,
@@ -359,7 +575,7 @@ func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.S
 				// this", and for a fetched one the address is the answer that
 				// can be checked.
 				Document: one.address,
-				Digest:   hex.EncodeToString(digest.Sum(nil)),
+				Digest:   recording(sum[:], statements),
 			}, statements)
 		return err
 	})
@@ -367,6 +583,30 @@ func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.S
 		return 0, err
 	}
 	return recorded, nil
+}
+
+// recording is what identifies this recording of a document.
+//
+// The bytes and what was kept of them, rather than the bytes alone. The store
+// treats a document whose digest it already holds as one that changes nothing,
+// and for a fetched document the bytes are not the whole of what decides which
+// claims get written — the components the product ships that day are the other
+// half. Keyed on the bytes alone, uploading the same advisory once a build
+// ships a component the fetch had narrowed away is a no-op reporting success,
+// and the claim the upload exists to add is never written.
+func recording(document []byte, kept []finding.Statement) string {
+	sum := sha256.New()
+	sum.Write(document)
+	names := make([]string, 0, len(kept))
+	for _, one := range kept {
+		names = append(names, one.Component+"@"+one.About)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		sum.Write([]byte{0})
+		sum.Write([]byte(name))
+	}
+	return hex.EncodeToString(sum.Sum(nil))
 }
 
 // shaped refuses an advisory whose two names do not fit what a claim records.
@@ -448,46 +688,48 @@ func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool
 	return ships, nil
 }
 
-// json fetches one document and reads it as the shape given.
-func (f *Fetcher) json(ctx context.Context, client *http.Client, address string, into any) error {
+// fetch reads one address, bounded, and answers what came back.
+func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string,
+	most int64) ([]byte, error) {
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("that publisher answered %s", res.Status)
-	}
-	counted := &counting{r: io.LimitReader(res.Body, mostListingBytes+1)}
-	if err := json.NewDecoder(counted).Decode(into); err != nil {
-		if counted.n > mostListingBytes {
-			return fmt.Errorf("that listing is larger than the %d bytes this reads",
-				mostListingBytes)
+		// A refusal that names this one address is about the document. A
+		// publisher's listing still naming a withdrawn advisory is the
+		// ordinary case, and a server having a bad day answers 5xx, which is
+		// about reaching them.
+		answered := fmt.Errorf("that publisher answered %s", res.Status)
+		if res.StatusCode >= 400 && res.StatusCode < 500 {
+			return nil, unreadable{answered}
 		}
+		return nil, answered
+	}
+	body, err := io.ReadAll(io.LimitReader(res.Body, most+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > most {
+		return nil, unreadable{fmt.Errorf(
+			"that document is larger than the %d bytes this reads", most)}
+	}
+	return body, nil
+}
+
+// json fetches one document and reads it as the shape given.
+func (f *Fetcher) json(ctx context.Context, client *http.Client, address string, into any) error {
+	body, err := f.fetch(ctx, client, address, mostListingBytes)
+	if err != nil {
 		return err
 	}
-	if counted.n > mostListingBytes {
-		return fmt.Errorf("that listing is larger than the %d bytes this reads",
-			mostListingBytes)
-	}
-	return nil
-}
-
-// counting says how much was read, so a document cut off at a bound is
-// reported as too large rather than as malformed.
-type counting struct {
-	r io.Reader
-	n int64
-}
-
-func (c *counting) Read(p []byte) (int, error) {
-	n, err := c.r.Read(p)
-	c.n += int64(n)
-	return n, err
+	return json.Unmarshal(body, into)
 }
 
 // The two JSON files a publisher serves to say what they offer and where. The
@@ -499,7 +741,8 @@ type providerMetadata struct {
 }
 
 type distribution struct {
-	ROLIE *rolie `json:"rolie,omitempty"`
+	DirectoryURL string `json:"directory_url,omitempty"`
+	ROLIE        *rolie `json:"rolie,omitempty"`
 }
 
 type rolie struct {
@@ -507,7 +750,8 @@ type rolie struct {
 }
 
 type feedDescription struct {
-	URL string `json:"url"`
+	TLPLabel string `json:"tlp_label"`
+	URL      string `json:"url"`
 }
 
 type rolieFeed struct {

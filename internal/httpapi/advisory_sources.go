@@ -21,10 +21,12 @@ import (
 type AdvisorySourceBody struct {
 	Name string `json:"name" doc:"The name this supplier is configured under"`
 	URL  string `json:"url" doc:"Where the supplier describes what they publish"`
-	// Read, CaughtUpTo and Because say whether it is working, which is the
-	// question an operator has about a source and one nothing else answers.
-	Read       *time.Time `json:"read,omitempty" doc:"When this supplier was last reached"`
-	CaughtUpTo *time.Time `json:"caught_up_to,omitempty" doc:"The newest moment in their feed that has been read"`
+	// Tried, Read, CaughtUpTo and Because say whether it is working, which is
+	// the question an operator has about a source and one nothing else
+	// answers.
+	Tried      *time.Time `json:"tried,omitempty" doc:"When this supplier was last tried"`
+	Read       *time.Time `json:"read,omitempty" doc:"When a read of this supplier last succeeded"`
+	CaughtUpTo *time.Time `json:"caught_up_to,omitempty" doc:"The newest moment in what they list that has been read"`
 	Because    string     `json:"because,omitempty" doc:"The reason the last attempt stopped, where one did"`
 }
 
@@ -37,10 +39,11 @@ func registerAdvisorySources(api huma.API, in Ingest) {
 		OperationID: "list-advisory-sources", Method: http.MethodGet, Path: path,
 		Summary: "List the suppliers advisories are read from",
 		Description: "The suppliers configured for this product, when each was last " +
-			"reached, and how far through what they publish this deployment has read.\n\n" +
-			"A supplier that cannot be reached is not a failure anything else reports. " +
-			"The moment of the last attempt is what says so, and the reason the last one " +
-			"stopped is returned beside it.",
+			"tried, when one last succeeded, and how far through what they publish this " +
+			"deployment has read.\n\n" +
+			"Two moments rather than one. An attempt that failed still happened, so how " +
+			"long a supplier has been unreachable is the gap between them; the reason the " +
+			"last attempt stopped is returned beside them.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -70,8 +73,8 @@ func registerAdvisorySources(api huma.API, in Ingest) {
 		out.Body.Items = make([]AdvisorySourceBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, AdvisorySourceBody{
-				Name: row.Name, URL: row.URL, Read: row.FetchedAt,
-				CaughtUpTo: row.CaughtUpTo, Because: row.Failed,
+				Name: row.Display, URL: row.URL, Tried: row.FetchedAt,
+				Read: row.ReachedAt, CaughtUpTo: row.CaughtUpTo, Because: row.Failed,
 			})
 		}
 		return out, nil
@@ -81,29 +84,30 @@ func registerAdvisorySources(api huma.API, in Ingest) {
 		OperationID: "add-advisory-source", Method: http.MethodPost, Path: path,
 		Summary: "Read advisories from a supplier",
 		Description: "Records a supplier whose published security advisories are read on " +
-			"the scan schedule, and lands them where an uploaded one lands: as evidence " +
-			"beside a finding and a prefill for a decision, never as a judgment of ours.\n\n" +
-			"The address is the supplier's CSAF provider description, the document naming " +
-			"the feeds their advisories are listed in. https only, on the host it names, " +
-			"and a redirect is refused rather than followed.\n\n" +
-			"Only what this product ships is kept. A publisher's feed is about their whole " +
-			"catalog, so a claim naming a component no build here contains is read and not " +
-			"recorded.\n\n" +
-			"Reading starts from the moment the supplier is added, not from the beginning " +
-			"of what they have published. A publisher's feed lists everything they have " +
-			"ever issued, and taking it would be tens of thousands of requests for evidence " +
-			"about issues already reported. Upload an older advisory to take one.\n\n" +
-			"A VEX document in the same feed is left alone. It replaces a publisher's whole " +
-			"answer for a product, which is not something a scheduled pass decides; upload " +
-			"it to take it.\n\n" +
-			"A supplier taken out of use and added again under the same name starts from " +
-			"today, the way a new one does.",
+			"the scan schedule. What they say arrives as evidence beside a finding and a " +
+			"prefill for a decision, and is never applied.\n\n" +
+			"The address is the supplier's CSAF provider description, which names where " +
+			"their advisories are listed. Both shapes the format defines are read: a ROLIE " +
+			"feed and a directory of documents. Only the listings a publisher labels " +
+			"TLP:WHITE or TLP:CLEAR are read.\n\n" +
+			"Only claims naming a component this product ships are recorded.\n\n" +
+			"Reading starts from the moment the supplier is added. To take an advisory " +
+			"published before that, upload it.\n\n" +
+			"A VEX document listed beside the advisories is not read here. Upload it to " +
+			"the VEX endpoint to take it.\n\n" +
+			"A supplier withdrawn and added again under the same name starts from today, " +
+			"the way a new one does.\n\n" +
+			"The name is matched without regard to capitals. A name already in use for " +
+			"this product is refused with 409; withdraw the supplier first to change its " +
+			"address.\n\n" +
+			"The address must be https and carry no user information. A product that is " +
+			"out of use takes no supplier.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Body    struct {
-			Name string `json:"name" minLength:"1" maxLength:"191" doc:"What to call this supplier"`
-			URL  string `json:"url" minLength:"1" maxLength:"1000" doc:"The supplier's CSAF provider description. https only"`
+			Name string `json:"name" minLength:"1" maxLength:"191" doc:"The name this supplier is configured under"`
+			URL  string `json:"url" minLength:"1" maxLength:"1000" doc:"The address of the supplier's CSAF provider description"`
 		}
 	}) (*struct {
 		Status int
@@ -135,14 +139,21 @@ func registerAdvisorySources(api huma.API, in Ingest) {
 		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
 			var err error
 			row, err = supplier.NewStore(tx).Add(ctx, by, product.ID, input.Body.Name, address)
-			if err != nil {
+			switch {
+			case errors.Is(err, supplier.ErrNameTaken):
+				// Somebody adding the same supplier twice, which is an answer
+				// rather than a fault: the row it collides with is one they
+				// can see.
+				return huma.Error409Conflict(
+					"a supplier is already read under that name for this product")
+			case err != nil:
 				return asked(in.Logger, err)
 			}
 			// The host rather than the whole address, which is what an
 			// administrator reading the trail needs: which publisher this
 			// deployment started reading from.
 			if err := noted(ctx, tx, trail.Setting,
-				"advisory source · "+product.Name+" · "+row.Name,
+				"advisory source · "+product.Name+" · "+row.Display,
 				nil, trail.Said(hostOf(row.URL), true)); err != nil {
 				return notRecorded(in.Logger, err)
 			}
@@ -153,16 +164,17 @@ func registerAdvisorySources(api huma.API, in Ingest) {
 		return &struct {
 			Status int
 			Body   AdvisorySourceBody
-		}{Status: http.StatusCreated, Body: AdvisorySourceBody{Name: row.Name, URL: row.URL}}, nil
+		}{Status: http.StatusCreated, Body: AdvisorySourceBody{Name: row.Display, URL: row.URL}}, nil
 	})
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "withdraw-advisory-source", Method: http.MethodDelete,
 		Path:    path + "/{name}",
 		Summary: "Stop reading a supplier",
-		Description: "Takes a supplier out of use. What they have already said stays " +
-			"standing: their claims are evidence somebody may have granted an approval on " +
-			"the strength of, and no longer reading them does not make them unsaid.",
+		Description: "Stops reading a supplier. What they have already said stays " +
+			"standing, because an approval may have been granted on the strength of it.\n\n" +
+			"The name is matched without regard to capitals. A name no supplier is " +
+			"configured under is refused with 404.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`

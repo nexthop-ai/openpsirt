@@ -162,6 +162,11 @@ const (
 	// morning waits to be noticed. It is tuned here rather than compiled
 	// in because what a deployment's scanner costs to run over its whole
 	// estate is a question about that estate.
+	//
+	// It is also how often each configured supplier is read again, because
+	// that is the same question: what is known about what a build ships moves
+	// on the cadence the vulnerability data does. Shortening it multiplies
+	// requests to third parties as well as scans here.
 	ScanEvery = "scanning.every"
 	// UpstreamCurrency is whether this deployment asks public package
 	// indexes what the newest version of a component is.
@@ -171,9 +176,10 @@ const (
 	// arrives as a file somebody imported
 	// deliberately, so that a scan answers the same way twice and nothing a
 	// scan depends on is somebody else's server being up (REQ-12). This
-	// stands outside that: it is not part of a scan, it is asked of a public
-	// index, and a deployment that cannot reach out loses this answer and
-	// nothing else.
+	// stands outside that: it is not part of a scan, and it is asked of a
+	// public index. A deployment that cannot reach out loses this answer and
+	// whatever a configured supplier would have said; what a scan reports is
+	// unaffected.
 	//
 	// A component's name goes out. One request per component to
 	// that ecosystem's public index, carrying the name and nothing else — no

@@ -36,25 +36,42 @@ func upAdvisorySource(ctx context.Context, tx *sql.Tx) error {
 		`CREATE TABLE "advisory_source" (
 			"id"           ` + t.id + `,
 			"product_id"   ` + t.ref + ` NOT NULL,
-			-- What it is called, so a screen and a log line can name it, and
-			-- the half of its identity that does not move when the supplier
-			-- reorganizes their site.
+			-- What it is called, lowered, which is what a name typed here is
+			-- matched by. Normalizing the stored value rather than comparing
+			-- loosely is what makes every engine agree without any of them
+			-- being asked to.
 			"name"         ` + t.name + ` NOT NULL,
+			-- The spelling somebody typed, which is what gets shown back.
+			"display_name" ` + t.name + ` NOT NULL,
 			-- Where the supplier describes what they publish: the CSAF
 			-- provider description, which names the feeds the documents are
 			-- listed in. An address rather than a document, because a
 			-- publisher issues one advisory per issue and a list of them is
 			-- the only thing that stays at one address.
 			"url"          ` + t.free + ` NOT NULL,
-			-- The newest moment in the feed this source has been read to.
-			-- Null until the first pass, which is what makes a source
-			-- configured today start at today rather than at a publisher's
-			-- whole history.
-			"caught_up_to" ` + t.timestamp + ` NULL,
-			-- When a pass last reached it and what stopped the last one, so
-			-- an operator can see a supplier that has been unreachable for a
-			-- week rather than inferring it from missing evidence.
+			-- How far through what a publisher lists this source has been
+			-- read: the moment, and the address that moment was last read at.
+			--
+			-- A pair rather than a moment, because a publisher stamps a batch
+			-- of documents with one moment and a date-only stamp gives a whole
+			-- day the same one. Read as a moment alone, a cycle that stopped
+			-- inside such a group would leave the mark on that moment and skip
+			-- the rest of the group for ever.
+			--
+			-- The address is kept as its digest, so the comparison that orders
+			-- two marks is over lower-case hexadecimal. Every engine orders
+			-- those the same way whatever its collation, which a comparison
+			-- over addresses themselves does not.
+			"caught_up_to"   ` + t.timestamp + ` NULL,
+			"caught_up_mark" ` + t.hash + ` NULL,
+			-- When a pass last tried this supplier, when one last succeeded,
+			-- and what stopped the last one. Two moments rather than one: an
+			-- attempt that failed still happened, so a single moment reads as
+			-- a supplier answering fine right up to the failure it is
+			-- reporting — and "unreachable for a week" is only visible as the
+			-- gap between them.
 			"fetched_at"   ` + t.timestamp + ` NULL,
+			"reached_at"   ` + t.timestamp + ` NULL,
 			"failed"       ` + t.free + ` NULL,
 			"created_by"   ` + t.ref + ` NOT NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
@@ -70,10 +87,9 @@ func upAdvisorySource(ctx context.Context, tx *sql.Tx) error {
 		)` + t.suffix,
 
 		// What the pass reads: every source still configured, across every
-		// product, oldest fetch first. Without this that is a scan of the
-		// table on every cycle, which is small now and is the shape that
-		// stops being small when a deployment configures a supplier per
-		// product across an estate.
+		// product, the one longest untried first. Without it that is a scan of
+		// the table on every cycle, over a table whose size is the number of
+		// products an estate holds times the publishers each reads from.
 		`CREATE INDEX "advisory_source_due_idx" ON "advisory_source"
 			("retired_at", "fetched_at")`,
 	}

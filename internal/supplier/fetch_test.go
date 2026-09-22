@@ -27,7 +27,10 @@ type publisher struct {
 	// each was last released.
 	documents map[string]string
 	stamped   map[string]string
-	asked     []string
+	// failing answers a status instead of a body at these paths, so a test can
+	// tell a refusal about one document from a publisher having a bad day.
+	failing map[string]int
+	asked   []string
 	// override answers everything where a test needs a directory this
 	// publisher would not serve. Set before the first request.
 	override http.HandlerFunc
@@ -35,7 +38,10 @@ type publisher struct {
 
 func serving(t *testing.T) *publisher {
 	t.Helper()
-	p := &publisher{documents: map[string]string{}, stamped: map[string]string{}}
+	p := &publisher{
+		documents: map[string]string{}, stamped: map[string]string{},
+		failing: map[string]int{},
+	}
 	// https, because the fetcher refuses anything else: what comes back is
 	// read as a publisher's own judgment, and over plain http it is read as
 	// whoever is between us and them.
@@ -43,6 +49,10 @@ func serving(t *testing.T) *publisher {
 		p.asked = append(p.asked, r.URL.Path)
 		if p.override != nil {
 			p.override(w, r)
+			return
+		}
+		if code, refusing := p.failing[r.URL.Path]; refusing {
+			http.Error(w, http.StatusText(code), code)
 			return
 		}
 		switch r.URL.Path {
@@ -139,6 +149,34 @@ func advisory(identifier, component, version, issue string) string {
 	    "product_status": {"fixed": ["p1"]},
 	    "notes": [{"category":"description","text":"Fixed in %[3]s."}]}]
 	}`, identifier, component, version, issue)
+}
+
+// twoPackages is one advisory naming two packages at one issue, which is the
+// ordinary shape: a distribution fixes a source package and ships several
+// binaries of it.
+func twoPackages(identifier, first, second, issue string) string {
+	return fmt.Sprintf(`{
+	  "document": {
+	    "category": "csaf_security_advisory",
+	    "csaf_version": "2.0",
+	    "publisher": {"category":"vendor","name":"Example Linux","namespace":"https://supplier.example"},
+	    "title": "update",
+	    "tracking": {"id": %[1]q, "current_release_date":"2026-09-20T00:00:00Z",
+	                 "initial_release_date":"2026-09-20T00:00:00Z","status":"final","version":"1"}
+	  },
+	  "product_tree": {"branches":[{"category":"vendor","name":"Example Linux","branches":[
+	    {"category":"product_name","name":%[2]q,"branches":[
+	      {"category":"product_version","name":"3.7.1",
+	       "product":{"name":"%[2]s","product_id":"p1",
+	                  "product_identification_helper":{"purl":"pkg:deb/debian/%[2]s@3.7.1"}}}]},
+	    {"category":"product_name","name":%[3]q,"branches":[
+	      {"category":"product_version","name":"3.7.1",
+	       "product":{"name":"%[3]s","product_id":"p2",
+	                  "product_identification_helper":{"purl":"pkg:deb/debian/%[3]s@3.7.1"}}}]}]}]},
+	  "vulnerabilities": [{"cve": %[4]q,
+	    "product_status": {"fixed": ["p1","p2"]},
+	    "notes": [{"category":"description","text":"Fixed in 3.7.1."}]}]
+	}`, identifier, first, second, issue)
 }
 
 // vexDocument is a publisher's statement set, which belongs in the same feed
@@ -278,6 +316,7 @@ func from(t *testing.T, f *ships, p *publisher) supplier.Source {
 	// after the mark, which is what a supplier configured before a publication
 	// looks like.
 	row.CaughtUpTo = &long
+	row.CaughtUpMark = ""
 	return *row
 }
 
@@ -462,6 +501,32 @@ func TestADocumentServedFromAnotherHostIsRefusedRatherThanFetched(t *testing.T) 
 	})
 }
 
+func TestTheFetcherAsBuiltWillNotReachInsideThisNetwork(t *testing.T) {
+	// Every other test here replaces the client with a pinned stand-in, so
+	// none of them touches the wiring a deployment actually runs: swapping the
+	// guarded client for an ordinary one leaves them all green. This one
+	// drives the fetcher as NewFetcher builds it.
+	//
+	// A test server is on loopback, which is exactly what the guard refuses —
+	// so the refusal is the assertion, and the reason is checked rather than
+	// the failure, because an unguarded client fails here too, on the
+	// certificate.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+
+		fetch := supplier.NewFetcher(f.db.DB, sbom.Limits{})
+		fetch.Pause = 0
+		_, err := fetch.From(ctx, f.by, from(t, f, p))
+		if err == nil {
+			t.Fatal("the fetcher reached a server inside this network")
+		}
+		if !strings.Contains(err.Error(), "not reached inside this network") {
+			t.Errorf("it was refused for the wrong reason: %v", err)
+		}
+	})
+}
+
 func TestOnlyWhatThePublisherStampedAfterTheMarkIsRead(t *testing.T) {
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
@@ -472,8 +537,8 @@ func TestOnlyWhatThePublisherStampedAfterTheMarkIsRead(t *testing.T) {
 			advisory("EL-2026-0006", "libnl-3-200", "3.7.2", "CVE-2026-7777"))
 
 		source := from(t, f, p)
-		mark := time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)
-		source.CaughtUpTo = &mark
+		at := time.Date(2026, 9, 21, 0, 0, 0, 0, time.UTC)
+		source.CaughtUpTo = &at
 
 		took, err := fetching(t, f, p).From(ctx, f.by, source)
 		if err != nil {
@@ -525,19 +590,22 @@ func TestAPublishersBacklogIsBoundedPerCycle(t *testing.T) {
 	})
 }
 
-func TestAPublisherWhoseDirectoryDescribesNoFeedIsReportedRatherThanSilent(t *testing.T) {
+func TestAPublisherWhoseDirectoryNamesNothingIsReportedRatherThanSilent(t *testing.T) {
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
 		p := serving(t)
+		// Neither shape: no ROLIE feed and no directory of documents. A
+		// publisher offering nothing readable is a fault an operator has to be
+		// told about, not an empty answer.
 		p.override = func(w http.ResponseWriter, _ *http.Request) {
-			_, _ = fmt.Fprint(w, `{"distributions":[{"directory_url":"https://supplier.example/csaf/"}]}`)
+			_, _ = fmt.Fprint(w, `{"distributions":[{}]}`)
 		}
 
 		_, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
 		if err == nil {
-			t.Fatal("a directory with no feed was read as empty")
+			t.Fatal("a directory naming nothing was read as empty")
 		}
-		if !strings.Contains(err.Error(), "no feed") {
+		if !strings.Contains(err.Error(), "names nothing to read") {
 			t.Errorf("it was reported as %v", err)
 		}
 	})

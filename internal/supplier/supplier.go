@@ -23,11 +23,17 @@
 // chose, and this is every document a publisher issues.
 //
 // Off unless configured. A deployment that names no supplier reaches nothing,
-// and one that cannot reach out loses this evidence and nothing else.
+// and one that cannot reach out loses a publisher's own judgment as evidence.
+// What a scan reports is unaffected: nothing on that path leaves this
+// deployment (REQ-12).
 package supplier
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -36,6 +42,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -45,18 +52,36 @@ type Source struct {
 
 	ID        int64 `bun:"id,pk,autoincrement"`
 	ProductID int64 `bun:"product_id,notnull"`
-	// Name is what an operator calls this supplier and URL is where the
-	// supplier describes what they publish. Two fields rather than one,
-	// because a publisher that moves its site is the same supplier and the
-	// claims already recorded name them.
-	Name string `bun:"name,notnull"`
-	URL  string `bun:"url,notnull"`
-	// CaughtUpTo is the newest moment in the supplier's feed this source has
-	// been read to. Absent until the first pass.
-	CaughtUpTo *time.Time `bun:"caught_up_to"`
-	// FetchedAt is when a pass last reached this supplier and Failed is what
-	// stopped the last one, where something did.
+	// Name is what this supplier is matched by, lowered, and Display is the
+	// spelling somebody typed. Two columns rather than one, because a name
+	// people type is matched without regard to capitals and the four engines
+	// fold differently — a value normalized on the way in compares the same
+	// under any of them.
+	Name    string `bun:"name,notnull"`
+	Display string `bun:"display_name,notnull"`
+	// URL is where the supplier describes what they publish. Beside the name
+	// rather than instead of it, because a publisher that moves its site is
+	// the same supplier and the claims already recorded name them.
+	URL string `bun:"url,notnull"`
+	// CaughtUpTo and CaughtUpMark are how far through what this publisher
+	// lists the source has been read: the moment, and the digest of the
+	// address read at that moment. Absent until the first pass.
+	//
+	// A pair rather than a moment. A publisher stamps a batch of documents
+	// with one moment, and a date-only stamp gives a whole day the same one —
+	// so a cycle that stopped inside such a group would leave the mark on that
+	// moment and skip the rest of the group for ever.
+	CaughtUpTo   *time.Time `bun:"caught_up_to"`
+	CaughtUpMark string     `bun:"caught_up_mark"`
+	// FetchedAt is when a pass last tried this supplier, ReachedAt when one
+	// last succeeded, and Failed what stopped the last one.
+	//
+	// Two moments, because an attempt that failed still happened: one moment
+	// moving on every attempt reads as a supplier answering fine right up to
+	// the failure it is reporting, and how long one has been unreachable is
+	// the gap between them.
 	FetchedAt *time.Time `bun:"fetched_at"`
+	ReachedAt *time.Time `bun:"reached_at"`
 	Failed    string     `bun:"failed"`
 	CreatedBy int64      `bun:"created_by,notnull"`
 	CreatedAt time.Time  `bun:"created_at,notnull"`
@@ -75,6 +100,15 @@ const (
 	MostURL  = 1000
 )
 
+// MostReason bounds what is kept of why a supplier could not be read.
+//
+// The text carries a publisher's own address and a server's own reason phrase,
+// both of which they choose and neither of which is bounded by anything they
+// have agreed to. A sentence is what an operator reads; a megabyte is a write
+// that fails on two of the four engines, which would leave the attempt
+// unrecorded and the supplier fetched again on the next wake.
+const MostReason = 400
+
 // Store reads and writes the suppliers this deployment fetches from.
 type Store struct {
 	db  bun.IDB
@@ -89,6 +123,30 @@ func NewStore(db bun.IDB) *Store {
 // At fixes the clock, for a test that asks what happens at a given moment.
 func (s *Store) At(now func() time.Time) *Store { return &Store{db: s.db, now: now} }
 
+// matching is the name a supplier is found by.
+//
+// Lowered on the way in rather than compared loosely on the way out. The four
+// engines default to different collations, so asking one to fold makes whether
+// two spellings are one supplier depend on which engine is running; a lowered
+// value compares the same under any of them, and the unique constraint means
+// the same thing everywhere.
+func matching(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
+
+// Mark is the digest of an address, which is half of how far a source has been
+// read.
+//
+// A digest rather than the address, so that ordering two marks is a comparison
+// over lower-case hexadecimal. Every engine orders those the same way whatever
+// its collation, which a comparison over addresses themselves does not — and
+// the ordering only has to be the same on both sides, never meaningful.
+func Mark(address string) string {
+	sum := sha256.Sum256([]byte(address))
+	return hex.EncodeToString(sum[:])
+}
+
+// ErrNameTaken says a supplier is already read under that name.
+var ErrNameTaken = errors.New("a supplier is already read under that name")
+
 // administering refuses anybody but an administrator.
 //
 // Configuring a supplier admits a third party's judgment into this deployment's
@@ -102,13 +160,23 @@ func administering(subject access.Subject, what string) error {
 	return nil
 }
 
-// Due is every supplier still configured that has not been read since before.
+// inUse narrows to the sources of a product that is still in use.
+//
+// A product taken out of use offers nothing and accepts no scan, and nothing
+// lists it — so a supplier configured against one goes on being fetched and
+// recorded into, with no screen left that could withdraw it.
+func inUse(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.Join(`JOIN "product" AS "pr" ON pr.id = sp.product_id`).
+		Where("pr.retired_at IS NULL")
+}
+
+// Due is every supplier still configured that has not been tried since before.
 //
 // Read by the pass, which answers nobody: it carries the deployment's own
 // subject because there is no person behind a background cycle, and what it
 // asks for is the list it is about to work through.
 //
-// One never read is due whatever the moment, which is what makes a supplier
+// One never tried is due whatever the moment, which is what makes a supplier
 // named this morning read this afternoon rather than tomorrow.
 func (s *Store) Due(ctx context.Context, subject access.Subject, before time.Time) ([]Source, error) {
 	if !subject.Unnarrowed() {
@@ -117,19 +185,37 @@ func (s *Store) Due(ctx context.Context, subject access.Subject, before time.Tim
 		}
 	}
 	var rows []Source
-	if err := s.db.NewSelect().Model(&rows).
-		Where("retired_at IS NULL").
+	q := s.db.NewSelect().Model(&rows).
+		Where("sp.retired_at IS NULL").
 		Where(`"sp"."fetched_at" IS NULL OR "sp"."fetched_at" < ?`,
 			before.UTC().Truncate(time.Microsecond)).
-		// Oldest read first, and one never read before the rest. Nothing
+		// Longest untried first, and one never tried before the rest. Nothing
 		// bounds how many suppliers a cycle takes, so the order is what keeps
 		// one that is slow from being the only one ever reached.
 		OrderExpr(`CASE WHEN "sp"."fetched_at" IS NULL THEN 0 ELSE 1 END`).
-		Order("fetched_at", "id").
-		Scan(ctx); err != nil {
+		OrderExpr(`"sp"."fetched_at"`).OrderExpr(`"sp"."id"`)
+	if err := inUse(q).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which suppliers are fetched from: %w", err)
 	}
 	return rows, nil
+}
+
+// Standing reads one source back as it is now.
+//
+// Asked inside the transaction that records what a document said, because a
+// pass takes minutes and a supplier withdrawn during one is a request leaving
+// this deployment that somebody thought they had stopped. Answers nothing where
+// the source has been withdrawn or its product taken out of use.
+func (s *Store) Standing(ctx context.Context, db bun.IDB, id int64) (*Source, error) {
+	row := new(Source)
+	q := db.NewSelect().Model(row).Where("sp.id = ?", id).Where("sp.retired_at IS NULL")
+	switch err := inUse(q).Scan(ctx); {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, nil
+	case err != nil:
+		return nil, fmt.Errorf("read whether that supplier is still configured: %w", err)
+	}
+	return row, nil
 }
 
 // For is every supplier configured against one product.
@@ -139,8 +225,8 @@ func (s *Store) For(ctx context.Context, subject access.Subject, productID int64
 	}
 	var rows []Source
 	if err := s.db.NewSelect().Model(&rows).
-		Where("product_id = ?", productID).
-		Where("retired_at IS NULL").
+		Where("sp.product_id = ?", productID).
+		Where("sp.retired_at IS NULL").
 		Order("name").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which suppliers are fetched from: %w", err)
 	}
@@ -165,12 +251,12 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 	if err := administering(subject, "configure which suppliers are fetched from"); err != nil {
 		return nil, err
 	}
-	name = strings.TrimSpace(name)
+	typed := strings.TrimSpace(name)
 	address = strings.TrimSpace(address)
-	if name == "" || address == "" {
+	if typed == "" || address == "" {
 		return nil, fmt.Errorf("a supplier needs a name and an address")
 	}
-	if utf8.RuneCountInString(name) > MostName {
+	if utf8.RuneCountInString(typed) > MostName {
 		return nil, fmt.Errorf("that name is longer than the %d characters this records",
 			MostName)
 	}
@@ -183,13 +269,26 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 	if err := Reachable(address); err != nil {
 		return nil, err
 	}
+	// A product taken out of use accepts no scan, so what a supplier would be
+	// read against is a build list nothing adds to. Refused here the way
+	// filing a scan against one is, rather than leaving a source nothing
+	// lists and nothing can withdraw.
+	switch live, err := s.productInUse(ctx, productID); {
+	case err != nil:
+		return nil, err
+	case !live:
+		return nil, fmt.Errorf("that product is out of use, and a supplier is read " +
+			"against what a product ships")
+	}
+	folded := matching(typed)
 	now := s.now().UTC().Truncate(time.Microsecond)
 	row := &Source{
-		ProductID: productID, Name: name, URL: address,
+		ProductID: productID, Name: folded, Display: typed, URL: address,
 		CreatedBy: subject.ID, CreatedAt: now,
 	}
 	res, err := s.db.NewUpdate().Model((*Source)(nil)).
 		Set("retired_at = ?", nil).
+		Set("display_name = ?", row.Display).
 		Set("url = ?", row.URL).
 		Set("created_by = ?", row.CreatedBy).
 		Set("created_at = ?", row.CreatedAt).
@@ -197,10 +296,12 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 		// again has. A stale mark left behind would be read as a failure by
 		// the pass that has not run yet.
 		Set("caught_up_to = ?", nil).
+		Set("caught_up_mark = ?", "").
 		Set("fetched_at = ?", nil).
+		Set("reached_at = ?", nil).
 		Set("failed = ?", "").
 		Where("product_id = ?", productID).
-		Where("name = ?", name).
+		Where("name = ?", folded).
 		Where("retired_at IS NOT NULL").
 		Exec(ctx)
 	if err != nil {
@@ -212,16 +313,32 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 	}
 	if n > 0 {
 		if err := s.db.NewSelect().Model(row).
-			Where("product_id = ?", productID).Where("name = ?", name).
+			Where("sp.product_id = ?", productID).Where("sp.name = ?", folded).
 			Limit(1).Scan(ctx); err != nil {
 			return nil, fmt.Errorf("read that supplier back: %w", err)
 		}
 		return row, nil
 	}
 	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
+		// A name already in use is somebody adding the same supplier twice,
+		// which is an answer rather than a fault: the row it collides with is
+		// one they can see.
+		if database.IsDuplicate(err) {
+			return nil, fmt.Errorf("%w: %q", ErrNameTaken, typed)
+		}
 		return nil, fmt.Errorf("record that supplier: %w", err)
 	}
 	return row, nil
+}
+
+// productInUse reports whether a product is still offered.
+func (s *Store) productInUse(ctx context.Context, productID int64) (bool, error) {
+	n, err := s.db.NewSelect().TableExpr(`"product" AS "pr"`).
+		Where("pr.id = ?", productID).Where("pr.retired_at IS NULL").Count(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether that product is in use: %w", err)
+	}
+	return n > 0, nil
 }
 
 // Retire stops fetching from a supplier.
@@ -238,7 +355,7 @@ func (s *Store) Retire(ctx context.Context, subject access.Subject, productID in
 	res, err := s.db.NewUpdate().Model((*Source)(nil)).
 		Set("retired_at = ?", s.now().UTC().Truncate(time.Microsecond)).
 		Where("product_id = ?", productID).
-		Where("name = ?", strings.TrimSpace(name)).
+		Where("name = ?", matching(name)).
 		Where("retired_at IS NULL").Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("stop fetching from that supplier: %w", err)
@@ -258,30 +375,46 @@ func (s *Store) Retire(ctx context.Context, subject access.Subject, productID in
 	return nil
 }
 
-// Reached records what a pass found, whether or not it found anything.
+// Reached records what one attempt at a supplier found.
 //
-// Written even where nothing came back, because "this supplier has been
-// unreachable for a week" is the fact an operator needs and it is only visible
-// as a moment that has stopped moving.
+// Written whether or not anything came back. An attempt that failed still
+// happened, and how long a publisher has been unreachable is the gap between
+// the last attempt and the last one that worked — which is a fact nothing else
+// in this deployment holds.
 //
-// caughtUpTo moves forward only. A publisher that revises an old document
-// stamps it with the moment of the revision, so a feed entry older than the
-// mark is one already taken — and a mark that could go backwards would make a
-// supplier who re-stamped one document replay their whole history.
-func (s *Store) Reached(ctx context.Context, id int64, caughtUpTo time.Time, failed error) error {
+// The mark moves forward only, and it is the whole pair that is compared. A
+// publisher that revises an old document stamps it with the moment of the
+// revision, so an entry behind the mark is one already taken — and a mark that
+// could go backwards would make a publisher who re-stamped one document replay
+// their whole history.
+//
+// The mark is conditional and the two moments are not. Written as one condition
+// on the statement, a mark that did not advance took the record of the attempt
+// with it, and the supplier was tried again on every wake.
+func (s *Store) Reached(ctx context.Context, id int64, at time.Time, mark string,
+	failed error) error {
+
 	now := s.now().UTC().Truncate(time.Microsecond)
-	because := ""
-	if failed != nil {
-		because = failed.Error()
-	}
 	update := s.db.NewUpdate().Model((*Source)(nil)).
 		Set("fetched_at = ?", now).
-		Set("failed = ?", because).
 		Where("id = ?", id)
-	if !caughtUpTo.IsZero() {
-		update = update.Set("caught_up_to = ?", caughtUpTo.UTC().Truncate(time.Microsecond)).
-			Where(`"caught_up_to" IS NULL OR "caught_up_to" < ?`,
-				caughtUpTo.UTC().Truncate(time.Microsecond))
+	if failed != nil {
+		update = update.Set("failed = ?", bound.HeadRunes(failed.Error(), MostReason))
+	} else {
+		update = update.Set("failed = ?", "").Set("reached_at = ?", now)
+	}
+	if !at.IsZero() {
+		moment := at.UTC().Truncate(time.Microsecond)
+		// A CASE rather than a condition on the statement, so that a mark
+		// which does not advance leaves the two moments written. The pair is
+		// compared in the order it is read in: the moment, then the digest of
+		// the address, which is hexadecimal and so orders the same on every
+		// engine.
+		update = update.
+			Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
+				moment, mark, moment, moment).
+			Set(`"caught_up_mark" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_mark" END`,
+				moment, mark, moment, mark)
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return fmt.Errorf("record what came back from that supplier: %w", err)
@@ -289,17 +422,53 @@ func (s *Store) Reached(ctx context.Context, id int64, caughtUpTo time.Time, fai
 	return nil
 }
 
-// From is where a source starts reading when nothing has been read yet.
+// CaughtUp records how far a pass read without saying the supplier is done.
 //
-// The moment it was configured, rather than the beginning of the publisher's
-// history. A publisher's feed lists every advisory they have ever issued —
-// tens of thousands for a distribution — and taking them is a burst at somebody
-// else's service that would drain over months and arrive as evidence about
-// issues a scan reported long ago. What a deployment wants from history is one
-// document at a time, which the upload path already takes.
-func (s Source) From() time.Time {
-	if s.CaughtUpTo != nil {
-		return *s.CaughtUpTo
+// For a pass that stopped at its bound rather than because there was nothing
+// left. The mark moves so the next wake starts after what was read, and the two
+// moments are left alone so the supplier stays due: the bound is per wake and
+// the interval is a day, so a publisher issuing more in a day than one pass
+// takes would otherwise fall further behind every day.
+func (s *Store) CaughtUp(ctx context.Context, id int64, at time.Time, mark string) error {
+	if at.IsZero() {
+		return nil
 	}
-	return s.CreatedAt
+	moment := at.UTC().Truncate(time.Microsecond)
+	_, err := s.db.NewUpdate().Model((*Source)(nil)).
+		Set(`"caught_up_to" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_to" END`,
+			moment, mark, moment, moment).
+		Set(`"caught_up_mark" = CASE WHEN `+ahead+` THEN ? ELSE "caught_up_mark" END`,
+			moment, mark, moment, mark).
+		Set("reached_at = ?", s.now().UTC().Truncate(time.Microsecond)).
+		Set("failed = ?", "").
+		Where("id = ?", id).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("record how far that supplier was read: %w", err)
+	}
+	return nil
+}
+
+// ahead is the test that a mark being written is past the one stored.
+//
+// Written once because the two assignments above have to ask exactly the same
+// question: one of them moving without the other leaves a mark that is half of
+// one pass and half of another, which orders against neither.
+const ahead = `"caught_up_to" IS NULL OR "caught_up_to" < ? ` +
+	`OR ("caught_up_to" = ? AND "caught_up_mark" < ?)`
+
+// From is where a source starts reading, as the pair a feed entry is compared
+// against.
+//
+// The moment it was configured, where nothing has been read yet, rather than
+// the beginning of the publisher's history. A publisher's feed lists every
+// advisory they have ever issued — tens of thousands for a distribution — and
+// taking them is a burst at somebody else's service that would drain over
+// months and arrive as evidence about issues a scan reported long ago. What a
+// deployment wants from history is one document at a time, which the upload
+// path already takes.
+func (s Source) From() (time.Time, string) {
+	if s.CaughtUpTo != nil {
+		return *s.CaughtUpTo, s.CaughtUpMark
+	}
+	return s.CreatedAt, ""
 }

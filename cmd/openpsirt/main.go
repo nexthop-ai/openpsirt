@@ -344,8 +344,9 @@ func run(args []string, stdout, stderr *os.File) error {
 	// whatever is configured and doing nothing where nothing is: the
 	// suppliers are read each cycle, so naming one takes effect without a
 	// redeploy and so does withdrawing one. Started on every replica and
-	// reaching out on one, by the same lease the two passes above use: the
-	// politeness it keeps to is a rate per deployment rather than per replica.
+	// reaching out on one, holding a lease of its own the way the two passes
+	// above hold theirs: the politeness it keeps to is a rate per deployment
+	// rather than per replica.
 	suppliers := supplier.NewPass(db.DB, logger, name, cfg.Limits())
 	// The messages that leave the application, where an operator configured
 	// somewhere for it to go. Nil when they did not, which is ordinary rather

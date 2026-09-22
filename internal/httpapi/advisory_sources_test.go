@@ -96,8 +96,8 @@ func TestASupplierIsNamedListedAndWithdrawn(t *testing.T) {
 		if len(listed) != 1 || listed[0].Name != "ExampleDistribution" {
 			t.Fatalf("the product reads as configured with %+v", listed)
 		}
-		// Never reached, so there is no moment and no reason.
-		if listed[0].Read != nil || listed[0].Because != "" {
+		// Never tried, so there is no moment of either kind and no reason.
+		if listed[0].Tried != nil || listed[0].Read != nil || listed[0].Because != "" {
 			t.Errorf("a supplier nothing has read reads as %+v", listed[0])
 		}
 
@@ -114,6 +114,47 @@ func TestASupplierIsNamedListedAndWithdrawn(t *testing.T) {
 		if got := r.named(t, "admin", http.MethodDelete,
 			sources+"/ExampleDistribution", "").Code; got != http.StatusNotFound {
 			t.Errorf("withdrawing a supplier that is not configured answered %d", got)
+		}
+	})
+}
+
+func TestASupplierAddedTwiceUnderOneNameIsAnAnswerRatherThanAFault(t *testing.T) {
+	// A double-click answered 500 and put a fault in the log for a rule
+	// working exactly as written: the row it collides with is one the caller
+	// can see.
+	twoReach(t, func(t *testing.T, r *reach) {
+		const sources = "/v1/products/mine/advisory-sources"
+
+		if got := r.named(t, "admin", http.MethodPost, sources, publishedAt).Code; got != http.StatusCreated {
+			t.Fatalf("naming a supplier answered %d", got)
+		}
+		rec := r.named(t, "admin", http.MethodPost, sources, publishedAt)
+		if rec.Code != http.StatusConflict {
+			t.Errorf("naming it again answered %d, want 409: %s", rec.Code, rec.Body.String())
+		}
+		// And under another spelling of the same name, because a name people
+		// type is matched without regard to capitals.
+		again := `{"name":"exampledistribution",` +
+			`"url":"https://distribution.example.test/.well-known/csaf/provider-metadata.json"}`
+		if got := r.named(t, "admin", http.MethodPost, sources, again).Code; got != http.StatusConflict {
+			t.Errorf("another spelling of the same name answered %d, want 409", got)
+		}
+	})
+}
+
+func TestAWithdrawalMatchesTheNameWithoutRegardToCapitals(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		const sources = "/v1/products/mine/advisory-sources"
+
+		if got := r.named(t, "admin", http.MethodPost, sources, publishedAt).Code; got != http.StatusCreated {
+			t.Fatalf("naming a supplier answered %d", got)
+		}
+		if got := r.named(t, "admin", http.MethodDelete,
+			sources+"/exampledistribution", "").Code; got != http.StatusNoContent {
+			t.Errorf("withdrawing it by another spelling answered %d", got)
+		}
+		if listed := r.suppliers(t, sources); len(listed) != 0 {
+			t.Errorf("it is still listed: %+v", listed)
 		}
 	})
 }
@@ -171,6 +212,7 @@ func TestASupplierIsNamedAgainstOneProductAndNotTheOther(t *testing.T) {
 type supplierRow struct {
 	Name    string  `json:"name"`
 	URL     string  `json:"url"`
+	Tried   *string `json:"tried"`
 	Read    *string `json:"read"`
 	Because string  `json:"because"`
 }

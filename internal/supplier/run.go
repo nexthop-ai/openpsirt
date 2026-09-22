@@ -80,19 +80,13 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 			if ctx.Err() == nil {
 				p.logger.Error("reading what suppliers have published", "error", err)
 			}
-		case took.Documents > 0:
+		case took.Documents > 0 || took.Refused > 0:
 			p.logger.Info("read what suppliers have published",
-				"documents", took.Documents, "claims", took.Recorded)
+				"documents", took.Documents, "claims", took.Recorded,
+				"refused", took.Refused, "other_documents", took.Skipped)
 		}
 	})
 }
-
-// FetchForTest points the pass at a fetcher that answers without a network.
-//
-// Exported for tests only, and doing nothing else: the real one reaches a
-// publisher's own service, whose contents change, so the pass cannot be
-// exercised end to end any other way.
-func FetchForTest(p *Pass, fetch *Fetcher) { p.fetch = fetch }
 
 // Once reads every supplier that is due one, reporting what it took.
 func (p *Pass) Once(ctx context.Context) (Taken, error) {
@@ -136,13 +130,14 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 		took.Documents += one.Documents
 		took.Recorded += one.Recorded
 		took.Skipped += one.Skipped
+		took.Refused += one.Refused
 		if err != nil {
 			// Recorded against the source and carried on. One publisher
 			// unreachable says nothing about the next, and a pass that stopped
 			// at the first would leave every supplier after it unread for as
 			// long as that one stayed down.
 			p.logger.Warn("a supplier could not be read",
-				"supplier", source.Name, "error", err)
+				"supplier", source.Display, "error", err)
 		}
 	}
 	return took, nil
@@ -152,13 +147,26 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 // well.
 //
 // What came back is written even where nothing did, because "this supplier has
-// been unreachable for a week" is the fact an operator needs and it is only
-// visible as a moment that has stopped moving.
+// been unreachable for a week" is the fact an operator needs and it is the gap
+// between the last attempt and the last one that worked.
+//
+// A pass that filled its bound leaves the supplier due rather than waiting for
+// the interval. The bound is per wake and the interval is a day, so a publisher
+// issuing more in a day than one pass takes would otherwise fall further behind
+// every day and never catch up.
 func (p *Pass) from(ctx context.Context, source Source) (Taken, error) {
 	took, err := p.fetch.From(ctx, recordedAs(source), source)
-	if marked := NewStore(p.db).Reached(ctx, source.ID, took.CaughtUpTo, err); marked != nil {
+	store := NewStore(p.db)
+	if took.Filled && err == nil {
+		if marked := store.CaughtUp(ctx, source.ID, took.CaughtUpTo, took.Mark); marked != nil {
+			p.logger.Error("recording how far a supplier was read",
+				"supplier", source.Display, "error", marked)
+		}
+		return took, nil
+	}
+	if marked := store.Reached(ctx, source.ID, took.CaughtUpTo, took.Mark, err); marked != nil {
 		p.logger.Error("recording what came back from a supplier",
-			"supplier", source.Name, "error", marked)
+			"supplier", source.Display, "error", marked)
 	}
 	return took, err
 }
@@ -174,7 +182,7 @@ func (p *Pass) from(ctx context.Context, source Source) (Taken, error) {
 // claim in, and every rule about who may read that claim is asked of the
 // reader.
 func recordedAs(source Source) access.Subject {
-	return access.Subject{Kind: access.Person, ID: source.CreatedBy, Identity: source.Name}
+	return access.Subject{Kind: access.Person, ID: source.CreatedBy, Identity: source.Display}
 }
 
 // fetching reports whether this replica is the one that reaches out.

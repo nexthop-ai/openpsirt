@@ -25,8 +25,8 @@ import { since } from "../ui/when";
 
 type Source = Body<"AdvisorySourceBody">;
 
-// The name a supplier is recorded under, which the address uses as a path
-// segment when one is withdrawn.
+// The suppliers configured against one product. Asked only once a product is
+// chosen, because the endpoint is per product and there is no list across them.
 function useSources(product: string) {
   return useQuery({
     queryKey: ["advisory-sources", product],
@@ -40,18 +40,21 @@ function useSources(product: string) {
   });
 }
 
-// How far through a publisher this deployment has read, in the words a reader
-// uses. A supplier nothing has reached yet is a different thing from one that
-// has been read and found nothing new.
+// How this supplier is doing, in the words a reader uses.
+//
+// The last attempt and the last one that worked are different facts, and the
+// gap between them is the whole answer to "how long has this been broken". Drawn
+// from the successful read, so a publisher that has been refusing for a week
+// says a week rather than saying it failed three hours ago.
 function Read({ row }: { row: Source }) {
-  if (!row.read) return <span style={{ color: "var(--faint)" }}>not yet</span>;
   if (row.because) {
     return (
       <span className="state closed" title={row.because}>
-        failed {since(row.read)}
+        {row.read ? <>failing, last read {since(row.read)}</> : <>never read</>}
       </span>
     );
   }
+  if (!row.read) return <span style={{ color: "var(--faint)" }}>not yet</span>;
   return <>{since(row.read)}</>;
 }
 

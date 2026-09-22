@@ -63,7 +63,7 @@ func TestASupplierIsConfiguredListedAndWithdrawn(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(rows) != 1 || rows[0].Name != "SUSE" || rows[0].URL != described {
+		if len(rows) != 1 || rows[0].Display != "SUSE" || rows[0].URL != described {
 			t.Fatalf("the product reads as configured with %+v", rows)
 		}
 
@@ -103,7 +103,7 @@ func TestAWithdrawnSupplierTakenUpAgainStartsAtToday(t *testing.T) {
 			t.Fatal(err)
 		}
 		lastMonth := time.Now().UTC().Add(-30 * 24 * time.Hour)
-		if err := store.Reached(ctx, row.ID, lastMonth, nil); err != nil {
+		if err := store.Reached(ctx, row.ID, lastMonth, supplier.Mark("a"), nil); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
@@ -124,7 +124,7 @@ func TestAWithdrawnSupplierTakenUpAgainStartsAtToday(t *testing.T) {
 		if again.FetchedAt != nil {
 			t.Errorf("it reads as already read: %v", again.FetchedAt)
 		}
-		if from := again.From(); from.Before(lastMonth.Add(time.Hour)) {
+		if from, _ := again.From(); from.Before(lastMonth.Add(time.Hour)) {
 			t.Errorf("it starts at %v, which is where it was when it was withdrawn", from)
 		}
 	})
@@ -222,7 +222,7 @@ func TestASupplierNeverReadIsDueAndOneJustReadIsNot(t *testing.T) {
 			t.Fatalf("a supplier never read is due %d times", len(due))
 		}
 
-		if err := store.Reached(ctx, row.ID, time.Time{}, nil); err != nil {
+		if err := store.Reached(ctx, row.ID, time.Time{}, supplier.Mark("a"), nil); err != nil {
 			t.Fatal(err)
 		}
 		due, err = store.Due(ctx, access.Everything("the pass"), now.Add(-24*time.Hour))
@@ -258,10 +258,10 @@ func TestTheMarkMovesForwardOnly(t *testing.T) {
 		}
 		ahead := time.Now().UTC().Truncate(time.Microsecond)
 		behind := ahead.Add(-48 * time.Hour)
-		if err := store.Reached(ctx, row.ID, ahead, nil); err != nil {
+		if err := store.Reached(ctx, row.ID, ahead, supplier.Mark("a"), nil); err != nil {
 			t.Fatal(err)
 		}
-		if err := store.Reached(ctx, row.ID, behind, nil); err != nil {
+		if err := store.Reached(ctx, row.ID, behind, supplier.Mark("a"), nil); err != nil {
 			t.Fatal(err)
 		}
 		rows, err := store.For(ctx, f.admin, f.product)
@@ -288,7 +288,7 @@ func TestWhyASupplierCouldNotBeReadIsRecorded(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := store.Reached(ctx, row.ID, time.Time{},
+		if err := store.Reached(ctx, row.ID, time.Time{}, "",
 			errNothingAnswered); err != nil {
 			t.Fatal(err)
 		}

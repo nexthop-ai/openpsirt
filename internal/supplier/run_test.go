@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
@@ -128,18 +129,29 @@ func TestASupplierThatCannotBeReachedDoesNotStopTheNext(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		reasons := map[string]string{}
+		byName := map[string]supplier.Source{}
 		for _, row := range rows {
 			if row.FetchedAt == nil {
-				t.Errorf("%q was never reached", row.Name)
+				t.Errorf("%q was never tried", row.Display)
 			}
-			reasons[row.Name] = row.Failed
+			byName[row.Display] = row
 		}
-		if reasons["Gone"] == "" {
+		if byName["Gone"].Failed == "" {
 			t.Error("a publisher that could not be reached recorded no reason")
 		}
-		if reasons["Example Linux"] != "" {
-			t.Errorf("the publisher that answered recorded %q", reasons["Example Linux"])
+		// The attempt is recorded and the success is not, which is what makes
+		// "unreachable for a week" visible: one moment moving on every attempt
+		// reads as a supplier answering fine right up to the failure.
+		if byName["Gone"].ReachedAt != nil {
+			t.Errorf("a publisher that could not be reached reads as reached at %v",
+				byName["Gone"].ReachedAt)
+		}
+		if byName["Example Linux"].Failed != "" {
+			t.Errorf("the publisher that answered recorded %q",
+				byName["Example Linux"].Failed)
+		}
+		if byName["Example Linux"].ReachedAt == nil {
+			t.Error("the publisher that answered does not read as reached")
 		}
 	})
 }
@@ -164,25 +176,43 @@ func TestOneReplicaReachesOutAndTheOtherDoesNothing(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		first := supplier.NewPass(f.db.DB, quiet(), "one", sbom.Limits{})
-		supplier.FetchForTest(first, fetching(t, f, p))
+		// The lease is taken by one replica while the supplier is still due, so
+		// what stops the second is the lease and nothing else. Run the other
+		// way round the first pass marks the supplier read, and the second
+		// finds nothing due whatever the lease says — which is a test that
+		// passes with the lease removed.
+		if mine, err := queue.NewLeases(f.db.DB).Take(ctx, supplier.FetchLease,
+			"one", time.Hour); err != nil || !mine {
+			t.Fatalf("taking the lease as the first replica: %v (%v)", mine, err)
+		}
+		due, err := store.Due(ctx, access.Everything("the test"), time.Now().UTC())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(due) != 1 {
+			t.Fatalf("the supplier is not due, so the lease is not what is being tested")
+		}
+
 		second := supplier.NewPass(f.db.DB, quiet(), "two", sbom.Limits{})
 		supplier.FetchForTest(second, fetching(t, f, p))
-
-		took, err := first.Once(ctx)
-		if err != nil || took.Documents != 1 {
-			t.Fatalf("the replica holding the lease read %+v (%v)", took, err)
-		}
-		asked := len(p.asked)
-		took, err = second.Once(ctx)
+		took, err := second.Once(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if took.Documents != 0 {
 			t.Errorf("the replica without the lease read %+v", took)
 		}
-		if len(p.asked) != asked {
-			t.Errorf("the publisher was reached %d more times", len(p.asked)-asked)
+		if len(p.asked) != 0 {
+			t.Errorf("the publisher was reached at %v by a replica without the lease",
+				p.asked)
+		}
+
+		// And the replica holding it does the work, so the refusal above is
+		// the lease rather than something that stops both.
+		first := supplier.NewPass(f.db.DB, quiet(), "one", sbom.Limits{})
+		supplier.FetchForTest(first, fetching(t, f, p))
+		if took, err := first.Once(ctx); err != nil || took.Documents != 1 {
+			t.Fatalf("the replica holding the lease read %+v (%v)", took, err)
 		}
 	})
 }
