@@ -47,7 +47,7 @@ func serving(t *testing.T) *publisher {
 		}
 		switch r.URL.Path {
 		case "/.well-known/csaf/provider-metadata.json":
-			fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":%q}]}}]}`,
+			_, _ = fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":%q}]}}]}`,
 				p.server.URL+"/feed.json")
 		case "/feed.json":
 			entries := make([]string, 0, len(p.documents))
@@ -56,14 +56,15 @@ func serving(t *testing.T) *publisher {
 					`{"link":[{"rel":"self","href":%q}],"updated":%q,"content":{"type":"application/json","src":%q}}`,
 					p.server.URL+path, stamp, p.server.URL+path))
 			}
-			fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[%s]}}`, strings.Join(entries, ","))
+			_, _ = fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[%s]}}`,
+				strings.Join(entries, ","))
 		default:
 			body, held := p.documents[r.URL.Path]
 			if !held {
 				http.NotFound(w, r)
 				return
 			}
-			fmt.Fprint(w, body)
+			_, _ = fmt.Fprint(w, body)
 		}
 	}))
 	t.Cleanup(p.server.Close)
@@ -355,14 +356,14 @@ func TestADocumentServedFromAnotherHostIsRefusedRatherThanFetched(t *testing.T) 
 		p := serving(t)
 		p.override = func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/.well-known/csaf/provider-metadata.json" {
-				fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":%q}]}}]}`,
+				_, _ = fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":%q}]}}]}`,
 					p.server.URL+"/feed.json")
 				return
 			}
 			// The shape of the attack: a publisher's own document telling us
 			// to fetch somewhere else.
 			const elsewhere = "https://elsewhere.example/2026/EL-4.json"
-			fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[
+			_, _ = fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[
 				{"link":[{"rel":"self","href":%q}],"updated":"2026-09-20T00:00:00Z",
 				 "content":{"type":"application/json","src":%q}}]}}`, elsewhere, elsewhere)
 		}
@@ -451,7 +452,7 @@ func TestAPublisherWhoseDirectoryDescribesNoFeedIsReportedRatherThanSilent(t *te
 		ctx := t.Context()
 		p := serving(t)
 		p.override = func(w http.ResponseWriter, _ *http.Request) {
-			fmt.Fprint(w, `{"distributions":[{"directory_url":"https://supplier.example/csaf/"}]}`)
+			_, _ = fmt.Fprint(w, `{"distributions":[{"directory_url":"https://supplier.example/csaf/"}]}`)
 		}
 
 		_, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
