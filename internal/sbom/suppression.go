@@ -93,6 +93,38 @@ type Target struct {
 	Version string
 }
 
+// VersionNamed is the version a claim's target was made about.
+//
+// Inside the package identifier where the document stated one there, and the
+// version the document stated outside it otherwise — a publisher naming no
+// package states it as the branch its product sits in.
+func (t Target) VersionNamed() string {
+	if version := graph.PartsOfPurl(t.Purl).Version; version != "" {
+		return version
+	}
+	return t.Version
+}
+
+// ComponentNamed is the component name a claim's target points at.
+//
+// A package identifier where it carries one, and the bare name otherwise: a
+// claim made against a source tree names something we cannot resolve to a
+// package, and the most that can be said is that a component of that name is
+// the one meant.
+func (t Target) ComponentNamed() string {
+	if t.Name != "" {
+		return t.Name
+	}
+	name := t.Purl
+	if cut := strings.LastIndex(name, "@"); cut > 0 {
+		name = name[:cut]
+	}
+	if cut := strings.LastIndex(name, "/"); cut > 0 {
+		name = name[cut+1:]
+	}
+	return name
+}
+
 // Covers reports whether a claim's target is the component described.
 func (t Target) Covers(d graph.Described) bool {
 	base, version := purlParts(t.Purl)

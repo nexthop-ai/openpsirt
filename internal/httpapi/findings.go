@@ -759,7 +759,7 @@ type EvidenceBody struct {
 
 	// LatestVersion is what upstream has released. Absent unless this
 	// deployment has turned asking on, which is off by default because it
-	// is the only thing here that reaches the network.
+	// sends a component's name to a public index.
 	LatestVersion    string `json:"latest_version,omitempty" doc:"The newest version the ecosystem's own index knows of"`
 	LatestReleasedAt string `json:"latest_released_at,omitempty" doc:"The date that version shipped"`
 	NothingSince     bool   `json:"nothing_since,omitempty" doc:"Upstream has released nothing since the year this issue was named, and there is no fix. Two dates compared — it says why there is no fix, not that the project is abandoned"`

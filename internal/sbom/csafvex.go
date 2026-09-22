@@ -1,6 +1,7 @@
 package sbom
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -210,6 +211,15 @@ func (r *csafReader) finish() ([]Suppression, error) {
 	return r.resolve()
 }
 
+// ErrWrongProfile says a CSAF document is not the kind the reader was opened
+// for.
+//
+// A sentinel because a caller reading a whole directory has to tell it from a
+// document that could not be read at all: one is a publisher issuing more than
+// one kind of document, which is ordinary, and the other is something wrong.
+// The two read identically as text.
+var ErrWrongProfile = errors.New("a CSAF document of another kind")
+
 // wrongProfile is the refusal for a document this reader was not opened for,
 // which names the path that does read it.
 //
@@ -221,19 +231,19 @@ func (r *csafReader) wrongProfile() error {
 	said := strings.TrimSpace(r.category)
 	switch {
 	case said == "":
-		return fmt.Errorf("a document that states no CSAF category, so which kind of " +
-			"document it is cannot be settled")
+		return fmt.Errorf("%w: a document that states no CSAF category, so which kind of "+
+			"document it is cannot be settled", ErrWrongProfile)
 	case strings.EqualFold(said, advisoryProfile):
-		return fmt.Errorf("that is a security advisory rather than a VEX document. " +
-			"It is read as a supplier advisory, where its claims are evidence about the " +
-			"versions it names")
+		return fmt.Errorf("%w: that is a security advisory rather than a VEX document. "+
+			"It is read as a supplier advisory, where its claims are evidence about the "+
+			"versions it names", ErrWrongProfile)
 	case strings.EqualFold(said, vexProfile):
-		return fmt.Errorf("that is a VEX document rather than a security advisory. " +
-			"It is read as VEX statements, where a publisher's whole statement set " +
-			"supersedes what they said before")
+		return fmt.Errorf("%w: that is a VEX document rather than a security advisory. "+
+			"It is read as VEX statements, where a publisher's whole statement set "+
+			"supersedes what they said before", ErrWrongProfile)
 	default:
-		return fmt.Errorf("a CSAF document of category %q, which is not one this reads",
-			trim(said))
+		return fmt.Errorf("%w: a CSAF document of category %q, which is not one this reads",
+			ErrWrongProfile, trim(said))
 	}
 }
 

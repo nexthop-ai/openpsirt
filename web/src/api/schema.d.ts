@@ -1960,6 +1960,68 @@ export interface paths {
         patch: operations["amend-product"];
         trace?: never;
     };
+    "/v1/products/{product}/advisory-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the suppliers advisories are read from
+         * @description The suppliers configured for this product, when each was last reached, and how far through what they publish this deployment has read.
+         *
+         *     A supplier that cannot be reached is not a failure anything else reports. The moment of the last attempt is what says so, and the reason the last one stopped is returned beside it.
+         *
+         *     Requires: administrator
+         */
+        get: operations["list-advisory-sources"];
+        put?: never;
+        /**
+         * Read advisories from a supplier
+         * @description Records a supplier whose published security advisories are read on the scan schedule, and lands them where an uploaded one lands: as evidence beside a finding and a prefill for a decision, never as a judgment of ours.
+         *
+         *     The address is the supplier's CSAF provider description, the document naming the feeds their advisories are listed in. https only, on the host it names, and a redirect is refused rather than followed.
+         *
+         *     Only what this product ships is kept. A publisher's feed is about their whole catalog, so a claim naming a component no build here contains is read and not recorded.
+         *
+         *     Reading starts from the moment the supplier is added, not from the beginning of what they have published. A publisher's feed lists everything they have ever issued, and taking it would be tens of thousands of requests for evidence about issues already reported. Upload an older advisory to take one.
+         *
+         *     A VEX document in the same feed is left alone. It replaces a publisher's whole answer for a product, which is not something a scheduled pass decides; upload it to take it.
+         *
+         *     A supplier taken out of use and added again under the same name starts from today, the way a new one does.
+         *
+         *     Requires: administrator
+         */
+        post: operations["add-advisory-source"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/advisory-sources/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop reading a supplier
+         * @description Takes a supplier out of use. What they have already said stays standing: their claims are evidence somebody may have granted an approval on the strength of, and no longer reading them does not make them unsaid.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["withdraw-advisory-source"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/comparison": {
         parameters: {
             query?: never;
@@ -5058,6 +5120,18 @@ export interface components {
             /** @description The identifier the issue is filed under */
             vulnerability: string;
         };
+        "Add-advisory-sourceRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Add-advisory-sourceRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What to call this supplier */
+            name: string;
+            /** @description The supplier's CSAF provider description. https only */
+            url: string;
+        };
         "Add-outboundRequest": {
             /**
              * Format: uri
@@ -5140,6 +5214,30 @@ export interface components {
              */
             status: "draft" | "final" | "interim";
             title?: string;
+        };
+        AdvisorySourceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdvisorySourceBody.json
+             */
+            readonly $schema?: string;
+            /** @description The reason the last attempt stopped, where one did */
+            because?: string;
+            /**
+             * Format: date-time
+             * @description The newest moment in their feed that has been read
+             */
+            caught_up_to?: string;
+            /** @description The name this supplier is configured under */
+            name: string;
+            /**
+             * Format: date-time
+             * @description When this supplier was last reached
+             */
+            read?: string;
+            /** @description Where the supplier describes what they publish */
+            url: string;
         };
         AdvisoryTakenBody: {
             /**
@@ -7492,6 +7590,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["AdvisoryListedBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyAdvisorySourceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyAdvisorySourceBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdvisorySourceBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -13249,6 +13358,102 @@ export interface operations {
                 "application/json": components["schemas"]["Amend-productRequest"];
             };
         };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-advisory-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyAdvisorySourceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-advisory-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Add-advisory-sourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvisorySourceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-advisory-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description No Content */
             204: {

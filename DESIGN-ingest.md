@@ -30,6 +30,7 @@ REQ-69.
 - [Document retrieval](#document-retrieval)
 - [Administrator-supplied VEX](#administrator-supplied-vex)
 - [Supplier advisories](#supplier-advisories)
+- [Supplier directories](#supplier-directories)
 - [The offline scanner database](#the-offline-scanner-database)
 - [Analyzer findings](#analyzer-findings)
 - [Limits](#limits)
@@ -855,6 +856,48 @@ The claims one document states are written in batches, because that advisory is
 27.9 seconds on PostgreSQL, 10.0 on MariaDB, 9.0 on MySQL and 7.3 on SQLite; in
 batches, 5.4, 1.2, 1.4 and 1.3. Revising the same advisory — every claim set
 aside and written again — is 6.1, 3.1, 3.0 and 2.2.
+
+## Supplier directories
+
+A supplier's advisories are read on the scan schedule, from an address an
+administrator configured, and land where an uploaded one lands (REQ-31). The
+address is the publisher's CSAF provider description, which names the feeds the
+documents are listed in — the same three files this deployment writes when it
+publishes its own (`DESIGN-remediation.md`).
+
+The deliberate act is choosing the publisher. An upload is somebody deciding
+that one document is worth reading, and a publisher issues hundreds a year:
+which of them is about a component a build here ships is not knowable until the
+document has been read.
+
+| Rule | Reason |
+|---|---|
+| Off unless a supplier is configured | Naming one is the switch. A second setting beside an empty list would be two ways to say the same thing, and a deployment that cannot reach out loses this evidence and nothing else |
+| A supplier is configured against one product | That is what a claim is recorded against, so a supplier feeding two products is two rows — and withdrawing one leaves the other's claims standing |
+| Only claims naming a component the product ships are recorded | A publisher's feed is about their whole catalog. One real advisory about a kernel carries 95,139 claims, so a deployment taking them whole would store a supplier's catalog rather than evidence about its own |
+| Reading starts at the moment the supplier was configured | A distribution's feed lists every advisory they have ever issued. Taking that history is tens of thousands of requests at somebody else's service, draining over months, for evidence about issues a scan reported long ago. One older document is taken by uploading it |
+| A supplier taken up again starts at today | A source withdrawn for a month and restored would otherwise fetch the month it was away |
+| A VEX document in the same feed is left alone | A publisher's statement set replaces their whole answer for a product. Setting that aside is a judgment, and a pass on a timer makes none — it is taken by uploading it |
+| One replica reaches out, settled by a lease | The politeness the pass keeps to is a rate per deployment rather than per replica, and three replicas each keeping to it would be three times the traffic at a publisher's expense |
+| The lease is taken again as the pass runs | A supplier is up to twenty requests with a timeout each, and a slow publisher handing the pass to a second replica mid-flight is what a lease exists to prevent |
+| Bounded per supplier per cycle | A publisher having a busy week is not a reason to make a hundred requests of them in a minute. What is not taken this cycle is taken next |
+| The mark stops where a failure is | Moved past a document that could not be read, a publisher with one bad file would lose everything they issued after it |
+| A supplier that could not be read does not stop the next | One publisher unreachable says nothing about another, and a pass that stopped at the first would leave every supplier after it unread for as long as that one stayed down |
+| When a supplier was last reached is recorded whether or not anything came back | "This publisher has been unreachable for a week" is only visible as a moment that has stopped moving. Nothing else reports it |
+| A feed entry nobody can date is left alone | It cannot be placed against the mark, so taking it would mean taking it again on every pass for ever |
+| A claim is recorded as the administrator who configured the supplier | Configuring one is the act that admitted this publisher's judgment, and it is the only decision anybody made. Nothing chose the individual document, which is the whole difference from an upload |
+
+Every request is the guarded client's: https only, to the host the
+configured address names, refusing a redirect and refusing an address inside
+this network (REQ-69). The addresses inside a publisher's directory come from
+outside, so a feed or a document served from anywhere but the configured host
+is refused rather than followed — a publisher that genuinely moved is
+reconfigured, which is visible.
+
+Nothing it reads decides anything. A pass on a timer makes that easier to
+violate by accident than an upload does, because nobody is watching each
+document arrive: what lands is evidence beside a finding and a prefill for a
+decision, and never a judgment of ours.
 
 ## The offline scanner database
 

@@ -1,0 +1,291 @@
+package supplier_test
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/supplier"
+)
+
+// The address of a publisher's description of what they publish, as every
+// test here names one.
+const described = "https://supplier.example/.well-known/csaf/provider-metadata.json"
+
+// configured is a product, an administrator and somebody who is not one.
+type configured struct {
+	db      *database.DB
+	product int64
+	admin   access.Subject
+	anybody access.Subject
+}
+
+func each(t *testing.T, fn func(t *testing.T, f *configured)) {
+	t.Helper()
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+
+		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		rights := access.NewStore(db.DB)
+		boss, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		other, err := rights.Ensure(ctx, "sam@example.com", "Sam", access.Stated(false), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fn(t, &configured{
+			db: db, product: product.ID,
+			admin:   access.Subject{Kind: access.Person, ID: boss.ID, Identity: boss.Email, Admin: true},
+			anybody: access.Subject{Kind: access.Person, ID: other.ID, Identity: other.Email},
+		})
+	})
+}
+
+func TestASupplierIsConfiguredListedAndWithdrawn(t *testing.T) {
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+
+		if _, err := store.Add(ctx, f.admin, f.product, "SUSE", described); err != nil {
+			t.Fatal(err)
+		}
+		rows, err := store.For(ctx, f.admin, f.product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].Name != "SUSE" || rows[0].URL != described {
+			t.Fatalf("the product reads as configured with %+v", rows)
+		}
+
+		if err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
+			t.Fatal(err)
+		}
+		rows, err = store.For(ctx, f.admin, f.product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 0 {
+			t.Fatalf("a withdrawn supplier is still listed: %+v", rows)
+		}
+		// And the pass no longer reaches it, which is the half that matters:
+		// a supplier believed withdrawn that was not is a request leaving this
+		// deployment that somebody thought they had stopped.
+		due, err := store.Due(ctx, access.Everything("the pass"), time.Now().UTC())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(due) != 0 {
+			t.Fatalf("a withdrawn supplier is still due a read: %+v", due)
+		}
+	})
+}
+
+func TestAWithdrawnSupplierTakenUpAgainStartsAtToday(t *testing.T) {
+	// A source withdrawn for a month and restored would otherwise fetch the
+	// month it was away: a burst at a publisher nobody asked for, and evidence
+	// about issues a scan has already reported.
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+
+		row, err := store.Add(ctx, f.admin, f.product, "SUSE", described)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lastMonth := time.Now().UTC().Add(-30 * 24 * time.Hour)
+		if err := store.Reached(ctx, row.ID, lastMonth, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
+			t.Fatal(err)
+		}
+
+		again, err := store.Add(ctx, f.admin, f.product, "SUSE",
+			"https://supplier.example/.well-known/csaf/provider-metadata.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.ID != row.ID {
+			t.Errorf("a second row was made rather than the first taken up again")
+		}
+		if again.CaughtUpTo != nil {
+			t.Errorf("it carries the mark from before it was withdrawn: %v", again.CaughtUpTo)
+		}
+		if again.FetchedAt != nil {
+			t.Errorf("it reads as already read: %v", again.FetchedAt)
+		}
+		if from := again.From(); from.Before(lastMonth.Add(time.Hour)) {
+			t.Errorf("it starts at %v, which is where it was when it was withdrawn", from)
+		}
+	})
+}
+
+func TestOnlyAnAdministratorConfiguresASupplier(t *testing.T) {
+	// Configuring one admits a third party's judgment into this deployment's
+	// evidence and points it at an address of their choosing.
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+
+		if _, err := store.Add(ctx, f.anybody, f.product, "SUSE", described); err == nil {
+			t.Error("somebody who administers nothing configured a supplier")
+		}
+		if _, err := store.Add(ctx, f.admin, f.product, "SUSE", described); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.For(ctx, f.anybody, f.product); err == nil {
+			t.Error("somebody who administers nothing read which suppliers are configured")
+		}
+		if err := store.Retire(ctx, f.anybody, f.product, "SUSE"); err == nil {
+			t.Error("somebody who administers nothing withdrew a supplier")
+		}
+		// And a key, which holds no person at all.
+		key := access.Subject{Kind: access.Pipeline, ID: 7, Identity: "a pipeline", Admin: true}
+		if _, err := store.Add(ctx, key, f.product, "Red Hat", described); err == nil {
+			t.Error("a pipeline's key configured a supplier")
+		}
+	})
+}
+
+func TestAnAddressThatIsNotAPublishersDirectoryIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+
+		for _, address := range []string{
+			"http://supplier.example/provider-metadata.json",
+			"ftp://supplier.example/provider-metadata.json",
+			"https://name:secret@supplier.example/provider-metadata.json",
+			"/provider-metadata.json",
+			"https:///provider-metadata.json",
+		} {
+			if _, err := store.Add(ctx, f.admin, f.product, "SUSE", address); err == nil {
+				t.Errorf("%q was stored", address)
+			}
+		}
+	})
+}
+
+func TestASupplierNeverReadIsDueAndOneJustReadIsNot(t *testing.T) {
+	// A supplier named this morning is read this afternoon rather than
+	// tomorrow, and one read an hour ago is not read again every cycle.
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+		now := time.Now().UTC()
+
+		row, err := store.Add(ctx, f.admin, f.product, "SUSE", described)
+		if err != nil {
+			t.Fatal(err)
+		}
+		due, err := store.Due(ctx, access.Everything("the pass"), now.Add(-24*time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(due) != 1 {
+			t.Fatalf("a supplier never read is due %d times", len(due))
+		}
+
+		if err := store.Reached(ctx, row.ID, time.Time{}, nil); err != nil {
+			t.Fatal(err)
+		}
+		due, err = store.Due(ctx, access.Everything("the pass"), now.Add(-24*time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(due) != 0 {
+			t.Fatalf("a supplier read a moment ago is due again: %+v", due)
+		}
+		// And is due once the interval has passed.
+		due, err = store.Due(ctx, access.Everything("the pass"), now.Add(time.Hour))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(due) != 1 {
+			t.Fatalf("a supplier read a day ago is due %d times", len(due))
+		}
+	})
+}
+
+func TestTheMarkMovesForwardOnly(t *testing.T) {
+	// A publisher that revises an old document stamps it with the moment of
+	// the revision, so a feed entry older than the mark is one already taken.
+	// A mark that could go backwards would make a publisher who re-stamped one
+	// document replay their whole history.
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+
+		row, err := store.Add(ctx, f.admin, f.product, "SUSE", described)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ahead := time.Now().UTC().Truncate(time.Microsecond)
+		behind := ahead.Add(-48 * time.Hour)
+		if err := store.Reached(ctx, row.ID, ahead, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Reached(ctx, row.ID, behind, nil); err != nil {
+			t.Fatal(err)
+		}
+		rows, err := store.For(ctx, f.admin, f.product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].CaughtUpTo == nil {
+			t.Fatalf("the supplier reads as %+v", rows)
+		}
+		if got := rows[0].CaughtUpTo.UTC(); !got.Equal(ahead) {
+			t.Errorf("the mark moved back to %v from %v", got, ahead)
+		}
+	})
+}
+
+func TestWhyASupplierCouldNotBeReadIsRecorded(t *testing.T) {
+	// "This publisher has been unreachable for a week" is only visible as a
+	// moment that has stopped moving. Nothing else reports it.
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+
+		row, err := store.Add(ctx, f.admin, f.product, "SUSE", described)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Reached(ctx, row.ID, time.Time{},
+			errNothingAnswered); err != nil {
+			t.Fatal(err)
+		}
+		rows, err := store.For(ctx, f.admin, f.product)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].FetchedAt == nil {
+			t.Fatalf("the attempt was not recorded: %+v", rows)
+		}
+		if !strings.Contains(rows[0].Failed, "nothing answered") {
+			t.Errorf("the reason reads as %q", rows[0].Failed)
+		}
+		// And it stays due, because nothing was read.
+		if rows[0].CaughtUpTo != nil {
+			t.Errorf("a failed attempt moved the mark to %v", rows[0].CaughtUpTo)
+		}
+	})
+}
+
+// errNothingAnswered stands for a publisher that could not be reached.
+var errNothingAnswered = errNothing("nothing answered at that address")
+
+type errNothing string
+
+func (e errNothing) Error() string { return string(e) }

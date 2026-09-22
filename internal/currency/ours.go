@@ -14,8 +14,8 @@ import (
 
 // Ours is the set of names this deployment does not send to a public index.
 //
-// Asking is the one thing here that reaches the network, and what it sends
-// is a component's name. For an open-source dependency that is public
+// What asking sends is a component's name, to a public index rather than to
+// an address anybody here chose. For an open-source dependency that is public
 // knowledge. For something built here it is not: the name of an internal
 // module is the name of a project, a team, or a product nobody has announced,
 // and a public index records every request made of it.

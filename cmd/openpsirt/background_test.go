@@ -32,6 +32,7 @@ func TestWhatADeploymentWithNothingConfiguredStillRuns(t *testing.T) {
 		"scan what arrived",
 		"schedule rescans",
 		"ask upstream what is current",
+		"read what suppliers publish",
 		"watch for quiet builds",
 		"send what is owed outward",
 		"route unheld work to teams",
@@ -46,8 +47,8 @@ func TestWhatADeploymentWithNothingConfiguredStillRuns(t *testing.T) {
 			t.Errorf("%q runs with nothing configured to do it with", absent)
 		}
 	}
-	if len(running) != 8 {
-		t.Errorf("a deployment with nothing configured runs %d passes, want 8: %v",
+	if len(running) != 9 {
+		t.Errorf("a deployment with nothing configured runs %d passes, want 9: %v",
 			len(running), keysOf(running))
 	}
 }
@@ -65,8 +66,8 @@ func TestMailAndAttachmentSweepingRunWhenTheyAreConfigured(t *testing.T) {
 			t.Errorf("%q does not run where it is configured", want)
 		}
 	}
-	if len(running) != 10 {
-		t.Errorf("a deployment with everything configured runs %d passes, want 10: %v",
+	if len(running) != 11 {
+		t.Errorf("a deployment with everything configured runs %d passes, want 11: %v",
 			len(running), keysOf(running))
 	}
 }

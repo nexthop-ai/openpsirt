@@ -346,6 +346,9 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerPendingUpgrades(api, in)
 	registerVexImport(api, in)
 	registerAdvisoryImport(api, in)
+	// The suppliers whose published advisories are read on a schedule, which
+	// is the same evidence arriving without anybody choosing each document.
+	registerAdvisorySources(api, in)
 	registerExport(api, in)
 	registerAnywhereExport(api, in)
 	// The three lists that could be read and not taken away.

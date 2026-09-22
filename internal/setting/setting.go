@@ -166,9 +166,9 @@ const (
 	// UpstreamCurrency is whether this deployment asks public package
 	// indexes what the newest version of a component is.
 	//
-	// Off unless somebody turns it on, and the only setting here that
-	// decides whether we talk to anyone while answering a question about a
-	// build. Everything a scan needs arrives as a file somebody imported
+	// Off unless somebody turns it on, and the only setting here that sends
+	// anything to a service nobody configured. Everything a scan needs
+	// arrives as a file somebody imported
 	// deliberately, so that a scan answers the same way twice and nothing a
 	// scan depends on is somebody else's server being up (REQ-12). This
 	// stands outside that: it is not part of a scan, it is asked of a public

@@ -262,10 +262,9 @@ entry that answers for it.
 
 ## Upstream currency
 
-Off unless an administrator turns it on, under Settings. It is the only thing
-here that reaches the network: everything a scan needs arrives as a file
-somebody imported, and a deployment that cannot reach out loses this answer and
-nothing else.
+Off unless an administrator turns it on, under Settings. Everything a scan
+needs arrives as a file somebody imported, and a deployment that cannot reach
+out loses this answer and nothing else.
 
 What goes out is a component's name. One request per component to that
 ecosystem's public index, carrying the name and nothing else — no version, no
