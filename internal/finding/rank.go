@@ -160,17 +160,6 @@ func (r Ranked) Rank() Rank {
 	return Rank(rank)
 }
 
-// How a grouping asks whether any of its places carries each exploitation
-// signal.
-//
-// Spelled once, because the two are asked together wherever a list groups
-// places and every site that wrote one of them by hand is a site that can
-// write the wrong column. A grouping cannot read the flags off the packed
-// number: both bands lift it, so a threshold answers "some exploitation" where
-// these name which.
-//
-// Counted rather than aggregated as a boolean, which is the same question
-// asked portably — the four engines do not agree on a boolean aggregate.
 // exploiting is the threshold a query crosses to ask whether a rank carries
 // either exploitation signal.
 //
@@ -185,6 +174,17 @@ func (r Ranked) Rank() Rank {
 // the weighting is allowed to move.
 const exploiting = exploitedBand
 
+// How a grouping asks whether any of its places carries each exploitation
+// signal.
+//
+// Spelled once, because the two are asked together wherever a list groups
+// places and every site that wrote one of them by hand is a site that can
+// write the wrong column. A grouping cannot read the flags off the packed
+// number: both bands lift it, so a threshold answers "some exploitation" where
+// these name which.
+//
+// Counted rather than aggregated as a boolean, which is the same question
+// asked portably — the four engines do not agree on a boolean aggregate.
 const (
 	exploitedAcross     = `MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END)`
 	exploitedHereAcross = `MAX(CASE WHEN f.urgency_exploited_here THEN 1 ELSE 0 END)`

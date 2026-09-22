@@ -5561,6 +5561,8 @@ export interface components {
             components: string[] | null;
             /** @description Some of what it closes is being exploited */
             exploited?: boolean;
+            /** @description Some of what it closes is something this product is recorded as having been exploited through */
+            exploited_here?: boolean;
             /** @description The version in hand */
             from: string;
             /** @description The builds that hold this upgrade */
@@ -8298,6 +8300,8 @@ export interface components {
             ecosystem?: string;
             /** @description Whether any of what is open here is known to be exploited, which outranks everything else about it */
             exploited: boolean;
+            /** @description Whether this product is recorded as having been exploited through any of what is open here */
+            exploited_here?: boolean;
             /**
              * Format: date-time
              * @description The moment a scan of this deployment first reported the component
@@ -9945,6 +9949,8 @@ export interface components {
             builds: number;
             component: string;
             exploited?: boolean;
+            /** @description This product is recorded as having been exploited through this issue */
+            exploited_here?: boolean;
             /**
              * Format: int64
              * @description The number of findings a judgment here would be recorded against, across every build it is in

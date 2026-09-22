@@ -988,6 +988,9 @@ components:
         exploited:
           description: Some of what it closes is being exploited
           type: boolean
+        exploited_here:
+          description: Some of what it closes is something this product is recorded as having been exploited through
+          type: boolean
         from:
           description: The version in hand
           type: string
@@ -5962,6 +5965,9 @@ components:
         exploited:
           description: Whether any of what is open here is known to be exploited, which outranks everything else about it
           type: boolean
+        exploited_here:
+          description: Whether this product is recorded as having been exploited through any of what is open here
+          type: boolean
         first_seen:
           description: The moment a scan of this deployment first reported the component
           format: date-time
@@ -8768,6 +8774,9 @@ components:
         component:
           type: string
         exploited:
+          type: boolean
+        exploited_here:
+          description: This product is recorded as having been exploited through this issue
           type: boolean
         places:
           description: The number of findings a judgment here would be recorded against, across every build it is in

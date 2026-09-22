@@ -743,6 +743,10 @@ a feed's word about the world and a person's word about this product are
 different facts, and a report that showed one where the other holds is the
 confusion the pair exists to prevent.
 
+Both columns are in the covering index the grouping reads, beside the urgency.
+A list that aggregates a column outside it fetches a table row per open
+finding, which is the cost the index was measured to remove.
+
 Explainability is the packing, not a sentence generated beside it. A function
 that turned a rank back into a list of reasons existed, exported and called by
 nothing but its own test. What makes a position explainable is that the rule is

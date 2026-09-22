@@ -483,10 +483,16 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 		//
 		// The column order is the portable shape: equality columns first
 		// (target, open, visibility), then the grouping key, then what the
-		// aggregate reads. Every engine here can answer the grouping from the
+		// aggregates read. Every engine here can answer the grouping from the
 		// index alone in that order; a narrower index on urgency was tried
 		// first, and it still cost a table lookup per row for the group key.
-		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency")`,
+		//
+		// The two exploitation flags are in it because the lists read them
+		// rather than the packed number: the number carries both in bands of
+		// its own and cannot say which, so every list that names one of them
+		// aggregates its column, and a column outside the index is a table
+		// row fetched per open finding.
+		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_exploited_here")`,
 	}
 
 	return apply(ctx, tx, statements)

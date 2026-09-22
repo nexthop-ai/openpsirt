@@ -356,3 +356,42 @@ func TestAGroupWhosePlacesDisagreeSaysSo(t *testing.T) {
 		}
 	})
 }
+
+func TestTheListAcrossProductsSaysWhatIsExploited(t *testing.T) {
+	// The flag is read off a column now rather than off the packed number,
+	// and a column this query does not select comes back at its zero value
+	// with no error — so the list spanning products reported every row as
+	// exploited by nobody, including the issues a feed says are being used.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		used := found("CVE-2026-1", libnl)
+		used.Issue.Exploited = true
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			used, found("CVE-2026-2", swss),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		rows, _, err := f.store.Anywhere(t.Context(), f.holding(t, access.PublicRead),
+			50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 2 {
+			t.Fatalf("%d rows, wanted two", len(rows))
+		}
+		for _, row := range rows {
+			want := row.Vulnerability == "CVE-2026-1"
+			if row.Exploited != want {
+				t.Errorf("%s reads exploited %v, want %v",
+					row.Vulnerability, row.Exploited, want)
+			}
+			// Nothing here was recorded as used against this product, and the
+			// two must never answer for one another.
+			if row.ExploitedHere {
+				t.Errorf("%s reads as exploited here with no record kept",
+					row.Vulnerability)
+			}
+		}
+	})
+}

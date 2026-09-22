@@ -632,6 +632,7 @@ A product may record that it was exploited through an issue.
 |---|---|
 | A claim that the issue does not apply is refused while a record stands | The two say opposite things about one product, and the one that arrived from a person who watched it happen is not the one to give way |
 | A record arriving over such a claim is kept, and takes back the agreement under it | A fact cannot be refused and a judgment can. The claim stands and returns to the queue for somebody to answer again, and whoever wrote it is told |
+| Agreeing to such a claim is refused too | Approving writes no decision row, so it meets nothing the write path checks. A claim proposed before the record arrived and agreed to afterwards is what hides the finding, which is the state the refusal exists to prevent |
 | Refused where a decision is written rather than at each entry point | A claim at a finding, a bulk act, a re-affirmation, an extension carried to another issue and a decision carried across builds all reach one place. Checked at the entry points, the paths nobody checked are the ways round the rule |
 | Only that one outcome | A claim that the scanner matched the wrong thing is about identity, and the outcomes that promise work or put it off are not contradicted by an attack |
 | Clearing the record puts nothing back | Whether the claim was right is for whoever answers the finding, not for the clearing to decide on their behalf |

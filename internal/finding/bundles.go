@@ -716,24 +716,25 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	}
 
 	var rows []struct {
-		TargetID    int64      `bun:"target_id"`
-		Stream      string     `bun:"stream"`
-		Variant     string     `bun:"variant"`
-		Version     string     `bun:"version"`
-		Purl        string     `bun:"purl"`
-		Summary     string     `bun:"summary"`
-		ProjectURL  string     `bun:"project_url"`
-		Supplier    string     `bun:"supplier"`
-		Newest      string     `bun:"latest_version"`
-		NewestAt    *time.Time `bun:"latest_released_at"`
-		FirstSeen   time.Time  `bun:"first_seen_at"`
-		Exploited   int        `bun:"exploited"`
-		Fixable     int        `bun:"fixable"`
-		Issues      int        `bun:"issues"`
-		Consumers   int        `bun:"consumers"`
-		Places      int        `bun:"places"`
-		DueAt       *time.Time `bun:"due_at"`
-		ComponentID int64      `bun:"component_id"`
+		TargetID      int64      `bun:"target_id"`
+		Stream        string     `bun:"stream"`
+		Variant       string     `bun:"variant"`
+		Version       string     `bun:"version"`
+		Purl          string     `bun:"purl"`
+		Summary       string     `bun:"summary"`
+		ProjectURL    string     `bun:"project_url"`
+		Supplier      string     `bun:"supplier"`
+		Newest        string     `bun:"latest_version"`
+		NewestAt      *time.Time `bun:"latest_released_at"`
+		FirstSeen     time.Time  `bun:"first_seen_at"`
+		Exploited     int        `bun:"exploited"`
+		ExploitedHere int        `bun:"exploited_here"`
+		Fixable       int        `bun:"fixable"`
+		Issues        int        `bun:"issues"`
+		Consumers     int        `bun:"consumers"`
+		Places        int        `bun:"places"`
+		DueAt         *time.Time `bun:"due_at"`
+		ComponentID   int64      `bun:"component_id"`
 	}
 	// Everything open against it, per build and component. A left join rather
 	// than the driving table: no findings is an answer, and it is the answer
@@ -748,7 +749,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
-		ColumnExpr(`MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END) AS "exploited"`).
+		ColumnExpr(exploitedAcross+` AS "exploited"`).
+		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr("COUNT(DISTINCT CASE WHEN f.fixed_in IS NOT NULL AND f.fixed_in <> ''"+
 			` THEN f.vulnerability_id END) AS "fixable"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
@@ -792,6 +794,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr(`c.latest_released_at AS "latest_released_at"`).
 		ColumnExpr(`c.first_seen_at AS "first_seen_at"`).
 		ColumnExpr(`COALESCE("op".exploited, 0) AS "exploited"`).
+		ColumnExpr(`COALESCE("op".exploited_here, 0) AS "exploited_here"`).
 		ColumnExpr(`COALESCE("op".fixable, 0) AS "fixable"`).
 		ColumnExpr(`COALESCE("op".issues, 0) AS "issues"`).
 		ColumnExpr(`COALESCE("op".places, 0) AS "places"`).
@@ -837,7 +840,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 			Summary: row.Summary, ProjectURL: row.ProjectURL,
 			Supplier: row.Supplier,
 			Newest:   row.Newest, NewestAt: row.NewestAt, FirstSeen: row.FirstSeen,
-			Exploited: row.Exploited > 0, Fixable: row.Fixable, Issues: row.Issues,
+			Exploited: row.Exploited > 0, ExploitedHere: row.ExploitedHere > 0,
+			Fixable: row.Fixable, Issues: row.Issues,
 			BySeverity: bands[[2]int64{row.TargetID, row.ComponentID}],
 			Consumers:  row.Consumers, Places: row.Places,
 			DueAt:    row.DueAt,
