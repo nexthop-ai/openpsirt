@@ -346,3 +346,48 @@ func TestAnAdvisoryIsBoundedBySizeDepthAndClaimCount(t *testing.T) {
 		}
 	}
 }
+
+func TestARealSupplierAdvisoryReads(t *testing.T) {
+	// Somebody else's output, unmodified. The three fixtures written here
+	// reproduce shapes read out of real documents, which proves the reader
+	// against shapes this project chose to write down — and a shape nobody
+	// here thought of is exactly what that cannot cover.
+	got := readAdvisory(t, "suse-su-2026_0005-1.json")
+	if got.Identifier != "SUSE-SU-2026:0005-1" {
+		t.Errorf("the document is named %q", got.Identifier)
+	}
+	if got.Publisher != "SUSE Product Security Team" {
+		t.Errorf("it was published by %q", got.Publisher)
+	}
+	if len(got.Claims) != 1 {
+		t.Fatalf("%d claims: %+v", len(got.Claims), got.Claims)
+	}
+	one := got.Claims[0]
+	if one.Vulnerability != "CVE-2025-10158" {
+		t.Errorf("the claim is about %q", one.Vulnerability)
+	}
+	// A recommended version is a fixed version. Four of the eight lists read,
+	// this document makes no claim at all and is accepted saying nothing.
+	if one.Status != sbom.AlreadyFixed {
+		t.Errorf("a recommended version reads as %q", one.Status)
+	}
+	// Every identifier the claim names is composed by a relationship, so a
+	// reader resolving through the tree alone refuses the whole document.
+	if len(one.Targets) != 4 {
+		t.Fatalf("it points at %+v", one.Targets)
+	}
+	for _, at := range one.Targets {
+		if at.Name != "rsync" {
+			t.Errorf("a target resolved to %+v rather than the package", at)
+		}
+		if !strings.HasPrefix(at.Purl, "pkg:rpm/suse/rsync@3.1.3-3.34.1") {
+			t.Errorf("a target carries %q", at.Purl)
+		}
+	}
+	// The words written about the products it names, rather than the ones
+	// written about the status at large.
+	if !strings.Contains(one.Statement, "zypper patch") {
+		t.Errorf("the claim says %q, and the remediation is the part worth having",
+			one.Statement)
+	}
+}

@@ -21,6 +21,7 @@ nobody can tell a producer quirk from a typo in.
 | `advisory-recommended.csaf.json` | Written here, in the shape a distribution publishes a recommended update in. Its only status is `recommended`, which is what makes it worth keeping: a reader that knows four of the eight lists takes this document, records nothing and reports that it worked. Its relationship carries a package identifier of its own, which is the package as that platform ships it |
 | `advisory-named-products.csaf.json` | Written here, in the shape an equipment vendor publishes in: products named and versioned in branches, identifiers that are serial numbers, and no package identifier anywhere in the document |
 | `advisory-opaque-products.csaf.json` | Written here, in the shape a network vendor publishes in: opaque identifiers, no package identifiers, and every identifier a claim names composed by a relationship |
+| `suse-su-2026_0005-1.json` | Real output, and the only advisory here a publisher wrote. SUSE's security update for rsync, unmodified. Every identifier its claim names is composed by a relationship, its only status is `recommended`, and it carries a `tracking.generator` none of the written fixtures thought to have. **CC-BY-4.0**, which `NOTICE` records |
 | `appbom.spdx3.json` | The specification's own example 9, and the largest at 3.0: 103 elements — 7 packages, 15 files and 63 relationships, most of which say nothing about structure. Six packages survive as components because one of the seven is the root, and 18 of its edges name a file |
 
 ## The SPDX fixtures
@@ -102,25 +103,37 @@ producer quirk worth handling.
 
 ## The advisory fixtures
 
-Four, one per publisher shape, and none of them a publisher's document. They
-were written from four real advisories — a distribution's kernel errata, a
-distribution's recommended update, an equipment vendor's and a network
-vendor's — read for the shapes they use, and none of those documents is here.
+Five: one real document, and four written here from four real ones read for
+the shapes they use — a distribution's kernel errata, a distribution's
+recommended update, an equipment vendor's and a network vendor's.
 
-**Nothing any of the four publishes carries a license this tree can take.**
-Three assert copyright and grant nothing: one says "All rights reserved" under
-a TLP:WHITE label, one says disclosure is not limited and nothing about
-copying, and one states no distribution terms at all. The fourth publishes a
-`LICENSE` beside its directory granting **CC-BY-4.0**, which is a real
-permissive grant and is not on `ALLOWED_LICENSES`.
+**Which of the four publishers can be taken from is a question of what each
+one grants**, and they differ:
 
-So these are written here, which is the answer the version-comparison suites
-already settled for the same question. What is given up is the same thing:
-nobody else chose the cases, so a shape nobody here thought of is not covered.
-What is gained is that each fixture names the rule it pins.
+| Publisher | What the document says | Taken |
+|---|---|---|
+| SUSE | A `LICENSE` beside the directory grants CC-BY-4.0. The document itself says "Copyright 2024 SUSE LLC. All rights reserved." | Yes, with attribution in `NOTICE` |
+| Red Hat | "Copyright © Red Hat, Inc. All rights reserved.", under a TLP:WHITE label | No |
+| Siemens | "Disclosure is not limited. (TLPv2: TLP:CLEAR)", and nothing about copying | No |
+| Cisco | No distribution statement at all | No |
 
-The real documents were read, and what they are is recorded rather than
-carried: one distribution advisory about a kernel is 27 MB, names 95,933
+TLP:CLEAR is a grant about spreading the information rather than about copying
+the file, and it sits beside a reservation of rights in two of these. That is
+an ambiguity rather than a permission, so those three are written here — the
+answer the version-comparison suites already settled for the same question.
+
+**The SUSE `LICENSE` names the wrong format**, and it is worth knowing rather
+than glossing. It says "The SUSE cVRF data", and the identical file sits in the
+`cvrf/` directory and in the `csaf/` one; the wording was carried across and
+the placement is what makes it apply to the documents beside it.
+
+What writing the other three gives up is that nobody else chose the cases, so a
+shape nobody here thought of is not covered. The real document is what buys
+part of that back: it arrived carrying a `tracking.generator` no written
+fixture had.
+
+The three that are not here were read, and what they are is recorded rather
+than carried: one distribution advisory about a kernel is 27 MB, names 95,933
 product identifiers against a default ceiling of 100,000, and states 341
 vulnerabilities. One distribution VEX document about a single issue composes
 every one of its 1,669 product identifiers through a relationship. An equipment

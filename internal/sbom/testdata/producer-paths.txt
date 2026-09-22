@@ -140,6 +140,9 @@ skipped document.references[].summary:string
 skipped document.references[].url:string
 read document.title:string
 skipped document.tracking.current_release_date:string
+skipped document.tracking.generator.date:string
+skipped document.tracking.generator.engine.name:string
+skipped document.tracking.generator.engine.version:string
 read document.tracking.id:string
 skipped document.tracking.initial_release_date:string
 skipped document.tracking.revision_history[].date:string
@@ -273,6 +276,9 @@ read vulnerabilities[].product_status.fixed[]:string
 read vulnerabilities[].product_status.known_affected[]:string
 read vulnerabilities[].product_status.known_not_affected[]:string
 read vulnerabilities[].product_status.recommended[]:string
+skipped vulnerabilities[].references[].category:string
+skipped vulnerabilities[].references[].summary:string
+skipped vulnerabilities[].references[].url:string
 skipped vulnerabilities[].remediations[].category:string
 skipped vulnerabilities[].remediations[].date:string
 read vulnerabilities[].remediations[].details:string
@@ -284,6 +290,7 @@ skipped vulnerabilities[].scores[].cvss_v3.vectorString:string
 skipped vulnerabilities[].scores[].cvss_v3.version:string
 skipped vulnerabilities[].scores[].products[]:string
 skipped vulnerabilities[].threats[].category:string
+skipped vulnerabilities[].threats[].date:string
 read vulnerabilities[].threats[].details:string
 read vulnerabilities[].threats[].product_ids[]:string
 skipped vulnerabilities[].title:string
