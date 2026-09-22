@@ -1198,6 +1198,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/exploited-here/{id}/told": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that somebody outside was told
+         * @description Records who was told about an attack, when, and what they were told. Append-only: a notice recorded in error is corrected by recording another beside it.
+         *
+         *     Name a window to say this notice answers it. The window then stops raising its notification for this incident.
+         *
+         *     Allowed on a cleared record, because a notice given before the clearing still happened.
+         *
+         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         */
+        post: operations["record-told-outside"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/findings": {
         parameters: {
             query?: never;
@@ -1533,6 +1559,88 @@ export interface paths {
          *     Requires: your own credential
          */
         delete: operations["acknowledge-notification"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/obligation-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List obligation windows
+         * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
+         *
+         *     Requires: any signed-in person, and not a pipeline key
+         */
+        get: operations["list-obligation-windows"];
+        put?: never;
+        /**
+         * Declare an obligation window
+         * @description Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
+         *
+         *     Requires: administrator
+         */
+        post: operations["declare-obligation-window"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/obligation-windows/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change an obligation window
+         * @description Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+         *
+         *     Requires: administrator
+         */
+        put: operations["change-obligation-window"];
+        post?: never;
+        /**
+         * Retire an obligation window
+         * @description Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-obligation-window"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/obligations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List standing attacks and their windows
+         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs from the moment the attack became known, and every notice recorded about it.
+         *
+         *     A window is answered where a notice names it. Nothing here says whether a notice met anything.
+         *
+         *     Unpaged. A record you may not be told of is left out and counted nowhere.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
+         */
+        get: operations["list-obligations"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2627,7 +2735,7 @@ export interface paths {
          *
          *     Say when it became known rather than when you are typing. Any window a deployment is under counts from the first of those, and the gap between the two is what such a window measures.
          *
-         *     Nothing refuses this. Where a claim that the issue does not apply is standing and agreed to in this product, the record is kept and that agreement is taken back, returning those claims to the review queue and telling whoever wrote them; the count comes back as `undone`. A claim of that kind made while a record stands is refused instead, because a judgment gives way to a fact and not the other way round.
+         *     Nothing refuses this. Where a claim that the issue does not apply stands in this product, or a claim over many issues that sets this one aside or puts it off, the record is kept and that claim goes back to waiting for a second person, telling whoever wrote it; the count comes back as `undone`. A claim of either kind made while a record stands is refused instead.
          *
          *     One record stands per issue and product. Clear the one standing before recording another.
          *
@@ -6417,6 +6525,18 @@ export interface components {
             product_tree: components["schemas"]["ProductTree"];
             vulnerabilities: components["schemas"]["Vulnerability"][] | null;
         };
+        DueBody: {
+            /** @description Whether a notice recorded against this incident names this window */
+            answered: boolean;
+            /**
+             * Format: date-time
+             * @description When the attack became known, plus the window
+             */
+            ends_at: string;
+            /** @description Whether that moment has gone */
+            passed: boolean;
+            window: components["schemas"]["WindowBody"];
+        };
         EarlierBody: {
             /** @description The component upstream version it was a claim about */
             about?: string;
@@ -6734,9 +6854,11 @@ export interface components {
             recorded_by?: string;
             /** @description Whether this is the record in force. One stands at a time per issue and product */
             standing: boolean;
+            /** @description Who outside was told about this, when, and what they were told */
+            told?: components["schemas"]["NoticeBody"][] | null;
             /**
              * Format: int64
-             * @description Approved claims that the issue does not apply whose agreement this took back, returning them to the review queue
+             * @description Decisions this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off
              */
             undone?: number;
             /** @description The issue this is about */
@@ -7450,6 +7572,24 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        "List-obligation-windowsResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-obligation-windowsResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["WindowBody"][] | null;
+        };
+        "List-obligationsResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/List-obligationsResponse.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ObligationBody"][] | null;
+        };
         "List-set-aside-workResponse": {
             /**
              * Format: uri
@@ -8103,6 +8243,53 @@ export interface components {
             /** @description Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the note is about — deliberately not said which */
             not_notified?: string[] | null;
         };
+        NoticeBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/NoticeBody.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Who was told */
+            recipient: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** @description Who recorded the notice */
+            recorded_by?: string;
+            /** @description What they were told */
+            said: string;
+            /**
+             * Format: date-time
+             * @description When they were told
+             */
+            told_at: string;
+            /** @description The window this notice answers, where whoever recorded it named one */
+            window?: string;
+        };
+        NoticeSaid: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/NoticeSaid.json
+             */
+            readonly $schema?: string;
+            /** @description Who was told: a regulator, a customer, a response team */
+            recipient: string;
+            /** @description What they were told */
+            said: string;
+            /**
+             * Format: date-time
+             * @description When they were told. Not before the attack became known, and not in the future
+             */
+            told_at: string;
+            /**
+             * Format: int64
+             * @description The window in force this notice answers. Left off, it answers none
+             */
+            window?: number;
+        };
         NotificationBody: {
             /** @description A condition's subject. Absent for an event */
             about?: string;
@@ -8138,6 +8325,48 @@ export interface components {
              * @description The number waiting on you
              */
             total: number;
+        };
+        ObligationBody: {
+            /** Format: date-time */
+            cleared_at?: string;
+            /** @description Why it was cleared */
+            cleared_because?: string;
+            /** @description Who cleared it */
+            cleared_by?: string;
+            /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
+            grounds: string;
+            /** Format: int64 */
+            id?: number;
+            /**
+             * Format: date-time
+             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+             */
+            known_at: string;
+            /** @description Whether you may record a notice about this record */
+            may_tell: boolean;
+            /** @description The product this record belongs to, by the name an address takes */
+            product?: string;
+            /** @description That product's spelling on screen */
+            product_name?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** @description Who recorded it */
+            recorded_by?: string;
+            /** @description Whether this is the record in force. One stands at a time per issue and product */
+            standing: boolean;
+            /** @description Who outside was told about this, when, and what they were told */
+            told?: components["schemas"]["NoticeBody"][] | null;
+            /** @description Whether the issue is undisclosed somewhere in this product */
+            undisclosed: boolean;
+            /**
+             * Format: int64
+             * @description Decisions this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off
+             */
+            undone?: number;
+            /** @description The issue this is about */
+            vulnerability?: string;
+            /** @description Every window in force, shortest first, as it runs from when the attack became known */
+            windows: components["schemas"]["DueBody"][] | null;
         };
         OursOutputBody: {
             /**
@@ -10275,6 +10504,40 @@ export interface components {
             /** @description An address is recorded for them, so anything can be sent at all */
             reachable?: boolean;
         };
+        WindowBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WindowBody.json
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            declared_at: string;
+            /**
+             * Format: int64
+             * @description How long the window runs, in hours, from the moment an attack became known
+             */
+            hours: number;
+            /** Format: int64 */
+            id: number;
+            /** @description What the window is called here */
+            name: string;
+        };
+        WindowSaid: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WindowSaid.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description How long the window runs, in hours, from the moment an attack became known
+             */
+            hours: number;
+            /** @description What the window is called here. Unique among the windows in force, without regard to capitals */
+            name: string;
+        };
         "Withdraw-estate-roleResponse": {
             /**
              * Format: uri
@@ -12037,6 +12300,41 @@ export interface operations {
             };
         };
     };
+    "record-told-outside": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeSaid"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-findings-anywhere": {
         parameters: {
             query?: {
@@ -12618,6 +12916,161 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-obligation-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-obligation-windowsResponse"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "declare-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindowSaid"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindowBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "change-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindowSaid"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindowBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-obligations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["List-obligationsResponse"];
+                };
             };
             /** @description Error */
             default: {

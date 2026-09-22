@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lasted, on, since } from "./when";
+import { at, lasted, on, since } from "./when";
 
 // Two forms and no others. There were four in use at once, two of them
 // showing the stored string with its time and offset — the tool displaying its
@@ -9,6 +9,15 @@ describe("how a moment is written", () => {
 
   it("writes the calendar day, as stored", () => {
     expect(on("2026-09-04T08:13:44.123456Z")).toBe("2026-09-04");
+  });
+
+  it("writes a moment to the minute in UTC, whatever offset it was stored with", () => {
+    // A window of hours ends on a different day depending on the hour it
+    // opened, so the day alone does not answer when one runs out.
+    expect(at("2026-09-04T23:13:44Z")).toBe("2026-09-04 23:13 UTC");
+    expect(at("2026-09-05T01:13:44+02:00")).toBe("2026-09-04 23:13 UTC");
+    expect(at("libnl-3-200")).toBe("");
+    expect(at(null)).toBe("");
   });
 
   it("says nothing about a moment that is not there", () => {
