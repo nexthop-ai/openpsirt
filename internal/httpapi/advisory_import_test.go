@@ -304,3 +304,33 @@ func TestAnAdvisorysPrefillIsSomethingAPersonStillHasToRecord(t *testing.T) {
 		}
 	})
 }
+
+func TestANameLongerThanTheRecordIsRefusedRatherThanShortened(t *testing.T) {
+	// Both names are part of the key a later upload replaces on, and both are
+	// stored in a column of a fixed width. Shortened, two advisories agreeing
+	// for the width of the column collapse into one, and a revision of one
+	// sets aside claims it has nothing to do with.
+	//
+	// Two layers refuse and either alone is enough, the way the scope and the
+	// handler check are: the endpoint, and the store behind it, which is
+	// reachable from any other caller. Both have to go before this fails.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		tooLong := strings.Repeat("x", 200)
+
+		named := r.advised(t, "admin", "exsa.json",
+			supplierAdvisory(tooLong, "fixed", "3.7.0"))
+		refusedWith(t, named, http.StatusUnprocessableEntity)
+		if !strings.Contains(named.Body.String(), "the name the publisher gave it") {
+			t.Errorf("the refusal does not say which name is too long: %s", named.Body.String())
+		}
+
+		published := strings.Replace(supplierAdvisory("EXSA-2026:1001", "fixed", "3.7.0"),
+			`"name": "Example Distribution"`, `"name": "`+tooLong+`"`, 1)
+		who := r.advised(t, "admin", "exsa.json", published)
+		refusedWith(t, who, http.StatusUnprocessableEntity)
+		if !strings.Contains(who.Body.String(), "who published it") {
+			t.Errorf("the refusal does not say which name is too long: %s", who.Body.String())
+		}
+	})
+}

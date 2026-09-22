@@ -311,3 +311,38 @@ func TestProseAboutOneProductWinsOverProseAboutTheWholeStatus(t *testing.T) {
 		}
 	}
 }
+
+func TestAnAdvisoryIsBoundedBySizeDepthAndClaimCount(t *testing.T) {
+	// A published document is somebody else's output arriving over a link we
+	// do not control, exactly as a scan file is. The reader is opened here
+	// rather than shared with the suppression path, so each bound it is meant
+	// to carry is asked of it rather than assumed from the reader beside it.
+	body := advisoryText(t, "advisory-platform-packages.csaf.json")
+	// A second issue in the same document, so that a limit of one has
+	// something to refuse. A zero limit is an unset one everywhere here.
+	opens := strings.Index(body, `"vulnerabilities": [`) + len(`"vulnerabilities": [`)
+	twice := body[:opens] + `{"cve": "CVE-2026-1099",
+	  "product_status": {"fixed": ["BaseOS-9.4.0.GA:libnl-3-200-0:3.7.0-1.el9.x86_64"]}},` +
+		body[opens:]
+	for _, each := range []struct {
+		bound string
+		body  string
+		lim   sbom.Limits
+		says  string
+	}{
+		{"size", body, sbom.Limits{MaxBytes: 64}, "larger than"},
+		{"depth", body, sbom.Limits{MaxDepth: 3}, "nests deeper"},
+		{"claims", twice, sbom.Limits{MaxStatements: 1}, "limit"},
+		{"products", body, sbom.Limits{MaxComponents: 3}, "product limit"},
+	} {
+		_, err := sbom.ReadAdvisory(strings.NewReader(each.body), each.lim)
+		if err == nil {
+			t.Errorf("a document past the %s bound was read", each.bound)
+			continue
+		}
+		if !strings.Contains(err.Error(), each.says) {
+			t.Errorf("the %s refusal reads %q, and does not say which bound it is",
+				each.bound, err)
+		}
+	}
+}
