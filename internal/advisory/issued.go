@@ -205,3 +205,62 @@ func readable(subject access.Subject) []access.Visibility {
 	}
 	return []access.Visibility{access.Public}
 }
+
+// AnyIssuedForProduct reports whether an advisory covering one product has
+// gone out.
+//
+// What a product rename is refused on. A published advisory names each
+// affected release in its product tree by the build it is — the product, the
+// release and the variant — and that identifier is what a customer's tooling
+// matches itself against. Renamed afterwards, the next revision names the same
+// release differently, and a reader matching the identifier they hold finds it
+// absent: which reads as no longer affected, about a customer who still is.
+//
+// The issue an advisory covers is recorded against the product, so this is
+// exact rather than inferred. An issue added since the last issuance is named
+// in no document yet, for the reason its counterpart over a release gives.
+func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool, error) {
+	issued, err := db.NewSelect().Model((*Issuance)(nil)).
+		Join(`JOIN "advisory_issue" AS "ac" ON ac.advisory_id = ai.advisory_id`).
+		Where("ac.product_id = ?", productID).
+		Where("ac.added_at <= ai.issued_at").
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether an advisory has gone out for this product: %w", err)
+	}
+	return issued, nil
+}
+
+// AnyIssuedForStream reports whether a published advisory named one release.
+//
+// A release reaches the product tree by holding one of the issues the advisory
+// covers, so that is what is asked. Asked of the product instead, a release
+// that no advisory ever named would be refused a correction because a sibling
+// release was named once — and a release cannot be retired and declared again
+// as a way round it, because the second one would hold none of its history.
+//
+// An issue taken back off the advisory still counts, and one added after the
+// last issuance does not. What went out is what readers hold: a document is
+// not rewritten, so an issue removed since is still named in it and an issue
+// added since is named in no document yet.
+//
+// The issue is covered in one product, and a release belongs to one product,
+// so the two have to be the same product. Left unjoined, one upstream flaw
+// shared between two products made an advisory for either refuse a rename on
+// the other, which is the over-refusal asking about the release rather than
+// about the product exists to avoid.
+func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
+	issued, err := db.NewSelect().Model((*Issuance)(nil)).
+		Join(`JOIN "advisory_issue" AS "ac" ON ac.advisory_id = ai.advisory_id`).
+		Join(`JOIN "finding" AS "f" ON f.vulnerability_id = ac.vulnerability_id`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		Where("tg.stream_id = ?", streamID).
+		Where(`"st"."product_id" = "ac"."product_id"`).
+		Where("ac.added_at <= ai.issued_at").
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether an advisory has gone out for this release: %w", err)
+	}
+	return issued, nil
+}

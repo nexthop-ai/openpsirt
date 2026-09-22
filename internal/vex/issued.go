@@ -239,3 +239,60 @@ func settledDigest(doc *Statements) (string, error) {
 	sum := sha256.Sum256(body)
 	return hex.EncodeToString(sum[:]), nil
 }
+
+// AnyIssuedForVariant reports whether a document has gone out for any build of
+// one variant.
+//
+// What a rename is refused on. A document is identified by the build it is
+// about — the publisher's namespace, then the product, the release and the
+// variant — and that identifier is inside the digest of what went out. A
+// reader tells a revision of a document they hold from a second document by
+// whether the identifier matches, so moving the name after publication does
+// not revise the document: it mints a different one, and leaves the one people
+// have looking abandoned.
+//
+// The record cannot carry the correction either. An issuance is stored against
+// the build and the revision number, and never against the name, so a rename
+// would leave every row reading as a revision of a document that never went
+// out under that name.
+//
+// Asked of the variant rather than of one build, because a variant is built on
+// every release and any one of them having gone out is enough.
+//
+// A function over the handle it is given rather than a method, so that it runs
+// inside the transaction that acts on the answer. A store here holds a pool
+// because it opens transactions of its own, and asking this outside the
+// rename's transaction answers for a database the rename no longer writes to:
+// a document issued between the two would be published under a name this had
+// already said nothing was published under.
+func AnyIssuedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool, error) {
+	return anyIssuedWhere(ctx, db, "tg.variant_id = ?", variantID, "variant")
+}
+
+// AnyIssuedForStream reports whether a document has gone out for any variant of
+// one release.
+//
+// The release is inside the same identifier the variant is, for the same
+// reasons AnyIssuedForVariant gives.
+func AnyIssuedForStream(ctx context.Context, db bun.IDB, streamID int64) (bool, error) {
+	return anyIssuedWhere(ctx, db, "tg.stream_id = ?", streamID, "release")
+}
+
+// AnyIssuedForProduct reports whether a document has gone out for any build of
+// one product.
+func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool, error) {
+	return anyIssuedWhere(ctx, db,
+		`"tg"."stream_id" IN (SELECT "id" FROM "stream" WHERE "product_id" = ?)`,
+		productID, "product")
+}
+
+func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, what string) (bool, error) {
+	issued, err := db.NewSelect().Model((*Issuance)(nil)).
+		Join(`JOIN "target" AS "tg" ON tg.id = vi.target_id`).
+		Where(where, id).
+		Exists(ctx)
+	if err != nil {
+		return false, fmt.Errorf("read whether anything has gone out for this %s: %w", what, err)
+	}
+	return issued, nil
+}

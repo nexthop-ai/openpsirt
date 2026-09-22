@@ -88,7 +88,7 @@ inferred from a rule, so adding a route never adds an exception.
 | 202 | Accepted, not yet done. Only an upload, which answers before it has been read |
 | 204 | Done, with nothing worth saying |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
-| 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim |
+| 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a retirement of something already retired, a name another row already holds |
 | 422 | Understood, and cannot be stored as written |
 
 Not found and not yours are one answer. A product somebody holds nothing on is
@@ -400,5 +400,7 @@ Recorded because the conclusion is the deliverable.
 | Paging is `limit` and `offset`, with a total | A cursor is better under concurrent writes and worse for jumping to a page. The total is separate from the page because somebody deciding whether to start work needs to know how much there is |
 | A list answers with an object, not an array | An array at the top level has nowhere to put the total |
 | Names in paths, identifiers in bodies | A product, stream and variant are what somebody typing a request knows and what a pipeline has in its configuration. A decision is numbered because it has no name |
+| A removal takes something out of use rather than out of the database | A team, a routing rule, an outbound destination and a variant are each reached by `DELETE` and each keep their row. What they hold is named by findings, decisions and documents that went to customers, so removing the row would take those with it |
+| An amendment leaves out what it does not change, and naming nothing is refused | Absent and cleared are different requests wherever a field has a default, and a request that asks for nothing answered as done would say something happened |
 | A place in a path is the identity the findings list gave out | A caller free to compose one would be choosing which decisions apply where |
 | Comment density in this layer is low by design | It is a registration and a mapping: the operation is declared, a store is called, its answer becomes a body. What is worth explaining about a rule belongs where the rule is enforced |

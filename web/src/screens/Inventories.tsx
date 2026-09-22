@@ -50,7 +50,7 @@ export function Inventories() {
   // Silence on a release that has gone out of support is expected rather than
   // a fault, so it is said quietly rather than raised — but it is still said.
   // "Not scanned, and that is fine" and "not mentioned" are different answers.
-  const retired = (scanning.data?.items ?? []).filter((b) => b.retired && b.quiet_days > 0);
+  const retired = (scanning.data?.items ?? []).filter((b) => b.out_of_support && b.quiet_days > 0);
 
   if (scans.isPending) return <Loading />;
   if (scans.isError)

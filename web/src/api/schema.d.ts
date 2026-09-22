@@ -1898,6 +1898,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a product
+         * @description Takes a product out of use. It is offered nowhere and no scan may be filed against it. Everything already filed against it stays: its findings are still open, its decisions still stand, and the documents published for it still name it.
+         *
+         *     Its releases and variants go out of every list with it and are otherwise left as they are. Declaring the product again brings it back with them.
+         *
+         *     An end-of-support date is a separate setting with a separate effect: it takes the deadline off what is open and leaves the product listed and scannable.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-product"];
+        options?: never;
+        head?: never;
+        /**
+         * Amend a product
+         * @description Corrects what a product is called. Both names are left alone where the request omits them.
+         *
+         *     The name is what scans, paths and published documents use. It is refused once a VEX document has gone out for any build of this product, or a published advisory covers it. Retire the product and declare the intended one instead.
+         *
+         *     The displayed name is what screens show and what a document names the product in prose. It may be corrected at any time.
+         *
+         *     Requires: administrator
+         */
+        patch: operations["amend-product"];
+        trace?: never;
+    };
     "/v1/products/{product}/comparison": {
         parameters: {
             query?: never;
@@ -2875,6 +2911,8 @@ export interface paths {
          *
          *     A stream past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
          *
+         *     A retired stream is left out unless asked for. Ask for it to resolve a name already in hand rather than to offer a choice; each one says that it is retired.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["list-streams"];
@@ -2890,6 +2928,40 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a branch or tag
+         * @description Takes a release out of use. It is offered nowhere and no scan may be filed against it, while everything already filed against it stays. Declaring it again brings it back.
+         *
+         *     An end-of-support date is a separate setting with a separate effect: it takes the deadline off what is open and leaves the release listed and scannable.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-stream"];
+        options?: never;
+        head?: never;
+        /**
+         * Amend a branch or tag
+         * @description Corrects what a release is called.
+         *
+         *     Refused once a VEX document has gone out for any build of this release, or a published advisory named it. Declare the intended name as a release of its own: retiring this one and declaring it again returns this same release under this same name.
+         *
+         *     Whether it is a branch or a tag does not move here, and neither does the branch a tag was cut from.
+         *
+         *     Requires: administrator
+         */
+        patch: operations["amend-stream"];
         trace?: never;
     };
     "/v1/products/{product}/streams/{stream}/end-of-life": {
@@ -3836,6 +3908,40 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/variants/{variant}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Retire a build variant
+         * @description Takes a variant out of use. It is offered nowhere and no scan may be filed against it. Everything already filed against it stays: its findings are still open, its decisions still stand, the documents published for it still name it, and the releases it was built as still list it.
+         *
+         *     The name stays spoken for. Declaring it again brings this variant back rather than making a second one.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-variant"];
+        options?: never;
+        head?: never;
+        /**
+         * Amend a build variant
+         * @description Corrects what a variant is called and whether it reaches customers. Both are left alone where the request omits them.
+         *
+         *     A name is refused once an OpenVEX document has been published for any release built as this variant. Retire the variant and declare the intended one instead.
+         *
+         *     A name another variant of this product holds is refused, including a retired one. Whether it reaches customers feeds how its findings rank and may be corrected at any time.
+         *
+         *     Requires: administrator
+         */
+        patch: operations["amend-variant"];
         trace?: never;
     };
     "/v1/products/{product}/vex-statements": {
@@ -4971,6 +5077,40 @@ export interface components {
             /** @description The version that build ships under this name, where it ships more than one */
             version?: string;
         };
+        "Amend-productRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Amend-productRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What screens and documents should show instead. Omitted leaves it alone */
+            display_name?: string;
+            /** @description What scans and paths should call it instead. Omitted leaves it alone */
+            name?: string;
+        };
+        "Amend-streamRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Amend-streamRequest.json
+             */
+            readonly $schema?: string;
+            /** @description What to call it instead */
+            name: string;
+        };
+        "Amend-variantRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Amend-variantRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Whether it reaches customers. Omitted leaves it alone */
+            customer_facing?: boolean;
+            /** @description What to call it instead. Omitted leaves the name alone */
+            name?: string;
+        };
         AnywhereOutputBody: {
             /**
              * Format: uri
@@ -5270,13 +5410,13 @@ export interface components {
              * @description Issues at components, the unit every count here uses
              */
             open: number;
+            /** @description This build's release is out of support */
+            out_of_support?: boolean;
             /**
              * Format: int64
              * @description The number past a deadline
              */
             overdue?: number;
-            /** @description This build's release is out of support */
-            retired?: boolean;
             stream: string;
             /**
              * @description Whether the line moves or is fixed
@@ -5455,7 +5595,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -5736,6 +5876,8 @@ export interface components {
             last_received_at?: string;
             /** @description The moment an upload against this build was last turned away. Absent where none has been */
             last_refused_at?: string;
+            /** @description Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet */
+            out_of_support?: boolean;
             product: string;
             /** @description Whether that is longer than this deployment allows */
             quiet?: boolean;
@@ -5746,7 +5888,7 @@ export interface components {
             quiet_days: number;
             /** @description The words the producer was given the last time one was turned away, in the same words they were given */
             refused_because?: string;
-            /** @description Whether this build's release is out of support, in which case silence is expected and it is never reported as quiet */
+            /** @description Whether the product, release or variant has been taken out of use. No scan may be filed against it, so it is never reported as quiet */
             retired?: boolean;
             stream: string;
             /**
@@ -7898,6 +8040,8 @@ export interface components {
             open: number;
             /** Format: int64 */
             overdue: number;
+            /** @description Whether the product has been taken out of use. Nothing filed against it is affected and no new scan is accepted */
+            retired?: boolean;
             /** @description The least severity this product triages, where the product states one of its own */
             triage_floor?: string;
             /** Format: int64 */
@@ -9416,6 +9560,8 @@ export interface components {
              * @example https://example.com/schemas/StreamBody.json
              */
             readonly $schema?: string;
+            /** @description The same name as it was spelled. Absent where it is the name itself */
+            display_name?: string;
             /** @description The date support ends, as YYYY-MM-DD */
             end_of_life?: string;
             /** @description The date shown is the product's, not this release's own */
@@ -9438,6 +9584,8 @@ export interface components {
             parent?: string;
             /** @description For a tag, the day it went out, as YYYY-MM-DD. Absent where nobody has said, and the day it was declared here stands in */
             released_on?: string;
+            /** @description Whether it has been taken out of use. Nothing filed against it is affected and no new scan is accepted */
+            retired?: boolean;
         };
         TLP: {
             label: string;
@@ -9692,6 +9840,8 @@ export interface components {
             readonly $schema?: string;
             /** @description Whether this reaches customers. Defaults to yes */
             customer_facing?: boolean;
+            /** @description The same name as it was spelled. Absent where it is the name itself */
+            display_name?: string;
             /** @description The name scans use for this build of the stream */
             name: string;
             /**
@@ -9699,6 +9849,8 @@ export interface components {
              * @description Issues open against it here, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
+            /** @description Whether it has been taken out of use. A release still lists what it was built as */
+            retired?: boolean;
         };
         VexSaidBody: {
             /** @description The moment it was uploaded here */
@@ -9932,7 +10084,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -9972,7 +10124,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -12773,6 +12925,68 @@ export interface operations {
             };
         };
     };
+    "retire-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "amend-product": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Amend-productRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "compare-releases": {
         parameters: {
             query: {
@@ -14477,6 +14691,8 @@ export interface operations {
     "list-streams": {
         parameters: {
             query?: {
+                /** @description Include streams that have been retired. They say so, and no scan may be filed against one */
+                retired?: boolean;
                 /** @description Count what is open against each row. Off by default: it is counted over the findings and is the expensive half of this read */
                 counts?: boolean;
             };
@@ -14531,6 +14747,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeclaredStreamBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "amend-stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Amend-streamRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -15937,6 +16217,70 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DeclaredVariantBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-variant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "amend-variant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                variant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Amend-variantRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
