@@ -1080,22 +1080,37 @@ what is running out with both ways of moving a date on it.
 
 ### The advisory
 
-An advisory is started from the issue it is about. The endpoints answered and
-nothing called them, so the one output of this tool that leaves the company was
-the one output nobody here could make.
+An advisory has screens of its own: a list of every one this deployment minted,
+and one advisory whole. `DESIGN-remediation.md` § The advisory holds what an
+advisory is and § Editorial state holds who may agree.
 
 | Rule | |
 |---|---|
-| Started from a flaw, and an ordinary advisory from there | An advisory is a record of its own covering issues, and this is the narrow case that begins with one: start it, name this flaw in this product on it. `DESIGN-remediation.md` § The advisory holds what an advisory is |
-| What already covers this flaw is said before another is started | The question before starting a second is whether one already says it |
-| A flaw in somebody else's component is refused when it is named | The refusal names the issue somebody chose, and is shown rather than swallowed |
-| No screen for an advisory in its own right | One covering several flaws is started and read through the issue that began it. Nothing lists what an advisory covers, adds a second flaw to one, or takes one off |
+| The screens are for care rather than throughput | Single or low double digits a year, each one the company speaking. No filters, no selection, no bulk anything, and the review step is a person reading text |
+| The panels are compose, review, approve, publish, in that order | They are the four acts in the order they happen. Panel order is decided rather than accumulated |
+| What is left before it can go out is said once, at the top | Naming no flaw and nobody agreeing are the two. Naming no flaw comes first: an advisory covering nothing generates no document, so an agreement is not the next thing to go looking for |
+| A control is disabled only on a fact the server has answered | Taking an agreement back and recording an issuance are disabled where the advisory reports nobody agreeing, which is the server's own count. Agreeing is offered to whoever reaches the screen: who may agree turns on who wrote the edition standing, which the screen is not told, so hiding it would be hiding on a guess |
+| The refusal a control reaches is the server's sentence | Agreeing as the person who started it, and naming a flaw a scanner reported. Each says what the store said rather than a sentence invented on the screen |
+| A flaw is typed as well as picked | The list offered is what this deployment still holds open in the chosen product, folded to one entry per issue and without what the advisory already names there. A flaw already closed is typed rather than picked — the server takes any flaw recorded here. A read that failed says so and leaves the typing, because an empty picker reads as "this product has none", which is the one thing a failed read did not say |
+| The picker says when it is holding less than what is there | It stops at the endpoint's own maximum, and folding to distinct issues hides how close it came. A truncated list otherwise reads as the whole of what a product holds |
+| Retitling and taking a flaw off are on the compose panel | They are the other two acts that open an edition, so each takes back every agreement standing, which is said beside the control. `DESIGN-remediation.md` § Editions and agreement holds the rule |
+| The document is asked for only where a flaw is named | One covering nothing is refused, and a refusal on every visit draws a failure on a screen where nothing failed |
 | Shown as text and never rendered (REQ-66) | What a reader has to check is exactly what a customer's tooling will receive |
 | What has already gone out is readable without generating anything | Every issuance is in the document's own revision history, which is right for a reader of the document — but it made "has an advisory gone out, and is what is published still what we would generate" a question you had to build a CSAF document to answer |
-| Recording that it went out is its own act, next to the draft rather than inside it | What was published on a date cannot be worked out again once a release is added or a decision is revised, and without the record a second document cannot be a revision — which a customer's validator checks |
+| Recording that it went out is its own act | What was published on a date cannot be worked out again once a release is added or a decision is revised, and without the record a second document cannot be a revision — which a customer's validator checks |
+| The three editorial statuses are shown under the standard's own names | Draft, final and interim, each with what reaching it means on hover. Interim is not "it has changed since it went out": a withdrawn agreement reaches it with nothing a reader acts on having moved |
+
+#### The panel on a flaw
+
+The narrow case that begins with one flaw: start an advisory, name this flaw in
+this product on it, read what it generates, and open it.
+
+| Rule | |
+|---|---|
+| What already covers this flaw is said before another is started | The question before starting a second is whether one already says it, and each is a link to the advisory that says it |
 | Where each advisory covering this flaw stands is shown beside its name | Whether one is agreed to and whether it has gone out is what somebody asks before starting a second |
-| Agreeing is said, never offered here | Whoever reaches this panel started the advisory a moment ago, and they are the person agreeing refuses. A control leading to a refusal is worse than no control. `DESIGN-remediation.md` § Editorial state holds who may agree |
-| Nothing here gives the agreement a document needs to go out | It belongs to the advisory in its own right, which has no screen. Until it does, agreement is reachable through the endpoints alone |
+| A flaw in somebody else's component is refused when it is named | The refusal names the issue somebody chose, and is shown rather than swallowed |
+| The panel hands over once there is a draft | Everything after it is the advisory's own, starting with the agreement. Whoever reaches this panel started the advisory a moment ago and is the person agreeing refuses, so a control here for agreeing, or for recording an issuance that needs one, could only ever reach a refusal |
 
 ## The editor
 

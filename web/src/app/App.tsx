@@ -55,6 +55,10 @@ const Report = lazy(() => import("../screens/reports/Report").then((m) => ({ def
 const Record = lazy(() => import("../screens/Record").then((m) => ({ default: m.Record })));
 const Person = lazy(() => import("../screens/Person").then((m) => ({ default: m.Person })));
 const Stream = lazy(() => import("../screens/Stream").then((m) => ({ default: m.Stream })));
+const Advisories = lazy(() =>
+  import("../screens/Advisories").then((m) => ({ default: m.Advisories })),
+);
+const Advisory = lazy(() => import("../screens/Advisory").then((m) => ({ default: m.Advisory })));
 
 const build = "/products/:product/streams/:stream/variants/:variant";
 
@@ -98,6 +102,8 @@ export const ROUTES = {
   report: "/reports/:report",
   record: "/record",
   disclosing: "/disclosing",
+  advisories: "/advisories",
+  advisory: "/advisories/:advisory",
   autoAssignment: "/auto-assignment",
   settings: "/settings",
   system: "/system",
@@ -218,6 +224,8 @@ export function App() {
               <Route path={ROUTES.report} element={<Report />} />
               <Route path={ROUTES.record} element={<Record />} />
               <Route path={ROUTES.disclosing} element={<Disclosing />} />
+              <Route path={ROUTES.advisories} element={<Advisories />} />
+              <Route path={ROUTES.advisory} element={<Advisory />} />
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
               <Route path={ROUTES.settings} element={<Settings who={who.data} />} />
               <Route path={ROUTES.system} element={<System />} />
