@@ -65,6 +65,12 @@ type Evidence struct {
 	// from the thousands that can wait.
 	Exploited     bool
 	LikelihoodPPM int
+	// ExploitedHere says somebody recorded this product being attacked through
+	// the issue. A different fact from the one above: that is a feed's word
+	// about the world, and this is an incident here. It admits the finding to
+	// the line whatever the rating says, which is why it is read beside the
+	// places rather than left to the screen.
+	ExploitedHere bool
 	// LikelihoodPercentilePPM is where that estimate stands among all of
 	// them, and the day it is about. The number alone is unreadable —
 	// 0.00042 is not something anybody acts on — and the day is what says
@@ -273,7 +279,10 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 		Vulnerability: issue.Identifier, Severity: issue.Severity,
 		Assessed: issue.Rated,
 		Vector:   issue.Vector, Exploited: issue.Exploited,
-		Description: issue.Description, Advisory: issue.Advisory,
+		// Off the places rather than off the issue: the record belongs to one
+		// product, and the issue is shared by every product that holds it.
+		ExploitedHere: rows[0].ExploitedHere,
+		Description:   issue.Description, Advisory: issue.Advisory,
 		References: references,
 		Component:  component.Name, Version: component.Version,
 		FixedAt:     rows[0].FixedAt,
@@ -448,6 +457,7 @@ type evidenceRow struct {
 	Claim         *int64     `bun:"claim"`
 	Suppressed    bool       `bun:"suppressed"`
 	Urgency       int64      `bun:"urgency"`
+	ExploitedHere bool       `bun:"exploited_here"`
 	FixState      string     `bun:"fix_state"`
 	FixedIn       string     `bun:"fixed_in"`
 	FixedAt       *time.Time `bun:"fixed_at"`
@@ -549,6 +559,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 		ColumnExpr(`(SELECT de.claim_id `+standingHere+`) AS "claim"`, productID).
 		ColumnExpr(`CASE WHEN f.suppressed_by IS NULL THEN ? ELSE ? END AS "suppressed"`, false, true).
 		ColumnExpr(`f.urgency AS "urgency"`).
+		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
 		ColumnExpr(`f.fix_state AS "fix_state"`).
 		ColumnExpr(`f.fixed_in AS "fixed_in"`).
 		ColumnExpr(`f.fixed_at AS "fixed_at"`).
@@ -657,7 +668,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 			return nil, err
 		}
 		switch {
-		case !line.Admits(evidence.Exploited, evidence.Severity):
+		case !line.Admits(evidence.Exploited || evidence.ExploitedHere, evidence.Severity):
 			evidence.NoDeadline = BelowTheLine
 		case evidence.nothingToTake:
 			evidence.NoDeadline = NothingToTake

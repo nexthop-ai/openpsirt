@@ -358,6 +358,14 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if err != nil {
 			return err
 		}
+		// A flaw recorded against an issue this product has already been
+		// attacked through ranks where that says it does. An entered finding
+		// is opened and closed by people and no scan ever touches it, so a
+		// row that missed the signal here would never pick it up.
+		attacked, err := ExploitedHere(ctx, tx, productID, []int64{vulnerabilityID})
+		if err != nil {
+			return err
+		}
 
 		// One row per place in every build, all pointing at the one issue.
 		// Every one of them gets the same embargo, rank and deadline: they
@@ -397,14 +405,20 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// Ranked and clocked exactly as a scanned finding is, from the
 			// same signals. A finding that sorted or expired differently
 			// because a person typed it would be a second policy nobody chose.
-			ranked := Ranked{Shipped: true}
-			if row.Urgency = int64(ranked.Rank()); floor.Admits(false, severity) {
+			ranked := Ranked{Shipped: true, ExploitedHere: attacked[row.VulnerabilityID]}
+			row.RankExploitedHere = ranked.ExploitedHere
+			if row.Urgency = int64(ranked.Rank()); floor.Admits(ranked.ExploitedHere, severity) {
 				// Through the one rule rather than worked out here. The two
 				// agree today only because a flaw somebody recorded carries no
 				// fix state and no fix date, which is exactly the condition
 				// that stops holding the first time the form gains one — and
 				// the comment above promises they cannot differ.
 				row.DueAt = Deadline(row.FixState, now, now, nil, row.FixedAt,
+					// The world's word, which a flaw recorded here does not
+					// carry. Being attacked here admits the finding to the
+					// line above and moves no window: how long a fix may take
+					// is a question about the work rather than about the
+					// attack.
 					windows.For(false, severity))
 			}
 			rows = append(rows, row)

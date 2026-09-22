@@ -124,7 +124,7 @@ inputs.
 
 | # | Requirement | Why |
 |---|---|---|
-| REQ-32 | Findings are ordered by one urgency, worked out from severity, known exploitation, exploitation likelihood, and whether the component reaches customers | Severity alone puts every critical in one bucket, and one image produces 335,021 findings (REQ-57) — so "look at the criticals first" names a population too large to order by hand |
+| REQ-32 | Findings are ordered by one urgency, worked out from exploitation of this product recorded here, severity, known exploitation in the world, exploitation likelihood, and whether the component reaches customers | Severity alone puts every critical in one bucket, and one image produces 335,021 findings (REQ-57) — so "look at the criticals first" names a population too large to order by hand. Somebody recording that this product was attacked through an issue outranks every signal that came from a feed |
 | REQ-33 | Every finding above the line carries a deadline set by policy from its urgency. Being overdue is reported, never acted on automatically | Dates people can edit per item are dates that mean nothing |
 
 ### 3.8 Remediation

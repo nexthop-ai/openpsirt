@@ -8,6 +8,7 @@ import {
   type Previous,
 } from "./FindingClaim";
 import { Assess } from "./FindingAssess";
+import { ExploitedHere } from "./FindingExploited";
 import { Notes } from "./FindingNotes";
 import { MatchMethod, LookItUp, Places, References, Reporter } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
@@ -20,7 +21,7 @@ import { api, type Body } from "../api/client";
 import { at as choicesAt, unwrap } from "../api/queries";
 import { useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
-import { Severity, Exploited } from "../ui/Severity";
+import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/Severity";
 import { Weaknesses } from "../ui/Weakness";
 import { AffectedBuilds } from "./FindingBuilds";
 import { Markdown } from "../ui/Markdown";
@@ -279,6 +280,11 @@ export function Finding() {
   });
 
   const it = finding.data;
+  // Whether this reader may argue about findings in this product, which is
+  // what every control on this screen turns on. Read once: asked at each
+  // control, the copies drift and one of them ends up offering a button that
+  // answers 403.
+  const mayTriage = !!who.data?.reach.find((r) => r.product === product)?.may_triage;
   const places = useMemo(() => it?.places ?? [], [it]);
   // A place is the component and what pulls it in; two chains reaching the
   // same pair are one place, and the head counts what a decision covers.
@@ -454,7 +460,8 @@ export function Finding() {
             {it.vulnerability}
           </Link>{" "}
           in <span className="id">{it.component}</span>{" "}
-          <Severity word={it.assessed || it.severity} /> {it.exploited && <Exploited when />}{" "}
+          <Severity word={it.assessed || it.severity} />{" "}
+          <ExploitedHereBadge when={!!it.exploited_here} /> {it.exploited && <Exploited when />}{" "}
           <span className={`state ${state.cls}`}>{state.label}</span>
         </h2>
         <p>
@@ -511,7 +518,7 @@ export function Finding() {
         <Marks
           at={at}
           tags={it.tags ?? []}
-          mayMark={!!who.data?.reach.find((r) => r.product === product)?.may_triage}
+          mayMark={mayTriage}
           onChanged={() => void finding.refetch()}
         />
       </div>
@@ -719,6 +726,15 @@ export function Finding() {
               onClose={() => setReclassifying(false)}
             />
           )}
+          {/* Beside the rating, because the two are the pair a reader is
+              weighing: what the world says this is worth, and whether it has
+              already happened to us. */}
+          <ExploitedHere
+            product={product}
+            vulnerability={vulnerability}
+            record={it.exploited_here}
+            mayTriage={mayTriage}
+          />
         </div>
 
         <MatchMethod

@@ -312,6 +312,18 @@ a.kpi:hover {
 :root[data-look="dark"] .kev {
   color: #1a0a10;
 }
+/* The record kept here, which is not the feed's word about the world. Drawn
+   as an outline of the same color so the two read as the same kind of fact at
+   a glance and never as the same fact: a filled badge beside a filled badge is
+   two words a reader has to actually read to tell apart. */
+.kev.here {
+  background: transparent;
+  color: var(--sev-exploited);
+  box-shadow: inset 0 0 0 1.5px var(--sev-exploited);
+}
+:root[data-look="dark"] .kev.here {
+  color: var(--sev-exploited);
+}
 
 .state {
   display: inline-flex;

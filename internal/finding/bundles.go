@@ -62,12 +62,16 @@ type Bundle struct {
 	// a bump is declared for releases, and the ones worth offering are the
 	// ones that have it.
 	In []Build
-	// Urgency is the worst of what it closes, Severity that as a word, and
-	// Exploited whether any of it is being used. A bundle is worth doing for
-	// its worst member.
-	Urgency   int64
-	Severity  string
-	Exploited bool
+	// Urgency is the worst of what it closes and Severity that as a word. A
+	// bundle is worth doing for its worst member.
+	Urgency  int64
+	Severity string
+	// Exploited says a feed reports somebody in the world using one of these,
+	// and ExploitedHere that somebody recorded this product being attacked
+	// through one. Different facts, so different flags: a bundle carrying the
+	// second is answering an incident.
+	Exploited     bool
+	ExploitedHere bool
 }
 
 // Bundles groups what is fixable by the bump that would fix it.
@@ -93,16 +97,18 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 	limit = database.AList.Of(limit)
 
 	var rows []struct {
-		Fold     string `bun:"fold"`
-		Upstream string `bun:"upstream"`
-		From     string `bun:"shipped"`
-		To       string `bun:"fixed_in"`
-		Issues   int    `bun:"issues"`
-		Places   int    `bun:"places"`
-		Builds   int    `bun:"builds"`
-		Urgency  int64  `bun:"urgency"`
-		Worst    int    `bun:"worst"`
-		Total    int    `bun:"total"`
+		Fold          string `bun:"fold"`
+		Upstream      string `bun:"upstream"`
+		From          string `bun:"shipped"`
+		To            string `bun:"fixed_in"`
+		Issues        int    `bun:"issues"`
+		Places        int    `bun:"places"`
+		Builds        int    `bun:"builds"`
+		Urgency       int64  `bun:"urgency"`
+		Exploited     int    `bun:"exploited"`
+		ExploitedHere int    `bun:"exploited_here"`
+		Worst         int    `bun:"worst"`
+		Total         int    `bun:"total"`
 	}
 	// The worst thing in the bundle, as a rank rather than as a word, because
 	// the four engines do not agree on how words order. Folded exactly the way
@@ -135,6 +141,8 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
 		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(exploitedAcross + ` AS "exploited"`).
+		ColumnExpr(exploitedHereAcross + ` AS "exploited_here"`).
 		ColumnExpr(worst + ` AS "worst"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// Worst first unless somebody asks otherwise, and every order is
@@ -167,7 +175,7 @@ func (s *Store) Bundles(ctx context.Context, subject access.Subject, scope Scope
 			Upstream: row.Upstream, From: row.From, To: row.To,
 			Issues: row.Issues, Places: row.Places, Builds: row.Builds,
 			Urgency: row.Urgency, Severity: worstWord(row.Worst),
-			Exploited: Rank(row.Urgency).Exploited(),
+			Exploited: row.Exploited == 1, ExploitedHere: row.ExploitedHere == 1,
 		})
 	}
 	if err := s.namesIn(ctx, targets, visible, filter, bundles); err != nil {
@@ -278,15 +286,17 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	limit = database.AList.Of(limit)
 
 	var rows []struct {
-		ComponentID int64 `bun:"component_id"`
-		Issues      int   `bun:"issues"`
-		Places      int   `bun:"places"`
-		Urgency     int64 `bun:"urgency"`
-		Total       int   `bun:"total"`
+		ComponentID   int64 `bun:"component_id"`
+		Issues        int   `bun:"issues"`
+		Places        int   `bun:"places"`
+		Urgency       int64 `bun:"urgency"`
+		Exploited     int   `bun:"exploited"`
+		ExploitedHere int   `bun:"exploited_here"`
+		Total         int   `bun:"total"`
 	}
 	// Everything read here is in finding's covering index, so this is one
-	// walk of it however large the build is; whether anything is exploited
-	// is read off the urgency, which ranks it in a band of its own.
+	// walk of it however large the build is; the two exploitation flags are
+	// in it as well, which is what keeps them apart without a join.
 	page := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
@@ -296,6 +306,8 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(`COUNT(DISTINCT f.vulnerability_id) AS "issues"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(exploitedAcross+` AS "exploited"`).
+		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		// The total rides on the page, as the findings list's does.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
@@ -364,7 +376,8 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	for _, row := range rows {
 		group := ComponentGroup{
 			Issues: row.Issues, Places: row.Places,
-			Exploited: Rank(row.Urgency).Exploited(), Urgency: row.Urgency,
+			Exploited: row.Exploited == 1, ExploitedHere: row.ExploitedHere == 1,
+			Urgency:    row.Urgency,
 			Upgrades:   upgrades[row.ComponentID],
 			BySeverity: bands[row.ComponentID],
 		}
@@ -628,9 +641,11 @@ type PerBuild struct {
 	// BySeverity is what is open here by how it was rated, so a count has a
 	// shape: forty issues and three criticals are different work.
 	BySeverity map[string]int
-	// Exploited says whether any of them is known to be exploited, which
-	// outranks everything else about a row.
-	Exploited bool
+	// Exploited says whether a feed reports any of them being used in the
+	// world, and ExploitedHere whether this product was recorded as attacked
+	// through one. The second outranks everything else about a row.
+	Exploited     bool
+	ExploitedHere bool
 	// Fixable is how many of them any version fixes, counted once per issue.
 	// Summed from the per-version counts instead, an issue whose record names
 	// three versions is counted three times and the total exceeds what is open.

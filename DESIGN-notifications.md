@@ -52,7 +52,7 @@ true is cleared, and running the same pass twice changes nothing.
 | Work arriving | event | The category that deserves interrupting somebody for |
 | A claim sent back | event | It goes straight back into its author's queue, so silence leaves it sitting |
 | Somebody named you | event | A name after an `@`, resolved when the text is saved |
-| An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on |
+| An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue taking back the agreement under a claim that it does not apply. The second reaches somebody who was not in the exchange at all, so without it the claim simply reappears in their queue with no explanation |
 | A decision the code moved under | event | It hands work back to somebody who did nothing to cause it |
 | An approval an edit withdrew | event | **Not built.** The people who granted it should be told, so it does not quietly stop counting |
 | A build that stopped being scanned | condition | A sweep derives every declared build with when it was last scanned and reconciles |

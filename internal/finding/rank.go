@@ -12,9 +12,9 @@ package finding
 // digits, so a signal never trades against a lower one. That is deliberate,
 // and the reason is explainability — somebody has to be able to
 // read a position and see why, and "it scored 0.4 higher on a weighted sum of
-// four things" is not something anybody trusts or argues with. Packing gives a
-// rule that can be stated in a sentence: exploited first, then what reaches
-// customers, then how likely, then how bad.
+// five things" is not something anybody trusts or argues with. Packing gives a
+// rule that can be stated in a sentence: attacked here first, then exploited
+// in the world, then what reaches customers, then how bad, then how likely.
 //
 // The trade is that a small difference in a higher signal always beats any
 // difference in a lower one. That is clearly right for exploitation and
@@ -26,10 +26,17 @@ type Rank int64
 // The place value each signal owns.
 //
 // Sized so nothing can carry into the band above it: a severity is at most a
-// thousand hundredths, and a likelihood at most a million parts.
+// thousand hundredths, a likelihood at most a million parts, and each of the
+// two exploitation bands is set once or not at all.
 const (
-	exploitedBand = 1_000_000_000_000
-	shippedBand   = 100_000_000_000
+	// exploitedHereBand is somebody here recording that this product was
+	// attacked through the issue. Above the band beside it because a person
+	// stating that we were attacked is worth more than a feed stating that
+	// somebody somewhere was, and the feed's flag says nothing about whether
+	// it reaches this product at all.
+	exploitedHereBand = 10_000_000_000_000
+	exploitedBand     = 1_000_000_000_000
+	shippedBand       = 100_000_000_000
 	// severityStep lifts severity above likelihood, which sits underneath it
 	// and orders things that are equally severe.
 	severityStep  = 10_000_000
@@ -54,6 +61,11 @@ type Rating struct {
 	// anybody has claimed, so a later report that does not mention it is read
 	// as a gap in that report rather than as the exploitation having stopped.
 	Exploited bool
+	// ExploitedHere says somebody recorded that this product was attacked
+	// through it. A different fact from the one above and the only one of the
+	// two that is an incident: a feed reports the world, and no feed reports
+	// this.
+	ExploitedHere bool
 	// ScoreCenti and LikelihoodPPM are the published numbers, each the highest
 	// anybody has claimed.
 	ScoreCenti    int
@@ -91,8 +103,14 @@ func (r Rating) Score() int {
 // back out would work and would be exactly the sort of cleverness that breaks
 // silently the first time the weighting changes.
 type Ranked struct {
-	// Exploited says somebody is known to be using it. It outranks everything
-	// else, because it is the difference between a risk and an incident.
+	// ExploitedHere says somebody recorded that this product was attacked
+	// through it. It outranks everything else, including the world's word:
+	// this is the incident, and the signal below it is a report about
+	// somewhere that may not be here at all.
+	ExploitedHere bool
+	// Exploited says somebody is known to be using it somewhere in the world.
+	// It outranks everything beneath it, because being used is a fact where
+	// the rest are estimates of how bad it would be.
 	Exploited bool
 	// Shipped says this reaches customers. A critical in something only the
 	// build system runs matters less than a medium in what people install.
@@ -106,9 +124,9 @@ type Ranked struct {
 
 // Rank packs the signals into one sortable number, highest first.
 //
-// Exploited, then whether it reaches customers, then severity, then
-// likelihood — each owning a range of digits so it never trades against a
-// lower signal.
+// Attacked here, then exploited in the world, then whether it reaches
+// customers, then severity, then likelihood — each owning a range of digits so
+// it never trades against a lower signal.
 //
 // Likelihood above severity is wrong, measured on a real image: a 2004
 // negligible with no score at all outranks every one of 379 criticals, because
@@ -128,6 +146,9 @@ type Ranked struct {
 // rather than a forecast and already ranks above everything.
 func (r Ranked) Rank() Rank {
 	rank := int64(0)
+	if r.ExploitedHere {
+		rank += exploitedHereBand
+	}
 	if r.Exploited {
 		rank += exploitedBand
 	}
@@ -139,14 +160,35 @@ func (r Ranked) Rank() Rank {
 	return Rank(rank)
 }
 
-// Exploited reports whether a rank says the issue is known to be exploited.
+// How a grouping asks whether any of its places carries each exploitation
+// signal.
 //
-// The band is the fact: exploitation lifts a rank above anything the other
-// signals can add together, so the flag is readable from the number — which
-// is what lets a query that has only the urgency, from an index, answer it.
-func (r Rank) Exploited() bool {
-	return int64(r) >= exploitedBand
-}
+// Spelled once, because the two are asked together wherever a list groups
+// places and every site that wrote one of them by hand is a site that can
+// write the wrong column. A grouping cannot read the flags off the packed
+// number: both bands lift it, so a threshold answers "some exploitation" where
+// these name which.
+//
+// Counted rather than aggregated as a boolean, which is the same question
+// asked portably — the four engines do not agree on a boolean aggregate.
+// exploiting is the threshold a query crosses to ask whether a rank carries
+// either exploitation signal.
+//
+// One question, not two. Both bands lift a rank above anything the signals
+// beneath them can add together, so "is some exploitation on this" is a
+// comparison against the lower of the two — which is what lets the triage
+// line, which asks exactly that, stay on an index holding only the urgency.
+//
+// Which of the two it is, the number does not say and nothing asks it to. A
+// query naming one of them reads the column that holds it, through the pair
+// below; telling the bands apart would be arithmetic on a packed number, and
+// the weighting is allowed to move.
+const exploiting = exploitedBand
+
+const (
+	exploitedAcross     = `MAX(CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END)`
+	exploitedHereAcross = `MAX(CASE WHEN f.urgency_exploited_here THEN 1 ELSE 0 END)`
+)
 
 // bounded keeps a signal inside the range its place value allows.
 //

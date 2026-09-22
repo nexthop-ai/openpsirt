@@ -60,6 +60,14 @@ const (
 	// ship date and what it was cut from, which are facts about one release
 	// rather than about what the catalog holds.
 	Catalog Kind = "catalog"
+	// Exploited is somebody recording that a product was exploited through an
+	// issue, or clearing that record. Not a triage decision: it is a fact
+	// about an incident rather than a judgment about a finding, and what it
+	// does is decide what the triage record may say — a claim that the issue
+	// does not apply is refused while it stands, and one already agreed to
+	// has its agreement taken back. That is the same kind of act as an alias,
+	// and it belongs beside one.
+	Exploited Kind = "exploited-here"
 	// Case is somebody brought into one undisclosed case, or taken off it
 	// . An access change like the rest of these: it is the one way
 	// somebody reaches an embargoed finding without holding private
@@ -77,7 +85,7 @@ const (
 func Kinds() []Kind {
 	return []Kind{
 		Setting, Role, Routing, Support, Release,
-		Credential, Account, Team, Case, Alias, Catalog,
+		Credential, Account, Team, Case, Alias, Catalog, Exploited,
 	}
 }
 

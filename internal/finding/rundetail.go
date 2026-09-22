@@ -123,8 +123,10 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 			ColumnExpr(rating.BandExpr+` AS "band"`).
 			ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
 			ColumnExpr(`f.component_id AS "component_id"`).
-			ColumnExpr(`CASE WHEN f.urgency >= ? THEN 1 ELSE 0 END AS "exploited"`,
-				int64(exploitedBand)).
+			// The flag rather than the urgency's top bands, which answer
+			// "some exploitation" and would count a product recorded as
+			// attacked here among the issues a feed calls exploited.
+			ColumnExpr(`CASE WHEN f.urgency_exploited THEN 1 ELSE 0 END AS "exploited"`).
 			Where("f.target_id = ?", targetID).
 			Where(string(database.Column(s.db, "f."+string(column)))+" = ?", runID).
 			Where("f.visibility IN (?)", bun.List(visible))

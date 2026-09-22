@@ -158,7 +158,7 @@ func TestAnIssueBecomingExploitedIsClockedFromWhenThatWasLearned(t *testing.T) {
 			if !row.RankExploited {
 				t.Error("a finding of an exploited issue is not marked exploited")
 			}
-			if !finding.Rank(row.Urgency).Exploited() {
+			if !finding.Exploiting(row.Urgency) {
 				t.Errorf("urgency %d does not read as exploited", row.Urgency)
 			}
 			if row.DueAt == nil {
@@ -392,7 +392,7 @@ func TestLearningSomethingIsExploitedReachesEveryBuildItIsOpenIn(t *testing.T) {
 			if !row.RankExploited {
 				t.Error("a release nobody rescanned does not know this is exploited")
 			}
-			if !finding.Rank(row.Urgency).Exploited() {
+			if !finding.Exploiting(row.Urgency) {
 				t.Errorf("its urgency is %d, which does not read as exploited", row.Urgency)
 			}
 			if row.DueAt == nil {

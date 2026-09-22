@@ -150,12 +150,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		if !wasBelow {
 			// Never below the line where somebody is using one,
 			// and being exploited is not a claim about how bad
-			// something is — it is a fact about the world, and the
-			// one thing a line cannot set aside . Read off the
-			// urgency, whose top band is exactly that.
+			// something is — it is a fact, and the one thing a
+			// line cannot set aside. Read off the urgency, whose
+			// two top bands are the feed's word and this product's
+			// own record of being attacked (the exploiting threshold).
 			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.
-					WhereOr("f.urgency >= ?", int64(exploitedBand)).
+					WhereOr("f.urgency >= ?", int64(exploiting)).
 					WhereOr(ratedAt+" >= "+lineAt, deployment)
 			})
 		}
