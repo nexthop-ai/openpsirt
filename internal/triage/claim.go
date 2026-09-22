@@ -440,7 +440,17 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 	// apply, written before a record of this product being exploited through
 	// it arrived, is a claim the record contradicts — and agreeing to it is
 	// what would put the finding out of sight.
-	if err := s.refuseIfExploitedHereOn(ctx, claim, rows); err != nil {
+	//
+	// Asked of the rows being agreed to rather than all of them, so an
+	// approver can set the attacked issue aside and agree to the rest: what
+	// is set aside goes back to its author, and the same rule meets it there.
+	agreeing := make([]Decision, 0, len(rows))
+	for _, row := range rows {
+		if !aside[row.ID] {
+			agreeing = append(agreeing, row)
+		}
+	}
+	if err := s.refuseIfExploitedHereOn(ctx, claim, agreeing); err != nil {
 		return nil, err
 	}
 	// Compared against whoever wrote the words being agreed to, not only

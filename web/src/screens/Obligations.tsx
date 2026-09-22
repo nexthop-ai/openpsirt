@@ -72,14 +72,14 @@ function Incident({ incident, windows }: { incident: Incident; windows: Window[]
   const [telling, setTelling] = useState(false);
 
   return (
-    <div className="evblock" style={{ marginBottom: 16 }}>
-      <h4>
+    <div className="card">
+      <h3>
         <Link className="id" to={`/issues/${encodeURIComponent(incident.vulnerability ?? "")}`}>
           {incident.vulnerability}
         </Link>{" "}
         in {incident.product_name || incident.product}
         {incident.undisclosed && <span className="hint"> · undisclosed</span>}
-      </h4>
+      </h3>
       <p>
         Known since <b style={{ color: "var(--ink)" }}>{at(incident.known_at)}</b>
         {incident.recorded_by && <> · recorded by {incident.recorded_by}</>}
@@ -119,7 +119,7 @@ function Incident({ incident, windows }: { incident: Incident; windows: Window[]
 
       {(incident.told ?? []).length > 0 && (
         <>
-          <h4 style={{ marginTop: 12 }}>Told</h4>
+          <h3 style={{ marginTop: 12 }}>Told</h3>
           {(incident.told ?? []).map((one) => (
             <p key={one.id}>
               <b style={{ color: "var(--ink)" }}>{one.recipient}</b> at {at(one.told_at)}
@@ -131,18 +131,21 @@ function Incident({ incident, windows }: { incident: Incident; windows: Window[]
         </>
       )}
 
-      {!incident.may_tell ? null : telling ? (
-        <Tell
-          id={incident.id ?? 0}
-          knownAt={incident.known_at}
-          windows={windows}
-          onClose={() => setTelling(false)}
-        />
-      ) : (
-        <button type="button" className="linkish" onClick={() => setTelling(true)}>
-          Record who was told
-        </button>
-      )}
+      {incident.may_tell &&
+        (telling ? (
+          <Tell
+            id={incident.id ?? 0}
+            knownAt={incident.known_at}
+            windows={windows}
+            onClose={() => setTelling(false)}
+          />
+        ) : (
+          <p>
+            <button type="button" className="linkish" onClick={() => setTelling(true)}>
+              Record who was told
+            </button>
+          </p>
+        ))}
     </div>
   );
 }
@@ -196,6 +199,7 @@ function Tell({
         <label htmlFor="recipient">Who</label>
         <input
           id="recipient"
+          type="text"
           value={recipient}
           placeholder="A regulator, a customer, a response team"
           onChange={(event) => setRecipient(event.target.value)}
@@ -280,8 +284,8 @@ function Windows({ windows }: { windows: Window[] }) {
   });
 
   return (
-    <div className="evblock" style={{ marginBottom: 16 }}>
-      <h4>Windows</h4>
+    <div className="card">
+      <h3>Windows</h3>
       {windows.length === 0 && <p className="hint">None declared.</p>}
       {windows.map((each) => (
         <p key={each.id}>
@@ -299,7 +303,9 @@ function Windows({ windows }: { windows: Window[] }) {
       {retire.error != null && <Failed error={retire.error} what="That window was not retired." />}
       <div className="actions" style={{ marginTop: 8 }}>
         <input
+          type="text"
           aria-label="Name"
+          style={{ width: "32ch" }}
           placeholder="Name"
           value={name}
           onChange={(event) => setName(event.target.value)}
@@ -309,7 +315,7 @@ function Windows({ windows }: { windows: Window[] }) {
           type="number"
           min={1}
           placeholder="Hours"
-          style={{ width: "8ch" }}
+          style={{ width: "10ch" }}
           value={hours}
           onChange={(event) => setHours(event.target.value)}
         />
