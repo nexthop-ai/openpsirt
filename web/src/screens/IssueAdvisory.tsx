@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useAfterAdvisory } from "../api/advisories";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
+import { standing, statusLabel } from "./advisory";
 
 // Starting an advisory about this flaw, and the first look at what it
 // generates.
@@ -44,6 +46,11 @@ export function IssueAdvisory({
   // The advisories that already cover this flaw here, without generating
   // anything. The question before starting another is whether one already
   // says it.
+  // The one list every act against an advisory moves, shared rather than
+  // restated: a second copy drifts, and the half that gets forgotten is the
+  // one reporting a control as still holding after the act that took it away.
+  const after = useAfterAdvisory();
+
   const already = useQuery({
     enabled: open && product !== "",
     queryKey: ["advisories", product, vulnerability],
@@ -95,7 +102,7 @@ export function IssueAdvisory({
     },
     onSuccess: (made) => {
       setAdvisory(made.name);
-      void already.refetch();
+      after();
     },
   });
   const document = draft.data?.document;
@@ -139,7 +146,9 @@ export function IssueAdvisory({
               <Link className="id" to={`/advisories/${encodeURIComponent(one.advisory)}`}>
                 {one.advisory}
               </Link>
-              {` (${one.status})`}
+              {" ("}
+              <span title={standing(one.status)?.means}>{statusLabel(one.status)}</span>
+              {")"}
               {(one.issuances ?? 0) > 0 && ` · out ${one.issuances}\u00d7`}
             </span>
           ))}

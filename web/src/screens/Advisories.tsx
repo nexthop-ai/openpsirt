@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PAGE, useAdvisories, useStartAdvisory } from "../api/advisories";
+import { useWho } from "../app/session";
 import { AddButton } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
@@ -25,6 +26,11 @@ export function Advisories() {
   const [offset, setOffset] = useState(0);
   const rows = useAdvisories(offset);
   const start = useStartAdvisory();
+  const who = useWho();
+  // Whoever may record a flaw in a product may write an advisory about one,
+  // which is the server's own gate. Drawn to somebody holding no triage
+  // anywhere, the control is one that always fails.
+  const mayStart = !!who.data?.reach.some((each) => each.may_triage);
 
   if (rows.isPending) return <Loading />;
   if (rows.isError) return <Failed error={rows.error} what="The advisories could not be read." />;
@@ -39,17 +45,19 @@ export function Advisories() {
           Advisories <span className="n">{(total ?? items.length).toLocaleString()}</span>
         </h2>
         <p>What this deployment has said about its own flaws, newest first.</p>
-        <AddButton
-          label="Start an advisory"
-          onClick={() =>
-            start.mutate(undefined, {
-              // Straight to it. A name is all the act produces, and what to
-              // call the document and which flaws it covers are decided on
-              // the screen the name opens.
-              onSuccess: (made) => navigate(`/advisories/${encodeURIComponent(made.advisory)}`),
-            })
-          }
-        />
+        {mayStart && (
+          <AddButton
+            label="Start an advisory"
+            onClick={() =>
+              start.mutate(undefined, {
+                // Straight to it. A name is all the act produces, and what to
+                // call the document and which flaws it covers are decided on
+                // the screen the name opens.
+                onSuccess: (made) => navigate(`/advisories/${encodeURIComponent(made.advisory)}`),
+              })
+            }
+          />
+        )}
       </div>
 
       {start.isError && (
@@ -59,7 +67,7 @@ export function Advisories() {
       {items.length === 0 ? (
         <Empty
           title="No advisories."
-          detail="An advisory is written for a flaw recorded here, an embargo reaching its date, or an inherited issue worth saying something about."
+          detail="One you start, or one started from a flaw, appears here."
         />
       ) : (
         <Wide>

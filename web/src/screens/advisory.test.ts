@@ -18,11 +18,16 @@ describe("an editorial status the interface does not know", () => {
 
 describe("the three statuses", () => {
   it("each carry a word a reader sees and a sentence saying what it means", () => {
-    for (const word of ["draft", "final", "interim"]) {
-      const it = standing(word);
-      expect(it?.label).toBeTruthy();
-      expect(it?.means).toBeTruthy();
-      expect(statusLabel(word)).not.toBe(word);
+    // The pairs, not merely that a word maps to something: swapping two
+    // entries of the table leaves an agreed advisory labelled Interim, with
+    // the hover sentence saying nobody agrees to it.
+    for (const [word, label] of [
+      ["draft", "Draft"],
+      ["final", "Final"],
+      ["interim", "Interim"],
+    ]) {
+      expect(statusLabel(word)).toBe(label);
+      expect(standing(word)?.means).toBeTruthy();
     }
   });
 

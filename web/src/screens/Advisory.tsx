@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
+  type Covered,
   useAdvisory,
   useAdvisoryDocument,
   useAgree,
@@ -18,6 +19,7 @@ import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { notACredential } from "../ui/noautofill";
+import { useReseed } from "../ui/reseed";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { agreeing, missing, nameable, standing, statusLabel } from "./advisory";
@@ -96,6 +98,10 @@ export function Advisory() {
 // flaws it covers.
 function Title({ advisory, title }: { advisory: string; title: string }) {
   const [words, setWords] = useState(title);
+  // Seeded once, the field keeps the old text with Save live, and pressing
+  // Save writes the old title back — which opens an edition and takes back
+  // every agreement standing.
+  useReseed(title, () => setWords(title));
   const retitle = useRetitle();
 
   return (
@@ -130,21 +136,7 @@ function Title({ advisory, title }: { advisory: string; title: string }) {
 //
 // One panel, because the three are one act. Split, the title's own label sat
 // under a heading of the same word.
-function Says({
-  advisory,
-  title,
-  covers,
-}: {
-  title: string;
-  advisory: string;
-  covers: {
-    product?: string;
-    product_name?: string;
-    vulnerability?: string;
-    summary?: string;
-    added_at?: string;
-  }[];
-}) {
+function Says({ advisory, title, covers }: { title: string; advisory: string; covers: Covered[] }) {
   const [product, setProduct] = useState("");
   const [flaw, setFlaw] = useState("");
   const name = useNameAFlaw();
@@ -204,10 +196,7 @@ function Says({
               {covers.map((row) => (
                 <tr key={`${row.product} ${row.vulnerability}`} className="row">
                   <td>
-                    <Link
-                      className="id"
-                      to={`/issues/${encodeURIComponent(row.vulnerability ?? "")}`}
-                    >
+                    <Link className="id" to={`/issues/${encodeURIComponent(row.vulnerability)}`}>
                       {row.vulnerability}
                     </Link>
                     {row.summary && <div className="hint">{row.summary}</div>}
@@ -218,12 +207,15 @@ function Says({
                     <button
                       type="button"
                       className="linkish"
+                      // The same cost the title carries, on the thing it is
+                      // about: taking a flaw off opens an edition.
+                      title="Takes back every agreement standing"
                       disabled={takeOff.isPending}
                       onClick={() =>
                         takeOff.mutate({
                           advisory,
-                          product: row.product ?? "",
-                          vulnerability: row.vulnerability ?? "",
+                          product: row.product,
+                          vulnerability: row.vulnerability,
                         })
                       }
                     >
@@ -298,6 +290,14 @@ function Says({
           {name.isPending ? "Naming…" : "Name it"}
         </button>
       </div>
+      {/* The read stops at the endpoint's own maximum, and folding to
+          distinct issues hides how close it came — so a truncated list reads
+          as the whole of what is recorded there. Typing reaches the rest. */}
+      {(recorded.data?.total ?? 0) > (recorded.data?.items ?? []).length && (
+        <p className="hint">
+          More is recorded in that product than this list holds. Type the identifier in full.
+        </p>
+      )}
       {/* A failed read is not an answer about what is recorded here. Drawn as
           an empty list it reads as "this product has none", which is the one
           thing the read did not say. */}

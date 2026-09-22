@@ -25,7 +25,7 @@ export type Issuance = Body<"IssuanceBody">;
 // `advisories` covers the list screen and the panel on a flaw that asks what
 // already covers it — both are keyed under that name, and a key is matched by
 // its prefix.
-function useAfterAdvisory() {
+export function useAfterAdvisory() {
   const queries = useQueryClient();
   return () => {
     void queries.invalidateQueries({ queryKey: ["advisories"] });
