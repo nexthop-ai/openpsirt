@@ -832,6 +832,12 @@ against a default of 256 MB. One distribution VEX document about a single issue
 composes 1,669 of its 1,669 product identifiers through relationships, so a
 reader that resolves only through the tree refuses the whole document.
 
+The claims one document states are written in batches, because that advisory is
+95,139 of them and the caller is waiting on the answer. A row at a time it takes
+27.9 seconds on PostgreSQL, 10.0 on MariaDB, 9.0 on MySQL and 7.3 on SQLite; in
+batches, 5.4, 1.2, 1.4 and 1.3. Revising the same advisory — every claim set
+aside and written again — is 6.1, 3.1, 3.0 and 2.2.
+
 ## The offline scanner database
 
 Produced by a build target rather than described in a document (REQ-12). A

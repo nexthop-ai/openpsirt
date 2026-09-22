@@ -621,13 +621,13 @@ func (r *csafReader) resolve() ([]Suppression, error) {
 				claim = &Suppression{
 					Vulnerability: one.vulnerability, Aliases: one.aliases,
 					Status: status, Origin: FromStatement,
-					Statement: one.said[status],
 				}
 				byStatus[status] = claim
 				order = append(order, status)
 			}
 			// Words that named this product say what the document is arguing
-			// about it, which the category-wide sentence does not.
+			// about it, and the first of them stands for the claim — one claim
+			// carries one sentence and every product under it shares a status.
 			if said := one.toldAbout[id]; said != "" && claim.Statement == "" {
 				claim.Statement = said
 			}
@@ -647,7 +647,15 @@ func (r *csafReader) resolve() ([]Suppression, error) {
 				"defines, so there is nothing it could be about", trim(one.vulnerability))
 		}
 		for _, status := range order {
-			out = append(out, *byStatus[status])
+			claim := byStatus[status]
+			// The words the document wrote about the status at large, where
+			// nothing was written about a product under it. A sentence naming
+			// its products is the more precise of the two and wins, which it
+			// cannot do if the general one is put in place first.
+			if claim.Statement == "" {
+				claim.Statement = one.said[status]
+			}
+			out = append(out, *claim)
 		}
 	}
 	return out, nil

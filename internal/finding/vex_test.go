@@ -380,3 +380,36 @@ func TestAClaimAboutOneVersionOffersNothingAtAnother(t *testing.T) {
 		t.Error("a publisher saying they do not know yet offered an outcome")
 	}
 }
+
+func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
+	// The closure a transaction runs is re-run whole when the transaction is
+	// retried, over the same claims. The engine writes the key it assigned
+	// back into the value it inserted, so a second pass that states those keys
+	// is a write that cannot happen twice — and the write a retry exists to
+	// repeat is exactly that one.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PrivateTriage)
+		claims := []finding.Statement{{
+			Vulnerability: "CVE-2026-1", Component: "libnl", Status: "fixed",
+		}, {
+			Vulnerability: "CVE-2026-2", Component: "zlib", Status: "not_affected",
+		}}
+		from := finding.Supplied{
+			Source: finding.FromAdvisory, Identifier: "EXSA-2026:1",
+			Publisher: "Example", Document: "one.json", Digest: "sha256:one",
+		}
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID, from,
+			claims); err != nil {
+			t.Fatal(err)
+		}
+		// The same slice, the way a retry hands it back.
+		recorded, _, err := f.store.RecordStatements(ctx, who, f.productID, from, claims)
+		if err != nil {
+			t.Fatalf("recording the same claims again: %v", err)
+		}
+		if recorded != len(claims) {
+			t.Errorf("the second pass recorded %d of %d", recorded, len(claims))
+		}
+	})
+}

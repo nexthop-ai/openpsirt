@@ -104,6 +104,13 @@ func TestASupplierAdvisoryIsEvidenceAndNeverADecision(t *testing.T) {
 
 		// Only an administrator uploads one: it is a document about somebody
 		// else's products, not a judgment anybody here triages.
+		//
+		// Two controls refuse, and either alone is enough: the scope the
+		// operation declares, which the middleware enforces before any handler
+		// runs, and the check inside the handler. Removing one leaves the test
+		// green because the other covers it, which is what the declaration
+		// exists for — a handler check somebody deletes does not quietly
+		// widen an operation that still says it requires an administrator.
 		refusedWith(t, r.advised(t, "triager", "exsa.json",
 			supplierAdvisory("EXSA-2026:1001", "fixed", "3.7.0")),
 			http.StatusForbidden)

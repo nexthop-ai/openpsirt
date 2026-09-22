@@ -257,6 +257,14 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		}
 		superseded = int(n)
 		for i := range said {
+			// The store assigns identity, so a key on the way in is cleared
+			// rather than stated. The engine writes the key it assigned back
+			// into the value it inserted, and this closure is re-run whole
+			// when a transaction is retried — so a second attempt over the
+			// same claims would state keys the first attempt was given, and
+			// the write that a retry exists to repeat is the one that cannot
+			// happen twice.
+			said[i].ID = 0
 			said[i].ProductID = productID
 			said[i].Publisher = publisher
 			said[i].Vulnerability = folded(said[i].Vulnerability)
@@ -265,10 +273,25 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			said[i].Document, said[i].Digest = from.Document, from.Digest
 			said[i].UploadedBy, said[i].UploadedAt = by.ID, now
 			said[i].Superseded = nil
-			if _, err := tx.NewInsert().Model(&said[i]).Exec(ctx); err != nil {
+		}
+		// Written in batches rather than one statement each. A publisher's
+		// statement set is a few thousand claims and one real security
+		// advisory about a kernel is 95,139, so the round trips are the whole
+		// cost. That advisory, a row at a time: 27.9 seconds on PostgreSQL,
+		// 10.0 on MariaDB, 9.0 on MySQL, 7.3 on SQLite. In batches: 5.4, 1.2,
+		// 1.4 and 1.3. The caller is waiting on the answer, so this is a
+		// request rather than a background pass.
+		//
+		// The batch is sized for the narrowest engine rather than for the
+		// fastest: PostgreSQL binds at most 65,535 parameters in one
+		// statement, and a claim states fourteen columns.
+		for from := 0; from < len(said); from += statementsPerInsert {
+			to := min(from+statementsPerInsert, len(said))
+			batch := said[from:to]
+			if _, err := tx.NewInsert().Model(&batch).Exec(ctx); err != nil {
 				return fmt.Errorf("record what they said: %w", err)
 			}
-			recorded++
+			recorded += len(batch)
 		}
 		return nil
 	})
@@ -355,6 +378,14 @@ func namingTheSamePackage(said []Statement, purl string) []Statement {
 // sourceTree is the package type a source tree is named with where it is named
 // as a package identifier at all.
 const sourceTree = "generic"
+
+// statementsPerInsert is how many claims one insert states.
+//
+// Bounded by what an engine will bind in one statement rather than by what is
+// fast: PostgreSQL takes 65,535 parameters, and a claim states fourteen
+// columns, so this leaves room for a column being added without the bound
+// becoming the thing that breaks.
+const statementsPerInsert = 500
 
 // MostPublisher is how long the name of whoever published a statement may be,
 // and MostDocumentName how long the name the publisher gave the document may

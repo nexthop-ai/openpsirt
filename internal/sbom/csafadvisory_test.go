@@ -294,3 +294,20 @@ func TestProseNamingAProductReachesTheClaimThatProductIsUnder(t *testing.T) {
 		}
 	}
 }
+
+func TestProseAboutOneProductWinsOverProseAboutTheWholeStatus(t *testing.T) {
+	// A document may write both: a sentence about everything it lists, and a
+	// sentence about one product under one status. The second is the more
+	// precise of the two and is what the reader wants, and it cannot win if
+	// the general one is put in place first.
+	got := readAdvisory(t, "advisory-platform-packages.csaf.json")
+	for _, one := range got.Claims {
+		if one.Status != sbom.NotAffected {
+			continue
+		}
+		if !strings.Contains(one.Statement, "not compiled into this package") {
+			t.Errorf("the not-affected claim says %q, and the document wrote a "+
+				"sentence about that product", one.Statement)
+		}
+	}
+}
