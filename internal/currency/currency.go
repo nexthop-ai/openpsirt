@@ -1,13 +1,18 @@
 // Package currency asks each ecosystem's index what the newest version of
 // something is, and when it shipped.
 //
-// This is the one thing here that reaches the network. Everything a scan
-// needs arrives as a file somebody imports, deliberately, so that a scan
-// answers the same way twice and nothing it depends on is somebody else's
-// server being up (REQ-12). That rule is about the scan path, and this is not
-// on it: it asks a public index what the newest version of something is, it is
-// off unless a deployment turns it on, and a deployment that cannot reach out
-// loses this answer and nothing else.
+// Nothing a scan needs comes from here. Everything a scan needs arrives as a
+// file somebody imports, deliberately, so that a scan answers the same way
+// twice and nothing it depends on is somebody else's server being up (REQ-12).
+// That rule is about the scan path, and this is not on it: it asks a public
+// index what the newest version of something is, and it is off unless a
+// deployment turns it on. A deployment that cannot reach out loses this answer;
+// what a scan reports is unaffected.
+//
+// It is the only thing here that asks a public index anything, which is what
+// makes what leaves it a question about names rather than about addresses: a
+// supplier fetched from is an address an administrator configured, and an index
+// is a service everybody shares.
 //
 // A component's name leaves. One request per component, carrying
 // the name and nothing else. For an open-source dependency that is public

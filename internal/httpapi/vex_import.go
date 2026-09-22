@@ -14,7 +14,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -217,8 +216,8 @@ func registerVexImport(api huma.API, in Ingest) {
 				statements = append(statements, finding.Statement{
 					Vulnerability: one.Vulnerability,
 					Purl:          at.Purl,
-					About:         versionNamed(at),
-					Component:     componentNamed(at),
+					About:         at.VersionNamed(),
+					Component:     at.ComponentNamed(),
 					Status:        string(one.Status),
 					Justification: one.Justification,
 					Statement:     one.Statement,
@@ -262,36 +261,4 @@ func cited(id int64) *int64 {
 		return nil
 	}
 	return &id
-}
-
-// versionNamed is the version a claim's target was made about.
-//
-// Inside the package identifier where the document stated one there, and the
-// version the document stated outside it otherwise — a publisher naming no
-// package states it as the branch its product sits in.
-func versionNamed(at sbom.Target) string {
-	if version := graph.PartsOfPurl(at.Purl).Version; version != "" {
-		return version
-	}
-	return at.Version
-}
-
-// componentNamed is the component name a statement's target points at.
-//
-// A package identifier where it carries one, and the bare name otherwise: a
-// statement made against a source tree names something we cannot resolve to a
-// package, and the most that can be said is that a component of that name is
-// the one meant.
-func componentNamed(at sbom.Target) string {
-	if at.Name != "" {
-		return at.Name
-	}
-	name := at.Purl
-	if cut := strings.LastIndex(name, "@"); cut > 0 {
-		name = name[:cut]
-	}
-	if cut := strings.LastIndex(name, "/"); cut > 0 {
-		name = name[cut+1:]
-	}
-	return name
 }

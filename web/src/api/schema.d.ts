@@ -1960,6 +1960,74 @@ export interface paths {
         patch: operations["amend-product"];
         trace?: never;
     };
+    "/v1/products/{product}/advisory-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the suppliers advisories are read from
+         * @description The suppliers configured for this product, when each was last tried, when one last succeeded, and how far through what they publish this deployment has read.
+         *
+         *     Two moments rather than one. An attempt that failed still happened, so how long a supplier has been unreachable is the gap between them; the reason the last attempt stopped is returned beside them.
+         *
+         *     Requires: administrator
+         */
+        get: operations["list-advisory-sources"];
+        put?: never;
+        /**
+         * Read advisories from a supplier
+         * @description Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision, and is never applied.
+         *
+         *     The address is the supplier's CSAF provider description, which names where their advisories are listed. Both shapes the format defines are read: a ROLIE feed and a directory of documents. Only the listings a publisher labels TLP:WHITE or TLP:CLEAR are read.
+         *
+         *     Only claims naming a component this product ships are recorded.
+         *
+         *     Reading starts from the moment the supplier is added. To take an advisory published before that, upload it.
+         *
+         *     A VEX document listed beside the advisories is not read here. Upload it to the VEX endpoint to take it.
+         *
+         *     A supplier withdrawn and added again under the same name starts from today, the way a new one does.
+         *
+         *     The name is matched without regard to capitals. A name already in use for this product is refused with 409; withdraw the supplier first to change its address.
+         *
+         *     The address must be https and carry no user information. A product that is out of use takes no supplier.
+         *
+         *     Requires: administrator
+         */
+        post: operations["add-advisory-source"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/advisory-sources/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop reading a supplier
+         * @description Stops reading a supplier. What they have already said stays standing, because an approval may have been granted on the strength of it.
+         *
+         *     The name is matched without regard to capitals. A name no supplier is configured under is refused with 404.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["withdraw-advisory-source"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/comparison": {
         parameters: {
             query?: never;
@@ -5208,6 +5276,18 @@ export interface components {
             /** @description The identifier the issue is filed under */
             vulnerability: string;
         };
+        "Add-advisory-sourceRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Add-advisory-sourceRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The name this supplier is configured under */
+            name: string;
+            /** @description The address of the supplier's CSAF provider description */
+            url: string;
+        };
         "Add-outboundRequest": {
             /**
              * Format: uri
@@ -5290,6 +5370,35 @@ export interface components {
              */
             status: "draft" | "final" | "interim";
             title?: string;
+        };
+        AdvisorySourceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdvisorySourceBody.json
+             */
+            readonly $schema?: string;
+            /** @description The reason the last attempt stopped, where one did */
+            because?: string;
+            /**
+             * Format: date-time
+             * @description The newest moment in what they list that has been read
+             */
+            caught_up_to?: string;
+            /** @description The name this supplier is configured under */
+            name: string;
+            /**
+             * Format: date-time
+             * @description When a read of this supplier last succeeded
+             */
+            read?: string;
+            /**
+             * Format: date-time
+             * @description When this supplier was last tried
+             */
+            tried?: string;
+            /** @description Where the supplier describes what they publish */
+            url: string;
         };
         AdvisoryTakenBody: {
             /**
@@ -7667,6 +7776,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["AdvisoryListedBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyAdvisorySourceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyAdvisorySourceBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdvisorySourceBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -13458,6 +13578,102 @@ export interface operations {
                 "application/json": components["schemas"]["Amend-productRequest"];
             };
         };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-advisory-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyAdvisorySourceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-advisory-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Add-advisory-sourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvisorySourceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-advisory-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description No Content */
             204: {

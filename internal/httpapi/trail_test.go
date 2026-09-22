@@ -340,6 +340,18 @@ var administrativeActs = []trailedAct{
 		path: "/v1/outbound/ops/*", kind: "setting", about: "outbound · ops · *",
 	},
 	{
+		id: "add-advisory-source", what: "a supplier to read advisories from",
+		method: http.MethodPost, path: "/v1/products/mine/advisory-sources",
+		body: `{"name":"ExampleLinux",` +
+			`"url":"https://supplier.example.test/.well-known/csaf/provider-metadata.json"}`,
+		kind: "setting", about: "advisory source · mine · ExampleLinux",
+	},
+	{
+		id: "withdraw-advisory-source", what: "a supplier no longer read",
+		method: http.MethodDelete, path: "/v1/products/mine/advisory-sources/ExampleLinux",
+		kind: "setting", about: "advisory source · mine · ExampleLinux",
+	},
+	{
 		id: "add-collaborator", what: "somebody brought into a case", who: "private-triage",
 		method: http.MethodPut,
 		path:   "/v1/products/mine/issues/{issue}/collaborators/reader",
