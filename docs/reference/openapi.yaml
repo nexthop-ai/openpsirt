@@ -5089,6 +5089,28 @@ components:
       required:
         - items
       type: object
+    ListBodyRulingBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyRulingBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/RulingBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodySavedBody:
       additionalProperties: false
       properties:
@@ -7223,6 +7245,18 @@ components:
         credit:
           description: The credit they asked for in an advisory
           type: string
+        disposition:
+          description: What the claim was judged to be, once that has taken effect
+          enum:
+            - accepted
+            - duplicate
+            - not-reproducible
+            - out-of-scope
+            - rejected
+          type: string
+        duplicate_of:
+          description: The issue a duplicate points at
+          type: string
         evaluated:
           description: When somebody said what it turned out to be
           type: string
@@ -7246,8 +7280,18 @@ components:
           type: string
         reported_by:
           type: string
+        ruling:
+          description: The ruling that answers it, waiting or in force
+          format: int64
+          type: integer
         summary:
           description: What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it
+          type: string
+        waiting:
+          description: A disposition proposed and waiting for a second person
+          enum:
+            - out-of-scope
+            - rejected
           type: string
       required:
         - reference
@@ -7587,6 +7631,105 @@ components:
         - name
         - team
         - order
+      type: object
+    RulingBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/RulingBody.json
+          format: uri
+          readOnly: true
+          type: string
+        approved_at:
+          type: string
+        approved_by:
+          description: Who agreed, on a disposition that takes a second person
+          type: string
+        disposition:
+          enum:
+            - duplicate
+            - not-reproducible
+            - out-of-scope
+            - rejected
+          type: string
+        duplicate_of:
+          description: The open issue a duplicate points at
+          type: string
+        id:
+          format: int64
+          type: integer
+        proposed_at:
+          type: string
+        proposed_by:
+          type: string
+        reasoning:
+          description: Why, as markdown. Never edited, so an approval is of these words
+          type: string
+        reports:
+          description: The references of the reports it covers, including after it was withdrawn
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        state:
+          description: Waiting for a second person, what its reports currently are, or taken back
+          enum:
+            - waiting
+            - in-force
+            - withdrawn
+          type: string
+        withdrawn_at:
+          type: string
+        withdrawn_by:
+          type: string
+      required:
+        - id
+        - disposition
+        - reports
+        - state
+        - proposed_by
+        - proposed_at
+      type: object
+    RulingProposedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/RulingProposedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        disposition:
+          enum:
+            - duplicate
+            - not-reproducible
+            - out-of-scope
+            - rejected
+          type: string
+        duplicate_of:
+          description: The open issue a duplicate points at, under any identifier it goes by. Only on a duplicate
+          maxLength: 191
+          type: string
+        reasoning:
+          description: Why, as markdown. Required on everything but a duplicate
+          maxLength: 65536
+          type: string
+        reports:
+          description: The references of the reports it covers. Naming one twice covers it once
+          items:
+            type: string
+          maxItems: 10000
+          minItems: 1
+          type:
+            - array
+            - "null"
+      required:
+        - reports
+        - disposition
       type: object
     RunBody:
       additionalProperties: false
@@ -17472,6 +17615,46 @@ paths:
         any_of:
           - private-triage
         note: A second person agrees past the threshold.
+  /v1/products/{product}/issues/{vulnerability}/duplicates:
+    get:
+      description: |-
+        Every report in this product ruled a duplicate of this issue, with the ruling in force. What arrived with each is listed on the report's own attachments.
+
+        An issue that is not here and one you may not be told of answer alike.
+
+        Requires: private-triage on the product
+      operationId: list-duplicate-reports
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: vulnerability
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List reports that duplicate an issue
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
   /v1/products/{product}/issues/{vulnerability}/exploited-here:
     post:
       description: |-
@@ -17849,6 +18032,229 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/report-rulings:
+    get:
+      description: |-
+        Every ruling in this product, newest first, including withdrawn ones. `waiting` narrows to those waiting for a second person.
+
+        Requires: private-triage on the product
+      operationId: list-report-rulings
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: Only rulings waiting for a second person
+          explode: false
+          in: query
+          name: waiting
+          schema:
+            description: Only rulings waiting for a second person
+            type: boolean
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            default: 0
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyRulingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List rulings on reports
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+    post:
+      description: |-
+        Says that one or more reports are duplicates, not reproducible, out of scope, or rejected. A report that turned out to be an issue here is pointed at that issue instead.
+
+        `out-of-scope` and `rejected` wait for a second person, and nothing changes until somebody other than the proposer approves. The other two take effect at once. While a ruling waits, its reports cannot be accepted as an issue or ruled on again.
+
+        `reasoning` is required on everything but a duplicate. `duplicate_of` is required on a duplicate and refused on anything else, and names an issue open in this product. A duplicate of an issue that is not open here is refused: reject the report instead.
+
+        Every report named has to be in this product and unanswered, or nothing is written. The number of reports is bounded by `triage.together-cap`, the setting that bounds every bulk judgment.
+
+        Requires: private-triage on the product
+      operationId: rule-reports
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RulingProposedBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RulingBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Rule on reports
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/report-rulings/{ruling}:
+    get:
+      description: |-
+        What was said, about which reports, by whom, and whether it is waiting, in force or withdrawn.
+
+        Requires: private-triage on the product
+      operationId: get-report-ruling
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: ruling
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RulingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Show a ruling on reports
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/report-rulings/{ruling}/approval:
+    post:
+      description: |-
+        Agrees to a waiting ruling, which is when it takes effect for every report it covers.
+
+        Refused to whoever proposed it, and refused on a ruling that is not waiting.
+
+        Requires: private-triage on the product. The proposer may not approve their own.
+      operationId: approve-report-ruling
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: ruling
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RulingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Approve a ruling on reports
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+        note: The proposer may not approve their own.
+  /v1/products/{product}/report-rulings/{ruling}/withdrawal:
+    post:
+      description: |-
+        Takes a ruling back, waiting or in force, and returns every report it covered to the inbox unanswered. Sending a waiting ruling back and undoing one in force are this one act.
+
+        Needs nobody else, and the proposer may withdraw their own. The ruling stays on record as withdrawn.
+
+        Requires: private-triage on the product
+      operationId: withdraw-report-ruling
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: ruling
+          required: true
+          schema:
+            format: int64
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RulingBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Withdraw a ruling on reports
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
   /v1/products/{product}/reports:
     get:
       description: |-

@@ -46,6 +46,53 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 	}
 
 	statements := []string{
+		// One act of saying what one or more claims are, where the answer is
+		// not an issue here. It is kept apart from the reports it covers
+		// because one act answers many of them — twenty slop reports rejected
+		// in one sentence with one approval — and the approval is of that act
+		// and those words.
+		`CREATE TABLE "report_ruling" (
+			"id"           ` + t.id + `,
+			"product_id"   ` + t.ref + ` NOT NULL,
+			-- duplicate, not-reproducible, out-of-scope or rejected. A
+			-- report accepted as an issue points at that issue instead.
+			"disposition"  ` + t.kind + ` NOT NULL,
+			-- Why, as markdown. Never edited: an approval is of these words,
+			-- and words that could change underneath it would be an approval
+			-- of nothing in particular.
+			"reasoning"    ` + t.text + ` NULL,
+			-- The open issue a duplicate points at. Null on every other
+			-- disposition.
+			"duplicate_of" ` + t.refNull + ` NULL,
+			"proposed_by"  ` + t.ref + ` NOT NULL,
+			"proposed_at"  ` + t.timestamp + ` NOT NULL,
+			-- Who agreed, where the disposition takes a second person.
+			"approved_by"  ` + t.refNull + ` NULL,
+			"approved_at"  ` + t.timestamp + ` NULL,
+			-- When it took effect: at once where nobody else has to agree,
+			-- on approval where somebody does. Null is waiting.
+			"settled_at"   ` + t.timestamp + ` NULL,
+			-- Taken back, before or after it took effect. The reports it
+			-- covered return to the inbox, and this row stays as the record
+			-- of what was said.
+			"withdrawn_by" ` + t.refNull + ` NULL,
+			"withdrawn_at" ` + t.timestamp + ` NULL,
+			CONSTRAINT "report_ruling_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "report_ruling_duplicate_fk" FOREIGN KEY ("duplicate_of") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "report_ruling_proposed_by_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id"),
+			CONSTRAINT "report_ruling_approved_by_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id"),
+			CONSTRAINT "report_ruling_withdrawn_by_fk" FOREIGN KEY ("withdrawn_by") REFERENCES "person"("id")
+		)` + t.suffix,
+
+		// What is waiting in one product, which is the list an approver
+		// works through.
+		`CREATE INDEX "report_ruling_waiting_idx"
+			ON "report_ruling" ("product_id", "settled_at", "withdrawn_at")`,
+
+		// A duplicate is read from the issue it points at.
+		`CREATE INDEX "report_ruling_duplicate_idx"
+			ON "report_ruling" ("duplicate_of")`,
+
 		`CREATE TABLE "flaw_report" (
 			"id"               ` + t.id + `,
 			-- The name this report is reached by, and the one somebody
@@ -104,13 +151,18 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 			"evaluated_by"     ` + t.refNull + ` NULL,
 			"recorded_by"      ` + t.ref + ` NOT NULL,
 			"recorded_at"      ` + t.timestamp + ` NOT NULL,
+			-- The ruling that answers it, waiting or in force. One at a
+			-- time: a report under a ruling cannot be put under a second
+			-- one, or accepted as an issue, until the first is withdrawn.
+			"ruling_id"        ` + t.refNull + ` NULL,
 			CONSTRAINT "flaw_report_reference_unique" UNIQUE ("reference"),
 			CONSTRAINT "flaw_report_issue_unique" UNIQUE ("vulnerability_id"),
 			CONSTRAINT "flaw_report_issue_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "flaw_report_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "flaw_report_by_fk" FOREIGN KEY ("recorded_by") REFERENCES "person"("id"),
 			CONSTRAINT "flaw_report_answered_by_fk" FOREIGN KEY ("acknowledged_by") REFERENCES "person"("id"),
-			CONSTRAINT "flaw_report_judged_by_fk" FOREIGN KEY ("evaluated_by") REFERENCES "person"("id")
+			CONSTRAINT "flaw_report_judged_by_fk" FOREIGN KEY ("evaluated_by") REFERENCES "person"("id"),
+			CONSTRAINT "flaw_report_ruling_fk" FOREIGN KEY ("ruling_id") REFERENCES "report_ruling"("id")
 		)` + t.suffix,
 
 		// The unacknowledged sweep's index: the reports nobody has answered.
@@ -121,11 +173,28 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 		// works through.
 		`CREATE INDEX "flaw_report_product_idx"
 			ON "flaw_report" ("product_id", "recorded_at")`,
+
+		`CREATE INDEX "flaw_report_ruling_idx"
+			ON "flaw_report" ("ruling_id")`,
+
+		// Which reports a ruling covered, for good. The live pointer on the
+		// report is cleared when a ruling is withdrawn, and this is what
+		// still says what the withdrawn ruling was about.
+		`CREATE TABLE "report_ruled" (
+			"ruling_id"      ` + t.ref + ` NOT NULL,
+			"flaw_report_id" ` + t.ref + ` NOT NULL,
+			CONSTRAINT "report_ruled_pk" PRIMARY KEY ("ruling_id", "flaw_report_id"),
+			CONSTRAINT "report_ruled_ruling_fk" FOREIGN KEY ("ruling_id") REFERENCES "report_ruling"("id"),
+			CONSTRAINT "report_ruled_report_fk" FOREIGN KEY ("flaw_report_id") REFERENCES "flaw_report"("id")
+		)` + t.suffix,
+
+		`CREATE INDEX "report_ruled_report_idx"
+			ON "report_ruled" ("flaw_report_id")`,
 	}
 
 	return apply(ctx, tx, statements)
 }
 
 func downReport(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "flaw_report")
+	return dropTables(ctx, tx, "report_ruled", "flaw_report", "report_ruling")
 }

@@ -72,10 +72,14 @@ type FlawReport struct {
 	EvaluatedBy *int64     `bun:"evaluated_by"`
 	RecordedBy  int64      `bun:"recorded_by,notnull"`
 	RecordedAt  time.Time  `bun:"recorded_at,notnull"`
+	// RulingID is the ruling that answers it, waiting or in force. A report
+	// under one is neither accepted nor ruled on again until it is
+	// withdrawn.
+	RulingID *int64 `bun:"ruling_id"`
 }
 
-// Judged reports whether somebody has said what this claim is.
-func (r *FlawReport) Judged() bool { return r.VulnerabilityID != nil }
+// Accepted reports whether the claim was judged to be an issue here.
+func (r *FlawReport) Accepted() bool { return r.VulnerabilityID != nil }
 
 // Told is what somebody types in when they record a flaw somebody sent them.
 //

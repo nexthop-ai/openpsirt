@@ -323,6 +323,8 @@ func registerIntake(api huma.API, in Ingest) {
 		}
 		return out, nil
 	})
+
+	registerRulings(api, in)
 }
 
 // productForReports resolves the product a report route names.

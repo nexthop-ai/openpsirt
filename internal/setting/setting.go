@@ -105,7 +105,7 @@ const (
 	DueMedium    = "remediation.due.medium"
 	DueLow       = "remediation.due.low"
 	// TogetherCap is how many findings one bulk judgment may cover at
-	// once. A bound rather than none, because a single action writing an
+	// once, and how many reports one ruling may cover. A bound rather than none, because a single action writing an
 	// unbounded number of rows is a denial of service somebody triggers by
 	// accident. How generous it should be is a judgment about a product — a
 	// kernel's list is long — so it is tuned here rather than compiled in.

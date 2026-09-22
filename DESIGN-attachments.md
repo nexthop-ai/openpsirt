@@ -58,7 +58,7 @@ becomes readable along with the words describing it.
 |---|---|
 | Attached to text | The ordinary case. A file attached while composing is bound to the issue alone until that text is saved |
 | Attached to the issue | Evidence for a recorded flaw. Attached the moment it arrives. The caller requests this; it is not the default |
-| Attached to the report | What arrived with a claim. Attached the moment it arrives, and it stays on the report when the claim is judged |
+| Attached to the report | What arrived with a claim. Attached the moment it arrives, and it stays on the report when the claim is judged. A report ruled a duplicate is listed on the issue it duplicates, and its files are reached through it there |
 | Attached to nothing | Collected by the reaper |
 
 ## Fetch authorization
@@ -86,6 +86,10 @@ A file on a report does not follow the issue the claim turned out to be. What
 a stranger sent is reviewed by nobody, so judging the claim to be a disclosed
 issue must not publish it; anything meant to be read there is attached to the
 issue instead.
+
+The same holds for a duplicate. Its files are listed where the issue it
+duplicates is read, and reached under the report's answer: somebody who reads
+the issue and may not work reports sees neither the duplicate nor its files.
 
 Reaching a file on a report and attaching one to it are the same right.
 Reaching a claim already asks for a role that writes, so there is nothing

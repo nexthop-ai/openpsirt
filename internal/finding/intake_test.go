@@ -32,7 +32,7 @@ func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if row.Judged() {
+		if row.Accepted() {
 			t.Errorf("a claim nobody judged points at issue %d", *row.VulnerabilityID)
 		}
 		if !referenceFor(row.Reference, "SONIC", 2026) {
@@ -171,7 +171,7 @@ func TestAClaimIsJudgedOnceAndSaysWhoJudgedIt(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !judged.Judged() || *judged.VulnerabilityID != issue {
+		if !judged.Accepted() || *judged.VulnerabilityID != issue {
 			t.Errorf("judging pointed the report at %v, want issue %d",
 				judged.VulnerabilityID, issue)
 		}
@@ -418,7 +418,7 @@ func TestAFlawRecordedByHandCarriesAReportThatWasJudgedAsItWasWrittenDown(t *tes
 		if !referenceFor(row.Reference, "SONIC", 2026) {
 			t.Errorf("it was filed under %q", row.Reference)
 		}
-		if !row.Judged() || *row.VulnerabilityID != issue {
+		if !row.Accepted() || *row.VulnerabilityID != issue {
 			t.Errorf("it points at %v, want issue %d", row.VulnerabilityID, issue)
 		}
 		if row.EvaluatedAt == nil || row.EvaluatedBy == nil || *row.EvaluatedBy != who.ID {
