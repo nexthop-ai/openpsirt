@@ -1,35 +1,25 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 
-// Starting an advisory about this flaw, generating it, and recording that it
-// went out.
-//
-// Both endpoints answered and nothing called them. The document a customer
-// receives could be produced by the API and by nothing a person can reach, so
-// the one output of this tool that leaves the company was the one output
-// nobody here could make.
+// Starting an advisory about this flaw, and the first look at what it
+// generates.
 //
 // An advisory is a record of its own under a name this deployment mints, and
-// it covers issues rather than being derived from one. What this screen does
+// it covers issues rather than being derived from one. What this panel does
 // is the narrow case that starts from a flaw: start one, name this flaw in
-// this product on it, and it is an ordinary advisory from there. Which is why
-// it lists the ones that already cover this flaw — the question before
-// starting another is whether one already says it.
+// this product on it, and it is an ordinary advisory from there — on its own
+// screen, which is where what it covers, who agrees to it and what has gone
+// out belong. Which is also why this lists the ones that already cover this
+// flaw: the question before starting another is whether one already says it.
 //
 // Refused for a flaw in somebody else's component, which is dependency
 // hygiene a consumer reads out of the inventory — and refused when the issue
 // is named rather than when the document is generated, so the refusal names
 // what somebody chose.
-//
-// Recording that it went out is a separate act, and deliberately so: what
-// was published on a date cannot be worked out again once a release is added
-// or a decision is revised. It is also what lets a second document be a
-// revision rather than a duplicate, which CSAF validators check.
-
-type Issued = { version?: number; digest?: string; issued_at?: string };
 
 export function IssueAdvisory({
   vulnerability,
@@ -41,8 +31,6 @@ export function IssueAdvisory({
   products: { name: string; called: string }[];
 }) {
   const [product, setProduct] = useState(products[0]?.name ?? "");
-  const [summary, setSummary] = useState("");
-  const [issued, setIssued] = useState<Issued | null>(null);
   // The advisory being worked on. Held here because an advisory is started
   // and then filled in, and the two are separate acts against separate names.
   const [advisory, setAdvisory] = useState("");
@@ -110,21 +98,6 @@ export function IssueAdvisory({
       void already.refetch();
     },
   });
-  const record = useMutation({
-    mutationFn: async (of: string) =>
-      unwrap(
-        await api.POST("/v1/advisories/{advisory}/issuance", {
-          params: { path: { advisory: of } },
-          body: { ...(summary.trim() ? { summary: summary.trim() } : {}) },
-        }),
-      ),
-    onSuccess: (done) => {
-      setIssued(done);
-      setSummary("");
-      void already.refetch();
-    },
-  });
-
   const document = draft.data?.document;
   const written = useMemo(() => (document ? JSON.stringify(document, null, 2) : ""), [document]);
   if (products.length === 0) return null;
@@ -163,7 +136,9 @@ export function IssueAdvisory({
           {(already.data?.items ?? []).map((one, at) => (
             <span key={one.advisory}>
               {at > 0 && ", "}
-              <span className="id">{one.advisory}</span>
+              <Link className="id" to={`/advisories/${encodeURIComponent(one.advisory)}`}>
+                {one.advisory}
+              </Link>
               {` (${one.status})`}
               {(one.issuances ?? 0) > 0 && ` · out ${one.issuances}\u00d7`}
             </span>
@@ -181,8 +156,6 @@ export function IssueAdvisory({
                 onChange={(event) => {
                   setProduct(event.target.value);
                   draft.reset();
-                  record.reset();
-                  setIssued(null);
                   setAdvisory("");
                 }}
               >
@@ -228,49 +201,19 @@ export function IssueAdvisory({
               <pre className="asis" style={{ maxHeight: 320, overflow: "auto" }}>
                 {written}
               </pre>
-              <div className="filters" style={{ marginTop: 10 }}>
-                <label className="field" style={{ flex: 1, minWidth: 240 }}>
-                  <span>This revision</span>
-                  <input
-                    type="text"
-                    value={summary}
-                    placeholder="for the revision history"
-                    onChange={(event) => setSummary(event.target.value)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn quiet"
-                  disabled={record.isPending}
-                  onClick={() => record.mutate(advisory)}
-                >
-                  {record.isPending ? "Recording…" : "Record that it went out"}
-                </button>
+              {/* Everything after the first draft is the advisory's own,
+              starting with the agreement, which the person who started it may
+              not give. A second flaw, the title, and recording that it went
+              out are all there too. */}
+              <div className="actions" style={{ marginTop: 10 }}>
+                <Link className="btn" to={`/advisories/${encodeURIComponent(advisory)}`}>
+                  Open {advisory}
+                </Link>
               </div>
-              {/* Said rather than offered. Whoever reaches this panel is the
-              person who just named the flaw on the advisory, and they are the
-              one agreeing refuses — a button leading to a refusal is worse
-              than no button. */}
               <p className="hint">
-                A second person agrees to what it says before it goes out, which is not you: you
+                A second person agrees to what it says before it goes out, and it is not you: you
                 started this one.
               </p>
-              <p className="hint">
-                Recorded here, published elsewhere. What went out cannot be rebuilt later, and a
-                revision needs the record of the first.
-              </p>
-              {record.error != null && (
-                <Failed error={record.error} what="That could not be recorded." />
-              )}
-              {issued && (
-                <div className="alert info">
-                  <strong>Recorded as version {issued.version}</strong>
-                  <span>
-                    Digest <span className="id">{issued.digest}</span>. A later draft that differs
-                    shows the published document has gone stale.
-                  </span>
-                </div>
-              )}
             </>
           )}
         </>
