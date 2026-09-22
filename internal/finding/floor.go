@@ -219,19 +219,24 @@ func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		// Never below the line if somebody is using it. A line is a
 		// claim about how bad something has to be before it is worth
 		// an afternoon, and being exploited is not a claim about how
-		// bad it is — it is a fact about the world, and it is the one
-		// thing that cannot be set aside on a rating. Hiding a
-		// known-exploited finding because it was rated low is the
-		// failure this whole line is supposed to prevent, arrived at
-		// from the other side.
+		// bad it is — it is a fact, and it is the one thing that
+		// cannot be set aside on a rating. Hiding an exploited finding
+		// because it was rated low is the failure this whole line is
+		// supposed to prevent, arrived at from the other side.
+		//
+		// Either exploitation signal, which is what the threshold
+		// asks: a feed's word about the world and this product's own
+		// record of being attacked both sit in bands above everything
+		// the rest can add together (the exploiting threshold). Which of the
+		// two it is, the line does not care and the number does not
+		// say.
 		//
 		// Both halves read without joining the issue: exploitation off
-		// the urgency, whose top band is exactly that (Ranked.Rank),
-		// and the rating as a membership test against the issues the
-		// line admits. So a query this narrows can stay on finding's
-		// covering index.
+		// the urgency, and the rating as a membership test against the
+		// issues the line admits. So a query this narrows can stay on
+		// finding's covering index.
 		q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.WhereOr("f.urgency >= ?", int64(exploitedBand)).
+			return q.WhereOr("f.urgency >= ?", int64(exploiting)).
 				WhereOr("f.vulnerability_id IN (?)",
 					q.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 						Join(rating.Here, f.ProductID).
@@ -243,6 +248,10 @@ func (f Floor) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 }
 
 // Admits reports whether the line lets this through.
+//
+// The flag is either exploitation signal, the way the threshold above reads
+// both bands: a caller holding them apart passes whether either holds, and
+// none of them passes one of the two and calls it the question.
 func (f Floor) Admits(exploited bool, severity string) bool {
 	words := f.admits()
 	if len(words) == 0 || exploited {

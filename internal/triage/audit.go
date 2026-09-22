@@ -275,12 +275,22 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 
 // namesOf reads sign-in identities for a set of people.
 func (s *Store) namesOf(ctx context.Context, ids map[int64]bool) (map[int64]string, error) {
-	if len(ids) == 0 {
-		return map[int64]string{}, nil
-	}
 	wanted := make([]int64, 0, len(ids))
 	for id := range ids {
 		wanted = append(wanted, id)
+	}
+	return s.PeopleNamed(ctx, wanted)
+}
+
+// PeopleNamed is who these identifiers are, by the identity they sign in
+// under.
+//
+// One implementation rather than a query wherever a record carries somebody's
+// identifier. A number is not an answer — nothing else publishes it — and a
+// second spelling of this lookup is a second place that can answer with one.
+func (s *Store) PeopleNamed(ctx context.Context, wanted []int64) (map[int64]string, error) {
+	if len(wanted) == 0 {
+		return map[int64]string{}, nil
 	}
 	var rows []struct {
 		ID       int64  `bun:"id"`

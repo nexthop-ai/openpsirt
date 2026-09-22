@@ -412,6 +412,18 @@ func (s *Store) propose(ctx context.Context, claim *Claim, p Proposal) (*Decisio
 // MySQL where the batched form is one statement per five hundred rows — the
 // same shape the scan apply already uses, and for the same reason.
 func (s *Store) proposeAll(ctx context.Context, claim *Claim, proposals []Proposal) ([]*Decision, error) {
+	// Here rather than at each entry point, because every path that writes a
+	// decision row reaches this one — a claim made at a finding, a bulk act, a
+	// re-affirmation, an extension carried to another issue, and a decision
+	// carried across builds. Checked at the entry points instead, the four
+	// that were not checked would be four ways round the rule.
+	//
+	// Inside the caller's transaction, which every one of them has open: a
+	// retry re-runs the closure, and a record kept in between is one this
+	// claim contradicts.
+	if err := s.refuseIfExploitedHere(ctx, claim, proposals); err != nil {
+		return nil, err
+	}
 	now := s.now().Truncate(time.Microsecond)
 	rows := make([]Decision, 0, len(proposals))
 	for _, p := range proposals {

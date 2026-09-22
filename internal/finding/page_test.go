@@ -151,7 +151,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 		}{
 			{"everything", finding.Filter{}, func(*group) bool { return true }},
 			{"exploited", finding.Filter{Exploited: true},
-				func(g *group) bool { return finding.Rank(g.urgency).Exploited() }},
+				func(g *group) bool { return finding.Exploiting(g.urgency) }},
 			{"with a fix", finding.Filter{HasFix: true}, func(g *group) bool { return g.fixed }},
 			{"at least high", finding.Filter{MinSeverity: "high"},
 				func(g *group) bool { return names[g.issue] != "CVE-2026-4" && names[g.issue] != "CVE-2026-6" }},
@@ -244,7 +244,7 @@ func TestThePageIsTheGroupsInOrder(t *testing.T) {
 					t.Errorf("%s in %s: %d places at urgency %d, wanted %d at %d",
 						g.Vulnerability, g.Component, g.Places, g.Urgency, expected.places, expected.urgency)
 				}
-				if g.Exploited != finding.Rank(expected.urgency).Exploited() {
+				if g.Exploited != finding.Exploiting(expected.urgency) {
 					t.Errorf("%s in %s: exploited %v disagrees with its urgency", g.Vulnerability, g.Component, g.Exploited)
 				}
 				ways := len(expected.consumer)

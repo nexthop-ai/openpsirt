@@ -988,6 +988,9 @@ components:
         exploited:
           description: Some of what it closes is being exploited
           type: boolean
+        exploited_here:
+          description: Some of what it closes is something this product is recorded as having been exploited through
+          type: boolean
         from:
           description: The version in hand
           type: string
@@ -1256,6 +1259,7 @@ components:
             - case
             - alias
             - catalog
+            - exploited-here
           type: string
         unset:
           description: Whether nothing had been set before this, as distinct from a value stored empty
@@ -1522,6 +1526,24 @@ components:
         - findings
         - builds
       type: object
+    Clear-exploited-hereRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Clear-exploited-hereRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        because:
+          description: Why the record is being cleared
+          maxLength: 65536
+          minLength: 1
+          type: string
+      required:
+        - because
+      type: object
     CollaboratorBody:
       additionalProperties: false
       properties:
@@ -1657,6 +1679,9 @@ components:
           type: string
         exploited:
           description: Whether any of them is known-exploited
+          type: boolean
+        exploited_here:
+          description: Whether this product is recorded as having been exploited through any of them
           type: boolean
         issues:
           description: Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list
@@ -2769,6 +2794,13 @@ components:
         exploited:
           description: Somebody is known to be exploiting this
           type: boolean
+        exploited_here:
+          description: What has been recorded about this product being exploited through this issue, newest first. At most one of them stands; the rest were cleared
+          items:
+            $ref: "#/components/schemas/ExploitedHereBody"
+          type:
+            - array
+            - "null"
         fix_state:
           enum:
             - fixed
@@ -2936,6 +2968,85 @@ components:
         - elsewhere
         - said
       type: object
+    ExploitedHereBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ExploitedHereBody.json
+          format: uri
+          readOnly: true
+          type: string
+        cleared_at:
+          format: date-time
+          type: string
+        cleared_because:
+          description: Why it was cleared
+          type: string
+        cleared_by:
+          description: Who cleared it
+          type: string
+        grounds:
+          description: What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has
+          type: string
+        id:
+          format: int64
+          type: integer
+        known_at:
+          description: When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+          format: date-time
+          type: string
+        product:
+          description: The product this record belongs to, by the name an address takes
+          type: string
+        product_name:
+          description: That product's spelling on screen
+          type: string
+        recorded_at:
+          format: date-time
+          type: string
+        recorded_by:
+          description: Who recorded it
+          type: string
+        standing:
+          description: Whether this is the record in force. One stands at a time per issue and product
+          type: boolean
+        undone:
+          description: Approved claims that the issue does not apply whose agreement this took back, returning them to the review queue
+          format: int64
+          type: integer
+        vulnerability:
+          description: The issue this is about
+          type: string
+      required:
+        - known_at
+        - grounds
+        - standing
+      type: object
+    ExploitedHereKept:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ExploitedHereKept.json
+          format: uri
+          readOnly: true
+          type: string
+        grounds:
+          description: What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has
+          maxLength: 65536
+          minLength: 1
+          type: string
+        known_at:
+          description: When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+          format: date-time
+          type: string
+      required:
+        - known_at
+        - grounds
+      type: object
     Extend-disclosureRequest:
       additionalProperties: false
       properties:
@@ -2995,6 +3106,9 @@ components:
           type: string
         exploited:
           description: Somebody is known to be exploiting this
+          type: boolean
+        exploited_here:
+          description: This product is recorded as having been exploited through this issue
           type: boolean
         fix_state:
           description: Upstream's answer about it
@@ -5904,6 +6018,9 @@ components:
         exploited:
           description: Whether any of what is open here is known to be exploited, which outranks everything else about it
           type: boolean
+        exploited_here:
+          description: Whether this product is recorded as having been exploited through any of what is open here
+          type: boolean
         first_seen:
           description: The moment a scan of this deployment first reported the component
           format: date-time
@@ -8712,6 +8829,9 @@ components:
           type: string
         exploited:
           type: boolean
+        exploited_here:
+          description: This product is recorded as having been exploited through this issue
+          type: boolean
         places:
           description: The number of findings a judgment here would be recorded against, across every build it is in
           format: int64
@@ -9256,6 +9376,7 @@ paths:
               - case
               - alias
               - catalog
+              - exploited-here
             type: string
         - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
           explode: false
@@ -9353,6 +9474,7 @@ paths:
               - case
               - alias
               - catalog
+              - exploited-here
             type: string
         - description: The first day of the period, as YYYY-MM-DD. Without an end the period runs to now
           explode: false
@@ -11827,6 +11949,48 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/exploited-here/{id}:
+    delete:
+      description: |-
+        A deliberate act with a reason on it. Nothing else clears one: no scan, no rescan, and no closing of the findings it was about. A record that turned out to be wrong is still something somebody has to say, and the cleared record stays readable with who cleared it and why.
+
+        What it does not do is put back what recording it undid. An agreement taken back stays taken back, and whether the claim it stood on was right is for whoever answers the finding again.
+
+        Asked of triage on the product the record belongs to: clearing one is recording one.
+
+        Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+      operationId: clear-exploited-here
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: int64
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Clear-exploited-hereRequest"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Clear a record of being exploited
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: The product is the record's own, not one in the path.
   /v1/findings:
     get:
       description: |-
@@ -17199,6 +17363,61 @@ paths:
         any_of:
           - private-triage
         note: A second person agrees past the threshold.
+  /v1/products/{product}/issues/{vulnerability}/exploited-here:
+    post:
+      description: |-
+        A different fact from the exploitation a feed reports. A feed says a vulnerability is being used somewhere in the world; this says that this product was the thing attacked, which no feed reports and nothing here can work out. It comes from a customer, a researcher or an investigation.
+
+        Recorded against the issue and one product, and it applies to every finding of that issue there whatever produced them. A flaw inherited from a dependency and used against this product is the ordinary case, and it needs no flaw of this deployment's own.
+
+        Say when it became known rather than when you are typing. Any window a deployment is under counts from the first of those, and the gap between the two is what such a window measures.
+
+        Nothing refuses this. Where a claim that the issue does not apply is standing and agreed to in this product, the record is kept and that agreement is taken back, returning those claims to the review queue and telling whoever wrote them; the count comes back as `undone`. A claim of that kind made while a record stands is refused instead, because a judgment gives way to a fact and not the other way round.
+
+        One record stands per issue and product. Clear the one standing before recording another.
+
+        Requires: public-triage or private-triage on the product
+      operationId: record-exploited-here
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: The issue, by any name it is known under
+          in: path
+          name: vulnerability
+          required: true
+          schema:
+            description: The issue, by any name it is known under
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExploitedHereKept"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExploitedHereBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Record that this product was exploited through an issue
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
   /v1/products/{product}/issues/{vulnerability}/notes:
     get:
       description: |-

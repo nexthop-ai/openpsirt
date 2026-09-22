@@ -38,6 +38,10 @@ type BundleBody struct {
 	Builds     int      `json:"builds,omitempty" doc:"The number of builds of the selection holding any of it. Absent where the selection is one build"`
 	Severity   string   `json:"severity,omitempty" doc:"The worst of what it closes"`
 	Exploited  bool     `json:"exploited,omitempty" doc:"Some of what it closes is being exploited"`
+	// ExploitedHere is the other exploitation signal, and the one that
+	// outranks it: a bundle carrying it closes something this product was
+	// attacked through.
+	ExploitedHere bool `json:"exploited_here,omitempty" doc:"Some of what it closes is something this product is recorded as having been exploited through"`
 	// In names the builds that hold it, which is what a declaration is
 	// offered against: a bump is declared for releases, and the ones worth
 	// offering are the ones that have it.
@@ -208,7 +212,8 @@ func bundleBodies(bundles []finding.Bundle, oneBuild bool) []BundleBody {
 			Components: bundle.Components,
 			Issues:     bundle.Issues, Places: bundle.Places,
 			Severity: bundle.Severity, Exploited: bundle.Exploited,
-			In: make([]BuildName, 0, len(bundle.In)),
+			ExploitedHere: bundle.ExploitedHere,
+			In:            make([]BuildName, 0, len(bundle.In)),
 		}
 		for _, at := range bundle.In {
 			body.In = append(body.In, BuildName{Stream: at.Stream, Variant: at.Variant})

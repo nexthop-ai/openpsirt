@@ -1172,6 +1172,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/exploited-here/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Clear a record of being exploited
+         * @description A deliberate act with a reason on it. Nothing else clears one: no scan, no rescan, and no closing of the findings it was about. A record that turned out to be wrong is still something somebody has to say, and the cleared record stays readable with who cleared it and why.
+         *
+         *     What it does not do is put back what recording it undid. An agreement taken back stays taken back, and whether the claim it stood on was right is for whoever answers the finding again.
+         *
+         *     Asked of triage on the product the record belongs to: clearing one is recording one.
+         *
+         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         */
+        delete: operations["clear-exploited-here"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/findings": {
         parameters: {
             query?: never;
@@ -2578,6 +2604,36 @@ export interface paths {
          *     Requires: private-triage on the product. A second person agrees past the threshold.
          */
         post: operations["shorten-disclosure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/issues/{vulnerability}/exploited-here": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that this product was exploited through an issue
+         * @description A different fact from the exploitation a feed reports. A feed says a vulnerability is being used somewhere in the world; this says that this product was the thing attacked, which no feed reports and nothing here can work out. It comes from a customer, a researcher or an investigation.
+         *
+         *     Recorded against the issue and one product, and it applies to every finding of that issue there whatever produced them. A flaw inherited from a dependency and used against this product is the ordinary case, and it needs no flaw of this deployment's own.
+         *
+         *     Say when it became known rather than when you are typing. Any window a deployment is under counts from the first of those, and the gap between the two is what such a window measures.
+         *
+         *     Nothing refuses this. Where a claim that the issue does not apply is standing and agreed to in this product, the record is kept and that agreement is taken back, returning those claims to the review queue and telling whoever wrote them; the count comes back as `undone`. A claim of that kind made while a record stands is refused instead, because a judgment gives way to a fact and not the other way round.
+         *
+         *     One record stands per issue and product. Clear the one standing before recording another.
+         *
+         *     Requires: public-triage or private-triage on the product
+         */
+        post: operations["record-exploited-here"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5531,6 +5587,8 @@ export interface components {
             components: string[] | null;
             /** @description Some of what it closes is being exploited */
             exploited?: boolean;
+            /** @description Some of what it closes is something this product is recorded as having been exploited through */
+            exploited_here?: boolean;
             /** @description The version in hand */
             from: string;
             /** @description The builds that hold this upgrade */
@@ -5677,7 +5735,7 @@ export interface components {
              * @description The kind of thing that changed
              * @enum {string}
              */
-            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
+            kind: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here";
             /** @description Whether nothing had been set before this, as distinct from a value stored empty */
             unset?: boolean;
             was?: string;
@@ -5847,6 +5905,16 @@ export interface components {
             /** @description The moment it became that. Absent while it is waiting: nothing has happened to it */
             when?: string;
         };
+        "Clear-exploited-hereRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Clear-exploited-hereRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Why the record is being cleared */
+            because: string;
+        };
         CollaboratorBody: {
             added_at: string;
             added_by: string;
@@ -5908,6 +5976,8 @@ export interface components {
             ecosystem?: string;
             /** @description Whether any of them is known-exploited */
             exploited: boolean;
+            /** @description Whether this product is recorded as having been exploited through any of them */
+            exploited_here?: boolean;
             /**
              * Format: int64
              * @description Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list
@@ -6548,6 +6618,8 @@ export interface components {
             elsewhere: components["schemas"]["ElsewhereBody"][] | null;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
+            /** @description What has been recorded about this product being exploited through this issue, newest first. At most one of them stands; the rest were cleared */
+            exploited_here?: components["schemas"]["ExploitedHereBody"][] | null;
             /** @enum {string} */
             fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
             /** @description The date that version became available */
@@ -6630,6 +6702,61 @@ export interface components {
             /** @description The kind of flaw, as CWE identifiers */
             weaknesses?: string[] | null;
         };
+        ExploitedHereBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ExploitedHereBody.json
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            cleared_at?: string;
+            /** @description Why it was cleared */
+            cleared_because?: string;
+            /** @description Who cleared it */
+            cleared_by?: string;
+            /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
+            grounds: string;
+            /** Format: int64 */
+            id?: number;
+            /**
+             * Format: date-time
+             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+             */
+            known_at: string;
+            /** @description The product this record belongs to, by the name an address takes */
+            product?: string;
+            /** @description That product's spelling on screen */
+            product_name?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** @description Who recorded it */
+            recorded_by?: string;
+            /** @description Whether this is the record in force. One stands at a time per issue and product */
+            standing: boolean;
+            /**
+             * Format: int64
+             * @description Approved claims that the issue does not apply whose agreement this took back, returning them to the review queue
+             */
+            undone?: number;
+            /** @description The issue this is about */
+            vulnerability?: string;
+        };
+        ExploitedHereKept: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ExploitedHereKept.json
+             */
+            readonly $schema?: string;
+            /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
+            grounds: string;
+            /**
+             * Format: date-time
+             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+             */
+            known_at: string;
+        };
         "Extend-disclosureRequest": {
             /**
              * Format: uri
@@ -6678,6 +6805,8 @@ export interface components {
             ecosystem?: string;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
+            /** @description This product is recorded as having been exploited through this issue */
+            exploited_here?: boolean;
             /**
              * @description Upstream's answer about it
              * @enum {string}
@@ -8221,6 +8350,8 @@ export interface components {
             ecosystem?: string;
             /** @description Whether any of what is open here is known to be exploited, which outranks everything else about it */
             exploited: boolean;
+            /** @description Whether this product is recorded as having been exploited through any of what is open here */
+            exploited_here?: boolean;
             /**
              * Format: date-time
              * @description The moment a scan of this deployment first reported the component
@@ -9868,6 +9999,8 @@ export interface components {
             builds: number;
             component: string;
             exploited?: boolean;
+            /** @description This product is recorded as having been exploited through this issue */
+            exploited_here?: boolean;
             /**
              * Format: int64
              * @description The number of findings a judgment here would be recorded against, across every build it is in
@@ -10199,7 +10332,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -10239,7 +10372,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Keep only changes of one kind */
-                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog";
+                kind?: "setting" | "role" | "routing" | "support" | "release" | "credential" | "account" | "team" | "case" | "alias" | "catalog" | "exploited-here";
                 /** @description The first day of the period, as YYYY-MM-DD. Without an end the period runs to now */
                 from?: string;
                 /** @description The day the period ends, as YYYY-MM-DD, and not itself in it. Without a start the period runs from the beginning */
@@ -11859,6 +11992,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OverPeriodSpentBodyBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "clear-exploited-here": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Clear-exploited-hereRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {
@@ -14332,6 +14498,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MovementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "record-exploited-here": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExploitedHereKept"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExploitedHereBody"];
                 };
             };
             /** @description Error */

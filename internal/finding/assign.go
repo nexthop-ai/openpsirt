@@ -589,6 +589,7 @@ type Owned struct {
 	Version       string `bun:"version"`
 	Severity      string `bun:"severity"`
 	Exploited     bool   `bun:"exploited"`
+	ExploitedHere bool   `bun:"exploited_here"`
 	Product       string `bun:"product"`
 	// Stream and Variant name a build holding this, not the only one. A
 	// screen needs somewhere to link to and an action needs a finding to name,
@@ -761,6 +762,8 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		TargetID        int64     `bun:"target_id"`
 		Builds          int       `bun:"builds"`
 		Urgency         int64     `bun:"urgency"`
+		Exploited       int       `bun:"exploited"`
+		ExploitedHere   int       `bun:"exploited_here"`
 		Places          int       `bun:"places"`
 		Total           int       `bun:"total"`
 		Undisclosed     bool      `bun:"undisclosed"`
@@ -778,6 +781,8 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		ColumnExpr(`MIN(f.target_id) AS "target_id"`).
 		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
 		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(exploitedAcross+` AS "exploited"`).
+		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		// The oldest place decides, as it does everywhere else here: a group
 		// open for a month with one place added yesterday has been somebody's
 		// problem for a month, and a maximum made it read as a day old — so
@@ -857,7 +862,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 			ProductID: head.ProductID,
 			Urgency:   head.Urgency, Places: head.Places, Builds: head.Builds,
 			Undisclosed: head.Undisclosed, OpenedAt: head.OpenedAt,
-			Exploited: Rank(head.Urgency).Exploited(),
+			Exploited: head.Exploited == 1, ExploitedHere: head.ExploitedHere == 1,
 		}
 		if issue, held := named[head.VulnerabilityID]; held {
 			issue = issue.RatedIn(rated[RatedKey{

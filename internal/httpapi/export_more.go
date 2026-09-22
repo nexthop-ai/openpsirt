@@ -539,7 +539,7 @@ func registerChangeExport(api huma.API, in Ingest) {
 		Tags: []string{"Administration"},
 	}, deploymentRecords, ""), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
-		Kind   string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog" doc:"Keep only changes of one kind"`
+		Kind   string `query:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here" doc:"Keep only changes of one kind"`
 		Period
 	}) (*huma.StreamResponse, error) {
 		subject, err := requester(ctx)

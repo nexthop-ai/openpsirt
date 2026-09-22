@@ -45,8 +45,12 @@ type PerBuildBody struct {
 	// work, and a number with nothing beside it says which is which.
 	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Everything open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
 	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited, which outranks everything else about it"`
-	Fixable    int            `json:"fixable" doc:"The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
-	Supplier   string         `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
+	// ExploitedHere is the other exploitation signal, and the one that
+	// outranks it. Separate, because a feed's word about the world and a
+	// person's word about this product are different facts.
+	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of what is open here"`
+	Fixable       int    `json:"fixable" doc:"The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
+	Supplier      string `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
 	// Newest is the current version according to the ecosystem's index, where
 	// one was asked.
 	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
@@ -139,9 +143,10 @@ func registerComponent(api huma.API, in Ingest) {
 				PackagePageURL: page, PackagePageName: called,
 				Summary: build.Summary, ProjectURL: build.ProjectURL,
 				BySeverity: build.BySeverity, Exploited: build.Exploited,
-				Fixable:  build.Fixable,
-				Supplier: build.Supplier,
-				Newest:   build.Newest, NewestAt: build.NewestAt, FirstSeen: build.FirstSeen,
+				ExploitedHere: build.ExploitedHere,
+				Fixable:       build.Fixable,
+				Supplier:      build.Supplier,
+				Newest:        build.Newest, NewestAt: build.NewestAt, FirstSeen: build.FirstSeen,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
 				DueAt:    build.DueAt, CommittedTo: build.CommittedTo, UpgradeTo: build.UpgradeTo,

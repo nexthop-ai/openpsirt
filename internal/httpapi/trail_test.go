@@ -29,13 +29,15 @@ type changed struct {
 // seeded is what an act needs that the fixture does not already hold: an issue
 // to name, and the identifier of a rule an earlier act made.
 type seeded struct {
-	issue string
-	rule  string
+	issue  string
+	rule   string
+	record string
 }
 
 // fill puts what has been seeded into a path, a body or an expected name.
 func (s *seeded) fill(text string) string {
 	text = strings.ReplaceAll(text, "{issue}", s.issue)
+	text = strings.ReplaceAll(text, "{record}", s.record)
 	return strings.ReplaceAll(text, "{rule}", s.rule)
 }
 
@@ -378,6 +380,36 @@ var administrativeActs = []trailedAct{
 	{
 		id: "end-sessions", what: "somebody cut off now", method: http.MethodDelete,
 		path: "/v1/people/newcomer/sessions", kind: "account", about: "newcomer",
+	},
+	{
+		// Recording that this product was exploited through an issue, and
+		// clearing it again. Both decide what the triage record may say — a
+		// claim that the issue does not apply is refused while one stands —
+		// which is what puts them in the trail rather than in the decision
+		// record beside the claims.
+		id: "record-exploited-here", what: "this product exploited through an issue",
+		who: "private-triage", method: http.MethodPost,
+		path: "/v1/products/mine/issues/CVE-2026-9999/exploited-here",
+		body: `{"known_at":"2026-09-20T14:00:00Z",` +
+			`"grounds":"A customer sent packet captures of the management socket."}`,
+		kind: "exploited-here", about: "CVE-2026-9999 on mine",
+		keep: func(t *testing.T, seen *seeded, answered []byte) {
+			t.Helper()
+			var kept struct {
+				ID int64 `json:"id"`
+			}
+			if err := json.Unmarshal(answered, &kept); err != nil {
+				t.Fatal(err)
+			}
+			seen.record = strconv.FormatInt(kept.ID, 10)
+		},
+	},
+	{
+		id: "clear-exploited-here", what: "a record of being exploited cleared",
+		who: "private-triage", method: http.MethodDelete,
+		path: "/v1/exploited-here/{record}",
+		body: `{"because":"The captures were of a different deployment."}`,
+		kind: "exploited-here", about: "CVE-2026-9999 on mine",
 	},
 	{
 		id: "deactivate-person", what: "somebody deactivated", method: http.MethodPut,

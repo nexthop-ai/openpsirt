@@ -436,15 +436,18 @@ func rerank(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 		ScoreCenti: issue.ScoreCenti, LikelihoodPPM: issue.Likelihood,
 	}
 
-	// Everything below the two flags, packed by the same function that packs
-	// it at ingest. The flags themselves are per finding, so they stay in the
-	// statement.
+	// Everything below the flags, packed by the same function that packs it
+	// at ingest. The flags themselves are per finding, so they stay in the
+	// statement — and every one of them is read here, so this is the one
+	// place the packed number is written again whichever signal moved.
 	rest := Ranked{ScoreCenti: inForce.Score(), LikelihoodPPM: inForce.LikelihoodPPM}.Rank()
 	_, err = tx.NewUpdate().
 		Model((*Finding)(nil)).
-		Set("urgency = (CASE WHEN urgency_exploited THEN ? ELSE 0 END)"+
+		Set("urgency = (CASE WHEN urgency_exploited_here THEN ? ELSE 0 END)"+
+			" + (CASE WHEN urgency_exploited THEN ? ELSE 0 END)"+
 			" + (CASE WHEN urgency_shipped THEN ? ELSE 0 END) + ?",
-			int64(exploitedBand), int64(shippedBand), int64(rest)).
+			int64(exploitedHereBand), int64(exploitedBand),
+			int64(shippedBand), int64(rest)).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("closed_at IS NULL").
 		// This product's findings alone. The number being written was worked
@@ -628,12 +631,17 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 	// and an inner one, so a finding a person opened is left out of its own
 	// recount.
 	var groups []struct {
-		Exploited bool       `bun:"exploited"`
-		OpenedAt  time.Time  `bun:"opened_at"`
-		LearnedAt *time.Time `bun:"learned_at"`
-		Severity  string     `bun:"severity"`
-		FixState  FixState   `bun:"fix_state"`
-		FixedAt   *time.Time `bun:"fixed_at"`
+		Exploited bool `bun:"exploited"`
+		// Whether this product was recorded as attacked through the issue,
+		// which the line admits and the window does not read: a window is how
+		// long a fix may take, and being attacked here says nothing about how
+		// long upstream will be.
+		ExploitedHere bool       `bun:"exploited_here"`
+		OpenedAt      time.Time  `bun:"opened_at"`
+		LearnedAt     *time.Time `bun:"learned_at"`
+		Severity      string     `bun:"severity"`
+		FixState      FixState   `bun:"fix_state"`
+		FixedAt       *time.Time `bun:"fixed_at"`
 	}
 	err = tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -642,6 +650,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.Here, productID).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
+		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
 		ColumnExpr(`f.opened_at AS "opened_at"`).
 		// Grouped on the learning as well, because it is the base an
 		// exploited deadline is counted from: grouped without it, the
@@ -659,8 +668,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
-		GroupExpr("f.urgency_exploited, f.opened_at, f.exploited_learned_at, "+
-			"f.fix_state, f.fixed_at, "+rating.EffectiveExpr).
+		GroupExpr("f.urgency_exploited, f.urgency_exploited_here, f.opened_at, "+
+			"f.exploited_learned_at, f.fix_state, f.fixed_at, "+rating.EffectiveExpr).
 		Scan(ctx, &groups)
 	if err != nil {
 		return fmt.Errorf("read what this issue is open against: %w", err)
@@ -672,6 +681,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 			Where("vulnerability_id = ?", vulnerabilityID).
 			Where("closed_at IS NULL").
 			Where("urgency_exploited = ?", group.Exploited).
+			Where("urgency_exploited_here = ?", group.ExploitedHere).
 			Where("opened_at = ?", group.OpenedAt).
 			Where(inThisProduct, productID)
 		if group.LearnedAt != nil {
@@ -691,7 +701,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		due := Deadline(group.FixState, group.OpenedAt, recountedAt,
 			group.LearnedAt, group.FixedAt,
 			windows.For(group.Exploited, group.Severity))
-		if due == nil || !floor.Admits(group.Exploited, group.Severity) {
+		if due == nil || !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity) {
 			q = q.Set("due_at = NULL")
 		} else {
 			q = q.Set("due_at = ?", *due)
@@ -870,9 +880,14 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 	// finding is exploited and what it is rated now, and a build carries
 	// thousands of findings of one issue.
 	var rows []struct {
-		Exploited bool   `bun:"exploited"`
-		Severity  string `bun:"severity"`
-		Open      int    `bun:"open"`
+		Exploited bool `bun:"exploited"`
+		// The line admits either exploitation signal, so a count of what a
+		// milder rating would take off the list has to read both. Reading one
+		// of them offered an approver a number that promised to hide findings
+		// the line would go on admitting.
+		ExploitedHere bool   `bun:"exploited_here"`
+		Severity      string `bun:"severity"`
+		Open          int    `bun:"open"`
 	}
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -881,12 +896,13 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.Here, claim.ProductID).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
+		ColumnExpr(`f.urgency_exploited_here AS "exploited_here"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
 		Where("f.vulnerability_id = ?", claim.VulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", claim.ProductID).
-		GroupExpr("f.urgency_exploited, " + rating.EffectiveExpr)
+		GroupExpr("f.urgency_exploited, f.urgency_exploited_here, " + rating.EffectiveExpr)
 	// The visibility half as well as the product. The visibility half alone
 	// admits every disclosed finding in the deployment, so an approver holding
 	// one product was told how many findings this issue has in products they
@@ -902,8 +918,9 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		// Only what the line admits today and would not admit after. A finding
 		// already below it is not taken off anything by this, and saying it
 		// was would inflate the number an approver is being asked to weigh.
-		if floor.Admits(row.Exploited, row.Severity) &&
-			!floor.Admits(row.Exploited, claim.Severity) {
+		exploited := row.Exploited || row.ExploitedHere
+		if floor.Admits(exploited, row.Severity) &&
+			!floor.Admits(exploited, claim.Severity) {
 			held.OffTheList += row.Open
 		}
 	}

@@ -313,6 +313,44 @@ func TestAnAgreementTakenBackIsSaidToWhoeverProposedIt(t *testing.T) {
 	})
 }
 
+func TestARecordOfBeingExploitedIsSaidToWhoeverProposedTheDismissal(t *testing.T) {
+	// The other cause of the same telling, and the one nobody is expecting: a
+	// reviewer undoing their own batch is an exchange the proposer can see,
+	// and this is somebody recording an incident somewhere else entirely.
+	// Without it the claim simply reappears in their queue with nothing
+	// saying why.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim),
+			`{"batch":"tuesday"}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		if told := r.told(t, "triager", "approval-undone"); len(told) != 0 {
+			t.Fatalf("an approval said something: %v", told)
+		}
+
+		if got := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/issues/CVE-2026-9999/exploited-here",
+			`{"known_at":"2026-09-20T14:00:00Z",`+
+				`"grounds":"A customer sent packet captures."}`,
+		); got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+
+		told := r.told(t, "triager", "approval-undone")
+		if len(told) != 1 {
+			t.Fatalf("recording told the proposer %d times: %v", len(told), told)
+		}
+		// Why, not only that. The proposer was not part of what caused this,
+		// so a notice saying an agreement went away sends them looking.
+		if !contains(told[0], "exploited") {
+			t.Errorf("the notice does not say what caused it: %q", told[0])
+		}
+	})
+}
+
 // told is what somebody has been told, of one kind, without running the sweep.
 //
 // Apart from alerts because these two are events: they were written when

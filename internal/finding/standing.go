@@ -96,6 +96,11 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 			ColumnExpr(`COUNT(*) AS "places"`).
 			ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 			ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+			// The flag rather than the urgency's top bands, which answer
+			// "some exploitation". This total is the feed's word about the
+			// world, and a product recorded as attacked here is a different
+			// fact that would be counted under the wrong name.
+			ColumnExpr(exploitedAcross+` AS "exploited"`).
 			ColumnExpr(decidedAs("?", anyClaim), productID, "withdrawn")
 		q = decisionCounts(q, "?", []any{productID}, claimApproved).
 			Where(inThisProductAs("f.target_id"), productID).
@@ -113,8 +118,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		return q.
 			ColumnExpr(`COUNT(*) AS "open"`).
 			ColumnExpr(`SUM(CASE WHEN grouped.due_at IS NOT NULL AND grouped.due_at < ? THEN 1 ELSE 0 END) AS "overdue"`, now).
-			ColumnExpr(`SUM(CASE WHEN grouped.urgency >= ? THEN 1 ELSE 0 END) AS "exploited"`,
-				int64(exploitedBand)).
+			ColumnExpr(`SUM(grouped.exploited) AS "exploited"`).
 			ColumnExpr(`SUM(CASE WHEN grouped.any_claim = 0 THEN 1 ELSE 0 END) AS "undecided"`).
 			ColumnExpr(`SUM(CASE WHEN grouped.approved_here = grouped.places THEN 1 ELSE 0 END) AS "agreed"`)
 	}
