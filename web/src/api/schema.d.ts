@@ -9651,6 +9651,8 @@ export interface components {
             state: "waiting" | "in-force" | "withdrawn";
             withdrawn_at?: string;
             withdrawn_by?: string;
+            /** @description Whether you proposed it. The proposer may not approve it */
+            yours?: boolean;
         };
         RulingProposedBody: {
             /**

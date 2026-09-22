@@ -38,6 +38,7 @@ end rather than left to be found by clicking.
 - [Catalog and inventories](#catalog-and-inventories)
 - [Product and scan-run pages](#product-and-scan-run-pages)
 - [Flaw entry](#flaw-entry)
+- [The inbox](#the-inbox)
 - [Disclosure and advisories](#disclosure-and-advisories)
 - [The editor](#the-editor)
 - [Reachable from a keyboard](#reachable-from-a-keyboard)
@@ -1079,6 +1080,26 @@ the text of arbitrary outbound links, laid out on the screen a triager is
 deciding from, plus the ability to name one of this deployment's own
 attachments and have it drawn beside their argument. A judgment somebody else
 publishes may be evidence and may never be presentation.
+
+## The inbox
+
+One product's reports, reached from the product page and from the two notices
+that name a report. `DESIGN-findings.md` § Reports holds what a report is and
+§ Dispositions what a ruling does; this is how the screens draw them.
+
+| Rule | |
+|---|---|
+| The link appears only for somebody who may work reports | Triage of undisclosed work in the product, which is what every read of a report asks. A link leading to a refusal is worse than none |
+| Two tabs: the reports, and the rulings waiting for approval | The second is where the waiting notice points. Its count is on the tab, because it is somebody else's turn and nothing else on the screen says so |
+| A report's status is one word, and a waiting ruling says so in it | "Rejected, waiting" reads differently from "Rejected", which is the whole of what the second person changes |
+| Only an open report can be selected | One under a ruling or accepted is refused by the server, and a checkbox that leads to a refusal is a control that always fails |
+| The selection and the form for one report are one form | A ruling covers any number of reports and the second person approves the selection as one act, so the two screens cannot come to say different things |
+| The button names the act | "Propose" where somebody else has to agree, "Submit" where nobody does. The count is on it where more than one report is covered |
+| A duplicate asks for the issue, and says a closed one is rejected instead | The server refuses a duplicate of an issue not open here; the hint says what to do before the refusal does |
+| Approve is not offered to the ruling's own proposer | The server tells them apart and says so on the ruling. Withdrawing is offered to everybody, and reads "Withdraw" to the proposer, "Send back" to anybody else while it waits, and "Undo" once it is in force — one act under three names, each the word for that moment |
+| A report's page holds the claim, the answer to the reporter, the files and the judgment | In that order, which is the order they happen in. The judgment offers accepting as an issue and a ruling side by side while nothing answers the report, and the ruling itself once one does |
+| Files are attached from the report's page and held at once | A report carries no text a reference could be written into |
+| Duplicates are listed on the issue's reporter card | Read under the report rule, so the list is absent for somebody who may not work reports rather than drawn empty |
 
 ## Disclosure and advisories
 

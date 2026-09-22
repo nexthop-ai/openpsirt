@@ -9,7 +9,8 @@ import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { statusOf, unwrap } from "../api/queries";
+import { notYours, statusOf, unwrap } from "../api/queries";
+import { useDuplicates } from "../api/intake";
 import { linkable } from "../ui/addressable";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
@@ -341,6 +342,8 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
         </>
       )}
 
+      <Duplicates product={product} vulnerability={vulnerability} />
+
       {/* A CVE assigned later is another name for the same issue.
           Nothing keyed on the issue moves; what changes is that a reader
           searching by the new name finds this, and the advisory carries it. */}
@@ -370,6 +373,41 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
           <Failed error={alsoKnown.error} what="That name could not be recorded." />
         )}
       </div>
+    </div>
+  );
+}
+
+// Reports ruled duplicates of this issue, where somebody triaging it finds the
+// screenshot one of them carried. Read under the report rule, so somebody who
+// may not work reports sees nothing here.
+function Duplicates({ product, vulnerability }: { product: string; vulnerability: string }) {
+  const duplicates = useDuplicates(product, vulnerability);
+  if (duplicates.isPending) return null;
+  if (duplicates.isError) {
+    return notYours(duplicates.error) ? null : (
+      <Failed error={duplicates.error} what="The duplicates could not be read." />
+    );
+  }
+  const rows = duplicates.data?.items ?? [];
+  if (rows.length === 0) return null;
+  const inbox = `/products/${encodeURIComponent(product)}/inbox`;
+  return (
+    <div style={{ marginTop: 10 }}>
+      <h4 style={{ margin: "0 0 4px" }}>Duplicates</h4>
+      <ul className="files">
+        {rows.map((row) => (
+          <li key={row.reference}>
+            <Link className="id" to={`${inbox}/${encodeURIComponent(row.reference)}`}>
+              {row.reference}
+            </Link>
+            <span className="hint">
+              {" "}
+              · {row.reported_by || "Anonymous"}
+              {row.received && <> · arrived {row.received}</>}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

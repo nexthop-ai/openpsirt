@@ -8,6 +8,7 @@ import { Empty } from "../ui/Empty";
 import { UNNARROWED } from "../app/scope";
 import { Failed } from "../ui/Failed";
 import { Wide } from "../ui/Wide";
+import { mayOf, useWho } from "../app/session";
 
 // One product's own page.
 //
@@ -23,6 +24,9 @@ import { Wide } from "../ui/Wide";
 // themselves.
 export function Product() {
   const { product = "" } = useParams();
+  const who = useWho();
+  // The inbox asks what reading a report asks: triage of undisclosed work.
+  const mayWorkReports = !!mayOf(who.data, product)?.may_hide;
   const overview = useQuery({
     queryKey: ["overview", product],
     queryFn: async () =>
@@ -50,6 +54,12 @@ export function Product() {
             <> · triaged at whatever the deployment says</>
           )}
           {it.end_of_life && <> · out of support {it.end_of_life}</>}
+          {mayWorkReports && (
+            <>
+              {" "}
+              · <Link to={`/products/${encodeURIComponent(product)}/inbox`}>Inbox</Link>
+            </>
+          )}
         </p>
       </div>
 

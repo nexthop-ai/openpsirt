@@ -23,6 +23,7 @@ type RulingBody struct {
 	State       string   `json:"state" enum:"waiting,in-force,withdrawn" doc:"Waiting for a second person, what its reports currently are, or taken back"`
 	ProposedBy  string   `json:"proposed_by"`
 	ProposedAt  string   `json:"proposed_at"`
+	Yours       bool     `json:"yours,omitempty" doc:"Whether you proposed it. The proposer may not approve it"`
 	ApprovedBy  string   `json:"approved_by,omitempty" doc:"Who agreed, on a disposition that takes a second person"`
 	ApprovedAt  string   `json:"approved_at,omitempty"`
 	WithdrawnBy string   `json:"withdrawn_by,omitempty"`
@@ -88,7 +89,7 @@ func registerRulings(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refusedRuling(in, err, "that ruling could not be recorded")
 		}
-		return rulingOutput(ctx, in, ruling)
+		return rulingOutput(ctx, in, subject, ruling)
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -113,7 +114,7 @@ func registerRulings(api huma.API, in Ingest) {
 			return nil, refusedRuling(in, err, "the rulings could not be read")
 		}
 		out := &listOutput[RulingBody]{}
-		out.Body.Items, err = rulingBodies(ctx, in, rows)
+		out.Body.Items, err = rulingBodies(ctx, in, subject, rows)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the rulings could not be read", err)
 		}
@@ -139,7 +140,7 @@ func registerRulings(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refusedRuling(in, err, "that ruling could not be read")
 		}
-		return rulingOutput(ctx, in, ruling)
+		return rulingOutput(ctx, in, subject, ruling)
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -163,7 +164,7 @@ func registerRulings(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, refusedRuling(in, err, "that ruling could not be approved")
 			}
-			return rulingOutput(ctx, in, ruling)
+			return rulingOutput(ctx, in, subject, ruling)
 		})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -188,7 +189,7 @@ func registerRulings(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, refusedRuling(in, err, "that ruling could not be withdrawn")
 		}
-		return rulingOutput(ctx, in, ruling)
+		return rulingOutput(ctx, in, subject, ruling)
 	})
 
 	huma.Register(api, requiring(huma.Operation{
@@ -227,10 +228,10 @@ func registerRulings(api huma.API, in Ingest) {
 }
 
 // rulingOutput renders one ruling as a response.
-func rulingOutput(ctx context.Context, in Ingest, ruling *finding.ReportRuling) (
-	*struct{ Body RulingBody }, error) {
+func rulingOutput(ctx context.Context, in Ingest, subject access.Subject,
+	ruling *finding.ReportRuling) (*struct{ Body RulingBody }, error) {
 
-	bodies, err := rulingBodies(ctx, in, []finding.ReportRuling{*ruling})
+	bodies, err := rulingBodies(ctx, in, subject, []finding.ReportRuling{*ruling})
 	if err != nil {
 		return nil, wentWrong(in.Logger, "that ruling could not be read back", err)
 	}
@@ -239,8 +240,8 @@ func rulingOutput(ctx context.Context, in Ingest, ruling *finding.ReportRuling) 
 
 // rulingBodies renders rulings, naming the people and issues they refer to in
 // one read each.
-func rulingBodies(ctx context.Context, in Ingest, rows []finding.ReportRuling) (
-	[]RulingBody, error) {
+func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
+	rows []finding.ReportRuling) ([]RulingBody, error) {
 
 	people := make([]int64, 0, len(rows))
 	issues := make([]int64, 0, len(rows))
@@ -269,6 +270,7 @@ func rulingBodies(ctx context.Context, in Ingest, rows []finding.ReportRuling) (
 			ID: row.ID, Disposition: string(row.Disposition), Reasoning: row.Reasoning,
 			Reports: row.References, State: rulingState(row),
 			ProposedBy: names[row.ProposedBy], ProposedAt: row.ProposedAt.Format(time.RFC3339),
+			Yours: row.ProposedBy == subject.ID,
 		}
 		if body.Reports == nil {
 			body.Reports = []string{}

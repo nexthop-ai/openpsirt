@@ -7685,6 +7685,9 @@ components:
           type: string
         withdrawn_by:
           type: string
+        yours:
+          description: Whether you proposed it. The proposer may not approve it
+          type: boolean
       required:
         - id
         - disposition
