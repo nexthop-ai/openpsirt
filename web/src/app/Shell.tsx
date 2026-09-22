@@ -261,7 +261,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
             {/* Standing attacks and the windows counted from each. Beside
               Disclosing because both are dates with somebody outside waiting
               on them, which no remediation deadline has. */}
-            <Rail to="/obligations" icon="shield" label="Obligations" />
+            <Rail to="/obligations" icon="shield" label="Standing attacks" />
             {/* What this deployment has said about its own flaws. Beside
               Disclosing because an embargo reaching its date is one of the
               three things an advisory gets written for. */}

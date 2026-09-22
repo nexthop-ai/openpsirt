@@ -181,17 +181,28 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 		}
 		was := window.Name + " " + strconv.Itoa(window.Hours) + "h"
 		live := folded(name)
-		if _, err := tx.NewUpdate().Model((*Window)(nil)).
+		res, err := tx.NewUpdate().Model((*Window)(nil)).
 			Set("name = ?", name).
 			Set("length_hours = ?", hours).
 			Set("live_name = ?", live).
 			Where("id = ?", id).
+			// Still in force when this lands. A retirement committed since the
+			// read above leaves nothing to change, and a trail row saying it
+			// changed would be false.
 			Where("retired_at IS NULL").
-			Exec(ctx); err != nil {
+			Exec(ctx)
+		if err != nil {
 			if database.IsDuplicate(err) {
 				return ErrWindowNamed
 			}
 			return fmt.Errorf("change a window: %w", err)
+		}
+		changed, err := database.Affected(res)
+		if err != nil {
+			return fmt.Errorf("change a window: %w", err)
+		}
+		if changed == 0 {
+			return ErrNoSuchWindow
 		}
 		window.Name, window.Hours, window.LiveName = name, hours, &live
 		became := name + " " + strconv.Itoa(hours) + "h"

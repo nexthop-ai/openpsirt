@@ -46,13 +46,18 @@ type Entry struct {
 	Told    []Told
 }
 
-// Standings is every record of being exploited still standing, oldest known
-// first, with no narrowing.
+// Standings is every record of being exploited still standing that this
+// subject may be told of, oldest known first.
 //
-// Unnarrowed, because its two callers narrow it by different questions: the
-// sweep by who may act on each product, recipient by recipient, and the shelf
-// by what one reader may be told of. A reader's list is Shelf.
-func (s *Store) Standings(ctx context.Context) ([]Standing, error) {
+// Narrowed record by record, each by the question that authorizes one issue
+// in one product. The set is what this deployment's products have been
+// attacked through and nobody has cleared, which is short. Nothing is counted
+// before the narrowing, so no total says how many records exist to somebody
+// shown fewer.
+//
+// The sweep asks as the deployment and narrows again per recipient, because
+// who may act on a product is a different question from who may read it.
+func (s *Store) Standings(ctx context.Context, subject access.Subject) ([]Standing, error) {
 	var rows []struct {
 		triage.ExploitedHere `bun:"extend"`
 
@@ -86,10 +91,24 @@ func (s *Store) Standings(ctx context.Context) ([]Standing, error) {
 	}
 	out := make([]Standing, 0, len(rows))
 	for _, row := range rows {
+		allowed, err := finding.MayBeToldOfWithin(ctx, s.db, subject,
+			row.ProductID, row.VulnerabilityID)
+		if err != nil {
+			return nil, err
+		}
+		if !allowed {
+			continue
+		}
+		// Whether the issue is undisclosed somewhere here is itself what an
+		// embargo keeps from a reader who may not see undisclosed work. They
+		// reach the record through a finding that is public, and are told
+		// nothing about the ones that are not.
+		private := row.Private == 1 && (subject.Reads(access.Private, row.ProductID) ||
+			subject.OnCase(row.ProductID, row.VulnerabilityID))
 		out = append(out, Standing{
 			Record: row.ExploitedHere, Issue: row.Issue,
 			Product: row.Product, ProductName: row.ProductName,
-			Private: row.Private == 1,
+			Private: private,
 		})
 	}
 	return out, nil
@@ -98,31 +117,16 @@ func (s *Store) Standings(ctx context.Context) ([]Standing, error) {
 // Shelf is every standing record this reader may be told of, with each
 // window this deployment counts and every notice given.
 //
-// Narrowed record by record, each by the question that authorizes one issue
-// in one product. The set is what this deployment's products have been
-// attacked through and nobody has cleared, which is short; a deployment where
-// it is long has a problem no paging would help with. Nothing is counted
-// before the narrowing, so no total says how many records exist to somebody
-// shown fewer.
+// Unpaged. A deployment where the set is long has a problem no paging would
+// help with.
 //
 // Its own surface rather than a filter over the overdue list. A window here
 // has somebody outside waiting on it, and a remediation deadline has nobody,
 // so the two are never read as one list.
 func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, error) {
-	all, err := s.Standings(ctx)
+	kept, err := s.Standings(ctx, subject)
 	if err != nil {
 		return nil, err
-	}
-	kept := make([]Standing, 0, len(all))
-	for _, one := range all {
-		allowed, err := finding.MayBeToldOfWithin(ctx, s.db, subject,
-			one.Record.ProductID, one.Record.VulnerabilityID)
-		if err != nil {
-			return nil, err
-		}
-		if allowed {
-			kept = append(kept, one)
-		}
 	}
 	if len(kept) == 0 {
 		return nil, nil
@@ -135,7 +139,7 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 	for _, one := range kept {
 		ids = append(ids, one.Record.ID)
 	}
-	told, err := s.ToldAbout(ctx, ids)
+	told, err := s.ToldAbout(ctx, subject, ids)
 	if err != nil {
 		return nil, err
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/obligation"
 )
 
@@ -44,7 +45,10 @@ func (w *Watch) windowsPassed(ctx context.Context) (map[int64][]Holds, error) {
 // they report.
 func (w *Watch) windows(ctx context.Context, kind Kind, passed bool) (map[int64][]Holds, error) {
 	store := obligation.NewStore(w.db)
-	standing, err := store.Standings(ctx)
+	// As the deployment, which reads everything; each recipient is narrowed
+	// below by what they may act on.
+	everything := access.Everything("the obligation sweep")
+	standing, err := store.Standings(ctx, everything)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +73,7 @@ func (w *Watch) windows(ctx context.Context, kind Kind, passed bool) (map[int64]
 	for _, one := range standing {
 		ids = append(ids, one.Record.ID)
 	}
-	told, err := store.ToldAbout(ctx, ids)
+	told, err := store.ToldAbout(ctx, everything, ids)
 	if err != nil {
 		return nil, err
 	}

@@ -42,7 +42,7 @@ export function Obligations() {
     <>
       <div className="screen-head">
         <h2>
-          Obligations <span className="n">{items.length.toLocaleString()}</span>
+          Standing attacks <span className="n">{items.length.toLocaleString()}</span>
         </h2>
         <p>
           Products attacked through an issue, and the windows counted from when each became known.
@@ -123,7 +123,15 @@ function Incident({ incident, windows }: { incident: Incident; windows: Window[]
           {(incident.told ?? []).map((one) => (
             <p key={one.id}>
               <b style={{ color: "var(--ink)" }}>{one.recipient}</b> at {at(one.told_at)}
-              {one.window && <span className="hint"> · for {one.window}</span>}
+              {one.window && (
+                <span className="hint">
+                  {" "}
+                  · for {one.window}
+                  {/* A retired window's name may be declared again, so a
+                      notice for the old one says which it was. */}
+                  {!windows.some((each) => each.id === one.window_id) && " (retired)"}
+                </span>
+              )}
               <br />
               <span className="hint">{one.said}</span>
             </p>

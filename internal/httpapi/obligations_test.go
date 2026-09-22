@@ -24,6 +24,7 @@ type shelf struct {
 		} `json:"windows"`
 		Told []struct {
 			Recipient string `json:"recipient"`
+			WindowID  int64  `json:"window_id"`
 			Window    string `json:"window"`
 		} `json:"told"`
 	} `json:"items"`
@@ -110,7 +111,8 @@ func TestAWindowAfterAnAttackIsWatchedUntilSomebodyOutsideIsRecordedAsTold(t *te
 		if !seen.Items[0].Windows[0].Answered {
 			t.Error("the answered window does not read as answered on the shelf")
 		}
-		if len(seen.Items[0].Told) != 1 || seen.Items[0].Told[0].Window != "Early warning" {
+		if len(seen.Items[0].Told) != 1 || seen.Items[0].Told[0].Window != "Early warning" ||
+			seen.Items[0].Told[0].WindowID != early {
 			t.Errorf("the notice is not on the shelf with its window: %+v", seen.Items[0].Told)
 		}
 	})
@@ -180,7 +182,7 @@ func TestAnAttackThroughAnUndisclosedIssueReachesOnlyWhoMayReadIt(t *testing.T) 
 	// undisclosed issue exists, on the shelf or in a notification. The
 	// notification is a second place the rule has to hold, and the one a
 	// reader does not go looking for.
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 		r.undisclosed(t)
 		r.declared(t, "Early warning", 24)
@@ -282,7 +284,7 @@ func TestANoticeNamingAPassedWindowClearsIt(t *testing.T) {
 func TestTheListABulkJudgmentIsPickedFromMarksAnAttackedIssue(t *testing.T) {
 	// A judgment over a selection reaching an attacked issue is refused
 	// whole, so the list it is picked from says which issue that is.
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scanned(t)
 		const at = "/v1/products/mine/streams/master/variants/broadcom" +
 			"/components/libnl-3-200/issues"

@@ -21,8 +21,9 @@ import (
 // a window counts from is what was said rather than the moment of typing.
 var knownAt = time.Date(2026, 9, 20, 14, 0, 0, 0, time.UTC)
 
-// cast is a product with an issue open in it, somebody who triages there,
-// somebody who reads another product only, and an administrator.
+// cast is a product with an issue open in it, somebody who triages its public
+// findings, somebody who triages its undisclosed ones too, somebody who reads
+// another product only, and an administrator.
 type cast struct {
 	product, issue int64
 }
@@ -90,6 +91,13 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 	if err := rights.GrantRole(ctx, triager.ID, product.ID, access.PublicTriage); err != nil {
 		return cast{}, err
 	}
+	insider, err := rights.Ensure(ctx, "insider", "Insider", nil, nil)
+	if err != nil {
+		return cast{}, err
+	}
+	if err := rights.GrantRole(ctx, insider.ID, product.ID, access.PrivateTriage); err != nil {
+		return cast{}, err
+	}
 	outsider, err := rights.Ensure(ctx, "outsider", "Outsider", nil, nil)
 	if err != nil {
 		return cast{}, err
@@ -101,10 +109,10 @@ var castSeed = dbtest.Seed(func(ctx context.Context, db *database.DB) (cast, err
 })
 
 type fixture struct {
-	db                       *database.DB
-	store                    *obligation.Store
-	product, issue           int64
-	admin, triager, outsider access.Subject
+	db                                *database.DB
+	store                             *obligation.Store
+	product, issue                    int64
+	admin, triager, insider, outsider access.Subject
 }
 
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
@@ -120,7 +128,8 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 		}
 		fn(t, &fixture{
 			db: db, store: obligation.NewStore(db.DB), product: c.product, issue: c.issue,
-			admin: subject("admin"), triager: subject("triager"), outsider: subject("outsider"),
+			admin: subject("admin"), triager: subject("triager"), insider: subject("insider"),
+			outsider: subject("outsider"),
 		})
 	})
 }
@@ -389,7 +398,7 @@ func TestARetiredWindowIsNeitherChangedNorAnswered(t *testing.T) {
 			t.Errorf("a notice naming a retired window answered %v", err)
 		}
 
-		told, err := f.store.ToldAbout(ctx, []int64{record.ID})
+		told, err := f.store.ToldAbout(ctx, f.triager, []int64{record.ID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -460,6 +469,74 @@ func TestAWindowIsRetiredOnlyByAnAdministrator(t *testing.T) {
 		if err := f.store.RetireWindow(t.Context(), f.triager, early.ID); !errors.Is(err,
 			access.ErrDenied) {
 			t.Errorf("a triager retiring a window answered %v", err)
+		}
+	})
+}
+
+func TestTheShelfDoesNotTellAPublicReaderTheIssueIsUndisclosedElsewhere(t *testing.T) {
+	// The issue is public at one place and undisclosed at another. A reader
+	// who may not see undisclosed work reaches the record through the public
+	// one, and that it is undisclosed anywhere is what the embargo keeps from
+	// them.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		var open finding.Finding
+		if err := f.db.DB.NewSelect().Model(&open).Limit(1).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		hidden := open
+		hidden.ID = 0
+		hidden.PlaceIdentity = "place-of-libfoo-under-libbar"
+		hidden.Visibility = access.Private
+		if _, err := f.db.DB.NewInsert().Model(&hidden).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		f.attacked(t)
+
+		shelf, err := f.store.Shelf(ctx, f.triager)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(shelf) != 1 {
+			t.Fatalf("the public triager was shown %d incidents, want the one", len(shelf))
+		}
+		if shelf[0].Private {
+			t.Error("a public triager was told the issue is undisclosed somewhere here")
+		}
+		shelf, err = f.store.Shelf(ctx, f.insider)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(shelf) != 1 || !shelf[0].Private {
+			t.Errorf("a private triager was not told the issue is undisclosed here: %+v", shelf)
+		}
+	})
+}
+
+func TestANoticeIsReadOnlyByWhoMayBeToldOfTheAttack(t *testing.T) {
+	// A notice names an attack, so it is narrowed by the record it is about:
+	// somebody who may not be told of the attack is not handed what was said
+	// about it, whoever asks on their behalf.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		record := f.attacked(t)
+		if _, err := f.store.RecordTold(ctx, f.triager, record.ID, nil, "ENISA",
+			knownAt.Add(time.Hour), "An attack."); err != nil {
+			t.Fatal(err)
+		}
+		told, err := f.store.ToldAbout(ctx, f.outsider, []int64{record.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(told) != 0 {
+			t.Errorf("somebody with nothing on the product was handed %+v", told)
+		}
+		told, err = f.store.ToldAbout(ctx, f.triager, []int64{record.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(told[record.ID]) != 1 {
+			t.Errorf("a triager on the product was handed %+v", told)
 		}
 	})
 }

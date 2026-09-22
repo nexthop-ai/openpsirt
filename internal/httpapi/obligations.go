@@ -41,7 +41,8 @@ type NoticeBody struct {
 	Recipient  string `json:"recipient" doc:"Who was told"`
 	ToldAt     string `json:"told_at" format:"date-time" doc:"When they were told"`
 	Said       string `json:"said" doc:"What they were told"`
-	Window     string `json:"window,omitempty" doc:"The window this notice answers, where whoever recorded it named one"`
+	WindowID   int64  `json:"window_id,omitempty" doc:"The window this notice answers, where whoever recorded it named one. A retired window's name may be declared again, so this is what tells the two apart"`
+	Window     string `json:"window,omitempty" doc:"That window's name"`
 	RecordedBy string `json:"recorded_by,omitempty" doc:"Who recorded the notice"`
 	RecordedAt string `json:"recorded_at" format:"date-time"`
 }
@@ -166,7 +167,9 @@ func registerObligations(api huma.API, in Ingest) {
 		Path:    "/v1/obligation-windows",
 		Summary: "Declare an obligation window",
 		Description: "Adds a window every standing attack is watched against, counted from " +
-			"the moment each became known. Recorded in the administrative trail.",
+			"the moment each became known. Recorded in the administrative trail.\n\n" +
+			"A name already in force, in any capitals, is refused with 409: retire that " +
+			"window or pick another name.",
 		Tags: []string{"Obligations"}, DefaultStatus: http.StatusCreated,
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		Body WindowSaid
@@ -192,7 +195,9 @@ func registerObligations(api huma.API, in Ingest) {
 		Summary: "Change an obligation window",
 		Description: "Renames a window in force or changes how long it runs. Every " +
 			"incident's end moves with it, and notices already recorded against it keep " +
-			"naming it. Recorded in the administrative trail.",
+			"naming it. Recorded in the administrative trail.\n\n" +
+			"A name another window in force holds is refused with 409. A retired or " +
+			"unknown window answers 404.",
 		Tags: []string{"Obligations"},
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		ID   int64 `path:"id"`
@@ -218,7 +223,8 @@ func registerObligations(api huma.API, in Ingest) {
 		Path:    "/v1/obligation-windows/{id}",
 		Summary: "Retire an obligation window",
 		Description: "Stops counting a window. Notices recorded against it keep naming it, " +
-			"and its name may be declared again. Recorded in the administrative trail.",
+			"and its name may be declared again. Recorded in the administrative trail.\n\n" +
+			"A window already retired, or never declared, answers 404.",
 		Tags: []string{"Obligations"}, DefaultStatus: http.StatusNoContent,
 	}, deploymentWide, ""), func(ctx context.Context, input *struct {
 		ID int64 `path:"id"`
@@ -327,7 +333,7 @@ func toldBodies(told []obligation.Told, windows map[int64]string,
 			RecordedAt: one.RecordedAt.Format(time.RFC3339),
 		}
 		if one.WindowID != nil {
-			body.Window = windows[*one.WindowID]
+			body.WindowID, body.Window = *one.WindowID, windows[*one.WindowID]
 		}
 		out = append(out, body)
 	}

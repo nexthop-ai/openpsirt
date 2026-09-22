@@ -1583,6 +1583,8 @@ export interface paths {
          * Declare an obligation window
          * @description Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
          *
+         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name.
+         *
          *     Requires: administrator
          */
         post: operations["declare-obligation-window"];
@@ -1604,6 +1606,8 @@ export interface paths {
          * Change an obligation window
          * @description Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
          *
+         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404.
+         *
          *     Requires: administrator
          */
         put: operations["change-obligation-window"];
@@ -1611,6 +1615,8 @@ export interface paths {
         /**
          * Retire an obligation window
          * @description Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
+         *
+         *     A window already retired, or never declared, answers 404.
          *
          *     Requires: administrator
          */
@@ -8435,8 +8441,13 @@ export interface components {
              * @description When they were told
              */
             told_at: string;
-            /** @description The window this notice answers, where whoever recorded it named one */
+            /** @description That window's name */
             window?: string;
+            /**
+             * Format: int64
+             * @description The window this notice answers, where whoever recorded it named one. A retired window's name may be declared again, so this is what tells the two apart
+             */
+            window_id?: number;
         };
         NoticeSaid: {
             /**
@@ -8586,12 +8597,16 @@ export interface components {
         OutlierBody: {
             /**
              * Format: int64
-             * @description A row of the claim about this issue, to set aside when approving
+             * @description A representative row of the claim about this issue
              */
             decision_id: number;
+            /** @description Every row of the claim about this issue, one per place. Name all of them to set the issue aside when approving */
+            decision_ids: number[] | null;
             /** @description The first two hundred characters of what the report says */
             description?: string;
             exploited?: boolean;
+            /** @description This product records being attacked through it */
+            exploited_here?: boolean;
             fixed_in?: string;
             severity?: string;
             vulnerability: string;
@@ -8606,10 +8621,15 @@ export interface components {
             exploited: number;
             /**
              * Format: int64
+             * @description Issues this product records being attacked through. Agreeing to the claim is refused while any is in it; set them aside
+             */
+            exploited_here: number;
+            /**
+             * Format: int64
              * @description Issues a fix is available for
              */
             fixable: number;
-            /** @description The issues that stood out, exploited first and then by severity, at most twenty */
+            /** @description The issues that stood out: attacked here first, then exploited, then by severity. At most twenty, except that every issue this product was attacked through is listed */
             rows: components["schemas"]["OutlierBody"][] | null;
             /**
              * Format: int64

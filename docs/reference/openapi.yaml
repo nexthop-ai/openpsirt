@@ -5733,8 +5733,12 @@ components:
           format: date-time
           type: string
         window:
-          description: The window this notice answers, where whoever recorded it named one
+          description: That window's name
           type: string
+        window_id:
+          description: The window this notice answers, where whoever recorded it named one. A retired window's name may be declared again, so this is what tells the two apart
+          format: int64
+          type: integer
       required:
         - id
         - recipient
@@ -5988,13 +5992,24 @@ components:
       additionalProperties: false
       properties:
         decision_id:
-          description: A row of the claim about this issue, to set aside when approving
+          description: A representative row of the claim about this issue
           format: int64
           type: integer
+        decision_ids:
+          description: Every row of the claim about this issue, one per place. Name all of them to set the issue aside when approving
+          items:
+            format: int64
+            type: integer
+          type:
+            - array
+            - "null"
         description:
           description: The first two hundred characters of what the report says
           type: string
         exploited:
+          type: boolean
+        exploited_here:
+          description: This product records being attacked through it
           type: boolean
         fixed_in:
           type: string
@@ -6011,6 +6026,7 @@ components:
             - "null"
       required:
         - decision_id
+        - decision_ids
         - vulnerability
         - why
       type: object
@@ -6021,12 +6037,16 @@ components:
           description: Issues in the set known to be exploited
           format: int64
           type: integer
+        exploited_here:
+          description: Issues this product records being attacked through. Agreeing to the claim is refused while any is in it; set them aside
+          format: int64
+          type: integer
         fixable:
           description: Issues a fix is available for
           format: int64
           type: integer
         rows:
-          description: The issues that stood out, exploited first and then by severity, at most twenty
+          description: "The issues that stood out: attacked here first, then exploited, then by severity. At most twenty, except that every issue this product was attacked through is listed"
           items:
             $ref: "#/components/schemas/OutlierBody"
           type:
@@ -6041,6 +6061,7 @@ components:
           format: int64
           type: integer
       required:
+        - exploited_here
         - exploited
         - severe
         - fixable
@@ -13812,6 +13833,8 @@ paths:
       description: |-
         Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
 
+        A name already in force, in any capitals, is refused with 409: retire that window or pick another name.
+
         Requires: administrator
       operationId: declare-obligation-window
       requestBody:
@@ -13843,6 +13866,8 @@ paths:
       description: |-
         Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
 
+        A window already retired, or never declared, answers 404.
+
         Requires: administrator
       operationId: retire-obligation-window
       parameters:
@@ -13869,6 +13894,8 @@ paths:
     put:
       description: |-
         Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+
+        A name another window in force holds is refused with 409. A retired or unknown window answers 404.
 
         Requires: administrator
       operationId: change-obligation-window

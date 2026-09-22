@@ -405,13 +405,20 @@ each as a comment.
 | Setting aside a row outside the claim is refused, not ignored | A stray identifier is more likely a mistake than a wish |
 | The proposer may not set rows of their own claim aside | Setting aside is an approver's act: the rest of the claim is approved in the same action |
 
-The outliers are four signals, all already stored, counted over the distinct
-issues in the claim: known to be exploited; rated critical or high, by our
-assessment where one stands; a fix available, read from the open findings the
-claim's rows match and only those the reader may see; and, where the record of
-how the set was narrowed names a term, a description that does not carry it.
-Exploited first, then the worst rated, then by name, capped at twenty, with
-counts saying how many are behind the cap.
+The outliers are five signals, all already stored, counted over the distinct
+issues in the claim: this product recorded as attacked through it; known to be
+exploited; rated critical or high, by our assessment where one stands; a fix
+available, read from the open findings the claim's rows match and only those the
+reader may see; and, where the record of how the set was narrowed names a term,
+a description that does not carry it. Attacked here first, then exploited, then
+the worst rated, then by name, capped at twenty, with counts saying how many are
+behind the cap.
+
+| Rule | |
+|---|---|
+| An issue this product was attacked through is never behind the cap | Agreeing is refused while one is in the claim, so it is the row an approver has to be able to set aside |
+| A row names every place of its issue, and setting it aside sets all of them aside | Agreeing to any one place of an issue is agreeing to the issue |
+| Every act over many issues carries the table | Rows set aside from one, and one re-made after it lapsed, are refused over an attacked issue the same way, and without the table the only answer to them is refusing them whole |
 
 Without this an approver of a bulk claim chooses between refusing everything and
 agreeing to everything.
@@ -635,7 +642,7 @@ A product may record that it was exploited through an issue.
 | A bulk act saying the issues apply, or promising work, is not refused | Neither sets anything aside, and the next scan checks every row a promise names |
 | Rows set aside from a bulk act are still a bulk act | Setting rows aside makes a claim of its own, followed back to where it began. Otherwise the rule ends one step from where it started |
 | An approver may set the attacked issue aside and agree to the rest | The refusal is asked of the rows being agreed to. One attacked issue does not make a selection of hundreds unanswerable, and what is set aside meets the rule again with its author |
-| A record arriving over either kind of claim is kept, and returns the claim to the queue | A fact cannot be refused and a judgment can. An agreed claim loses its agreement; a claim standing with nobody's agreement because it never needed any is made to need one. The claim itself stands for somebody to answer again, and whoever wrote it is told |
+| A record arriving over either kind of claim is kept, and returns the claim to the queue | A fact cannot be refused and a judgment can. It loses its agreement; a bulk act always needs one. The claim itself stands for somebody to answer again, and whoever wrote it is told |
 | Agreeing to either kind of claim is refused too | Approving writes no decision row, so it meets nothing the write path checks. A claim proposed before the record arrived and agreed to afterwards is what hides the finding, which is the state the refusal exists to prevent |
 | Refused where a decision is written rather than at each entry point | A claim at a finding, a bulk act, a re-affirmation, an extension carried to another issue and a decision carried across builds all reach one place. Checked at the entry points, the paths nobody checked are the ways round the rule |
 | At the finding, only the claim that the issue does not apply | A claim that the scanner matched the wrong thing is about identity, and the outcomes that promise work or put it off are not contradicted by an attack. Made one finding at a time, each is a judgment somebody made about that finding |
