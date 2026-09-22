@@ -436,6 +436,13 @@ func (s *Store) approveClaim(ctx context.Context, subject access.Subject, claimI
 	if claim.RevisionID == nil {
 		return nil, ErrNothingToApprove
 	}
+	// Refused before anybody agrees to it. A claim that the issue does not
+	// apply, written before a record of this product being exploited through
+	// it arrived, is a claim the record contradicts — and agreeing to it is
+	// what would put the finding out of sight.
+	if err := s.refuseIfExploitedHereOn(ctx, claim, rows); err != nil {
+		return nil, err
+	}
 	// Compared against whoever wrote the words being agreed to, not only
 	// against whoever proposed the claim. An approval names one revision, so
 	// the control is about the text — and anybody who may triage can revise,

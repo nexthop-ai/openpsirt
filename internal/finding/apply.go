@@ -232,19 +232,26 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 				}
 				rated := ratings[vulnerabilityID]
 				ranked := Ranked{
-					Exploited: rated.Exploited, Shipped: shipped,
+					ExploitedHere: rated.ExploitedHere,
+					Exploited:     rated.Exploited, Shipped: shipped,
 					LikelihoodPPM: rated.LikelihoodPPM,
 					ScoreCenti:    rated.Score(),
 				}
 				entry := wanted[key{vulnerabilityID, at}]
 				entry.Urgency = int64(ranked.Rank())
 				entry.RankExploited, entry.RankShipped = ranked.Exploited, ranked.Shipped
+				entry.RankExploitedHere = ranked.ExploitedHere
 				// A finding that opens already exploited was learned about
 				// when it opened, and every later recount has to reach the
 				// same answer.
 				entry.ExploitedLearnedAt = learnedExploitation(entry, startedAt)
 				severity := rated.Severity()
-				if onTheClock && floor.Admits(rated.Exploited, severity) {
+				// The line admits either exploitation signal; the window
+				// reads only the world's. How long a fix may take is a
+				// question about upstream, and this product having been
+				// attacked says nothing about that — what it says is that the
+				// finding is not one to put below the line.
+				if onTheClock && floor.Admits(rated.Exploited || rated.ExploitedHere, severity) {
 					window := windows.For(rated.Exploited, severity)
 					windowFor[key{vulnerabilityID, at}] = window
 					// From this run, which for a new finding is when it was
@@ -555,6 +562,7 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 		Published     string `bun:"published"`
 		Assessed      string `bun:"assessed"`
 		Exploited     bool   `bun:"exploited"`
+		ExploitedHere int    `bun:"exploited_here"`
 		ScoreCenti    int    `bun:"score_centi"`
 		LikelihoodPPM int    `bun:"likelihood_ppm"`
 	}
@@ -564,16 +572,23 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 			Published     string `bun:"published"`
 			Assessed      string `bun:"assessed"`
 			Exploited     bool   `bun:"exploited"`
+			ExploitedHere int    `bun:"exploited_here"`
 			ScoreCenti    int    `bun:"score_centi"`
 			LikelihoodPPM int    `bun:"likelihood_ppm"`
 		}
 		err := tx.NewSelect().
 			TableExpr(`"vulnerability" AS "v"`).
 			Join(rating.Here, productID).
+			// Whether this product has been recorded as attacked through the
+			// issue. A left join on the standing record rather than a column
+			// on the issue, because the record belongs to one product and the
+			// issue is shared by all of them.
+			Join(standingExploitationHere, productID).
 			ColumnExpr(`v.id AS "id"`).
 			ColumnExpr(`COALESCE(v.severity, ?) AS "published"`, "").
 			ColumnExpr(`COALESCE(ir.severity, ?) AS "assessed"`, "").
 			ColumnExpr(`v.exploited AS "exploited"`).
+			ColumnExpr(`CASE WHEN eh.id IS NULL THEN 0 ELSE 1 END AS "exploited_here"`).
 			ColumnExpr(`COALESCE(v.score_centi, 0) AS "score_centi"`).
 			ColumnExpr(`COALESCE(v.likelihood_ppm, 0) AS "likelihood_ppm"`).
 			Where("v.id IN (?)", bun.List(batch)).
@@ -587,7 +602,8 @@ func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 	for _, row := range rows {
 		ratings[row.ID] = Rating{
 			Published: row.Published, Assessed: row.Assessed,
-			Exploited: row.Exploited, ScoreCenti: row.ScoreCenti,
+			Exploited: row.Exploited, ExploitedHere: row.ExploitedHere == 1,
+			ScoreCenti:    row.ScoreCenti,
 			LikelihoodPPM: row.LikelihoodPPM,
 		}
 	}

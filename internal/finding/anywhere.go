@@ -150,12 +150,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		if !wasBelow {
 			// Never below the line where somebody is using one,
 			// and being exploited is not a claim about how bad
-			// something is — it is a fact about the world, and the
-			// one thing a line cannot set aside . Read off the
-			// urgency, whose top band is exactly that.
+			// something is — it is a fact, and the one thing a
+			// line cannot set aside. Read off the urgency, whose
+			// two top bands are the feed's word and this product's
+			// own record of being attacked (the exploiting threshold).
 			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.
-					WhereOr("f.urgency >= ?", int64(exploitedBand)).
+					WhereOr("f.urgency >= ?", int64(exploiting)).
 					WhereOr(ratedAt+" >= "+lineAt, deployment)
 			})
 		}
@@ -240,6 +241,13 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`COUNT(DISTINCT f.target_id) AS "builds"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		// The two exploitation flags, which the packed number above cannot
+		// tell apart. Read here as well as in the per-product list: a column
+		// this query does not select is left at its zero value rather than
+		// refused, so leaving them out reported every row of the
+		// deployment-wide list as exploited by nobody.
+		ColumnExpr(exploitedAcross+` AS "exploited"`).
+		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`MAX(COALESCE(v.likelihood_ppm, 0)) AS "likelihood_ppm"`).
 		ColumnExpr(`MAX(COALESCE(v.score_centi, 0)) AS "score_centi"`).
 		// Whether anything here carries a score at all, and the scheme it is

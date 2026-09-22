@@ -332,10 +332,13 @@ type ComponentGroup struct {
 	// carrying a fix, and the count is what makes one of them obviously worth
 	// taking. Most components have exactly one.
 	Upgrades []Candidate
-	// Exploited says whether any of them is known-exploited, which is what
-	// stops a component being put aside on the strength of its size alone.
-	Exploited bool
-	Urgency   int64
+	// Exploited says whether a feed reports any of them being used in the
+	// world, and ExploitedHere whether this product was recorded as attacked
+	// through one. Either is what stops a component being put aside on the
+	// strength of its size alone.
+	Exploited     bool
+	ExploitedHere bool
+	Urgency       int64
 }
 
 // Narrowing is a bulk selection as something other than the caller's word for

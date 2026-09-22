@@ -110,12 +110,18 @@ type Group struct {
 	// deliberate, and a blank cell would mean any of them.
 	DueAt      *time.Time
 	NoDeadline NoDeadline
-	// Urgency is how far up the list this belongs, and Exploited says whether
-	// it is there because somebody is using it. The flag is carried rather
-	// than left to be inferred from the number: a position nobody can explain
-	// is one people stop trusting and then work around.
-	Urgency   int64
-	Exploited bool
+	// Urgency is how far up the list this belongs, and the two flags say
+	// whether it is there because somebody is using it. Exploited is a feed's
+	// word about the world; ExploitedHere is somebody here recording that this
+	// product was attacked through it, which is the signal that outranks
+	// everything.
+	//
+	// Both are carried rather than left to be inferred from the number: a
+	// position nobody can explain is one people stop trusting and then work
+	// around, and the number cannot tell the two apart in any case.
+	Urgency       int64
+	Exploited     bool
+	ExploitedHere bool
 	// LikelihoodPPM is the published estimate that this will be exploited, in
 	// parts per million. Carried because it ranks *above* severity: without it
 	// on the row, a medium sitting above a high looks like the list is
@@ -467,7 +473,8 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 	group := Group{
 		Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
 		Places: row.Places, Answered: row.Answered,
-		Urgency: row.Urgency, Exploited: Rank(row.Urgency).Exploited(),
+		Urgency: row.Urgency, Exploited: row.Exploited == 1,
+		ExploitedHere: row.ExploitedHere == 1,
 		LikelihoodPPM: row.LikelihoodPPM, ScoreCenti: row.ScoreCenti,
 		Scored:       row.Scored == 1,
 		ScoreVersion: row.ScoreVersion,
@@ -511,7 +518,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 	// word chosen for a page that spans them would answer for none of them.
 	if group.DueAt == nil {
 		switch {
-		case !floor.Admits(group.Exploited, group.Severity):
+		case !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity):
 			group.NoDeadline = BelowTheLine
 		// Asked of both ends rather than of the word they agree on. A group
 		// whose places disagree reports "mixed", which is not a state upstream
@@ -587,6 +594,12 @@ type groupHead struct {
 	// filtered set, so the distinct counts go where there is none.
 	Places  int   `bun:"places"`
 	Urgency int64 `bun:"urgency"`
+	// The two exploitation signals, each read from its own flag. The urgency
+	// cannot tell them apart — both lift it into a band above everything
+	// else — and a list that showed one where the other holds would be the
+	// confusion the two columns exist to prevent.
+	Exploited     int `bun:"exploited"`
+	ExploitedHere int `bun:"exploited_here"`
 	// Total is how many groups the filter admits, the same on every row.
 	Total int `bun:"total"`
 }
@@ -696,6 +709,8 @@ func (s *Store) heads(ctx context.Context, targets []int64, visible []access.Vis
 		// about one issue at one fold, so what should decide where that
 		// decision appears is the worst of what it covers.
 		ColumnExpr(`MAX(f.urgency) AS "urgency"`).
+		ColumnExpr(exploitedAcross+` AS "exploited"`).
+		ColumnExpr(exploitedHereAcross+` AS "exploited_here"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		Where("f.target_id IN (?)", bun.List(targets)).
 		Where("f.closed_at IS NULL").

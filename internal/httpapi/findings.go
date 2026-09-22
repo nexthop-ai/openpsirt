@@ -144,6 +144,12 @@ type FindingBody struct {
 	// can explain is one people stop trusting, and then they sort by something
 	// else and lose the point of the order entirely.
 	Exploited bool `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
+	// ExploitedHere is the other reason a row sits at the top, and the one
+	// that outranks everything: a person here recorded this product being
+	// attacked through the issue. Carried apart from the flag above because
+	// the two are different facts, and a row showing one where the other
+	// holds is the confusion the pair exists to prevent.
+	ExploitedHere bool `json:"exploited_here,omitempty" doc:"This product is recorded as having been exploited through this issue"`
 	// Likelihood separates one medium from another, and from a high. It ranks
 	// between reachability and severity, so a list ordering by it and not
 	// showing it reads as unsorted.
@@ -190,14 +196,15 @@ type UpgradeBody struct {
 // ComponentFindingBody is one component at one version, with what is open
 // against it counted.
 type ComponentFindingBody struct {
-	Component string `json:"component"`
-	Version   string `json:"version"`
-	Upstream  string `json:"upstream,omitempty" doc:"The upstream a fork was cut from, where one is known"`
-	Source    string `json:"source_package,omitempty" doc:"The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it. With the component and version it tells one row from another, which those two alone do not"`
-	Issues    int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
-	Places    int    `json:"places" doc:"The number of times those sit somewhere in the build"`
-	Exploited bool   `json:"exploited" doc:"Whether any of them is known-exploited"`
+	Component     string `json:"component"`
+	Version       string `json:"version"`
+	Upstream      string `json:"upstream,omitempty" doc:"The upstream a fork was cut from, where one is known"`
+	Source        string `json:"source_package,omitempty" doc:"The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary"`
+	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it. With the component and version it tells one row from another, which those two alone do not"`
+	Issues        int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
+	Places        int    `json:"places" doc:"The number of times those sit somewhere in the build"`
+	Exploited     bool   `json:"exploited" doc:"Whether any of them is known-exploited"`
+	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of them"`
 	// BySeverity and Worst are the parts of the weight. Ranking by count
 	// alone answers this view's own question with the opposite of what
 	// somebody needs: a package with forty-four issues outranks one with three
@@ -472,7 +479,7 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 				Fold: group.Fold, Packages: group.Packages, Consumers: group.Consumers,
 				Places: group.Places, Answered: group.Answered,
 				State: group.State, SentBack: group.SentBack,
-				Exploited:    group.Exploited,
+				Exploited: group.Exploited, ExploitedHere: group.ExploitedHere,
 				Likelihood:   float64(group.LikelihoodPPM) / 1_000_000,
 				Score:        float64(group.ScoreCenti) / 100,
 				ScoreVersion: group.ScoreVersion,
@@ -562,7 +569,8 @@ func registerComponentFindings(api huma.API, in Ingest) {
 				Ecosystem:  group.Ecosystem,
 				BySeverity: group.BySeverity, Worst: group.Worst,
 				Issues: group.Issues, Places: group.Places, Exploited: group.Exploited,
-				Upgrades: upgrades,
+				ExploitedHere: group.ExploitedHere,
+				Upgrades:      upgrades,
 			})
 		}
 		return out, nil
@@ -667,6 +675,14 @@ type EvidenceBody struct {
 	ScoreKind    string  `json:"score_kind,omitempty" doc:"The rating's rank: primary or secondary"`
 	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
+	// ExploitedHere is what has been recorded in this product about being
+	// exploited through the issue, newest first. Not the flag above: that is a
+	// feed's word about the world, and this is somebody here saying this
+	// product was the thing attacked.
+	//
+	// Cleared records are among them rather than hidden. What was said and
+	// then taken back is part of the answer to what was known and when.
+	ExploitedHere []ExploitedHereBody `json:"exploited_here,omitempty" doc:"What has been recorded about this product being exploited through this issue, newest first. At most one of them stands; the rest were cleared"`
 	// LikelihoodPercentile ranks the estimate against every other published
 	// one, and the day beside it dates the forecast. The probability alone is
 	// unreadable — nobody acts on 0.00042 — and it is a thirty-day forecast
@@ -881,6 +897,16 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			return nil, noSuchFinding()
 		}
 		body := evidenceBody(*evidence)
+		// The record kept in this product, where one stands. Read here rather
+		// than in the detail because it is the triage record's, and what it
+		// carries — the moment something became known, the grounds, who wrote
+		// them — is what a reader of the finding is asking about when the row
+		// is at the top of the list and nothing on the page says why.
+		if body.ExploitedHere, err = exploitedHereAt(ctx, in, subject,
+			named.ProductID, issue, input.Vulnerability); err != nil {
+			return nil, wentWrong(in.Logger,
+				"what this product was exploited through could not be read", err)
+		}
 
 		// The build's own places, with the versions it ships at each: what
 		// stands is matched by key, and a key carries versions a place name

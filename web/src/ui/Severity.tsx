@@ -50,3 +50,21 @@ export function Exploited({ when }: { when?: boolean }) {
     </span>
   );
 }
+
+// Somebody here recorded that this product was attacked through the issue.
+//
+// A badge of its own beside the one above, never instead of it. The one above
+// is a feed saying the world is using this; this is a person saying it was
+// used against us, and a reader who takes one for the other has the wrong
+// answer to the only question a regulator asks.
+export function ExploitedHere({ when }: { when?: boolean }) {
+  if (!when) return null;
+  return (
+    <span
+      className="kev here"
+      title="Somebody recorded that this product was attacked through this issue. It sorts above everything, including a feed saying the world is exploiting it"
+    >
+      Exploited here
+    </span>
+  );
+}

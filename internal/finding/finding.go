@@ -232,11 +232,18 @@ type Finding struct {
 	// that simply stopped appearing is indistinguishable from a scanner fault,
 	// and that is the bucket nothing is allowed to explain away.
 	SuppressedBy *int64 `bun:"suppressed_by"`
-	// Rank is how urgent this is, as one sortable number, and the two flags
-	// are what it was made of that is not already on the row. The rest — the
-	// likelihood and the score — belong to the issue and are read from there.
+	// Rank is how urgent this is, as one sortable number, and the flags beside
+	// it are what it was made of that is not already on the row. The rest —
+	// the likelihood and the score — belong to the issue and are read from
+	// there.
 	Urgency       int64 `bun:"urgency,notnull"`
 	RankExploited bool  `bun:"urgency_exploited,notnull"`
+	// RankExploitedHere is somebody here having recorded that this product was
+	// attacked through the issue. Kept beside the flag above rather than
+	// folded into it: a feed's word about the world and a person's word about
+	// this product are different facts, and a report that names one of them
+	// reads the column it means.
+	RankExploitedHere bool `bun:"urgency_exploited_here,notnull"`
 	// ExploitedLearnedAt is when exploitation was learned, which is what an
 	// exploited deadline is counted from.
 	//

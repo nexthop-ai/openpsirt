@@ -31,6 +31,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Sending back](#sending-back)
 - [The deferral threshold](#the-deferral-threshold)
 - [One live claim per key](#one-live-claim-per-key)
+- [Claims against a recorded attack](#claims-against-a-recorded-attack)
 - [The triage line](#the-triage-line)
 - [Issue assessments](#issue-assessments)
 - [Coverage count](#coverage-count)
@@ -622,6 +623,20 @@ unmarked as contradictory: what applies is chosen by agreed-beats-waiting and
 then newest-wins, so approving both leaves one silently governing while the
 other stands on the record as agreed.
 
+## Claims against a recorded attack
+
+A product may record that it was exploited through an issue.
+`DESIGN-obligations.md` holds the record; what it does to decisions is here.
+
+| Rule | |
+|---|---|
+| A claim that the issue does not apply is refused while a record stands | The two say opposite things about one product, and the one that arrived from a person who watched it happen is not the one to give way |
+| A record arriving over such a claim is kept, and takes back the agreement under it | A fact cannot be refused and a judgment can. The claim stands and returns to the queue for somebody to answer again, and whoever wrote it is told |
+| Agreeing to such a claim is refused too | Approving writes no decision row, so it meets nothing the write path checks. A claim proposed before the record arrived and agreed to afterwards is what hides the finding, which is the state the refusal exists to prevent |
+| Refused where a decision is written rather than at each entry point | A claim at a finding, a bulk act, a re-affirmation, an extension carried to another issue and a decision carried across builds all reach one place. Checked at the entry points, the paths nobody checked are the ways round the rule |
+| Only that one outcome | A claim that the scanner matched the wrong thing is about identity, and the outcomes that promise work or put it off are not contradicted by an attack |
+| Clearing the record puts nothing back | Whether the claim was right is for whoever answers the finding, not for the clearing to decide on their behalf |
+
 ## The triage line
 
 A deployment says what it considers worth triaging. Below that line a finding
@@ -634,7 +649,7 @@ the ones that drown it are the ones nobody was ever going to act on.
 | Nothing is hidden until somebody decides to hide it | A tool that kept findings out of the list on the day it was installed would be deciding something nobody asked it to |
 | The line is compared against our rating where one stands | Being able to say a published rating is wrong is pointless if everything that ranks and filters then ignores us |
 | An unrated issue is judged as a medium | The same folding the deadline uses, spelled once. Briefly two rules read one fact and disagreed: on a real image 91,040 findings rated "unknown" dropped out of the working list *and* off any clock |
-| Being known to be exploited is never below the line | A line is a claim about how bad something has to be before it is worth an afternoon; being exploited is a fact about the world |
+| Exploitation is never below the line | A line is a claim about how bad something has to be before it is worth an afternoon, and exploitation is a fact. Either signal admits it: a feed's word about the world, and this product's own record of being attacked |
 | Below the line nothing is on a clock | A line says "this is not work" and a deadline says "this is work, and it is late". Within a year the overdue figure would be thousands of things nobody intended to look at |
 | Nothing on a release out of support is on a clock either (REQ-15) | Applied separately rather than folded in: it reaches further, because a line never sets aside something known to be exploited while end-of-life says nothing here will be fixed at all |
 

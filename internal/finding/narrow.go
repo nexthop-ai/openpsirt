@@ -507,11 +507,11 @@ func (f Filter) narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		}
 	}
 	if f.Exploited {
-		// Read off the urgency rather than the flag beside it. A place known
-		// to be exploited ranks in a band of its own above everything else
-		// (Ranked.Rank), and the urgency is in the index the grouping walks
-		// where the flag is not.
-		q = q.Having("MAX(f.urgency) >= ?", int64(exploitedBand))
+		// The flag, not the urgency. Two bands of the urgency answer "some
+		// exploitation" — the world's word and this product's own record of
+		// being attacked — and this filter names the first of them, so a
+		// threshold on the packed number would return the other as well.
+		q = q.Having(exploitedAcross+" = ?", 1)
 	}
 	if f.HasFix {
 		// Unanimity, like the fix-state filter below, which the documentation
@@ -1037,9 +1037,11 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 		Where("f.visibility IN (?)", bun.List(visible)).
 		GroupExpr(GroupedOn)
 	if words := filter.Floor.admits(); len(words) > 0 {
-		// The line's own condition, negated: not exploited, and rated
-		// beneath the line. Both read the way Floor.narrow reads them.
-		counted = counted.Where("f.urgency < ?", int64(exploitedBand)).
+		// The line's own condition, negated: no exploitation signal at
+		// all, and rated beneath the line. Both read the way
+		// Floor.narrow reads them, including the threshold that covers
+		// both bands.
+		counted = counted.Where("f.urgency < ?", int64(exploiting)).
 			Where("f.vulnerability_id IN (?)",
 				counted.NewSelect().TableExpr(`"vulnerability" AS "v"`).
 					Join(rating.Here, productID).

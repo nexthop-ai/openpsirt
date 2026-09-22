@@ -18,6 +18,7 @@ type UnassignedBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Severity      string `json:"severity,omitempty"`
 	Exploited     bool   `json:"exploited,omitempty"`
+	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"This product is recorded as having been exploited through this issue"`
 	Component     string `json:"component"`
 	Version       string `json:"version"`
 	Product       string `json:"product"`
@@ -369,7 +370,8 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		out.Body.Items = make([]UnassignedBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, UnassignedBody{
-				Vulnerability: row.Vulnerability, Severity: row.Severity, Exploited: row.Exploited,
+				Vulnerability: row.Vulnerability, Severity: row.Severity,
+				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
 				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
 				Places: row.Places, Builds: row.Builds,
@@ -472,7 +474,8 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		out.Body.Items = make([]UnassignedBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, UnassignedBody{
-				Vulnerability: row.Vulnerability, Severity: row.Severity, Exploited: row.Exploited,
+				Vulnerability: row.Vulnerability, Severity: row.Severity,
+				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
 				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
 				Places: row.Places, Builds: row.Builds,
@@ -554,7 +557,8 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		out.Body.Items = make([]UnassignedBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, UnassignedBody{
-				Vulnerability: row.Vulnerability, Severity: row.Severity, Exploited: row.Exploited,
+				Vulnerability: row.Vulnerability, Severity: row.Severity,
+				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
 				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
 				Places: row.Places, Builds: row.Builds,

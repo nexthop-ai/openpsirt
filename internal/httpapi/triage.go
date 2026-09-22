@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -14,7 +13,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
-	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -567,26 +565,12 @@ func registerTriage(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, wentWrong(in.Logger, "an agreement could not be undone", err)
 			}
-			// Each proposer is told. Approval itself stays silent,
-			// and this is not approval: taking an agreement back
-			// reverses something somebody was relying on, which is
-			// the one outcome nobody expects.
-			for _, one := range undone.Told {
-				what := "A claim of yours"
-				if one.Rows > 1 {
-					what = fmt.Sprintf("%d claims of yours", one.Rows)
-				}
-				tell(ctx, in, "could not say that an agreement was taken back", notify.Telling{
-					PersonID: one.PersonID, Kind: notify.ApprovalUndone,
-					Body: what + " was agreed to and the agreement has been taken back. " +
-						"It is waiting for a second person again; nothing you wrote has changed.",
-					Link:    "/decisions/" + strconv.FormatInt(one.DecisionID, 10),
-					Private: one.Undisclosed,
-					// The narrowing a later read applies.
-					ProductID:       &one.ProductID,
-					VulnerabilityID: &one.VulnerabilityID,
-				}, "person", one.PersonID, "batch", input.Batch)
-			}
+			// Each proposer is told, through the one telling both causes
+			// share.
+			tellTheProposers(ctx, in, undone,
+				"was agreed to and the agreement has been taken back. It is waiting "+
+					"for a second person again; nothing you wrote has changed.",
+				"batch", input.Batch)
 			out := &struct {
 				Body struct {
 					Undone int64 `json:"undone"`

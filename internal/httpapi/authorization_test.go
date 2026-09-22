@@ -48,6 +48,10 @@ func declaredBody(method, path, name string) io.Reader {
 	if strings.HasSuffix(path, "/streams") {
 		return strings.NewReader(`{"name": "` + name + `", "kind": "branch"}`)
 	}
+	if strings.HasSuffix(path, "/exploited-here") {
+		return strings.NewReader(
+			`{"known_at": "2026-09-20T14:00:00Z", "grounds": "A customer sent captures."}`)
+	}
 	if strings.HasSuffix(path, "/roles/bindings") {
 		// A body the schema accepts, so that a refusal is about the asker
 		// rather than about the request. Validation runs before the handler,
@@ -479,10 +483,15 @@ func TestWhoMayReachWhat(t *testing.T) {
 			// shape that leaves a check behind on the narrow path.
 			mineWhole  = "/v1/products/mine/findings"
 			theirWhole = "/v1/products/theirs/findings"
-			people     = "/v1/people"
-			keys       = "/v1/keys"
-			tokens     = "/v1/tokens"
-			queue      = "/v1/review-queue"
+			// Recording that a product was exploited through an issue, which
+			// refuses a dismissal somebody would otherwise be free to make
+			// and moves where this product's findings sit.
+			mineAttacked   = "/v1/products/mine/issues/CVE-2026-0001/exploited-here"
+			theirsAttacked = "/v1/products/theirs/issues/CVE-2026-0001/exploited-here"
+			people         = "/v1/people"
+			keys           = "/v1/keys"
+			tokens         = "/v1/tokens"
+			queue          = "/v1/review-queue"
 		)
 
 		for _, c := range []struct {
@@ -540,6 +549,18 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"assigner-only", http.MethodPost, products, http.StatusForbidden},
 			{"reader", http.MethodPost, mine, http.StatusForbidden},
 			{"reader", http.MethodPost, mineVars, http.StatusForbidden},
+
+			// Recording that this product was exploited is triage on it.
+			// Reading the product is not enough: the record refuses a
+			// dismissal somebody there would otherwise be free to make.
+			{"reader", http.MethodPost, mineAttacked, http.StatusForbidden},
+			{"approver", http.MethodPost, mineAttacked, http.StatusNotFound},
+			{"assigner-only", http.MethodPost, mineAttacked, http.StatusNotFound},
+			// A product this asker cannot see answers as one nobody declared,
+			// before the issue in the path is resolved.
+			{"triager", http.MethodPost, theirsAttacked, http.StatusNotFound},
+			{"private-triage", http.MethodPost, theirsAttacked, http.StatusNotFound},
+			{"", http.MethodPost, mineAttacked, http.StatusUnauthorized},
 
 			// A product's triage line hides findings, which
 			// is the act every other part of this gates. No role granted per

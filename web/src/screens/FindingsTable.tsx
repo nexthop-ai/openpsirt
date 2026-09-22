@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { Severity, Exploited } from "../ui/Severity";
+import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
 import { decidedAs } from "../ui/decided";
 import { on } from "../ui/when";
@@ -270,7 +270,7 @@ export function FindingsTable({
                       <Link to={at} className="id" onClick={(e) => e.stopPropagation()}>
                         {row.vulnerability}
                       </Link>{" "}
-                      <Exploited when={row.exploited} />
+                      <ExploitedHere when={row.exploited_here} /> <Exploited when={row.exploited} />
                       {/* The secondary signal. What somebody must not
                                 miss is on the finding itself. */}
                       {row.undisclosed && (
@@ -514,7 +514,7 @@ export function FindingsTable({
               // The word the badge draws with, so the card's stripe and the
               // badge on it agree. An absent rating gave the card no class at
               // all while the badge beside it said "Unrated".
-              className={`fcard ${row.exploited ? "exploited" : bandOf(row.severity)}`}
+              className={`fcard ${row.exploited || row.exploited_here ? "exploited" : bandOf(row.severity)}`}
               role="link"
               tabIndex={0}
               aria-label={`${row.vulnerability} in ${row.component}`}
@@ -528,6 +528,7 @@ export function FindingsTable({
             >
               <header>
                 <Severity word={row.severity} />
+                <ExploitedHere when={row.exploited_here} />
                 <Exploited when={row.exploited} />
               </header>
               <div>

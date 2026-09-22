@@ -776,12 +776,13 @@ issue holds is the worst anybody has claimed for the two that are claims, and
 for the likelihood the newest anybody has published — see the table above for
 why those differ.
 
-The fourth signal, the rating, belongs to a product (REQ-29). Three of the
-four are properties of the issue and reach every product holding it; the rating
-is the product's own where somebody there has made one and the published word
-otherwise, so the same issue can sit at two different places in two products'
-lists. A finding opened later reads it at the moment it opens, rather than
-carrying a copy something has to remember to refresh.
+Two of the signals belong to a product (REQ-29). The rating is the product's
+own where somebody there has made one and the published word otherwise, and the
+record that this product was exploited through the issue belongs to the product
+it was recorded against; the rest are properties of the issue and reach every
+product holding it. So the same issue can sit at two different places in two
+products' lists. A finding opened later reads both at the moment it opens,
+rather than carrying a copy something has to remember to refresh.
 
 And it is rewritten wherever the issue is open, not only in the build being
 scanned — once per product holding it, each against that product's rating. A
@@ -798,11 +799,12 @@ bottom of the list, until somebody rescanned that tag, which for a tag is never.
 | The moment it was learned is kept on the row | Nothing else holds it, so every later recount had to guess and fell back to the opening — which moved the deadline back to a date already in the past, on any assessment, agreement or withdrawal that touched the issue, with nothing logged |
 | It is not a cache being refreshed | The stored order describes an issue rather than a moment, so it is rewritten when the signals move. What is stored because it cannot be worked out again is a different thing |
 
-Four signals, in this order:
+Five signals, in this order:
 
 | Signal | Reason for its position |
 |---|---|
-| Known to be exploited | The difference between a risk and an incident |
+| This product recorded as exploited through it | A person here saying this product was attacked. Above the signal below it, which is a feed's word about somewhere that may not be here at all. `DESIGN-obligations.md` holds the record itself |
+| Known to be exploited in the world | The difference between a risk and an incident |
 | Reaches customers | A critical in something only the build system runs matters less than a medium in what people install |
 | Severity | How bad it would be if it happened. Scores from two schemes rank against one another as bands — see § One ladder for every scheme |
 | Likelihood of exploitation | Which of two equally severe things to look at first |
@@ -817,8 +819,21 @@ amplifies what is inside that spike and mediums jump criticals on noise.
 
 The number is packed rather than weighted: each signal owns a range of digits,
 so a signal never trades against a lower one. The reason is explainability — "it
-scored 0.4 higher on a weighted sum of four things" is not something anyone
+scored 0.4 higher on a weighted sum of five things" is not something anyone
 trusts or argues with, and packing gives a rule statable in a sentence.
+
+The two exploitation signals are one band each and are never read apart from
+the number. A comparison against the lower of the two answers "is some
+exploitation on this", which is what the triage line asks and what lets it stay
+on an index holding only the urgency. Which of the two holds is a column, on
+the finding, and every list and count that names one of them reads that column:
+a feed's word about the world and a person's word about this product are
+different facts, and a report that showed one where the other holds is the
+confusion the pair exists to prevent.
+
+Both columns are in the covering index the grouping reads, beside the urgency.
+A list that aggregates a column outside it fetches a table row per open
+finding, which is the cost the index was measured to remove.
 
 Explainability is the packing, not a sentence generated beside it. A function
 that turned a rank back into a list of reasons existed, exported and called by
@@ -827,6 +842,14 @@ statable, and the interface says it from the signals a finding already carries.
 
 A signal reported out of range is clamped. A source sending something
 impossible otherwise carries into the band above and ranks as exploited.
+
+The record of being exploited here moves no deadline. How long a fix may take
+is a question about the work and about upstream, and being attacked says
+nothing about either; what it does is admit the finding to the triage line
+whatever the rating says, so a finding that was below the line gains the clock
+its severity earns and one whose record is cleared may lose it again.
+`DESIGN-obligations.md` § Windows holds why the clock an obligation runs on is
+not this one.
 
 Where a report rates an issue only in words, the word stands in for a number, so
 a finding rated in words does not sort below everything rated at all. A group
@@ -837,7 +860,7 @@ What is known changes under a finding that has not:
 | Rule | Reason |
 |---|---|
 | The rank follows the issue | A scan finding the record has moved rewrites the urgency of every open finding of that issue. Held as at opening, the list would order by a number nobody could reconcile with the row beside it. It does not flap nightly, because the stored signals only move toward worse |
-| The deadline follows only exploitation | Severity is the flaw, exploitation is a fact about the world, and neither score nor likelihood sets a clock. A clock reset whenever a number was revised would never arrive |
+| The deadline follows only exploitation in the world | Severity is the flaw, exploitation is a fact about the world, and neither score nor likelihood sets a clock. A clock reset whenever a number was revised would never arrive |
 | A recount runs from the scan that learned the fact | An issue that becomes exploited after six months, clocked from the opening, would be given three days that ran out five months ago. This is how the published exploited catalogs work: their due dates run from the date an entry was added |
 
 ## Work across builds

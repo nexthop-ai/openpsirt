@@ -18,6 +18,15 @@ func RankCase(over string, otherwise int) string { return rankCase(over, otherwi
 // WordAt is the severity word a rank stands for.
 func WordAt(rank int) string { return wordAt(rank) }
 
+// Exploiting reports whether a packed urgency carries an exploitation signal
+// at all, for the test.
+//
+// Exported for the test alone: the number is written at ingest and read back
+// by queries through a threshold, so what the tests hold is that the two
+// agree. It says nothing about which of the two signals is on — the number
+// cannot, which is why the columns beside it exist.
+func Exploiting(urgency int64) bool { return urgency >= exploiting }
+
 // JudgingAfter puts fn between a judgment reading the report and writing to
 // it, for the test.
 //
