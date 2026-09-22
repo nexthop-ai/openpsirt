@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -131,7 +132,79 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 			out[personID] = append(out[personID], holds)
 		}
 	}
+	if err := w.waitingRulings(ctx, since, reach, out); err != nil {
+		return nil, err
+	}
 	return out, nil
+}
+
+// waitingRulings adds every ruling on reports that has been waiting on a
+// second person as long as a claim may.
+//
+// The same condition as a waiting claim, because it is the same thing: one
+// act setting something aside, which takes effect only once somebody else
+// agrees. It reaches whoever may work the product's reports, since approving
+// a ruling asks that, and never its proposer.
+func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
+	reach map[int64]map[int64]acts, out map[int64][]Holds) error {
+
+	var rows []struct {
+		RulingID    int64     `bun:"ruling_id"`
+		ProductID   int64     `bun:"product_id"`
+		Product     string    `bun:"product"`
+		Disposition string    `bun:"disposition"`
+		ProposedBy  int64     `bun:"proposed_by"`
+		ProposedAt  time.Time `bun:"proposed_at"`
+		Reports     int       `bun:"reports"`
+	}
+	err := w.db.NewSelect().
+		TableExpr(`"report_ruling" AS "rr"`).
+		Join(`JOIN "product" AS "p" ON p.id = rr.product_id`).
+		Join(`JOIN "report_ruled" AS "rd" ON rd.ruling_id = rr.id`).
+		ColumnExpr(`rr.id AS "ruling_id"`).
+		ColumnExpr(`rr.product_id AS "product_id"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(rr.disposition) AS "disposition"`).
+		ColumnExpr(`MIN(rr.proposed_by) AS "proposed_by"`).
+		ColumnExpr(`MIN(rr.proposed_at) AS "proposed_at"`).
+		ColumnExpr(`COUNT(*) AS "reports"`).
+		Where("rr.settled_at IS NULL").
+		Where("rr.withdrawn_at IS NULL").
+		Where("rr.proposed_at <= ?", since).
+		GroupExpr("rr.id, rr.product_id").
+		Scan(ctx, &rows)
+	if err != nil {
+		return fmt.Errorf("read which rulings are waiting on a second person: %w", err)
+	}
+
+	now := time.Now().UTC()
+	for _, row := range rows {
+		days := int(now.Sub(row.ProposedAt).Hours() / 24)
+		reports := "one report"
+		if row.Reports != 1 {
+			reports = fmt.Sprintf("%d reports", row.Reports)
+		}
+		holds := Holds{
+			About: identify(fmt.Sprintf("ruling-waiting %d", row.RulingID)),
+			Body: fmt.Sprintf("A ruling in %s that %s %s has been waiting %s for a "+
+				"second person. It takes effect only once somebody agrees to it.",
+				row.Product, reports, strings.ReplaceAll(row.Disposition, "-", " "),
+				plainly(days)),
+			Link: fmt.Sprintf("/products/%s/inbox?waiting=1",
+				url.PathEscape(row.Product)),
+			// A claim nobody has agreed to set aside is one nobody has
+			// decided is safe to repeat.
+			Private:   true,
+			ProductID: &row.ProductID,
+		}
+		for personID, per := range reach {
+			if personID == row.ProposedBy || !per[row.ProductID].triages(true) {
+				continue
+			}
+			out[personID] = append(out[personID], holds)
+		}
+	}
+	return nil
 }
 
 // sentBackWaiting is every claim an approver asked more of and nobody has
@@ -522,17 +595,16 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 			VulnerabilityID: &row.VulnerabilityID,
 		}
 		// A claim nobody has judged has no issue to name and nobody on a
-		// case. It is named by the reference it was minted with, and it
-		// carries no address: nothing in the interface reaches a report yet,
-		// and a notice pointing at a page that answers "not found" is worse
-		// than one that names what to go and look for.
+		// case. It is named by the reference it was minted with, and points
+		// at the report.
 		if row.VulnerabilityID == 0 {
 			holds.About = identify(fmt.Sprintf("unanswered report %d", row.ReportID))
 			holds.Body = fmt.Sprintf("%s sent %s in %s%s and has not been answered. "+
 				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Reference, row.Product, when)
-			holds.Link = ""
+			holds.Link = fmt.Sprintf("/products/%s/inbox/%s",
+				url.PathEscape(row.Product), url.PathEscape(row.Reference))
 			holds.VulnerabilityID = nil
 		}
 		for personID, per := range reach {

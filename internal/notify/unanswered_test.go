@@ -94,12 +94,9 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 			t.Errorf("the alert reads %q and does not name %q",
 				told[0].Body, report.Reference)
 		}
-		// And it points nowhere. Nothing in the interface reaches a report
-		// yet, and an address that answers "not found" is worse than none:
-		// the body already names the reference and the product, which is
-		// what the reader acts on.
-		if told[0].Link != "" {
-			t.Errorf("the alert points at %q, and no screen reaches a report", told[0].Link)
+		// And it points at the report, which is where it is answered.
+		if want := "/products/sonic/inbox/" + report.Reference; told[0].Link != want {
+			t.Errorf("the alert points at %q, want %q", told[0].Link, want)
 		}
 		if n := len(waiting(announced)); n != 0 {
 			t.Errorf("somebody who triages only announced work was told %d things", n)
