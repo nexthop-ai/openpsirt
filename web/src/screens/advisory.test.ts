@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { missing, nameable, standing, statusLabel } from "./advisory";
+import { agreeing, missing, nameable, standing, statusLabel } from "./advisory";
 
 describe("an editorial status the interface does not know", () => {
   it("is shown as it arrived rather than crashing the render", () => {
@@ -30,6 +30,20 @@ describe("the three statuses", () => {
     // A withdrawn agreement reaches interim with nothing a reader acts on
     // having moved, so a sentence about a change is one that is often false.
     expect(standing("interim")?.means).not.toMatch(/chang/i);
+  });
+});
+
+describe("who agrees to what an advisory says", () => {
+  it("is nobody, where nobody does", () => {
+    expect(agreeing(0)).toBe("Nobody agrees");
+  });
+
+  it("is one person, in the singular", () => {
+    expect(agreeing(1)).toBe("One person agrees");
+  });
+
+  it("is a count, in the plural", () => {
+    expect(agreeing(3)).toBe("3 people agree");
   });
 });
 

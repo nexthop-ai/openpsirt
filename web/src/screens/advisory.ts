@@ -43,6 +43,17 @@ export function statusLabel(status?: string): string {
   return standing(status)?.label ?? status ?? "";
 }
 
+// Who agrees to what an advisory says now, as a sentence opens.
+//
+// A count beside a status word is the shape this replaces: "1 agree" is
+// wrong, and a bare number beside a chip saying Final is a figure nobody
+// reads.
+export function agreeing(people: number): string {
+  if (people <= 0) return "Nobody agrees";
+  if (people === 1) return "One person agrees";
+  return `${people} people agree`;
+}
+
 // What has to happen before an advisory can go out.
 export type Missing = "" | "flaws" | "agreement";
 

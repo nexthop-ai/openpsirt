@@ -20,7 +20,7 @@ import { Loading } from "../ui/Loading";
 import { notACredential } from "../ui/noautofill";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
-import { missing, nameable, standing, statusLabel } from "./advisory";
+import { agreeing, missing, nameable, standing, statusLabel } from "./advisory";
 
 // One advisory, whole: what it is called, what it covers, the document it
 // generates, who agrees to it, and what has gone out.
@@ -84,8 +84,7 @@ export function Advisory() {
         </div>
       )}
 
-      <Title advisory={advisory} title={it?.title ?? ""} />
-      <Flaws advisory={advisory} covers={covers} />
+      <Says advisory={advisory} title={it?.title ?? ""} covers={covers} />
       <Document advisory={advisory} covers={covers.length} read={document} />
       <Agreement advisory={advisory} agreed={agreed} />
       <Issued advisory={advisory} read={issuances} agreed={agreed} />
@@ -93,16 +92,14 @@ export function Advisory() {
   );
 }
 
-// What the document is called. Left empty it names the flaws it covers.
+// The title, as a row of the compose panel. Left empty the document names the
+// flaws it covers.
 function Title({ advisory, title }: { advisory: string; title: string }) {
   const [words, setWords] = useState(title);
   const retitle = useRetitle();
 
   return (
-    <div className="card" style={{ marginBottom: 12 }}>
-      <header>
-        <h3>Title</h3>
-      </header>
+    <>
       <div className="filters">
         <label className="field" style={{ flex: 1, minWidth: 260 }}>
           <span>Title</span>
@@ -128,15 +125,20 @@ function Title({ advisory, title }: { advisory: string; title: string }) {
         standing.
       </p>
       {retitle.isError && <Failed error={retitle.error} what="The title was not changed." />}
-    </div>
+    </>
   );
 }
 
-// The flaws this advisory covers, and naming another.
-function Flaws({
+// What the advisory says: the title, the flaws it names, and naming another.
+//
+// One panel, because the three are one act. Split, the title's own label sat
+// under a heading of the same word.
+function Says({
   advisory,
+  title,
   covers,
 }: {
+  title: string;
   advisory: string;
   covers: {
     product?: string;
@@ -186,13 +188,12 @@ function Flaws({
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <header>
-        <h3>Flaws</h3>
-      </header>
+      <h3>What it says</h3>
+      <Title advisory={advisory} title={title} />
       {covers.length === 0 ? (
         <p className="hint">None named yet.</p>
       ) : (
-        <Wide>
+        <Wide style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
@@ -341,18 +342,7 @@ function Document({
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <header>
-        <h3>Document</h3>
-        {covers > 0 && !read.isError && (
-          <a
-            className="btn quiet"
-            style={{ marginLeft: "auto" }}
-            href={`/v1/advisories/${encodeURIComponent(advisory)}/document`}
-          >
-            JSON
-          </a>
-        )}
-      </header>
+      <h3>Document</h3>
       {covers === 0 ? (
         <p className="hint">Name a flaw and the document appears here.</p>
       ) : read.isPending ? (
@@ -361,11 +351,15 @@ function Document({
         <Failed error={read.error} what="The document could not be generated." />
       ) : (
         <>
+          {/* What a reader checks first. The status says where the document
+              is in its life; how far it may travel is the distribution
+              label, red while anything it covers is still held back. */}
           <p className="hint">
             <span className="id">{tracking?.id}</span> · version {tracking?.version} ·{" "}
-            {tracking?.status} · {read.data?.document?.distribution?.tlp?.label}
+            {tracking?.status} · {read.data?.document?.distribution?.tlp?.label} ·{" "}
+            <a href={`/v1/advisories/${encodeURIComponent(advisory)}/document`}>JSON</a>
           </p>
-          <pre className="asis" style={{ maxHeight: 420, overflow: "auto" }}>
+          <pre className="asis" style={{ maxHeight: 420, overflow: "auto", marginBottom: 10 }}>
             {written}
           </pre>
           <p className="hint">
@@ -385,14 +379,8 @@ function Agreement({ advisory, agreed }: { advisory: string; agreed: number }) {
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <header>
-        <h3>Agreement</h3>
-      </header>
-      <p>
-        {agreed === 0
-          ? "Nobody agrees to what it says now."
-          : `${agreed} ${agreed === 1 ? "person agrees" : "people agree"} to what it says now.`}
-      </p>
+      <h3>Agreement</h3>
+      <p>{agreeing(agreed)} to what it says now.</p>
       <div className="actions">
         <button
           type="button"
@@ -413,7 +401,7 @@ function Agreement({ advisory, agreed }: { advisory: string; agreed: number }) {
       </div>
       <p className="hint">
         Not the person who started it, and not whoever wrote what it says now. There is no override.
-        Taking agreement back takes back everybody&rsquo;s, and needs no agreement of its own.
+        Taking agreement back takes back everybody&rsquo;s.
       </p>
       {agree.isError && <Failed error={agree.error} what="That was not agreed to." />}
       {back.isError && <Failed error={back.error} what="Nothing was taken back." />}
@@ -437,9 +425,7 @@ function Issued({
 
   return (
     <div className="card">
-      <header>
-        <h3>What has gone out</h3>
-      </header>
+      <h3>What has gone out</h3>
       {read.isPending ? (
         <Loading inline />
       ) : read.isError ? (
@@ -497,9 +483,9 @@ function Issued({
         </button>
       </div>
       <p className="hint">
-        Recorded here, published elsewhere. The bytes are kept as the record is written, because
-        what went out cannot be rebuilt once a release is added or a decision is revised — and a
-        second document is a revision of the first only where the first was recorded.
+        Recorded here, published elsewhere. The bytes are kept as the record is written: what went
+        out cannot be rebuilt once a release is added or a decision is revised, and a second
+        document is a revision only where the first was recorded.
       </p>
       {record.isError && <Failed error={record.error} what="That was not recorded." />}
     </div>

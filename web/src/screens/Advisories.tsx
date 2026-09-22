@@ -90,7 +90,6 @@ export function Advisories() {
                     >
                       {statusLabel(row.status)}
                     </span>
-                    {row.agreed > 0 && <span className="hint"> {row.agreed} agree</span>}
                   </td>
                   <td className="num">{row.issues}</td>
                   <td className="num">{row.products}</td>
