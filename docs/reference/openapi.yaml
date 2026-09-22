@@ -3529,6 +3529,26 @@ components:
       required:
         - "@id"
       type: object
+    InventoryBody:
+      additionalProperties: false
+      properties:
+        added:
+          description: Names this upload's inventory holds and the one before it did not
+          format: int64
+          type: integer
+        changed:
+          description: Names both hold at a different set of versions
+          format: int64
+          type: integer
+        removed:
+          description: Names the one before it held and this one does not
+          format: int64
+          type: integer
+      required:
+        - added
+        - removed
+        - changed
+      type: object
     IssuanceBody:
       additionalProperties: false
       properties:
@@ -6454,6 +6474,9 @@ components:
         failure:
           description: The reason it could not be used, where it could not
           type: string
+        inventory:
+          $ref: "#/components/schemas/InventoryBody"
+          description: What this upload changed about the build's inventory. Absent on the first upload read for a build, and until this one has been read
         measured:
           $ref: "#/components/schemas/MeasuredBody"
           description: The tools the run answering this upload was measured with. Absent until a run has covered it

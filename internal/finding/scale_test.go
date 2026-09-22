@@ -169,7 +169,7 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 			timed(t, ctx, store, who, finding.Scope{
 				ProductID: &product.ID, StreamID: &branch.ID, VariantID: &variant.ID,
 			})
-			timedHistory(t, ctx, store, scans, who, target.ID, product.ID)
+			timedHistory(t, ctx, store, scans, graphs, who, target.ID, product.ID)
 		}
 		report("after night 1")
 
@@ -354,7 +354,7 @@ func reports(versionOf func(int) string, extra int) []finding.Reported {
 // is open against every build of a product. A year of nights is what tells the
 // difference between a shape that grows and a shape that matters.
 func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
-	scans *ingest.Store, who access.Subject, target, product int64) {
+	scans *ingest.Store, graphs *graph.Store, who access.Subject, target, product int64) {
 
 	t.Helper()
 	start := time.Now()
@@ -385,10 +385,28 @@ func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
 	}
 	compare := time.Since(start)
 
+	// What each upload on the page made of the inventory, which every row of
+	// that page carries. One statement for the page, over the build's node
+	// rows — a year of nights is what says whether that grows with the
+	// calendar, since the rows a closed interval leaves behind are what it
+	// reads.
+	ids := make([]int64, 0, len(first))
+	for _, receipt := range first {
+		ids = append(ids, receipt.Scan.ID)
+	}
+	start = time.Now()
+	deltas, err := graphs.Deltas(ctx, who, target, ids)
+	if err != nil {
+		t.Fatalf("inventory deltas: %v", err)
+	}
+	inventory := time.Since(start)
+
 	t.Logf("    receipts page 1 %s (%d of %d) · page at %d %s (%d) · releases %s (%d builds)",
 		page.Round(time.Millisecond), len(first), filed,
 		deep, back.Round(time.Millisecond), len(last),
 		compare.Round(time.Millisecond), len(releases))
+	t.Logf("    inventory deltas %s (%d uploads of the page answered)",
+		inventory.Round(time.Millisecond), len(deltas))
 }
 
 // timed runs the queries somebody actually waits for.
