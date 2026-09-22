@@ -136,12 +136,17 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # finding means — counts are only comparable between products measured the same
 # way — so "whatever was latest at build time" is not good enough.
 FROM alpine:${ALPINE_VERSION} AS scanner
-ARG GRYPE_VERSION=0.118.0
-ARG TARGETARCH=amd64
+ARG GRYPE_VERSION=0.119.0
+# Redeclared without a value, which is how a stage receives the architecture
+# the build is for. Given a default it takes the default: measured, a build
+# for linux/arm64 ran `case "amd64"`, fetched the amd64 archive, verified it
+# against the amd64 checksum and put an amd64 binary in an arm64 image. The
+# refusal below cannot fire while a default answers for every platform.
+ARG TARGETARCH
 RUN apk add --no-cache curl ca-certificates \
  && case "${TARGETARCH}" in \
-      amd64) expected=1d444c5e7360471815f7158f71935fcecc68a3c417d85c7344f770854300bba2 ;; \
-      arm64) expected=32aceeb8ee837244775fcb522372c8b3a47914986385f3148f4ee2c930482a84 ;; \
+      amd64) expected=3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b ;; \
+      arm64) expected=29f0ec7c549ddb0e2b6a0ca714851f7399438afc399b80c12808e065edc9a8f8 ;; \
       *) echo "no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
  && curl -fsSL -o /tmp/grype.tar.gz \
@@ -159,7 +164,8 @@ RUN apk add --no-cache curl ca-certificates \
 # build whose output depends on a day.
 FROM alpine:${ALPINE_VERSION} AS inventory-tool
 ARG SYFT_VERSION=1.51.1
-ARG TARGETARCH=amd64
+# Without a value, for the reason the scanner stage above states.
+ARG TARGETARCH
 RUN apk add --no-cache curl ca-certificates \
  && case "${TARGETARCH}" in \
       amd64) expected=8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3 ;; \

@@ -651,3 +651,88 @@ func TestWhichWeaknessTheDataCallsTheRootCauseIsRead(t *testing.T) {
 		})
 	}
 }
+
+func TestAKnownExploitedIssueIsReadAsExploited(t *testing.T) {
+	// The flag a deadline and a ranking both turn on, and nothing recorded
+	// ever carried one: every match in the other fixture has no catalog entry
+	// at all, so the arm that sets this was reached by no test and the field
+	// it decoded was a key the scanner has never emitted.
+	f, err := os.OpenInRoot("testdata", "grype-known-exploited.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	result, err := scanner.ParseGrype(f, scanner.Limits{})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if len(result.Reported) != 1 {
+		t.Fatalf("read %d matches, want the one", len(result.Reported))
+	}
+	if !result.Reported[0].Issue.Exploited {
+		t.Error("an issue the catalog lists reads as not exploited")
+	}
+	// The other direction, so the flag is not simply always on. Asserted over
+	// documents written here rather than over the recorded corpus: the corpus
+	// carries no catalog entry today and would carry several the moment it is
+	// re-recorded, which would make a deferral elsewhere break this.
+	for _, doc := range []string{
+		`{"matches":[{"vulnerability":{"id":"CVE-2026-1","severity":"High"},
+		  "artifact":{"name":"libfoo","version":"1.0"}}],
+		  "descriptor":{"name":"grype","version":"0.119.0"}}`,
+		`{"matches":[{"vulnerability":{"id":"CVE-2026-1","severity":"High","knownExploited":[]},
+		  "artifact":{"name":"libfoo","version":"1.0"}}],
+		  "descriptor":{"name":"grype","version":"0.119.0"}}`,
+		`{"matches":[{"vulnerability":{"id":"CVE-2026-1","severity":"High","knownExploited":null},
+		  "artifact":{"name":"libfoo","version":"1.0"}}],
+		  "descriptor":{"name":"grype","version":"0.119.0"}}`,
+	} {
+		result, err := scanner.ParseGrype(strings.NewReader(doc), scanner.Limits{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Reported[0].Issue.Exploited {
+			t.Error("an issue with no catalog entry reads as exploited")
+		}
+	}
+}
+
+func TestTheCatalogIsAskedUnderEveryIdentifierAnIssueAnswersTo(t *testing.T) {
+	// Which record a match resolves to is a preference of whichever database
+	// the scanner consulted rather than a property of the issue, and the same
+	// rule already makes a publisher's statement match a finding by alias.
+	//
+	// Measured over 9,778 matches on a real image, the catalog decorates the
+	// match's own record every time — including the one match whose own
+	// identifier is not a CVE. So this removes a dependence on that staying
+	// true rather than repairing something observed broken, and the document
+	// below is written here because no recorded one has the shape.
+	const onTheRelated = `{"matches":[{
+	  "vulnerability":{"id":"GHSA-45x7-px36-x8w8","severity":"High"},
+	  "relatedVulnerabilities":[{"id":"CVE-2023-48795",
+	    "knownExploited":[{"cve":"CVE-2023-48795","vendorProject":"Example"}]}],
+	  "artifact":{"name":"golang.org/x/crypto","version":"0.16.0"}}],
+	  "descriptor":{"name":"grype","version":"0.119.0"}}`
+	// And the other side of it. The recorded entry sits on both records,
+	// which is what the scanner does, so neither arm is isolated by it: with
+	// the own-record arm deleted the recorded fixture still reads exploited
+	// through the related one.
+	const onItsOwn = `{"matches":[{
+	  "vulnerability":{"id":"CVE-2025-39964","severity":"Medium",
+	    "knownExploited":[{"cve":"CVE-2025-39964","vendorProject":"Linux"}]},
+	  "relatedVulnerabilities":[{"id":"GHSA-0000-0000-0000"}],
+	  "artifact":{"name":"linux","version":"6.12.41-1"}}],
+	  "descriptor":{"name":"grype","version":"0.119.0"}}`
+	for what, doc := range map[string]string{
+		"on a record it is related to": onTheRelated,
+		"on its own record":            onItsOwn,
+	} {
+		result, err := scanner.ParseGrype(strings.NewReader(doc), scanner.Limits{})
+		if err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		if !result.Reported[0].Issue.Exploited {
+			t.Errorf("an issue the catalog lists %s reads as not exploited", what)
+		}
+	}
+}

@@ -14,3 +14,13 @@ fields mean and wrong about where one of them lives: the database describes
 itself under a status, not directly, so the version of
 the data a finding was matched against read as empty. The lesson is the ordinary
 one — a fixture assembled from a description agrees with the description.
+
+`grype-known-exploited.json` is one match, recorded from grype 0.119.0 against
+the switch image this project keeps, with its own descriptor because it is its
+own run. It exists for the one signal the corpus above carries none of: not a
+match in it is listed in the exploitation catalog, so the arm that sets the
+flag was reached by nothing.
+
+The entries state the issue under `cve`, and only whether an entry is present
+is read. A named field here would be a claim about the scanner's format that
+nothing checks.
