@@ -3,6 +3,8 @@ package graph
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/uptrace/bun"
 
@@ -80,52 +82,29 @@ func (s *Store) Deltas(ctx context.Context, subject access.Subject, targetID int
 		return nil, err
 	}
 
-	// Versions are counted rather than collected: a name whose version set
-	// moved is one whose count on either side differs from the count present
-	// on both, which answers the same question without carrying the strings.
-	type tally struct{ before, after, both int }
-	names := map[int64]map[string]*tally{}
-	for _, row := range rows {
-		at, ok := names[row.At]
-		if !ok {
-			at = map[string]*tally{}
-			names[row.At] = at
-		}
-		seen, ok := at[row.Name]
-		if !ok {
-			seen = &tally{}
-			at[row.Name] = seen
-		}
-		switch {
-		case row.Had == 1 && row.Has == 1:
-			seen.before, seen.after, seen.both = seen.before+1, seen.after+1, seen.both+1
-		case row.Had == 1:
-			seen.before++
-		case row.Has == 1:
-			seen.after++
-		}
-	}
-
-	// One statement answers the whole page, so every name any scan on the
-	// page moved is looked at against every scan on it. A name that stood on
-	// neither side of this one belongs to another upload.
-	for at, seen := range names {
-		delta := out[at]
-		for _, name := range seen {
-			switch {
-			case name.before == 0 && name.after == 0:
-				// Another scan on the page moved this name; this one did not.
-			case name.before == 0:
-				delta.Added++
-			case name.after == 0:
-				delta.Removed++
-			case name.before != name.both || name.after != name.both:
-				delta.Changed++
-			}
-		}
-		out[at] = delta
+	// Counted from the same fold the listing of one upload is made of. Two
+	// folds is two answers to "did this name move", and the one nobody reads
+	// beside the other is the one that drifts.
+	for at, changes := range changed(rows) {
+		out[at] = count(changes)
 	}
 	return out, nil
+}
+
+// count is the delta a list of changes adds up to.
+func count(changes []Change) Delta {
+	var delta Delta
+	for _, change := range changes {
+		switch change.Kind {
+		case Added:
+			delta.Added++
+		case Removed:
+			delta.Removed++
+		case Changed:
+			delta.Changed++
+		}
+	}
+	return delta
 }
 
 // comparable is which of these scans this build can be compared across.
@@ -161,11 +140,16 @@ func (s *Store) comparable(ctx context.Context, targetID int64, scanIDs []int64)
 
 // movedRow is one name at one of its versions, and whether that version stood
 // on each side of one scan.
+//
+// Name is the folded name, which is what two versions of one dependency have
+// in common, and Display is that name as a producer wrote it, for a reader.
 type movedRow struct {
-	At   int64  `bun:"at"`
-	Name string `bun:"nm"`
-	Had  int    `bun:"had"`
-	Has  int    `bun:"has"`
+	At      int64  `bun:"at"`
+	Name    string `bun:"nm"`
+	Display string `bun:"dsp"`
+	Version string `bun:"ver"`
+	Had     int    `bun:"had"`
+	Has     int    `bun:"has"`
 }
 
 // moved reads every version of every name one of these scans may have moved,
@@ -205,6 +189,12 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
 		ColumnExpr(`sc.id AS "at"`).
 		ColumnExpr(`c.name_folded AS "nm"`).
+		ColumnExpr(`c.version AS "ver"`).
+		// The name as a producer wrote it, for the listing to show. An
+		// aggregate because the group is the folded name: two producers
+		// writing one dependency in different capitals are one name here,
+		// and either spelling names the same thing on a screen.
+		ColumnExpr(`MIN(c.name) AS "dsp"`).
 		// Present immediately before the scan, and present at it. A row the
 		// scan closed was still there on the near side of it, which is why
 		// one bound is inclusive and the other is not.
@@ -238,13 +228,289 @@ func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]m
 			return q.Where("n.closed_scan_id IS NULL").
 				WhereOr("n.closed_scan_id >= ?", earliest)
 		}).
-		// The version is grouped on and not selected: what is being asked is
-		// how many versions of a name stood on each side, and the strings
-		// themselves are nobody's answer here.
+		// One row per version of a name at each scan, which is what makes
+		// "the same name at a different set of versions" answerable: the page
+		// of receipts counts those rows and the listing of one scan reads the
+		// strings off them.
 		GroupExpr(`sc.id, c.name_folded, c.version`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these scans changed: %w", err)
 	}
 	return rows, nil
+}
+
+// Change is what one scan did to one name in a build's inventory.
+type Change struct {
+	// Name is the name as a producer wrote it.
+	Name string
+	// Kind is what happened to it.
+	Kind ChangeKind
+	// Before and After are the versions the name stood at immediately before
+	// the scan and stands at from it, in the order they sort. A name that
+	// arrived has nothing before it and one that went has nothing after it.
+	Before []string
+	After  []string
+}
+
+// ChangeKind is what one scan did to one name.
+//
+// The three the delta counts, spelled the same way: a screen reading a listing
+// and a pipeline reading a receipt are looking at one answer.
+type ChangeKind string
+
+const (
+	// Added is a name the inventory did not hold before this scan.
+	Added ChangeKind = "added"
+	// Removed is a name it held and does not any more. The one worth reading
+	// first: a build that stopped describing a dependency looks exactly like
+	// one that stopped shipping it.
+	Removed ChangeKind = "removed"
+	// Changed is a name both sides hold at a different set of versions.
+	Changed ChangeKind = "changed"
+)
+
+// Changes is every name one scan moved, in the order they are worth reading.
+//
+// The same comparison the counts on a receipt are made of, read off the same
+// statement: a listing that disagreed with the number beside it would leave a
+// reader with two answers and no way to tell which is the build's.
+//
+// Removals first, then arrivals, then the names that moved version, and each
+// group by name. A build that stopped describing a dependency and one that
+// stopped shipping it look identical from here, and that is the case somebody
+// opens this to find.
+//
+// The page is taken after the comparison rather than in the statement. What is
+// read is the scan's own delta — the names it opened or closed a row of — so
+// the cost is what the upload changed rather than what the build contains.
+func (s *Store) Changes(ctx context.Context, subject access.Subject, targetID, scanID int64,
+	only ChangeKind, limit, offset int) ([]Change, int, error) {
+
+	productID, err := catalog.NewStore(s.db).ProductOf(ctx, targetID)
+	if err != nil {
+		return nil, 0, err
+	}
+	// The rule the counts are answered under, for the reason they are: this is
+	// what a build sent rather than what is open against it, so what it asks
+	// is whether this subject reaches the build at all.
+	if !subject.Sees(productID) {
+		return nil, 0, access.Denied(fmt.Sprintf("read what product %d contains", productID))
+	}
+
+	wanted, err := s.comparable(ctx, targetID, []int64{scanID})
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(wanted) == 0 {
+		// The first scan applied to this build, a scan of another build, or
+		// one nothing has applied. None of them is a change to an inventory.
+		return nil, 0, nil
+	}
+
+	rows, err := s.moved(ctx, targetID, wanted)
+	if err != nil {
+		return nil, 0, err
+	}
+	changes := changed(rows)[scanID]
+	if only != "" {
+		// A word this does not know would narrow the answer to nothing, which
+		// reads as an upload that changed nothing rather than as a question
+		// nobody can answer.
+		if only != Added && only != Removed && only != Changed {
+			return nil, 0, fmt.Errorf("%q is not a kind of change", only)
+		}
+		kept := changes[:0]
+		for _, change := range changes {
+			if change.Kind == only {
+				kept = append(kept, change)
+			}
+		}
+		changes = kept
+	}
+	total := len(changes)
+	if offset >= total {
+		return []Change{}, total, nil
+	}
+	changes = changes[offset:]
+	if limit > 0 && limit < len(changes) {
+		changes = changes[:limit]
+	}
+	return changes, total, nil
+}
+
+// changed folds the rows into what happened to each name, per scan.
+//
+// One statement answers a whole page of receipts, so every name any scan on
+// the page moved comes back against every scan on it. A name that stood on
+// neither side of a scan belongs to another upload and is no change of this
+// one's.
+func changed(rows []movedRow) map[int64][]Change {
+	type sides struct {
+		display       string
+		before, after []string
+	}
+	names := map[int64]map[string]*sides{}
+	order := map[int64][]string{}
+	for _, row := range rows {
+		at, ok := names[row.At]
+		if !ok {
+			at = map[string]*sides{}
+			names[row.At] = at
+		}
+		seen, ok := at[row.Name]
+		if !ok {
+			seen = &sides{display: row.Display}
+			at[row.Name] = seen
+			order[row.At] = append(order[row.At], row.Name)
+		}
+		if row.Had == 1 {
+			seen.before = append(seen.before, row.Version)
+		}
+		if row.Has == 1 {
+			seen.after = append(seen.after, row.Version)
+		}
+	}
+
+	out := make(map[int64][]Change, len(names))
+	for at, seen := range names {
+		changes := make([]Change, 0, len(order[at]))
+		for _, name := range order[at] {
+			side := seen[name]
+			before, after := sorted(side.before), sorted(side.after)
+			change := Change{Name: side.display, Before: before, After: after}
+			switch {
+			case len(before) == 0 && len(after) == 0:
+				// Another scan on the page moved this name; this one did not.
+				continue
+			case len(before) == 0:
+				change.Kind = Added
+			case len(after) == 0:
+				change.Kind = Removed
+			case !slices.Equal(before, after):
+				change.Kind = Changed
+			default:
+				// The same versions on both sides. A scan that closed one
+				// place of a name and opened another at the same version has
+				// moved nothing about what the build ships.
+				continue
+			}
+			changes = append(changes, change)
+		}
+		// Removals first, then arrivals, then what moved version, and each
+		// group by name. The order is the answer to "what should somebody
+		// look at", so it is decided here rather than by whichever column a
+		// screen happens to sort on.
+		slices.SortFunc(changes, func(a, b Change) int {
+			if a.Kind != b.Kind {
+				return weigh(a.Kind) - weigh(b.Kind)
+			}
+			return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+		})
+		out[at] = changes
+	}
+	return out
+}
+
+// weigh is the order the three are worth reading in.
+//
+// A removal first: a build that stopped describing a dependency looks exactly
+// like one that stopped shipping it, and that is the case somebody opens this
+// to find.
+func weigh(kind ChangeKind) int {
+	switch kind {
+	case Removed:
+		return 0
+	case Added:
+		return 1
+	default:
+		return 2
+	}
+}
+
+// sorted is the versions of one name in a stable order.
+//
+// Ordered as text rather than as versions. Ordering them properly is
+// per-ecosystem work, and what this is for is a reader looking at a handful of
+// strings beside a name — an order they can rely on being the same twice, not
+// a claim about which is newer.
+func sorted(versions []string) []string {
+	out := slices.Clone(versions)
+	slices.Sort(out)
+	return out
+}
+
+// Movement is what one scan made of a build's inventory, against the size of
+// the inventory it changed.
+//
+// The size is what makes a count mean anything: forty names moving is a
+// rebuild on an inventory of two thousand and a different build on an
+// inventory of sixty.
+type Movement struct {
+	Delta
+	// Held is how many names stood in the inventory immediately before this
+	// scan, counted the way the delta counts them.
+	Held int
+}
+
+// Moved is what one scan made of a build's inventory, for the pass that
+// decides whether anybody should hear about it.
+//
+// Answers whether there is an answer at all, which is false for the first scan
+// applied to a build: it is the first picture rather than a change to one.
+//
+// No subject, because there is nobody asking — this is the deployment working
+// out what happened, in the same shape as the passes that derive what is true
+// across every product before deciding who may hear each part. Who is told is
+// decided where the telling is.
+func (s *Store) Moved(ctx context.Context, targetID, scanID int64) (Movement, bool, error) {
+	wanted, err := s.comparable(ctx, targetID, []int64{scanID})
+	if err != nil {
+		return Movement{}, false, err
+	}
+	if len(wanted) == 0 {
+		return Movement{}, false, nil
+	}
+
+	rows, err := s.moved(ctx, targetID, wanted)
+	if err != nil {
+		return Movement{}, false, err
+	}
+	moved := Movement{Delta: count(changed(rows)[scanID])}
+
+	held, err := s.held(ctx, targetID, scanID)
+	if err != nil {
+		return Movement{}, false, err
+	}
+	moved.Held = held
+	return moved, true, nil
+}
+
+// held is how many names stood in a build's inventory immediately before one
+// scan.
+//
+// The same side of the scan the comparison reads — a row the scan closed was
+// still there on the near side of it — and the same exclusion: the build's own
+// root is not one of its components.
+func (s *Store) held(ctx context.Context, targetID, scanID int64) (int, error) {
+	var held int
+	// Scanned rather than counted: the count is of names rather than of rows,
+	// and asking the query builder to count wraps this in a count of its one
+	// row.
+	err := s.db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
+		ColumnExpr(`COUNT(DISTINCT c.name_folded)`).
+		Where("n.target_id = ?", targetID).
+		Where("n.is_root = ?", false).
+		Where("n.opened_scan_id < ?", scanID).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where("n.closed_scan_id IS NULL").
+				WhereOr("n.closed_scan_id >= ?", scanID)
+		}).
+		Scan(ctx, &held)
+	if err != nil {
+		return 0, fmt.Errorf("read how many names this build held: %w", err)
+	}
+	return held, nil
 }

@@ -138,6 +138,21 @@ const (
 	// bundle across an air gap on a schedule expects otherwise. So it is tuned
 	// here rather than compiled in.
 	VulnerabilityDataStaleAfter = "scanning.data-stale-after"
+	// DeltaShare and DeltaFloor are when an upload has changed enough of a
+	// build's inventory that somebody is told.
+	//
+	// Two rather than one, and both have to be passed. A share alone fires on
+	// an inventory of ten every time three names move, which is an ordinary
+	// night. A count alone is either that same noise or, set high enough to
+	// stop it, silence on the build that replaced every dependency it had.
+	// The share is what makes the question "is this unlike this build" and
+	// the floor is what keeps a small inventory from asking it.
+	//
+	// Both are a judgment about a deployment: how much a build moves between
+	// nights depends on what it is built from, and a base image that rolls
+	// weekly is not a fault.
+	DeltaShare = "scanning.delta-share"
+	DeltaFloor = "scanning.delta-floor"
 	// ScanEvery is how often everything tracked is scanned again against
 	// the vulnerability data of the day.
 	//
@@ -361,6 +376,24 @@ const DefaultQuietAfter = 7 * 24 * time.Hour
 // publisher having a slow few days is not an alert, short enough that a feed
 // that stopped being fetched is noticed in the week it stopped.
 const DefaultVulnerabilityDataStaleAfter = 7 * 24 * time.Hour
+
+// DefaultDeltaShare is how much of a build's inventory may move in one upload
+// before the deployment is told, as a percentage, where nobody has said.
+//
+// A quarter: past what a night of dependency upgrades moves, and short of the
+// half an inventory loses when a document arrives describing part of a build.
+// Like every other shipped number here it is a starting point rather than a
+// recommendation.
+const DefaultDeltaShare = 25
+
+// DefaultDeltaFloor is the fewest names that counts as a move worth telling
+// anybody about, where nobody has said.
+//
+// Ten, so that a build of a dozen dependencies is not reported for the three
+// that moved. What it costs is that a very small inventory has to be replaced
+// outright to be reported at all, which is the direction to be wrong in: an
+// alert nobody believes is one nobody reads.
+const DefaultDeltaFloor = 10
 
 // DefaultScanEvery is how often everything tracked is scanned again, where a
 // deployment has not said otherwise.

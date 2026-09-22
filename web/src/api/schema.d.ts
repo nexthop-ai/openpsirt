@@ -3732,6 +3732,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List what an upload changed about a build's inventory
+         * @description Returns the component names this upload added, removed and moved to different versions, against the upload read before it. Removals first, then arrivals, then the names that moved version.
+         *
+         *     Counted by name rather than by component, so a dependency upgraded is one name that moved rather than one arrival and one departure. A name the build ships at several versions at once carries all of them on each side.
+         *
+         *     Empty for the first upload read for a build, which is the first picture of it rather than a change to one, and for an upload nothing has read yet.
+         *
+         *     Requires: any recognized credential. Answers only what you may see.
+         */
+        get: operations["list-inventory-changes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/streams/{stream}/variants/{variant}/scans/{scan}/documents/{document}": {
         parameters: {
             query?: never;
@@ -6973,6 +6999,19 @@ export interface components {
              */
             removed: number;
         };
+        InventoryChangeBody: {
+            /** @description The versions it holds from this upload. Empty where the name went */
+            after?: string[] | null;
+            /** @description The versions the build held before this upload. Empty where the name arrived */
+            before?: string[] | null;
+            /**
+             * @description What the upload did to this name
+             * @enum {string}
+             */
+            change: "added" | "removed" | "changed";
+            /** @description The component name, as the document wrote it */
+            name: string;
+        };
         IssuanceBody: {
             /**
              * Format: uri
@@ -7356,6 +7395,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["HoldingBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyInventoryChangeBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyInventoryChangeBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["InventoryChangeBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -9252,10 +9302,10 @@ export interface components {
             /** @description Nobody has set this; the shipped value is in use */
             default?: boolean;
             /**
-             * @description The kind of value: a length of time, a count of things, a count of bytes, one of a few words, or on and off
+             * @description The kind of value: a length of time, a count of things, a count of bytes, a percentage, one of a few words, or on and off
              * @enum {string}
              */
-            kind: "duration" | "count" | "size" | "word" | "switch";
+            kind: "duration" | "count" | "size" | "percent" | "word" | "switch";
             /** @description The thing it decides */
             means: string;
             name: string;
@@ -15946,6 +15996,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UploadResult"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-inventory-changes": {
+        parameters: {
+            query?: {
+                /** @description One kind of change alone */
+                change?: "added" | "removed" | "changed";
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description The upload, as a receipt names it */
+                scan: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyInventoryChangeBody"];
                 };
             };
             /** @description Error */

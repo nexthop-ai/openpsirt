@@ -14,6 +14,7 @@ describe("what a notification is called", () => {
     expect(label("assigned")).toBe("assigned to you");
     expect(label("sent-back")).toBe("rejected");
     expect(label("build-quiet")).toBe("not being scanned");
+    expect(label("inventory-moved")).toBe("a build's contents changed sharply");
     // The one of the ten this list left out.
     expect(label("critical-on-release")).toBe("critical on a release");
     // Each of the four staleness conditions says what has stopped rather than

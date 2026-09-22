@@ -317,7 +317,7 @@ func (w *Watch) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 	// ask the same question a thousand times. This one goes to whoever may
 	// triage, because reading alone is not enough — interrupting somebody who
 	// cannot act is noise.
-	acts, err := w.whoActs(ctx)
+	acts, err := whoActs(ctx, w.db)
 	if err != nil {
 		return nil, err
 	}

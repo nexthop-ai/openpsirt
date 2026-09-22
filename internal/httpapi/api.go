@@ -301,6 +301,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerComponent(api, in)
 	registerPlanUpgrade(api, in)
 	registerReceipts(api, in)
+	registerInventoryChanges(api, in)
 	// Reading back a document a build sent.
 	registerRetained(api, in)
 	// One run of the scanner.

@@ -10,6 +10,8 @@ describe("which screens need a whole build", () => {
     expect(needsBuild(`${BUILD}/components`)).toBe(true);
     expect(needsBuild(`${BUILD}/components/libnl-3-200/decide`)).toBe(true);
     expect(needsBuild(`${BUILD}/scans`)).toBe(true);
+    // What one upload changed is that upload's, and an upload is one build's.
+    expect(needsBuild(`${BUILD}/scans/4/changes`)).toBe(true);
     expect(needsBuild(`${BUILD}/findings/CVE-2026-1/components/libnl-3-200`)).toBe(true);
   });
 

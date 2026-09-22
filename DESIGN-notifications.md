@@ -11,6 +11,7 @@ Satisfies REQ-46, REQ-47, REQ-48, REQ-49.
 - [The in-application area](#the-in-application-area)
 - [Mentions](#mentions)
 - [New criticals in a shipped release](#new-criticals-in-a-shipped-release)
+- [An inventory that moved sharply](#an-inventory-that-moved-sharply)
 - [Staleness conditions](#staleness-conditions)
 - [Reports that must come back empty](#reports-that-must-come-back-empty)
 - [Absent holders](#absent-holders)
@@ -66,9 +67,12 @@ true is cleared, and running the same pass twice changes nothing.
 | A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
+| An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
 
 A new build notifies nobody. A build arriving is the ordinary state of a tool
-scanned nightly. What a build *changed* is on the receipts and in the trend.
+scanned nightly. What a build changed is on the receipts and in the trend, and
+the one exception is below: an upload that changed much of what a build is made
+of.
 
 ## The in-application area
 
@@ -102,6 +106,40 @@ it.
 | A condition | It clears when the finding closes or somebody answers it |
 | Tags only | A critical on a branch is ordinary work in progress. Sending both would make the alert as frequent as the findings list |
 | To whoever may read it and may triage it, not to administrators | This one names an issue, a component and a build. An administrator does not read a product by administering it (REQ-42), so administrators alone would disclose to people who may not read it and stay silent for the people who can act. Reading alone is not enough: interrupting somebody who cannot act is noise |
+
+## An inventory that moved sharply
+
+An upload that changed much of what a build is made of. A build that expected to
+move three dependencies and moved two hundred has had a base image change under
+it, a lockfile regenerated, or a transitive tree arrive, and nothing else says
+so to somebody who is not watching.
+
+| Rule | Reason |
+|---|---|
+| An event | It happened at a moment and stays true of it. The next upload is a different upload rather than a state this one could return from, so there is nothing for a condition to clear |
+| The fact and a link, never the names | What moved is a list of a build's contents, which is a screen. The screen applies the reading rule; a message travels outside this deployment |
+| To whoever may read the product | It says what a build holds and links to the inventory, which is what reading the product is. An administrator holding no product role administers the catalog rather than watching builds, and granting themselves one is a line in the administrative record |
+| Not for the first upload read for a build | Every name in it is new, so every build would be reported the first time it is scanned |
+
+### The two thresholds
+
+Two thresholds, both set by the deployment, and an upload has to pass both.
+
+| Threshold | What it stops |
+|---|---|
+| A share of what the build held | A count alone is either noise on every build or, set high enough to quiet the large ones, silence on the build that replaced everything it had |
+| The fewest names that counts at all | A share alone reports an inventory of ten every time three names move, which is an ordinary night |
+
+A share is refused above the whole and a count at or below zero, because both
+are a threshold nothing reaches: the alert would never fire and the screen would
+report the setting as applying. The shipped numbers are a quarter of the
+inventory and ten names, which are a starting point rather than a recommendation
+— how much a build moves between nights is a question about what it is built
+from, and a base image that rolls weekly is not a fault.
+
+An inventory that held nothing has no share to be part of, so whatever arrives
+passes. A build reaches that by having had everything removed, which is the case
+least worth staying quiet about.
 
 ## Staleness conditions
 

@@ -245,7 +245,7 @@ function Field({
     value?: string;
     default?: boolean;
     means?: string;
-    kind: "duration" | "count" | "size" | "word" | "switch";
+    kind: "duration" | "count" | "size" | "percent" | "word" | "switch";
     words?: string[] | null;
   };
   canSet: boolean;
@@ -441,6 +441,11 @@ function Field({
       )}
       {!sizes && setting.kind === "size" && humaneBytes(value) && (
         <span className="hint">= {humaneBytes(value)}</span>
+      )}
+      {/* A share in a plain box is a number with no unit, and the number it
+          would be read as is the count of something. */}
+      {setting.kind === "percent" && value.trim() !== "" && (
+        <span className="hint">= {value.trim()}%</span>
       )}
       {(takes || sizes) && count.trim() !== "" && !usable && (
         <span className="hint" style={{ color: "var(--sev-high)" }}>

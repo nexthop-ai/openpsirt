@@ -57,7 +57,7 @@ func Kinds() []Kind {
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
-		VulnerabilityDataStale, RiskUnagreed,
+		VulnerabilityDataStale, RiskUnagreed, InventoryMoved,
 	}
 }
 
@@ -196,6 +196,18 @@ const (
 	// what was known a month ago, and a finding that newer data would have
 	// opened simply has not.
 	VulnerabilityDataStale Kind = "vulnerability-data-stale"
+	// InventoryMoved is an upload that changed more of a build's contents
+	// than this deployment expects one to.
+	//
+	// An event, and the one thing an upload is worth interrupting anybody
+	// for. What it reports happened at a moment and stays true of that
+	// moment: the next upload is a different upload rather than a state this
+	// one could return from, so there is nothing for a condition to clear.
+	//
+	// The fact and a link. What moved is a list of component names, which is
+	// a screen rather than a sentence, and the screen is where the reading
+	// rule is applied.
+	InventoryMoved Kind = "inventory-moved"
 	// RiskUnagreed is something hidden with nobody's agreement behind it.
 	//
 	// The one outcome-shaped failure the record cannot find on its own

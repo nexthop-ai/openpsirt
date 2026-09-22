@@ -128,3 +128,25 @@ func TestWhatTheDocumentSaysAFindingWithNoDeadlineCarries(t *testing.T) {
 		}
 	})
 }
+
+func TestAShareIsRefusedAboveTheWhole(t *testing.T) {
+	// A share above a hundred is a threshold nothing can reach: the alert it
+	// governs would never fire, and the screen would report the setting as
+	// applying. Refused at the write, where a value nothing can use is
+	// refused rather than stored.
+	twoReach(t, func(t *testing.T, r *reach) {
+		at := "/v1/settings/scanning.delta-share"
+		for _, value := range []string{"101", "0", "-5", "quarter"} {
+			if got := asPerson(t, r, "admin", http.MethodPut, at,
+				fmt.Sprintf(`{"value":%q}`, value)); got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("setting the share to %q answered %d, want 422: %s",
+					value, got.Code, got.Body.String())
+			}
+		}
+		// And a share somebody can act on is taken.
+		if got := asPerson(t, r, "admin", http.MethodPut, at,
+			`{"value":"40"}`); got.Code >= 300 {
+			t.Errorf("setting the share to 40 answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
