@@ -41,7 +41,7 @@ import (
 
 // Source is a supplier this deployment fetches advisories from.
 type Source struct {
-	bun.BaseModel `bun:"table:advisory_source,alias:as"`
+	bun.BaseModel `bun:"table:advisory_source,alias:sp"`
 
 	ID        int64 `bun:"id,pk,autoincrement"`
 	ProductID int64 `bun:"product_id,notnull"`
@@ -119,12 +119,12 @@ func (s *Store) Due(ctx context.Context, subject access.Subject, before time.Tim
 	var rows []Source
 	if err := s.db.NewSelect().Model(&rows).
 		Where("retired_at IS NULL").
-		Where(`"as"."fetched_at" IS NULL OR "as"."fetched_at" < ?`,
+		Where(`"sp"."fetched_at" IS NULL OR "sp"."fetched_at" < ?`,
 			before.UTC().Truncate(time.Microsecond)).
 		// Oldest read first, and one never read before the rest. Nothing
 		// bounds how many suppliers a cycle takes, so the order is what keeps
 		// one that is slow from being the only one ever reached.
-		OrderExpr(`CASE WHEN "as"."fetched_at" IS NULL THEN 0 ELSE 1 END`).
+		OrderExpr(`CASE WHEN "sp"."fetched_at" IS NULL THEN 0 ELSE 1 END`).
 		Order("fetched_at", "id").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read which suppliers are fetched from: %w", err)
