@@ -18,6 +18,11 @@ export function label(kind?: string): string {
       return "not being scanned";
     case "critical-on-release":
       return "critical on a release";
+    // An upload that changed much of what a build is made of. Said as what it
+    // was rather than as what it might mean: nothing here knows whether the
+    // base image moved or the pipeline broke.
+    case "inventory-moved":
+      return "a build's contents changed sharply";
     // The two conditions about the deployment rather than about anybody's
     // work. Both go to administrators, and both said their own slug here —
     // which is the one place the fallthrough below reads as a tool that was

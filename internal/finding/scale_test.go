@@ -405,8 +405,26 @@ func timedHistory(t *testing.T, ctx context.Context, store *finding.Store,
 		page.Round(time.Millisecond), len(first), filed,
 		deep, back.Round(time.Millisecond), len(last),
 		compare.Round(time.Millisecond), len(releases))
-	t.Logf("    inventory deltas %s (%d uploads of the page answered)",
-		inventory.Round(time.Millisecond), len(deltas))
+	// And the names behind one of those numbers, which is the screen an alert
+	// about a build that changed sharply leads to. One upload rather than a
+	// page, over the same rows: what it costs is what that upload moved, and
+	// a year of nights is what says whether the history behind it is also
+	// being paid for.
+	var listing time.Duration
+	var moved int
+	if len(ids) > 0 {
+		start = time.Now()
+		_, total, err := graphs.Changes(ctx, who, target, ids[0], "", 200, 0)
+		if err != nil {
+			t.Fatalf("inventory changes: %v", err)
+		}
+		listing, moved = time.Since(start), total
+	}
+
+	t.Logf("    inventory deltas %s (%d uploads of the page answered) · "+
+		"one upload's names %s (%d moved)",
+		inventory.Round(time.Millisecond), len(deltas),
+		listing.Round(time.Millisecond), moved)
 }
 
 // timed runs the queries somebody actually waits for.

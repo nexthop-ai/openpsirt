@@ -578,3 +578,120 @@ func TestAConditionOpenedForSeveralPeopleDoesNotFillTheWindow(t *testing.T) {
 		}
 	})
 }
+
+func TestOneUploadReachesAChannelOnceHoweverManyReadItsProduct(t *testing.T) {
+	// The event that says the same sentence to everybody. Keyed on the row,
+	// a product with six readers carries one upload to a channel six times,
+	// and a night of builds fills the sweep with copies of itself — which is
+	// the shape the condition arm above already refuses.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		first, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, first), "chat",
+			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+
+		// One upload, told to six people, each of them naming the same thing.
+		for i := range 6 {
+			who := first
+			if i > 0 {
+				who, err = rights.Ensure(ctx,
+					fmt.Sprintf("them-%d@example.com", i), "Them", access.Stated(true), nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := store.Tell(ctx, notify.Telling{
+				PersonID: who.ID, Kind: notify.InventoryMoved,
+				Body:     "sonic master broadcom: 21 names moved in one upload.",
+				Link:     "/products/sonic/streams/master/variants/broadcom/scans/4/changes",
+				Together: "one-upload",
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		if _, _, err := signal.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		saw.mu.Lock()
+		requests := saw.requests
+		saw.mu.Unlock()
+		if requests != 1 {
+			t.Errorf("one upload told to six people was sent %d times", requests)
+		}
+
+		// And the five that rode on the first one's delivery have left the
+		// window, or they hold the front of it for ever.
+		left, err := notify.StillToTell(signal, ctx, "chat")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if left != 0 {
+			t.Errorf("%d of the six rows can never be settled", left)
+		}
+	})
+}
+
+func TestTwoUploadsAreTwoThingsToCarry(t *testing.T) {
+	// The other side of the same key: what collapses is one upload told to
+	// many people, never two uploads. Keyed on the kind alone, the second
+	// night of a build that keeps changing would be silently dropped.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		dbtest.Reset(t, db)
+
+		rights := access.NewStore(db.DB)
+		saw := &took{}
+		server := httptest.NewTLSServer(http.HandlerFunc(saw.handle))
+		defer server.Close()
+
+		who, err := rights.Ensure(ctx, "ana@example.com", "Ana", access.Stated(true), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store := notify.NewStore(db.DB)
+		if _, err := store.AddDestination(ctx, asks(t, db, who), "chat",
+			notify.Everything, server.URL, "a-shared-secret-long-enough"); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, upload := range []string{"scan-4", "scan-5"} {
+			if err := store.Tell(ctx, notify.Telling{
+				PersonID: who.ID, Kind: notify.InventoryMoved,
+				Body: "sonic master broadcom moved a great deal in " + upload,
+				Link: "/scans/" + upload + "/changes", Together: upload,
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		signal := notify.NewSignal(db.DB, "https://openpsirt.example", quiet, "test")
+		notify.TrustForTest(signal, server.Client())
+		if _, _, err := signal.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		saw.mu.Lock()
+		requests := saw.requests
+		saw.mu.Unlock()
+		if requests != 2 {
+			t.Errorf("two uploads were sent %d times, want one each", requests)
+		}
+	})
+}

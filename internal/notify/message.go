@@ -52,6 +52,7 @@ var called = map[Kind]string{
 	ClaimLapsed:       "A decision of yours stopped applying",
 	BroughtIn:         "You have been brought into a case",
 	Unanswered:        "Somebody's report has not been answered",
+	InventoryMoved:    "A build's contents changed sharply",
 
 	VulnerabilityDataStale: "The vulnerability data has stopped moving",
 	RiskUnagreed:           "Something is hidden with nobody agreeing",

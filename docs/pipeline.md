@@ -140,6 +140,24 @@ a base image move under it, a lockfile regenerated, or a transitive tree
 arrive. Removals are the ones to watch: a build that stopped describing a
 dependency looks exactly like one that stopped shipping it.
 
+Which names those were is one request further, against the upload the receipt
+names:
+
+```
+GET /v1/products/sonic/streams/master/variants/broadcom/scans/2/changes
+```
+
+```json
+{"items": [
+   {"name": "libssl1.1", "change": "removed", "before": ["1.1.1w"]},
+   {"name": "curl", "change": "added", "after": ["8.4.0"]},
+   {"name": "zlib1g", "change": "changed", "before": ["1.3"], "after": ["1.3.1"]}],
+ "total": 3}
+```
+
+Removals come first, then arrivals, then the names at new versions. Add
+`?change=removed` for one kind alone.
+
 Reading the inventory and scanning it are separate work with different rhythms:
 an inventory is read once, and scanned again whenever the vulnerability data
 moves. So a scan appearing is not the same as findings appearing.

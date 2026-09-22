@@ -902,6 +902,15 @@ type Placement struct {
 	// A branch is superseded by the next build; a tag never is, so what it
 	// shipped has to be answerable years later.
 	Moves bool
+	// ProductID is what a visibility rule is asked about.
+	ProductID int64
+	// Addressed is the same three levels as an address names them, which is
+	// the matched form rather than the one a reader is shown. A message
+	// carrying a link needs both: the names above for the sentence, and these
+	// for the address.
+	Addressed struct {
+		Product, Stream, Variant string
+	}
 }
 
 // Describe reads back what a target is.
@@ -926,10 +935,13 @@ func (s *Store) Describe(ctx context.Context, targetID int64) (*Placement, error
 		return nil, missingOr(err, fmt.Sprintf("product %d", st.ProductID),
 			fmt.Sprintf("look up the product release %d belongs to", st.ID))
 	}
-	return &Placement{
+	placed := &Placement{
 		Product: p.DisplayName, Stream: st.DisplayName, Kind: st.Kind, Variant: v.DisplayName,
-		Moves: st.Kind == Branch,
-	}, nil
+		Moves: st.Kind == Branch, ProductID: p.ID,
+	}
+	placed.Addressed.Product, placed.Addressed.Stream, placed.Addressed.Variant =
+		p.Name, st.Name, v.Name
+	return placed, nil
 }
 
 // ProductByID finds a product by its row.

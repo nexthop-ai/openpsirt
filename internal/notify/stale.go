@@ -93,7 +93,7 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 		return nil, fmt.Errorf("read what is waiting on a second person: %w", err)
 	}
 
-	reach, err := w.whoActs(ctx)
+	reach, err := whoActs(ctx, w.db)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		return nil, fmt.Errorf("read what was sent back and left: %w", err)
 	}
 
-	reach, err := w.whoActs(ctx)
+	reach, err := whoActs(ctx, w.db)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 		return nil, fmt.Errorf("read which deferrals are running out: %w", err)
 	}
 
-	reach, err := w.whoActs(ctx)
+	reach, err := whoActs(ctx, w.db)
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +391,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		return nil, fmt.Errorf("read what is sitting in a queue: %w", err)
 	}
 
-	reach, err := w.whoActs(ctx)
+	reach, err := whoActs(ctx, w.db)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +484,7 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 	if err != nil {
 		return nil, err
 	}
-	reach, err := w.whoActs(ctx)
+	reach, err := whoActs(ctx, w.db)
 	if err != nil {
 		return nil, err
 	}

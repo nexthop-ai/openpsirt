@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
@@ -50,13 +52,14 @@ func (a acts) triages(private bool) bool {
 
 // whoActs is everybody, with what they may do with each product.
 //
-// Read once per sweep rather than per condition. Every condition asking the
+// Read once per sweep rather than per condition, and once per upload where one
+// upload is what raised the question. Every condition asking the
 // same two tables is that much more work to answer one question, and — the
 // part that matters more — that many places for "may read" to be spelled
 // slightly differently. It was three: this, and two copies written out by hand
 // in watch.go that also re-read access.People per condition.
-func (w *Watch) whoActs(ctx context.Context) (map[int64]map[int64]acts, error) {
-	people, held, err := access.NewStore(w.db).People(ctx)
+func whoActs(ctx context.Context, db bun.IDB) (map[int64]map[int64]acts, error) {
+	people, held, err := access.NewStore(db).People(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read who may hear about this: %w", err)
 	}

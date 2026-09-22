@@ -299,7 +299,12 @@ func run(args []string, stdout, stderr *os.File) error {
 	// Every replica serves, reads and scans. Separate worker deployments would
 	// be more things to run and more things to get wrong for an installation
 	// this size, and the queue already stops two of them taking the same work.
-	reader := ingest.NewReader(db, work, cfg.Limits(), logger, name)
+	// An upload that changed much of what a build is made of is the one thing
+	// an inventory arriving is worth interrupting anybody for. Wired here for
+	// the reason the lapse notice below is: reading a document and telling
+	// somebody about it are separate concerns.
+	reader := ingest.NewReader(db, work, cfg.Limits(), logger, name).
+		Telling(notify.Movements(db.DB, logger))
 	// A scan that moves the code out from under somebody's judgment hands
 	// them work back that they did nothing to cause, so they are told.
 	// Wired here rather than inside the scanner: what a scan does and how

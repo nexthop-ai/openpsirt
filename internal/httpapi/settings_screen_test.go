@@ -126,6 +126,11 @@ func TestEverySettingOfferedReportsWhatIsInForce(t *testing.T) {
 				t.Errorf("%s ships %q, which the write path refuses as a count",
 					each.name, value)
 			}
+		case aPercent:
+			if n, err := strconv.Atoi(value); err != nil || n <= 0 || n > 100 {
+				t.Errorf("%s ships %q, which the write path refuses as a share",
+					each.name, value)
+			}
 		case aWord:
 			if !slices.Contains(theFloor, value) {
 				t.Errorf("%s ships %q, which is not one of the words it takes", each.name, value)

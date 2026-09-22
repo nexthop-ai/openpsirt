@@ -985,6 +985,20 @@ is what the screen is about.
 | The screen that lists receipts is called Inventories | A scan is what the deployment does to an inventory after it arrives; what a person uploads is inventories |
 | It says what each run changed, and what the numbers were measured against | Which scanner, at which version, reading which vulnerability database. Without it, a build with nothing wrong and a build last measured against a months-old database read identically. A run covers a build rather than an upload, so where several uploads are answered by one run the numbers sit on the newest and the rest are blank |
 | A run that changed nothing says 0; a row with no numbers to report is blank | Both were drawn as a dash, so an upload superseded before anything read it read as a scan that found the build clean. The wire tells them apart too — a count that drops its zero cannot |
+| Each receipt says what its upload did to the build's contents, and opens the names behind it | Removals are marked and drawn first: a build that stopped describing a dependency looks exactly like one that stopped shipping it. An upload that moved nothing says so, and the first upload read for a build says nothing at all, because it is a picture rather than a change to one |
+
+The listing behind that column is one upload's own screen: the names it added,
+removed and moved to another version, against the upload before it, with every
+version each name stood at on both sides. It is where an alert about a build
+that changed sharply leads, which is why it is a screen rather than a panel —
+an alert whose investigation path does not exist is an alarm pointing at
+nothing.
+
+| Rule | |
+|---|---|
+| Removals, then arrivals, then names at new versions | The order is the answer to what to look at, so it is the server's rather than whichever column somebody sorted by |
+| One kind at a time is a filter, asked of the server | A build that replaced two hundred names is read one kind at a time, and a count taken over the page would be of the page |
+| A name that went is not a link | Its component page is about what is open against something this build no longer ships. Everything else opens the component |
 
 ## Product and scan-run pages
 

@@ -33,11 +33,39 @@ type Reader struct {
 	// name identifies this worker in a claim, so a job held by a process that
 	// has since died can be told apart from one being worked on.
 	name string
+	// told carries an applied inventory to whoever works out whether anybody
+	// should hear about what it changed.
+	//
+	// A hook rather than a call, for the reason the scanner's is one: reading
+	// a document has no business knowing how anybody is notified, and the
+	// package that notifies reads what has been ingested, so reaching it from
+	// here would close a cycle between the two.
+	told func(context.Context, Stored)
+}
+
+// Stored is an inventory that has been applied, as the fact that something
+// happened to a build.
+//
+// Two identifiers and nothing worked out: what the upload changed is read
+// where the decision to say anything is made, so that a policy about what is
+// worth telling somebody is in one place rather than half here.
+type Stored struct {
+	TargetID int64
+	ScanID   int64
 }
 
 // NewReader returns a reader over db.
 func NewReader(db *database.DB, q *queue.Queue, limits sbom.Limits, logger *slog.Logger, name string) *Reader {
 	return &Reader{db: db, queue: q, limits: limits, logger: logger, name: name}
+}
+
+// Telling is the instruction for an inventory that has been applied.
+//
+// Left unset a reader tells nobody, which is what every test and every
+// single-purpose invocation wants; the deployment wires it once.
+func (r *Reader) Telling(tell func(context.Context, Stored)) *Reader {
+	r.told = tell
+	return r
 }
 
 // Result is what reading one scan did.
@@ -321,6 +349,13 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 			return NewStore(tx).Made(ctx, scanID, components, placed, rootIdentifier)
 		}); err != nil {
 		return nil, fmt.Errorf("scan %d: %w", scanID, err)
+	}
+
+	// What the upload did to the build's inventory, for whoever decides
+	// whether that is worth telling anybody. After the writes have committed,
+	// because what it reads is the rows they wrote.
+	if r.told != nil {
+		r.told(ctx, Stored{TargetID: scan.TargetID, ScanID: scanID})
 	}
 
 	result := &Result{

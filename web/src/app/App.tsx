@@ -26,6 +26,9 @@ const Home = lazy(() => import("../screens/Home").then((m) => ({ default: m.Home
 const Finding = lazy(() => import("../screens/Finding").then((m) => ({ default: m.Finding })));
 const Tree = lazy(() => import("../screens/Tree").then((m) => ({ default: m.Tree })));
 const Compare = lazy(() => import("../screens/Compare").then((m) => ({ default: m.Compare })));
+const InventoryChanges = lazy(() =>
+  import("../screens/InventoryChanges").then((m) => ({ default: m.InventoryChanges })),
+);
 const People = lazy(() => import("../screens/People").then((m) => ({ default: m.People })));
 const Work = lazy(() => import("../screens/Work").then((m) => ({ default: m.Work })));
 const Queue = lazy(() => import("../screens/Queue").then((m) => ({ default: m.Queue })));
@@ -89,6 +92,7 @@ export const ROUTES = {
   tree: `${build}/components`,
   decide: `${build}/components/:component/decide`,
   inventories: `${build}/scans`,
+  inventoryChanges: `${build}/scans/:scan/changes`,
   run: `${build}/runs/:run`,
   upgrades: `${build}/pending-upgrades`,
   comparison: "/products/:product/comparison",
@@ -207,6 +211,7 @@ export function App() {
               <Route path={ROUTES.tree} element={<Tree />} />
               <Route path={ROUTES.decide} element={<Together />} />
               <Route path={ROUTES.inventories} element={<Inventories />} />
+              <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />
               <Route path={ROUTES.run} element={<Run />} />
               <Route path={ROUTES.upgrades} element={<Upgrades />} />
               <Route path={ROUTES.comparison} element={<Compare />} />

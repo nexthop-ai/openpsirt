@@ -203,12 +203,18 @@ func (s *Signal) window(ctx context.Context, to Outbound) ([]Notification, error
 		// because a channel wants it once. Asked by the row's own number
 		// instead, five of the six could never be settled: they answered this
 		// for ever and, being the oldest, sat at the front of the window.
+		//
+		// An event says the same thing to many people when it names what it
+		// is one of, and then it settles the same way. Without that arm a
+		// product with twenty-five readers carries one upload to a channel
+		// twenty-five times, and a night of them fills a sweep.
 		Where(`NOT EXISTS (SELECT 1 FROM "outbound_delivery" AS "settled" `+
 			`WHERE "settled"."outbound_id" = ? `+
 			`AND ("settled"."notification_id" = "nt"."id" `+
-			`     OR ("nt"."about" <> ? AND "settled"."about" = "nt"."about")) `+
+			`     OR ("nt"."about" <> ? AND "settled"."about" = "nt"."about") `+
+			`     OR ("nt"."together" <> ? AND "settled"."about" = "nt"."together")) `+
 			`AND ("settled"."sent_at" IS NOT NULL OR "settled"."attempts" >= ?))`,
-			to.ID, "", tries).
+			to.ID, "", "", tries).
 		OrderExpr("nt.created_at ASC, nt.id ASC").
 		Limit(sweepBatch)
 	// The kind is an equality test, which is what normalizing it on the way in
@@ -358,11 +364,19 @@ func (s *Signal) send(ctx context.Context, to Outbound, body []byte, now time.Ti
 // about is the key one thing said is tracked under.
 //
 // A condition's own identity where it has one, so that a condition opened for
-// six people is sent once; the notification's identifier otherwise, because an
-// event is a thing that happened to somebody and two of them are two things.
+// six people is sent once. An event carries one where the sentence is the same
+// for everybody it reached. Otherwise it is the notification's identifier,
+// because an event is a thing that happened to somebody and two of them are
+// two things.
 func about(row Notification) string {
 	if row.About != "" {
 		return row.About
+	}
+	// One thing said to many people is one delivery. The key is the thing
+	// rather than the row, so the second reader's copy settles against the
+	// first one's delivery instead of making another.
+	if row.Together != "" {
+		return row.Together
 	}
 	return "notification-" + strconv.FormatInt(row.ID, 10)
 }

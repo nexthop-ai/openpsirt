@@ -457,11 +457,16 @@ func TestWhoMayReachWhat(t *testing.T) {
 			absent     = "/v1/products/nosuch/streams"
 			version    = "/v1/version"
 
-			mineFound  = "/v1/products/mine/findings?stream=master&variant=broadcom"
-			mineFloor  = "/v1/products/mine/triage-floor"
-			mineEOL    = "/v1/products/mine/end-of-life"
-			streamEOL  = "/v1/products/mine/streams/master/end-of-life"
-			mineScans  = "/v1/products/mine/streams/master/variants/broadcom/scans"
+			mineFound = "/v1/products/mine/findings?stream=master&variant=broadcom"
+			mineFloor = "/v1/products/mine/triage-floor"
+			mineEOL   = "/v1/products/mine/end-of-life"
+			streamEOL = "/v1/products/mine/streams/master/end-of-life"
+			mineScans = "/v1/products/mine/streams/master/variants/broadcom/scans"
+			// What one upload changed about the build's inventory. Reached
+			// on the same terms the receipt carrying its counts is: they are
+			// one answer read twice.
+			mineMoved  = mineScans + "/1/changes"
+			theirMoved = "/v1/products/theirs/streams/master/variants/broadcom/scans/1/changes"
 			theirFound = "/v1/products/theirs/findings?stream=master&variant=broadcom"
 			// The same list with the branch and the variant left
 			// at "all". Widening the selection is exactly the
@@ -589,6 +594,19 @@ func TestWhoMayReachWhat(t *testing.T) {
 			{"reader", http.MethodGet, mineScans, http.StatusOK},
 			{"approver", http.MethodGet, mineScans, http.StatusNotFound},
 			{"", http.MethodGet, mineScans, http.StatusUnauthorized},
+
+			// And so is what one of them changed about the inventory. The
+			// same rule as the receipt carrying its counts, down to an
+			// administrator reaching it: what a build sent is the catalog
+			// rather than what is open against it, and an approver holds a
+			// capability rather than a way in.
+			{"reader", http.MethodGet, mineMoved, http.StatusOK},
+			{"private", http.MethodGet, mineMoved, http.StatusOK},
+			{"triager", http.MethodGet, mineMoved, http.StatusOK},
+			{"admin", http.MethodGet, mineMoved, http.StatusOK},
+			{"approver", http.MethodGet, mineMoved, http.StatusNotFound},
+			{"reader", http.MethodGet, theirMoved, http.StatusNotFound},
+			{"", http.MethodGet, mineMoved, http.StatusUnauthorized},
 
 			// Administration is administration. Holding every product role
 			// there is does not amount to any of it.
@@ -730,6 +748,18 @@ func TestAPipelineCanReachNothingButSending(t *testing.T) {
 		if got := r.asKey(t, http.MethodGet,
 			"/v1/products/theirs/streams/master/variants/broadcom/scans"); got != http.StatusNotFound {
 			t.Errorf("a pipeline reached receipts outside its scope: %d", got)
+		}
+		// And what one of its uploads changed, which is the detail behind the
+		// counts on the receipt. A key holds no reading role, so this is
+		// reached as the sender rather than as a reader — and outside its
+		// scope it is the same refusal a receipt gets.
+		if got := r.asKey(t, http.MethodGet,
+			"/v1/products/mine/streams/master/variants/broadcom/scans/1/changes"); got != http.StatusOK {
+			t.Errorf("a pipeline could not read what its own upload changed: %d", got)
+		}
+		if got := r.asKey(t, http.MethodGet,
+			"/v1/products/theirs/streams/master/variants/broadcom/scans/1/changes"); got != http.StatusNotFound {
+			t.Errorf("a pipeline reached an inventory outside its scope: %d", got)
 		}
 		if got := r.asKey(t, http.MethodGet, "/v1/version"); got != http.StatusForbidden {
 			t.Errorf("a pipeline read the running version: %d", got)
@@ -961,8 +991,9 @@ func TestAMalformedCredentialIsRefused(t *testing.T) {
 // reference, the extension a client generator reads and an access review all
 // state a rule the code contradicts.
 //
-// Two operations do mean any credential — a key reads back the scans it sent —
-// which is why the word cannot simply be redefined.
+// Some operations do mean any credential — a key reads back what it sent, down
+// to what one upload changed about the build — which is why the word cannot
+// simply be redefined.
 func TestWhatAnOperationSaysItNeedsIsWhatItEnforces(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		checked := 0

@@ -101,7 +101,7 @@ func (w *Watch) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 
 	// Whoever may read it and act on it, which for a claim somebody approved
 	// is whoever may triage that product.
-	acts, err := w.whoActs(ctx)
+	acts, err := whoActs(ctx, w.db)
 	if err != nil {
 		return nil, err
 	}

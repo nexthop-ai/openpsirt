@@ -436,6 +436,32 @@ uploads takes 73 ms on SQLite behind 73 nights and 102 ms behind 365, 51 to
 62 ms on PostgreSQL, 38 to 50 ms on MySQL and 107 to 200 ms on MariaDB.
 Without the bound, measured on SQLite, the same page takes 78 ms and 264 ms.
 
+### The names behind the counts
+
+The counts and the names behind them are one fold over one statement. A listing
+that disagreed with the number beside it leaves a reader with two answers and
+no way to tell which is the build's.
+
+| Rule | Reason |
+|---|---|
+| Removals first, then arrivals, then names at new versions | A build that stopped describing a dependency looks exactly like one that stopped shipping it, which is what somebody opens a listing to find |
+| Every version of a name, on each side | The count says a name moved; which copy of a vendored tree moved is what the versions say |
+| The name as a producer wrote it | Identity is the folded name, and two producers writing one dependency in different capitals are one dependency. Either spelling names the same thing to a reader |
+| Versions are ordered as text | A reader wants the same order twice, and ordering them properly is per-ecosystem work that would answer confidently for a pair it cannot order |
+| A page is cut after the comparison | What is read is the scan's own change — the names it opened or closed a row of — so the cost is what the upload moved rather than what the build contains |
+
+Over a year of nightly scans that cost stays flat: listing an upload that moved
+seven names takes 2 to 4 ms on SQLite and 2 to 6 ms on PostgreSQL, behind 73
+nights of history and behind 365. MySQL and MariaDB are unmeasured for this.
+
+### The size a change is against
+
+A count alone does not say whether a build is unlike itself, so what the change
+is against is read with it: the names the build held immediately before the
+scan, counted the way the change is counted and excluding the root. Forty names
+moving is a rebuild on an inventory of two thousand and a different build on an
+inventory of sixty.
+
 ## Place identity
 
 The unit of triage is a component at a place: the pair of this component and the

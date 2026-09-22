@@ -770,6 +770,13 @@ that key sent, in the same class as the two numbers above it. The comparison is
 against what the build held before that upload, whoever sent it: two keys
 sending for one variant are describing one artifact.
 
+Which names moved is a listing of its own, reached on the same terms as the
+receipt carrying the counts. An upload that moved much of a build is also told
+to whoever may read the product, on the terms `DESIGN-notifications.md` § An
+inventory that moved sharply holds: the telling is worked out once the writes
+have committed, and a message that cannot be composed is logged rather than
+failing an upload whose inventory is stored.
+
 ## Document retrieval
 
 A tag's documents are retained so a release can be re-scanned later. With

@@ -35,7 +35,7 @@ type SettingBody struct {
 	// on setting names, beside the server's own, are five copies of one fact,
 	// and a setting added to any of them is a control that offers the wrong
 	// thing or none.
-	Kind string `json:"kind" enum:"duration,count,size,word,switch" doc:"The kind of value: a length of time, a count of things, a count of bytes, one of a few words, or on and off"`
+	Kind string `json:"kind" enum:"duration,count,size,percent,word,switch" doc:"The kind of value: a length of time, a count of things, a count of bytes, a percentage, one of a few words, or on and off"`
 	// Words is the values a word setting may take, in the order to offer them.
 	// Empty for every other kind.
 	Words []string `json:"words,omitempty" doc:"For a word setting, the values it takes, in the order to offer them"`
@@ -58,9 +58,14 @@ const (
 	// because a screen must: 26214400 is twenty-five megabytes and nobody
 	// reads it as that, so the mistake available in a raw byte field is a
 	// factor of a thousand.
-	aSize   settingKind = "size"
-	aWord   settingKind = "word"
-	aSwitch settingKind = "switch"
+	aSize settingKind = "size"
+	// aPercent is a share of something the deployment holds rather than a
+	// count of things. Checked as one to a hundred: a share above the whole
+	// is a threshold nothing can reach, which is a setting somebody changed
+	// and got nothing from.
+	aPercent settingKind = "percent"
+	aWord    settingKind = "word"
+	aSwitch  settingKind = "switch"
 )
 
 // windows is the shipped deadline policy, read from the package that applies
@@ -143,6 +148,10 @@ var settable = []struct {
 		aDuration, nil, func(Ingest) string { return setting.DefaultQuietAfter.String() }, false},
 	{setting.VulnerabilityDataStaleAfter, "How long the vulnerability data may go without moving before the deployment is told. A scan against data that has not moved answers the same way it did last month, with the same confidence and nothing saying so",
 		aDuration, nil, func(Ingest) string { return setting.DefaultVulnerabilityDataStaleAfter.String() }, false},
+	{setting.DeltaShare, "How much of a build's inventory may move in one upload before whoever may read the product is told, as a percentage of what the build held. Both this and the floor below have to be passed: a share alone reports a small inventory every time three names move",
+		aPercent, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultDeltaShare) }, false},
+	{setting.DeltaFloor, "The fewest component names that counts as an upload worth reporting, whatever share of the build they are. A whole number, not a length of time",
+		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultDeltaFloor) }, false},
 	{setting.ScanEvery, "How often everything tracked is scanned again against the vulnerability data of the day. A release that is never rebuilt has the same components it always had and a different answer every month, so this is what finds an advisory published after it shipped",
 		aDuration, nil, func(Ingest) string { return setting.DefaultScanEvery.String() }, false},
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: it is the only thing here that reaches the network, and a deployment that cannot reach out loses this answer and nothing else. What goes out is a component's name, one request per component, carrying the name and nothing else — so names this deployment calls its own are held back, and the report of what has no upstream answer says which",
@@ -271,6 +280,13 @@ func registerSettings(api huma.API, in Ingest) {
 				return nil, huma.Error422UnprocessableEntity(
 					fmt.Sprintf("%q is not a count — write a whole number above zero",
 						input.Body.Value))
+			}
+		case aPercent:
+			n, err := strconv.Atoi(input.Body.Value)
+			if err != nil || n <= 0 || n > 100 {
+				return nil, huma.Error422UnprocessableEntity(
+					fmt.Sprintf("%q is not a share — write a whole number of percent "+
+						"between 1 and 100", input.Body.Value))
 			}
 		case aDuration:
 			d, err := time.ParseDuration(input.Body.Value)

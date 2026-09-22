@@ -124,6 +124,7 @@ export function Inventories() {
                 <th className="num">Closed</th>
                 <th>Sent</th>
                 <th className="num">Placed</th>
+                <th>Inventory moved</th>
                 <th>Measured with</th>
                 <th>Serial</th>
               </tr>
@@ -187,6 +188,13 @@ export function Inventories() {
                   </td>
                   <td className="num">
                     <Placed components={scan.components} placed={scan.placed} />
+                  </td>
+                  {/* What this upload did to the build's contents, against the
+                      upload before it. The row somebody is on when they ask
+                      why a build grew by two hundred dependencies overnight,
+                      and the names behind it are a click away. */}
+                  <td>
+                    <Moved at={at} scan={scan.scan_id ?? 0} inventory={scan.inventory} />
                   </td>
                   {/* What the run answering *this* upload was made with,
                       rather than what the newest run was. A page spanning a
@@ -387,6 +395,59 @@ function Placed({ components, placed }: { components?: number; placed?: number }
     >
       {placed.toLocaleString()} / {components.toLocaleString()}
     </span>
+  );
+}
+
+// What one upload changed about the build's contents, counted by name.
+//
+// Nothing at all for the first upload read for a build, which is a picture
+// rather than a change to one, and for one nothing has read yet. A rebuild
+// that moved nothing says so: zero and no answer are different statements,
+// and a dash for both reads as the second.
+function Moved({
+  at,
+  scan,
+  inventory,
+}: {
+  at: { product: string; stream: string; variant: string };
+  scan: number;
+  inventory?: { added?: number; removed?: number; changed?: number };
+}) {
+  if (!inventory) return <span className="hint">—</span>;
+  const added = inventory.added ?? 0;
+  const removed = inventory.removed ?? 0;
+  const changed = inventory.changed ?? 0;
+  const where =
+    `/products/${encodeURIComponent(at.product)}` +
+    `/streams/${encodeURIComponent(at.stream)}` +
+    `/variants/${encodeURIComponent(at.variant)}/scans/${scan}/changes`;
+  if (added + removed + changed === 0) {
+    return (
+      <Link to={where} className="hint" title="Nothing about this build's contents moved">
+        no change
+      </Link>
+    );
+  }
+  // Said in words rather than in signs. A cell reading "−4 +6 ~11" is three
+  // numbers somebody has to hover to name, on the screen they came to for one
+  // of the three.
+  //
+  // Removals first, and marked: a build that stopped describing a dependency
+  // looks exactly like one that stopped shipping it.
+  const said = [
+    { n: removed, word: "removed", marked: true },
+    { n: added, word: "added", marked: false },
+    { n: changed, word: "moved", marked: false },
+  ].filter((each) => each.n > 0);
+  return (
+    <Link to={where} title="What this upload changed about the build's contents">
+      {said.map((each, i) => (
+        <span key={each.word} className={each.marked ? "sev high" : undefined}>
+          {i > 0 && " · "}
+          {each.n.toLocaleString()} {each.word}
+        </span>
+      ))}
+    </Link>
   );
 }
 

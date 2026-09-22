@@ -36,8 +36,9 @@ const (
 	// anySubject is any credential this deployment recognizes, a pipeline's
 	// key included. It still answers only what that subject may see.
 	//
-	// Two operations mean it: a key reads back the scans it sent, and the
-	// receipts for them. Everything else that carried it refuses a key in the
+	// What means it is a key reading back what it sent: the scans, their
+	// receipts, and what one of those uploads changed about the build's
+	// inventory. Everything else that carried it refuses a key in the
 	// handler, which is what anyPerson is for.
 	anySubject = "any"
 	// anyPerson is any credential belonging to somebody who signed in. A
@@ -46,8 +47,8 @@ const (
 	// An operation carrying anySubject and then refusing every credential that
 	// is not a person leaves the generated reference, the extension a client
 	// generator reads and an access review all stating a rule the code
-	// contradicts. The word cannot simply be redefined, because two operations
-	// do mean it.
+	// contradicts. The word cannot simply be redefined, because the operations
+	// a sender reads its own uploads back through do mean it.
 	anyPerson = "person"
 	// ownSubject is whoever is asking, about themselves.
 	ownSubject = "self"
