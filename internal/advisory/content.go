@@ -207,7 +207,7 @@ func (s *Store) creditedFor(ctx context.Context, productID,
 	issueID int64) ([]Acknowledgment, error) {
 
 	var credits []string
-	err := s.db.NewSelect().Model((*finding.WhoTold)(nil)).
+	err := s.db.NewSelect().Model((*finding.FlawReport)(nil)).
 		ColumnExpr("fr.credit").
 		Where("fr.vulnerability_id = ?", issueID).
 		Where("fr.product_id = ?", productID).
