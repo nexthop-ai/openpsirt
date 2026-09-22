@@ -251,6 +251,9 @@ type Notification struct {
 	// it; this is never matched on for uniqueness, and exists so a digest can
 	// answer whether somebody was already told.
 	Concerns string `bun:"concerns"`
+	// Together is what makes one thing said to many people one thing to carry
+	// outside. Empty for everything personal, which is most of it.
+	Together string `bun:"together,notnull"`
 	// SentAt says this has been carried outside the application, and Attempts
 	// how many times that has been tried. Unsent is the whole of the work
 	// list, so a failure needs no state of its own — it is simply still
@@ -289,6 +292,15 @@ type Telling struct {
 	// Concerning so that whoever tells and whoever asks later agree on the
 	// shape without either of them writing it out.
 	Concerns string
+	// Together says this sentence is one thing said to many people, and names
+	// the thing. Every recipient gets their own row, as they do for every
+	// kind; what this decides is that a channel outside this deployment is
+	// told once rather than once per reader.
+	//
+	// Empty where a message is somebody's own — "a decision of yours",
+	// "you were named" — because those are as many things as there are
+	// people, and collapsing them would carry one and drop the rest.
+	Together string
 	// Private says what this is about is a finding nobody has announced.
 	// It travels with the telling rather than being worked out later: what
 	// is said outside this deployment depends on what was true when there
@@ -322,7 +334,7 @@ func (s *Store) Tell(ctx context.Context, t Telling) error {
 		PersonID: t.PersonID, Kind: t.Kind, Lifetime: Event,
 		Body: t.Body, Link: t.Link, Private: t.Private,
 		ProductID: t.ProductID, VulnerabilityID: t.VulnerabilityID,
-		Concerns: t.Concerns, CreatedAt: s.now(),
+		Concerns: t.Concerns, Together: t.Together, CreatedAt: s.now(),
 	}
 	if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
 		return fmt.Errorf("record what happened: %w", err)

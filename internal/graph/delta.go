@@ -363,6 +363,14 @@ func changed(rows []movedRow) map[int64][]Change {
 			seen = &sides{display: row.Display}
 			at[row.Name] = seen
 			order[row.At] = append(order[row.At], row.Name)
+		} else if row.Display < seen.display {
+			// The smallest of the spellings rather than whichever row came
+			// back first. One name at two versions is two rows, a producer
+			// that changed how it capitalizes a dependency gives them
+			// different spellings, and nothing orders the rows — so taken
+			// from the first, the same request answers differently twice and
+			// the link a screen builds from it lands on nothing.
+			seen.display = row.Display
 		}
 		if row.Had == 1 {
 			seen.before = append(seen.before, row.Version)

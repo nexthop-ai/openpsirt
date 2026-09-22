@@ -991,8 +991,9 @@ func TestAMalformedCredentialIsRefused(t *testing.T) {
 // reference, the extension a client generator reads and an access review all
 // state a rule the code contradicts.
 //
-// Two operations do mean any credential — a key reads back the scans it sent —
-// which is why the word cannot simply be redefined.
+// Some operations do mean any credential — a key reads back what it sent, down
+// to what one upload changed about the build — which is why the word cannot
+// simply be redefined.
 func TestWhatAnOperationSaysItNeedsIsWhatItEnforces(t *testing.T) {
 	twoReach(t, func(t *testing.T, r *reach) {
 		checked := 0

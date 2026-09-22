@@ -105,6 +105,17 @@ func upNotification(ctx context.Context, tx *sql.Tx) error {
 			-- digest can answer "was this person already told about this",
 			-- which is the whole of what a digest carries.
 			"concerns"  ` + t.name + ` NULL,
+			-- What makes one thing said to many people one thing to carry
+			-- outside this deployment. Empty for everything personal.
+			--
+			-- A message about somebody's own work names them and is theirs;
+			-- one saying a build's contents changed sharply is the same
+			-- sentence for every reader of that product, and a channel wants
+			-- it once however many people hold the product. The area inside
+			-- the application is per person either way — this decides what a
+			-- delivery is keyed on, which is the same question a condition's
+			-- "about" answers for the rows a sweep opens.
+			"together"  ` + t.name + ` NOT NULL,
 			-- When this was carried outside the application, and how many
 			-- times that has been tried.
 			--

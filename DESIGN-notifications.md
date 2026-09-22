@@ -118,6 +118,7 @@ so to somebody who is not watching.
 |---|---|
 | An event | It happened at a moment and stays true of it. The next upload is a different upload rather than a state this one could return from, so there is nothing for a condition to clear |
 | The fact and a link, never the names | What moved is a list of a build's contents, which is a screen. The screen applies the reading rule; a message travels outside this deployment |
+| One upload is one thing to carry outside | The sentence is the same for every reader of the product, so a channel is told once and the area inside the application still shows each of them their own line |
 | To whoever may read the product | It says what a build holds and links to the inventory, which is what reading the product is. An administrator holding no product role administers the catalog rather than watching builds, and granting themselves one is a line in the administrative record |
 | Not for the first upload read for a build | Every name in it is new, so every build would be reported the first time it is scanned |
 
@@ -137,9 +138,10 @@ inventory and ten names, which are a starting point rather than a recommendation
 — how much a build moves between nights is a question about what it is built
 from, and a base image that rolls weekly is not a fault.
 
-An inventory that held nothing has no share to be part of, so whatever arrives
-passes. A build reaches that by having had everything removed, which is the case
-least worth staying quiet about.
+An inventory that held nothing has no share to be part of, so the share stops
+nothing that arrives. The floor still applies: both thresholds are asked of
+every upload, and a build given three names back after being emptied is three
+names.
 
 ## Staleness conditions
 
@@ -445,7 +447,8 @@ request-forgery primitive unless governed (REQ-69):
 | Every request is signed over the timestamp and the body | A receiver can distinguish one of ours from one anybody could make, and cannot be handed yesterday's again. The timestamp is inside the signature |
 | The signing secret is stored recoverably | Every other credential is hashed because it authenticates somebody to this deployment; this one authenticates this deployment to somebody else. No endpoint returns it |
 | What it carries is what the channel rules already allow | Composed by the same code that composes a mail, the address included. A rule enforced in two places is enforced in one and a half, and the address is the part a channel would otherwise build for itself |
-| Tracked per destination and per thing said, not per notification | A condition is opened once for every person who should hear it, and a channel wants it once. An event has no such identity and is tracked by its own |
+| Tracked per destination and per thing said, not per notification | A condition is opened once for every person who should hear it, and a channel wants it once. An event is tracked by its own identity, unless it names what it is one of |
+| An event that says the same sentence to many people names what it is one of | One upload changing much of a build is one thing to carry however many people read that product. Without it a product with twenty-five readers posts twenty-five identical messages a night, and a night of builds crowds every other kind out of a sweep. What is personal — a decision of yours, you were named — carries none, because those are as many things as there are people |
 | The claim is staked before the request is made | A row with no sent-at stops a second replica, or the next sweep, sending the same thing while the first is in flight |
 | What a sweep reads is what this destination has not settled | Read as "everything not cleared", the window is the oldest two hundred, and an event is never cleared because only a condition is. Past two hundred events the same two hundred are re-read every cycle and nothing created afterwards is ever carried, with no error, no log and no counter |
 | A destination's kind is normalized where it is written | Stored as typed and compared loosely, a destination added under one spelling is retired by another only by accident, and one believed retired goes on receiving everything it takes, undisclosed findings included |

@@ -2,6 +2,7 @@ package notify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -74,7 +75,12 @@ func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
 	if err != nil {
 		return err
 	}
+	var failed error
 	body := saying(placed, movement)
+	// One upload is one thing to carry outside, however many people read the
+	// product. Hashed for the reason a condition's key is: it lands in a
+	// fixed-width column beside keys other passes invent.
+	together := identify("inventory-moved " + strconv.FormatInt(stored.ScanID, 10))
 	where := "/products/" + url.PathEscape(placed.Addressed.Product) +
 		"/streams/" + url.PathEscape(placed.Addressed.Stream) +
 		"/variants/" + url.PathEscape(placed.Addressed.Variant) +
@@ -93,11 +99,17 @@ func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
 		if err := NewStore(db).Tell(ctx, Telling{
 			PersonID: personID, Kind: InventoryMoved,
 			Body: body, Link: where, ProductID: &productID,
+			Together: together,
 		}); err != nil {
-			return fmt.Errorf("tell %d what an upload changed: %w", personID, err)
+			// Carried on rather than returned. The map is walked in no
+			// order, so stopping at the first failure tells a random subset
+			// and the rest hear nothing — and an event has no retry, so
+			// "the rest" means for ever.
+			failed = errors.Join(failed,
+				fmt.Errorf("tell %d what an upload changed: %w", personID, err))
 		}
 	}
-	return nil
+	return failed
 }
 
 // outsized says whether an upload moved enough of a build's inventory that
@@ -115,9 +127,9 @@ func outsized(movement graph.Movement, share, floor int) bool {
 	}
 	// Multiplied out rather than divided, so that the comparison is in whole
 	// names and a share of a small inventory does not round to nothing. It is
-	// also what lets an inventory that held nothing through whatever the share
-	// is: whatever arrived is the whole of it, and a build reaches that by
-	// having had everything removed.
+	// also what makes an inventory that held nothing pass whatever the share
+	// is — whatever arrived is the whole of it — while the floor above still
+	// applies to it, as it does to every upload.
 	return names*100 >= share*movement.Held
 }
 

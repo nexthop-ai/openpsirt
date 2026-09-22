@@ -40,6 +40,11 @@ type readerFixture struct {
 	reader *ingest.Reader
 	branch int64
 	tag    int64
+	// told is every inventory the reader handed to whoever works out whether
+	// anybody should hear about it. The deployment wires that hook and
+	// nothing else does, so without one here the three lines that call it
+	// could go and the whole suite would stay green.
+	told *[]ingest.Stored
 }
 
 // accept records a scan and stores what a build sent with it, the way an
@@ -125,9 +130,14 @@ func eachReader(t *testing.T, fn func(t *testing.T, f *readerFixture)) {
 		}
 
 		q := queue.New(db, queue.DefaultOptions())
+		told := &[]ingest.Stored{}
 		fn(t, &readerFixture{
 			db: db, queue: q, branch: branchTarget.ID, tag: tagTarget.ID,
-			reader: ingest.NewReader(db, q, sbom.Limits{}, quiet, "test"),
+			told: told,
+			reader: ingest.NewReader(db, q, sbom.Limits{}, quiet, "test").
+				Telling(func(_ context.Context, stored ingest.Stored) {
+					*told = append(*told, stored)
+				}),
 		})
 	})
 }
@@ -603,4 +613,35 @@ func TestAScanKeepsWhatItsDocumentCalledTheThingItIsAbout(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestAStoredInventoryIsHandedOnToWhoeverWouldSaySomethingAboutIt(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		scanID := f.accept(t, f.branch, time.Now().UTC().Add(-time.Hour), anInventory)
+		if _, err := f.reader.Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		if len(*f.told) != 1 {
+			t.Fatalf("%d inventories were handed on, want the one that was read", len(*f.told))
+		}
+		if got := (*f.told)[0]; got.ScanID != scanID || got.TargetID != f.branch {
+			t.Errorf("handed on %+v, want scan %d of build %d", got, scanID, f.branch)
+		}
+	})
+}
+
+func TestAnInventoryNothingCouldReadIsHandedToNobody(t *testing.T) {
+	// The hook runs after the writes commit, so a document that never became
+	// a graph has nothing anybody could be told about.
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		f.accept(t, f.branch, time.Now().UTC().Add(-time.Hour),
+			`{"bomFormat": "CycloneDX", "specVersion": "1.6", "components": [`)
+		if _, err := f.reader.Once(t.Context()); err == nil {
+			t.Fatal("a document nothing can read was accepted")
+		}
+		if len(*f.told) != 0 {
+			t.Errorf("a scan that failed was handed on: %+v", *f.told)
+		}
+	})
 }

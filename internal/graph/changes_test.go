@@ -331,3 +331,44 @@ func TestAKindOfChangeNobodyHasIsRefused(t *testing.T) {
 		}
 	})
 }
+
+func TestOneNameSpelledTwoWaysAnswersTheSameWayTwice(t *testing.T) {
+	// A producer that changed how it capitalizes a dependency leaves one
+	// folded name with two spellings, one per version, and nothing orders the
+	// rows they come back in. Taken from whichever arrived first, the listing
+	// answers differently between two identical requests — and a screen keys
+	// the component link on that string, so one of the two answers leads
+	// nowhere.
+	each(t, func(t *testing.T, f *fixture) {
+		lower := at("jinja2", "2.11.3")
+		first := graph.Snapshot{
+			Root: root, Components: []graph.Described{lower},
+			Dependencies: []graph.Dependency{{Parent: root, Child: lower}},
+		}
+		applied(t, f, first)
+
+		// The same name at a new version, written the other way.
+		upper := at("Jinja2", "3.1.2")
+		next := graph.Snapshot{
+			Root: root, Components: []graph.Described{lower, upper},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: lower},
+				{Parent: root, Child: upper},
+			},
+		}
+		scanID := applied(t, f, next)
+
+		listed := changes(t, f, scanID)
+		if len(listed) != 1 {
+			t.Fatalf("the upload moved %d names, want one: %v", len(listed), spelled(listed))
+		}
+		// The spelling is decided rather than taken from whichever row came
+		// back first: the smallest of them, which is the same answer on every
+		// engine and on every read. Asserted as the value rather than as
+		// "twice the same", because two reads in one test see one order.
+		if listed[0].Name != "Jinja2" {
+			t.Errorf("the listing names it %q, want the spelling this picks "+
+				"whatever order the rows arrive in", listed[0].Name)
+		}
+	})
+}
