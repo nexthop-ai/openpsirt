@@ -58,7 +58,7 @@ becomes readable along with the words describing it.
 |---|---|
 | Attached to text | The ordinary case. A file attached while composing is bound to the issue alone until that text is saved |
 | Attached to the issue | Evidence for a recorded flaw. Attached the moment it arrives. The caller requests this; it is not the default |
-| Attached to the report | What arrived with a claim. Attached the moment it arrives, on the same request |
+| Attached to the report | What arrived with a claim. Attached the moment it arrives, and it stays on the report when the claim is judged |
 | Attached to nothing | Collected by the reaper |
 
 ## Fetch authorization
@@ -78,13 +78,17 @@ another product reads as public here. Any reader of any product could then
 confirm whether a name exists anywhere in the deployment, one request at a time.
 
 For a file on a report, the report's own answer, which `DESIGN-findings.md`
-§ Reports holds: a report that became an issue takes the issue's answer, and a
-claim nobody has judged takes the right to triage work nobody has announced in
-that product. Asked at the moment of the request, like an issue's, so a claim
-becoming a disclosed issue carries its evidence with it.
+§ Report visibility holds: the right to triage work nobody has announced in
+that product, whether or not the claim has been judged. The record and what
+arrived with it have one answer rather than two.
+
+A file on a report does not follow the issue the claim turned out to be. What
+a stranger sent is reviewed by nobody, so judging the claim to be a disclosed
+issue must not publish it; anything meant to be read there is attached to the
+issue instead.
 
 Reaching a file on a report and attaching one to it are the same right.
-Reaching a claim already asks for a role that triages, so there is nothing
+Reaching a claim already asks for a role that writes, so there is nothing
 narrower for a writer to be refused by.
 
 A file the reader may not see and a file that does not exist answer identically,

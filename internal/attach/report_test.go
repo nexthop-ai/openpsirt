@@ -81,37 +81,39 @@ func TestAFileOnAnUnjudgedClaimIsReachedOnlyByWhoeverTriagesUnannouncedWork(t *t
 	})
 }
 
-func TestAFileOnAJudgedClaimIsAsReadableAsTheIssue(t *testing.T) {
-	// Asked at the moment of the request rather than copied onto the file, so
-	// a claim becoming a disclosed issue carries its evidence with it — the
-	// same rule that makes an embargo ending carry the file with the words.
+func TestJudgingAClaimDoesNotPublishWhatArrivedWithIt(t *testing.T) {
+	// A file on a report follows the report and not the issue, which is the
+	// one place the two differ. What arrived with a claim is what a stranger
+	// sent and nobody has reviewed it, so saying the claim is a disclosed
+	// issue must not hand it to everybody who reads that product. A file
+	// meant to be read there is attached to the issue, which is an act
+	// somebody takes.
 	each(t, func(t *testing.T, f *fixture) {
 		owner := f.who(t, access.PrivateTriage)
-		undisclosed := f.anIssue(t, "CVE-2026-7000", access.Private)
-		report := f.aReport(t, owner, &undisclosed)
-		stored, err := f.store.Upload(t.Context(), owner,
-			attach.Against{ProductID: f.product, FlawReportID: report},
-			"proof.log", strings.NewReader("what they sent"), 14,
+		// f.issue is announced work, so a file on the issue itself is
+		// readable by a reader of this product. The pair is what makes the
+		// rule visible rather than a single refusal that could be anything.
+		onTheIssue, err := f.store.Upload(t.Context(), owner,
+			attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
+			"ours.log", strings.NewReader("what we attached"), 16,
 			roomy, plenty, plenty, true)
 		if err != nil {
 			t.Fatal(err)
 		}
-		reader := f.who(t, access.PublicRead)
-		if _, err := f.store.Find(t.Context(), reader, stored.Token); err == nil {
-			t.Error("a reader of announced work fetched a file on an undisclosed issue")
+		onTheReport, err := f.store.Upload(t.Context(), owner,
+			attach.Against{ProductID: f.product, FlawReportID: f.aReport(t, owner, &f.issue)},
+			"theirs.log", strings.NewReader("what they sent"), 14,
+			roomy, plenty, plenty, true)
+		if err != nil {
+			t.Fatal(err)
 		}
 
-		// The same file, on a claim that turned out to be announced work.
-		announced := f.aReport(t, owner, &f.issue)
-		open, err := f.store.Upload(t.Context(), owner,
-			attach.Against{ProductID: f.product, FlawReportID: announced},
-			"open.log", strings.NewReader("what they sent"), 14,
-			roomy, plenty, plenty, true)
-		if err != nil {
-			t.Fatal(err)
+		reader := f.who(t, access.PublicRead)
+		if _, err := f.store.Find(t.Context(), reader, onTheIssue.Token); err != nil {
+			t.Errorf("a reader could not fetch a file on announced work: %v", err)
 		}
-		if _, err := f.store.Find(t.Context(), reader, open.Token); err != nil {
-			t.Errorf("a reader could not fetch a file on a disclosed issue: %v", err)
+		if _, err := f.store.Find(t.Context(), reader, onTheReport.Token); err == nil {
+			t.Error("judging a claim to be announced work published what arrived with it")
 		}
 	})
 }

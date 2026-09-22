@@ -193,11 +193,21 @@ func mayAttachTo(ctx context.Context, db bun.IDB, subject access.Subject,
 // mayReachReport reports whether a subject may read what arrived with one
 // report.
 //
-// A report that became an issue is as readable as the issue, asked at the
-// moment of the request: an embargo ending carries the evidence with the
-// words. One nobody has judged is undisclosed — there is no issue to be
-// public about, and nobody has decided the claim is safe to repeat — so it
-// takes the right to triage work nobody has announced.
+// The right to triage work nobody has announced in that product, whether or
+// not the report has been judged. A file that arrived with a claim is what a
+// stranger sent and nobody has reviewed it, so judging the claim to be a
+// disclosed issue must not publish it to everybody who reads that product —
+// a file meant to be read there is attached to the issue, which is an act
+// somebody takes.
+//
+// The same rule the report itself takes, so the record and what arrived with
+// it have one answer rather than two. That makes reaching a report's files
+// and attaching one to it the same right, because reaching already asks for a
+// role that writes.
+//
+// A file on an issue follows the issue instead, including an embargo ending.
+// The two differ because what they hang off differs: one is our own record of
+// a flaw, the other is what somebody outside sent us.
 //
 // The product is the one the request named, and a report filed against
 // another product answers as one that is not here. Told apart, the pair of
@@ -208,30 +218,23 @@ func mayReachReport(ctx context.Context, db bun.IDB, subject access.Subject,
 	if subject.Kind != access.Person {
 		return access.Denied("reach an attachment without being a person")
 	}
-	var row struct {
-		ProductID int64  `bun:"product_id"`
-		Issue     *int64 `bun:"vulnerability_id"`
-	}
+	// The report has to be in the product the request named before anything
+	// is said about who may read it.
+	var here int
 	err := db.NewSelect().
 		TableExpr(`"flaw_report" AS "fr"`).
-		ColumnExpr("fr.product_id").
-		ColumnExpr("fr.vulnerability_id").
+		ColumnExpr("COUNT(*)").
 		Where("fr.id = ?", reportID).
 		Where("fr.product_id = ?", productID).
-		Scan(ctx, &row)
-	if database.IsNoRows(err) {
-		return access.Denied(fmt.Sprintf("reach attachments in product %d", productID))
-	}
+		Scan(ctx, &here)
 	if err != nil {
 		return fmt.Errorf("read what a report is about: %w", err)
 	}
-	if row.Issue != nil {
-		return mayReach(ctx, db, subject, row.ProductID, *row.Issue)
-	}
-	if !subject.Triages(access.Private, row.ProductID) {
-		// The same answer as a report that is not here, for the reason an
-		// issue's files give the same answer twice: telling somebody a file
-		// exists but is not theirs tells them the claim exists.
+	// The same answer for a report that is not here and one this subject may
+	// not read, for the reason an issue's files give the same answer twice:
+	// telling somebody a file exists but is not theirs tells them the claim
+	// exists.
+	if here == 0 || !subject.Triages(access.Private, productID) {
 		return access.Denied(fmt.Sprintf("reach attachments in product %d", productID))
 	}
 	return nil

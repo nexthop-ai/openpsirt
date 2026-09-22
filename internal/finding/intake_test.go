@@ -353,6 +353,53 @@ func TestAReferenceIsDrawnRatherThanCounted(t *testing.T) {
 	})
 }
 
+func TestAFlawRecordedByHandCarriesAReportThatWasJudgedAsItWasWrittenDown(t *testing.T) {
+	// The other way a report is made. Whoever typed the flaw in said what it
+	// is in the same act, so all three roles are filled at once — and the row
+	// is reachable by its reference like any other, rather than only through
+	// the issue it was minted with.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PrivateTriage)
+		_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary: "The management socket accepts a request nobody authenticated.",
+			Told: finding.Told{
+				ReportedBy: "A Researcher", Contact: "them@example.org",
+				Credit: "anonymous", Received: "2026-06-01",
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue, err := finding.NewVulnerabilities(f.db.DB).ByName(t.Context(), identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		row, err := f.store.ReportFor(t.Context(), who, issue)
+		if err != nil || row == nil {
+			t.Fatalf("the report on a recorded flaw: %v %v", row, err)
+		}
+		if !referenceFor(row.Reference, "SONIC", 2026) {
+			t.Errorf("it was filed under %q", row.Reference)
+		}
+		if !row.Judged() || *row.VulnerabilityID != issue {
+			t.Errorf("it points at %v, want issue %d", row.VulnerabilityID, issue)
+		}
+		if row.EvaluatedAt == nil || row.EvaluatedBy == nil || *row.EvaluatedBy != who.ID {
+			t.Errorf("whoever recorded the flaw said what it is and the row says %v at %v",
+				row.EvaluatedBy, row.EvaluatedAt)
+		}
+		// Reachable both ways, because it is one row. Read only through the
+		// issue, a report made this way would be the one kind nothing on the
+		// reports surface could answer for.
+		back, err := f.store.ReportBy(t.Context(), who, f.productID, row.Reference)
+		if err != nil || back.ID != row.ID {
+			t.Errorf("reading it by reference answered %v (%v)", back, err)
+		}
+	})
+}
+
 // somebody is a second person holding roles on this fixture's product.
 func (f *fixture) somebody(t *testing.T, identity string, roles ...access.Role) access.Subject {
 	t.Helper()

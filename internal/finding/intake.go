@@ -77,9 +77,6 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 	if err := markdown.Check(summary); err != nil {
 		return nil, err
 	}
-	if err := markdown.Check(in.Told.Credit); err != nil {
-		return nil, err
-	}
 
 	now := s.now().UTC().Truncate(time.Microsecond)
 	var row *FlawReport

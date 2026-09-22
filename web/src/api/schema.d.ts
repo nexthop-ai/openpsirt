@@ -2863,7 +2863,7 @@ export interface paths {
          * Attach a file to a report
          * @description Stores one file against a report and returns the reference to put in text. A claim that has not been judged has no issue to hang a screenshot on, and the screenshot is often the whole of what was sent.
          *
-         *     The file stays with the report once the report gains an issue. What was sent is a fact about the report, and moving it would lose which of two reports it came in.
+         *     The file stays with the report once the report gains an issue, and stays as readable as the report: saying a claim is a disclosed issue does not publish what somebody sent with it. Attach it to the issue to put it there.
          *
          *     The content type is decided here from the bytes and is never the one that was uploaded. Everything outside a small allowlist of raster images is served as an attachment download whatever it is.
          *

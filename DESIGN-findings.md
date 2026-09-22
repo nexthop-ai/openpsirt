@@ -443,13 +443,20 @@ it lives.
 
 ### Report visibility
 
-A claim nobody has judged is undisclosed: there is no issue to be public
-about, and nobody has decided the claim is safe to repeat. So recording one,
-reading one and listing a product's reports all ask for the right to triage
-work nobody has announced in that product.
+A claim is undisclosed: there is no issue to be public about, and nobody has
+decided the claim is safe to repeat. So recording one, reading one, listing a
+product's reports and reading what arrived with one all ask for the right to
+triage work nobody has announced in that product.
 
-A report that became an issue is as readable as the issue, asked at the moment
-of the request.
+Judging a claim does not widen that. What a stranger sent is what a stranger
+sent, reviewed by nobody, so saying the claim is a disclosed issue must not
+hand it to everybody who reads that product. Anything meant to be read there
+is attached to the issue, which is an act somebody takes.
+
+That is the one place a report and an issue differ, and `DESIGN-attachments.md`
+§ Fetch authorization holds the attachment half of it. A file on an issue
+follows the issue, including an embargo ending; a file on a report follows the
+report.
 
 A reference is reached in the product it was recorded against and nowhere
 else. A reference nobody minted, one recorded against another product, and one

@@ -97,6 +97,18 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 			t.Errorf("judging recorded %q by %q", one.Evaluated, one.EvaluatedBy)
 		}
 
+		// And it is the issue's report now, reachable at the route that was
+		// always there. One row, two ways in — a claim that decoupled and
+		// was then judged must not be the one report the issue screen
+		// cannot find.
+		var byIssue reportRead
+		read(t, r, "private-triage",
+			"/v1/products/mine/issues/"+minted+"/report", &byIssue)
+		if byIssue.Reference != recorded.Reference {
+			t.Errorf("the issue's report reads as %q, want %q",
+				byIssue.Reference, recorded.Reference)
+		}
+
 		// Judging twice is refused, and so is a second claim at one issue.
 		if got := asPerson(t, r, "private-triage", http.MethodPut, at+"/issue",
 			`{"vulnerability":"`+minted+`"}`); got.Code != http.StatusUnprocessableEntity {
