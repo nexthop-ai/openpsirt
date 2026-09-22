@@ -26,6 +26,10 @@ const Home = lazy(() => import("../screens/Home").then((m) => ({ default: m.Home
 const Finding = lazy(() => import("../screens/Finding").then((m) => ({ default: m.Finding })));
 const Tree = lazy(() => import("../screens/Tree").then((m) => ({ default: m.Tree })));
 const Compare = lazy(() => import("../screens/Compare").then((m) => ({ default: m.Compare })));
+const Inbox = lazy(() => import("../screens/Inbox").then((m) => ({ default: m.Inbox })));
+const InboxReport = lazy(() =>
+  import("../screens/InboxReport").then((m) => ({ default: m.InboxReport })),
+);
 const InventoryChanges = lazy(() =>
   import("../screens/InventoryChanges").then((m) => ({ default: m.InventoryChanges })),
 );
@@ -99,6 +103,8 @@ export const ROUTES = {
   run: `${build}/runs/:run`,
   upgrades: `${build}/pending-upgrades`,
   comparison: "/products/:product/comparison",
+  inbox: "/products/:product/inbox",
+  inboxReport: "/products/:product/inbox/:reference",
   me: "/me",
   people: "/people",
   person: "/people/:identity",
@@ -219,6 +225,8 @@ export function App() {
               <Route path={ROUTES.run} element={<Run />} />
               <Route path={ROUTES.upgrades} element={<Upgrades />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
+              <Route path={ROUTES.inbox} element={<Inbox />} />
+              <Route path={ROUTES.inboxReport} element={<InboxReport />} />
               {/* A person's own page: what they reach, what is sent to them,
                 and the credentials they hold. */}
               <Route path={ROUTES.me} element={<Me />} />

@@ -10,7 +10,7 @@ import {
 import { Assess } from "./FindingAssess";
 import { ExploitedHere } from "./FindingExploited";
 import { Notes } from "./FindingNotes";
-import { MatchMethod, LookItUp, Places, References, Reporter } from "./FindingEvidence";
+import { Duplicates, MatchMethod, LookItUp, Places, References, Reporter } from "./FindingEvidence";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
 import { useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -1200,6 +1200,7 @@ export function Finding() {
             this issue answers to. Both are about a flaw recorded
             here rather than one a scanner reported. */}
         {it.recorded && <Reporter product={product} vulnerability={vulnerability} />}
+        {!it.recorded && <Duplicates product={product} vulnerability={vulnerability} card />}
 
         {/* And which builds it affects, which the first belief about
             a flaw is often wrong about — that is the point of being able to

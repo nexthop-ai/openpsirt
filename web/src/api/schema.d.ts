@@ -2792,6 +2792,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/issues/{vulnerability}/duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List reports that duplicate an issue
+         * @description Every report in this product ruled a duplicate of this issue, with the ruling in force. What arrived with each is listed on the report's own attachments.
+         *
+         *     An issue that is not here and one you may not be told of answer alike.
+         *
+         *     Requires: private-triage on the product
+         */
+        get: operations["list-duplicate-reports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/issues/{vulnerability}/exploited-here": {
         parameters: {
             query?: never;
@@ -2994,6 +3018,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/report-rulings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List rulings on reports
+         * @description Every ruling in this product, newest first, including withdrawn ones. `waiting` narrows to those waiting for a second person.
+         *
+         *     Requires: private-triage on the product
+         */
+        get: operations["list-report-rulings"];
+        put?: never;
+        /**
+         * Rule on reports
+         * @description Says that one or more reports are duplicates, not reproducible, out of scope, or rejected. A report that turned out to be an issue here is pointed at that issue instead.
+         *
+         *     `out-of-scope` and `rejected` wait for a second person, and nothing changes until somebody other than the proposer approves. The other two take effect at once. While a ruling waits, its reports cannot be accepted as an issue or ruled on again.
+         *
+         *     `reasoning` is required on everything but a duplicate. `duplicate_of` is required on a duplicate and refused on anything else, and names an issue open in this product. A duplicate of an issue that is not open here is refused: reject the report instead.
+         *
+         *     Every report named has to be in this product, not accepted as an issue, and under no ruling, or nothing is written. The number of reports is bounded by `triage.together-cap`, the setting that bounds every bulk judgment.
+         *
+         *     Requires: private-triage on the product
+         */
+        post: operations["rule-reports"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/report-rulings/{ruling}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show a ruling on reports
+         * @description What was said, about which reports, by whom, and whether it is waiting, in force or withdrawn.
+         *
+         *     Requires: private-triage on the product
+         */
+        get: operations["get-report-ruling"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/report-rulings/{ruling}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a ruling on reports
+         * @description Agrees to a waiting ruling, which is when it takes effect for every report it covers.
+         *
+         *     Refused to whoever proposed it, and refused on a ruling that is not waiting.
+         *
+         *     Requires: private-triage on the product. The proposer may not approve their own.
+         */
+        post: operations["approve-report-ruling"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/report-rulings/{ruling}/withdrawal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Withdraw a ruling on reports
+         * @description Takes a ruling back, waiting or in force, and returns every report it covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
+         *
+         *     Needs nobody else, and the proposer may withdraw their own. The ruling stays on record as withdrawn.
+         *
+         *     Requires: private-triage on the product
+         */
+        post: operations["withdraw-report-ruling"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/reports": {
         parameters: {
             query?: never;
@@ -3130,7 +3258,7 @@ export interface paths {
          *
          *     The issue is one that already exists here. Recording a flaw is its own act, because it carries the builds the flaw ships in, the severity and the embargo — so agreeing that a claim is real is not the same keystroke as declaring where it lives.
          *
-         *     Refused where the report has already been judged, and where another report is already the record of that issue: one report is one issue's record, and a second pointed at the same issue is a duplicate rather than this.
+         *     Refused where the report has already been judged, where a ruling holds it — withdraw a waiting ruling first — and where another report is already the record of that issue: one report is one issue's record, and a second pointed at the same issue is a duplicate rather than this.
          *
          *     An issue this product does not hold, and one you may not be told of, answer alike — otherwise this route says which identifiers are open here.
          *
@@ -4500,6 +4628,30 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-remediation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/report-rulings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List rulings on reports across products
+         * @description Every ruling in the products you may work reports in, newest first, including withdrawn ones. A product you may not work reports in contributes nothing, not even to the count.
+         *
+         *     `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["list-rulings-across"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8228,6 +8380,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyRulingBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyRulingBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["RulingBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodySavedBody: {
             /**
              * Format: uri
@@ -9596,6 +9759,13 @@ export interface components {
             contact?: string;
             /** @description The credit they asked for in an advisory */
             credit?: string;
+            /**
+             * @description What the claim was judged to be, once that has taken effect
+             * @enum {string}
+             */
+            disposition?: "accepted" | "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
+            /** @description The issue a duplicate points at */
+            duplicate_of?: string;
             /** @description When somebody said what it turned out to be */
             evaluated?: string;
             /** @description Who said so */
@@ -9611,8 +9781,18 @@ export interface components {
             /** @description The name this report is reached by */
             reference: string;
             reported_by?: string;
+            /**
+             * Format: int64
+             * @description The ruling that answers it, waiting or in force
+             */
+            ruling?: number;
             /** @description What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it */
             summary?: string;
+            /**
+             * @description A disposition proposed and waiting for a second person
+             * @enum {string}
+             */
+            waiting?: "out-of-scope" | "rejected";
         };
         ReportIssueBody: {
             /**
@@ -9827,6 +10007,56 @@ export interface components {
             team_display_name?: string;
             /** @description A source package name. Catches every binary package built from it */
             upstream?: string;
+        };
+        RulingBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RulingBody.json
+             */
+            readonly $schema?: string;
+            approved_at?: string;
+            /** @description Who agreed, on a disposition that takes a second person */
+            approved_by?: string;
+            /** @enum {string} */
+            disposition: "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
+            /** @description The issue a duplicate points at */
+            duplicate_of?: string;
+            /** Format: int64 */
+            id: number;
+            /** @description The product it was made in */
+            product: string;
+            proposed_at: string;
+            proposed_by: string;
+            /** @description Why, as markdown. Never edited */
+            reasoning?: string;
+            /** @description The references of the reports it covers, including after it was withdrawn */
+            reports: string[] | null;
+            /**
+             * @description Waiting for a second person, what its reports currently are, or taken back
+             * @enum {string}
+             */
+            state: "waiting" | "in-force" | "withdrawn";
+            withdrawn_at?: string;
+            withdrawn_by?: string;
+            /** @description Whether you proposed it. The proposer may not approve it */
+            yours?: boolean;
+        };
+        RulingProposedBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/RulingProposedBody.json
+             */
+            readonly $schema?: string;
+            /** @enum {string} */
+            disposition: "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
+            /** @description The open issue a duplicate points at, under any identifier it goes by. Only on a duplicate */
+            duplicate_of?: string;
+            /** @description Why, as markdown. Required on everything but a duplicate */
+            reasoning?: string;
+            /** @description The references of the reports it covers. Naming one twice covers it once */
+            reports: string[] | null;
         };
         RunBody: {
             /**
@@ -15411,6 +15641,38 @@ export interface operations {
             };
         };
     };
+    "list-duplicate-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyReportBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "record-exploited-here": {
         parameters: {
             query?: never;
@@ -15666,6 +15928,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListBodyReleaseBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-report-rulings": {
+        parameters: {
+            query?: {
+                /** @description Only rulings waiting for a second person */
+                waiting?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyRulingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "rule-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulingProposedBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-report-ruling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                ruling: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "approve-report-ruling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                ruling: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulingBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-report-ruling": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                ruling: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulingBody"];
                 };
             };
             /** @description Error */
@@ -17976,6 +18405,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RemediationOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-rulings-across": {
+        parameters: {
+            query?: {
+                /** @description Limit to these products, by name. Repeatable; any of them matches */
+                product?: string[] | null;
+                /** @description Only rulings waiting for a second person */
+                waiting?: boolean;
+                /** @description Only rulings proposed on or after this date, as YYYY-MM-DD */
+                from?: string;
+                /** @description Only rulings proposed before this date, as YYYY-MM-DD */
+                to?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyRulingBody"];
                 };
             };
             /** @description Error */

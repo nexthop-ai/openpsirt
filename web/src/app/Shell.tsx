@@ -6,7 +6,7 @@ import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { findingsPath, useScope, type Scoped } from "./scope";
 import { UNOWNED, UNOWNED_LIST, asAsked, listQuery } from "../screens/list";
 import { folded, fold } from "./rail";
-import { signOut } from "./session";
+import { mayOf, signOut } from "./session";
 import { Scope } from "./Scope";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -46,6 +46,9 @@ const UNOWNED_QUERY = listQuery(asAsked(new URLSearchParams(UNOWNED), "issues"))
 export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const { product, stream, variant } = useScope();
   const whole = !!(product && stream && variant);
+  // Reports take triage of undisclosed work, which is what may_hide says.
+  const reportsAnywhere = who.reach.some((each) => each.may_hide);
+  const reportsHere = !!product && !!mayOf(who, product)?.may_hide;
   const scope = [product ?? "all products", stream, variant].filter(Boolean).join(" · ");
   const build = whole
     ? `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}/variants/${encodeURIComponent(variant)}`
@@ -244,6 +247,18 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               label="Pending upgrades"
               needs={whole}
             />
+            {/* What people outside have sent a product. Only for somebody who may
+              work reports somewhere, and it needs a product picked because an
+              inbox belongs to one. */}
+            {reportsAnywhere && (
+              <Rail
+                to={product ? `/products/${encodeURIComponent(product)}/inbox` : ""}
+                icon="letter"
+                label="Inbox"
+                needs={!!product && reportsHere}
+                why={product ? "You don't work reports in this product" : "Pick a product"}
+              />
+            )}
             {/* Recording a flaw is an act rather than a place, so it opens a
               drawer instead of going anywhere — the same shape as Upload. It
               lives here rather than on the findings list because it is not a

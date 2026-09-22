@@ -176,7 +176,8 @@ func registerIntake(api huma.API, in Ingest) {
 			"because it carries the builds the flaw ships in, the severity and the embargo — " +
 			"so agreeing that a claim is real is not the same keystroke as declaring where it " +
 			"lives.\n\n" +
-			"Refused where the report has already been judged, and where another report is " +
+			"Refused where the report has already been judged, where a ruling holds it — " +
+			"withdraw a waiting ruling first — and where another report is " +
 			"already the record of that issue: one report is one issue's record, and a second " +
 			"pointed at the same issue is a duplicate rather than this.\n\n" +
 			"An issue this product does not hold, and one you may not be told of, answer " +
@@ -190,6 +191,12 @@ func registerIntake(api huma.API, in Ingest) {
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
+		}
+		// Authorized before the issue's name is resolved, so an issue nobody
+		// filed and one filed here answer alike to somebody who may not judge
+		// a report at all. Refused as the report route refuses everything.
+		if err := finding.MayWorkReports(subject, product.ID); err != nil {
+			return nil, huma.Error404NotFound(finding.ErrNoSuchReport.Error())
 		}
 		// Propagated rather than flattened. It already answers alike for an
 		// issue that is not here and one this subject may not be told of,
@@ -323,6 +330,8 @@ func registerIntake(api huma.API, in Ingest) {
 		}
 		return out, nil
 	})
+
+	registerRulings(api, in)
 }
 
 // productForReports resolves the product a report route names.

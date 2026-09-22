@@ -14,6 +14,8 @@ import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
 import { coveringPeriod, stated } from "./reports/Window";
+import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
+import { RulingCard, useBackOff } from "./InboxRuling";
 
 // The share of the record one page holds. The server's own ceiling is five
 // hundred; a page is what somebody reads, and the rest is a click away rather
@@ -342,8 +344,65 @@ export function Audit() {
         </>
       )}
 
+      {/* Keyed on what narrows it, so a narrowed period starts on its
+          first page rather than on a page it no longer has. */}
+      <Ruled key={[...products, from, to].join("|")} />
       <Administered />
     </>
+  );
+}
+
+// What reports were ruled to be, over the same products and period.
+//
+// Beside the record rather than in it: a ruling is about claims somebody sent
+// rather than findings, and shares none of the filters the judgments above
+// take. Read under the report rule, so a reader who may work reports nowhere
+// has no section.
+function Ruled() {
+  const [params] = useSearchParams();
+  const products = params.getAll("product").filter(Boolean);
+  const from = params.get("from") ?? "";
+  const to = params.get("to") ?? "";
+  const [offset, setOffset] = useState(0);
+  const ruled = useRulingsAcross({ products, from, to, offset });
+  useBackOff(ruled.data?.items?.length, offset, setOffset);
+  if (ruled.isError) {
+    return (
+      <div style={{ marginTop: 24 }}>
+        <h3>Rulings on reports</h3>
+        <Failed error={ruled.error} what="The rulings on reports could not be read." />
+      </div>
+    );
+  }
+  const rows = ruled.data?.items ?? [];
+  const total = ruled.data?.total ?? rows.length;
+  if (total === 0) return null;
+  return (
+    <div style={{ marginTop: 24 }} id="rulings">
+      <div className="screen-head">
+        <h3>
+          Rulings on reports <span className="n">{total.toLocaleString()}</span>
+        </h3>
+      </div>
+      <p className="hint">
+        Reports ruled duplicate, not reproducible, out of scope or rejected, withdrawn ones
+        included.
+        {stated({ from, to }) ? ` Proposed over ${coveringPeriod({ from, to }, 0)}.` : ""}
+      </p>
+      {rows.map((ruling) => (
+        <RulingCard key={ruling.id} ruling={ruling} named record />
+      ))}
+      <div className="noprint">
+        <Paged
+          shown={rows.length}
+          total={total}
+          offset={offset}
+          limit={RULINGS_PAGE}
+          onGo={setOffset}
+          what="listed"
+        />
+      </div>
+    </div>
   );
 }
 

@@ -42,8 +42,9 @@ type FlawReport struct {
 	// and a report keyed on the issue alone was readable from every one of
 	// them.
 	ProductID int64 `bun:"product_id,notnull"`
-	// VulnerabilityID is the issue it turned out to be. Absent is a claim
-	// nobody has judged, which is the state every report arrives in.
+	// VulnerabilityID is the issue it turned out to be, where it was accepted
+	// as one. Absent is every other report: one nobody has judged, which is
+	// the state every report arrives in, and one a ruling answers.
 	VulnerabilityID *int64 `bun:"vulnerability_id"`
 	// Summary is what was claimed, in the words it was claimed in. It carries
 	// the substance of a report with no issue; once there is one, the issue's
@@ -72,10 +73,11 @@ type FlawReport struct {
 	EvaluatedBy *int64     `bun:"evaluated_by"`
 	RecordedBy  int64      `bun:"recorded_by,notnull"`
 	RecordedAt  time.Time  `bun:"recorded_at,notnull"`
+	// RulingID is the ruling that answers it, waiting or in force. A report
+	// under one is neither accepted nor ruled on again until it is
+	// withdrawn.
+	RulingID *int64 `bun:"ruling_id"`
 }
-
-// Judged reports whether somebody has said what this claim is.
-func (r *FlawReport) Judged() bool { return r.VulnerabilityID != nil }
 
 // Told is what somebody types in when they record a flaw somebody sent them.
 //
@@ -190,10 +192,11 @@ func (s *Store) answered(ctx context.Context, subject access.Subject, reportID i
 type Unanswered struct {
 	ReportID int64
 	// Reference is the name the report is reached by, which is the only name
-	// a claim nobody has judged has.
+	// a report with no issue has.
 	Reference string
-	// VulnerabilityID and Identifier are the issue it turned out to be, where
-	// somebody has said. Zero and empty are a claim nobody has judged.
+	// VulnerabilityID and Identifier are the issue it was accepted as. Zero
+	// and empty are a report with no issue: unjudged, or ruled something
+	// other than an issue.
 	VulnerabilityID int64
 	Identifier      string
 	ProductID       int64
@@ -214,14 +217,15 @@ type Unanswered struct {
 // raising. A report that became an issue is worth raising only while that
 // issue is open somewhere: one about something long closed is history rather
 // than an unanswered letter, and a condition nobody can act on teaches people
-// to ignore the list. A report nobody has judged has no issue to be open, and
-// is the one that most needs answering.
+// to ignore the list. A report with no issue has none to be open, and is
+// still owed an answer whether or not a ruling says what it is — a ruling
+// answers what the claim is, not the person who sent it.
 func (s *Store) Unacknowledged(ctx context.Context) ([]Unanswered, error) {
 	out, err := s.unacknowledgedOnIssues(ctx)
 	if err != nil {
 		return nil, err
 	}
-	unjudged, err := s.unacknowledgedUnjudged(ctx)
+	unjudged, err := s.unacknowledgedWithoutIssue(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -284,12 +288,13 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 	return out, nil
 }
 
-// unacknowledgedUnjudged is every unanswered report nobody has said what to
-// make of.
+// unacknowledgedWithoutIssue is every unanswered report with no issue:
+// unjudged, and ruled something other than an issue, which is still owed an
+// answer.
 //
-// Undisclosed always. There is no issue to be public about, and a claim
-// nobody has judged is one nobody has decided is safe to repeat.
-func (s *Store) unacknowledgedUnjudged(ctx context.Context) ([]Unanswered, error) {
+// Undisclosed always. There is no issue to be public about, and nobody has
+// decided that what a stranger sent is safe to repeat.
+func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, error) {
 	var rows []struct {
 		ReportID   int64      `bun:"report_id"`
 		Reference  string     `bun:"reference"`

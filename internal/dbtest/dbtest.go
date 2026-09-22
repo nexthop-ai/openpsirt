@@ -742,8 +742,13 @@ var tables = []string{
 	"routing_rule",
 	// Before person, product and vulnerability, all of which it points at.
 	"case_collaborator",
-	// Before person, vulnerability and product, all of which it points at.
+	// Before flaw_report and report_ruling, both of which it points at.
+	"report_ruled",
+	// Before report_ruling, person, vulnerability and product, all of which
+	// it points at.
 	"flaw_report",
+	// Before person, vulnerability and product, all of which it points at.
+	"report_ruling",
 	// Before advisory_edition, advisory and person, all of which it points
 	// at. The edition is what went out, which is a fact about a moment.
 	"advisory_issuance",

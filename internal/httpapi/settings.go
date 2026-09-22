@@ -140,7 +140,7 @@ var settable = []struct {
 		aDuration, nil, func(Ingest) string { return access.MaxTokenLifetime.String() }, false},
 	{setting.ClaimWindow, "How long an authorization written for somebody who has never signed in stays redeemable. It is the one window where a name rather than an identifier decides who gets a set of roles, so it ends",
 		aDuration, nil, func(Ingest) string { return access.DefaultClaimWindow.String() }, false},
-	{setting.TogetherCap, "How many findings one action may claim about at once. A whole number, not a length of time",
+	{setting.TogetherCap, "How many findings one action may claim about at once, and how many reports one ruling may cover. A whole number, not a length of time",
 		aCount, nil, func(Ingest) string { return strconv.Itoa(triage.DefaultTogetherCap) }, false},
 	{setting.TriageFloor, "What counts as worth triaging: everything, or a severity word below which findings are still recorded and counted but kept out of the working list. A product may state its own instead",
 		aWord, theFloor, func(Ingest) string { return theFloor[0] }, true},

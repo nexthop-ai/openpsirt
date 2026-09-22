@@ -59,7 +59,7 @@ true is cleared, and running the same pass twice changes nothing.
 | An approval an edit withdrew | event | **Not built.** The people who granted it should be told, so it does not quietly stop counting |
 | A build that stopped being scanned | condition | A sweep derives every declared build with when it was last scanned and reconciles |
 | An embargo whose date arrived | condition | Reaching the date discloses nothing (REQ-37). Clears when the date moves or the finding is disclosed |
-| A claim waiting for a second person | condition | To whoever may approve it, never to its proposer |
+| A claim waiting for a second person | condition | To whoever may approve it, never to its proposer. A ruling on reports waiting for its approval is the same condition |
 | A claim sent back and not revised | condition | The event told them at the moment it was sent back; an event cannot report that it has since been ignored |
 | A deferral running out | condition | Before the date. What follows the date is the finding arriving back as late work |
 | Work sitting in a team queue | condition | Per team and product, with a count |
@@ -154,6 +154,7 @@ occurred, which nothing driven by an event can do.
 | Condition | Told to |
 |---|---|
 | A claim waiting for approval | Whoever may approve it, never its proposer |
+| A ruling on reports waiting for approval | Whoever may triage undisclosed work in that product, never its proposer |
 | A deferral whose end is approaching | The proposer |
 | A claim sent back and untouched | The proposer |
 | Work sitting in a team queue | The people on that team |
@@ -167,14 +168,21 @@ unanswered report carries no period — the answer to how long that may go
 unanswered is "not at all".
 
 A claim nobody has judged is raised the same way and named differently. It has
-no issue to name, so the alert carries the reference it was minted with, and
-it carries no address at all: nothing in the interface reaches a report, and a
-notice pointing at a page that answers "not found" is worse than one that
-names what to go and look for.
+no issue to name, so the alert carries the reference it was minted with and
+points at the report.
 
 Both are told to whoever may triage work nobody has announced there, which is
 who may open the report. An alert about a letter somebody cannot read is one
 they can do nothing with.
+
+A ruling waiting for approval takes the period a waiting claim does, because it
+is the same thing: one act setting something aside, which takes effect only
+once somebody else agrees. One alert per ruling, however many reports it
+covers, pointing at the inbox narrowed to what is waiting. It is undisclosed,
+and reaches whoever may approve it, which is the report rule — the approver
+capability alone reaches no ruling. A ruling answers what a claim is and not
+the reporter, so a rejected report nobody acknowledged is still raised as
+unanswered.
 
 A report about an issue long closed is history rather than an unanswered
 letter, so those stop being raised; a claim nobody has judged has no issue to

@@ -32,7 +32,8 @@ var ErrNoSuchReport = errors.New("no report here goes by that name")
 // ErrAlreadyJudged, ErrIssueReported and ErrNothingClaimed are the three ways
 // recording or judging a claim is refused.
 var (
-	ErrAlreadyJudged  = errors.New("that report has already been judged")
+	ErrAlreadyJudged = errors.New(
+		"that report has already been judged, or a ruling on it is waiting for a second person")
 	ErrIssueReported  = errors.New("another report is already the record of that issue")
 	ErrNothingClaimed = errors.New(
 		"say what was claimed — a report with nothing in it records only that a mail arrived")
@@ -52,6 +53,13 @@ func mayHandle(subject access.Subject, productID int64) error {
 		return access.Denied(fmt.Sprintf("work the reports in product %d", productID))
 	}
 	return nil
+}
+
+// MayWorkReports reports whether this subject may work a product's reports,
+// for a caller that has a name to resolve before it reaches the store and
+// has to authorize first.
+func MayWorkReports(subject access.Subject, productID int64) error {
+	return mayHandle(subject, productID)
 }
 
 // Record writes down a claim that arrived.
@@ -231,6 +239,9 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 			// input a single caller can produce, so it was a rule with no
 			// test rather than a second line of defense.
 			Where("vulnerability_id IS NULL").
+			// A report under a ruling is answered, or about to be. Accepting
+			// it as well would leave it two things at once.
+			Where("ruling_id IS NULL").
 			Exec(ctx)
 		if err != nil {
 			return err

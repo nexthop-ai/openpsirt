@@ -3,7 +3,7 @@
 What a scan run found, where it sits, and how it is ranked and closed.
 
 Satisfies REQ-08, REQ-11, REQ-13, REQ-14, REQ-15, REQ-17, REQ-18, REQ-19,
-REQ-20, REQ-21, REQ-22, REQ-25, REQ-32, REQ-37.
+REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-32, REQ-37.
 
 ## Contents
 
@@ -423,7 +423,7 @@ cannot tell them apart evidences none of them.
 |---|---|
 | Who wrote it down, and when | Recording the report |
 | Who answered the reporter, and when | Acknowledging it |
-| Who judged the claim, and when | Saying what it turned out to be |
+| Who judged the claim, and when | Accepting it as an issue, or a ruling taking effect. On a ruling, the proposer and the moment they proposed it |
 
 A flaw recorded by hand carries all three at once, because whoever typed it in
 said what the flaw is in the same act.
@@ -438,8 +438,10 @@ it lives.
 | Refusal | Reason |
 |---|---|
 | The report has already been judged | Two people judging at once would both succeed, and the second would overwrite who decided and when. Asked in the write as well as before it |
-| Another report is already that issue's record | One report is one issue's record. A second pointed at the same issue is a duplicate, which is a judgment of its own |
+| Another report is already that issue's record | One report is one issue's record. A second pointed at the same issue is a duplicate, which is a ruling of its own |
+| A ruling holds the report | A report waiting to be rejected and accepted by somebody else in the meantime would be two things when the approval lands. Asked in the write |
 | The issue is not one the judge may be told of here | Resolving first and refusing after makes the refusal informative: an identifier nobody has filed and one filed on work this person cannot see would come back differently, which turns this into a way to ask which identifiers are open here |
+| The judge may not work reports here | Asked before the issue's name is resolved. Asked after, an identifier nobody has filed and one filed here come back in different words to somebody who may not judge a report at all. The same holds for the issue a duplicate names, and for the issue whose duplicates are listed |
 
 ### Report visibility
 
@@ -471,12 +473,48 @@ which products hold claims.
 Somebody brought onto a single case reaches no reports. A case grant is about
 one issue, and a product's claims are not.
 
-### Not built
+### Dispositions
 
-The five dispositions a judged report can carry — accepted, duplicate, out of
-scope, not reproducible, rejected — and the second person that rejecting or
-declaring something out of scope requires. Pointing a report at an issue is
-the whole of what a report can be judged as today.
+A judged report carries one of five dispositions. Accepted is written by
+pointing the report at an issue. The other four are written by a **ruling**:
+one act, with one reason, covering one or more reports in one product.
+
+| Disposition | Second person | Reason required | Meaning |
+|---|---|---|---|
+| Accepted | No | No | The claim is an issue here. The issue carries it from then on |
+| Duplicate | No | No | The claim is an issue already open here. The ruling names that issue |
+| Not reproducible | No | Yes | Nobody could make it happen |
+| Out of scope | Yes | Yes | It is about something this product does not answer for |
+| Rejected | Yes | Yes | It is not a flaw |
+
+| Rule | Reason |
+|---|---|
+| Rejecting and declaring out of scope wait for a second person (REQ-24) | Both set a claim aside with nothing left anywhere to work on, which is hiding risk. The proposer never approves their own, with no override |
+| A duplicate needs nobody else, and names an issue open in this product | The work exists elsewhere, so nothing is hidden. The target is resolved against what the proposer may be told of, and one they may not answers as one that is not here |
+| Not reproducible needs nobody else | It records that an attempt failed rather than that the claim is false. The reporter is still owed an answer and the report is raised as unanswered until they have one, and a reply carrying a way to reproduce it is met by withdrawing the ruling |
+| A duplicate of an issue not open here is refused at submission | Nothing is left to work on, so it buries the report with nobody having agreed. Open is a place not closed, not suppressed by what the build said, and not dismissed by a decision in force; a deferral or a promised upgrade is work that comes back, and counts as open. The refusal says to reject it instead, which takes the second person |
+| A reason is required on everything but a duplicate, and goes through the submission policy | A reviewer and a reporter asking why are owed a sentence. A duplicate's reason is the issue it names |
+| A reason is never edited (REQ-28) | An approval is of particular words. Different words are a new ruling |
+| A ruling covers many reports and is approved, sent back or undone as one act (REQ-28) | Twenty slop reports rejected in one sentence take one approval. An approver facing one row per report is given "select all", which is not review |
+| A ruling is bounded by the bulk-judgment setting, counted in reports written (REQ-27) | Nothing re-checks a rejection. Naming one report twice writes it once, and a reference typed in another case is the same report |
+| Every report named is in the product and unanswered, or nothing is written | A ruling that half applies is one nobody agreed to. Asked in the write, so two people ruling at once cannot both succeed |
+| A waiting ruling holds its reports | Nobody accepts them as an issue or rules on them again until it is approved or withdrawn |
+| A report under a waiting ruling reads as unjudged | Who judged it is written when the ruling takes effect. Before then one person has said it and nobody has agreed |
+| Withdrawing needs nobody else | It returns every report the ruling covered to the inbox unanswered, which re-exposes risk. Sending a waiting ruling back and undoing one in force are this one act, and the proposer may withdraw their own |
+| A withdrawn ruling stays on record with the reports it covered | The live pointer on each report is cleared; the list of what the ruling covered is kept apart from it |
+| Rulings are read and approved under the report rule | A ruling says what a stranger's claim is, and reading it reads the claim. The approver capability alone reaches no ruling. Listed across products, a product the reader may not work reports in contributes nothing, not even to the count |
+
+#### Duplicates on the issue
+
+The reports ruled duplicates of an issue are listed on that issue, with what
+arrived with each. A duplicate often carries the screenshot that makes the
+issue clearer. The list is read under the report rule: the issue being
+readable says nothing about whether what a stranger sent is.
+
+#### The unanswered condition
+
+A ruling answers what a claim is. It does not answer the reporter. A rejected
+report nobody acknowledged is still raised as unanswered.
 
 ## Scoring
 
@@ -1145,3 +1183,5 @@ question next year should find the answer rather than the question.
 | A derived address refuses a name that is nothing but dots, rather than escaping it | A name and a version become path segments, and "." and ".." are resolved by the browser before the request leaves it. Everything else, separators included, is escaped into its segment (REQ-66) |
 | An identifier is matched against an anchored scheme before it resolves | A flaw this deployment recorded is filed under a name it minted, and a loose match sends somebody to a public page about something else |
 | A package kind nothing here knows produces no link | A link that lands on the wrong thing costs more than no link, because it is followed before it is disbelieved |
+| A ruling carries one disposition and one reason for every report it covers | Reports needing different reasons are different rulings. Splitting one is withdrawing it and proposing two |
+| Accepting a report takes no ruling and no second person | Accepting re-exposes risk, and an issue already carries its own triage |

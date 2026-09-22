@@ -33,6 +33,13 @@ type ReportBody struct {
 	Issue       string `json:"issue,omitempty" doc:"The issue the claim turned out to be"`
 	Evaluated   string `json:"evaluated,omitempty" doc:"When somebody said what it turned out to be"`
 	EvaluatedBy string `json:"evaluated_by,omitempty" doc:"Who said so"`
+	// Disposition is what the claim was judged to be, where that has taken
+	// effect. Absent is a claim nobody has answered, or one whose ruling is
+	// waiting for a second person.
+	Disposition string `json:"disposition,omitempty" enum:"accepted,duplicate,not-reproducible,out-of-scope,rejected" doc:"What the claim was judged to be, once that has taken effect"`
+	DuplicateOf string `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
+	Ruling      int64  `json:"ruling,omitempty" doc:"The ruling that answers it, waiting or in force"`
+	Waiting     string `json:"waiting,omitempty" enum:"out-of-scope,rejected" doc:"A disposition proposed and waiting for a second person"`
 	RecordedBy  string `json:"recorded_by" doc:"Who wrote it down"`
 	RecordedAt  string `json:"recorded_at" doc:"When it was written down, which is not when it arrived"`
 }
@@ -210,6 +217,15 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 			issues = append(issues, *row.VulnerabilityID)
 		}
 	}
+	rulings, err := finding.NewStore(in.DB.DB).RulingsOf(ctx, rows)
+	if err != nil {
+		return nil, err
+	}
+	for _, ruling := range rulings {
+		if ruling.DuplicateOf != nil {
+			issues = append(issues, *ruling.DuplicateOf)
+		}
+	}
 	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
 	if err != nil {
 		return nil, err
@@ -238,6 +254,19 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 		}
 		if row.VulnerabilityID != nil {
 			body.Issue = identifiers[*row.VulnerabilityID]
+			body.Disposition = string(finding.Accepted)
+		}
+		if row.RulingID != nil {
+			ruling := rulings[*row.RulingID]
+			body.Ruling = ruling.ID
+			if ruling.InForce() {
+				body.Disposition = string(ruling.Disposition)
+			} else {
+				body.Waiting = string(ruling.Disposition)
+			}
+			if ruling.DuplicateOf != nil {
+				body.DuplicateOf = identifiers[*ruling.DuplicateOf]
+			}
 		}
 		if row.EvaluatedAt != nil {
 			body.Evaluated = row.EvaluatedAt.Format(time.RFC3339)
