@@ -137,7 +137,7 @@ func (f *fixture) admin(t *testing.T) access.Subject {
 // upload puts one file against the fixture's issue.
 func (f *fixture) upload(t *testing.T, who access.Subject, name string, body []byte) *attach.Attachment {
 	t.Helper()
-	row, err := f.store.Upload(t.Context(), who, f.product, f.issue, name,
+	row, err := f.store.Upload(t.Context(), who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, name,
 		strings.NewReader(string(body)), int64(len(body)), roomy, plenty, plenty, false)
 	if err != nil {
 		t.Fatalf("upload %s: %v", name, err)
@@ -233,7 +233,7 @@ func TestAFileIsAsReadableAsTheIssueItHangsOff(t *testing.T) {
 
 		public := f.upload(t, f.who(t, access.PublicTriage), "public.log",
 			[]byte("open knowledge"))
-		hidden, err := f.store.Upload(ctx, trusted, f.product, undisclosed, "hidden.log",
+		hidden, err := f.store.Upload(ctx, trusted, attach.Against{ProductID: f.product, VulnerabilityID: undisclosed}, "hidden.log",
 			strings.NewReader("not announced"), 13, roomy, plenty, plenty, false)
 		if err != nil {
 			t.Fatalf("upload against an undisclosed issue: %v", err)
@@ -270,7 +270,7 @@ func TestAnEmbargoEndingCarriesTheFileWithTheWords(t *testing.T) {
 		trusted := f.who(t, access.PublicTriage, access.PrivateTriage)
 		reader := f.who(t, access.PublicRead)
 
-		stored, err := f.store.Upload(ctx, trusted, f.product, undisclosed, "evidence.log",
+		stored, err := f.store.Upload(ctx, trusted, attach.Against{ProductID: f.product, VulnerabilityID: undisclosed}, "evidence.log",
 			strings.NewReader("embargoed"), 9, roomy, plenty, plenty, false)
 		if err != nil {
 			t.Fatal(err)
@@ -373,12 +373,12 @@ func TestAnUploadTooBigOrWithNoRoomIsRefused(t *testing.T) {
 		who := f.who(t, access.PublicTriage)
 		body := strings.Repeat("x", 4096)
 
-		_, err := f.store.Upload(ctx, who, f.product, f.issue, "big.log",
+		_, err := f.store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "big.log",
 			strings.NewReader(body), int64(len(body)), 1024, plenty, plenty, false)
 		if err != attach.ErrTooLarge {
 			t.Errorf("a file over the limit answered %v, want it named as too large", err)
 		}
-		_, err = f.store.Upload(ctx, who, f.product, f.issue, "big.log",
+		_, err = f.store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "big.log",
 			strings.NewReader(body), int64(len(body)), roomy, 1024, plenty, false)
 		if err != attach.ErrNoRoom {
 			t.Errorf("an upload with no room answered %v, want it named as full", err)
@@ -402,7 +402,8 @@ func TestADeploymentWithNoStoreHoldsNothingAndSaysSo(t *testing.T) {
 		if none.Configured() {
 			t.Fatal("a store with nowhere to put anything reports itself configured")
 		}
-		_, err := none.Upload(t.Context(), f.who(t, access.PublicTriage), f.product, f.issue,
+		_, err := none.Upload(t.Context(), f.who(t, access.PublicTriage),
+			attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
 			"x.log", strings.NewReader("x"), 1, roomy, plenty, plenty, false)
 		if err != attach.ErrNotConfigured {
 			t.Errorf("uploading with no store answered %v", err)
@@ -446,7 +447,7 @@ func TestReadingIsNotAttachingAndAShareIsOnePersons(t *testing.T) {
 		body := strings.Repeat("x", 512)
 
 		reader := f.who(t, access.PublicRead)
-		if _, err := f.store.Upload(ctx, reader, f.product, f.issue, "theirs.log",
+		if _, err := f.store.Upload(ctx, reader, attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "theirs.log",
 			strings.NewReader(body), int64(len(body)), roomy, plenty, plenty,
 			false); err == nil {
 			t.Error("somebody who may only read wrote a file into the store")
@@ -460,7 +461,7 @@ func TestReadingIsNotAttachingAndAShareIsOnePersons(t *testing.T) {
 		}
 		guest := access.NewPerson(person.ID, person.Identity, false, nil, 0).
 			OnCases(map[int64][]int64{f.product: {f.issue}})
-		if _, err := f.store.Upload(ctx, guest, f.product, f.issue, "theirs.log",
+		if _, err := f.store.Upload(ctx, guest, attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "theirs.log",
 			strings.NewReader(body), int64(len(body)), roomy, plenty, plenty,
 			false); err != nil {
 			t.Errorf("a collaborator on the case could not attach to it: %v", err)
@@ -469,7 +470,7 @@ func TestReadingIsNotAttachingAndAShareIsOnePersons(t *testing.T) {
 		// And one person's share bounds them, whatever room the deployment
 		// has left in total.
 		who := f.who(t, access.PublicTriage)
-		if _, err := f.store.Upload(ctx, who, f.product, f.issue, "mine.log",
+		if _, err := f.store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue}, "mine.log",
 			strings.NewReader(body), int64(len(body)), roomy, plenty, 256,
 			false); err != attach.ErrNoRoom {
 			t.Errorf("an upload past one person's share answered %v, want it named as full", err)

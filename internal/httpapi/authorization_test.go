@@ -36,8 +36,14 @@ func declaredBody(method, path, name string) io.Reader {
 	if method == http.MethodPut && strings.HasSuffix(path, "/end-of-life") {
 		return strings.NewReader(`{"on": "2030-01-01"}`)
 	}
+	if method == http.MethodPut && strings.HasSuffix(path, "/issue") {
+		return strings.NewReader(`{"vulnerability": "CVE-2026-9999"}`)
+	}
 	if method != http.MethodPost {
 		return nil
+	}
+	if strings.HasSuffix(path, "/reports") {
+		return strings.NewReader(`{"summary": "` + name + `"}`)
 	}
 	if strings.HasSuffix(path, "/streams") {
 		return strings.NewReader(`{"name": "` + name + `", "kind": "branch"}`)
