@@ -1,0 +1,82 @@
+{
+  "document": {
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "distribution": {"text": "Disclosure is not limited.", "tlp": {"label": "WHITE"}},
+    "lang": "en",
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "productcert@industrial.test",
+      "name": "Example Industrial ProductCERT",
+      "namespace": "https://industrial.test"
+    },
+    "title": "Denial of service in the WT676 web interface",
+    "tracking": {
+      "id": "EXA-823812",
+      "initial_release_date": "2026-09-16T00:00:00Z",
+      "current_release_date": "2026-09-16T00:00:00Z",
+      "status": "interim",
+      "version": "1",
+      "revision_history": [
+        {"number": "1", "date": "2026-09-16T00:00:00Z", "summary": "Publication Date"}
+      ]
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "category": "vendor",
+        "name": "Example Industrial",
+        "branches": [
+          {
+            "category": "product_name",
+            "name": "WT676 Web Interface",
+            "branches": [
+              {
+                "category": "product_version_range",
+                "name": "vers:intdot/<3.94",
+                "product": {"name": "WT676 Web Interface < V3.94", "product_id": "1"}
+              }
+            ]
+          },
+          {
+            "category": "product_name",
+            "name": "WT776 Web Interface",
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "4.17",
+                "product": {"name": "WT776 Web Interface V4.17", "product_id": "2"}
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2026-1002",
+      "cwe": {"id": "CWE-400", "name": "Uncontrolled Resource Consumption"},
+      "notes": [
+        {"category": "summary",
+         "text": "The devices can be forced into protection mode, disabling remote access.",
+         "title": "Summary"}
+      ],
+      "product_status": {"known_affected": ["1", "2"]},
+      "remediations": [
+        {"category": "vendor_fix", "details": "Update to V3.94 or a later version",
+         "product_ids": ["1"], "url": "https://industrial.test/view/109480838/"},
+        {"category": "mitigation",
+         "details": "Restrict network access to the web interface.",
+         "product_ids": ["1", "2"]}
+      ],
+      "scores": [
+        {"cvss_v3": {"baseScore": 5.3, "baseSeverity": "MEDIUM", "version": "3.1",
+                     "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"},
+         "products": ["1", "2"]}
+      ],
+      "title": "Denial of service"
+    }
+  ]
+}

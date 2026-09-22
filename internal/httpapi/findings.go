@@ -785,7 +785,7 @@ type EvidenceBody struct {
 	// prefill; never applied to anything by itself, because a third
 	// party's claim standing as ours would put somebody else's judgment
 	// inside a number we quote.
-	Vex []VexSaidBody `json:"vex" doc:"Statements from VEX documents uploaded here. Evidence, never applied"`
+	Said []SaidBody `json:"said" doc:"What publishers have said about this, from VEX documents and supplier advisories uploaded here. Evidence, never applied"`
 }
 
 func registerFindingDetail(api huma.API, in Ingest) {
@@ -895,19 +895,24 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			return nil, wentWrong(in.Logger, "what was decided here could not be read", err)
 		}
 
-		// VEX statements, matched on every name the issue is known by: the
-		// identifier a publisher chose is a preference of whichever database
-		// they consulted rather than a property of the issue.
+		// What publishers have said, matched on every name the issue is known
+		// by: the identifier a publisher chose is a preference of whichever
+		// database they consulted rather than a property of the issue.
 		said, err := finding.NewStore(in.DB.DB).SaidAbout(ctx, subject, named.ProductID,
 			issue, append([]string{body.Vulnerability}, body.Aliases...),
 			body.Component, evidence.Purl)
 		if err != nil {
-			return nil, wentWrong(in.Logger, "what VEX documents say could not be read", err)
+			return nil, wentWrong(in.Logger, "what publishers say could not be read", err)
 		}
 		for _, one := range said {
-			offers, _ := one.Prefills()
-			body.Vex = append(body.Vex, VexSaidBody{
-				ID: one.ID, Publisher: one.Publisher, Status: one.Status,
+			// Offered for the version this place ships, because a statement
+			// naming a version is about that version: a publisher saying
+			// something is fixed in one is saying nothing about another.
+			offers, _ := one.PrefillsFor(evidence.Version)
+			body.Said = append(body.Said, SaidBody{
+				ID: one.ID, Publisher: one.Publisher,
+				Source: evidenceSource(one.Source), Identifier: one.Identifier,
+				Status: one.Status, About: graph.PartsOfPurl(one.Purl).Version,
 				Justification: one.Justification, Statement: one.Statement,
 				Document: one.Document, At: one.UploadedAt.Format(time.DateOnly),
 				Offers: outcomeOffered(offers),
@@ -939,7 +944,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Places:   make([]SittingBody, 0, len(e.Places)),
 		Standing: []StandingClaimBody{}, Previous: []EarlierBody{}, Similar: []SimilarBody{},
 		Elsewhere: []ElsewhereBody{},
-		Vex:       []VexSaidBody{},
+		Said:      []SaidBody{},
 	}
 	if !e.OpenedAt.IsZero() {
 		body.Opened = e.OpenedAt.Format(time.DateOnly)

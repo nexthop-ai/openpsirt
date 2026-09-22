@@ -104,20 +104,20 @@ func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
 		// is what it adds over what the scanner already reports.
 		var detail struct {
 			State string `json:"state"`
-			Vex   []struct {
+			Said  []struct {
 				Publisher string `json:"publisher"`
 				Status    string `json:"status"`
 				Statement string `json:"statement"`
 				Offers    string `json:"offers"`
-			} `json:"vex"`
+			} `json:"said"`
 			Standing []struct{} `json:"standing"`
 		}
 		read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
-		if len(detail.Vex) != 1 {
-			t.Fatalf("the finding shows %d VEX statements", len(detail.Vex))
+		if len(detail.Said) != 1 {
+			t.Fatalf("the finding shows %d VEX statements", len(detail.Said))
 		}
-		one := detail.Vex[0]
+		one := detail.Said[0]
 		if one.Publisher != "debian" || one.Statement == "" {
 			t.Errorf("the statement reads %+v, and the reasoning is the point", one)
 		}
@@ -156,19 +156,19 @@ func TestWillNotFixNeverOffersADismissal(t *testing.T) {
 				t.Fatalf("%s answered %d: %s", each.status, got.Code, got.Body.String())
 			}
 			var detail struct {
-				Vex []struct {
+				Said []struct {
 					Status string `json:"status"`
 					Offers string `json:"offers"`
-				} `json:"vex"`
+				} `json:"said"`
 			}
 			read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
 				"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
-			if len(detail.Vex) != 1 {
-				t.Fatalf("%s left %d standing statements", each.status, len(detail.Vex))
+			if len(detail.Said) != 1 {
+				t.Fatalf("%s left %d standing statements", each.status, len(detail.Said))
 			}
-			if detail.Vex[0].Offers != each.offers {
+			if detail.Said[0].Offers != each.offers {
 				t.Errorf("%q offers %q, want %q",
-					each.status, detail.Vex[0].Offers, each.offers)
+					each.status, detail.Said[0].Offers, each.offers)
 			}
 		}
 	})
@@ -241,14 +241,14 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 
 		// detail is which statement to cite, as the finding offers it.
 		var detail struct {
-			Vex []struct {
+			Said []struct {
 				ID int64 `json:"id"`
-			} `json:"vex"`
+			} `json:"said"`
 		}
 		read(t, r, "triager", "/v1/products/mine/streams/master/variants/broadcom"+
 			"/findings/CVE-2026-9999/components/libnl-3-200", &detail)
-		if len(detail.Vex) != 1 || detail.Vex[0].ID == 0 {
-			t.Fatalf("the finding offers %+v to cite", detail.Vex)
+		if len(detail.Said) != 1 || detail.Said[0].ID == 0 {
+			t.Fatalf("the finding offers %+v to cite", detail.Said)
 		}
 
 		// A dismissal started from it, agreed to by somebody else.
@@ -257,7 +257,7 @@ func TestARevisedStatementRaisesAnAlertAndLeavesTheDecisionStanding(t *testing.T
 				"/findings/CVE-2026-9999/places/"+place+"/decision",
 			`{"outcome":"not-applicable","justification":"vulnerable_code_not_present",`+
 				`"reasoning":"Debian says the affected routine is not built.",`+
-				`"from_statement":`+itoa(detail.Vex[0].ID)+`}`)
+				`"from_statement":`+itoa(detail.Said[0].ID)+`}`)
 		if made.Code != http.StatusCreated {
 			t.Fatalf("deciding answered %d: %s", made.Code, made.Body.String())
 		}

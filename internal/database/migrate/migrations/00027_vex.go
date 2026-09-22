@@ -11,7 +11,7 @@ func init() {
 	goose.AddMigrationContext(upVex, downVex)
 }
 
-// A VEX document's statement about a component we ship.
+// What a third party has said about a component we ship.
 //
 // A third layer, never a decision. A build's own claims are one
 // layer, our decisions are another, and this is a third: what a distribution or
@@ -20,6 +20,12 @@ func init() {
 // party's claim stand as ours would put somebody else's judgment inside a
 // number we quote, which is exactly what keeping the layers apart exists to
 // prevent.
+//
+// Two kinds of document arrive here. A VEX document is a publisher's whole
+// statement set, so a later one from the same publisher replaces it. A
+// security advisory is one announcement about one issue, of which a publisher
+// issues hundreds, so it is replaced by the name the publisher gave it and
+// nothing else.
 //
 // It adds the reasoning over the scan. The status is in the fix
 // state already; what a triager otherwise types from memory, and an approver
@@ -45,6 +51,22 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 			-- Who published it, as the document's author names itself,
 			-- normalized for matching the way every other typed name is.
 			"publisher"   ` + t.name + ` NOT NULL,
+			-- Which kind of document carried it, and the name the publisher
+			-- gave that document where it carries one.
+			--
+			-- Together they are what a later upload replaces. A publisher's
+			-- statement set replaces their previous statement set; one of
+			-- their advisories replaces the same advisory and leaves the rest
+			-- of what they have published standing. Keyed on the publisher
+			-- alone, every advisory from a publisher would set aside every
+			-- other one the moment the next arrived.
+			-- A kind rather than a name: this vocabulary is ours and its
+			-- longest word is nine characters, unlike the status below.
+			"source"      ` + t.kind + ` NOT NULL,
+			-- Empty where the document carries no name of its own, which a
+			-- statement set does not. A value rather than an absence, so the
+			-- key is compared the same way on every engine.
+			"document_id" ` + t.name + ` NOT NULL,
 			-- What the issue is called in the statement. Matched against a
 			-- finding's issue by name and by alias, because which identifier a
 			-- publisher chose is a preference of whichever database they
@@ -69,9 +91,11 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 			-- The reasoning, which is the part worth having: the status is in
 			-- the fix state already.
 			"statement"   ` + t.text + ` NULL,
-			-- The document this came from and what it hashed to, so that a
+			-- The file it arrived as and what it hashed to, so that a
 			-- revision can be noticed rather than silently replacing what an
-			-- approval was granted against.
+			-- approval was granted against. A file name is what a client
+			-- called it rather than what it is, which is why it identifies
+			-- nothing.
 			"document"    ` + t.free + ` NOT NULL,
 			"digest"      ` + t.hash + ` NOT NULL,
 			"uploaded_by" ` + t.ref + ` NOT NULL,

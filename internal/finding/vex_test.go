@@ -35,7 +35,8 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		// the two folds disagree about.
 		const component = "libFÜNF"
 		recorded, superseded, err2 := f.store.RecordStatements(ctx, who, f.productID,
-			"Debian", "dsa.json", "sha256:one", []finding.Statement{{
+			finding.Supplied{Source: finding.FromVex, Publisher: "Debian",
+				Document: "dsa.json", Digest: "sha256:one"}, []finding.Statement{{
 				Vulnerability: "CVE-2026-1", Component: component,
 				Status: "not_affected", Justification: "vulnerable_code_not_in_execute_path",
 				Statement: "The affected function is never reached in our build.",
@@ -65,7 +66,8 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		// rather than sitting beside it: what a publisher says now is what
 		// they say, and "they changed their mind" is a fact the record keeps.
 		_, setAside, err := f.store.RecordStatements(ctx, who, f.productID,
-			"debian", "dsa.json", "sha256:two", []finding.Statement{{
+			finding.Supplied{Source: finding.FromVex, Publisher: "debian",
+				Document: "dsa.json", Digest: "sha256:two"}, []finding.Statement{{
 				Vulnerability: "CVE-2026-1", Component: component,
 				Status: "affected", Statement: "On reflection, it is reachable.",
 			}})
@@ -112,7 +114,8 @@ func TestAStatementAboutOnePackageIsNotShownAgainstAnotherOfTheSameName(t *testi
 		issue := interned["CVE-2026-1"]
 
 		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
-			"Acme", "acme.json", "sha256:one", []finding.Statement{{
+			finding.Supplied{Source: finding.FromVex, Publisher: "Acme",
+				Document: "acme.json", Digest: "sha256:one"}, []finding.Statement{{
 				Vulnerability: "CVE-2026-1", Component: "parser",
 				Purl:   "pkg:npm/@acme/parser@1.0.0",
 				Status: "not_affected",
@@ -167,7 +170,8 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 		issue := interned["CVE-2026-2"]
 
 		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
-			"Debian", "dsa.json", "sha256:two", []finding.Statement{{
+			finding.Supplied{Source: finding.FromVex, Publisher: "Debian",
+				Document: "dsa.json", Digest: "sha256:two"}, []finding.Statement{{
 				Vulnerability: "CVE-2026-2", Component: "thrift", Status: "not_affected",
 			}}); err != nil {
 			t.Fatal(err)
@@ -176,7 +180,8 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 		// Another publisher because a second document from the first sets
 		// the first aside, which is a different rule.
 		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
-			"Apache", "apache.json", "sha256:three", []finding.Statement{{
+			finding.Supplied{Source: finding.FromVex, Publisher: "Apache",
+				Document: "apache.json", Digest: "sha256:three"}, []finding.Statement{{
 				Vulnerability: "CVE-2026-2", Component: "thrift",
 				Purl:   "pkg:generic/thrift@0.14.1",
 				Status: "not_affected",
@@ -192,4 +197,186 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 			t.Errorf("%d statements, want the source tree named both ways", len(said))
 		}
 	})
+}
+
+func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T) {
+	// A publisher's statement set is their whole answer and is replaced as
+	// one. An advisory is one announcement among hundreds, so keyed on the
+	// publisher alone every advisory of theirs on record would be set aside
+	// the moment the next one arrived — and the deployment would hold exactly
+	// the last document anybody uploaded.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PrivateTriage)
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{
+				{Identifier: "CVE-2026-1", Severity: "high"},
+				{Identifier: "CVE-2026-2", Severity: "high"},
+			})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := finding.Supplied{
+			Source: finding.FromAdvisory, Identifier: "EXSA-2026:1",
+			Publisher: "Example", Document: "one.json", Digest: "sha256:one",
+		}
+		second := finding.Supplied{
+			Source: finding.FromAdvisory, Identifier: "EXSA-2026:2",
+			Publisher: "Example", Document: "two.json", Digest: "sha256:two",
+		}
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID, first,
+			[]finding.Statement{{
+				Vulnerability: "CVE-2026-1", Component: "libnl", Status: "fixed",
+			}}); err != nil {
+			t.Fatal(err)
+		}
+		// A second advisory from the same publisher sets nothing aside.
+		_, setAside, err := f.store.RecordStatements(ctx, who, f.productID, second,
+			[]finding.Statement{{
+				Vulnerability: "CVE-2026-2", Component: "zlib", Status: "fixed",
+			}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if setAside != 0 {
+			t.Errorf("a second advisory set aside %d claims of the first", setAside)
+		}
+		still, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
+			[]string{"CVE-2026-1"}, "libnl", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(still) != 1 {
+			t.Fatalf("the first advisory left %d standing claims", len(still))
+		}
+
+		// A revision of the first replaces the first and leaves the second.
+		revised := first
+		revised.Digest = "sha256:revised"
+		_, replaced, err := f.store.RecordStatements(ctx, who, f.productID, revised,
+			[]finding.Statement{{
+				Vulnerability: "CVE-2026-1", Component: "libnl", Status: "not_affected",
+			}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if replaced != 1 {
+			t.Errorf("a revision of one advisory set aside %d claims, want its own one",
+				replaced)
+		}
+		other, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-2"],
+			[]string{"CVE-2026-2"}, "zlib", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(other) != 1 {
+			t.Errorf("revising one advisory left %d of the other standing", len(other))
+		}
+	})
+}
+
+func TestAStatementSetAndAnAdvisoryDoNotReplaceEachOther(t *testing.T) {
+	// One publisher issues both. Swept on the publisher alone, uploading their
+	// statement set sets aside every advisory of theirs on record, and each
+	// advisory sets aside the statement set.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PrivateTriage)
+		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+			finding.Supplied{
+				Source: finding.FromAdvisory, Identifier: "EXSA-2026:1",
+				Publisher: "Example", Document: "advisory.json", Digest: "sha256:one",
+			}, []finding.Statement{{
+				Vulnerability: "CVE-2026-1", Component: "libnl", Status: "fixed",
+			}}); err != nil {
+			t.Fatal(err)
+		}
+		_, setAside, err := f.store.RecordStatements(ctx, who, f.productID,
+			finding.Supplied{
+				Source: finding.FromVex, Publisher: "Example",
+				Document: "vex.json", Digest: "sha256:two",
+			}, []finding.Statement{{
+				Vulnerability: "CVE-2026-1", Component: "zlib", Status: "not_affected",
+			}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if setAside != 0 {
+			t.Errorf("a statement set put aside %d claims from an advisory", setAside)
+		}
+		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
+			[]string{"CVE-2026-1"}, "libnl", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != 1 {
+			t.Fatalf("the advisory's claim stands %d times", len(said))
+		}
+		if said[0].Source != finding.FromAdvisory || said[0].Identifier != "EXSA-2026:1" {
+			t.Errorf("what came back is %+v, and where it came from is how a reader "+
+				"places it", said[0])
+		}
+	})
+}
+
+func TestAnAdvisoryWithNoNameOfItsOwnIsRefusedByTheStore(t *testing.T) {
+	// Refused here as well as at the endpoint, because this is reachable from
+	// any other caller and what it refuses is a key collapsing into somebody
+	// else's.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PrivateTriage)
+		for _, each := range []struct {
+			what string
+			from finding.Supplied
+		}{
+			{"an advisory carrying no name", finding.Supplied{
+				Source: finding.FromAdvisory, Publisher: "Example"}},
+			{"a statement set carrying one", finding.Supplied{
+				Source: finding.FromVex, Identifier: "EXSA-2026:1", Publisher: "Example"}},
+			{"a document of no kind", finding.Supplied{Publisher: "Example"}},
+			{"a document naming nobody", finding.Supplied{Source: finding.FromVex}},
+		} {
+			if _, _, err := f.store.RecordStatements(ctx, who, f.productID, each.from,
+				nil); err == nil {
+				t.Errorf("%s was recorded", each.what)
+			}
+		}
+	})
+}
+
+func TestAClaimAboutOneVersionOffersNothingAtAnother(t *testing.T) {
+	// A publisher saying a vulnerability is fixed in one version is saying
+	// nothing about another. Offered anyway, the control comes prefilled with
+	// a claim they never made and their name is on it.
+	fixed := finding.Statement{
+		Status: "fixed", Purl: "pkg:rpm/example/libnl@3.7.0-1.el9?arch=x86_64",
+	}
+	if _, offers := fixed.PrefillsFor("3.7.0-1.el9"); !offers {
+		t.Error("a claim about the version shipped here offered nothing")
+	}
+	if outcome, offers := fixed.PrefillsFor("3.6.0-1.el9"); offers {
+		t.Errorf("a claim about another version offered %q", outcome)
+	}
+	// A claim naming no version is about whatever is shipped, which is how a
+	// publisher states something about a family.
+	family := finding.Statement{Status: "not_affected", Purl: "pkg:rpm/example/libnl"}
+	if _, offers := family.PrefillsFor("3.6.0-1.el9"); !offers {
+		t.Error("a claim naming no version offered nothing")
+	}
+	bare := finding.Statement{Status: "affected"}
+	if _, offers := bare.PrefillsFor("3.6.0-1.el9"); !offers {
+		t.Error("a claim made against a source tree offered nothing")
+	}
+	// Under investigation still offers nothing, at any version.
+	looking := finding.Statement{Status: "under_investigation"}
+	if _, offers := looking.PrefillsFor("3.6.0-1.el9"); offers {
+		t.Error("a publisher saying they do not know yet offered an outcome")
+	}
 }

@@ -680,9 +680,15 @@ The rating sits inside the severity block, under the words it disagrees with,
 so it is changed where it is read. A pane of its own further down asks somebody
 reading a severity to go and find the control for it.
 
-The references sit above the VEX statements, at the head of what is read to
+The references sit above what publishers say, at the head of what is read to
 decide. A write-up is what somebody triaging reads first, and a third party's
 claim about the finding is read against it rather than before it.
+
+A publisher's claim carries the version it was made about. A supplier's
+advisory names the version that carries the fix, which is not the version
+shipped here, so a status shown alone reads as the opposite of what it says.
+The claim is shown at every version and offers to fill the form in only at the
+version it named.
 
 Below the form they answer the objection that eleven links beside the action
 recreate the defect the side-by-side layout fixes. That holds for the whole
@@ -1510,7 +1516,7 @@ same fact is written one way in this document and another on a screen.
 
 | On the screen | In this document |
 |---|---|
-| No VEX statements uploaded | An empty panel reads as "nobody has an opinion about this", and what it means is that no document saying so has been uploaded here |
+| Nothing uploaded, under "What publishers say" | An empty panel reads as "nobody has an opinion about this", and what it means is that no document saying so has been uploaded here |
 | Planned fixes. Cleared by the next scan | A release clears when the next scan of it stops finding the issue, so nothing is marked done by hand |
 | Applies to every build with this component | The same code built several ways is one piece of work |
 
