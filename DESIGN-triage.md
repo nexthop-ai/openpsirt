@@ -44,7 +44,7 @@ The text rules are in `DESIGN-text.md`; the reports these numbers feed are in
 - [Re-affirmation](#re-affirmation)
 - [Comments and reasoning](#comments-and-reasoning)
 - [Notes on an issue](#notes-on-an-issue)
-- [VEX statements as evidence](#vex-statements-as-evidence)
+- [Evidence from publishers](#evidence-from-publishers)
 - [Dates still to come](#dates-still-to-come)
 - [Mitigation-based dismissals](#mitigation-based-dismissals)
 - [Mitigations](#mitigations)
@@ -1072,13 +1072,17 @@ Something true of one copy and not another is a comment, not a note. "We do
 not call that function in the vendored build" is about a judgment at a place,
 and it has a home there already.
 
-## VEX statements as evidence
+## Evidence from publishers
 
-It is called VEX rather than "supplier" (REQ-31), everywhere: the publisher, the
-status, the import, the filters. "Supplier" describes who tends to publish
-rather than what the thing is, so an empty panel reads as "nobody has an
-opinion about this" where it means no document has been uploaded. The emptiness
-is stated: the panel says there is nothing and says why.
+Two kinds of document arrive, and the layer is named for what it holds rather
+than for either of them (REQ-31): a publisher's VEX statement set, and a
+supplier's security advisory about their own products. The screen says "what
+publishers say" and the field is named the same, because a name taken from one
+format is wrong about the other every time the other arrives.
+
+The emptiness is stated. An empty panel reads as "nobody has an opinion about
+this" where it means no document has been uploaded, so the panel says there is
+nothing and says why.
 
 It is a third layer, beside the claims a build supplies with its inventory and
 the decisions made here. The screen says what the build claims, what the
@@ -1100,8 +1104,11 @@ they are an afternoon; unfound, they are retyped one claim at a time.
 | A distribution declining to fix is not a distribution saying it is not affected | Debian's `no-dsa`, Ubuntu's `ignored` and Red Hat's will-not-fix all mean *affected, and judged minor*, so they prefill a will-not-fix and never `not-applicable`. A publisher saying they have not decided offers nothing at all |
 | The statements are resolved once, never asked per row | There are far fewer statements than findings, so the cheap direction is to work out which pairs the statements name, once, and join the list to that. Distinct on the pair, by `UNION` rather than `UNION ALL`, so joining cannot multiply a finding by the number of statements about it |
 | The issue's identifier is folded on write, like every other typed name | A published identifier arrives in whatever case its reporter chose and a statement arrives folded, so without a folded column the two could only be compared through a function — and a function on the indexed side is an index nobody can use |
-| Only what stands narrows | A statement set aside by a later document from the same publisher stops answering the filter, while the superseded row stays readable: an approval granted on the strength of it has to remain explicable |
+| Only what stands narrows | A statement set aside stops answering the filter, while the superseded row stays readable: an approval granted on the strength of it has to remain explicable |
+| What a later upload sets aside is the document's own kind | A statement set is a publisher's whole answer, so a later one replaces it. An advisory is one announcement among the hundreds a publisher issues, so it replaces the advisory of the same name and leaves the rest standing. `DESIGN-ingest.md` § Supplier advisories holds the rule |
+| The same bytes arriving again change nothing | A superseded claim is what tells everyone holding an approved decision that cited it that the publisher has changed what they published. Re-syncing a publisher's directory is the ordinary operation once advisories arrive one per issue, so a pass that rewrote every claim would raise that notice every time and mean nothing by it |
 | A statement is shown against the package it names, not against the name it carries | A component in the graph is called by its short name, so a statement is stored and matched under that — and a short name is not a package. Two registries and two namespaces hold different packages under one, so a publisher's statement about a scoped npm package appeared against every component called `parser`, from anywhere, with that publisher's name on it. The type and the namespace are compared, never the version: a statement says which versions it is about in its own terms |
+| The version a statement was made about is shown beside what it said | A supplier's advisory names the version that carries the fix, which is not the version shipped here, so a status shown alone says the opposite of what it means. It is stored rather than read back out of the identifier, because a publisher that states products and no identifier states the version as the branch its product sits in |
 | A claim against a source tree is shown however it was named | A bare name and a package identifier of the generic type are the same claim, and the matching rules treat them as one. Compared as a package, the second spelling was narrowed away — so a statement that had already suppressed the finding was missing from the evidence for it |
 
 As a correlated `EXISTS` over three subqueries evaluated per candidate finding,

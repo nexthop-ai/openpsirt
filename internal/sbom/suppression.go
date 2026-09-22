@@ -86,11 +86,19 @@ type Target struct {
 	// packages came out of that tree and we do not, so the most that can be
 	// said is that a component of the same name is the one meant.
 	Name string
+	// Version is which version the claim was made about, where the document
+	// stated one outside the identifier. A publisher naming no package states
+	// it as the branch the product sits in, and without it a claim about one
+	// version of an appliance reads as a claim about every version of it.
+	Version string
 }
 
 // Covers reports whether a claim's target is the component described.
 func (t Target) Covers(d graph.Described) bool {
 	base, version := purlParts(t.Purl)
+	if version == "" {
+		version = t.Version
+	}
 	if base == "" {
 		// A claim naming no package identifier names a source tree, and the
 		// most that can be said is that a component of that name, or a fork
@@ -99,7 +107,12 @@ func (t Target) Covers(d graph.Described) bool {
 		// ordinary case rather than the exception — read as "matches
 		// nothing", every one of them was accepted, stored and silently had
 		// no effect.
-		return coversNamed(t.Name, "", d)
+		//
+		// The version the document stated outside the identifier is still a
+		// version it stated: a publisher naming no package names one in the
+		// branch its product sits in, and dropped here a claim about one
+		// release of an appliance answers for every release of it.
+		return coversNamed(t.Name, version, d)
 	}
 	if strings.HasPrefix(base, "pkg:generic/") {
 		// The same question, asked of a claim that spells the source tree as

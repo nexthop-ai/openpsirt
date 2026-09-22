@@ -84,6 +84,12 @@ func (outcomeOffered) Schema(huma.Registry) *huma.Schema {
 	return words(finding.OutcomesOffered())
 }
 
+// evidenceSource is which kind of document a publisher's statement arrived in.
+type evidenceSource string
+
+// Schema answers with the kinds of document a statement can arrive in.
+func (evidenceSource) Schema(huma.Registry) *huma.Schema { return words(finding.Sources()) }
+
 // vexStatus is a publisher's own word, in the exchange format's vocabulary.
 type vexStatus string
 

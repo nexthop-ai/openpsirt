@@ -344,6 +344,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerBundles(api, in)
 	registerPendingUpgrades(api, in)
 	registerVexImport(api, in)
+	registerAdvisoryImport(api, in)
 	registerExport(api, in)
 	registerAnywhereExport(api, in)
 	// The three lists that could be read and not taken away.

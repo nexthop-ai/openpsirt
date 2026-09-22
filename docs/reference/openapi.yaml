@@ -253,6 +253,43 @@ components:
         - agreed
         - minted_at
       type: object
+    AdvisoryTakenBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AdvisoryTakenBody.json
+          format: uri
+          readOnly: true
+          type: string
+        digest:
+          description: The document's digest, which is how a revision is noticed later
+          type: string
+        identifier:
+          description: The name the publisher gave the advisory
+          type: string
+        publisher:
+          description: The publisher the document names
+          type: string
+        recorded:
+          description: Claims taken from it
+          format: int64
+          type: integer
+        superseded:
+          description: Claims from an earlier upload of this same advisory, set aside rather than deleted
+          format: int64
+          type: integer
+        title:
+          description: What the publisher called it
+          type: string
+      required:
+        - publisher
+        - identifier
+        - recorded
+        - superseded
+        - digest
+      type: object
     AffectsBody:
       additionalProperties: false
       properties:
@@ -2824,6 +2861,13 @@ components:
         routed_by:
           description: The standing rule that placed this, where one did. Empty means a person did, or nobody has
           type: string
+        said:
+          description: What publishers have said about this, from VEX documents and supplier advisories uploaded here. Evidence, never applied
+          items:
+            $ref: "#/components/schemas/SaidBody"
+          type:
+            - array
+            - "null"
         score:
           description: The same judgment as a number, where one is published
           format: double
@@ -2872,13 +2916,6 @@ components:
           type: string
         version:
           type: string
-        vex:
-          description: Statements from VEX documents uploaded here. Evidence, never applied
-          items:
-            $ref: "#/components/schemas/VexSaidBody"
-          type:
-            - array
-            - "null"
         vulnerability:
           type: string
         weaknesses:
@@ -2897,7 +2934,7 @@ components:
         - previous
         - similar
         - elsewhere
-        - vex
+        - said
       type: object
     Extend-disclosureRequest:
       additionalProperties: false
@@ -7344,6 +7381,57 @@ components:
       required:
         - total
       type: object
+    SaidBody:
+      additionalProperties: false
+      properties:
+        about:
+          description: The version they made the claim about, where they named one
+          type: string
+        at:
+          description: The moment it was uploaded here
+          type: string
+        document:
+          description: The document it came from
+          type: string
+        id:
+          description: Pass as from_statement when starting a decision from this, so a later revision can be noticed
+          format: int64
+          type: integer
+        identifier:
+          description: The name the publisher gave the advisory
+          type: string
+        justification:
+          description: The term they gave for it, where the status is one that takes one
+          type: string
+        offers:
+          description: The outcome this offers as a prefill, where it was made about the version shipped here. Never applied by itself
+          enum:
+            - not-applicable
+            - wont-fix
+            - already-fixed
+          type: string
+        publisher:
+          type: string
+        source:
+          description: Which kind of document carried it
+          enum:
+            - vex
+            - advisory
+          type: string
+        statement:
+          description: Their reasoning. What a triager otherwise types from memory
+          type: string
+        status:
+          description: Their statement, in the format's own vocabulary
+          type: string
+      required:
+        - id
+        - publisher
+        - source
+        - status
+        - document
+        - at
+      type: object
     Save-filterRequest:
       additionalProperties: false
       properties:
@@ -8755,44 +8843,6 @@ components:
           type: boolean
       required:
         - name
-      type: object
-    VexSaidBody:
-      additionalProperties: false
-      properties:
-        at:
-          description: The moment it was uploaded here
-          type: string
-        document:
-          description: The document it came from
-          type: string
-        id:
-          description: Pass as from_statement when starting a decision from this, so a later revision can be noticed
-          format: int64
-          type: integer
-        justification:
-          description: The term they gave for it, where the status is one that takes one
-          type: string
-        offers:
-          description: The outcome this offers as a prefill. Never applied by itself
-          enum:
-            - not-applicable
-            - wont-fix
-            - already-fixed
-          type: string
-        publisher:
-          type: string
-        statement:
-          description: Their reasoning. What a triager otherwise types from memory
-          type: string
-        status:
-          description: Their statement, in the format's own vocabulary
-          type: string
-      required:
-        - id
-        - publisher
-        - status
-        - document
-        - at
       type: object
     Vulnerability:
       additionalProperties: false
@@ -20058,6 +20108,61 @@ paths:
           - public-triage
           - private-triage
         note: The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
+  /v1/products/{product}/supplier-advisories:
+    post:
+      description: |-
+        Takes one CSAF security advisory a supplier has published about their own products, where those products are components this product ships.
+
+        Nothing is applied. What arrives is a third layer beside the build's own claims and our decisions: shown as evidence, offered as a prefill, and never standing as our judgment by itself.
+
+        An advisory is about the versions it names. Where it says a vulnerability is fixed in one version, that is not a statement about another, so a claim naming a version is shown against every version of that component and offers a prefill only at the version it named.
+
+        Uploading the same advisory again sets its earlier claims aside rather than deleting them, so what an approval was granted on the strength of stays readable. It is matched on the name the publisher gave it, so everything else that publisher has issued stays standing — which is the difference from a VEX document, where a publisher's whole statement set is replaced at once.
+
+        A VEX document is refused here and taken by the VEX endpoint instead.
+
+        Requires: administrator
+      operationId: upload-supplier-advisory
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            encoding:
+              advisory:
+                contentType: application/json,application/octet-stream
+            schema:
+              properties:
+                advisory:
+                  contentEncoding: binary
+                  contentMediaType: application/octet-stream
+                  format: binary
+                  type: string
+              required:
+                - advisory
+              type: object
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdvisoryTakenBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Upload a supplier security advisory
+      tags:
+        - Ingest
+      x-openpsirt-requires:
+        scope: deployment
   /v1/products/{product}/tags:
     get:
       description: |-
@@ -20303,7 +20408,7 @@ paths:
 
         OpenVEX and CSAF-VEX both read. The two say the same thing in different shapes — one puts the status on a statement, the other in which list a product identifier appears in — and both become the same claim here, because what a publisher is saying does not depend on which file they wrote it in. Which of the two a document is decides itself; anything else is refused with a sentence rather than half-read.
 
-        A CSAF *advisory* is refused as well, and deliberately: it is a document about somebody's own flaws, and reading one as claims about what a build ships would take their advisory as this build's argument and every product it names as a suppression.
+        A CSAF security advisory is refused here and taken by the supplier-advisory endpoint instead. It is a document about somebody's own flaws, one per issue, and what a later upload of it replaces is the advisory of the same name rather than everything that publisher has said.
 
         Requires: administrator
       operationId: upload-vex-statements

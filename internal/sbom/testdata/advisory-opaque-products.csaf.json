@@ -1,0 +1,96 @@
+{
+  "document": {
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "lang": "en",
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "psirt@networking.test",
+      "name": "Example Networking",
+      "namespace": "https://networking.test"
+    },
+    "title": "Example Networking MeetingOS Denial of Service Vulnerability",
+    "tracking": {
+      "id": "example-sa-meetingos-dos-9V9jrC2q",
+      "initial_release_date": "2026-09-10T16:00:00Z",
+      "current_release_date": "2026-09-10T16:00:00Z",
+      "status": "final",
+      "version": "1.0",
+      "revision_history": [
+        {"number": "1.0", "date": "2026-09-10T16:00:00Z", "summary": "Initial public release."}
+      ]
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "category": "vendor",
+        "name": "Example Networking",
+        "branches": [
+          {
+            "category": "product_family",
+            "name": "MeetingOS",
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "10.3.2.0",
+                "product": {"name": "MeetingOS 10.3.2.0", "product_id": "EXPID-284328"}
+              },
+              {
+                "category": "product_version",
+                "name": "10.3.4.0",
+                "product": {"name": "MeetingOS 10.3.4.0", "product_id": "EXPID-286475"}
+              }
+            ]
+          },
+          {
+            "category": "product_name",
+            "name": "Room Device",
+            "product": {"name": "Room Device", "product_id": "EXPID-100000"}
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "MeetingOS 10.3.2.0 on Room Device",
+          "product_id": "EXPID-284328-100000"
+        },
+        "product_reference": "EXPID-284328",
+        "relates_to_product_reference": "EXPID-100000"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "MeetingOS 10.3.4.0 on Room Device",
+          "product_id": "EXPID-286475-100000"
+        },
+        "product_reference": "EXPID-286475",
+        "relates_to_product_reference": "EXPID-100000"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2026-1003",
+      "ids": [{"system_name": "Example Networking Bug ID", "text": "EXwc12345"}],
+      "notes": [
+        {"category": "summary",
+         "text": "A flaw in the call-control subsystem could allow an unauthenticated remote attacker to cause a reload.",
+         "title": "Summary"}
+      ],
+      "product_status": {
+        "known_affected": ["EXPID-284328-100000", "EXPID-286475-100000"]
+      },
+      "remediations": [
+        {"category": "vendor_fix",
+         "details": "Example Networking has released software updates that address this vulnerability.",
+         "product_ids": ["EXPID-284328-100000", "EXPID-286475-100000"],
+         "url": "https://networking.test/security/example-sa-meetingos-dos-9V9jrC2q"}
+      ],
+      "title": "Example Networking MeetingOS Denial of Service Vulnerability"
+    }
+  ]
+}

@@ -3826,6 +3826,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/supplier-advisories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a supplier security advisory
+         * @description Takes one CSAF security advisory a supplier has published about their own products, where those products are components this product ships.
+         *
+         *     Nothing is applied. What arrives is a third layer beside the build's own claims and our decisions: shown as evidence, offered as a prefill, and never standing as our judgment by itself.
+         *
+         *     An advisory is about the versions it names. Where it says a vulnerability is fixed in one version, that is not a statement about another, so a claim naming a version is shown against every version of that component and offers a prefill only at the version it named.
+         *
+         *     Uploading the same advisory again sets its earlier claims aside rather than deleting them, so what an approval was granted on the strength of stays readable. It is matched on the name the publisher gave it, so everything else that publisher has issued stays standing — which is the difference from a VEX document, where a publisher's whole statement set is replaced at once.
+         *
+         *     A VEX document is refused here and taken by the VEX endpoint instead.
+         *
+         *     Requires: administrator
+         */
+        post: operations["upload-supplier-advisory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/tags": {
         parameters: {
             query?: never;
@@ -3965,7 +3995,7 @@ export interface paths {
          *
          *     OpenVEX and CSAF-VEX both read. The two say the same thing in different shapes — one puts the status on a statement, the other in which list a product identifier appears in — and both become the same claim here, because what a publisher is saying does not depend on which file they wrote it in. Which of the two a document is decides itself; anything else is refused with a sentence rather than half-read.
          *
-         *     A CSAF *advisory* is refused as well, and deliberately: it is a document about somebody's own flaws, and reading one as claims about what a build ships would take their advisory as this build's argument and every product it names as a suppression.
+         *     A CSAF security advisory is refused here and taken by the supplier-advisory endpoint instead. It is a document about somebody's own flaws, one per issue, and what a later upload of it replaces is the advisory of the same name rather than everything that publisher has said.
          *
          *     Requires: administrator
          */
@@ -5027,6 +5057,32 @@ export interface components {
              * @enum {string}
              */
             status: "draft" | "final" | "interim";
+            title?: string;
+        };
+        AdvisoryTakenBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdvisoryTakenBody.json
+             */
+            readonly $schema?: string;
+            /** @description The document's digest, which is how a revision is noticed later */
+            digest: string;
+            /** @description The name the publisher gave the advisory */
+            identifier: string;
+            /** @description The publisher the document names */
+            publisher: string;
+            /**
+             * Format: int64
+             * @description Claims taken from it
+             */
+            recorded: number;
+            /**
+             * Format: int64
+             * @description Claims from an earlier upload of this same advisory, set aside rather than deleted
+             */
+            superseded: number;
+            /** @description What the publisher called it */
             title?: string;
         };
         AffectsBody: {
@@ -6516,6 +6572,8 @@ export interface components {
             references?: components["schemas"]["ReferenceBody"][] | null;
             /** @description The standing rule that placed this, where one did. Empty means a person did, or nobody has */
             routed_by?: string;
+            /** @description What publishers have said about this, from VEX documents and supplier advisories uploaded here. Evidence, never applied */
+            said: components["schemas"]["SaidBody"][] | null;
             /**
              * Format: double
              * @description The same judgment as a number, where one is published
@@ -6542,8 +6600,6 @@ export interface components {
             /** @description The score's assumptions — reachability, privilege, interaction */
             vector?: string;
             version: string;
-            /** @description Statements from VEX documents uploaded here. Evidence, never applied */
-            vex: components["schemas"]["VexSaidBody"][] | null;
             vulnerability: string;
             /** @description The kind of flaw, as CWE identifiers */
             weaknesses?: string[] | null;
@@ -9068,6 +9124,38 @@ export interface components {
              */
             total: number;
         };
+        SaidBody: {
+            /** @description The version they made the claim about, where they named one */
+            about?: string;
+            /** @description The moment it was uploaded here */
+            at: string;
+            /** @description The document it came from */
+            document: string;
+            /**
+             * Format: int64
+             * @description Pass as from_statement when starting a decision from this, so a later revision can be noticed
+             */
+            id: number;
+            /** @description The name the publisher gave the advisory */
+            identifier?: string;
+            /** @description The term they gave for it, where the status is one that takes one */
+            justification?: string;
+            /**
+             * @description The outcome this offers as a prefill, where it was made about the version shipped here. Never applied by itself
+             * @enum {string}
+             */
+            offers?: "not-applicable" | "wont-fix" | "already-fixed";
+            publisher: string;
+            /**
+             * @description Which kind of document carried it
+             * @enum {string}
+             */
+            source: "vex" | "advisory";
+            /** @description Their reasoning. What a triager otherwise types from memory */
+            statement?: string;
+            /** @description Their statement, in the format's own vocabulary */
+            status: string;
+        };
         "Save-filterRequest": {
             /**
              * Format: uri
@@ -9851,29 +9939,6 @@ export interface components {
             open?: number;
             /** @description Whether it has been taken out of use. A release still lists what it was built as */
             retired?: boolean;
-        };
-        VexSaidBody: {
-            /** @description The moment it was uploaded here */
-            at: string;
-            /** @description The document it came from */
-            document: string;
-            /**
-             * Format: int64
-             * @description Pass as from_statement when starting a decision from this, so a later revision can be noticed
-             */
-            id: number;
-            /** @description The term they gave for it, where the status is one that takes one */
-            justification?: string;
-            /**
-             * @description The outcome this offers as a prefill. Never applied by itself
-             * @enum {string}
-             */
-            offers?: "not-applicable" | "wont-fix" | "already-fixed";
-            publisher: string;
-            /** @description Their reasoning. What a triager otherwise types from memory */
-            statement?: string;
-            /** @description Their statement, in the format's own vocabulary */
-            status: string;
         };
         Vulnerability: {
             acknowledgments?: components["schemas"]["Acknowledgment"][] | null;
@@ -16083,6 +16148,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VEXIssuanceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "upload-supplier-advisory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    advisory: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvisoryTakenBody"];
                 };
             };
             /** @description Error */

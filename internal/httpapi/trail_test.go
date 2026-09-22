@@ -366,6 +366,16 @@ var administrativeActs = []trailedAct{
 		},
 	},
 	{
+		// Named by the document rather than by the publisher, because that is
+		// what a later upload of it replaces.
+		id: "upload-supplier-advisory", what: "what a supplier published about their own product",
+		kind: "setting", about: "Advisory EXSA-2026:1001 from Example Distribution",
+		drive: func(t *testing.T, r *reach, _ *seeded) *httptest.ResponseRecorder {
+			return r.advised(t, "admin", "exsa.json",
+				supplierAdvisory("EXSA-2026:1001", "fixed", "3.7.0"))
+		},
+	},
+	{
 		id: "end-sessions", what: "somebody cut off now", method: http.MethodDelete,
 		path: "/v1/people/newcomer/sessions", kind: "account", about: "newcomer",
 	},

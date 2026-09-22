@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -34,14 +35,24 @@ type StatementsTakenBody struct {
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 
-// VexSaidBody is one standing VEX statement, as a finding shows it.
-type VexSaidBody struct {
+// SaidBody is one standing third-party statement, as a finding shows it.
+type SaidBody struct {
 	// ID is the citation a decision carries when somebody starts from this, so
 	// a revision to it can be noticed later.
-	ID            int64  `json:"id" doc:"Pass as from_statement when starting a decision from this, so a later revision can be noticed"`
-	Publisher     string `json:"publisher"`
-	Status        string `json:"status" doc:"Their statement, in the format's own vocabulary"`
-	Justification string `json:"justification,omitempty" doc:"The term they gave for it, where the status is one that takes one"`
+	ID        int64  `json:"id" doc:"Pass as from_statement when starting a decision from this, so a later revision can be noticed"`
+	Publisher string `json:"publisher"`
+	// Source is which kind of document carried it and Identifier the name the
+	// publisher gave that document. An advisory is recognized by its own name;
+	// a statement set carries none, because a publisher issues one.
+	Source        evidenceSource `json:"source" doc:"Which kind of document carried it"`
+	Identifier    string         `json:"identifier,omitempty" doc:"The name the publisher gave the advisory"`
+	Status        string         `json:"status" doc:"Their statement, in the format's own vocabulary"`
+	Justification string         `json:"justification,omitempty" doc:"The term they gave for it, where the status is one that takes one"`
+	// About is the version the publisher spoke about, where they named one. A
+	// status read without it is a claim about a version the reader cannot see:
+	// "fixed" against a component that is not at that version says the
+	// opposite of what it looks like.
+	About string `json:"about,omitempty" doc:"The version they made the claim about, where they named one"`
 	// Statement is the reasoning, which is the part worth having: the status
 	// is in the fix state already.
 	Statement string `json:"statement,omitempty" doc:"Their reasoning. What a triager otherwise types from memory"`
@@ -50,7 +61,8 @@ type VexSaidBody struct {
 	// Offers is the outcome this would prefill, where it offers one. A
 	// publisher saying they will not fix something is not the same as saying
 	// it does not apply, so that offers a will-not-fix and never a dismissal.
-	Offers outcomeOffered `json:"offers,omitempty" doc:"The outcome this offers as a prefill. Never applied by itself"`
+	// A statement naming a version offers nothing against a different one.
+	Offers outcomeOffered `json:"offers,omitempty" doc:"The outcome this offers as a prefill, where it was made about the version shipped here. Never applied by itself"`
 }
 
 // counting is a reader that says how much has gone past it.
@@ -67,6 +79,54 @@ func (c *counting) Read(p []byte) (int, error) {
 	n, err := c.r.Read(p)
 	c.n += int64(n)
 	return n, err
+}
+
+// uploaded streams one third party's document past a digest, parses it with
+// read, and answers the digest of the bytes that arrived.
+//
+// Read as a stream, digested as it goes, and never held whole. Read into
+// memory it is held twice — the growing buffer and then a copy of it to parse
+// from — which is about two and a half times the limit, against a container
+// that ships with less than that: an administrator importing a large vendor
+// document gets the process killed rather than an answer. The scan upload
+// streams a document of the same size past the same digest and holds none of
+// it.
+//
+// Read one byte past the limit, so a document over it is refused as too large
+// rather than cut off and reported as malformed — and so the digest recorded
+// is over what arrived rather than over the part that fitted.
+func uploaded(in Ingest, file huma.FormFile, read func(io.Reader) error) (string, error) {
+	most := in.Limits.OrDefault().MaxBytes
+	digest := sha256.New()
+	counted := &counting{r: io.TeeReader(io.LimitReader(file, most+1), digest)}
+	err := read(counted)
+	// Asked before the parse error, because a document cut off at the limit
+	// fails as malformed and the honest answer is its size.
+	if counted.n > most {
+		return "", huma.Error413RequestEntityTooLarge(fmt.Sprintf(
+			"that document is larger than the %d bytes this deployment reads", most))
+	}
+	if err != nil {
+		return "", asked(in.Logger, err)
+	}
+	// Whatever the parser left, read past the digest exactly once. The digest
+	// is the whole document by definition, and a reader that answered early
+	// would otherwise record a hash of the part it read.
+	//
+	// Drained into nothing, because the reader above already tees into the
+	// digest: copying into it here hashes every drained byte a second time, so
+	// a document with anything after the closing brace — a trailing newline is
+	// enough — records a digest that is not the document's, and the digest is
+	// what says whether a publisher has revised what an approval was granted
+	// against.
+	if _, err := io.Copy(io.Discard, counted); err != nil {
+		return "", huma.Error400BadRequest("that document could not be read")
+	}
+	if counted.n > most {
+		return "", huma.Error413RequestEntityTooLarge(fmt.Sprintf(
+			"that document is larger than the %d bytes this deployment reads", most))
+	}
+	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
 func registerVexImport(api huma.API, in Ingest) {
@@ -90,10 +150,10 @@ func registerVexImport(api huma.API, in Ingest) {
 			"publisher is saying does not depend on which file they wrote it in. Which of the " +
 			"two a document is decides itself; anything else is refused with a sentence rather " +
 			"than half-read.\n\n" +
-			"A CSAF *advisory* is refused as well, and deliberately: it is a document about " +
-			"somebody's own flaws, and reading one as claims about what a build ships would " +
-			"take their advisory as this build's argument and every product it names as a " +
-			"suppression.",
+			"A CSAF security advisory is refused here and taken by the supplier-advisory " +
+			"endpoint instead. It is a document about somebody's own flaws, one per issue, " +
+			"and what a later upload of it replaces is the advisory of the same name rather " +
+			"than everything that publisher has said.",
 		Tags: []string{"Ingest"}, DefaultStatus: http.StatusCreated,
 		// A published document is somebody else's output arriving over a link
 		// we do not control, exactly as a scan file is, and this is the first
@@ -122,48 +182,15 @@ func registerVexImport(api huma.API, in Ingest) {
 			return nil, absent(in.Logger, err, "that product could not be looked up", noSuchProduct)
 		}
 
-		// Read as a stream, digested as it goes, and never held whole. Read
-		// into memory it is held twice — the growing buffer and then a copy
-		// of it to parse from — which is about two and a half times the
-		// limit, against a container that ships with less than that: an
-		// administrator importing a large vendor document gets the process
-		// killed rather than an answer. The scan upload streams a document of
-		// the same size past the same digest and holds none of it.
-		//
-		// Read one byte past the limit, so a document over it is refused as
-		// too large rather than cut off and reported as malformed — and so
-		// the digest recorded is over what arrived rather than over the part
-		// that fitted.
 		file := input.RawBody.Data().Statements
-		most := in.Limits.OrDefault().MaxBytes
-		digest := sha256.New()
-		counted := &counting{r: io.TeeReader(io.LimitReader(file, most+1), digest)}
-		said, err := sbom.ReadSuppressions(counted, in.Limits.OrDefault())
-		// Asked before the parse error, because a document cut off at the
-		// limit fails as malformed and the honest answer is its size.
-		if counted.n > most {
-			return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
-				"that document is larger than the %d bytes this deployment reads", most))
-		}
+		var said []sbom.Suppression
+		digest, err := uploaded(in, file, func(r io.Reader) error {
+			var err error
+			said, err = sbom.ReadSuppressions(r, in.Limits.OrDefault())
+			return err
+		})
 		if err != nil {
-			return nil, asked(in.Logger, err)
-		}
-		// Whatever the parser left, read past the digest exactly once. The
-		// digest is the whole document by definition, and a reader that
-		// answered early would otherwise record a hash of the part it read.
-		//
-		// Drained into nothing, because the reader above already tees into the
-		// digest: copying into it here hashes every drained byte a second
-		// time, so a document with anything after the closing brace — a
-		// trailing newline is enough — records a digest that is not the
-		// document's, and the digest is what says whether a publisher has
-		// revised what an approval was granted against.
-		if _, err := io.Copy(io.Discard, counted); err != nil {
-			return nil, huma.Error400BadRequest("that document could not be read")
-		}
-		if counted.n > most {
-			return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
-				"that document is larger than the %d bytes this deployment reads", most))
+			return nil, err
 		}
 
 		// The publisher is the key a later upload supersedes on, and it is
@@ -190,6 +217,7 @@ func registerVexImport(api huma.API, in Ingest) {
 				statements = append(statements, finding.Statement{
 					Vulnerability: one.Vulnerability,
 					Purl:          at.Purl,
+					About:         versionNamed(at),
 					Component:     componentNamed(at),
 					Status:        string(one.Status),
 					Justification: one.Justification,
@@ -201,8 +229,12 @@ func registerVexImport(api huma.API, in Ingest) {
 		if err := changing(ctx, in.DB, in.logger(), func(ctx context.Context, tx bun.Tx) error {
 			var err error
 			recorded, superseded, err = finding.NewStore(tx).RecordStatements(ctx, by,
-				product.ID, publisher, file.Filename,
-				hex.EncodeToString(digest.Sum(nil)), statements)
+				product.ID, finding.Supplied{
+					Source:    finding.FromVex,
+					Publisher: publisher,
+					Document:  file.Filename,
+					Digest:    digest,
+				}, statements)
 			if err != nil {
 				return asked(in.Logger, err)
 			}
@@ -217,7 +249,7 @@ func registerVexImport(api huma.API, in Ingest) {
 
 		return &struct{ Body StatementsTakenBody }{Body: StatementsTakenBody{
 			Publisher: strings.ToLower(publisher), Recorded: recorded, Superseded: superseded,
-			Digest: hex.EncodeToString(digest.Sum(nil)),
+			Digest: digest,
 		}}, nil
 	})
 }
@@ -230,6 +262,18 @@ func cited(id int64) *int64 {
 		return nil
 	}
 	return &id
+}
+
+// versionNamed is the version a claim's target was made about.
+//
+// Inside the package identifier where the document stated one there, and the
+// version the document stated outside it otherwise — a publisher naming no
+// package states it as the branch its product sits in.
+func versionNamed(at sbom.Target) string {
+	if version := graph.PartsOfPurl(at.Purl).Version; version != "" {
+		return version
+	}
+	return at.Version
 }
 
 // componentNamed is the component name a statement's target points at.

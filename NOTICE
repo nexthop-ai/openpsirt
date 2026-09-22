@@ -28,3 +28,15 @@ The Apache Software Foundation (http://www.apache.org/).
 
 Both are in internal/vercmp, as the cases each project's own suite uses to
 check the ordering its ecosystem defines.
+
+This product includes one security advisory published by SUSE, licensed under
+the Creative Commons Attribution 4.0 International license (CC-BY-4.0). See
+https://creativecommons.org/licenses/by/4.0/
+
+Copyright 2024 SUSE LLC. Provided by the SUSE Product Security Team at
+https://ftp.suse.com/pub/projects/security/csaf/, which states that license
+beside the documents it serves.
+
+It is in internal/sbom/testdata/suse-su-2026_0005-1.json, unmodified and
+byte for byte what that address serves, as the one document in the reader's
+corpus that a publisher rather than this project wrote.

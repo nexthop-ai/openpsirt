@@ -379,9 +379,10 @@ export function Finding() {
   // unit — a count of distinct places against a count of chain rows — and
   // could never be false, which read as a second safety check and was none.
   const undecided = places.some((place) => place.decision == null);
-  // The VEX documents' own claims: a third layer beside what the build claims
-  // and what we decided. Shown, offered as a prefill, never applied.
-  const vex = it.vex ?? [];
+  // What publishers have said, from VEX documents and supplier advisories: a
+  // third layer beside what the build claims and what we decided. Shown,
+  // offered as a prefill, never applied.
+  const publishers = it.said ?? [];
 
   // Counted as places, the way the decision counts them, not as chain rows.
   const decided = new Set(places.filter((p) => p.decision != null).map((p) => p.place)).size;
@@ -859,28 +860,34 @@ export function Finding() {
  — nothing derives it, and a distribution's
                 will-not-fix arrives through the scanner as an upstream fix
                 status instead. */}
-            {vex.length === 0 && (
+            {publishers.length === 0 && (
               <div className="card">
-                <h3>VEX statements</h3>
+                <h3>What publishers say</h3>
                 <p className="reading" title="Uploaded by an administrator, never fetched">
-                  No VEX statements uploaded
+                  Nothing uploaded
                 </p>
               </div>
             )}
 
-            {vex.length > 0 && (
+            {publishers.length > 0 && (
               <div className="card">
-                <h3>VEX statements</h3>
+                <h3>What publishers say</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
                   Evidence only. Nothing here is decided or counted from it.
                 </p>
-                {vex.map((one, i) => (
+                {publishers.map((one, i) => (
                   <div key={`${one.publisher} ${i}`} className="prior">
                     <header>
                       <span className="id">{one.publisher}</span>{" "}
                       <span className="hint">
                         says <b>{(one.status ?? "").replace("_", " ")}</b>
+                        {/* The version they spoke about. A supplier names the
+                          version that carries the fix, which is not the
+                          version shipped here, so the status alone reads as
+                          the opposite of what it says. */}
+                        {one.about && <> of {one.about}</>}
                         {one.justification && <> · {one.justification.replaceAll("_", " ")}</>}
+                        {one.identifier && <> · {one.identifier}</>}
                         {one.at && <> · {on(one.at)}</>}
                       </span>
                     </header>
@@ -908,8 +915,13 @@ export function Finding() {
                               outcome: one.offers as string,
                               justification:
                                 one.offers === "not-applicable" ? (one.justification ?? "") : "",
+                              // The version goes into the record too: an
+                              // approver reads this months later, and "says
+                              // fixed" with nothing saying fixed in what is
+                              // the same sentence about a different claim.
                               reasoning:
                                 `${one.publisher} says ${(one.status ?? "").replace("_", " ")}` +
+                                (one.about ? ` of ${one.about}` : "") +
                                 (one.statement ? `: ${one.statement}` : "") +
                                 "\n\n",
                             })

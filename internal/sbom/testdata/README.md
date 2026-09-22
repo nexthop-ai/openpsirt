@@ -17,6 +17,11 @@ nobody can tell a producer quirk from a typo in.
 | `rust-app.spdx3.json` | The same Rust application as `rust-app.spdx.json`, at **SPDX 3.0**. Example 11 again, which is what makes the pair worth keeping: one application described twice, in two versions that share no key path |
 | `maven-app.spdx3.json` | The same Maven application as `maven-app.spdx.json`, at 3.0, and the two disagree. See below |
 | `acme-app.spdx3.json` | The specification's own example 13. It states the root on an inventory element rather than on the document, which is a shape only this version has, and it is the only 3.0 document to hand that carries an `externalIdentifier` on a package — the 2.x fixtures all carry the same thing under `externalRefs` |
+| `advisory-platform-packages.csaf.json` | Written here, in the shape a distribution publishes a security advisory in: packages under an architecture branch with package identifiers, a platform under a product-family branch with a CPE and none, and relationships composing the two into the identifiers the claims point at. It carries two statuses, a flag, a remediation naming the products it is about, and a bug number under `ids` where an alias would be |
+| `advisory-recommended.csaf.json` | Written here, in the shape a distribution publishes a recommended update in. Its only status is `recommended`, which is what makes it worth keeping: a reader that knows four of the eight lists takes this document, records nothing and reports that it worked. Its relationship carries a package identifier of its own, which is the package as that platform ships it |
+| `advisory-named-products.csaf.json` | Written here, in the shape an equipment vendor publishes in: products named and versioned in branches, identifiers that are serial numbers, and no package identifier anywhere in the document |
+| `advisory-opaque-products.csaf.json` | Written here, in the shape a network vendor publishes in: opaque identifiers, no package identifiers, and every identifier a claim names composed by a relationship |
+| `suse-su-2026_0005-1.json` | Real output, and the only advisory here a publisher wrote. SUSE's security update for rsync, unmodified. Every identifier its claim names is composed by a relationship, its only status is `recommended`, and it carries a `tracking.generator` none of the written fixtures thought to have. **CC-BY-4.0**, which `NOTICE` records |
 | `appbom.spdx3.json` | The specification's own example 9, and the largest at 3.0: 103 elements — 7 packages, 15 files and 63 relationships, most of which say nothing about structure. Six packages survive as components because one of the seven is the root, and 18 of its edges name a file |
 
 ## The SPDX fixtures
@@ -95,6 +100,44 @@ Debian development package, which is a copy-and-paste in the example rather
 than anything about the format. Nothing here depends on it, and it is written
 down so the next person reads it as the example's mistake rather than as a
 producer quirk worth handling.
+
+## The advisory fixtures
+
+Five: one real document, and four written here from four real ones read for
+the shapes they use — a distribution's kernel errata, a distribution's
+recommended update, an equipment vendor's and a network vendor's.
+
+**Which of the four publishers can be taken from is a question of what each
+one grants**, and they differ:
+
+| Publisher | What the document says | Taken |
+|---|---|---|
+| SUSE | A `LICENSE` beside the directory grants CC-BY-4.0. The document itself says "Copyright 2024 SUSE LLC. All rights reserved." | Yes, with attribution in `NOTICE` |
+| Red Hat | "Copyright © Red Hat, Inc. All rights reserved.", under a TLP:WHITE label | No |
+| Siemens | "Disclosure is not limited. (TLPv2: TLP:CLEAR)", and nothing about copying | No |
+| Cisco | No distribution statement at all | No |
+
+TLP:CLEAR is a grant about spreading the information rather than about copying
+the file, and it sits beside a reservation of rights in two of these. That is
+an ambiguity rather than a permission, so those three are written here — the
+answer the version-comparison suites already settled for the same question.
+
+**The SUSE `LICENSE` names the wrong format**, and it is worth knowing rather
+than glossing. It says "The SUSE cVRF data", and the identical file sits in the
+`cvrf/` directory and in the `csaf/` one; the wording was carried across and
+the placement is what makes it apply to the documents beside it.
+
+What writing the other three gives up is that nobody else chose the cases, so a
+shape nobody here thought of is not covered. The real document is what buys
+part of that back: it arrived carrying a `tracking.generator` no written
+fixture had.
+
+The three that are not here were read, and what they are is recorded rather
+than carried: one distribution advisory about a kernel is 27 MB, names 95,933
+product identifiers against a default ceiling of 100,000, and states 341
+vulnerabilities. One distribution VEX document about a single issue composes
+every one of its 1,669 product identifiers through a relationship. An equipment
+vendor's advisory names two products, both by name alone.
 
 ## The full-size fixture
 
