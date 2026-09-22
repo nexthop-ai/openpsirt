@@ -260,12 +260,34 @@ does not yet take. The layout leaves room for it: a signature sits beside the
 document under the same name, and the feed already names the file beside each
 entry that answers for it.
 
+## Supplier advisories
+
+Off unless an administrator names a supplier, under Settings. Each is named
+against one product, and what is read lands as evidence beside a finding — a
+publisher's own judgment, never a decision taken here.
+
+Requests go to the host the configured address names and nowhere else: https
+only, a redirect refused rather than followed, and an address that resolves
+inside this network refused. So an egress rule for this is one host per
+supplier configured, on 443.
+
+What leaves is the request itself. No component name, no build, no product,
+nothing about what this deployment holds — the narrowing to what a product
+ships happens here, after the document has arrived.
+
+How often each supplier is read again is `scanning.every`, the same setting
+that paces re-scans. Shortening it makes more requests to every configured
+supplier as well as more scans here.
+
+Reading starts at the moment a supplier is added. A publisher's listing holds
+everything they have ever issued, and taking that history is tens of thousands
+of requests; to take an advisory published earlier, upload it.
+
 ## Upstream currency
 
-Off unless an administrator turns it on, under Settings. It is the only thing
-here that reaches the network: everything a scan needs arrives as a file
-somebody imported, and a deployment that cannot reach out loses this answer and
-nothing else.
+Off unless an administrator turns it on, under Settings. Everything a scan
+needs arrives as a file somebody imported, so a deployment that cannot reach out
+loses this answer and what a scan reports is unaffected.
 
 What goes out is a component's name. One request per component to that
 ecosystem's public index, carrying the name and nothing else — no version, no

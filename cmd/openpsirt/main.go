@@ -32,6 +32,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
+	"github.com/nexthop-ai/openpsirt/internal/supplier"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 	"github.com/nexthop-ai/openpsirt/internal/webui"
 )
@@ -339,6 +340,14 @@ func run(args []string, stdout, stderr *os.File) error {
 	// two scans of one build on the queue and the second would find
 	// nothing to do.
 	schedule := scanner.NewSchedule(db, work, logger, name)
+	// Reads what configured suppliers publish about their own flaws. Started
+	// whatever is configured and doing nothing where nothing is: the
+	// suppliers are read each cycle, so naming one takes effect without a
+	// redeploy and so does withdrawing one. Started on every replica and
+	// reaching out on one, holding a lease of its own the way the two passes
+	// above hold theirs: the politeness it keeps to is a rate per deployment
+	// rather than per replica.
+	suppliers := supplier.NewPass(db.DB, logger, name, cfg.Limits())
 	// The messages that leave the application, where an operator configured
 	// somewhere for it to go. Nil when they did not, which is ordinary rather
 	// than broken: the notification area is the channel that always exists.
@@ -373,7 +382,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	return serve(cfg, logger, handler, passes{
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
-		undertaker: undertaker, publish: writer,
+		undertaker: undertaker, publish: writer, suppliers: suppliers,
 	})
 }
 
@@ -604,11 +613,13 @@ type passes struct {
 	runner   *scanner.Runner
 	schedule *scanner.Schedule
 	upstream *currency.Refresher
-	watch    *notify.Watch
-	post     *notify.Post
-	outward  *notify.Signal
-	keeper   *attach.Keeper
-	routing  *finding.Sweeper
+	// suppliers reads what configured publishers say about their own flaws.
+	suppliers *supplier.Pass
+	watch     *notify.Watch
+	post      *notify.Post
+	outward   *notify.Signal
+	keeper    *attach.Keeper
+	routing   *finding.Sweeper
 	// undertaker sets aside work whose worker never came back, which is the
 	// only pass that observes a worker having died at all.
 	undertaker *queue.Undertaker
@@ -658,6 +669,7 @@ func (p passes) loops() []loop {
 		{"scan what arrived", p.runner.Run, readInterval},
 		{"schedule rescans", p.schedule.Run, scheduleInterval},
 		{"ask upstream what is current", p.upstream.Run, askInterval},
+		{"read what suppliers publish", p.suppliers.Run, scheduleInterval},
 		{"watch for quiet builds", p.watch.Run, 0},
 		{"send what is owed outward", p.outward.Run, 0},
 		{"route unheld work to teams", p.routing.Run, readInterval},

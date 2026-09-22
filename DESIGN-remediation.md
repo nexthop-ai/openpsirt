@@ -231,8 +231,8 @@ build is clear when it stops holding them.
 
 What the public index for an ecosystem says the newest version is, for the
 components this deployment builds rather than the ones a distribution
-maintains. Off unless an administrator turns it on: it is the one thing here
-that reaches the network.
+maintains. Off unless an administrator turns it on: it sends a component's
+name to a public index.
 
 | Rule | Reason |
 |---|---|

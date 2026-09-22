@@ -118,8 +118,8 @@ func registerAdvisoryImport(api huma.API, in Ingest) {
 				statements = append(statements, finding.Statement{
 					Vulnerability: one.Vulnerability,
 					Purl:          at.Purl,
-					About:         versionNamed(at),
-					Component:     componentNamed(at),
+					About:         at.VersionNamed(),
+					Component:     at.ComponentNamed(),
 					Status:        string(one.Status),
 					Justification: one.Justification,
 					Statement:     one.Statement,

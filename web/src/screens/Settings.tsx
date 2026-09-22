@@ -1,4 +1,5 @@
 import { notACredential } from "../ui/noautofill";
+import { AdvisorySources } from "./AdvisorySources";
 import { Webhooks } from "./Webhooks";
 import { useId, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -150,6 +151,14 @@ export function Settings({ who }: { who: Who }) {
           the endpoint behind it refuses anybody else — so drawn for an auditor
           this would be a table that could only fail to load. */}
       {who.admin && <Webhooks />}
+
+      {/* The suppliers whose published advisories are read on the scan
+          schedule. Configuration rather than health, so it is here with the
+          rest of what the deployment is set to.
+
+          Administrators only, for the reason the panel above is: the endpoint
+          behind it refuses anybody else. */}
+      {who.admin && <AdvisorySources />}
     </>
   );
 }

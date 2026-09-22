@@ -58,6 +58,7 @@ func Kinds() []Kind {
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
 		VulnerabilityDataStale, RiskUnagreed, InventoryMoved,
+		ObligationOpen, ObligationPassed,
 	}
 }
 
@@ -123,6 +124,22 @@ const (
 	// stopped being scanned, and it clears the same way, when the decision
 	// is revisited or the statement is cited no longer.
 	StatementRevised Kind = "statement-revised"
+
+	// ObligationOpen is a window this deployment declared, running from the
+	// moment an attack on a product became known, with no notice outside
+	// recorded against it.
+	//
+	// A condition from the moment the record stands rather than from a lead
+	// time before the end: the windows in force anywhere are a day to a
+	// fortnight, and waiting to warn gives back the hours the warning is for.
+	// It clears when a notice names the window, when the record is cleared,
+	// or when the window is retired — and when the end arrives, at which point
+	// the other opens.
+	ObligationOpen Kind = "obligation-open"
+	// ObligationPassed is the same window after its end, still with no
+	// notice recorded against it. Both halves are facts; whether anybody owed
+	// anything is not the tool's answer to give.
+	ObligationPassed Kind = "obligation-passed"
 
 	// The four things that are wrong because nothing has happened.
 	//

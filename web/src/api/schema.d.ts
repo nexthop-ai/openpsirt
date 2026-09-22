@@ -1198,6 +1198,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/exploited-here/{id}/told": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that somebody outside was told
+         * @description Records who was told about an attack, when, and what they were told. Append-only: a notice recorded in error is corrected by recording another beside it.
+         *
+         *     Name a window to say this notice answers it. The window then stops raising its notification for this incident.
+         *
+         *     Allowed on a cleared record, because a notice given before the clearing still happened.
+         *
+         *     Requires: public-triage or private-triage on the product. The product is the record's own, not one in the path.
+         */
+        post: operations["record-told-outside"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/findings": {
         parameters: {
             query?: never;
@@ -1533,6 +1559,94 @@ export interface paths {
          *     Requires: your own credential
          */
         delete: operations["acknowledge-notification"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/obligation-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List obligation windows
+         * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
+         *
+         *     Requires: any signed-in person, and not a pipeline key
+         */
+        get: operations["list-obligation-windows"];
+        put?: never;
+        /**
+         * Declare an obligation window
+         * @description Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
+         *
+         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name.
+         *
+         *     Requires: administrator
+         */
+        post: operations["declare-obligation-window"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/obligation-windows/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change an obligation window
+         * @description Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+         *
+         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404.
+         *
+         *     Requires: administrator
+         */
+        put: operations["change-obligation-window"];
+        post?: never;
+        /**
+         * Retire an obligation window
+         * @description Stops counting a window. Notices recorded against it keep naming it, and its name may be declared again. Recorded in the administrative trail.
+         *
+         *     A window already retired, or never declared, answers 404.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["retire-obligation-window"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/obligations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List standing attacks and their windows
+         * @description Every standing record that a product was exploited through an issue, earliest known first. Each carries every window this deployment counts, as it runs from the moment the attack became known, and every notice recorded about it.
+         *
+         *     A window is answered where a notice names it. Nothing here says whether a notice met anything.
+         *
+         *     Unpaged. A record you may not be told of is left out and counted nowhere.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage on the product. What you hold decides what comes back rather than whether you may ask. A product you may not read contributes nothing, not even a count.
+         */
+        get: operations["list-obligations"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1958,6 +2072,74 @@ export interface paths {
          *     Requires: administrator
          */
         patch: operations["amend-product"];
+        trace?: never;
+    };
+    "/v1/products/{product}/advisory-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the suppliers advisories are read from
+         * @description The suppliers configured for this product, when each was last tried, when one last succeeded, and how far through what they publish this deployment has read.
+         *
+         *     Two moments rather than one. An attempt that failed still happened, so how long a supplier has been unreachable is the gap between them; the reason the last attempt stopped is returned beside them.
+         *
+         *     Requires: administrator
+         */
+        get: operations["list-advisory-sources"];
+        put?: never;
+        /**
+         * Read advisories from a supplier
+         * @description Records a supplier whose published security advisories are read on the scan schedule. What they say arrives as evidence beside a finding and a prefill for a decision, and is never applied.
+         *
+         *     The address is the supplier's CSAF provider description, which names where their advisories are listed. Both shapes the format defines are read: a ROLIE feed and a directory of documents. Only the listings a publisher labels TLP:WHITE or TLP:CLEAR are read.
+         *
+         *     Only claims naming a component this product ships are recorded.
+         *
+         *     Reading starts from the moment the supplier is added. To take an advisory published before that, upload it.
+         *
+         *     A VEX document listed beside the advisories is not read here. Upload it to the VEX endpoint to take it.
+         *
+         *     A supplier withdrawn and added again under the same name starts from today, the way a new one does.
+         *
+         *     The name is matched without regard to capitals. A name already in use for this product is refused with 409; withdraw the supplier first to change its address.
+         *
+         *     The address must be https and carry no user information. A product that is out of use takes no supplier.
+         *
+         *     Requires: administrator
+         */
+        post: operations["add-advisory-source"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/advisory-sources/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Stop reading a supplier
+         * @description Stops reading a supplier. What they have already said stays standing, because an approval may have been granted on the strength of it.
+         *
+         *     The name is matched without regard to capitals. A name no supplier is configured under is refused with 404.
+         *
+         *     Requires: administrator
+         */
+        delete: operations["withdraw-advisory-source"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/products/{product}/comparison": {
@@ -2651,7 +2833,7 @@ export interface paths {
          *
          *     Say when it became known rather than when you are typing. Any window a deployment is under counts from the first of those, and the gap between the two is what such a window measures.
          *
-         *     Nothing refuses this. Where a claim that the issue does not apply is standing and agreed to in this product, the record is kept and that agreement is taken back, returning those claims to the review queue and telling whoever wrote them; the count comes back as `undone`. A claim of that kind made while a record stands is refused instead, because a judgment gives way to a fact and not the other way round.
+         *     Nothing refuses this. Where a claim that the issue does not apply stands in this product, or a claim over many issues that sets this one aside or puts it off, the record is kept and that claim goes back to waiting for a second person, telling whoever wrote it; the count comes back as `undone`. A claim of either kind made while a record stands is refused instead.
          *
          *     One record stands per issue and product. Clear the one standing before recording another.
          *
@@ -5360,6 +5542,18 @@ export interface components {
             /** @description The identifier the issue is filed under */
             vulnerability: string;
         };
+        "Add-advisory-sourceRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Add-advisory-sourceRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The name this supplier is configured under */
+            name: string;
+            /** @description The address of the supplier's CSAF provider description */
+            url: string;
+        };
         "Add-outboundRequest": {
             /**
              * Format: uri
@@ -5442,6 +5636,35 @@ export interface components {
              */
             status: "draft" | "final" | "interim";
             title?: string;
+        };
+        AdvisorySourceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AdvisorySourceBody.json
+             */
+            readonly $schema?: string;
+            /** @description The reason the last attempt stopped, where one did */
+            because?: string;
+            /**
+             * Format: date-time
+             * @description The newest moment in what they list that has been read
+             */
+            caught_up_to?: string;
+            /** @description The name this supplier is configured under */
+            name: string;
+            /**
+             * Format: date-time
+             * @description When a read of this supplier last succeeded
+             */
+            read?: string;
+            /**
+             * Format: date-time
+             * @description When this supplier was last tried
+             */
+            tried?: string;
+            /** @description Where the supplier describes what they publish */
+            url: string;
         };
         AdvisoryTakenBody: {
             /**
@@ -5657,6 +5880,8 @@ export interface components {
             due?: string;
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
+            /** @description This product records being exploited through it. A judgment over several issues that sets this one aside or puts it off is refused */
+            exploited_here?: boolean;
             /** @description The version the report says fixes it, where it names one */
             fixed_in?: string;
             /**
@@ -6735,6 +6960,18 @@ export interface components {
             product_tree: components["schemas"]["ProductTree"];
             vulnerabilities: components["schemas"]["Vulnerability"][] | null;
         };
+        DueBody: {
+            /** @description Whether a notice recorded against this incident names this window */
+            answered: boolean;
+            /**
+             * Format: date-time
+             * @description When the attack became known, plus the window
+             */
+            ends_at: string;
+            /** @description Whether that moment has gone */
+            passed: boolean;
+            window: components["schemas"]["WindowBody"];
+        };
         EarlierBody: {
             /** @description The component upstream version it was a claim about */
             about?: string;
@@ -7052,9 +7289,11 @@ export interface components {
             recorded_by?: string;
             /** @description Whether this is the record in force. One stands at a time per issue and product */
             standing: boolean;
+            /** @description Who outside was told about this, when, and what they were told */
+            told?: components["schemas"]["NoticeBody"][] | null;
             /**
              * Format: int64
-             * @description Approved claims that the issue does not apply whose agreement this took back, returning them to the review queue
+             * @description Decisions this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off
              */
             undone?: number;
             /** @description The issue this is about */
@@ -7822,6 +8061,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyAdvisorySourceBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyAdvisorySourceBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["AdvisorySourceBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyApprovalBody: {
             /**
              * Format: uri
@@ -8452,6 +8702,58 @@ export interface components {
             /** @description Names written after an @ that reached nobody. Either no such person is recorded, or they cannot read what the note is about — deliberately not said which */
             not_notified?: string[] | null;
         };
+        NoticeBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/NoticeBody.json
+             */
+            readonly $schema?: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Who was told */
+            recipient: string;
+            /** Format: date-time */
+            recorded_at: string;
+            /** @description Who recorded the notice */
+            recorded_by?: string;
+            /** @description What they were told */
+            said: string;
+            /**
+             * Format: date-time
+             * @description When they were told
+             */
+            told_at: string;
+            /** @description That window's name */
+            window?: string;
+            /**
+             * Format: int64
+             * @description The window this notice answers, where whoever recorded it named one. A retired window's name may be declared again, so this is what tells the two apart
+             */
+            window_id?: number;
+        };
+        NoticeSaid: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/NoticeSaid.json
+             */
+            readonly $schema?: string;
+            /** @description Who was told: a regulator, a customer, a response team */
+            recipient: string;
+            /** @description What they were told */
+            said: string;
+            /**
+             * Format: date-time
+             * @description When they were told. Not before the attack became known, and not in the future
+             */
+            told_at: string;
+            /**
+             * Format: int64
+             * @description The window in force this notice answers. Left off, it answers none
+             */
+            window?: number;
+        };
         NotificationBody: {
             /** @description A condition's subject. Absent for an event */
             about?: string;
@@ -8487,6 +8789,57 @@ export interface components {
              * @description The number waiting on you
              */
             total: number;
+        };
+        ObligationBody: {
+            /** Format: date-time */
+            cleared_at?: string;
+            /** @description Why it was cleared */
+            cleared_because?: string;
+            /** @description Who cleared it */
+            cleared_by?: string;
+            /** @description What happened and how it is known. Nothing re-checks a record of being exploited, so this is the whole of what a later reader has */
+            grounds: string;
+            /** Format: int64 */
+            id?: number;
+            /**
+             * Format: date-time
+             * @description When this became known here. Any window a deployment is under counts from this, so it is when somebody learned of the attack rather than when they typed it in
+             */
+            known_at: string;
+            /** @description Whether you may record a notice about this record */
+            may_tell: boolean;
+            /** @description The product this record belongs to, by the name an address takes */
+            product?: string;
+            /** @description That product's spelling on screen */
+            product_name?: string;
+            /** Format: date-time */
+            recorded_at?: string;
+            /** @description Who recorded it */
+            recorded_by?: string;
+            /** @description Whether this is the record in force. One stands at a time per issue and product */
+            standing: boolean;
+            /** @description Who outside was told about this, when, and what they were told */
+            told?: components["schemas"]["NoticeBody"][] | null;
+            /** @description Whether the issue is undisclosed somewhere in this product */
+            undisclosed: boolean;
+            /**
+             * Format: int64
+             * @description Decisions this returned to the review queue: a claim that the issue does not apply, and a claim over many issues that set this one aside or put it off
+             */
+            undone?: number;
+            /** @description The issue this is about */
+            vulnerability?: string;
+            /** @description Every window in force, shortest first, as it runs from when the attack became known */
+            windows: components["schemas"]["DueBody"][] | null;
+        };
+        ObligationsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ObligationsBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["ObligationBody"][] | null;
         };
         OursOutputBody: {
             /**
@@ -8527,12 +8880,16 @@ export interface components {
         OutlierBody: {
             /**
              * Format: int64
-             * @description A row of the claim about this issue, to set aside when approving
+             * @description A representative row of the claim about this issue
              */
             decision_id: number;
+            /** @description Every row of the claim about this issue, one per place. Name all of them to set the issue aside when approving */
+            decision_ids: number[] | null;
             /** @description The first two hundred characters of what the report says */
             description?: string;
             exploited?: boolean;
+            /** @description This product records being attacked through it */
+            exploited_here?: boolean;
             fixed_in?: string;
             severity?: string;
             vulnerability: string;
@@ -8547,10 +8904,15 @@ export interface components {
             exploited: number;
             /**
              * Format: int64
+             * @description Issues this product records being attacked through. Agreeing to the claim is refused while any is in it; set them aside
+             */
+            exploited_here: number;
+            /**
+             * Format: int64
              * @description Issues a fix is available for
              */
             fixable: number;
-            /** @description The issues that stood out, exploited first and then by severity, at most twenty */
+            /** @description The issues that stood out: attacked here first, then exploited, then by severity. At most twenty, except that every issue this product was attacked through is listed */
             rows: components["schemas"]["OutlierBody"][] | null;
             /**
              * Format: int64
@@ -10714,6 +11076,49 @@ export interface components {
             /** @description An address is recorded for them, so anything can be sent at all */
             reachable?: boolean;
         };
+        WindowBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WindowBody.json
+             */
+            readonly $schema?: string;
+            /** Format: date-time */
+            declared_at: string;
+            /**
+             * Format: int64
+             * @description How long the window runs, in hours, from the moment an attack became known
+             */
+            hours: number;
+            /** Format: int64 */
+            id: number;
+            /** @description What the window is called here */
+            name: string;
+        };
+        WindowSaid: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WindowSaid.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description How long the window runs, in hours, from the moment an attack became known
+             */
+            hours: number;
+            /** @description What the window is called here. Unique among the windows in force, without regard to capitals */
+            name: string;
+        };
+        WindowsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/WindowsBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["WindowBody"][] | null;
+        };
         "Withdraw-estate-roleResponse": {
             /**
              * Format: uri
@@ -12476,6 +12881,41 @@ export interface operations {
             };
         };
     };
+    "record-told-outside": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoticeSaid"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoticeBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-findings-anywhere": {
         parameters: {
             query?: {
@@ -13057,6 +13497,161 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-obligation-windows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindowsBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "declare-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindowSaid"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindowBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "change-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindowSaid"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindowBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "retire-obligation-window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-obligations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObligationsBody"];
+                };
             };
             /** @description Error */
             default: {
@@ -13688,6 +14283,102 @@ export interface operations {
                 "application/json": components["schemas"]["Amend-productRequest"];
             };
         };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-advisory-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyAdvisorySourceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "add-advisory-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Add-advisory-sourceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvisorySourceBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "withdraw-advisory-source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description No Content */
             204: {

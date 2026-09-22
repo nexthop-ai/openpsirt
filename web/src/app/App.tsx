@@ -48,6 +48,9 @@ const AutoAssignment = lazy(() =>
 const Disclosing = lazy(() =>
   import("../screens/Disclosing").then((m) => ({ default: m.Disclosing })),
 );
+const Obligations = lazy(() =>
+  import("../screens/Obligations").then((m) => ({ default: m.Obligations })),
+);
 const Upgrades = lazy(() => import("../screens/Upgrades").then((m) => ({ default: m.Upgrades })));
 const Inventories = lazy(() =>
   import("../screens/Inventories").then((m) => ({ default: m.Inventories })),
@@ -112,6 +115,7 @@ export const ROUTES = {
   report: "/reports/:report",
   record: "/record",
   disclosing: "/disclosing",
+  obligations: "/obligations",
   advisories: "/advisories",
   advisory: "/advisories/:advisory",
   autoAssignment: "/auto-assignment",
@@ -237,6 +241,7 @@ export function App() {
               <Route path={ROUTES.report} element={<Report />} />
               <Route path={ROUTES.record} element={<Record />} />
               <Route path={ROUTES.disclosing} element={<Disclosing />} />
+              <Route path={ROUTES.obligations} element={<Obligations />} />
               <Route path={ROUTES.advisories} element={<Advisories />} />
               <Route path={ROUTES.advisory} element={<Advisory />} />
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />

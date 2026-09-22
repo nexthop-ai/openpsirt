@@ -173,7 +173,7 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many |
+| **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, what is disclosing, the advisories and the standing attacks sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 A build-only entry declines rather than opening on a scope that means nothing.
@@ -1433,6 +1433,8 @@ since a person only ever sees products they hold a role on.
 | **A setting says what it does in words, under its name** | It said so on the label's hover, which is where clarification goes — and what a setting does is not clarification, it is the whole of what the control is. Three of them rewrite what the tool reports without anything being scanned. Not on the control itself: a password manager classifies a field by the words it can reach through it |
 | **A setting's control is identified by a generated id, never by its key** | The prose moved off the control and the key stayed on it as `id`, and `signin.claim-window` is a sign-in field to a manager reading attributes however many ignore flags sit beside it. `name` was already pinned to a constant for this; `id` was the half that was missed. Generated rather than sanitized, because sanitizing moves the problem to the next key somebody adds |
 | **Webhooks are configured here** | Adding one is administration and this is where a deployment is set to things. Administrators only, and the panel as a whole rather than its controls: the address authenticates to two of the services it names, and the endpoint refuses anybody else — so drawn for an auditor it is a table that can only fail to load. Whether they arrive is the system screen's |
+| **Advisory sources are configured here** | Naming a supplier is administration, and the panel is administrator-only for the reason the one above it is: the endpoint refuses anybody else. It takes a product before it takes an address, because a claim is recorded against a product and a supplier feeding two is two rows |
+| **A supplier nothing has reached reads differently from one that failed** | "Not yet" and "failed three days ago" are different facts, and a single last-read moment collapses them. What stopped the last attempt is on hover, where the address is not — a publisher unreachable for a week is otherwise invisible |
 
 ## The System screen
 

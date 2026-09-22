@@ -304,13 +304,15 @@ func claimBody(c triage.Claim, proposedBy string) ClaimBody {
 
 func outliersBody(o triage.Outliers) *OutliersBody {
 	body := &OutliersBody{
-		Exploited: o.Exploited, Severe: o.Severe, Fixable: o.Fixable, Unmatched: o.Unmatched,
+		ExploitedHere: o.ExploitedHere,
+		Exploited:     o.Exploited, Severe: o.Severe, Fixable: o.Fixable, Unmatched: o.Unmatched,
 		Rows: make([]OutlierBody, 0, len(o.Rows)),
 	}
 	for _, row := range o.Rows {
 		body.Rows = append(body.Rows, OutlierBody{
-			DecisionID: row.DecisionID, Vulnerability: row.Vulnerability,
-			Severity: row.Severity, Exploited: row.Exploited, FixedIn: row.FixedIn,
+			DecisionID: row.DecisionID, DecisionIDs: row.DecisionIDs,
+			Vulnerability: row.Vulnerability, Severity: row.Severity,
+			ExploitedHere: row.ExploitedHere, Exploited: row.Exploited, FixedIn: row.FixedIn,
 			Description: row.Description, Why: row.Why,
 		})
 	}

@@ -25,10 +25,11 @@ type AtComponentBody struct {
 	// Summary is the text one judgment is made on. Deciding in bulk on
 	// less than deciding singly is the wrong way round, and this list
 	// narrows by the description while showing none of it.
-	Summary    string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
-	Exploited  bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	Likelihood float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
-	Due        string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its places here, which is the one that makes it late"`
+	Summary       string  `json:"summary,omitempty" doc:"The first line of what the issue says about itself, cut to fit a row"`
+	Exploited     bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
+	ExploitedHere bool    `json:"exploited_here,omitempty" doc:"This product records being exploited through it. A judgment over several issues that sets this one aside or puts it off is refused"`
+	Likelihood    float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
+	Due           string  `json:"due,omitempty" doc:"The date it runs out. The earliest among its places here, which is the one that makes it late"`
 }
 
 func registerBulk(api huma.API, in Ingest) {
@@ -138,8 +139,8 @@ func registerBulk(api huma.API, in Ingest) {
 				Vulnerability: named[each.VulnerabilityID],
 				Severity:      finding.SeverityWord(each.SeverityCenti),
 				Places:        each.Places, FixedIn: each.FixedIn,
-				Summary:    each.Summary,
-				Exploited:  each.Exploited,
+				Summary:   each.Summary,
+				Exploited: each.Exploited, ExploitedHere: each.ExploitedHere,
 				Likelihood: float64(each.LikelihoodPPM) / 1_000_000,
 			}
 			if due := soonest[each.VulnerabilityID]; due != nil {

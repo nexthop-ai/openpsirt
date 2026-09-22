@@ -45,6 +45,22 @@ const Timeout = 10 * time.Second
 // that genuinely moved its endpoints should be reconfigured, which is visible,
 // rather than followed, which is not.
 func Guarded(hosts ...string) *http.Client {
+	return GuardedWithin(Timeout, hosts...)
+}
+
+// GuardedWithin is Guarded with a budget of its own.
+//
+// Timeout is sized for somebody watching a blank page while a sign-in runs, and
+// it bounds the whole call rather than the wait for a first byte. A caller
+// fetching a document whose bound is measured in hundreds of megabytes needs a
+// budget in proportion: at the interactive one, a document too large to arrive
+// in ten seconds cannot be fetched at all, however many times it is tried.
+//
+// Everything else is Guarded's: the host allowlist, the refusal to follow a
+// redirect, and the refusal to connect inside this network. The dialer keeps
+// the interactive budget whatever the whole call is given, because how long a
+// connection takes to establish does not scale with what is being fetched.
+func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 	allowed := make(map[string]bool, len(hosts))
 	for _, host := range hosts {
 		allowed[strings.ToLower(host)] = true
@@ -64,7 +80,7 @@ func Guarded(hosts ...string) *http.Client {
 		},
 	}
 	return &http.Client{
-		Timeout: Timeout,
+		Timeout: within,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
 			return fmt.Errorf("refused a redirect to %s: a provider's endpoints are configured, not followed", req.URL.Host)
 		},

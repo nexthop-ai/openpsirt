@@ -110,8 +110,9 @@ const betweenCycles = time.Minute
 //
 // The setting is read each cycle rather than at startup, so turning this on
 // takes effect without a restart — and, more to the point, so does turning it
-// off. This is the one thing here that reaches the network, and an operator
-// who decides that was a mistake should not have to redeploy to stop it.
+// off. This asks a public index rather than an address somebody configured,
+// and an operator who decides that was a mistake should not have to redeploy
+// to stop it.
 func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
 	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
 		on, err := r.enabled(ctx)
