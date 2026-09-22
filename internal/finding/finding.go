@@ -417,6 +417,12 @@ type Store struct {
 	// name, or zero for the shipped number. Carried on the store so a test can
 	// bring it down to a fixture rather than building a fixture up to it.
 	reach int
+	// afterReadingReport runs between a judgment reading the report and
+	// writing to it, so a test can put another writer in that window. The
+	// window is the whole of what the condition on the write is for, and
+	// waiting for two callers to land in it by themselves is a test that
+	// passes by not racing.
+	afterReadingReport func()
 }
 
 // NewStore returns a store over db.

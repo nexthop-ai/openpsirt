@@ -240,23 +240,23 @@ func mayReachReport(ctx context.Context, db bun.IDB, subject access.Subject,
 	return nil
 }
 
-// Upload stores a file against an issue and records it.
+// Upload stores a file against an issue or a report and records it.
 //
 // The bytes are streamed rather than held (the file-size limit bounds one
 // file; holding each would mean every upload happening at once is resident at
 // once), and hashed on the way through so that a redaction can say later what
 // it removed.
 //
-// `hangsOffTheIssue` says nothing is going to point at this from text. A
-// file attached while somebody is composing a justification is pointed at by
-// words that are not saved yet, so it waits, and the sweep collects it if they
-// abandon the form. A file attached to the issue itself — evidence, a
-// test case that proves the flaw — is pointed at by the issue the moment it
-// arrives, and waiting for text that will never be written would mean the
-// sweep took it a day later.
+// `held` says nothing is going to point at this from text. A file attached
+// while somebody is composing a justification is pointed at by words that are
+// not saved yet, so it waits, and the sweep collects it if they abandon the
+// form. A file the thing itself holds — evidence on an issue, a test case
+// that proves the flaw, whatever arrived with a report — is pointed at the
+// moment it arrives, and waiting for text that will never be written would
+// mean the sweep took it a day later.
 func (s *Store) Upload(ctx context.Context, subject access.Subject,
 	at Against, filename string, body io.Reader, size int64,
-	maxSize, quota, share int64, hangsOffTheIssue bool) (*Attachment, error) {
+	maxSize, quota, share int64, held bool) (*Attachment, error) {
 
 	if !s.Configured() {
 		return nil, ErrNotConfigured
@@ -325,7 +325,7 @@ func (s *Store) Upload(ctx context.Context, subject access.Subject,
 			Digest: hex.EncodeToString(digest.Sum(nil)), ObjectKey: key,
 			UploadedBy: subject.ID, UploadedAt: now,
 		}
-		if hangsOffTheIssue {
+		if held {
 			row.AttachedAt = &now
 		}
 		// Asked again inside the transaction, because the first answer

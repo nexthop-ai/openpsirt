@@ -123,7 +123,7 @@ func registerIntake(api huma.API, in Ingest) {
 		Tags: []string{"Findings"},
 	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Reference string `path:"reference" maxLength:"191" doc:"The reference this deployment minted"`
+		Reference string `path:"reference" maxLength:"593" doc:"The reference this deployment minted"`
 	}) (*struct{ Body ReportBody }, error) {
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
@@ -154,7 +154,7 @@ func registerIntake(api huma.API, in Ingest) {
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Reference string `path:"reference" maxLength:"191"`
+		Reference string `path:"reference" maxLength:"593"`
 	}) (*struct{}, error) {
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
@@ -184,16 +184,20 @@ func registerIntake(api huma.API, in Ingest) {
 		Tags: []string{"Findings"},
 	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Reference string `path:"reference" maxLength:"191"`
+		Reference string `path:"reference" maxLength:"593"`
 		Body      ReportIssueBody
 	}) (*struct{ Body ReportBody }, error) {
 		subject, product, err := productForReports(ctx, in, input.Product)
 		if err != nil {
 			return nil, err
 		}
+		// Propagated rather than flattened. It already answers alike for an
+		// issue that is not here and one this subject may not be told of,
+		// which is what this operation promises — and it answers a lookup
+		// that failed as a fault, logged, instead of as a name nobody holds.
 		issue, err := issueHere(ctx, in, subject, product.ID, input.Body.Vulnerability)
 		if err != nil {
-			return nil, huma.Error404NotFound(finding.ErrNoSuchIssueHere.Error())
+			return nil, err
 		}
 		row, err := finding.NewStore(in.DB.DB).JudgeAsIssue(ctx, subject,
 			product.ID, input.Reference, issue)
@@ -222,16 +226,13 @@ func registerIntake(api huma.API, in Ingest) {
 			"attachment download whatever it is.\n\n" +
 			"Refused when the file is larger than this deployment accepts, when it has no " +
 			"room left, or when it would take you past your own share of the store; all " +
-			"three limits are settings.\n\n" +
-			"Send `evidence=true` where the file arrived with the report rather than " +
-			"hanging off text you are about to write: it is then listed at once and never " +
-			"swept.",
+			"three limits are settings.",
 		Tags:        []string{"Findings"},
 		Middlewares: huma.Middlewares{boundedForm(api, maxAttachmentRequest)},
 	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Reference string `path:"reference" maxLength:"191"`
-		RawBody   huma.MultipartFormFiles[attachmentParts]
+		Reference string `path:"reference" maxLength:"593"`
+		RawBody   huma.MultipartFormFiles[arrivedParts]
 	}) (*struct {
 		Status int
 		Body   AttachmentBody
@@ -256,7 +257,12 @@ func registerIntake(api huma.API, in Ingest) {
 		stored, err := files.Upload(ctx, subject,
 			attach.Against{ProductID: product.ID, FlawReportID: row.ID},
 			part.Filename, part, part.Size, maxSize, quota, share,
-			input.RawBody.Data().Evidence)
+			// Held the moment it arrives, never waiting. A report carries no
+			// text a reference could be written into, so the only thing that
+			// ever sets the flag afterwards cannot reach one — left waiting,
+			// the file is listed nowhere and the sweep takes it, with the
+			// uploader told it worked.
+			true)
 		switch {
 		case errors.Is(err, attach.ErrTooLarge):
 			return nil, huma.Error413RequestEntityTooLarge(fmt.Sprintf(
@@ -284,7 +290,7 @@ func registerIntake(api huma.API, in Ingest) {
 		Tags: []string{"Findings"},
 	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Reference string `path:"reference" maxLength:"191"`
+		Reference string `path:"reference" maxLength:"593"`
 	}) (*struct {
 		Body struct {
 			Items []AttachmentBody `json:"items"`

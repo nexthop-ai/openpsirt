@@ -2869,8 +2869,6 @@ export interface paths {
          *
          *     Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings.
          *
-         *     Send `evidence=true` where the file arrived with the report rather than hanging off text you are about to write: it is then listed at once and never swept.
-         *
          *     Requires: private-triage on the product
          */
         post: operations["upload-report-attachment"];
@@ -9105,17 +9103,22 @@ export interface components {
             contact?: string;
             /** @description The credit they asked for in an advisory */
             credit?: string;
+            /** @description When somebody said what it turned out to be */
             evaluated?: string;
+            /** @description Who said so */
             evaluated_by?: string;
+            /** @description The issue the claim turned out to be */
             issue?: string;
             /** @description The day it arrived, which the embargo is counted from */
             received?: string;
+            /** @description When it was written down, which is not when it arrived */
             recorded_at: string;
+            /** @description Who wrote it down */
             recorded_by: string;
             /** @description The name this report is reached by */
             reference: string;
             reported_by?: string;
-            /** @description What was claimed, as markdown. Absent where the issue's own description carries it */
+            /** @description What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it */
             summary?: string;
         };
         ReportIssueBody: {
@@ -14959,7 +14962,6 @@ export interface operations {
         requestBody?: {
             content: {
                 "multipart/form-data": {
-                    evidence: boolean;
                     /** Format: binary */
                     file: string;
                 };

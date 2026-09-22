@@ -49,6 +49,17 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 		if err := rights.GrantRole(ctx, announced.ID, product.ID, access.PublicTriage); err != nil {
 			t.Fatal(err)
 		}
+		// And somebody who may read work nobody has announced but not argue
+		// about it. They are the role the rule actually turns on: the
+		// condition used to be sent to whoever could read the flaw, and a
+		// report refuses them, so the notice named a report they cannot open.
+		reads, err := rights.Ensure(ctx, "reads@example.com", "Reads", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(ctx, reads.ID, product.ID, access.PrivateRead); err != nil {
+			t.Fatal(err)
+		}
 
 		report := &finding.FlawReport{
 			Reference: "SONIC-R-2026-424242", ProductID: product.ID,
@@ -83,11 +94,18 @@ func TestAClaimNobodyHasJudgedIsStillAnUnansweredLetter(t *testing.T) {
 			t.Errorf("the alert reads %q and does not name %q",
 				told[0].Body, report.Reference)
 		}
-		if !strings.Contains(told[0].Link, "/reports/"+report.Reference) {
-			t.Errorf("the alert points at %q", told[0].Link)
+		// And it points nowhere. Nothing in the interface reaches a report
+		// yet, and an address that answers "not found" is worse than none:
+		// the body already names the reference and the product, which is
+		// what the reader acts on.
+		if told[0].Link != "" {
+			t.Errorf("the alert points at %q, and no screen reaches a report", told[0].Link)
 		}
 		if n := len(waiting(announced)); n != 0 {
 			t.Errorf("somebody who triages only announced work was told %d things", n)
+		}
+		if n := len(waiting(reads)); n != 0 {
+			t.Errorf("somebody who may read but not triage was told %d things", n)
 		}
 
 		// Answering it clears the condition, with nobody dismissing anything.

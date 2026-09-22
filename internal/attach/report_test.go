@@ -60,7 +60,14 @@ func TestAFileOnAnUnjudgedClaimIsReachedOnlyByWhoeverTriagesUnannouncedWork(t *t
 			t.Fatal(err)
 		}
 
-		for _, held := range []access.Role{access.PublicRead, access.PublicTriage} {
+		// PrivateRead is the boundary: somebody who may read work nobody has
+		// announced still may not reach a claim. Without it, relaxing the
+		// rule from "triages privately" to "reads privately" leaves this
+		// green, and the sibling copy of the rule in internal/finding pins
+		// exactly that.
+		for _, held := range []access.Role{
+			access.PublicRead, access.PublicTriage, access.PrivateRead,
+		} {
 			stranger := f.who(t, held)
 			if _, err := f.store.Find(t.Context(), stranger, stored.Token); err == nil {
 				t.Errorf("%s fetched a file on a claim nobody has judged", held)

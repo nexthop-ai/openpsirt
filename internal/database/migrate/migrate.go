@@ -90,7 +90,16 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 			return fmt.Errorf("read schema version: %w", err)
 		}
 		if err := goose.UpContext(ctx, db.DB.DB, "."); err != nil {
-			return fmt.Errorf("apply migrations: %w", err)
+			// Named, because the commonest way this fails says a migration is
+			// missing and then prints the path of a file that is sitting
+			// right there. Below 1.0 a schema change edits the migration that
+			// made the thing, and one that moves between numbers leaves an
+			// older database holding a version this set no longer issues — so
+			// what the operator has is a schema built by a build that is gone,
+			// and recreating is the answer rather than migrating.
+			return fmt.Errorf("apply migrations: %w — before 1.0 a migration is "+
+				"edited rather than added beside, so a database built by an "+
+				"earlier build is recreated rather than migrated", err)
 		}
 		after, err := goose.GetDBVersionContext(ctx, db.DB.DB)
 		if err != nil {

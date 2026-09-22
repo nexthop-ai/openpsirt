@@ -549,10 +549,8 @@ func isRootIn(ctx context.Context, db bun.IDB, targetID, componentID int64) (boo
 // the name alone, before any route is asked anything.
 //
 // Drawn from a source fit for the purpose, because guessing the next one is
-// the whole of what this prevents. A collision is answered by drawing again
-// inside the same transaction, so two people recording at the same moment
-// cannot be handed the same identifier: the second waits, sees the first's
-// row, and draws once more.
+// the whole of what this prevents. What happens to a collision is
+// drawIdentifier's, below.
 func mint(ctx context.Context, tx bun.IDB, product string, year int) (string, error) {
 	prefix := strings.ToUpper(strings.TrimSpace(product))
 	if prefix == "" {
@@ -583,11 +581,13 @@ func mint(ctx context.Context, tx bun.IDB, product string, year int) (string, er
 // the routes answer a name somebody holds and a name nobody holds identically
 // — it is what stops the sequence from being readable.
 //
-// A collision is answered by drawing again inside the same transaction, so
-// two people recording at the same moment cannot be handed the same name: the
-// second waits, sees the first's row, and draws once more. Eight collisions in
-// a row against a space this size is not luck, and carrying on would be a loop
-// nobody is watching.
+// A collision with a name already recorded is answered by drawing again, so a
+// name in use is never handed out twice. Two writers drawing the same number
+// at the same moment are separated by the unique constraint on the column
+// instead, and the loser is told its transaction was rolled back: a count does
+// not block on an insert nobody has committed, so neither of them sees the
+// other here. Eight collisions in a row against a space this size is not luck,
+// and carrying on would be a loop nobody is watching.
 func drawIdentifier(ctx context.Context, issuer string, name func(number int64) string,
 	taken func(ctx context.Context, candidate string) (bool, error)) (string, error) {
 

@@ -17,7 +17,7 @@ import (
 // ReportBody is what somebody told us, and what became of it.
 type ReportBody struct {
 	Reference  string `json:"reference" doc:"The name this report is reached by"`
-	Summary    string `json:"summary,omitempty" doc:"What was claimed, as markdown. Absent where the issue's own description carries it"`
+	Summary    string `json:"summary,omitempty" doc:"What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it"`
 	ReportedBy string `json:"reported_by,omitempty"`
 	Contact    string `json:"contact,omitempty"`
 	Credit     string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
@@ -30,11 +30,11 @@ type ReportBody struct {
 	// Issue is what the claim turned out to be, where somebody has said, with
 	// when they said it and who they were. Absent is a claim nobody has
 	// judged, which is the state every report arrives in.
-	Issue       string `json:"issue,omitempty"`
-	Evaluated   string `json:"evaluated,omitempty"`
-	EvaluatedBy string `json:"evaluated_by,omitempty"`
-	RecordedBy  string `json:"recorded_by"`
-	RecordedAt  string `json:"recorded_at"`
+	Issue       string `json:"issue,omitempty" doc:"The issue the claim turned out to be"`
+	Evaluated   string `json:"evaluated,omitempty" doc:"When somebody said what it turned out to be"`
+	EvaluatedBy string `json:"evaluated_by,omitempty" doc:"Who said so"`
+	RecordedBy  string `json:"recorded_by" doc:"Who wrote it down"`
+	RecordedAt  string `json:"recorded_at" doc:"When it was written down, which is not when it arrived"`
 }
 
 // registerWhoTold is the record of who told us, and the act of saying we

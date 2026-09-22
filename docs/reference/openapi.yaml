@@ -7107,17 +7107,22 @@ components:
           description: The credit they asked for in an advisory
           type: string
         evaluated:
+          description: When somebody said what it turned out to be
           type: string
         evaluated_by:
+          description: Who said so
           type: string
         issue:
+          description: The issue the claim turned out to be
           type: string
         received:
           description: The day it arrived, which the embargo is counted from
           type: string
         recorded_at:
+          description: When it was written down, which is not when it arrived
           type: string
         recorded_by:
+          description: Who wrote it down
           type: string
         reference:
           description: The name this report is reached by
@@ -7125,7 +7130,7 @@ components:
         reported_by:
           type: string
         summary:
-          description: What was claimed, as markdown. Absent where the issue's own description carries it
+          description: What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it
           type: string
       required:
         - reference
@@ -17742,7 +17747,7 @@ paths:
           required: true
           schema:
             description: The reference this deployment minted
-            maxLength: 191
+            maxLength: 593
             type: string
       responses:
         "200":
@@ -17785,7 +17790,7 @@ paths:
           name: reference
           required: true
           schema:
-            maxLength: 191
+            maxLength: 593
             type: string
       responses:
         "204":
@@ -17822,7 +17827,7 @@ paths:
           name: reference
           required: true
           schema:
-            maxLength: 191
+            maxLength: 593
             type: string
       responses:
         "200":
@@ -17854,8 +17859,6 @@ paths:
 
         Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings.
 
-        Send `evidence=true` where the file arrived with the report rather than hanging off text you are about to write: it is then listed at once and never swept.
-
         Requires: private-triage on the product
       operationId: upload-report-attachment
       parameters:
@@ -17868,20 +17871,16 @@ paths:
           name: reference
           required: true
           schema:
-            maxLength: 191
+            maxLength: 593
             type: string
       requestBody:
         content:
           multipart/form-data:
             encoding:
-              evidence:
-                contentType: text/plain
               file:
                 contentType: application/octet-stream
             schema:
               properties:
-                evidence:
-                  type: boolean
                 file:
                   contentEncoding: binary
                   contentMediaType: application/octet-stream
@@ -17889,7 +17888,6 @@ paths:
                   type: string
               required:
                 - file
-                - evidence
               type: object
       responses:
         "200":
@@ -17934,7 +17932,7 @@ paths:
           name: reference
           required: true
           schema:
-            maxLength: 191
+            maxLength: 593
             type: string
       requestBody:
         content:

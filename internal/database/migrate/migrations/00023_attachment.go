@@ -56,10 +56,10 @@ func upAttachment(ctx context.Context, tx *sql.Tx) error {
 			"product_id"       ` + t.ref + ` NOT NULL,
 			-- And then one of the two things a file hangs off: an issue, or
 			-- a report nobody has turned into one. Exactly one is set, which
-			-- the store asks and the schema does not — a constraint saying
-			-- so is spelled differently on each of the four engines, and the
-			-- one place a row is written is where the question is answerable
-			-- anyway.
+			-- the store asks and the schema does not: MySQL parses a CHECK
+			-- and ignores it until 8.0.16 and the floor here is 8.0, so the
+			-- constraint would hold on three engines of four. No migration
+			-- here declares one.
 			"vulnerability_id" ` + t.refNull + ` NULL,
 			"flaw_report_id"   ` + t.refNull + ` NULL,
 			-- What it was called when it arrived, for the disposition header.

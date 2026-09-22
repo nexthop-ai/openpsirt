@@ -475,15 +475,15 @@ func itemsWaiting(n int) string {
 // acknowledgment is the part of coordinated disclosure a reporter judges us
 // on, and it costs nothing and is missed by being nobody's job.
 //
-// To whoever may read the flaw and act on it, which for a recorded flaw
-// nobody has announced is whoever may triage undisclosed work in that product.
-// A report is about somebody outside this deployment and the reply goes to
-// them from a person, so this reaches the people who could be that person.
+// To whoever may triage work nobody has announced in that product, which is
+// who may open the report. A report is about somebody outside this deployment
+// and the reply goes to them from a person, so this reaches the people who
+// could be that person — and narrowing it that way is what keeps the notice
+// from naming a report the reader is refused.
 //
-// A claim nobody has judged is narrowed further, to whoever may triage work
-// nobody has announced. It is who may open the report at all, and telling
-// somebody about a letter they cannot read is an alert they can do nothing
-// with.
+// Judged or not. A claim that turned out to be announced work is still a
+// letter a stranger sent, and reading it asks the same thing it asked
+// before.
 func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 	rows, err := finding.NewStore(w.db).Unacknowledged(ctx)
 	if err != nil {
@@ -521,27 +521,26 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 			ProductID:       &row.ProductID,
 			VulnerabilityID: &row.VulnerabilityID,
 		}
-		// A claim nobody has judged has no issue to name, no finding screen
-		// to point at and nobody on a case. It is named by the reference it
-		// was minted with, and reaches whoever may triage work nobody has
-		// announced in that product — which is exactly who may open it.
-		unjudged := row.VulnerabilityID == 0
-		if unjudged {
+		// A claim nobody has judged has no issue to name and nobody on a
+		// case. It is named by the reference it was minted with, and it
+		// carries no address: nothing in the interface reaches a report yet,
+		// and a notice pointing at a page that answers "not found" is worse
+		// than one that names what to go and look for.
+		if row.VulnerabilityID == 0 {
 			holds.About = identify(fmt.Sprintf("unanswered report %d", row.ReportID))
 			holds.Body = fmt.Sprintf("%s sent %s in %s%s and has not been answered. "+
 				"Acknowledging is the part of coordinated disclosure a reporter judges, "+
 				"and it is what starts the timeline the record has to evidence.",
 				who, row.Reference, row.Product, when)
-			holds.Link = fmt.Sprintf("/products/%s/reports/%s",
-				url.QueryEscape(row.Product), url.QueryEscape(row.Reference))
+			holds.Link = ""
 			holds.VulnerabilityID = nil
 		}
 		for personID, per := range reach {
-			at := per[row.ProductID]
-			switch {
-			case unjudged && !at.triages(true):
-				continue
-			case !unjudged && (!at.public() || (row.Undisclosed && !at.private())):
+			// Whoever may triage work nobody has announced there, judged or
+			// not, because that is who may open the report — asked as a read
+			// instead, the notice named a report to somebody the report
+			// itself refuses.
+			if !per[row.ProductID].triages(true) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)

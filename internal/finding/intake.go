@@ -203,8 +203,8 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	if row.Judged() {
-		return nil, ErrAlreadyJudged
+	if s.afterReadingReport != nil {
+		s.afterReadingReport()
 	}
 	// The issue has to be one this subject may already be told of here.
 	// Without it, pointing a report at an identifier would say whether that
@@ -225,9 +225,11 @@ func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 			Set("evaluated_at = ?", now).
 			Set("evaluated_by = ?", subject.ID).
 			Where("id = ?", row.ID).
-			// Still unjudged, asked in the write rather than only before it.
-			// Two people judging the same claim at once would otherwise both
-			// succeed, and the second would overwrite who decided and when.
+			// Whether it is still unjudged is asked here and nowhere else.
+			// Asked before the write as well, the answer read a row that may
+			// have moved since — and the second guard was unreachable by any
+			// input a single caller can produce, so it was a rule with no
+			// test rather than a second line of defense.
 			Where("vulnerability_id IS NULL").
 			Exec(ctx)
 		if err != nil {

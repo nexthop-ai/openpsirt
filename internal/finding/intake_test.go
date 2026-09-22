@@ -9,6 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 )
@@ -185,12 +186,31 @@ func TestAClaimIsJudgedOnceAndSaysWhoJudgedIt(t *testing.T) {
 			t.Error("the moment it was written down and the moment it was judged are one value")
 		}
 
-		// A judgment is made once. Two people judging at the same moment
-		// would otherwise both succeed, and the second would overwrite who
-		// decided.
+		// A judgment is made once. Plainly, first.
 		if _, err := f.store.JudgeAsIssue(t.Context(), who, f.productID,
 			row.Reference, issue); !errors.Is(err, finding.ErrAlreadyJudged) {
 			t.Errorf("judging twice was answered %v", err)
+		}
+
+		// And then the case the condition on the write exists for, which a
+		// repeat does not reach: judged by somebody else between this
+		// judgment reading the row and writing to it.
+		third, err := f.store.Record(t.Context(), who, f.productID,
+			finding.Claimed{Summary: "Judged by somebody else mid-flight."})
+		if err != nil {
+			t.Fatal(err)
+		}
+		another := f.anIssueHere(t, who, "A second flaw, for the racing judgment.")
+		racing := finding.NewStore(f.db.DB)
+		racing.JudgingAfter(func() {
+			if _, err := f.store.JudgeAsIssue(t.Context(), who, f.productID,
+				third.Reference, another); err != nil {
+				t.Errorf("the other writer could not judge it: %v", err)
+			}
+		})
+		if _, err := racing.JudgeAsIssue(t.Context(), who, f.productID,
+			third.Reference, issue); !errors.Is(err, finding.ErrAlreadyJudged) {
+			t.Errorf("judging a claim somebody judged mid-flight was answered %v", err)
 		}
 
 		// One report is one issue's record. A second pointed at the same
@@ -213,37 +233,52 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 	// see would come back differently, which turns this into a way to ask
 	// which identifiers are open here.
 	each(t, func(t *testing.T, f *fixture) {
-		f.shipped(t, twoConsumers())
 		owner := f.planner(t, access.PrivateTriage)
-		_, identifier, err := f.store.Enter(t.Context(), owner, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
-			Summary: "Undisclosed, and recorded by somebody who may see it.",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		issue, err := finding.NewVulnerabilities(f.db.DB).ByName(t.Context(), identifier)
-		if err != nil {
-			t.Fatal(err)
-		}
 		row, err := f.store.Record(t.Context(), owner, f.productID,
 			finding.Claimed{Summary: "A claim about something undisclosed."})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		// A different product's rights reach neither the report nor the
-		// issue, and the refusal names neither.
+		// The judge holds this product's reports, so the report gate lets
+		// them through and only the issue gate is left to refuse. Held the
+		// other way round — somebody holding nothing here — the report gate
+		// refuses first and the issue gate is never reached, so deleting it
+		// leaves the test green.
+		judge := f.somebody(t, "judge@example.com", access.PrivateTriage)
 		elsewhere, err := catalog.NewStore(f.db.DB).DeclareProduct(t.Context(),
 			"edge-router", "Edge")
 		if err != nil {
 			t.Fatal(err)
 		}
-		outsider := access.NewPerson(owner.ID, "them@example.com", false,
+		if _, err := catalog.NewStore(f.db.DB).DeclareVariant(t.Context(),
+			elsewhere.ID, "broadcom", true); err != nil {
+			t.Fatal(err)
+		}
+		theirs := f.anotherBranchOf(t, elsewhere.ID, "master")
+		f.shippedTo(t, theirs, twoConsumers())
+		holder := access.NewPerson(owner.ID, "them@example.com", false,
 			map[int64][]access.Role{elsewhere.ID: {access.PrivateTriage}}, 0)
-		if _, err := f.store.JudgeAsIssue(t.Context(), outsider, f.productID,
-			row.Reference, issue); !errors.Is(err, finding.ErrNoSuchReport) {
-			t.Errorf("somebody holding nothing here judged a claim: %v", err)
+		_, name, err := f.store.Enter(t.Context(), holder, finding.Entering{
+			TargetIDs: []int64{theirs}, Component: swss.Name, Severity: "high",
+			Summary: "A flaw in a product this judge holds nothing on.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		far, err := finding.NewVulnerabilities(f.db.DB).ByName(t.Context(), name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.JudgeAsIssue(t.Context(), judge, f.productID,
+			row.Reference, far); !errors.Is(err, finding.ErrNoSuchIssueHere) {
+			t.Errorf("a claim was pointed at an issue the judge cannot be told of: %v", err)
+		}
+		// And the issue is genuinely there, so the refusal is about who is
+		// asking rather than about a row that does not exist.
+		if _, err := f.store.JudgeAsIssue(t.Context(), holder, elsewhere.ID,
+			row.Reference, far); !errors.Is(err, finding.ErrNoSuchReport) {
+			t.Errorf("the report was reachable from another product: %v", err)
 		}
 	})
 }
@@ -398,6 +433,58 @@ func TestAFlawRecordedByHandCarriesAReportThatWasJudgedAsItWasWrittenDown(t *tes
 			t.Errorf("reading it by reference answered %v (%v)", back, err)
 		}
 	})
+}
+
+func TestAReferenceFitsAProductNamedAtTheFullWidth(t *testing.T) {
+	// A reference is a product's name and twelve more characters, and a
+	// product may be named at the full width of a name. Sized as a name, the
+	// longest one mints a reference PostgreSQL and MySQL refuse with a fault
+	// out of an ordinary request — and SQLite stores it, so the quick loop
+	// would never see it.
+	each(t, func(t *testing.T, f *fixture) {
+		widest := strings.Repeat("a", database.NameWidth)
+		product, err := catalog.NewStore(f.db.DB).DeclareProduct(t.Context(), widest, "Wide")
+		if err != nil {
+			t.Fatal(err)
+		}
+		who := access.NewPerson(f.planner(t).ID, "them@example.com", false,
+			map[int64][]access.Role{product.ID: {access.PrivateTriage}}, 0)
+		row, err := f.store.Record(t.Context(), who, product.ID,
+			finding.Claimed{Summary: "Reported against a product with a very long name."})
+		if err != nil {
+			t.Fatalf("recording against the widest product name: %v", err)
+		}
+		if len(row.Reference) <= database.NameWidth {
+			t.Fatalf("the reference is %d characters, which does not reach the width "+
+				"this is about", len(row.Reference))
+		}
+		// Read back, because storing and returning are two things: a column
+		// too narrow truncates on one engine and refuses on another.
+		back, err := f.store.ReportBy(t.Context(), who, product.ID, row.Reference)
+		if err != nil {
+			t.Fatalf("reading it back: %v", err)
+		}
+		if back.Reference != row.Reference {
+			t.Errorf("it was stored as %q and minted as %q", back.Reference, row.Reference)
+		}
+	})
+}
+
+// anIssueHere records a flaw by hand and returns the issue it minted.
+func (f *fixture) anIssueHere(t *testing.T, who access.Subject, summary string) int64 {
+	t.Helper()
+	_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
+		TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+		Summary: summary,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	issue, err := finding.NewVulnerabilities(f.db.DB).ByName(t.Context(), identifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return issue
 }
 
 // somebody is a second person holding roles on this fixture's product.

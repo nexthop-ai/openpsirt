@@ -79,6 +79,16 @@ type attachmentParts struct {
 	Evidence bool `form:"evidence"`
 }
 
+// arrivedParts is what an upload against a report carries.
+//
+// The file alone. An issue's upload asks whether the file hangs off the issue
+// or off text somebody is part way through writing; a report has no text, so
+// the question has one answer and offering it would be offering a field that
+// changes nothing.
+type arrivedParts struct {
+	File huma.FormFile `form:"file" required:"true"`
+}
+
 func registerAttachments(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "upload-attachment", Method: http.MethodPost,

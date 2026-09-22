@@ -448,6 +448,11 @@ decided the claim is safe to repeat. So recording one, reading one, listing a
 product's reports and reading what arrived with one all ask for the right to
 triage work nobody has announced in that product.
 
+Every reader of the row, including the one that reaches it through the issue
+it turned out to be. Asked there as the issue's own visibility, judging a
+claim handed what a stranger wrote to everybody who triages announced work,
+which is a widening by the act of filing.
+
 Judging a claim does not widen that. What a stranger sent is what a stranger
 sent, reviewed by nobody, so saying the claim is a disclosed issue must not
 hand it to everybody who reads that product. Anything meant to be read there

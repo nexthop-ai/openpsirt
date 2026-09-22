@@ -3,8 +3,11 @@ package migrations
 import (
 	"context"
 	"database/sql"
+	"strconv"
 
 	"github.com/pressly/goose/v3"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 func init() {
@@ -50,7 +53,13 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 			-- counted: a sequence tells anybody who may ask how many
 			-- claims this product has received and when the last one
 			-- arrived, which is a disclosure made by the name alone.
-			"reference"        ` + t.name + ` NOT NULL,
+			--
+			-- Composed rather than a name: it is a product's name and
+			-- twelve more characters, and a product may be named at the
+			-- full width of one. Sized as a name, a long enough product
+			-- minted a reference two engines refuse and SQLite stores,
+			-- so the quick loop would never see it.
+			"reference"        VARCHAR(` + strconv.Itoa(database.ComposedWidth) + `) NOT NULL,
 			-- The product it was reported against.
 			--
 			-- It is what decides who may read the reporter's name, address

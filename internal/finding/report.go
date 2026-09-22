@@ -120,6 +120,12 @@ func (t Told) When() *time.Time {
 // reporter's name, address and received date for a report made about a
 // product they hold nothing in.
 //
+// The same rule a report reached by its reference takes, because it is the
+// same row. Asked as the issue's own visibility instead, judging a claim
+// handed what a stranger wrote to everybody who triages announced work in
+// that product — a widening by the act of filing, which is the one thing a
+// report's visibility rule says does not happen.
+//
 // A report the subject may not reach and no report at all answer alike, so
 // asking is not a way to find out that one exists.
 func (s *Store) ReportFor(ctx context.Context, subject access.Subject,
@@ -134,11 +140,7 @@ func (s *Store) ReportFor(ctx context.Context, subject access.Subject,
 	case err != nil:
 		return nil, fmt.Errorf("read who told us: %w", err)
 	}
-	reachable, err := s.MayBeToldOfIn(ctx, subject, row.ProductID, vulnerabilityID)
-	if err != nil {
-		return nil, err
-	}
-	if !reachable {
+	if err := mayHandle(subject, row.ProductID); err != nil {
 		return nil, nil
 	}
 	return row, nil

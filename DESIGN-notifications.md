@@ -164,11 +164,16 @@ unanswered report carries no period — the answer to how long that may go
 unanswered is "not at all".
 
 A claim nobody has judged is raised the same way and named differently. It has
-no issue to name and no finding screen to point at, so the alert carries the
-reference it was minted with and points at the report. It is narrowed to
-whoever may triage work nobody has announced, which is exactly who may open
-it — an alert about a letter somebody cannot read is one they can do nothing
-with. A report about an issue long closed is history rather than an unanswered
+no issue to name, so the alert carries the reference it was minted with, and
+it carries no address at all: nothing in the interface reaches a report, and a
+notice pointing at a page that answers "not found" is worse than one that
+names what to go and look for.
+
+Both are told to whoever may triage work nobody has announced there, which is
+who may open the report. An alert about a letter somebody cannot read is one
+they can do nothing with.
+
+A report about an issue long closed is history rather than an unanswered
 letter, so those stop being raised; a claim nobody has judged has no issue to
 be closed and goes on being raised until it is answered.
 
