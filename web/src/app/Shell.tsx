@@ -258,6 +258,10 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               so a product somebody may not read undisclosed work in contributes
               nothing to it — the server narrows it. */}
             <Rail to="/disclosing" icon="bell" label="Disclosing" />
+            {/* What this deployment has said about its own flaws. Beside
+              Disclosing because an embargo reaching its date is one of the
+              three things an advisory gets written for. */}
+            <Rail to="/advisories" icon="advisory" label="Advisories" />
           </>
         )}
         <Group name="manage" label="Manage" shut={shut} onToggle={toggleGroup} />

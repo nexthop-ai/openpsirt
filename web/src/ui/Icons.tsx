@@ -39,6 +39,11 @@ const PATHS: Record<string, string> = {
     '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21h4"/>',
+  // A sheet that leaves. The record's sheet carries a plus because it is
+  // something being written down; this one carries an arrow because it is
+  // something being sent.
+  advisory:
+    '<path d="M4 4.5h10v15H4z"/><path d="M7 8.5h4M7 12h4M7 15.5h2"/><path d="M16 12h5"/><path d="m18.5 9.5 2.5 2.5-2.5 2.5"/>',
   upload: '<path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   // The other half of the pair a row's preview control is drawn with.
