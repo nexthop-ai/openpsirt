@@ -21,6 +21,7 @@ REQ-25, REQ-32, REQ-52, REQ-54.
 - [The fold](#the-fold)
 - [Duplicate descriptions](#duplicate-descriptions)
 - [History as intervals](#history-as-intervals)
+- [Inventory delta](#inventory-delta)
 - [Place identity](#place-identity)
 - [Path traversal](#path-traversal)
 - [Limits](#limits)
@@ -398,6 +399,42 @@ release contained.
 | Rows are closed, never deleted | What a release shipped is a question asked years later |
 | An unchanged build writes nothing | Applying a scan compares against what is open and writes only the difference. Scans arrive nightly and change very little, so storage that grew per scan would grow with the calendar (REQ-20). A test asserts it, and has been watched to fail with the comparison broken |
 | One transaction | A half-applied graph is indistinguishable from components having been removed, which would close findings that are still present |
+
+## Inventory delta
+
+What one scan made of a build's contents: the names that arrived, the names that
+went, and the names held at a different set of versions. A fact about the
+documents a build sent, true as they are read.
+
+| Rule | Reason |
+|---|---|
+| Counted by name | An upgrade is one dependency that moved. Counted by component it is one arrival and one departure, so a build that upgraded three things reports six |
+| A name at two versions at once is one entry | A vendored tree ships one routinely, and one copy going is that name at fewer versions |
+| The root is excluded from both sides | It is not one of the build's components, its version is not stored, and its name differs per variant |
+| The earliest scan applied to a build has none | It is the first picture rather than a change to one |
+| Worked out when asked, never stored | The rows that answer it are the rows applying the scan already wrote (REQ-20) |
+
+The comparison is read off the intervals. A node stands immediately before a
+scan where it opened earlier and had not closed by then, and at the scan where
+it opened no later and has not closed since. A node the scan closed stands on
+the near side of it.
+
+Accepted scans of one build rise in identifier as they rise in build time, since
+a scan not newer than the one a build holds is refused on arrival. The interval
+columns hold scan identifiers, so that is what makes a comparison keyed on them
+a comparison in time.
+
+The names a scan opened or closed a row of are the whole of what it can have
+moved, and narrowing to them is speed rather than meaning: a name none of them
+touched stands at the same versions on both sides, or on neither side where it
+reached the build later, and both are counted as no change.
+
+Rows that stood on neither side of any scan being compared are dropped before
+the comparison, which is what keeps the cost proportional to the page rather
+than to the history behind it. Over a year of nightly scans a page of fifty
+uploads takes 73 ms on SQLite behind 73 nights and 102 ms behind 365, 51 to
+62 ms on PostgreSQL, 38 to 50 ms on MySQL and 107 to 200 ms on MariaDB.
+Without the bound, measured on SQLite, the same page takes 78 ms and 264 ms.
 
 ## Place identity
 

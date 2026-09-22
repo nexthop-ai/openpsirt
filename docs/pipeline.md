@@ -126,6 +126,20 @@ document describing a graph and one that is a list. One component placed
 nowhere is ordinary; a document placing none of them produces findings that are
 each correct and cannot answer "why is this here" about any of them.
 
+An upload that is not the first one read for a build also carries `inventory`:
+how many component names it gained, lost, and holds at a different set of
+versions, against the upload before it.
+
+```json
+{"scan_id": 2, "state": "scanning", "components": 108, "placed": 108,
+ "inventory": {"added": 2, "removed": 0, "changed": 7}}
+```
+
+A build that expected to move three dependencies and moved two hundred has had
+a base image move under it, a lockfile regenerated, or a transitive tree
+arrive. Removals are the ones to watch: a build that stopped describing a
+dependency looks exactly like one that stopped shipping it.
+
 Reading the inventory and scanning it are separate work with different rhythms:
 an inventory is read once, and scanned again whenever the vulnerability data
 moves. So a scan appearing is not the same as findings appearing.
