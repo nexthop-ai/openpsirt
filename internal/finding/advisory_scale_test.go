@@ -7,7 +7,7 @@
 // kernel lists every package of every architecture on every platform it
 // shipped to, and one real one names 95,933 product identifiers — so an
 // administrator uploading it writes on that order of rows, in one
-// transaction, one insert each.
+// transaction, in batches.
 //
 // Behind a build tag because it is a measurement and not a gate: it asserts
 // almost nothing and its output is a number to write down. `make measure`

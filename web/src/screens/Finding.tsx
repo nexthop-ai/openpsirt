@@ -881,6 +881,11 @@ export function Finding() {
                       <span className="id">{one.publisher}</span>{" "}
                       <span className="hint">
                         says <b>{(one.status ?? "").replace("_", " ")}</b>
+                        {/* The version they spoke about. A supplier names the
+                          version that carries the fix, which is not the
+                          version shipped here, so the status alone reads as
+                          the opposite of what it says. */}
+                        {one.about && <> of {one.about}</>}
                         {one.justification && <> · {one.justification.replaceAll("_", " ")}</>}
                         {one.identifier && <> · {one.identifier}</>}
                         {one.at && <> · {on(one.at)}</>}
@@ -910,8 +915,13 @@ export function Finding() {
                               outcome: one.offers as string,
                               justification:
                                 one.offers === "not-applicable" ? (one.justification ?? "") : "",
+                              // The version goes into the record too: an
+                              // approver reads this months later, and "says
+                              // fixed" with nothing saying fixed in what is
+                              // the same sentence about a different claim.
                               reasoning:
                                 `${one.publisher} says ${(one.status ?? "").replace("_", " ")}` +
+                                (one.about ? ` of ${one.about}` : "") +
                                 (one.statement ? `: ${one.statement}` : "") +
                                 "\n\n",
                             })

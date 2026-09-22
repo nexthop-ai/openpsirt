@@ -43,11 +43,13 @@ import (
 // under the wrong meaning.
 const vexProfile = "csaf_vex"
 
-// named is one product the tree defines: what to call it, and the package
-// identifier where the document gave one.
+// named is one product the tree defines: what to call it, the package
+// identifier where the document gave one, and the version where it stated one
+// as a branch rather than inside an identifier.
 type named struct {
-	purl string
-	name string
+	purl    string
+	name    string
+	version string
 }
 
 // joins is what a relationship says: the package the composite identifier
@@ -62,9 +64,15 @@ type claimed struct {
 	vulnerability string
 	aliases       []string
 	// byProduct is the status each product identifier was listed under, and
-	// flagged the justification a flag gave it.
+	// listed the order they were read in. A map has no first, so which of
+	// several sentences stands for a claim, which order its products are
+	// carried in and which order the claims come back would all be whatever
+	// the runtime chose that minute — and the same document uploaded twice
+	// would store different reasoning under a digest saying nothing moved.
 	byProduct map[string]Status
-	flagged   map[string]string
+	listed    []string
+	// flagged is the justification a flag gave each product.
+	flagged map[string]string
 	// said is the prose, per status, for the words that named no product. An
 	// impact statement belongs to the products called not affected and an
 	// action statement to the affected ones, and reading either into both
@@ -97,13 +105,26 @@ type csafReader struct {
 	// Kept apart from the tree because the package it names may be defined
 	// after it, and because a relationship may carry an identifier of its own
 	// that is better than the one on the package.
-	joined   map[string]joins
+	joined map[string]joins
+	// groups is what each product group holds. A flag, a remediation or a
+	// threat names the products it is about by identifier or by group, and
+	// the two mean the same thing.
+	groups map[string][]string
+	// defined is which products the branch being walked has defined, so the
+	// branch that names a version can reach them once it closes.
+	defined  []string
 	claims   []*claimed
 	statuses map[string]Status
-	// named counts every identifier this document makes the reader hold: a
-	// product the tree defines, a product a claim lists, and an identifier an
-	// issue also goes by. Charged as each is read.
-	named int
+	// charged is every identifier this document has made the reader hold: a
+	// product the tree defines, a product a claim lists, a product a sentence
+	// names, and an identifier an issue also goes by.
+	//
+	// Kept as a set rather than a count because one identifier is named in
+	// several places — a product listed under a status and again in the
+	// remediation about it — and what the bound is for is what is retained.
+	// Counted per mention, a document naming each of its products twice costs
+	// twice what it holds, and a real advisory that fits is refused.
+	charged map[string]struct{}
 }
 
 // name charges one more identifier this document makes the reader hold.
@@ -117,12 +138,15 @@ type csafReader struct {
 // Against the component bound, because these are what a suppression document
 // describes and they cost what a component costs to hold. A ceiling of its own
 // would be a setting nobody could reason about separately.
-func (r *csafReader) name() error {
-	r.named++
-	if r.named > r.lim.MaxComponents {
-		return fmt.Errorf("suppression document names more than the %d product limit",
+func (r *csafReader) name(id string) error {
+	if _, held := r.charged[id]; held {
+		return nil
+	}
+	if len(r.charged) >= r.lim.MaxComponents {
+		return fmt.Errorf("the document names more than the %d product limit",
 			r.lim.MaxComponents)
 	}
+	r.charged[id] = struct{}{}
 	return nil
 }
 
@@ -156,7 +180,9 @@ var csafStatuses = map[string]Status{
 func newCSAF(b *bounded, lim Limits) *csafReader {
 	return &csafReader{
 		b: b, lim: lim, profile: vexProfile,
-		tree: map[string]named{}, joined: map[string]joins{}, statuses: csafStatuses,
+		tree: map[string]named{}, joined: map[string]joins{},
+		groups: map[string][]string{}, charged: map[string]struct{}{},
+		statuses: csafStatuses,
 	}
 }
 
@@ -257,13 +283,66 @@ func (r *csafReader) productTree() error {
 		case "branches":
 			return r.branches()
 		case "full_product_names":
-			return r.b.array(func() error { return r.product() })
+			return r.b.array(func() error {
+				id, err := r.product()
+				if id != "" {
+					r.defined = append(r.defined, id)
+				}
+				return err
+			})
 		case "relationships":
 			return r.b.array(func() error { return r.relationship() })
+		case "product_groups":
+			return r.b.array(func() error { return r.productGroup() })
 		default:
 			return r.b.skip()
 		}
 	})
+}
+
+// productGroup reads one named set of products.
+//
+// A flag, a remediation or a threat says which products it is about with
+// either a list of identifiers or a list of groups, and the two mean the same
+// thing. Read only the first and a sentence scoped by group falls through to
+// the words written about the status at large — so an upgrade instruction
+// lands on a claim the document never made it about.
+func (r *csafReader) productGroup() error {
+	var (
+		id  string
+		has []string
+	)
+	err := r.b.object(func(key string) error {
+		switch key {
+		case "group_id":
+			value, err := r.b.str()
+			id = value
+			return err
+		case "product_ids":
+			return r.b.array(func() error {
+				product, err := r.b.str()
+				if err != nil {
+					return err
+				}
+				if product != "" {
+					if err := r.name(product); err != nil {
+						return err
+					}
+					has = append(has, product)
+				}
+				return nil
+			})
+		default:
+			return r.b.skip()
+		}
+	})
+	if err != nil {
+		return err
+	}
+	if id != "" {
+		r.groups[id] = has
+	}
+	return nil
 }
 
 // relationship reads one join between a package and the platform it ships in.
@@ -324,29 +403,88 @@ func (r *csafReader) relationship() error {
 	if id == "" || join.reference == "" {
 		return nil
 	}
-	if err := r.name(); err != nil {
+	if err := r.name(id); err != nil {
 		return err
 	}
 	r.joined[id] = join
 	return nil
 }
 
+// branches walks the tree, and carries the version an enclosing branch names
+// down to the products defined under it.
+//
+// A publisher that states no package identifier states the version as a
+// branch: the branch is categorized `product_version` and its name is the
+// version, with the product defined inside it. Read without it, a claim about
+// one version of an appliance is a claim about the name alone — it offers its
+// prefill at every version, and the screen has no version to show beside the
+// status. That is the ordinary shape for an equipment vendor rather than an
+// exception.
+//
+// Applied after the branch closes rather than as it opens, because nothing in
+// the format promises that a branch names itself before it names what is
+// inside it. The innermost version wins: an inner branch fills its products
+// first, and an outer one only fills what is still empty.
 func (r *csafReader) branches() error {
 	return r.b.array(func() error {
-		return r.b.object(func(key string) error {
+		var (
+			category string
+			name     string
+			within   []string
+		)
+		err := r.b.object(func(key string) error {
 			switch key {
+			case "category":
+				value, err := r.b.str()
+				category = value
+				return err
+			case "name":
+				value, err := r.b.str()
+				name = value
+				return err
 			case "branches":
-				return r.branches()
+				defined, err := r.branchesDefining()
+				within = append(within, defined...)
+				return err
 			case "product":
-				return r.product()
+				id, err := r.product()
+				if id != "" {
+					within = append(within, id)
+				}
+				return err
 			default:
 				return r.b.skip()
 			}
 		})
+		if err != nil {
+			return err
+		}
+		if category == "product_version" && name != "" {
+			for _, id := range within {
+				at := r.tree[id]
+				if at.version == "" {
+					at.version = name
+					r.tree[id] = at
+				}
+			}
+		}
+		r.defined = append(r.defined, within...)
+		return nil
 	})
 }
 
-func (r *csafReader) product() error {
+// branchesDefining walks a nested set of branches and answers which products
+// it defined, so the branch above can name their version.
+func (r *csafReader) branchesDefining() ([]string, error) {
+	was := r.defined
+	r.defined = nil
+	err := r.branches()
+	defined := r.defined
+	r.defined = was
+	return defined, err
+}
+
+func (r *csafReader) product() (string, error) {
 	var (
 		id  string
 		one named
@@ -375,15 +513,19 @@ func (r *csafReader) product() error {
 		}
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
-	if id != "" && (one.purl != "" || one.name != "") {
-		if err := r.name(); err != nil {
-			return err
-		}
-		r.tree[id] = one
+	if id == "" || (one.purl == "" && one.name == "") {
+		return "", nil
 	}
-	return nil
+	if err := r.name(id); err != nil {
+		return "", err
+	}
+	// The version inside the identifier where there is one, so that a branch
+	// above cannot overwrite what the document already stated precisely.
+	_, one.version = purlParts(one.purl)
+	r.tree[id] = one
+	return id, nil
 }
 
 func (r *csafReader) vulnerability() error {
@@ -453,7 +595,7 @@ func (r *csafReader) ids(one *claimed) error {
 			one.vulnerability = text
 			return nil
 		}
-		if err := r.name(); err != nil {
+		if err := r.name(text); err != nil {
 			return err
 		}
 		one.aliases = append(one.aliases, text)
@@ -476,8 +618,11 @@ func (r *csafReader) productStatus(one *claimed) error {
 				return err
 			}
 			if id != "" {
-				if err := r.name(); err != nil {
+				if err := r.name(id); err != nil {
 					return err
+				}
+				if _, held := one.byProduct[id]; !held {
+					one.listed = append(one.listed, id)
 				}
 				one.byProduct[id] = status
 			}
@@ -508,11 +653,21 @@ func (r *csafReader) flags(one *claimed) error {
 						return err
 					}
 					if id != "" {
-						if err := r.name(); err != nil {
+						if err := r.name(id); err != nil {
 							return err
 						}
 						ids = append(ids, id)
 					}
+					return nil
+				})
+			case "group_ids":
+				// The same thing said the other way the format allows.
+				return r.b.array(func() error {
+					group, err := r.b.str()
+					if err != nil {
+						return err
+					}
+					ids = append(ids, r.groups[group]...)
 					return nil
 				})
 			default:
@@ -566,11 +721,21 @@ func (r *csafReader) prose(one *claimed, to Status, field string) error {
 						return err
 					}
 					if id != "" {
-						if err := r.name(); err != nil {
+						if err := r.name(id); err != nil {
 							return err
 						}
 						ids = append(ids, id)
 					}
+					return nil
+				})
+			case "group_ids":
+				// The same thing said the other way the format allows.
+				return r.b.array(func() error {
+					group, err := r.b.str()
+					if err != nil {
+						return err
+					}
+					ids = append(ids, r.groups[group]...)
 					return nil
 				})
 			default:
@@ -608,7 +773,8 @@ func (r *csafReader) resolve() ([]Suppression, error) {
 	for _, one := range r.claims {
 		byStatus := map[Status]*Suppression{}
 		order := make([]Status, 0, 4)
-		for id, status := range one.byProduct {
+		for _, id := range one.listed {
+			status := one.byProduct[id]
 			at, held := r.defines(id)
 			if !held {
 				// A product identifier the tree never defined names nothing we
@@ -695,7 +861,7 @@ func (r *csafReader) defines(id string) (named, bool) {
 // targetOf is what a claim points at, in the shape the matcher takes: the
 // package identifier where the document gave one, and the name otherwise.
 func targetOf(at named) Target {
-	target := Target{Purl: at.purl, Name: at.name}
+	target := Target{Purl: at.purl, Name: at.name, Version: at.version}
 	if target.Purl == "" {
 		return target
 	}

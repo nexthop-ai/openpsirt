@@ -815,22 +815,33 @@ product ships.
 | Neither kind touches the other | One publisher issues both, and a sweep on the publisher alone would have a statement set set aside every advisory of theirs |
 | An advisory that names no publisher or carries no tracking identifier is refused | Whose judgment it is decides what it supersedes and whose name stands beside it, and the tracking identifier is the key a revision replaces. Both are mandatory in the format |
 | Every product-status list the format defines is read, at the versions it names | Two of the eight are the only status a real advisory carries. What is not read is the range a list implies — that everything after a first fixed version is fixed — because the document enumerates the versions it is about and nothing else |
+| Words are attached to the products they name, by identifier or by group | The format lets either say which products a flag, a remediation or a threat is about, and they mean the same thing. Read only the first and a remediation scoped by a group falls through to the words written about the status at large, so an upgrade instruction lands on a claim the document never made |
+| The claims come back in the order the document stated them | A map has no first. Which of several sentences stands for a claim, which order its products are carried in and which order the claims are written would otherwise be whatever the runtime chose, so the same bytes uploaded twice would store different reasoning under a digest saying nothing moved |
+| A version stated as a branch is the version the claim is about | A publisher that states no package identifier states the version as the branch its product sits in. Dropped, a claim about one release of an appliance answers for every release of it, and the screen has no version to show beside the status |
 | A claim naming a version offers a prefill only at that version | An advisory exists to name the version that carries the fix, which is not the version shipped here. Offered against another, the control comes prefilled with a claim the publisher never made, with their name on it |
 | The claim is shown at every version regardless, with the version it was about | Which versions a publisher spoke about is what a triager reading the evidence wants, and a status shown without it reads as the opposite of what it says |
 | Words that name the products they are about reach the claim those products are under | An advisory's remediation names the packages to upgrade and lists those same packages as fixed. Read by category alone, the one sentence worth having lands on an affected claim the document never made |
 
-A publisher names its products in one of three shapes, and all three are read:
-a package with a package identifier, a package composed into a platform by a
-relationship, and a product named and nothing more. The third is the ordinary
+A publisher names its products in one of three shapes, and all three are read
+with the version each states: a package with a package identifier, a package
+composed into a platform by a relationship, and a product named and nothing
+more. The third is the ordinary
 case for an equipment vendor, whose advisories carry no package identifier
 anywhere, and it resolves the way a claim against a source tree does — a
 component of that name is the one meant.
 
-Measured on real documents: one distribution advisory about a kernel names
-95,933 identifiers, against a default product ceiling of 100,000, and is 27 MB
-against a default of 256 MB. One distribution VEX document about a single issue
-composes 1,669 of its 1,669 product identifiers through relationships, so a
-reader that resolves only through the tree refuses the whole document.
+The bound is what the reader holds, so an identifier is charged once however
+often the document names it. Measured on a real distribution advisory about a
+kernel: 794 distinct product identifiers, mentioned 220,088 times — 341 issues
+over 279 composed products, each listed under a status and again in the
+remediation about it. Charged per mention that document is refused at a
+ceiling of 100,000 while holding under eight hundred entries; charged per
+identifier it is nowhere near. The same file is 27 MB against a size default of
+256 MB.
+
+One distribution VEX document about a single issue composes 1,669 of its 1,669
+product identifiers through relationships, so a reader that resolves only
+through the tree refuses the whole document.
 
 The claims one document states are written in batches, because that advisory is
 95,139 of them and the caller is waiting on the answer. A row at a time it takes

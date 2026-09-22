@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/uptrace/bun"
 
@@ -33,6 +34,11 @@ type Statement struct {
 	Vulnerability string `bun:"vulnerability,notnull"`
 	Purl          string `bun:"purl"`
 	Component     string `bun:"component,notnull"`
+	// About is which version the publisher spoke about, where they named one.
+	// Stored rather than read back out of the identifier: a publisher that
+	// states products and no package identifier states the version as the
+	// branch its product sits in, and there is nothing to read it out of.
+	About string `bun:"about,notnull"`
 	// Status is what they said in the format's own vocabulary, Justification
 	// the term they gave for it, and Statement the reasoning — which is the
 	// part worth having, because the status is in the fix state already.
@@ -171,7 +177,7 @@ func (s Statement) PrefillsFor(version string) (outcome string, offers bool) {
 	if !offers {
 		return "", false
 	}
-	said := graph.PartsOfPurl(s.Purl).Version
+	said := s.About
 	if said == "" || said == strings.TrimSpace(version) {
 		return outcome, true
 	}
@@ -194,7 +200,7 @@ func (from Supplied) valid() error {
 			return fmt.Errorf("an advisory is replaced by the name its publisher gave " +
 				"it, and this one carries none")
 		}
-		if len(from.Identifier) > MostDocumentName {
+		if utf8.RuneCountInString(from.Identifier) > MostDocumentName {
 			return fmt.Errorf("the name the publisher gave it is longer than the %d "+
 				"characters this records", MostDocumentName)
 		}
@@ -205,7 +211,7 @@ func (from Supplied) valid() error {
 	if strings.TrimSpace(from.Publisher) == "" {
 		return fmt.Errorf("a statement is somebody's, and this document names nobody")
 	}
-	if len(from.Publisher) > MostPublisher {
+	if utf8.RuneCountInString(from.Publisher) > MostPublisher {
 		return fmt.Errorf("who published it is longer than the %d characters this records",
 			MostPublisher)
 	}
@@ -238,6 +244,31 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	now := s.now().UTC().Truncate(time.Microsecond)
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		recorded, superseded = 0, 0
+
+		// The same bytes arriving again change nothing, so nothing is
+		// written. Set aside and rewritten, every standing claim gets a new
+		// identity and a superseded moment — and a superseded claim is what
+		// tells everyone holding an approved decision that cited it that the
+		// publisher has changed what they published. Re-syncing a publisher's
+		// directory is the ordinary operation once advisories arrive one per
+		// issue, so that notice would fire on every pass and say nothing.
+		standing, err := tx.NewSelect().Model((*Statement)(nil)).
+			Where("product_id = ?", productID).
+			Where("publisher = ?", publisher).
+			Where("source = ?", from.Source).
+			Where("document_id = ?", identifier).
+			Where("digest = ?", from.Digest).
+			Where("superseded_at IS NULL").
+			Count(ctx)
+		if err != nil {
+			return fmt.Errorf("ask what is already held: %w", err)
+		}
+		if standing > 0 {
+			// What the document says is what the record already holds.
+			recorded = standing
+			return nil
+		}
+
 		setting := tx.NewUpdate().Model((*Statement)(nil)).
 			Set("superseded_at = ?", now).
 			Where("product_id = ?", productID).

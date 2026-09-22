@@ -61,7 +61,7 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 			-- alone, every advisory from a publisher would set aside every
 			-- other one the moment the next arrived.
 			-- A kind rather than a name: this vocabulary is ours and its
-			-- longest word is nine characters, unlike the status below.
+			-- longest word is eight characters, unlike the status below.
 			"source"      ` + t.kind + ` NOT NULL,
 			-- Empty where the document carries no name of its own, which a
 			-- statement set does not. A value rather than an absence, so the
@@ -79,6 +79,16 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 			-- that name is the one meant.
 			"purl"        ` + t.free + ` NULL,
 			"component"   ` + t.name + ` NOT NULL,
+			-- Which version the claim was made about, where the document
+			-- stated one. Inside the package identifier for a publisher that
+			-- states packages, and as the branch the product sits in for one
+			-- that states products and no identifier at all.
+			--
+			-- Stored rather than read back out of the identifier, because for
+			-- that second kind there is no identifier to read it out of — and
+			-- a status shown without it says the opposite of what it means
+			-- against a component at another version.
+			"about"       ` + t.name + ` NOT NULL,
 			-- What they said, in the format's own vocabulary, and why.
 			--
 			-- A name rather than a kind: the vocabulary is somebody else's and
@@ -114,6 +124,17 @@ func upVex(ctx context.Context, tx *sql.Tx) error {
 		// the component's. Only what still stands, which is the common read.
 		`CREATE INDEX "vex_statement_about_idx"
 			ON "vex_statement" ("product_id", "vulnerability", "component", "superseded_at")`,
+
+		// The key an upload sets aside what it replaces by, and asks what it
+		// already holds by. The index above shares only its first column, so
+		// without this every upload reads every statement row the product
+		// holds — and on the two engines whose default isolation locks what a
+		// write scanned, the scan's breadth is the lock's breadth, against
+		// triagers reading at the same time. A publisher issues one statement
+		// set and hundreds of advisories, so that read is the ordinary
+		// operation rather than a rare one.
+		`CREATE INDEX "vex_statement_from_idx"
+			ON "vex_statement" ("product_id", "publisher", "source", "document_id", "superseded_at")`,
 	}
 
 	return apply(ctx, tx, statements)

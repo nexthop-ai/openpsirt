@@ -134,7 +134,10 @@ func TestASupplierAdvisoryIsEvidenceAndNeverADecision(t *testing.T) {
 		// Who published it and what they called it are read from the document
 		// rather than from the request: an advisory names both, and it is not
 		// a conforming advisory without them.
-		if taken.Publisher != "example distribution" || taken.Identifier != "EXSA-2026:1001" {
+		// As the document names itself: the response says "the publisher the
+		// document names", and the folding is how the record matches rather
+		// than how the publisher spells their own name.
+		if taken.Publisher != "Example Distribution" || taken.Identifier != "EXSA-2026:1001" {
 			t.Fatalf("the upload reports %+v", taken)
 		}
 		if taken.Recorded != 1 || taken.Digest == "" || taken.Title == "" {

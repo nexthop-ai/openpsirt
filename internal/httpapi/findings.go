@@ -908,11 +908,20 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			// Offered for the version this place ships, because a statement
 			// naming a version is about that version: a publisher saying
 			// something is fixed in one is saying nothing about another.
-			offers, _ := one.PrefillsFor(evidence.Version)
+			// The component's own identifier where it has one, and its stated
+			// version otherwise. The two spellings differ — a Go module is
+			// `go1.26.3` and its identifier says `1.26.3` — and the matching
+			// path already asks it this way, so asking differently here makes
+			// a claim about exactly the version shipped offer nothing.
+			at := graph.PartsOfPurl(evidence.Purl).Version
+			if at == "" {
+				at = evidence.Version
+			}
+			offers, _ := one.PrefillsFor(at)
 			body.Said = append(body.Said, SaidBody{
 				ID: one.ID, Publisher: one.Publisher,
 				Source: evidenceSource(one.Source), Identifier: one.Identifier,
-				Status: one.Status, About: graph.PartsOfPurl(one.Purl).Version,
+				Status: one.Status, About: one.About,
 				Justification: one.Justification, Statement: one.Statement,
 				Document: one.Document, At: one.UploadedAt.Format(time.DateOnly),
 				Offers: outcomeOffered(offers),

@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -216,6 +217,7 @@ func registerVexImport(api huma.API, in Ingest) {
 				statements = append(statements, finding.Statement{
 					Vulnerability: one.Vulnerability,
 					Purl:          at.Purl,
+					About:         versionNamed(at),
 					Component:     componentNamed(at),
 					Status:        string(one.Status),
 					Justification: one.Justification,
@@ -260,6 +262,18 @@ func cited(id int64) *int64 {
 		return nil
 	}
 	return &id
+}
+
+// versionNamed is the version a claim's target was made about.
+//
+// Inside the package identifier where the document stated one there, and the
+// version the document stated outside it otherwise — a publisher naming no
+// package states it as the branch its product sits in.
+func versionNamed(at sbom.Target) string {
+	if version := graph.PartsOfPurl(at.Purl).Version; version != "" {
+		return version
+	}
+	return at.Version
 }
 
 // componentNamed is the component name a statement's target points at.

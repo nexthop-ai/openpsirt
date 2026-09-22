@@ -355,8 +355,13 @@ func TestAClaimAboutOneVersionOffersNothingAtAnother(t *testing.T) {
 	// A publisher saying a vulnerability is fixed in one version is saying
 	// nothing about another. Offered anyway, the control comes prefilled with
 	// a claim they never made and their name is on it.
+	// The version is a field the store carries, not something read back out
+	// of the identifier: a publisher that states products and no identifier
+	// at all still names a version, and there would be nothing to read it
+	// out of.
 	fixed := finding.Statement{
 		Status: "fixed", Purl: "pkg:rpm/example/libnl@3.7.0-1.el9?arch=x86_64",
+		About: "3.7.0-1.el9",
 	}
 	if _, offers := fixed.PrefillsFor("3.7.0-1.el9"); !offers {
 		t.Error("a claim about the version shipped here offered nothing")
@@ -367,6 +372,13 @@ func TestAClaimAboutOneVersionOffersNothingAtAnother(t *testing.T) {
 	// A claim naming no version is about whatever is shipped, which is how a
 	// publisher states something about a family.
 	family := finding.Statement{Status: "not_affected", Purl: "pkg:rpm/example/libnl"}
+	named := finding.Statement{Status: "affected", Component: "wt676", About: "3.94"}
+	if _, offers := named.PrefillsFor("3.94"); !offers {
+		t.Error("a claim naming no package missed the version it was made about")
+	}
+	if outcome, offers := named.PrefillsFor("4.10"); offers {
+		t.Errorf("a claim about 3.94 offered %q at 4.10", outcome)
+	}
 	if _, offers := family.PrefillsFor("3.6.0-1.el9"); !offers {
 		t.Error("a claim naming no version offered nothing")
 	}

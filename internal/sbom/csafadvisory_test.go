@@ -1,6 +1,7 @@
 package sbom_test
 
 import (
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -115,6 +116,177 @@ func TestEveryProductStatusTheFormatDefinesIsRead(t *testing.T) {
 	}
 	if got.Claims[0].Targets[0].Name != "httpd" {
 		t.Errorf("it points at %+v", got.Claims[0].Targets)
+	}
+}
+
+// oneStatus is the smallest advisory that lists one product under one status.
+func oneStatus(list string) string {
+	return `{
+	  "document": {"category": "csaf_security_advisory", "csaf_version": "2.0",
+	    "publisher": {"category": "vendor", "name": "Example"},
+	    "title": "One status", "tracking": {"id": "EX-1", "version": "1",
+	      "status": "final", "initial_release_date": "2026-09-01T00:00:00Z",
+	      "current_release_date": "2026-09-01T00:00:00Z",
+	      "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z",
+	                            "summary": "First"}]}},
+	  "product_tree": {"full_product_names": [{"product_id": "P", "name": "libnl",
+	    "product_identification_helper": {"purl": "pkg:deb/debian/libnl@3.7.0"}}]},
+	  "vulnerabilities": [{"cve": "CVE-2026-1",
+	    "product_status": {"` + list + `": ["P"]}}]
+	}`
+}
+
+func TestEveryProductStatusListYieldsTheStatusItMeans(t *testing.T) {
+	// One document per list, because a list nothing drives is a row that can
+	// be deleted with the suite green — and the failure it exists to prevent
+	// is a reader that does not know a list taking the document, recording
+	// nothing, and reporting that it worked.
+	//
+	// What is not read is the range a list implies. Each says something
+	// definite about the versions it names and nothing about the versions
+	// between them.
+	for _, each := range []struct {
+		list string
+		want sbom.Status
+	}{
+		{"known_not_affected", sbom.NotAffected},
+		{"known_affected", sbom.Affected},
+		{"first_affected", sbom.Affected},
+		{"last_affected", sbom.Affected},
+		{"fixed", sbom.AlreadyFixed},
+		{"first_fixed", sbom.AlreadyFixed},
+		{"recommended", sbom.AlreadyFixed},
+		{"under_investigation", sbom.UnderInvestigation},
+	} {
+		got, err := sbom.ReadAdvisory(strings.NewReader(oneStatus(each.list)), sbom.Limits{})
+		if err != nil {
+			t.Errorf("%s: %v", each.list, err)
+			continue
+		}
+		if len(got.Claims) != 1 {
+			t.Errorf("%s yielded %d claims", each.list, len(got.Claims))
+			continue
+		}
+		if got.Claims[0].Status != each.want {
+			t.Errorf("%s reads as %q, want %q", each.list, got.Claims[0].Status, each.want)
+		}
+	}
+	// A list the format does not define is not guessed at.
+	got, err := sbom.ReadAdvisory(strings.NewReader(oneStatus("probably_fine")), sbom.Limits{})
+	if err == nil {
+		t.Errorf("a status list nothing defines yielded %+v", got.Claims)
+	}
+}
+
+func TestTheSentenceStoredDoesNotDependOnMapOrder(t *testing.T) {
+	// Two products under one status, each with words of its own. Read from a
+	// map there is no first, so the same bytes uploaded twice store different
+	// reasoning for an approver while the digest says nothing moved.
+	for range 20 {
+		got := readAdvisory(t, "advisory-named-products.csaf.json")
+		if len(got.Claims) != 1 {
+			t.Fatalf("%d claims", len(got.Claims))
+		}
+		if want := "Update to V3.94 or a later version"; got.Claims[0].Statement != want {
+			t.Fatalf("the claim says %q, and the document names that product first",
+				got.Claims[0].Statement)
+		}
+		if got.Claims[0].Targets[0].Name != "WT676 Web Interface < V3.94" {
+			t.Fatalf("its products come back as %+v", got.Claims[0].Targets)
+		}
+	}
+}
+
+func TestAVersionStatedAsABranchIsTheVersionTheClaimIsAbout(t *testing.T) {
+	// A publisher naming no package identifier states the version as the
+	// branch its product sits in. Dropped, a claim about one release of an
+	// appliance answers for every release of it.
+	got := readAdvisory(t, "advisory-named-products.csaf.json")
+	versions := map[string]string{}
+	for _, at := range got.Claims[0].Targets {
+		versions[at.Name] = at.Version
+	}
+	if versions["WT776 Web Interface V4.17"] != "4.17" {
+		t.Errorf("the versions read as %+v", versions)
+	}
+	at := graph.Described{Name: "WT776 Web Interface V4.17", Version: "4.17"}
+	elsewhere := graph.Described{Name: "WT776 Web Interface V4.17", Version: "4.20"}
+	if !got.Claims[0].Covers(at) {
+		t.Error("the claim missed the version it was made about")
+	}
+	if got.Claims[0].Covers(elsewhere) {
+		t.Error("a claim about 4.17 answered for 4.20")
+	}
+}
+
+func TestWordsScopedByGroupReachTheProductsTheGroupHolds(t *testing.T) {
+	// A flag, a remediation and a threat each name their products by
+	// identifier or by group. Read only the first and a remediation scoped by
+	// group falls through to the words written about the status at large, so
+	// an upgrade instruction lands on a claim the document never made.
+	const grouped = `{
+	  "document": {"category": "csaf_security_advisory", "csaf_version": "2.0",
+	    "publisher": {"category": "vendor", "name": "Example"},
+	    "title": "Grouped", "tracking": {"id": "EX-2", "version": "1",
+	      "status": "final", "initial_release_date": "2026-09-01T00:00:00Z",
+	      "current_release_date": "2026-09-01T00:00:00Z",
+	      "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z",
+	                            "summary": "First"}]}},
+	  "product_tree": {
+	    "full_product_names": [
+	      {"product_id": "P1", "name": "libnl",
+	       "product_identification_helper": {"purl": "pkg:deb/debian/libnl@3.7.0"}},
+	      {"product_id": "P2", "name": "zlib1g",
+	       "product_identification_helper": {"purl": "pkg:deb/debian/zlib1g@1.1.3"}}],
+	    "product_groups": [{"group_id": "G1", "product_ids": ["P1"]}]},
+	  "vulnerabilities": [{"cve": "CVE-2026-1",
+	    "product_status": {"fixed": ["P1"], "known_not_affected": ["P2"]},
+	    "flags": [{"label": "vulnerable_code_not_present", "product_ids": ["P2"]}],
+	    "remediations": [{"category": "vendor_fix",
+	      "details": "Upgrade to libnl 3.7.0.", "group_ids": ["G1"]}]}]
+	}`
+	got, err := sbom.ReadAdvisory(strings.NewReader(grouped), sbom.Limits{})
+	if err != nil {
+		t.Fatalf("reading: %v", err)
+	}
+	for _, one := range got.Claims {
+		switch one.Status {
+		case sbom.AlreadyFixed:
+			if one.Statement != "Upgrade to libnl 3.7.0." {
+				t.Errorf("the fixed claim says %q, and the group named that product",
+					one.Statement)
+			}
+		case sbom.NotAffected:
+			if one.Statement != "" {
+				t.Errorf("the not-affected claim carries %q", one.Statement)
+			}
+		}
+	}
+}
+
+func TestAnIdentifierNamedTwiceCostsWhatItHolds(t *testing.T) {
+	// The bound is what the reader retains, which is one entry per identifier
+	// the document states. Charged per mention, a document that lists each of
+	// its products under a status and again in the remediation about it costs
+	// twice what it holds — and a real advisory that fits is refused.
+	body := advisoryText(t, "advisory-platform-packages.csaf.json")
+	distinct := map[string]bool{}
+	for _, id := range []string{
+		"BaseOS-9.4.0.GA", "libnl-3-200-0:3.7.0-1.el9.x86_64",
+		"zlib1g-0:1.1.3-2.el9.x86_64",
+		"BaseOS-9.4.0.GA:libnl-3-200-0:3.7.0-1.el9.x86_64",
+		"BaseOS-9.4.0.GA:zlib1g-0:1.1.3-2.el9.x86_64", "1918601",
+	} {
+		distinct[id] = true
+	}
+	if _, err := sbom.ReadAdvisory(strings.NewReader(body),
+		sbom.Limits{MaxComponents: len(distinct)}); err != nil {
+		t.Errorf("a document naming %d identifiers was refused at that bound: %v",
+			len(distinct), err)
+	}
+	if _, err := sbom.ReadAdvisory(strings.NewReader(body),
+		sbom.Limits{MaxComponents: len(distinct) - 1}); err == nil {
+		t.Error("a document naming one more identifier than the bound was read")
 	}
 }
 
@@ -233,17 +405,49 @@ func TestAnAdvisoryPointingAtNothingIsRefused(t *testing.T) {
 }
 
 func TestARelationshipCountsAgainstTheProductLimit(t *testing.T) {
-	// What a bound has to stop is the walk. A document composing millions of
-	// identifiers is under a claim count and under a tree count, because it
-	// states neither.
-	lim := sbom.Limits{MaxComponents: 3}
-	_, err := sbom.ReadAdvisory(
-		strings.NewReader(advisoryText(t, "advisory-platform-packages.csaf.json")), lim)
-	if err == nil {
-		t.Fatal("a document naming more identifiers than the limit was read")
+	// What a bound has to stop is the walk, and a relationship is held
+	// whether or not any claim names it. A document composing a great many
+	// products and claiming one of them states few enough products and few
+	// enough claims to pass both other bounds, so this is the only thing
+	// standing between it and a map the reader fills from the wire.
+	var b strings.Builder
+	b.WriteString(`{
+	  "document": {"category": "csaf_security_advisory", "csaf_version": "2.0",
+	    "publisher": {"category": "vendor", "name": "Example"},
+	    "title": "Many joins", "tracking": {"id": "EX-3", "version": "1",
+	      "status": "final", "initial_release_date": "2026-09-01T00:00:00Z",
+	      "current_release_date": "2026-09-01T00:00:00Z",
+	      "revision_history": [{"number": "1", "date": "2026-09-01T00:00:00Z",
+	                            "summary": "First"}]}},
+	  "product_tree": {
+	    "full_product_names": [{"product_id": "P", "name": "libnl",
+	      "product_identification_helper": {"purl": "pkg:deb/debian/libnl@3.7.0"}}],
+	    "relationships": [`)
+	for i := range 40 {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, `{"category": "default_component_of",
+		  "full_product_name": {"name": "libnl in platform %d", "product_id": "C%d"},
+		  "product_reference": "P", "relates_to_product_reference": "PLATFORM%d"}`, i, i, i)
 	}
-	if !strings.Contains(err.Error(), "product limit") {
+	b.WriteString(`]},
+	  "vulnerabilities": [{"cve": "CVE-2026-1",
+	    "product_status": {"fixed": ["C0"]}}]
+	}`)
+
+	// One product, one claim: both other bounds are far above what this
+	// document states, so neither can be what refuses it.
+	lim := sbom.Limits{MaxComponents: 10, MaxStatements: 100}
+	if _, err := sbom.ReadAdvisory(strings.NewReader(b.String()), lim); err == nil {
+		t.Fatal("a document composing more products than the limit was read")
+	} else if !strings.Contains(err.Error(), "product limit") {
 		t.Errorf("the refusal does not name the bound: %v", err)
+	}
+	// And the same document is read where the bound has room for the joins.
+	if _, err := sbom.ReadAdvisory(strings.NewReader(b.String()),
+		sbom.Limits{MaxComponents: 100, MaxStatements: 100}); err != nil {
+		t.Errorf("the same document was refused with room for its joins: %v", err)
 	}
 }
 

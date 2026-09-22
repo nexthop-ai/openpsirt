@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
+	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
@@ -101,12 +101,12 @@ func registerAdvisoryImport(api huma.API, in Ingest) {
 		// Taken from the document rather than from the request, because a
 		// security advisory names its publisher and its own identifier and is
 		// not a conforming advisory without them.
-		if len(advisory.Publisher) > finding.MostPublisher {
+		if utf8.RuneCountInString(advisory.Publisher) > finding.MostPublisher {
 			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"who published it is longer than the %d characters this records",
 				finding.MostPublisher))
 		}
-		if len(advisory.Identifier) > finding.MostDocumentName {
+		if utf8.RuneCountInString(advisory.Identifier) > finding.MostDocumentName {
 			return nil, huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"the name the publisher gave it is longer than the %d characters this records",
 				finding.MostDocumentName))
@@ -118,6 +118,7 @@ func registerAdvisoryImport(api huma.API, in Ingest) {
 				statements = append(statements, finding.Statement{
 					Vulnerability: one.Vulnerability,
 					Purl:          at.Purl,
+					About:         versionNamed(at),
 					Component:     componentNamed(at),
 					Status:        string(one.Status),
 					Justification: one.Justification,
@@ -149,7 +150,7 @@ func registerAdvisoryImport(api huma.API, in Ingest) {
 		}
 
 		return &struct{ Body AdvisoryTakenBody }{Body: AdvisoryTakenBody{
-			Publisher: strings.ToLower(advisory.Publisher), Identifier: advisory.Identifier,
+			Publisher: advisory.Publisher, Identifier: advisory.Identifier,
 			Title: advisory.Title, Recorded: recorded, Superseded: superseded,
 			Digest: digest,
 		}}, nil
