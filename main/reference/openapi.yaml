@@ -1526,6 +1526,36 @@ components:
         - findings
         - builds
       type: object
+    ClaimedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ClaimedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        contact:
+          maxLength: 191
+          type: string
+        credit:
+          description: The credit they asked for in an advisory
+          maxLength: 191
+          type: string
+        received:
+          description: The day it arrived, as YYYY-MM-DD, which the embargo is counted from
+          type: string
+        reported_by:
+          maxLength: 191
+          type: string
+        summary:
+          description: What was claimed, in the words it was claimed in
+          maxLength: 65536
+          type: string
+      required:
+        - summary
+      type: object
     Clear-exploited-hereRequest:
       additionalProperties: false
       properties:
@@ -4326,6 +4356,25 @@ components:
         - findings
         - cap
       type: object
+    List-report-attachmentsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/List-report-attachmentsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/AttachmentBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
+      type: object
     List-set-aside-workResponse:
       additionalProperties: false
       properties:
@@ -4965,6 +5014,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/RepeatBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyReportBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyReportBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/ReportBody"
           type:
             - array
             - "null"
@@ -7152,15 +7223,53 @@ components:
         credit:
           description: The credit they asked for in an advisory
           type: string
+        evaluated:
+          description: When somebody said what it turned out to be
+          type: string
+        evaluated_by:
+          description: Who said so
+          type: string
+        issue:
+          description: The issue the claim turned out to be
+          type: string
         received:
           description: The day it arrived, which the embargo is counted from
           type: string
+        recorded_at:
+          description: When it was written down, which is not when it arrived
+          type: string
         recorded_by:
+          description: Who wrote it down
+          type: string
+        reference:
+          description: The name this report is reached by
           type: string
         reported_by:
           type: string
+        summary:
+          description: What was claimed, as markdown. Absent on a flaw recorded by hand, where the issue's own description carries it
+          type: string
       required:
+        - reference
         - recorded_by
+        - recorded_at
+      type: object
+    ReportIssueBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ReportIssueBody.json
+          format: uri
+          readOnly: true
+          type: string
+        vulnerability:
+          description: The issue it turned out to be, under any identifier it goes by
+          maxLength: 191
+          type: string
+      required:
+        - vulnerability
       type: object
     Repromise-upgradeRequest:
       additionalProperties: false
@@ -17740,6 +17849,336 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/reports:
+    get:
+      description: |-
+        Every claim recorded against this product, newest first, judged or not.
+
+        A report already turned into an issue stays in the list, because it is the evidence that the issue came from outside.
+
+        Requires: private-triage on the product
+      operationId: list-reports
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            default: 0
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List what was reported
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+    post:
+      description: |-
+        Records a claim that arrived, and returns the reference it is reached by.
+
+        No issue is minted. What arrived is a claim, and whether it is a flaw is a judgment somebody makes afterwards — so a report nobody believes is answered and filed rather than either minting a flaw nobody believes or going unrecorded.
+
+        `summary` is required and everything else is optional: a claim arriving anonymously is an ordinary claim, and a report with nothing in it records only that a mail arrived. The summary is stored as markdown and goes through the same submission policy a justification does, so raw HTML and link schemes outside http, https and mailto are refused naming the line they are on.
+
+        `received` is the day it arrived, which is what an embargo would be counted from. A date that cannot be read is treated as one nobody gave.
+
+        Requires: private-triage on the product
+      operationId: record-report
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClaimedBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Record a report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/reports/{reference}:
+    get:
+      description: |-
+        What was claimed, who claimed it, when it arrived, when somebody answered them, and what it turned out to be.
+
+        A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
+
+        Requires: private-triage on the product
+      operationId: get-recorded-report
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: The reference this deployment minted
+          in: path
+          name: reference
+          required: true
+          schema:
+            description: The reference this deployment minted
+            maxLength: 593
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Show a report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/reports/{reference}/acknowledgement:
+    post:
+      description: |-
+        Records that somebody replied to whoever sent this, and when.
+
+        It records that it happened rather than doing it. What reaches a researcher is a mail somebody sends from an address they already have; recording it is what turns "somebody probably replied" into a date the timeline can be evidenced from, and what clears the condition an unanswered report opens.
+
+        Acknowledging twice keeps the first date: when somebody was answered is a fact about the past, and the second person to press it did not change it.
+
+        Requires: private-triage on the product
+      operationId: acknowledge-recorded-report
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Record that a reporter was answered
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/reports/{reference}/attachments:
+    get:
+      description: |-
+        What arrived with this report, and what text about it refers to. An upload nothing refers to yet is not listed, because it is not attached to anything.
+
+        A file an administrator removed is still listed, saying so, because the text that pointed at it still does.
+
+        Requires: private-triage on the product
+      operationId: list-report-attachments
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/List-report-attachmentsResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List files that arrived with a report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+    post:
+      description: |-
+        Stores one file against a report and returns the reference to put in text. A claim that has not been judged has no issue to hang a screenshot on, and the screenshot is often the whole of what was sent.
+
+        The file stays with the report once the report gains an issue, and stays as readable as the report: saying a claim is a disclosed issue does not publish what somebody sent with it. Attach it to the issue to put it there.
+
+        The content type is decided here from the bytes and is never the one that was uploaded. Everything outside a small allowlist of raster images is served as an attachment download whatever it is.
+
+        Refused when the file is larger than this deployment accepts, when it has no room left, or when it would take you past your own share of the store; all three limits are settings.
+
+        Requires: private-triage on the product
+      operationId: upload-report-attachment
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            encoding:
+              file:
+                contentType: application/octet-stream
+            schema:
+              properties:
+                file:
+                  contentEncoding: binary
+                  contentMediaType: application/octet-stream
+                  format: binary
+                  type: string
+              required:
+                - file
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttachmentBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Attach a file to a report
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+  /v1/products/{product}/reports/{reference}/issue:
+    put:
+      description: |-
+        Points a report at the issue it turned out to be, and records who said so and when.
+
+        The issue is one that already exists here. Recording a flaw is its own act, because it carries the builds the flaw ships in, the severity and the embargo — so agreeing that a claim is real is not the same keystroke as declaring where it lives.
+
+        Refused where the report has already been judged, and where another report is already the record of that issue: one report is one issue's record, and a second pointed at the same issue is a duplicate rather than this.
+
+        An issue this product does not hold, and one you may not be told of, answer alike — otherwise this route says which identifiers are open here.
+
+        Requires: private-triage on the product
+      operationId: judge-report
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: reference
+          required: true
+          schema:
+            maxLength: 593
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportIssueBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Record what a report turned out to be
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
   /v1/products/{product}/routing-rules:
     get:
       description: |-
