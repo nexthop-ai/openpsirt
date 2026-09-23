@@ -76,6 +76,9 @@ const (
 // twice is one that disagrees with itself the first time anybody moves it.
 var windows = finding.DefaultWindows()
 
+// ownWindows is the same for a flaw recorded in our own product.
+var ownWindows = finding.DefaultOwnWindows()
+
 // sessionLifetime is the one shipped value that is not a constant.
 //
 // A sign-in's length falls back to the environment before the built-in, so
@@ -135,6 +138,16 @@ var settable = []struct {
 		aDuration, nil, func(Ingest) string { return windows.Medium.String() }, true},
 	{setting.DueLow, "How long a low may stay open",
 		aDuration, nil, func(Ingest) string { return windows.Low.String() }, true},
+	{setting.OwnDueExploited, "How long a known-exploited flaw recorded in one of our own products may stay open, counted from when it was first rated",
+		aDuration, nil, func(Ingest) string { return ownWindows.Exploited.String() }, true},
+	{setting.OwnDueCritical, "How long a critical flaw recorded in one of our own products may stay open, counted from when it was first rated",
+		aDuration, nil, func(Ingest) string { return ownWindows.Critical.String() }, true},
+	{setting.OwnDueHigh, "How long a high flaw recorded in one of our own products may stay open, counted from when it was first rated",
+		aDuration, nil, func(Ingest) string { return ownWindows.High.String() }, true},
+	{setting.OwnDueMedium, "How long a medium flaw recorded in one of our own products may stay open, counted from when it was first rated",
+		aDuration, nil, func(Ingest) string { return ownWindows.Medium.String() }, true},
+	{setting.OwnDueLow, "How long a low flaw recorded in one of our own products may stay open, counted from when it was first rated",
+		aDuration, nil, func(Ingest) string { return ownWindows.Low.String() }, true},
 	{setting.DeferralThreshold, "How long something may be put off before a second person has to agree. Measured against everything the finding has already been put off for, not against the postponement being asked for",
 		aDuration, nil, func(Ingest) string { return triage.DefaultDeferralThreshold.String() }, false},
 	{setting.SessionLifetime, "How long a sign-in lasts",

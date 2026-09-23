@@ -25,6 +25,7 @@ type ReportBody struct {
 	Contact    string `json:"contact,omitempty"`
 	Credit     string `json:"credit,omitempty" doc:"The credit they asked for in an advisory"`
 	Received   string `json:"received,omitempty" doc:"The day it arrived, which the embargo is counted from"`
+	FoundHere  bool   `json:"found_here" doc:"Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer"`
 	// Acknowledged is when somebody answered them, and by whom. Absent is the
 	// state an unacknowledged report is in: prompt acknowledgment is the part
 	// of coordinated disclosure a reporter actually judges.
@@ -61,8 +62,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 			"on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the " +
 			"one the reporter has a publication scheduled against, and they are the party who " +
 			"will publish regardless.\n\n" +
-			"Answers 404 where nobody recorded a reporter, which is every flaw we found " +
-			"ourselves, and to somebody who may not read the product's vulnerability reports.",
+			"Answers 404 to somebody who may not read the product's vulnerability reports.",
 		Tags: []string{"Findings"},
 	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
@@ -245,6 +245,7 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 		body := ReportBody{
 			Reference: row.Reference, Summary: row.Summary,
 			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
+			FoundHere:  row.FoundHere,
 			RecordedBy: names[row.RecordedBy],
 			RecordedAt: row.RecordedAt.Format(time.RFC3339),
 		}

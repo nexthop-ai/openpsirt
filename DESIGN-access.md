@@ -1029,8 +1029,10 @@ thinks of as holding secrets.
 Public and private mean disclosed and not disclosed, so an undisclosed finding is
 one somebody intends to disclose eventually. All of this is built.
 
-A private finding carries a disclosure date, defaulting to ninety days after the
-report was received (REQ-37). A public finding has none. The point of having one
+A private finding reported from outside carries a disclosure date, defaulting to
+ninety days after the report was received (REQ-37). A flaw found here carries
+none, because nobody outside is counting down to a publication, and neither does
+a public finding. The point of having one
 is that it gives the embargo an end somebody outside could hold this deployment
 to.
 

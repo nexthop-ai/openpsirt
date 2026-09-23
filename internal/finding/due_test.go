@@ -695,8 +695,7 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// One recorded by hand, opened a fortnight ago, rated high like the
-		// scanned one so the same window applies to both.
+		// One recorded by hand, opened and rated high a fortnight ago.
 		opened := time.Now().UTC().Add(-14 * 24 * time.Hour).Truncate(time.Microsecond)
 		entered := finding.Finding{
 			TargetID: f.target, Kind: finding.Entered,
@@ -706,16 +705,21 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 			PlaceIdentity:   "place-of-something-we-build",
 			LastChangedAt:   opened,
 			OpenedAt:        opened,
-			DueAt:           ptr(opened.Add(testWindows.High)),
+			RatedAt:         &opened,
+			DueAt:           ptr(opened.Add(finding.DefaultOwnWindows().High)),
 		}
 		if _, err := f.db.DB.NewInsert().Model(&entered).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 
 		// The deadline policy changes. Everything open is rewritten, whatever
-		// opened it.
+		// opened it, and a recorded flaw against the windows for our own
+		// products.
 		shorter := testWindows
 		shorter.High = 15 * 24 * time.Hour
+		if err := f.setting(t, setting.OwnDueHigh, "360h"); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := f.store.Recompute(t.Context(), shorter); err != nil {
 			t.Fatal(err)
 		}

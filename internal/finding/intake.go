@@ -170,6 +170,7 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 			Contact:    strings.TrimSpace(in.Told.Contact),
 			Credit:     strings.TrimSpace(in.Told.Credit),
 			ReceivedOn: in.Told.When(),
+			FoundHere:  in.Told.FoundHere,
 			RecordedBy: subject.ID, RecordedAt: now,
 		}
 		_, err = tx.NewInsert().Model(row).Exec(ctx)

@@ -521,6 +521,8 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 	// word chosen for a page that spans them would answer for none of them.
 	if group.DueAt == nil {
 		switch {
+		case row.Recorded > 0 && group.Severity == "":
+			group.NoDeadline = NotRated
 		case !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity):
 			group.NoDeadline = BelowTheLine
 		// Asked of both ends rather than of the word they agree on. A group
@@ -633,6 +635,11 @@ const (
 	// OutOfSupport is a finding in a release that is past its end of life
 	// . Nothing is going to be fixed there, so nothing is late.
 	OutOfSupport NoDeadline = "out-of-support"
+	// NotRated is a flaw recorded here that nobody has given a severity. Its
+	// clock starts when somebody does (REQ-33). The narrowest of the four,
+	// being about what this finding lacks rather than about anything around
+	// it.
+	NotRated NoDeadline = "not-rated"
 )
 
 // groupKey names one group of the list.
@@ -663,12 +670,15 @@ type decorated struct {
 	Scored        int        `bun:"scored"`
 	ScoreVersion  string     `bun:"score_version"`
 	FixStateLeast string     `bun:"fix_state_least"`
-	FixStateMost  string     `bun:"fix_state_most"`
-	FixedIn       string     `bun:"fixed_in"`
-	Matched       string     `bun:"matched"`
-	ConsumerID    *int64     `bun:"consumer_id"`
-	Consumers     int        `bun:"consumers"`
-	Direct        int        `bun:"direct"`
+	// Recorded is how many of the places are a flaw recorded here rather than
+	// scanned, which is the one kind a missing severity leaves off the clock.
+	Recorded     int    `bun:"recorded"`
+	FixStateMost string `bun:"fix_state_most"`
+	FixedIn      string `bun:"fixed_in"`
+	Matched      string `bun:"matched"`
+	ConsumerID   *int64 `bun:"consumer_id"`
+	Consumers    int    `bun:"consumers"`
+	Direct       int    `bun:"direct"`
 	// Packages is how many binaries of the fold sit here and ConsumerPlaces
 	// how many things pull them in — the two numbers a reader is shown.
 	Packages       int   `bun:"packages"`
@@ -849,6 +859,7 @@ func (s *Store) decorate(ctx context.Context, targets []int64, productID int64,
 		// claiming one definite state, with a version taken from whichever of
 		// the disagreeing rows sorted first.
 		ColumnExpr(`MIN(f.fix_state) AS "fix_state_least"`).
+		ColumnExpr(`SUM(CASE WHEN f.kind = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MAX(f.fix_state) AS "fix_state_most"`).
 		ColumnExpr(`MIN(f.fixed_in) AS "fixed_in"`).
 		// Any of them: a group is an issue at a component, every place of it

@@ -184,17 +184,8 @@ func TestAClaimIsJudgedOnceAndSaysWhoJudgedIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		who := f.planner(t, access.PrivateTriage)
-		_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
-			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
-			Summary: "The management socket accepts a request nobody authenticated.",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		issue, err := finding.NewVulnerabilities(f.db.DB).ByName(t.Context(), identifier)
-		if err != nil {
-			t.Fatal(err)
-		}
+		issue := f.anIssueHere(t, who,
+			"The management socket accepts a request nobody authenticated.")
 
 		row, err := f.store.Record(t.Context(), who, f.productID,
 			finding.Claimed{Summary: "The management socket lets anybody in."})
@@ -504,21 +495,20 @@ func TestAReferenceFitsAProductNamedAtTheFullWidth(t *testing.T) {
 	})
 }
 
-// anIssueHere records a flaw by hand and returns the issue it minted.
+// anIssueHere is an issue a scan reported in this fixture's build.
+//
+// Scanned rather than recorded by hand. A flaw recorded here is written with a
+// report of its own, so no other report can be accepted as it.
 func (f *fixture) anIssueHere(t *testing.T, who access.Subject, summary string) int64 {
 	t.Helper()
-	_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
-		TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
-		Summary: summary,
-	})
-	if err != nil {
+	identifier := fmt.Sprintf("CVE-2026-8%04d", len(f.issues)+1)
+	one := found(identifier, swss)
+	one.Issue.Description = summary
+	f.issues = append(f.issues, one)
+	if _, err := f.store.Apply(t.Context(), f.target, f.run(t), f.issues); err != nil {
 		t.Fatal(err)
 	}
-	issue, err := finding.NewVulnerabilities(f.db.DB).ByName(t.Context(), identifier)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return issue
+	return f.issueID(t, identifier)
 }
 
 // somebody is a second person holding roles on this fixture's product.

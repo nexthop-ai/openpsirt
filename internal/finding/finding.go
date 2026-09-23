@@ -255,7 +255,12 @@ type Finding struct {
 	// opening moves it back to a date that may already be in the past. Null
 	// where the row is not exploited.
 	ExploitedLearnedAt *time.Time `bun:"exploited_learned_at"`
-	RankShipped        bool       `bun:"urgency_shipped,notnull"`
+	// RatedAt is when a recorded flaw was first given a severity in its
+	// product, which is what its deadline is counted from. Nil on a scanned
+	// row, whose clock runs from the opening, and on a recorded flaw nobody has
+	// rated, which carries no deadline.
+	RatedAt     *time.Time `bun:"rated_at"`
+	RankShipped bool       `bun:"urgency_shipped,notnull"`
 	// AssignedTo is who is dealing with this, and AssignedAt is when they were
 	// given it. Absent means nobody, which is a state worth being able to ask
 	// about rather than an empty column: work nobody owns is the thing that

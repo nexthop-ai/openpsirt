@@ -41,6 +41,9 @@ type fixture struct {
 	scans    *ingest.Store
 	built    time.Time
 	seq      int
+	// issues is what anIssueHere has had a scan report, each run carrying
+	// every one so far, because a run closes what it does not report.
+	issues []finding.Reported
 }
 
 func at(name, version string) graph.Described {

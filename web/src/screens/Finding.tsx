@@ -78,6 +78,8 @@ const SAMPLE = 8;
 // its own is a term they would have to go and learn.
 function whyNone(reason: string | undefined): string {
   switch (reason) {
+    case "not-rated":
+      return "nobody has rated it yet. The clock starts when somebody does.";
     case "below-the-line":
       return "below what this product triages at. Recorded and counted; nothing is late.";
     case "nothing-to-take":

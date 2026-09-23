@@ -107,6 +107,13 @@ const (
 	DueHigh      = "remediation.due.high"
 	DueMedium    = "remediation.due.medium"
 	DueLow       = "remediation.due.low"
+	// The OwnDue values are the same windows for a flaw recorded in our own
+	// product, whose fix has to be written rather than taken from upstream.
+	OwnDueExploited = "remediation.own.due.exploited"
+	OwnDueCritical  = "remediation.own.due.critical"
+	OwnDueHigh      = "remediation.own.due.high"
+	OwnDueMedium    = "remediation.own.due.medium"
+	OwnDueLow       = "remediation.own.due.low"
 	// TogetherCap is how many findings one bulk judgment may cover at
 	// once, and how many reports one ruling may cover. A bound rather than none, because a single action writing an
 	// unbounded number of rows is a denial of service somebody triggers by

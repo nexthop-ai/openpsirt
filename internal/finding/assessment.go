@@ -511,6 +511,7 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 			return fmt.Errorf("read what is known about this issue: %w", err)
 		}
 
+		recorded := false
 		if issue.Exploited {
 			// learning is which rows are learning it now, read
 			// before the flag is raised: afterwards there is
@@ -524,6 +525,17 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 				Where("urgency_exploited = ?", false).
 				Scan(ctx, &learning); err != nil {
 				return fmt.Errorf("read what is learning this: %w", err)
+			}
+			if len(learning) > 0 {
+				held, err := tx.NewSelect().Model((*Finding)(nil)).
+					Where("vulnerability_id = ?", id).
+					Where("closed_at IS NULL").
+					Where("kind = ?", Entered).
+					Count(ctx)
+				if err != nil {
+					return fmt.Errorf("read whether a recorded flaw is learning this: %w", err)
+				}
+				recorded = held > 0
 			}
 			// Batched. This is every open finding of one issue across the
 			// deployment — a kernel flaw carries 45 places each across
@@ -596,6 +608,15 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 			if err := rerank(ctx, tx, productID, id,
 				rated[RatedKey{ProductID: productID, VulnerabilityID: id}]); err != nil {
 				return err
+			}
+			// A recorded flaw that learned it has just been given a
+			// scanned finding's deadline above. Its own windows and its own
+			// start put it back. Asked only then, because this runs for
+			// every issue whose likelihood a feed moved.
+			if recorded {
+				if err := recountOwn(ctx, tx, productID, []int64{id}, learnedAt); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -673,6 +694,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", productID).
+		// A recorded flaw is clocked by recountOwn, below.
+		Where("f.kind <> ?", Entered).
 		GroupExpr("f.urgency_exploited, f.urgency_exploited_here, f.opened_at, "+
 			"f.exploited_learned_at, f.fix_state, f.fixed_at, "+rating.EffectiveExpr).
 		Scan(ctx, &groups)
@@ -688,6 +711,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 			Where("urgency_exploited = ?", group.Exploited).
 			Where("urgency_exploited_here = ?", group.ExploitedHere).
 			Where("opened_at = ?", group.OpenedAt).
+			Where("kind <> ?", Entered).
 			Where(inThisProduct, productID)
 		if group.LearnedAt != nil {
 			q = q.Where("exploited_learned_at = ?", *group.LearnedAt)
@@ -716,7 +740,7 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 			return fmt.Errorf("move this issue's deadline: %w", err)
 		}
 	}
-	return nil
+	return recountOwn(ctx, tx, productID, []int64{vulnerabilityID}, recountedAt)
 }
 
 // Assessments lists what has been said about issues, newest first.

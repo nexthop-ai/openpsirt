@@ -39,6 +39,7 @@ function openFor(opened: string | undefined): string | null {
 // A blank cell would mean any of several deliberate things at once, on the one
 // screen whose purpose is noticing what is running out, so the reason is said.
 const noDeadlineSays: Record<string, string> = {
+  "not-rated": "not rated",
   "below-the-line": "below the line",
   "nothing-to-take": "no fix to take",
   "out-of-support": "out of support",

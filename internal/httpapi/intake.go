@@ -25,6 +25,7 @@ type ClaimedBody struct {
 	Contact    string `json:"contact,omitempty" maxLength:"191"`
 	Credit     string `json:"credit,omitempty" maxLength:"191" doc:"The credit they asked for in an advisory"`
 	Received   string `json:"received,omitempty" doc:"The day it arrived, as YYYY-MM-DD, which the embargo is counted from"`
+	FoundHere  bool   `json:"found_here,omitempty" doc:"Whether somebody here found it. Unset is a report from outside, which carries a disclosure date once it is recorded as a flaw"`
 }
 
 // ReportIssueBody says what a report turned out to be.
@@ -41,8 +42,8 @@ func registerIntake(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "record-report", Method: http.MethodPost, Path: list,
 		Summary: "Record a vulnerability report",
-		Description: "Records a claim that arrived, and returns the reference it is reached " +
-			"by.\n\n" +
+		Description: "Records a claim that arrived, or a flaw somebody here found, and " +
+			"returns the reference it is reached by.\n\n" +
 			"No issue is minted. What arrived is a claim, and whether it is a flaw is a " +
 			"judgment somebody makes afterwards — so a report nobody believes is answered and " +
 			"filed rather than either minting a flaw nobody believes or going unrecorded.\n\n" +
@@ -52,7 +53,9 @@ func registerIntake(api huma.API, in Ingest) {
 			"same submission policy a justification does, so raw HTML and link schemes " +
 			"outside http, https and mailto are refused naming the line they are on.\n\n" +
 			"`received` is the day it arrived, which is what an embargo would be counted " +
-			"from. A date that cannot be read is treated as one nobody gave.",
+			"from. A date that cannot be read is treated as one nobody gave.\n\n" +
+			"`found_here` marks a flaw somebody here found. Recorded as a flaw, it carries " +
+			"no disclosure date, and it is never listed as waiting for an answer.",
 		Tags: []string{"Findings"},
 	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -70,6 +73,7 @@ func registerIntake(api huma.API, in Ingest) {
 			Told: finding.Told{
 				ReportedBy: input.Body.ReportedBy, Contact: input.Body.Contact,
 				Credit: input.Body.Credit, Received: input.Body.Received,
+				FoundHere: input.Body.FoundHere,
 			},
 		})
 		if err != nil {
