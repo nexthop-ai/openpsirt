@@ -61,8 +61,9 @@ const ours = 2000
 // No reading on the product is asked for. An assignment is itself a grant
 // of visibility of what was assigned, which is what gives a
 // capability held without a read role any content at all — so the population
-// here is what they hold, at the visibility they may read it at and no
-// further. Somebody who holds nothing gets nothing, which is not a refusal:
+// here is what they hold, as an assignment carries it: a disclosed row
+// whatever they read, an undisclosed one only where they read undisclosed
+// work in the product. Somebody who holds nothing gets nothing, which is not a refusal:
 // there is no work of theirs here to hang a tree from.
 //
 // Complete is false where they hold work on more components than this will
@@ -99,9 +100,9 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, targetID int64
 		GroupExpr("f.component_id").
 		OrderExpr("issues DESC, name").
 		Limit(ours + 1)
-	// An assignment carries the row at the visibility they may read it at, so
-	// somebody who may not read undisclosed work does not get it here either
-	// — the same clause the work list applies, for the same reason.
+	// An assignment carries an undisclosed row only to somebody who reads
+	// undisclosed work here, so anybody else gets disclosed rows alone — the
+	// rule the work list applies, for the same reason.
 	if !subject.Reads(access.Private, productID) {
 		held = held.Where("f.visibility = ?", access.Public)
 	}

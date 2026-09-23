@@ -19,7 +19,7 @@ func TestAPersonClosesAFlawTheyRecordedAndNothingElseCan(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		rows, identifier, err := f.store.Enter(ctx, who, finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
@@ -111,7 +111,7 @@ func TestAScannersFindingIsNotClosedByHand(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, err = f.store.Resolve(ctx, who, f.target, issueID, "We fixed it, honestly.")
 		if !errors.Is(err, finding.ErrNotOursToClose) {
 			t.Errorf("a scanner's finding was closed by hand: %v", err)
@@ -138,7 +138,7 @@ func TestClosingAnUndisclosedFlawNeedsThePrivateRight(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage), finding.Entering{
+		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		})
@@ -172,7 +172,7 @@ func TestARecordedFlawStaysClosableWhenAScannerReportsTheSameName(t *testing.T) 
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		rows, identifier, err := f.store.Enter(ctx, who, finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",

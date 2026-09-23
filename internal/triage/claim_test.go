@@ -49,8 +49,10 @@ func (f *fixture) privateTriager(t *testing.T, identity, display string) access.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := rights.GrantRole(ctx, who.ID, f.product, access.PrivateTriage); err != nil {
-		t.Fatal(err)
+	for _, role := range []access.Role{access.PublicTriage, access.PrivateTriage} {
+		if err := rights.GrantRole(ctx, who.ID, f.product, role); err != nil {
+			t.Fatal(err)
+		}
 	}
 	resolved, err := rights.Resolve(ctx, identity)
 	if err != nil {
@@ -833,7 +835,7 @@ func TestThePersonalPageCountsOnlyWhatIsStillReadable(t *testing.T) {
 		// Proposed while they could still read both, which is the only way a
 		// claim comes to hold a row its proposer may not read.
 		both := access.NewPerson(f.proposer, "proposer", false,
-			map[int64][]access.Role{f.product: {access.PrivateTriage}}, 0)
+			map[int64][]access.Role{f.product: {access.PublicTriage, access.PrivateTriage}}, 0)
 		if _, err := f.store.ProposeMany(ctx, both, []triage.Proposal{
 			{
 				Place: here, Outcome: triage.WontFix,

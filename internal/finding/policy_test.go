@@ -30,7 +30,7 @@ func TestEveryFieldSomebodyTypesGoesThroughTheSubmissionPolicy(t *testing.T) {
 			t.Fatal(err)
 		}
 		f.recorded(t, 1, "someone")
-		who := f.holding(t, access.PrivateTriage)
+		who := f.holding(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.issue(t, "CVE-2026-1")
 		const raw = "Looks fine <script>alert(1)</script>"
 		tooLong := strings.Repeat("a", markdown.MaxBytes+1)

@@ -428,7 +428,7 @@ func TestTheSameComponentInTwoProductsIsTwoPiecesOfWork(t *testing.T) {
 		}
 
 		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, elsewhere)},
-			access.PrivateRead)
+			access.PublicRead, access.PrivateRead)
 		rows, total, err := f.store.Unassigned(ctx, who, finding.Scope{}, 50, 0)
 		if err != nil {
 			t.Fatal(err)

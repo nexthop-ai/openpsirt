@@ -192,11 +192,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	if in.Disclosed {
 		visibility = access.Public
 	}
-	// The same composition every other triage decision uses: an undisclosed
-	// finding asks for the private right, and a public one is covered by
-	// either. Somebody trusted with what nobody has announced is certainly
-	// trusted with what everybody has, and spelling that a second way here
-	// would be a second rule to keep in step with the first.
+	// The same composition every other triage decision uses: each
+	// visibility asks for the right that names it.
 	if !subject.Triages(visibility, productID) {
 		return nil, "", access.Denied(
 			fmt.Sprintf("record a finding in product %d", productID))

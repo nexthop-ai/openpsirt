@@ -49,15 +49,19 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 		}{
 			{"public reader", f.holding(t, access.PublicRead), 1, false},
 			{"public triager", f.holding(t, access.PublicTriage), 1, false},
-			{"private reader", f.holding(t, access.PrivateRead), 2, false},
-			{"private triager", f.holding(t, access.PrivateTriage), 2, false},
+			// The undisclosed half alone reads the undisclosed row and not
+			// the disclosed one: each visibility is its own grant.
+			{"private reader", f.holding(t, access.PrivateRead), 1, false},
+			{"private triager", f.holding(t, access.PrivateTriage), 1, false},
+			{"a reader of both", f.holding(t, access.PublicRead, access.PrivateRead), 2, false},
+			{"a triager of both", f.holding(t, access.PublicTriage, access.PrivateTriage), 2, false},
 			{"an approver alone", f.holding(t), 0, true},
 			// An administrator holds no role here, so they read
 			// nothing here. Administering the catalog is not reading
 			// what is open against it, and this is the row that
 			// says so.
 			{"an administrator granted nothing", access.NewPerson(1, "admin", true, nil, 0), 0, true},
-			{"an administrator granted private reading", f.admin(t, access.PrivateRead), 2, false},
+			{"an administrator granted private reading", f.admin(t, access.PublicRead, access.PrivateRead), 2, false},
 			{"a pipeline", access.NewPipeline(1, "nightly", access.Scope{ProductID: f.productID}), 0, true},
 		} {
 			rows, err := f.store.Open(t.Context(), c.who, f.target)
@@ -70,6 +74,11 @@ func TestOnlyWhatSomebodyMayReadIsRead(t *testing.T) {
 				t.Errorf("%s: %v", c.what, err)
 			case len(rows) != c.want:
 				t.Errorf("%s read %d findings, want %d", c.what, len(rows), c.want)
+			}
+			for _, row := range rows {
+				if !c.who.Reads(row.Visibility, f.productID) {
+					t.Errorf("%s read a %s finding", c.what, row.Visibility)
+				}
 			}
 		}
 	})
@@ -131,7 +140,7 @@ func TestWhatIsOpenPerBuildIsNarrowedToWhatSomebodyMayRead(t *testing.T) {
 
 		// Two issues at one component: two rows for somebody who may read
 		// both, one for somebody who may read only what is disclosed.
-		if got := open(f.holding(t, access.PrivateRead)); got != 2 {
+		if got := open(f.holding(t, access.PublicRead, access.PrivateRead)); got != 2 {
 			t.Errorf("a reader of everything was told %d, expected 2", got)
 		}
 		if got := open(f.holding(t, access.PublicRead)); got != 1 {

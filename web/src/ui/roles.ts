@@ -11,26 +11,27 @@
 export const ROLES = [
   {
     role: "public-read",
-    label: "Read, disclosed",
+    label: "Read, public",
     means: "Read findings about issues that are public",
     grants: true,
   },
   {
     role: "private-read",
-    label: "Read, everything",
-    means: "Also read findings nobody has announced",
+    label: "Read, private",
+    means: "Read findings nobody has announced. Public ones need their own role",
     grants: true,
   },
   {
     role: "public-triage",
-    label: "Triage, disclosed",
+    label: "Triage, public",
     means: "Decide, revise, withdraw and comment on public findings; take work nobody owns",
     grants: true,
   },
   {
     role: "private-triage",
-    label: "Triage, everything",
-    means: "The same for findings nobody has announced, including recording one",
+    label: "Triage, private",
+    means:
+      "The same for findings nobody has announced, including recording one. Public ones need their own role",
     grants: true,
   },
   {

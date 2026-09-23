@@ -75,7 +75,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 	// Asked of the one predicate rather than written out: the same question
 	// every other write here asks, and a second spelling of it is a second
 	// rule to keep in step.
-	if !mayDecide(subject, up.ProductID, access.Public) {
+	if !subject.TriagesIn(up.ProductID) {
 		return Declared{}, access.Denied(
 			fmt.Sprintf("decide what is fixed in product %d", up.ProductID))
 	}

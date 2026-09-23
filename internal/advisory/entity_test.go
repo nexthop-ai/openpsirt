@@ -419,7 +419,7 @@ func TestAnAdvisorySpanningTwoProductsIsHiddenFromSomebodyHoldingOne(t *testing.
 
 		// Somebody holding the first product and nothing on the second.
 		partly := access.NewPerson(f.who.ID+2, "partly", false, map[int64][]access.Role{
-			f.product: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+			f.product: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 		}, 0)
 		if _, err := f.store.ForAdvisory(t.Context(), partly, issuer, both); !errors.Is(
 			err, advisory.ErrNoSuchAdvisory) {
@@ -455,7 +455,7 @@ func TestNamingAFlawOnAnAdvisoryAsksForTheRoleOnThatProduct(t *testing.T) {
 		// wrong reason.
 		reader := access.NewPerson(f.second.ID, f.second.Identity, false,
 			map[int64][]access.Role{
-				f.product:      {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				f.product:      {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 				f.otherProduct: {access.PublicRead, access.PrivateRead},
 			}, 0)
 		if _, err := f.store.Add(t.Context(), reader, named, "switchd", there); err == nil {
@@ -505,7 +505,7 @@ func TestWhatWentOutAboutAnotherProductIsNotReported(t *testing.T) {
 		// holds nothing on the second does not.
 		elsewhere := access.NewPerson(f.second.ID, f.second.Identity, false,
 			map[int64][]access.Role{
-				f.product: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				f.product: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 			}, 0)
 		rows, err = f.store.Published(t.Context(), elsewhere, nil, time.Time{}, time.Time{})
 		if err != nil {
@@ -533,8 +533,8 @@ func TestAnAdvisoryCoveringNothingIsItsMintersAlone(t *testing.T) {
 		// emptiness rules them out.
 		other := access.NewPerson(f.second.ID, f.second.Identity, false,
 			map[int64][]access.Role{
-				f.product:      {access.PublicRead, access.PrivateRead, access.PrivateTriage},
-				f.otherProduct: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				f.product:      {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
+				f.otherProduct: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 			}, 0)
 		if _, _, err := f.store.Covers(t.Context(), other, made.Identifier); !errors.Is(
 			err, advisory.ErrNoSuchAdvisory) {

@@ -33,8 +33,7 @@ var ErrSamePerson = errors.New("that would hand their work to themselves")
 // with the same narrowing. A second copy of this update would be a second
 // place for the dispatch rule to be forgotten.
 func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject,
-	productID, vulnerabilityID, componentID int64, to *int64, dispatches bool,
-	visible []access.Visibility) (int64, error) {
+	productID, vulnerabilityID, componentID int64, to *int64, dispatches bool) (int64, error) {
 
 	now := s.now().UTC().Truncate(time.Microsecond)
 	update := db.NewUpdate().Model((*Finding)(nil)).
@@ -48,26 +47,42 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 		Where(inThisProduct, productID).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("component_id = ?", componentID).
-		Where("closed_at IS NULL").
-		// Narrowed by what this person may see, like every other query here. A
-		// finding nobody has disclosed is not one somebody may hand around.
-		Where("visibility IN (?)", bun.List(visible))
+		Where("closed_at IS NULL")
 
-	// Without the right to dispatch, this only ever moves what nobody owns or
-	// what is already theirs. Asked here rather than beforehand so that the
-	// engine answers it at the moment of the write: there is no window for a
-	// colleague's assignment to land in, and a row that stopped qualifying is
-	// simply not matched.
-	if !dispatches {
-		// Work nobody holds, work already theirs, and work
-		// sitting in a queue of a team they are on. That last is not
-		// taking work off a colleague, which is the act the dispatch
-		// right names: work routed to a team is unheld until somebody
-		// takes it, so anybody on the team picks it up under triage
-		// alone.
-		update = update.Where("assigned_to IS NULL OR assigned_to IN (?)",
-			bun.List(subject.Mine()))
-	}
+	// Which rows this caller may move, asked here rather than beforehand so
+	// that the engine answers it at the moment of the write: there is no
+	// window for a colleague's assignment to land in, and a row that stopped
+	// qualifying is simply not matched.
+	//
+	// Two ways in, and a row qualifies by either.
+	//
+	// Dispatching — putting work on somebody else, or taking what they hold —
+	// is an act on the finding, so it reaches the visibilities this caller
+	// triages.
+	//
+	// Taking work nobody holds and handing back their own is part of
+	// triaging and needs no dispatch right: work nobody holds, work already
+	// theirs, and work sitting in a queue of a team they are on. That last is
+	// not taking work off a colleague, which is the act the dispatch right
+	// names: work routed to a team is unheld until somebody takes it. It
+	// reaches what they read, and a disclosed row of their own whatever they
+	// read, because an assignment carries it to them and disclosure does not
+	// strand it there.
+	mine := bun.List(subject.Mine())
+	triaged := bun.List(triagedIn(subject, productID))
+	read := bun.List(access.Visible(subject, productID))
+	selfward := to == nil || *to == subject.Party()
+	update = update.WhereGroup(" AND ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
+		if dispatches {
+			q = q.WhereOr("visibility IN (?)", triaged)
+		}
+		if selfward {
+			q = q.WhereOr(`((assigned_to IS NULL OR assigned_to IN (?))
+				AND (visibility IN (?) OR (visibility = ? AND assigned_to IN (?))))`,
+				mine, read, access.Public, mine)
+		}
+		return q
+	})
 
 	if to == nil {
 		update = update.Set("assigned_to = ?", nil).Set("assigned_at = ?", nil)
@@ -86,6 +101,17 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 	return moved, nil
 }
 
+// triagedIn is the visibilities this subject triages in one product.
+func triagedIn(subject access.Subject, productID int64) []access.Visibility {
+	var triaged []access.Visibility
+	for _, v := range []access.Visibility{access.Public, access.Private} {
+		if subject.Triages(v, productID) {
+			triaged = append(triaged, v)
+		}
+	}
+	return triaged
+}
+
 // HandOverWithin gives several pieces of work to one party inside a
 // transaction somebody else opened, under the rule Assign holds.
 //
@@ -100,7 +126,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.Subject,
 	productID int64, work [][2]int64, to *int64) (int64, error) {
 
-	if !subject.Triages(access.Public, productID) {
+	if !subject.TriagesIn(productID) {
 		return 0, access.Denied(fmt.Sprintf(
 			"decide who deals with findings in product %d", productID))
 	}
@@ -110,14 +136,10 @@ func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.S
 			"give work to somebody else in product %d — you may take what nobody owns, "+
 				"and hand back your own", productID))
 	}
-	visible := access.Visible(subject, productID)
-	if len(visible) == 0 {
-		return 0, access.Denied(fmt.Sprintf("read findings in product %d", productID))
-	}
 	var moved int64
 	for _, each := range work {
 		n, err := s.moveWork(ctx, tx, subject, productID, each[0], each[1], to,
-			dispatches, visible)
+			dispatches)
 		if err != nil {
 			return 0, err
 		}
@@ -166,7 +188,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	// otherwise need somebody's attention before anybody could start.
 	// Putting work on somebody else, or taking what they are holding, is a
 	// different act and asks for the right that names it.
-	triages := subject.Triages(access.Public, productID)
+	triages := subject.TriagesIn(productID)
 	if !triages {
 		return 0, false, access.Denied(fmt.Sprintf("decide who deals with findings in product %d", productID))
 	}
@@ -187,7 +209,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	}
 
 	moved, err = s.moveWork(ctx, s.db, subject, productID, vulnerabilityID, componentID,
-		to, dispatches, visible)
+		to, dispatches)
 	if err != nil {
 		return 0, false, err
 	}
@@ -247,9 +269,9 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 //
 // The question routing asks: work goes to a party that can read all of what is
 // routed there, and one undisclosed place among fifty public ones makes the
-// whole of it undisclosed for that purpose. Reading what is undisclosed
-// implies reading what is not, so the strictest is the only one worth asking
-// about.
+// whole of it undisclosed for that purpose. A disclosed row travels with the
+// assignment to whoever holds it, so the strictest is the only one worth
+// asking about.
 //
 // Narrowed by what the caller may see, like every other read here. A place
 // they cannot see is not one they can route.
@@ -718,21 +740,9 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		} else {
 			q = q.Where("f.assigned_to IN (?)", bun.List(holders))
 		}
-		if !all {
-			// A product they read, or a row that is theirs. The visibility
-			// clause below still applies to both, so an assignment carries a
-			// row at the visibility they may read it at and no further.
-			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				if len(products) > 0 {
-					q = q.WhereOr("st.product_id IN (?)", bun.List(products))
-				}
-				if len(mine) > 0 {
-					q = q.WhereOr("f.assigned_to IN (?)", bun.List(mine))
-				}
-				return q
-			})
-		}
-		return scope.Narrow(onlyVisible(q, subject, products, all))
+		// A product they read at the row's visibility, or a disclosed row
+		// that is theirs. The product half is inside both.
+		return scope.Narrow(orCarried(q, subject, products, all))
 	}
 
 	// Counted by grouping and counting the groups, not by a COUNT DISTINCT
@@ -920,12 +930,11 @@ func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build
 }
 
 // onlyReadable narrows a query to what one person may read: the products they
-// hold anything on, and within those, what has been disclosed to them.
+// hold anything on, and within those, the visibilities they read in each.
 //
-// Both halves, together, because forgetting the first one is silent. The
-// visibility half alone admits every disclosed finding in the deployment,
-// including in products the asker holds nothing on — which reads as working,
-// because the numbers are plausible and nothing refuses.
+// Both halves, together. The visibility half is written per product and
+// admits nothing in a product the asker holds nothing on; the product half
+// states that bound outright.
 //
 // The product half is not always this one, which is why the visibility half
 // is callable on its own. A query that has already pinned a single product —
@@ -956,8 +965,9 @@ func inOneProduct(q *bun.SelectQuery, subject access.Subject, productID int64,
 
 // onlyVisible narrows a query to what this subject may read, per product.
 //
-// Holding private read on one product does not make undisclosed findings on
-// another visible, so the clause is per product rather than a single flag.
+// Each visibility is its own grant on each product: reading undisclosed
+// findings on one product does not make them visible on another, and does not
+// make the disclosed ones visible anywhere.
 //
 // An administrator is not narrowed at all, and the shape makes that easy to
 // get backwards: Products() reports "everything" as an empty list with a flag,
@@ -969,17 +979,30 @@ func onlyVisible(q *bun.SelectQuery, subject access.Subject, products []int64, a
 	if all {
 		return q
 	}
-	held := make([]int64, 0, len(products))
-	for _, id := range products {
-		if subject.Reads(access.Private, id) {
-			held = append(held, id)
-		}
+	both, public, private := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
+	return q.Where(where, args...)
+}
+
+// orCarried narrows a query to what this subject may read, or to a disclosed
+// row they or a team of theirs hold.
+//
+// The "what am I dealing with" list alone asks it. An assignment carries a
+// disclosed row to whoever holds it, whatever they read: that is what gives a
+// bare capability content, and a disclosed finding handed to somebody who
+// reads only undisclosed work is theirs to see. An undisclosed row carries no
+// further than private reading does. Every other list, count and export
+// answers a question about a product, and holding one row in it is not an
+// answer to that.
+func orCarried(q *bun.SelectQuery, subject access.Subject, products []int64, all bool) *bun.SelectQuery {
+	if all {
+		return q
 	}
-	if len(held) == 0 {
-		// Nothing undisclosed anywhere, which is a real answer rather than an
-		// empty condition to be filled in.
-		return q.Where("f.visibility = ?", access.Public)
+	both, public, private := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
+	if mine := subject.Mine(); len(mine) > 0 {
+		where = "(" + where + " OR (f.assigned_to IN (?) AND f.visibility = ?))"
+		args = append(args, bun.List(mine), access.Public)
 	}
-	return q.Where("(f.visibility = ? OR st.product_id IN (?))",
-		access.Public, bun.List(held))
+	return q.Where(where, args...)
 }

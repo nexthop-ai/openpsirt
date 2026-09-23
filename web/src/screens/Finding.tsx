@@ -283,11 +283,14 @@ export function Finding() {
   });
 
   const it = finding.data;
-  // Whether this reader may argue about findings in this product, which is
-  // what every control on this screen turns on. Read once: asked at each
-  // control, the copies drift and one of them ends up offering a button that
-  // answers 403.
-  const mayTriage = !!who.data?.reach.find((r) => r.product === product)?.may_triage;
+  // Whether this reader may argue about this finding, which is what the
+  // controls about the finding turn on: triage at the finding's own
+  // visibility, since each is its own role. A record of being exploited here
+  // is about the product and takes triage at either visibility. Read once:
+  // asked at each control, the copies drift and one of them ends up offering a
+  // button that answers 403.
+  const here = who.data?.reach.find((r) => r.product === product);
+  const mayTriage = !!(it?.undisclosed ? here?.may_hide : here?.triages_public);
   const places = useMemo(() => it?.places ?? [], [it]);
   // A place is the component and what pulls it in; two chains reaching the
   // same pair are one place, and the head counts what a decision covers.
@@ -755,7 +758,7 @@ export function Finding() {
             product={product}
             vulnerability={vulnerability}
             records={it.exploited_here ?? undefined}
-            mayTriage={mayTriage}
+            mayTriage={!!here?.may_triage}
           />
         </div>
 
@@ -873,7 +876,7 @@ export function Finding() {
             summary={summary}
             places={places}
             mine={mine(claim.proposed_by ?? "")}
-            mayApprove={!!who.data?.reach.find((r) => r.product === product)?.may_agree}
+            mayApprove={!!(it.undisclosed ? here?.agrees_private : here?.agrees_public)}
             onRevised={() => void finding.refetch()}
             about={{ product, vulnerability }}
             undisclosed={!!it.undisclosed}

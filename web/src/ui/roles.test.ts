@@ -16,7 +16,7 @@ describe("the roles as somebody granting one reads them", () => {
   });
 
   it("shows a role it does not know rather than nothing", () => {
-    expect(called("public-read")).toBe("Read, disclosed");
+    expect(called("public-read")).toBe("Read, public");
     expect(called("something-new")).toBe("something-new");
     expect(called()).toBe("");
   });

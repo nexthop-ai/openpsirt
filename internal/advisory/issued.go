@@ -109,24 +109,32 @@ func (s *Store) Published(ctx context.Context, subject access.Subject,
 //
 // It takes the alias the advisory carries in both: "ad".
 func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
-	// Every product it covers is one this reader holds something on. Without
-	// it the clause below asks only whether a visibility is one they may read
-	// somewhere, so a public flaw in a product they hold nothing on passes —
-	// and the row carries the identifier, the title, the summary and the
-	// digest.
-	q = q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ap"
-		WHERE ap.advisory_id = ad.id AND ap.removed_at IS NULL
-		  AND ap.product_id NOT IN (?))`, bun.List(seen(subject)))
+	// The product half is inside it: a product this reader holds nothing on
+	// is in none of the groups the issue clause admits.
+	return wholeIssues(q, subject)
+}
 
-	// And every issue it covers is one they may see. Asked of the issues
-	// rather than of the issuance, because that is where a visibility lives —
-	// an issuance carries none of its own, and reading one as public because
-	// it has no visibility column is how an undisclosed flaw would be
-	// announced by the report about announcements.
-	//
-	// Whole rather than in part, for the reason the document is: a row saying
-	// an advisory went out, about a product this reader holds nothing on, is
-	// the disclosure the narrowing exists to stop.
+// wholeIssues narrows a statement over "advisory" as "ad" to the advisories
+// every live issue of which this reader may see: a finding recorded here about
+// it, in its product, at a visibility they read in that product.
+//
+// Asked of the issues rather than of an issuance, because that is where a
+// visibility lives — an issuance carries none of its own, and reading one as
+// public because it has no visibility column is how an undisclosed flaw would
+// be announced by the report about announcements.
+//
+// Per product and per visibility. Each visibility is its own grant, so a
+// reader of undisclosed work in one product and disclosed work in another
+// reads neither kind in both. Whole rather than in part, for the reason the
+// document is: a row saying an advisory went out is as much a disclosure as
+// the document.
+func wholeIssues(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
+	products, all := subject.Products()
+	if all {
+		return q
+	}
+	both, public, private := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "advisory_issue" AS "ac"
 		WHERE ac.advisory_id = ad.id AND ac.removed_at IS NULL AND NOT EXISTS (
 			SELECT 1 FROM "finding" AS "f"
@@ -135,8 +143,8 @@ func narrowed(q *bun.SelectQuery, subject access.Subject) *bun.SelectQuery {
 			WHERE st.product_id = ac.product_id
 			  AND f.vulnerability_id = ac.vulnerability_id
 			  AND f.kind = ?
-			  AND f.visibility IN (?)))`,
-		finding.Entered, bun.List(readable(subject)))
+			  AND `+where+`))`,
+		append([]any{finding.Entered}, args...)...)
 }
 
 // Sent is one document that went out, as what publishes it reads it.
@@ -187,26 +195,6 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error
 		return nil, fmt.Errorf("read the documents that went out: %w", err)
 	}
 	return rows, nil
-}
-
-// readable is the visibilities this subject may read anywhere.
-//
-// A statement spanning products cannot bind one product's answer, so what it
-// binds is the union: public always, and private where this subject reads it
-// on any product. On its own it is too loose — a public flaw in a product
-// they hold nothing on reads as visible — so the clause above it asks the
-// product half, and neither stands without the other.
-func readable(subject access.Subject) []access.Visibility {
-	products, all := subject.Products()
-	if all {
-		return []access.Visibility{access.Public, access.Private}
-	}
-	for _, id := range products {
-		if subject.Reads(access.Private, id) {
-			return []access.Visibility{access.Public, access.Private}
-		}
-	}
-	return []access.Visibility{access.Public}
 }
 
 // AnyIssuedForProduct reports whether an advisory covering one product has

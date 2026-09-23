@@ -65,8 +65,9 @@ func registerHolders(api huma.API, in Ingest) {
 			"regard to capitals. This is not the people list: that is the deployment's " +
 			"directory and needs administration.",
 		Tags: []string{"Triage"},
-	}, perProduct, "Asking about undisclosed findings needs private-read or "+
-		"private-triage.", readRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "Asking about disclosed findings, the default, needs public-read or "+
+		"public-triage; about undisclosed findings, private-read or private-triage.",
+		readRights()...), func(ctx context.Context, input *struct {
 		Product    string `path:"product"`
 		Visibility string `query:"visibility" default:"public" enum:"public,private" doc:"The visibility of the work being handed over"`
 		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals"`

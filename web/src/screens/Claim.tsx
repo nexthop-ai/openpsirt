@@ -455,7 +455,9 @@ function Answer({
   // panel for nobody.
   const named = same(claim.place.product);
   const mayAgree = (who.data?.reach ?? []).some(
-    (each) => (same(each.product) === named || same(each.name) === named) && each.may_agree,
+    (each) =>
+      (same(each.product) === named || same(each.name) === named) &&
+      (claim.undisclosed ? each.agrees_private : each.agrees_public),
   );
   if (mine || !mayAgree || !live(claim.happened)) return null;
   const busy = approve.isPending || reject.isPending;

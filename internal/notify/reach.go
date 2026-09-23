@@ -38,10 +38,26 @@ type acts struct {
 	readsPublic, readsPrivate, triagesPublic, triagesPrivate bool
 }
 
-// public and private are what a condition sent to whoever may read it asks.
-func (a acts) public() bool { return a.readsPublic }
+// reads is what a condition sent to whoever may read it asks, of something at
+// one visibility. Each visibility is its own grant, so neither answers for the
+// other.
+func (a acts) reads(private bool) bool {
+	if private {
+		return a.readsPrivate
+	}
+	return a.readsPublic
+}
 
-func (a acts) private() bool { return a.readsPrivate }
+// readsAll is whether they read every row of something spanning both
+// visibilities: a claim may mix disclosed and undisclosed places, and a
+// condition about it is sent to somebody who reads every one of them.
+func (a acts) readsAll(public, private int) bool {
+	return (public == 0 || a.readsPublic) && (private == 0 || a.readsPrivate)
+}
+
+// readsIn is whether they read the product at either visibility: the question
+// for something about the product that names no finding.
+func (a acts) readsIn() bool { return a.readsPublic || a.readsPrivate }
 
 // triages is the same question for a condition sent to whoever may act: a
 // reader who cannot argue about a product can do nothing about work sitting in
@@ -80,12 +96,11 @@ func whoActs(ctx context.Context, db bun.IDB) (map[int64]map[int64]acts, error) 
 			case access.PublicRead:
 				at.readsPublic = true
 			case access.PrivateRead:
-				at.readsPublic, at.readsPrivate = true, true
+				at.readsPrivate = true
 			case access.PublicTriage:
 				at.readsPublic, at.triagesPublic = true, true
 			case access.PrivateTriage:
-				at.readsPublic, at.readsPrivate = true, true
-				at.triagesPublic, at.triagesPrivate = true, true
+				at.readsPrivate, at.triagesPrivate = true, true
 			}
 			per[grant.ProductID] = at
 		}

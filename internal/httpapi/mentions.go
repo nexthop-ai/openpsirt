@@ -33,8 +33,9 @@ func registerMentions(api huma.API, in Ingest) {
 			"`visibility` says which kind of finding the text is about. Asking about " +
 			"undisclosed findings requires being able to read them.",
 		Tags: []string{"Triage"},
-	}, perProduct, "Asking about undisclosed findings needs private-read or "+
-		"private-triage.", readRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "Asking about disclosed findings, the default, needs public-read or "+
+		"public-triage; about undisclosed findings, private-read or private-triage.",
+		readRights()...), func(ctx context.Context, input *struct {
 		Product    string `path:"product"`
 		Visibility string `query:"visibility" default:"public" enum:"public,private" doc:"The kind of finding the text is about"`
 		Term       string `query:"q" maxLength:"100" doc:"Narrow to names containing this, ignoring capitals. Matched on the identity and on the displayed name"`

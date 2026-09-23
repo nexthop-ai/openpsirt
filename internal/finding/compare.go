@@ -118,16 +118,27 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 	if err != nil {
 		return nil, err
 	}
-	// The readable part of the two, which is the narrower of the two answers.
-	if len(earlier) < len(visible) {
-		visible = earlier
+	// What may be read at both ends. Each visibility is its own grant, so
+	// neither answer contains the other.
+	var both []access.Visibility
+	for _, v := range visible {
+		if slices.Contains(earlier, v) {
+			// Its destination is usually a public document, so including
+			// something undisclosed is a deliberate act rather than something
+			// somebody pastes in without noticing.
+			if v == access.Private && !includePrivate {
+				continue
+			}
+			both = append(both, v)
+		}
 	}
-	if !includePrivate {
-		// Its destination is usually a public document, so including
-		// something undisclosed is a deliberate act rather than something
-		// somebody pastes in without noticing.
-		visible = []access.Visibility{access.Public}
+	// Disclosed work is what a release note is. Somebody reading only
+	// undisclosed work at either end is refused rather than handed a note
+	// reading "nothing fixed, nothing new", which looks complete.
+	if !slices.Contains(both, access.Public) {
+		return nil, access.Denied("read disclosed work in both builds")
 	}
+	visible = both
 
 	at := func(productID, targetID int64) *bun.SelectQuery {
 		q := s.db.NewSelect().

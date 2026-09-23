@@ -88,7 +88,7 @@ func TestADigestNamesWhatIsDisclosedAndOnlyCountsWhatIsNot(t *testing.T) {
 				VulnerabilityID: named[each.identifier],
 				Visibility:      each.visibility, ComponentID: component.ID,
 				PlaceIdentity: "place-" + each.component, Urgency: int64(i + 1),
-				OpenedAt: time.Now().UTC(), AssignedTo: &holder.ID,
+				OpenedAt: time.Now().UTC(), AssignedTo: &holder.PartyID,
 			}
 			if _, err := db.DB.NewInsert().Model(row).Exec(ctx); err != nil {
 				t.Fatal(err)

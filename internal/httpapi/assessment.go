@@ -97,7 +97,7 @@ func registerAssessment(api huma.API, in Ingest) {
 		}
 		// Before the issue name is resolved. Refusing afterwards answers "is
 		// this issue known here" for anybody who may read the product.
-		if !subject.Triages(access.Public, product.ID) {
+		if !subject.TriagesIn(product.ID) {
 			return nil, huma.Error403Forbidden("not authorized")
 		}
 		issue, err := finding.NewVulnerabilities(in.DB.DB).ByName(ctx, input.Vulnerability)
