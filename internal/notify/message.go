@@ -54,6 +54,7 @@ var called = map[Kind]string{
 	Unanswered:        "Somebody's report has not been answered",
 	InventoryMoved:    "A build's contents changed sharply",
 	ObligationOpen:    "A window after an attack is running",
+	ObligationNear:    "A window after an attack is about to end",
 	ObligationPassed:  "A window after an attack has passed",
 
 	VulnerabilityDataStale: "The vulnerability data has stopped moving",

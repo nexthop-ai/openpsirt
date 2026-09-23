@@ -39,7 +39,11 @@ type Window struct {
 	Name string `bun:"name,notnull"`
 	// Hours is how long the window runs. Hours rather than days, because the
 	// shortest windows in force anywhere are a day.
-	Hours      int       `bun:"length_hours,notnull"`
+	Hours int `bun:"length_hours,notnull"`
+	// LeadHours is how long before the end a second notice is raised, or nil
+	// where the window names none. Each window says its own, because a day's
+	// window and a fortnight's want warnings of different sizes.
+	LeadHours  *int      `bun:"lead_hours"`
 	DeclaredBy int64     `bun:"declared_by,notnull"`
 	DeclaredAt time.Time `bun:"declared_at,notnull"`
 	// RetiredAt is when this stopped being counted. Retired rather than
@@ -49,6 +53,53 @@ type Window struct {
 	// force, and null once it is retired. Unique, so two windows in force
 	// cannot share a name and a retired one does not hold its name back.
 	LiveName *string `bun:"live_name"`
+
+	// Products is the products the window is limited to, by identifier and
+	// by the name an address takes. Empty is every product.
+	Products     []int64  `bun:"-"`
+	ProductNames []string `bun:"-"`
+}
+
+// WindowProduct limits a window to one product.
+type WindowProduct struct {
+	bun.BaseModel `bun:"table:obligation_window_product,alias:owp"`
+
+	WindowID  int64 `bun:"window_id,pk"`
+	ProductID int64 `bun:"product_id,pk"`
+}
+
+// WindowSaid is what an administrator states about a window.
+type WindowSaid struct {
+	Name  string
+	Hours int
+	// LeadHours is how long before the end the second notice comes, or nil
+	// for none.
+	LeadHours *int
+	// Products names the products the window applies to. Empty is every
+	// product.
+	Products []string
+}
+
+// AppliesTo is whether the window counts for an attack on this product.
+func (w Window) AppliesTo(productID int64) bool {
+	if len(w.Products) == 0 {
+		return true
+	}
+	for _, id := range w.Products {
+		if id == productID {
+			return true
+		}
+	}
+	return false
+}
+
+// NearAt is when the second notice for an incident known at this moment is
+// raised, where the window names a lead time.
+func (w Window) NearAt(knownAt time.Time) (time.Time, bool) {
+	if w.LeadHours == nil {
+		return time.Time{}, false
+	}
+	return w.EndsAt(knownAt).Add(-time.Duration(*w.LeadHours) * time.Hour), true
 }
 
 // Length is how long the window runs.
@@ -83,8 +134,33 @@ func NewStore(db bun.IDB) *Store {
 // the space around it, the way every name people type is matched here.
 func folded(name string) string { return strings.ToLower(strings.TrimSpace(name)) }
 
-// windowSaid checks a name and a length before either is stored.
-func windowSaid(name string, hours int) (string, error) {
+// ErrNoSuchProduct is returned where a window names a product nobody declared.
+var ErrNoSuchProduct = errors.New("no product goes by that name")
+
+// windowSaid checks what a window states before any of it is stored.
+func windowSaid(said WindowSaid) (WindowSaid, error) {
+	name, err := nameSaid(said.Name, said.Hours)
+	if err != nil {
+		return said, err
+	}
+	said.Name = name
+	if said.LeadHours != nil {
+		// Zero reads as unset everywhere, so a lead of none is written by
+		// leaving it out rather than stored as a notice at the end itself.
+		if *said.LeadHours <= 0 {
+			return said, errors.New("a warning comes at least an hour before the end")
+		}
+		// A warning at or before the moment the window opens says nothing the
+		// notice raised when the record stands has not already said.
+		if *said.LeadHours >= said.Hours {
+			return said, errors.New("a warning comes before the end and after the window opens")
+		}
+	}
+	return said, nil
+}
+
+// nameSaid checks a name and a length.
+func nameSaid(name string, hours int) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", errors.New("a window needs a name")
@@ -114,7 +190,108 @@ func (s *Store) Windows(ctx context.Context) ([]Window, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read the windows in force: %w", err)
 	}
+	if len(windows) == 0 {
+		return windows, nil
+	}
+	ids := make([]int64, 0, len(windows))
+	for _, window := range windows {
+		ids = append(ids, window.ID)
+	}
+	var limits []struct {
+		WindowID  int64  `bun:"window_id"`
+		ProductID int64  `bun:"product_id"`
+		Product   string `bun:"product"`
+	}
+	err = s.db.NewSelect().
+		TableExpr(`"obligation_window_product" AS "owp"`).
+		Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
+		ColumnExpr(`owp.window_id AS "window_id"`).
+		ColumnExpr(`owp.product_id AS "product_id"`).
+		ColumnExpr(`p.name AS "product"`).
+		Where("owp.window_id IN (?)", bun.List(ids)).
+		Order("p.name ASC").
+		Scan(ctx, &limits)
+	if err != nil {
+		return nil, fmt.Errorf("read which products the windows apply to: %w", err)
+	}
+	at := make(map[int64]int, len(windows))
+	for i, window := range windows {
+		at[window.ID] = i
+	}
+	for _, limit := range limits {
+		window := &windows[at[limit.WindowID]]
+		window.Products = append(window.Products, limit.ProductID)
+		window.ProductNames = append(window.ProductNames, limit.Product)
+	}
 	return windows, nil
+}
+
+// productsNamed resolves the names a window is limited to, inside the write
+// that stores them.
+//
+// Refused whole on a name nobody declared: a window that silently applied to
+// fewer products than the administrator named would be quiet about the one
+// they meant.
+func productsNamed(ctx context.Context, tx bun.IDB, names []string) ([]int64, []string, error) {
+	if len(names) == 0 {
+		return nil, nil, nil
+	}
+	folded := make([]string, 0, len(names))
+	seen := map[string]bool{}
+	for _, name := range names {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		folded = append(folded, name)
+	}
+	var found []struct {
+		ID   int64  `bun:"id"`
+		Name string `bun:"name"`
+	}
+	if err := tx.NewSelect().
+		TableExpr(`"product" AS "p"`).
+		ColumnExpr(`p.id AS "id"`).
+		ColumnExpr(`p.name AS "name"`).
+		Where("p.name IN (?)", bun.List(folded)).
+		Order("p.name ASC").
+		Scan(ctx, &found); err != nil {
+		return nil, nil, fmt.Errorf("read the products a window names: %w", err)
+	}
+	known := map[string]bool{}
+	ids := make([]int64, 0, len(found))
+	kept := make([]string, 0, len(found))
+	for _, product := range found {
+		known[product.Name] = true
+		ids = append(ids, product.ID)
+		kept = append(kept, product.Name)
+	}
+	for _, name := range folded {
+		if !known[name] {
+			return nil, nil, fmt.Errorf("%w: %q", ErrNoSuchProduct, name)
+		}
+	}
+	return ids, kept, nil
+}
+
+// limit replaces the products a window applies to.
+func limit(ctx context.Context, tx bun.IDB, windowID int64, products []int64) error {
+	if _, err := tx.NewDelete().Model((*WindowProduct)(nil)).
+		Where("window_id = ?", windowID).Exec(ctx); err != nil {
+		return fmt.Errorf("clear the products a window applies to: %w", err)
+	}
+	if len(products) == 0 {
+		return nil
+	}
+	rows := make([]WindowProduct, 0, len(products))
+	for _, id := range products {
+		rows = append(rows, WindowProduct{WindowID: windowID, ProductID: id})
+	}
+	if _, err := tx.NewInsert().Model(&rows).Exec(ctx); err != nil {
+		return fmt.Errorf("limit a window to its products: %w", err)
+	}
+	return nil
 }
 
 // DeclareWindow adds a window this deployment counts.
@@ -122,21 +299,26 @@ func (s *Store) Windows(ctx context.Context) ([]Window, error) {
 // An administrator's act, and one the trail records: a window decides what
 // every incident is watched against from now on, which is the layer a setting
 // sits in.
-func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject, name string,
-	hours int) (*Window, error) {
+func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject,
+	said WindowSaid) (*Window, error) {
 
 	if !subject.Admin || subject.Kind != access.Person {
 		return nil, access.Denied("declare a window")
 	}
-	name, err := windowSaid(name, hours)
+	said, err := windowSaid(said)
 	if err != nil {
 		return nil, err
 	}
 	window := new(Window)
 	err = s.writing(ctx, func(ctx context.Context, tx bun.IDB) error {
-		live := folded(name)
+		products, names, err := productsNamed(ctx, tx, said.Products)
+		if err != nil {
+			return err
+		}
+		live := folded(said.Name)
 		*window = Window{
-			Name: name, Hours: hours, DeclaredBy: subject.ID,
+			Name: said.Name, Hours: said.Hours, LeadHours: said.LeadHours,
+			DeclaredBy: subject.ID,
 			DeclaredAt: s.now().Truncate(time.Microsecond), LiveName: &live,
 		}
 		if _, err := tx.NewInsert().Model(window).Exec(ctx); err != nil {
@@ -145,7 +327,11 @@ func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject, name 
 			}
 			return fmt.Errorf("declare a window: %w", err)
 		}
-		return noteWindow(ctx, tx, subject, name, nil, said(hours))
+		if err := limit(ctx, tx, window.ID, products); err != nil {
+			return err
+		}
+		window.Products, window.ProductNames = products, names
+		return noteWindow(ctx, tx, subject, said.Name, nil, describe(*window))
 	})
 	if err != nil {
 		return nil, err
@@ -153,18 +339,19 @@ func (s *Store) DeclareWindow(ctx context.Context, subject access.Subject, name 
 	return window, nil
 }
 
-// ChangeWindow renames a window in force or changes how long it runs.
+// ChangeWindow restates a window in force: its name, how long it runs, its
+// warning, and the products it applies to.
 //
 // Every incident's end moves with it, because an end is worked out from the
 // window as it stands rather than stored. A notice already recorded against
 // the window keeps pointing at it.
 func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int64,
-	name string, hours int) (*Window, error) {
+	said WindowSaid) (*Window, error) {
 
 	if !subject.Admin || subject.Kind != access.Person {
 		return nil, access.Denied("change a window")
 	}
-	name, err := windowSaid(name, hours)
+	said, err := windowSaid(said)
 	if err != nil {
 		return nil, err
 	}
@@ -179,11 +366,27 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 			}
 			return fmt.Errorf("read the window: %w", err)
 		}
-		was := window.Name + " " + strconv.Itoa(window.Hours) + "h"
-		live := folded(name)
+		var before []string
+		if err := tx.NewSelect().
+			TableExpr(`"obligation_window_product" AS "owp"`).
+			Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
+			ColumnExpr("p.name").
+			Where("owp.window_id = ?", id).
+			Order("p.name ASC").
+			Scan(ctx, &before); err != nil {
+			return fmt.Errorf("read which products the window applies to: %w", err)
+		}
+		window.ProductNames = before
+		was := describe(*window)
+		products, names, err := productsNamed(ctx, tx, said.Products)
+		if err != nil {
+			return err
+		}
+		live := folded(said.Name)
 		res, err := tx.NewUpdate().Model((*Window)(nil)).
-			Set("name = ?", name).
-			Set("length_hours = ?", hours).
+			Set("name = ?", said.Name).
+			Set("length_hours = ?", said.Hours).
+			Set("lead_hours = ?", said.LeadHours).
 			Set("live_name = ?", live).
 			Where("id = ?", id).
 			// Still in force when this lands. A retirement committed since the
@@ -204,9 +407,13 @@ func (s *Store) ChangeWindow(ctx context.Context, subject access.Subject, id int
 		if changed == 0 {
 			return ErrNoSuchWindow
 		}
-		window.Name, window.Hours, window.LiveName = name, hours, &live
-		became := name + " " + strconv.Itoa(hours) + "h"
-		return noteWindow(ctx, tx, subject, name, &was, &became)
+		if err := limit(ctx, tx, id, products); err != nil {
+			return err
+		}
+		window.Name, window.Hours, window.LeadHours, window.LiveName =
+			said.Name, said.Hours, said.LeadHours, &live
+		window.Products, window.ProductNames = products, names
+		return noteWindow(ctx, tx, subject, said.Name, was, describe(*window))
 	})
 	if err != nil {
 		return nil, err
@@ -250,7 +457,18 @@ func (s *Store) RetireWindow(ctx context.Context, subject access.Subject, id int
 		if retired == 0 {
 			return ErrNoSuchWindow
 		}
-		return noteWindow(ctx, tx, subject, window.Name, said(window.Hours), nil)
+		var products []string
+		if err := tx.NewSelect().
+			TableExpr(`"obligation_window_product" AS "owp"`).
+			Join(`JOIN "product" AS "p" ON p.id = owp.product_id`).
+			ColumnExpr("p.name").
+			Where("owp.window_id = ?", id).
+			Order("p.name ASC").
+			Scan(ctx, &products); err != nil {
+			return fmt.Errorf("read which products the window applies to: %w", err)
+		}
+		window.ProductNames = products
+		return noteWindow(ctx, tx, subject, window.Name, describe(*window), nil)
 	})
 }
 
@@ -261,9 +479,17 @@ func (s *Store) writing(ctx context.Context,
 	return database.Within(ctx, s.db, do)
 }
 
-// said is a window's length as the trail records it.
-func said(hours int) *string {
-	return trail.Said(strconv.Itoa(hours)+"h", true)
+// describe is a window as the trail records it: its length, its warning and
+// the products it is limited to.
+func describe(w Window) *string {
+	text := strconv.Itoa(w.Hours) + "h"
+	if w.LeadHours != nil {
+		text += ", warned " + strconv.Itoa(*w.LeadHours) + "h before"
+	}
+	if len(w.ProductNames) > 0 {
+		text += ", for " + strings.Join(w.ProductNames, ", ")
+	}
+	return trail.Said(text, true)
 }
 
 // noteWindow writes a change to a window into the administrative trail, in

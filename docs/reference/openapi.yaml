@@ -2540,6 +2540,9 @@ components:
           description: When the attack became known, plus the window
           format: date-time
           type: string
+        near:
+          description: Whether the window's warning has come and its end has not
+          type: boolean
         passed:
           description: Whether that moment has gone
           type: boolean
@@ -2549,6 +2552,7 @@ components:
         - window
         - ends_at
         - passed
+        - near
         - answered
       type: object
     EarlierBody:
@@ -5999,7 +6003,7 @@ components:
           description: The issue this is about
           type: string
         windows:
-          description: Every window in force, shortest first, as it runs from when the attack became known
+          description: Every window in force that applies to this product, shortest first, as it runs from when the attack became known
           items:
             $ref: "#/components/schemas/DueBody"
           type:
@@ -9856,13 +9860,25 @@ components:
         id:
           format: int64
           type: integer
+        lead_hours:
+          description: How many hours before the end a second notice is raised. Absent where the window names none
+          format: int64
+          type: integer
         name:
           description: What the window is called here
           type: string
+        products:
+          description: The products the window is limited to, among those you may know exist. Empty for a window that applies to every product
+          items:
+            type: string
+          type:
+            - array
+            - "null"
       required:
         - id
         - name
         - hours
+        - products
         - declared_at
       type: object
     WindowSaid:
@@ -9881,11 +9897,25 @@ components:
           maximum: 8784
           minimum: 1
           type: integer
+        lead_hours:
+          description: How many hours before the end a second notice is raised. Left off or zero, the window raises none. Fewer hours than the window runs
+          format: int64
+          maximum: 8783
+          minimum: 0
+          type: integer
         name:
           description: What the window is called here. Unique among the windows in force, without regard to capitals
           maxLength: 191
           minLength: 1
           type: string
+        products:
+          description: The products the window applies to, by name. Left off, it applies to every product
+          items:
+            type: string
+          maxItems: 500
+          type:
+            - array
+            - "null"
       required:
         - name
         - hours
@@ -14040,6 +14070,8 @@ paths:
       description: |-
         Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
 
+        A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
+
         Requires: any signed-in person, and not a pipeline key
       operationId: list-obligation-windows
       responses:
@@ -14062,9 +14094,9 @@ paths:
         scope: person
     post:
       description: |-
-        Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
+        Adds a window every standing attack on the products it names is watched against, counted from the moment each became known. Recorded in the administrative trail.
 
-        A name already in force, in any capitals, is refused with 409: retire that window or pick another name.
+        A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
 
         Requires: administrator
       operationId: declare-obligation-window
@@ -14124,9 +14156,9 @@ paths:
         scope: deployment
     put:
       description: |-
-        Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+        Restates a window in force: its name, how long it runs, its warning and the products it applies to. Each field is replaced by what is sent, so a warning or a product list left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
 
-        A name another window in force holds is refused with 409. A retired or unknown window answers 404.
+        A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
 
         Requires: administrator
       operationId: change-obligation-window

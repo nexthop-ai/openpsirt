@@ -28,6 +28,8 @@ export function label(kind?: string): string {
     // anything is not the tool's answer to give.
     case "obligation-open":
       return "window after an attack running";
+    case "obligation-near":
+      return "window after an attack ending soon";
     case "obligation-passed":
       return "window after an attack passed";
     // The two conditions about the deployment rather than about anybody's

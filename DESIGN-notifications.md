@@ -70,6 +70,7 @@ true is cleared, and running the same pass twice changes nothing.
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
 | A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
+| The same window near its end, where it names a warning | condition | Described under obligation notices below |
 | The same window passed | condition | Described under obligation notices below |
 
 A new build notifies nobody. A build arriving is the ordinary state of a tool
@@ -511,8 +512,10 @@ notices; what is said about them is here.
 
 | Rule | Reason |
 |---|---|
-| Two conditions, running and passed | They clear differently, the way the two embargo conditions do. The running one clears when the end arrives, and the passed one opens |
-| Raised from the moment the record stands, with no lead time | The windows in force anywhere are a day to a fortnight and an incident is rare, so a warning that waits gives back the hours it exists to save |
+| Three conditions: running, near its end, and passed | They clear differently, the way the embargo conditions do. The running one and the near one clear when the end arrives, and the passed one opens |
+| Running is raised from the moment the record stands | The windows in force anywhere are a day to a fortnight and an incident is rare, so a warning that waits gives back the hours it exists to save |
+| Near is raised at the warning the window names, and not at all where it names none | Beside the running one rather than instead of it. The first says an attack is being counted; the second says the count is nearly out |
+| Only for a product the window applies to | A window limited to other products raises nothing for this one |
 | One per record and window | Each window is answered separately, so each is said separately |
 | Cleared by a notice naming the window, by clearing the record, or by retiring the window | The same way every condition here clears: by the thing happening. Nobody dismisses it |
 | To whoever may triage the product, at the issue's visibility | The people who may record the notice. An undisclosed issue reaches nobody who may not read undisclosed work there, and what leaves the deployment about it is a link |

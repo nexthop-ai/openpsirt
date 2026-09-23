@@ -29,7 +29,13 @@ import (
 // an incident is rare: a warning that waits for most of a day to pass gives
 // back the hours it exists to save.
 func (w *Watch) windowsOpen(ctx context.Context) (map[int64][]Holds, error) {
-	return w.windows(ctx, ObligationOpen, false)
+	return w.windows(ctx, ObligationOpen)
+}
+
+// windowsNear is every window whose warning has come and whose end has not,
+// with no notice named against it.
+func (w *Watch) windowsNear(ctx context.Context) (map[int64][]Holds, error) {
+	return w.windows(ctx, ObligationNear)
 }
 
 // windowsPassed is every window whose end has gone with no notice named
@@ -38,12 +44,12 @@ func (w *Watch) windowsOpen(ctx context.Context) (map[int64][]Holds, error) {
 // It says the time passed and that nothing is recorded, which are both facts.
 // Whether anybody owed anything is not the tool's answer to give.
 func (w *Watch) windowsPassed(ctx context.Context) (map[int64][]Holds, error) {
-	return w.windows(ctx, ObligationPassed, true)
+	return w.windows(ctx, ObligationPassed)
 }
 
-// windows is the one pass behind both, which differ in which side of the end
-// they report.
-func (w *Watch) windows(ctx context.Context, kind Kind, passed bool) (map[int64][]Holds, error) {
+// windows is the one pass behind all three, which differ in which part of a
+// window they report.
+func (w *Watch) windows(ctx context.Context, kind Kind) (map[int64][]Holds, error) {
 	store := obligation.NewStore(w.db)
 	// As the deployment, which reads everything; each recipient is narrowed
 	// below by what they may act on.
@@ -80,16 +86,24 @@ func (w *Watch) windows(ctx context.Context, kind Kind, passed bool) (map[int64]
 
 	now := time.Now().UTC()
 	for _, one := range standing {
-		for _, due := range obligation.Running(windows, one.Record.KnownAt,
-			told[one.Record.ID], now) {
+		for _, due := range obligation.Running(windows, one.Record.ProductID,
+			one.Record.KnownAt, told[one.Record.ID], now) {
 
-			if due.Answered || due.Passed != passed {
+			if due.Answered {
 				continue
 			}
-			about, verb := "obligation-open", "ends"
-			if passed {
-				about, verb = "obligation-passed", "ended"
+			var verb string
+			switch {
+			case kind == ObligationPassed && due.Passed:
+				verb = "ended"
+			case kind == ObligationNear && due.Near:
+				verb = "ends"
+			case kind == ObligationOpen && !due.Passed:
+				verb = "ends"
+			default:
+				continue
 			}
+			about := string(kind)
 			holds := Holds{
 				About: identify(fmt.Sprintf("%s %d %d", about, one.Record.ID, due.Window.ID)),
 				Body: fmt.Sprintf("%s in %s: the window %q, counted from when this became "+

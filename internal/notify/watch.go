@@ -200,6 +200,7 @@ func (w *Watch) Once(ctx context.Context) (opened, cleared int, err error) {
 		what string
 	}{
 		{ObligationOpen, w.windowsOpen, "which windows after an attack are running"},
+		{ObligationNear, w.windowsNear, "which windows after an attack are about to end"},
 		{ObligationPassed, w.windowsPassed, "which windows after an attack have passed"},
 	} {
 		holding, err := window.of(ctx)

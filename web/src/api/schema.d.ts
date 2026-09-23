@@ -1575,15 +1575,17 @@ export interface paths {
          * List obligation windows
          * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
          *
+         *     A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
+         *
          *     Requires: any signed-in person, and not a pipeline key
          */
         get: operations["list-obligation-windows"];
         put?: never;
         /**
          * Declare an obligation window
-         * @description Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
+         * @description Adds a window every standing attack on the products it names is watched against, counted from the moment each became known. Recorded in the administrative trail.
          *
-         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name.
+         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
          *
          *     Requires: administrator
          */
@@ -1604,9 +1606,9 @@ export interface paths {
         get?: never;
         /**
          * Change an obligation window
-         * @description Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+         * @description Restates a window in force: its name, how long it runs, its warning and the products it applies to. Each field is replaced by what is sent, so a warning or a product list left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
          *
-         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404.
+         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
          *
          *     Requires: administrator
          */
@@ -6968,6 +6970,8 @@ export interface components {
              * @description When the attack became known, plus the window
              */
             ends_at: string;
+            /** @description Whether the window's warning has come and its end has not */
+            near: boolean;
             /** @description Whether that moment has gone */
             passed: boolean;
             window: components["schemas"]["WindowBody"];
@@ -8829,7 +8833,7 @@ export interface components {
             undone?: number;
             /** @description The issue this is about */
             vulnerability?: string;
-            /** @description Every window in force, shortest first, as it runs from when the attack became known */
+            /** @description Every window in force that applies to this product, shortest first, as it runs from when the attack became known */
             windows: components["schemas"]["DueBody"][] | null;
         };
         ObligationsBody: {
@@ -11092,8 +11096,15 @@ export interface components {
             hours: number;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: int64
+             * @description How many hours before the end a second notice is raised. Absent where the window names none
+             */
+            lead_hours?: number;
             /** @description What the window is called here */
             name: string;
+            /** @description The products the window is limited to, among those you may know exist. Empty for a window that applies to every product */
+            products: string[] | null;
         };
         WindowSaid: {
             /**
@@ -11107,8 +11118,15 @@ export interface components {
              * @description How long the window runs, in hours, from the moment an attack became known
              */
             hours: number;
+            /**
+             * Format: int64
+             * @description How many hours before the end a second notice is raised. Left off or zero, the window raises none. Fewer hours than the window runs
+             */
+            lead_hours?: number;
             /** @description What the window is called here. Unique among the windows in force, without regard to capitals */
             name: string;
+            /** @description The products the window applies to, by name. Left off, it applies to every product */
+            products?: string[] | null;
         };
         WindowsBody: {
             /**

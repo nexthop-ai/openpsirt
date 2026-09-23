@@ -58,7 +58,7 @@ func Kinds() []Kind {
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
 		VulnerabilityDataStale, RiskUnagreed, InventoryMoved,
-		ObligationOpen, ObligationPassed,
+		ObligationOpen, ObligationNear, ObligationPassed,
 	}
 }
 
@@ -136,6 +136,13 @@ const (
 	// or when the window is retired — and when the end arrives, at which point
 	// the other opens.
 	ObligationOpen Kind = "obligation-open"
+	// ObligationNear is the same window once the warning it names has come
+	// and its end has not, still with no notice recorded against it.
+	//
+	// Beside the one raised when the record stands rather than instead of it.
+	// A day's window and a fortnight's want warnings of different sizes, so
+	// each window says its own, and one that says none raises none.
+	ObligationNear Kind = "obligation-near"
 	// ObligationPassed is the same window after its end, still with no
 	// notice recorded against it. Both halves are facts; whether anybody owed
 	// anything is not the tool's answer to give.
