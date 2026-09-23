@@ -251,7 +251,9 @@ name to a public index.
 | Rule | Reason |
 |---|---|
 | One replica asks, settled by a lease | These are free services somebody else runs, and the politeness the pass is built around — two hundred at a time, a quarter of a second apart — is a rate per deployment rather than per replica |
-| The lease is taken again as the pass runs | Sized from the interval between cycles it is a guess at how long a pass takes, and the arithmetic says so: two hundred requests with a timeout each is far past several intervals. A slow index then hands the pass to a second replica mid-flight and both ask |
+| The lease is taken again as the pass runs | Sized from the interval between cycles it is a guess at how long a pass takes, and the arithmetic says so: two hundred components of one or more requests each, with a timeout each, is far past several intervals. A slow index then hands the pass to a second replica mid-flight and both ask |
+| Taken again every twenty-five components or once half the lease has gone, whichever comes first | A component is one request to most indexes, two to Maven Central and up to five to nuget.org, so a count alone lets a slow index outlast the lease between renewals |
+| An index that fails is asked once a pass | Its components stay due, and the window is read again without that ecosystem for the rest of the pass. A deployment whose egress does not reach one index would otherwise fill every window with that index's never-asked components, and no other ecosystem would be asked again |
 | A pass that has lost the lease stops | Two replicas asking is what the lease exists to prevent, and it is at somebody else's expense |
 | The candidates are the ecosystems there is an index for | Maintained as the complement of one of them, every other unaskable ecosystem passed the filter, reached the asker, found none and was recorded empty — spending one of the pass's slots. An image with ten thousand distribution packages spent fifty passes writing nothing |
 | A distribution package is not asked about | The distribution is the maintainer, and the date it released says nothing about the age of the software inside |
@@ -267,10 +269,11 @@ name to a public index.
 
 | Rule | Reason |
 |---|---|
-| An index that lists every version is read with the ecosystem's own ordering | Maven Central's metadata names a "release" and it is whatever was published last: measured on log4j-core, 3.0.0-beta3 while 2.25 was the newest release. An ordering is what says 2.25.1 is after 2.9.1 |
+| An index that lists every version is read with the ecosystem's own ordering | Maven Central's metadata names a "release" and it is whatever was published last: measured on log4j-core, 3.0.0-beta3 while 2.26.1 was the newest release. An ordering is what says 2.25.1 is after 2.9.1 |
 | A pre-release is not what somebody is behind | Telling somebody they are behind a release candidate is not a claim to act on. It is offered only where a package has published nothing else |
 | An unlisted NuGet version is passed over | Its owner withdrew it from what anybody choosing a version is offered, and nuget.org dates it to 1900 |
 | A paged NuGet registration is read from its newest page back, at most four pages | Pages run oldest to newest, so the answer is usually on the last. The bound is for a package whose newest pages hold only pre-releases, which would otherwise cost a request per page back to its first release |
+| Where the bound stops the walk with no release found, there is no answer | A release may sit on a page that was not read, so the newest pre-release is not offered. The package is recorded as asked with no version |
 | A page is read only from the registration it came from | Its address is what the answer says it is. An index naming a page anywhere else is not followed |
 | A Maven name that would move the request is not asked | A group or an artifact that is empty, `.` or `..` names a different place in the repository rather than a package. Refused as unaskable, which records it |
 
@@ -312,6 +315,7 @@ So a name this deployment calls its own is never sent. Three sources, unioned:
 | Rule | Reason |
 |---|---|
 | A name is matched a part at a time, either exactly or followed by a separator | Matched anywhere in the string, one organization's name holds back every package containing those letters; matched only exactly, it misses the family of names the organization actually publishes, which is most of what it is for |
+| A name without a dot is matched against each dotted part as well | A Maven group starts with a top-level domain, so `com.skunkworks` never begins with `skunkworks`. Matched only at the start, a stated name was held back from npm and NuGet and sent to Maven Central |
 | The segment beside the package's name, never the whole namespace | A forge host is shared by everybody. Taking it would hold back most of an ecosystem while reporting that it was protecting one organization, which is the failure that makes an operator turn the feature off rather than tune it |
 | Nothing is derived from the root's own name | A product called "core" would hold back every package whose name starts that way. A default that wrong is one nobody tunes |
 | A label that names a kind of registration rather than an organization is dropped | Where a deployment publishes under a second-level registration, the generic part is nobody's name. It is a closed handful rather than a list of where each country's registrations begin, which is a file this does not have |

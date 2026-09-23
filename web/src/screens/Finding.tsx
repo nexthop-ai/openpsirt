@@ -666,7 +666,7 @@ export function Finding() {
                 nowhere to go. */}
             {/* The newest generation the issue is rated under, and the
                 others beside it: a version 3 and a version 4 rating are two
-                judgments, not one number spelled twice. */}
+                judgments. */}
             <div className="score">
               <span className="n">{newest.score ? newest.score.toFixed(1) : "—"}</span>
               <span className="l">CVSS{newest.version ? ` ${newest.version}` : ""}</span>

@@ -47,18 +47,18 @@ func mentions(faults []string, phrase string) bool {
 // A baseline that passes, which each case below breaks in one way.
 func passing() (tree, []entry, string) {
 	files := tree{
-		"NOTICE":                    "Copyright 2026 Nexthop Systems Inc.",
-		"pkg/testdata/taken.json":   `{"dataLicense": "CC-BY-4.0"}`,
-		"pkg/testdata/written.json": `{}`,
-		"pkg/code.go":               "package pkg\n",
-		"internal/x/y.go":           "package x\n// Copyright (c) Somebody Else\n",
+		"NOTICE":                             "Copyright 2026 Nexthop Systems Inc.",
+		"internal/pkg/testdata/taken.json":   `{"dataLicense": "CC-BY-4.0"}`,
+		"internal/pkg/testdata/written.json": `{}`,
+		"internal/pkg/code.go":               "package pkg\n",
+		"internal/x/y.go":                    "package x\n// Copyright (c) Somebody Else\n",
 	}
 	held := []entry{
-		{"pkg/testdata/taken.json", "CC-BY-4.0", "https://example.test"},
-		{"pkg/testdata/written.json", ours, ""},
+		{"internal/pkg/testdata/taken.json", "CC-BY-4.0", "https://example.test"},
+		{"internal/pkg/testdata/written.json", ours, ""},
 		{"internal/x/y.go", "Apache-2.0", "https://example.test"},
 	}
-	return files, held, "See pkg/testdata/taken.json and internal/x/y.go."
+	return files, held, "See internal/pkg/testdata/taken.json and internal/x/y.go."
 }
 
 func TestATreeWhoseEveryBorrowedFileIsHeldPasses(t *testing.T) {
@@ -70,13 +70,13 @@ func TestATreeWhoseEveryBorrowedFileIsHeldPasses(t *testing.T) {
 
 func TestAFileSomebodyElseWroteAndNothingHoldsIsReported(t *testing.T) {
 	for _, c := range []struct{ what, file, content string }{
-		{"a fixture", "pkg/testdata/new.json", "{}"},
+		{"a fixture", "internal/pkg/testdata/new.json", "{}"},
 		{"a fixture at the top of the tree", "testdata/new.json", "{}"},
-		{"a copyright line", "pkg/table.go", "// Copyright 2023 Somebody Else\n"},
-		{"a copyright line with a sign", "pkg/table.go", "// Copyright (c) Somebody Else\n"},
-		{"a license identifier", "pkg/lib.js", "// SPDX-License-Identifier: MIT\n"},
-		{"a document's data license", "pkg/doc.json", `{"dataLicense": "CC0-1.0"}`},
-		{"a comment saying NOTICE records it", "pkg/suite_test.go", "// `NOTICE` records that.\n"},
+		{"a copyright line", "internal/pkg/table.go", "// Copyright 2023 Somebody Else\n"},
+		{"a copyright line with a sign", "internal/pkg/table.go", "// Copyright (c) Somebody Else\n"},
+		{"a license identifier", "internal/pkg/lib.js", "// SPDX-License-Identifier: MIT\n"},
+		{"a document's data license", "internal/pkg/doc.json", `{"dataLicense": "CC0-1.0"}`},
+		{"a comment saying NOTICE records it", "internal/pkg/suite_test.go", "// `NOTICE` records that.\n"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			files, held, notice := passing()
@@ -90,11 +90,11 @@ func TestAFileSomebodyElseWroteAndNothingHoldsIsReported(t *testing.T) {
 
 func TestAFileThatIsOursIsNotAskedAbout(t *testing.T) {
 	for _, c := range []struct{ what, file, content string }{
-		{"our own copyright", "pkg/header.go", "// Copyright 2026 Nexthop Systems Inc.\n"},
-		{"the word in prose", "pkg/doc.go", "// neither the name of the copyright holder\n"},
-		{"a markdown file describing a license", "pkg/testdata/README.md", "Copyright 2024 SUSE LLC"},
+		{"our own copyright", "internal/pkg/header.go", "// Copyright 2026 Nexthop Systems Inc.\n"},
+		{"the word in prose", "internal/pkg/doc.go", "// neither the name of the copyright holder\n"},
+		{"a markdown file describing a license", "internal/pkg/testdata/README.md", "Copyright 2024 SUSE LLC"},
 		{"the license itself", "LICENSE", "Copyright 2026 Somebody"},
-		{"a file that is not text", "pkg/blob.bin", "\xff\xfeCopyright 2020 X"},
+		{"a file that is not text", "internal/pkg/blob.bin", "\xff\xfeCopyright 2020 X"},
 		{"this program, which spells the marks", "internal/tools/vendored/main.go", "SPDX-License-Identifier:"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestAFileThatIsOursIsNotAskedAbout(t *testing.T) {
 
 func TestTheListIsHeldToTheTree(t *testing.T) {
 	files, held, notice := passing()
-	held = append(held, entry{"pkg/testdata/gone.json", ours, ""})
+	held = append(held, entry{"internal/pkg/testdata/gone.json", ours, ""})
 	if faults := faultsFor(t, files, held, notice); !mentions(faults, "gone.json is held and is not in the tree") {
 		t.Errorf("a held file the tree does not have was not reported: %v", faults)
 	}
@@ -135,6 +135,10 @@ func TestAnAttributionLicenseNoticeDoesNotNameIsReported(t *testing.T) {
 	files, held, _ := passing()
 	if faults := faultsFor(t, files, held, "See internal/x/y.go."); !mentions(faults, "NOTICE does not name it") {
 		t.Errorf("an attribution license NOTICE omits was not reported: %v", faults)
+	}
+	// A longer path ending in this one is a different file.
+	if faults := faultsFor(t, files, held, "See internal/x/y.go and internal/x/internal/pkg/testdata/taken.json."); !mentions(faults, "NOTICE does not name it") {
+		t.Errorf("NOTICE naming a longer path was read as naming this one: %v", faults)
 	}
 	// A dedication to the public domain asks nothing, so NOTICE need not say.
 	held[0].license = "CC0-1.0"

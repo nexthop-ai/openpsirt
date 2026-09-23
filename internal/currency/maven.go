@@ -26,7 +26,7 @@ type mavenCentral struct{ c *Client }
 //
 // The document's own "release" field is not read. It names whatever was
 // published last, which for a library releasing a new major line in betas is a
-// beta — measured on log4j-core, it answers 3.0.0-beta3 while 2.25 is the
+// beta — measured on log4j-core, it answers 3.0.0-beta3 while 2.26.1 is the
 // newest release.
 type mavenMetadata struct {
 	Versions []string `xml:"versioning>versions>version"`

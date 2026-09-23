@@ -127,6 +127,10 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 	for _, each := range held {
 		holds[each.path] = each
 	}
+	inNotice := map[string]bool{}
+	for _, each := range noticed(notice) {
+		inNotice[each] = true
+	}
 	permitted := map[string]bool{ours: true}
 	for _, each := range allowed {
 		permitted[strings.TrimSpace(each)] = true
@@ -164,7 +168,7 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 		if each.license != ours && each.source == "" {
 			faults = append(faults, fmt.Sprintf("%s says nothing about where it came from", each.path))
 		}
-		if !asksNothing(each.license) && !strings.Contains(notice, each.path) {
+		if !asksNothing(each.license) && !inNotice[each.path] {
 			faults = append(faults, fmt.Sprintf("%s is under %s, which asks for attribution, and NOTICE does not name it",
 				each.path, each.license))
 		}

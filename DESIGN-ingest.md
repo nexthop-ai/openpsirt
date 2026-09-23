@@ -663,10 +663,10 @@ different generations of the scheme.
 
 | Rule | |
 |---|---|
-| One rating per generation is kept: the first in it stating both a score and a vector | Ratings disagree, and the first stated is at least a stable answer. A version 3 and a version 4 rating are two judgments rather than one number spelled twice, so neither generation is the one thrown away |
-| The newest generation is the one beside the issue | It is what a screen shows and what the order ranks by. The others are held beside it, and a published document states the one its format has a field for |
+| One rating per generation is kept: the worst any report states that has both a score and a vector | The worst is the one answer that is the same whatever order the reports arrived in. A version 3 and a version 4 rating are two judgments, so neither generation is the one thrown away |
+| The issue's number is the newest generation's rating, copied whole | It is what a screen shows beside its scheme and what the order ranks by, so the number, vector, version and publisher are one rating. A higher rating under an older generation is held beside it and does not move it. The issue's findings are ranked again when the number moves |
 | A rating is kept whole | Number, vector, version, publisher and rank come from one rating, so the vector never explains a number somebody else published |
-| The first rating held in a generation is not replaced by a later report | The rule descriptions follow: reports arrive in an order nobody controls, and taking the latest would make what is held a fact about which scan ran last |
+| A number with no vector is not a rating | It raises the issue's number to the worst claimed only on an issue that holds no rating |
 | A rating whose generation nothing states is not held beside the others | A version 2 vector names no scheme and a report states its version beside one. Filed under a guess, it would stand in for a generation it may not be |
 | The generation is recorded beside the number | Two generations are scorable and their numbers are not comparable. Left off, a number is placed by guessing at its vector |
 | A number is taken as the hundredths it states | Rounded rather than cut: 8.2 is 819.999… hundredths as a float |

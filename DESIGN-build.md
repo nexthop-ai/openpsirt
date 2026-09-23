@@ -610,6 +610,7 @@ from and the license its source states.
 |---|---|
 | A file is found in the tree, then looked for in the list | Every file under a `testdata` directory, and every file carrying a copyright line that is not this project's, a license identifier, a document's data license, or a comment saying `NOTICE` records it. A file copied in without a line in the list fails the gate |
 | Found broadly, and a file written here is listed as ours | A file the search misses is one nobody is asked about. A fixture written here costs a line saying so |
+| Not searched | `NOTICE` and `LICENSE`, which are the statements; markdown, which is prose about the tree; a file that is not text; and the gate's own source, which spells every mark it looks for |
 | Held to a license this tree may carry | The dependency allowlist, and beside it the licenses data is published under: a dedication to the public domain, CC-BY-4.0, and the weakness catalog's own terms. An expression is evaluated as the dependency check evaluates one |
 | Named in `NOTICE` where the license asks for attribution | Every license here but a public-domain dedication asks for it. A file under one that `NOTICE` does not name fails the gate |
 | Every path `NOTICE` names is in the tree and held as somebody else's | The other direction, so a file removed or renamed leaves no attribution pointing at nothing |

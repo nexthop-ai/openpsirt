@@ -116,22 +116,41 @@ func (o *Ours) add(labels ...string) {
 const separators = "-._"
 
 // matches reports whether one segment of a name is this label, is a name
-// beginning with it, or sits under it as a host.
+// beginning with it, sits under it as a host, or holds it as one of its dotted
+// parts.
 //
-// The third only applies to a label that is itself a host, which is what the
-// dot tells it. A vanity import path and a self-hosted forge both put the
-// organization's host in front of the package — "go.example.test/team/agent" —
-// and a label matched only where it begins a segment covers neither. Bounded
-// to a dot so that "example" does not take "notexample".
+// A label that is itself a host, which is what the dot tells it, matches a
+// segment ending in it: a vanity import path and a self-hosted forge both put
+// the organization's host in front of the package — "go.example.test/team/agent"
+// — and a label matched only where it begins a segment covers neither.
+//
+// A label without a dot matches any dotted part of a segment the same way it
+// matches a segment. A Maven group always starts with a top-level domain, so
+// "com.skunkworks" never begins with "skunkworks"; matched only at the start,
+// an organization's own group names went to the index.
+//
+// Each bounded to a separator, so "example" takes neither "notexample" nor
+// "examples".
 func matches(segment, label string) bool {
-	if segment == label {
+	if begins(segment, label) {
 		return true
 	}
-	if strings.Contains(label, ".") && strings.HasSuffix(segment, "."+label) {
-		return true
+	if strings.Contains(label, ".") {
+		return strings.HasSuffix(segment, "."+label)
 	}
-	rest, begins := strings.CutPrefix(segment, label)
-	return begins && rest != "" && strings.ContainsRune(separators, rune(rest[0]))
+	for _, part := range strings.Split(segment, ".") {
+		if begins(part, label) {
+			return true
+		}
+	}
+	return false
+}
+
+// begins reports whether a name is this label, or the label followed by a
+// separator.
+func begins(name, label string) bool {
+	rest, ok := strings.CutPrefix(name, label)
+	return ok && (rest == "" || strings.ContainsRune(separators, rune(rest[0])))
 }
 
 // segments splits a package's name into the parts a label is matched against.

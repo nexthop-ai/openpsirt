@@ -861,3 +861,97 @@ func carried(t *testing.T, w *fixture.World, root string, purls ...string) {
 		}
 	}
 }
+
+// failingFor is an index answering for some ecosystems and having a bad day
+// for the rest.
+type failingFor struct {
+	down  bool
+	asked *[]string
+	then  func()
+}
+
+func (f failingFor) Latest(_ context.Context, name string) (currency.Latest, error) {
+	*f.asked = append(*f.asked, name)
+	if f.then != nil {
+		f.then()
+	}
+	if f.down {
+		return currency.Latest{}, fmt.Errorf("%w: connection refused", currency.ErrNotAnswering)
+	}
+	return currency.Latest{Version: "2.0.0"}, nil
+}
+
+func TestAnIndexThisDeploymentCannotReachDoesNotHoldBackTheOthers(t *testing.T) {
+	// A deployment whose egress allows some index hosts and not another. The
+	// unreachable index's components are never recorded, so they are always
+	// the never-asked head of the window; read once per pass, they filled it
+	// and no other ecosystem was asked again.
+	each(t, func(t *testing.T, db *database.DB) {
+		old := time.Now().Add(-48 * time.Hour).UTC()
+		var of []component
+		for i := range currency.MostPerPass {
+			of = append(of, component{purl: fmt.Sprintf("pkg:nuget/Thing%03d@1.0.0", i)})
+		}
+		of = append(of, component{purl: "pkg:cargo/serde@1.0.0", checked: &old, version: ptr("1.0.0")})
+		r, _ := seed(t, db, of, nil, nil)
+		asked := &[]string{}
+		r.Index = func(ecosystem string) currency.Asker {
+			switch ecosystem {
+			case "nuget":
+				return failingFor{down: true, asked: asked}
+			case "cargo":
+				return failingFor{asked: asked}
+			}
+			return nil
+		}
+		if _, err := r.Once(t.Context()); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		nuget := 0
+		for _, name := range *asked {
+			if strings.HasPrefix(name, "Thing") {
+				nuget++
+			}
+		}
+		if nuget != 1 {
+			t.Errorf("asked the unreachable index %d times in one pass, want once", nuget)
+		}
+		if got := read(t, db)["pkg:cargo/serde@1.0.0"].Version; got == nil || *got != "2.0.0" {
+			t.Errorf("the reachable index was not asked: %v", *asked)
+		}
+	})
+}
+
+func TestASlowIndexDoesNotOutlastTheLease(t *testing.T) {
+	// A component is several requests to some indexes, so twenty-five of them
+	// against a slow index can take longer than the lease. The pass asks for
+	// the lease again once half of it has gone, whatever the count.
+	each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		var of []component
+		for i := range currency.RenewEvery {
+			of = append(of, component{purl: fmt.Sprintf("pkg:cargo/thing-%03d@1.0.0", i)})
+		}
+		r, _ := seed(t, db, of, nil, nil)
+		now := time.Now().UTC()
+		r.Now = func() time.Time { return now }
+		asked := &[]string{}
+		r.Index = func(string) currency.Asker {
+			// Each request takes twenty minutes of the clock.
+			return failingFor{asked: asked, then: func() { now = now.Add(20 * time.Minute) }}
+		}
+		// A lease of half an hour, which another replica holds.
+		currency.Asking(r, 6*time.Minute)
+		if mine, err := queue.NewLeases(db.DB).Take(ctx, currency.AskingLease, "somebody-else", time.Hour); err != nil || !mine {
+			t.Fatalf("the other replica did not take the lease: %v", err)
+		}
+		if _, err := r.Once(ctx); err != nil {
+			t.Fatalf("once: %v", err)
+		}
+		if len(*asked) != 1 {
+			t.Errorf("asked about %d components after the lease had gone, want 1", len(*asked))
+		}
+	})
+}
+
+func ptr(s string) *string { return &s }

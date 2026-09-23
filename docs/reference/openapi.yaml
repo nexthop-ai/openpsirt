@@ -3003,7 +3003,7 @@ components:
             - array
             - "null"
         ratings:
-          description: Every published rating of the issue, one per generation of the scoring system, newest first. A report commonly rates one issue under version 3 and version 4
+          description: Every published rating of the issue, one per generation of the scoring system, newest first
           items:
             $ref: "#/components/schemas/RatingBody"
           type:
@@ -7030,7 +7030,7 @@ components:
           description: "The rating's rank: primary or secondary"
           type: string
         score:
-          description: The base score
+          description: The score the publisher states for the vector
           format: double
           type: number
         source:

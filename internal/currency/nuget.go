@@ -51,7 +51,9 @@ type nugetLeaf struct {
 
 // nugetMostPages bounds how many pages one package costs. A package whose
 // newest pages hold nothing but pre-releases would otherwise be read back to
-// its first release, a request a page.
+// its first release, a request a page. Where the bound stops the walk the
+// package is recorded with no version rather than with a pre-release, because
+// a release may sit on a page that was not read.
 const nugetMostPages = 4
 
 func (n nugetGallery) Latest(ctx context.Context, name string) (Latest, error) {
@@ -67,11 +69,12 @@ func (n nugetGallery) Latest(ctx context.Context, name string) (Latest, error) {
 	}
 
 	var fallback *nugetLeaf
-	fetched := 0
+	fetched, capped := 0, false
 	for at := len(registration.Items) - 1; at >= 0; at-- {
 		page := registration.Items[at]
 		if page.Items == nil {
 			if fetched == nugetMostPages {
+				capped = true
 				break
 			}
 			// The page's address is what the document says it is, so it is
@@ -95,7 +98,10 @@ func (n nugetGallery) Latest(ctx context.Context, name string) (Latest, error) {
 			return best.latest(), nil
 		}
 	}
-	if fallback != nil {
+	// A pre-release only where the package has published nothing else, which
+	// is known only once every page has been read. Stopped short, a release
+	// may be on a page that was never read, so there is no answer.
+	if fallback != nil && !capped {
 		return fallback.latest(), nil
 	}
 	return Latest{}, ErrUnknown

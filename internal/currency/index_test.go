@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -255,21 +256,48 @@ func TestAPagedNuGetRegistrationIsReadFromItsNewestPage(t *testing.T) {
 }
 
 func TestANuGetPageIsReadOnlyFromTheRegistrationItCameFrom(t *testing.T) {
-	r := routing(t, map[string]string{
-		"/v3/registration5-gz-semver2/thing/index.json": `{"items":[{"@id":"http://169.254.169.254/latest"}]}`,
-	})
-	_, err := routedClient(r).For("nuget").Latest(t.Context(), "thing")
-	if !errors.Is(err, currency.ErrUnaskable) {
-		t.Errorf("got %v, want the page refused", err)
+	// Another host, and on the same host another package's registration —
+	// including one whose name begins with this one's.
+	for _, elsewhere := range []string{
+		"http://169.254.169.254/latest",
+		"{{base}}/v3/registration5-gz-semver2/thingelse/page/1.json",
+		"{{base}}/v3/registration5-gz-semver2/other/page/1.json",
+	} {
+		r := routing(t, map[string]string{
+			"/v3/registration5-gz-semver2/thing/index.json":      `{"items":[{"@id":"` + elsewhere + `"}]}`,
+			"/v3/registration5-gz-semver2/thingelse/page/1.json": `{"items":[{"catalogEntry":{"version":"9.9.9"}}]}`,
+			"/v3/registration5-gz-semver2/other/page/1.json":     `{"items":[{"catalogEntry":{"version":"9.9.9"}}]}`,
+		})
+		_, err := routedClient(r).For("nuget").Latest(t.Context(), "thing")
+		if !errors.Is(err, currency.ErrUnaskable) {
+			t.Errorf("%s: got %v, want the page refused", elsewhere, err)
+		}
+		if len(r.asked) != 1 {
+			t.Errorf("%s: followed a page elsewhere: %v", elsewhere, r.asked)
+		}
 	}
-	if len(r.asked) != 1 {
-		t.Errorf("followed a page elsewhere: %v", r.asked)
+}
+
+func TestAMavenOrNuGetNameCannotSteerTheRequest(t *testing.T) {
+	// A package identifier is somebody else's input. Unescaped, a name
+	// carrying a "?" or a "#" turns the rest of the path into a query or a
+	// fragment, and an uploaded document picks part of the request.
+	r := routing(t, map[string]string{})
+	_, _ = routedClient(r).For("nuget").Latest(t.Context(), "thing?x=1")
+	_, _ = routedClient(r).For("maven").Latest(t.Context(), "org.example/thing#frag")
+	_, _ = routedClient(r).For("maven").Latest(t.Context(), "org.ex?ample/thing")
+	want := []string{
+		"/v3/registration5-gz-semver2/thing%3Fx=1/index.json",
+		"/maven2/org/example/thing%23frag/maven-metadata.xml",
+		"/maven2/org/ex%3Fample/thing/maven-metadata.xml",
+	}
+	if !slices.Equal(r.asked, want) {
+		t.Errorf("requested %v, want %v", r.asked, want)
 	}
 }
 
 func TestANuGetPackageOfOnlyPreReleasesIsReadABoundedDistance(t *testing.T) {
-	// Every page a pre-release, so nothing stops the walk but the bound — and
-	// the newest pre-release is the answer.
+	// Every page a pre-release, so nothing stops the walk but the bound.
 	prefix := "/v3/registration5-gz-semver2/beta.only/"
 	served := map[string]string{}
 	var pages []string
@@ -280,12 +308,10 @@ func TestANuGetPackageOfOnlyPreReleasesIsReadABoundedDistance(t *testing.T) {
 	}
 	served[prefix+"index.json"] = `{"items":[` + strings.Join(pages, ",") + `]}`
 	r := routing(t, served)
-	latest, err := routedClient(r).For("nuget").Latest(t.Context(), "Beta.Only")
-	if err != nil {
-		t.Fatalf("latest: %v", err)
-	}
-	if latest.Version != "0.6.0-beta" {
-		t.Errorf("version %q, want the newest pre-release", latest.Version)
+	// Stopped short, a release may sit on a page that was not read, so the
+	// newest pre-release is not offered.
+	if _, err := routedClient(r).For("nuget").Latest(t.Context(), "Beta.Only"); !errors.Is(err, currency.ErrUnknown) {
+		t.Errorf("got %v, want no answer where the walk stopped short", err)
 	}
 	// The registration, and then no more pages than the bound.
 	if len(r.asked) != 1+4 {

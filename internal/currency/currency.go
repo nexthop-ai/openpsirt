@@ -14,8 +14,8 @@
 // supplier fetched from is an address an administrator configured, and an index
 // is a service everybody shares.
 //
-// A component's name leaves. One request per component, carrying
-// the name and nothing else. For an open-source dependency that is public
+// A component's name leaves, and nothing else: one request per component for
+// most indexes, and a few for the two that answer in pieces. For an open-source dependency that is public
 // knowledge; for something built here it is the name of a project, a team or a
 // product nobody has announced, so what this deployment calls its own is held
 // back rather than asked about — see Ours.

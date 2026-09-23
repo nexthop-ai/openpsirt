@@ -659,7 +659,7 @@ type SittingBody struct {
 // RatingBody is one published rating of an issue.
 type RatingBody struct {
 	Version string  `json:"version" doc:"The scoring system's version, as the report states it"`
-	Score   float64 `json:"score" doc:"The base score"`
+	Score   float64 `json:"score" doc:"The score the publisher states for the vector"`
 	Vector  string  `json:"vector" doc:"The vector the score is worked out from"`
 	Source  string  `json:"source,omitempty" doc:"The publisher, where the report names them"`
 	Kind    string  `json:"kind,omitempty" doc:"The rating's rank: primary or secondary"`
@@ -702,7 +702,7 @@ type EvidenceBody struct {
 	ScoreVersion string       `json:"score_version,omitempty" doc:"The scoring system the number is on, as the report states it"`
 	ScoreSource  string       `json:"score_source,omitempty" doc:"The publisher, where the report names them"`
 	ScoreKind    string       `json:"score_kind,omitempty" doc:"The rating's rank: primary or secondary"`
-	Ratings      []RatingBody `json:"ratings,omitempty" doc:"Every published rating of the issue, one per generation of the scoring system, newest first. A report commonly rates one issue under version 3 and version 4"`
+	Ratings      []RatingBody `json:"ratings,omitempty" doc:"Every published rating of the issue, one per generation of the scoring system, newest first"`
 	Exploited    bool         `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
 	Likelihood   float64      `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
 	// ExploitedHere is what has been recorded in this product about being

@@ -13,7 +13,7 @@ package main
 // The license is what the file's source states, in the spelling SPDX gives
 // it. Where no SPDX identifier exists the reference names the terms instead.
 var held = []entry{
-	// The four SPDX examples, in both versions where there is a pair. The
+	// The SPDX examples, in both versions where there is a pair. The
 	// spdx-examples repository states CC0-1.0 for its documents; the sample
 	// source beside them is GPL-3.0-or-later and is not taken.
 	{"internal/sbom/testdata/rust-app.spdx.json", "CC0-1.0", "https://github.com/spdx/spdx-examples"},

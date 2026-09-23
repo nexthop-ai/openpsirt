@@ -3,6 +3,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -59,18 +60,40 @@ func GenerationOf(version, vector string) int {
 	return 0
 }
 
-// rate records the ratings a report states under a generation this issue has
-// no rating for yet.
+// hundredths is a published number in hundredths, rounded. Cut instead, 8.2
+// is 819: it is 819.999… as a float.
+func hundredths(f float64) int { return int(math.Round(f * 100)) }
+
+// perMillion is a published fraction in parts per million, rounded for the
+// same reason.
+func perMillion(f float64) int { return int(math.Round(f * 1_000_000)) }
+
+// ratingsOf is the ratings a report states: the ones it lists, or the one its
+// score and vector make where it lists none.
+func ratingsOf(named Named) []CVSS {
+	if len(named.Ratings) > 0 || named.Score <= 0 || strings.TrimSpace(named.Vector) == "" {
+		return named.Ratings
+	}
+	return []CVSS{{
+		Generation: GenerationOf(named.ScoreVersion, named.Vector),
+		ScoreCenti: hundredths(named.Score), Vector: named.Vector,
+		Version: named.ScoreVersion, Source: named.ScoreSource, Kind: named.ScoreKind,
+	}}
+}
+
+// rate records the ratings a report states, keeping the worst in each
+// generation.
 //
-// The first stated in each generation is kept, whole: a later report does not
-// replace it, for the reason a description is filled in rather than
-// overwritten — reports disagree and arrive in an order nobody controls, so
-// taking the latest would make what is stored a fact about which scan ran
-// last. Kept whole, so the number and the vector never come from two
-// different publishers.
+// The worst, because it is the one answer that is the same whatever order the
+// reports arrived in: reports disagree, and keeping the first or the latest
+// would make what is held a fact about which scan ran first or last. Kept
+// whole, number, vector and publisher together, so the vector never explains
+// a number somebody else published.
 //
-// A re-scan of unchanged data writes nothing: the pair is unique and the
-// generations already held are read first.
+// A re-scan of unchanged data writes nothing. A generation already held is
+// replaced only where the report's number is higher, and a new one is inserted
+// keeping whatever a concurrent writer put there first, which a retry then
+// reads and raises.
 func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) error {
 	if len(ratings) == 0 {
 		return nil
@@ -89,7 +112,22 @@ func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) er
 	var missing []CVSS
 	for _, rating := range ratings {
 		if rating.Generation <= 0 || rating.ScoreCenti <= 0 ||
-			strings.TrimSpace(rating.Vector) == "" || known[rating.Generation] {
+			strings.TrimSpace(rating.Vector) == "" {
+			continue
+		}
+		if known[rating.Generation] {
+			if _, err := v.db.NewUpdate().Model((*CVSS)(nil)).
+				Set("score_centi = ?", rating.ScoreCenti).
+				Set("vector = ?", rating.Vector).
+				Set("score_version = ?", rating.Version).
+				Set("score_source = ?", rating.Source).
+				Set("score_kind = ?", rating.Kind).
+				Where("vulnerability_id = ?", id).
+				Where("generation = ?", rating.Generation).
+				Where("score_centi < ?", rating.ScoreCenti).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("raise how the issue is rated: %w", err)
+			}
 			continue
 		}
 		known[rating.Generation] = true
@@ -99,10 +137,51 @@ func (v *Vulnerabilities) rate(ctx context.Context, id int64, ratings []CVSS) er
 	if len(missing) == 0 {
 		return nil
 	}
-	if err := database.InBatches(ctx, v.db, missing); err != nil {
+	if err := database.InBatchesKeeping(ctx, v.db, missing); err != nil {
 		return fmt.Errorf("record how the issue is rated: %w", err)
 	}
 	return nil
+}
+
+// settle copies the newest generation's rating onto the issue, whole, and
+// says whether its number moved.
+//
+// The issue's number is what the order ranks by and what every list shows
+// beside its scheme, so it and its vector, version and publisher are one
+// rating rather than five columns filled by different rules. Moved is what
+// tells the caller the issue's findings need ranking again.
+func (v *Vulnerabilities) settle(ctx context.Context, id int64) (bool, error) {
+	var newest []CVSS
+	if err := v.db.NewSelect().Model(&newest).
+		Where("vr.vulnerability_id = ?", id).
+		OrderExpr("vr.generation DESC").
+		Limit(1).Scan(ctx); err != nil {
+		return false, fmt.Errorf("read the newest rating: %w", err)
+	}
+	if len(newest) == 0 {
+		return false, nil
+	}
+	rating := newest[0]
+	var row Vulnerability
+	if err := v.db.NewSelect().Model(&row).Where("id = ?", id).Scan(ctx); err != nil {
+		return false, fmt.Errorf("read the issue's rating: %w", err)
+	}
+	moved := row.ScoreCenti == nil || *row.ScoreCenti != rating.ScoreCenti
+	if !moved && row.Vector == rating.Vector && row.ScoreVersion == rating.Version &&
+		row.ScoreSource == rating.Source && row.ScoreKind == rating.Kind {
+		return false, nil
+	}
+	if _, err := v.db.NewUpdate().Model((*Vulnerability)(nil)).
+		Set("score_centi = ?", rating.ScoreCenti).
+		Set("vector = ?", rating.Vector).
+		Set("score_version = ?", rating.Version).
+		Set("score_source = ?", rating.Source).
+		Set("score_kind = ?", rating.Kind).
+		Where("id = ?", id).
+		Exec(ctx); err != nil {
+		return false, fmt.Errorf("record the issue's rating: %w", err)
+	}
+	return moved, nil
 }
 
 // Ratings reads every rating held for one issue, newest generation first.
