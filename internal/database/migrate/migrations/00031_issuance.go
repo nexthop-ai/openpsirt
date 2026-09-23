@@ -1,15 +1,17 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package v010
+package migrations
 
 import (
 	"context"
 	"database/sql"
+
+	"github.com/pressly/goose/v3"
 )
 
 func init() {
-	register(upIssuance, downIssuance)
+	goose.AddMigrationContext(upIssuance, downIssuance)
 }
 
 // That an advisory went out.

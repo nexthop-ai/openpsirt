@@ -358,8 +358,11 @@ document that cites one.
 ## Compatibility below 1.0
 
 Below 1.0 there is no schema compatibility and no API compatibility (REQ-76).
-A schema change edits the migration that created the thing rather than
-adding one beside it, and anybody holding a development database recreates it. The version in the API path is the shape it will have, not a
+A schema change edits what declares the thing rather than adding a migration
+beside it, and anybody holding a development database recreates it. The
+migrations v0.1.0 shipped are the exception and never change; v0.2.0's
+declarations sit beside the migration that upgrades from them
+(`DESIGN-database.md` § Migrations). The version in the API path is the shape it will have, not a
 promise anybody may hold us to.
 
 The migrations that exist are kept only because walking the chain up and down

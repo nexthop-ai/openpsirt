@@ -1,41 +1,34 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package v010
+package migrations
 
-import (
-	"context"
-	"database/sql"
-)
-
-func init() {
-	register(upAttachment, downAttachment)
-}
-
-// A file hanging off an issue, and the record of it that outlives the bytes.
+// A file hanging off an issue or a report, and the record of it that outlives
+// the bytes.
 //
-// **The bytes are not here**. What this table holds is the reference
+// The bytes are not here. What this table holds is the reference
 // the text uses, what the file is, where it went, who put it there, and — when
 // somebody has to take a file back out — what was removed and why.
 //
-// **It hangs off the issue in the product**, which is the unit a decision, an
+// It hangs off the issue in the product, which is the unit a decision, an
 // embargo and a comment already use. Not a finding row: text is written against
 // a decision and a decision covers every place an issue sits at, so binding a
 // file to whichever of forty-eight rows somebody was looking at would lose it
 // the day that row closed while its siblings stayed open.
 //
-// **There is no visibility column, deliberately.** Whether a file may be read
-// is whether its issue may be read, asked at the moment of the request. A copy
-// taken at upload would still say "private" after the embargo it documents had
-// ended, which is the shape of every stale-value defect: correct when written,
-// wrong from then on, and nothing reports it.
-func upAttachment(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-
-	statements := []string{
+// Or off a report, which is the other thing a file arrives with. A report
+// that has not been judged has no issue to hang anything on, and the
+// screenshot is often the whole of what was sent — so a file arriving with
+// one is kept against the report and stays there once the report gains an
+// issue, because what was sent is a fact about the report.
+//
+// There is no visibility column, deliberately. Whether a file may be read
+// is whether the thing it hangs off may be read, asked at the moment of the
+// request. A copy taken at upload would still say "private" after the embargo
+// it documents had ended, which is the shape of every stale-value defect:
+// correct when written, wrong from then on, and nothing reports it.
+func attachmentStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "attachment" (
 			"id"               ` + t.id + `,
 			-- What the text refers to, and the only identifier that
@@ -44,11 +37,18 @@ func upAttachment(ctx context.Context, tx *sql.Tx) error {
 			-- can enumerate turns "which issues have attachments" into a
 			-- question an outsider can ask by counting.
 			"token"            ` + t.name + ` NOT NULL,
-			-- What it is about. Both, because an issue is only an issue
-			-- somewhere: the same CVE in two products is two pieces of work
-			-- and two sets of readers.
+			-- What it is about. The product always, because an issue is
+			-- only an issue somewhere: the same CVE in two products is two
+			-- pieces of work and two sets of readers.
 			"product_id"       ` + t.ref + ` NOT NULL,
-			"vulnerability_id" ` + t.ref + ` NOT NULL,
+			-- And then one of the two things a file hangs off: an issue, or
+			-- a report nobody has turned into one. Exactly one is set, which
+			-- the store asks and the schema does not: MySQL parses a CHECK
+			-- and ignores it until 8.0.16 and the floor here is 8.0, so the
+			-- constraint would hold on three engines of four. No migration
+			-- here declares one.
+			"vulnerability_id" ` + t.refNull + ` NULL,
+			"flaw_report_id"   ` + t.refNull + ` NULL,
 			-- What it was called when it arrived, for the disposition header.
 			-- Kept as given and never used as a path.
 			"filename"         ` + t.text + ` NOT NULL,
@@ -84,24 +84,25 @@ func upAttachment(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "attachment_token_unique" UNIQUE ("token"),
 			CONSTRAINT "attachment_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "attachment_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "attachment_report_fk" FOREIGN KEY ("flaw_report_id") REFERENCES "flaw_report"("id"),
 			CONSTRAINT "attachment_uploaded_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id"),
 			CONSTRAINT "attachment_redacted_by_fk" FOREIGN KEY ("redacted_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// What hangs off one issue, which is what a finding screen lists.
+		// Everything hanging off one issue, which is what a finding screen
+		// lists.
 		`CREATE INDEX "attachment_issue_idx"
 			ON "attachment" ("product_id", "vulnerability_id")`,
 
-		// What nothing points at yet, for the sweep. Leading with the column
-		// the sweep tests for null, so it walks only the candidates rather
-		// than every attachment ever made.
+		// Everything that arrived with one report, which is what a report
+		// screen lists.
+		`CREATE INDEX "attachment_report_idx"
+			ON "attachment" ("flaw_report_id")`,
+
+		// Anything nothing points at yet, for the sweep. Leading with the
+		// column the sweep tests for null, so it walks only the candidates
+		// rather than every attachment ever made.
 		`CREATE INDEX "attachment_unattached_idx"
 			ON "attachment" ("attached_at", "uploaded_at")`,
 	}
-
-	return apply(ctx, tx, statements)
-}
-
-func downAttachment(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "attachment")
 }

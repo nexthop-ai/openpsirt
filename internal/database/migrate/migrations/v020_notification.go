@@ -1,18 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package v010
+package migrations
 
-import (
-	"context"
-	"database/sql"
-)
-
-func init() {
-	register(upNotification, downNotification)
-}
-
-// What somebody is told, and the two different lifetimes that has.
+// Everything somebody is told, and the two lifetimes that has.
 //
 // Everyone gets a notification area, not only administrators: a triager sees
 // work arriving, a proposer sees a dismissal sent back, an approver sees what
@@ -23,7 +14,7 @@ func init() {
 // sent into a void, and the people who most need telling that the tool itself
 // is unwell are exactly the ones who have not opted into anything.
 //
-// **The lifetimes are the design, not a column somebody added for tidiness**
+// The lifetimes are the design, not a column somebody added for tidiness
 // . An event happened once and is acknowledged by the person it
 // happened to: you were assigned this, your dismissal was sent back, somebody
 // named you. A condition is true for as long as it is true and clears itself
@@ -36,12 +27,8 @@ func init() {
 // derives conditions reconciles against it: what is true is opened, what is no
 // longer true is cleared. Two rows for one condition about one thing is the
 // failure that key exists to prevent, which is why it is unique per person.
-func upNotification(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-	statements := []string{
+func notificationStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "notification" (
 			"id"        ` + t.id + `,
 			"person_id" ` + t.ref + ` NOT NULL,
@@ -106,6 +93,17 @@ func upNotification(ctx context.Context, tx *sql.Tx) error {
 			-- digest can answer "was this person already told about this",
 			-- which is the whole of what a digest carries.
 			"concerns"  ` + t.name + ` NULL,
+			-- What makes one thing said to many people one thing to carry
+			-- outside this deployment. Empty for everything personal.
+			--
+			-- A message about somebody's own work names them and is theirs;
+			-- one saying a build's contents changed sharply is the same
+			-- sentence for every reader of that product, and a channel wants
+			-- it once however many people hold the product. The area inside
+			-- the application is per person either way — this decides what a
+			-- delivery is keyed on, which is the same question a condition's
+			-- "about" answers for the rows a sweep opens.
+			"together"  ` + t.name + ` NOT NULL,
 			-- When this was carried outside the application, and how many
 			-- times that has been tried.
 			--
@@ -133,7 +131,7 @@ func upNotification(ctx context.Context, tx *sql.Tx) error {
 				REFERENCES "vulnerability"("id")
 		)` + t.suffix,
 
-		// What the area reads: one person's unread, newest first. The
+		// The area's own read: one person's unread, newest first. The
 		// visibility narrowing that follows it is over one person's unread
 		// rows, which is the small set this index already produces.
 		`CREATE INDEX "notification_unread_idx"
@@ -151,12 +149,4 @@ func upNotification(ctx context.Context, tx *sql.Tx) error {
 		`CREATE UNIQUE INDEX "notification_condition_idx"
 			ON "notification" ("person_id", "kind", "about_open")`,
 	}
-	return apply(ctx, tx, statements)
-}
-
-func downNotification(ctx context.Context, tx *sql.Tx) error {
-	// The table goes and its indexes go with it. Dropping them first is what
-	// broke two rollbacks already: MySQL and MariaDB refuse to drop an index a
-	// foreign key is using to enforce itself.
-	return dropTables(ctx, tx, "notification")
 }

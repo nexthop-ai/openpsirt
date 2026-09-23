@@ -3,17 +3,6 @@
 
 package migrations
 
-import (
-	"context"
-	"database/sql"
-
-	"github.com/pressly/goose/v3"
-)
-
-func init() {
-	goose.AddMigrationContext(upVexIssuance, downVexIssuance)
-}
-
 // A generated VEX document going out.
 //
 // Beside the imported statement of somebody else's document, and the opposite
@@ -32,14 +21,6 @@ func init() {
 // recorded when it happens, with the bytes that went out. The digest is what
 // makes "is what is published still what we would generate" a question with a
 // yes or no.
-func upVexIssuance(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-	return apply(ctx, tx, vexIssuanceStatements(t))
-}
-
 func vexIssuanceStatements(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "vex_issuance" (
@@ -70,8 +51,4 @@ func vexIssuanceStatements(t *columnTypes) []string {
 			CONSTRAINT "vex_issuance_by_fk" FOREIGN KEY ("issued_by") REFERENCES "person"("id")
 		)` + t.suffix,
 	}
-}
-
-func downVexIssuance(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "vex_issuance")
 }

@@ -197,6 +197,17 @@ func encryptionAsAsked(server Server, target Target) error {
 	return nil
 }
 
+// Query wraps a connection somebody else opened in the query builder, spoken
+// in the dialect of the engine it reaches. A migration is handed a bare
+// connection, and one that moves rows reads them back by name.
+func Query(sqldb *sql.DB, e Engine) (*bun.DB, error) {
+	_, dialect, err := driverFor(e)
+	if err != nil {
+		return nil, err
+	}
+	return bun.NewDB(sqldb, dialect()), nil
+}
+
 func driverFor(e Engine) (driver string, dialect func() schema.Dialect, err error) {
 	switch e {
 	case Postgres:

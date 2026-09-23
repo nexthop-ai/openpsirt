@@ -127,7 +127,7 @@ func upGraph(ctx context.Context, tx *sql.Tx) error {
 		// Not unique: a fold is many components by construction.
 		`CREATE INDEX "component_fold_idx" ON "component" ("fold_key")`,
 
-		// The key a routing rule and a component search look one up by. The
+		// What a routing rule and a component search look one up by. The
 		// upstream name matters most, because a rule names a source package:
 		// that is the key one rule uses to reach every binary package built
 		// from it.

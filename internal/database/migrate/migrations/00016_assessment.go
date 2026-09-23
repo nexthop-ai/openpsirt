@@ -14,7 +14,7 @@ func init() {
 	goose.AddMigrationContext(upAssessment, downAssessment)
 }
 
-// One product's own view of an issue, as against what was published about it.
+// What one product thinks of an issue, as against what was published about it.
 //
 // Recorded against the issue rather than against a place, and against one
 // product rather than against the deployment. Keyed to a place it would have
@@ -105,7 +105,7 @@ func upAssessment(ctx context.Context, tx *sql.Tx) error {
 		)` + t.suffix,
 
 		// Reading an issue's claims in a product, live and withdrawn alike.
-		// The rule that only one of them is live is held by the unique
+		// What holds the rule that only one of them is live is the unique
 		// constraint above, not this.
 		`CREATE INDEX "assessment_issue_idx" ON "assessment" ("vulnerability_id", "product_id", "state")`,
 		`CREATE INDEX "assessment_waiting_idx" ON "assessment" ("state", "needs_approval")`,

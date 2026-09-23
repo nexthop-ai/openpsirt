@@ -21,24 +21,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
-func init() {
-	migrate.AddUpgrade(migrate.Upgrade{
-		Release: "v0.1.0",
-		Applied: []int64{1, 2, 3, 4, 5, 7, 9, 10, 11, 12, 16, 18, 19, 20, 21, 22, 23,
-			24, 25, 26, 27, 28, 29, 30, 31, 33, 34, 35, 36},
-		Run: upgradeV010,
-	})
-}
-
-// upgradeV010 changes the schema the v0.1.0 release built into this build's,
-// and moves the rows it holds.
+// upgradeV020 changes the schema the v0.1.0 release built into v0.2.0's, and
+// moves the rows it holds.
 //
-// Every table and index it creates is created by the statement the migration
-// that makes it on a fresh install runs, read from that migration. A column it
-// adds is declared as that statement declares it. What is written here is only
-// the order, the rows, and the engine differences in how an existing table is
-// changed.
-func upgradeV010(ctx context.Context, tx bun.Tx) error {
+// The v020 files beside this one hold v0.2.0's declaration of every table this
+// creates or changes, with the reasoning for each. Every table and index is
+// created by that statement, and a column added is declared as it declares
+// it. What is written here is only the order, the rows, and the engine
+// differences in how an existing table is changed.
+func upgradeV020(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
 		return err
@@ -165,14 +156,14 @@ func (u *upgrader) create(statements []string, tables ...string) error {
 // change describes what one existing table gains.
 type change struct {
 	table string
-	// add is the columns it gains, declared as the fresh install declares
+	// add is the columns it gains, declared as v0.2.0 declares
 	// them.
 	add []added
 	// relax is the columns that stop refusing a null.
 	relax []string
 	// then runs once every column is in place and before any constraint is.
 	then func() error
-	// constraints and indexes are named as the fresh install names them. An
+	// constraints and indexes are named as v0.2.0 names them. An
 	// index of that name the table already has is replaced.
 	constraints []string
 	indexes     []string
@@ -201,10 +192,10 @@ type added struct {
 	serverFill string
 }
 
-// change alters one table into the shape the fresh install gives it.
+// change alters one table into the shape v0.2.0 declares.
 //
 // SQLite cannot drop a default or change whether a column takes a null, so
-// there the table is rebuilt from the fresh install's statement and its rows
+// there the table is rebuilt from v0.2.0's statement and its rows
 // copied across. The other three alter it where it stands.
 func (u *upgrader) change(statements []string, c change) error {
 	made, indexes, err := pick(statements, c.table)
@@ -234,7 +225,7 @@ func (u *upgrader) change(statements []string, c change) error {
 			continue
 		}
 		// Added with a default so that every row takes the value at once, and
-		// the default dropped so the column is declared as a fresh install
+		// the default dropped so the column is declared as v0.2.0
 		// declares it.
 		stmts = append(stmts,
 			`ALTER TABLE "`+c.table+`" ADD COLUMN `+def+` DEFAULT `+fill,
@@ -286,7 +277,7 @@ func (u *upgrader) change(statements []string, c change) error {
 	return u.run(stmts)
 }
 
-// rebuild replaces a SQLite table with one made by the fresh install's
+// rebuild replaces a SQLite table with one made by v0.2.0's
 // statement, the rows copied across by column name.
 //
 // Foreign keys are off while this runs, which the upgrade's caller arranges:
@@ -583,7 +574,7 @@ func (u *upgrader) moveAdvisories() error {
 		return fmt.Errorf("read what v0.1.0 issued: %w", err)
 	}
 
-	// The fresh install's table replaces v0.1.0's, which has the same name
+	// v0.2.0's table replaces v0.1.0's, which has the same name
 	// and constraints of the same names; the rows are held in memory across
 	// the swap.
 	made, indexes, err := pick(advisoryStatements(u.t), "advisory_issuance")

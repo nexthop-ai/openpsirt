@@ -1,16 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package v010
-
-import (
-	"context"
-	"database/sql"
-)
-
-func init() {
-	register(upScan, downScan)
-}
+package migrations
 
 // The record of what arrived: which variant it was filed against, when the
 // producer says it was built, when we received it, what it hashed to, and
@@ -20,13 +11,8 @@ func init() {
 // so this row plus the extracted data is the whole record of an ingest. The
 // hash is what makes a re-upload idempotent, and the parser version is what
 // bounds the damage if a parser bug is found later.
-func upScan(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-
-	statements := []string{
+func scanStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "scan" (
 			"id"             ` + t.id + `,
 			"target_id"      ` + t.ref + ` NOT NULL,
@@ -63,6 +49,16 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 			-- "not known" rather than as zero.
 			"components"     INTEGER NULL,
 			"placed"         INTEGER NULL,
+			-- What the document called the thing it is about, in its own
+			-- spelling, and empty where it named no component of its own.
+			--
+			-- Kept here rather than on the component, because the component is
+			-- stored by name alone on purpose: a package identifier carries the
+			-- version, the version moves every build, and the root's identity
+			-- moving takes every edge hanging off it with it. This is a fact
+			-- about one document rather than an identity, so it belongs beside
+			-- the serial and what the inventory was made of.
+			"root_identifier" ` + t.text + ` NULL,
 			CONSTRAINT "scan_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
 			CONSTRAINT "scan_content_unique" UNIQUE ("target_id", "content_hash")
 		)` + t.suffix,
@@ -81,7 +77,7 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 		// the deployment nothing to look at. The producer was told and
 		// nobody here was.
 		//
-		// What that cost is a coverage report that can say a build has gone
+		// The gain is a coverage report that can say a build has gone
 		// quiet and cannot say whether anybody is trying. Those want
 		// different people: one is a pipeline nobody wired up, the other is a
 		// pipeline failing nightly and reporting success to its own log.
@@ -111,10 +107,4 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "scan_refusal_target_unique" UNIQUE ("target_id")
 		)` + t.suffix,
 	}
-
-	return apply(ctx, tx, statements)
-}
-
-func downScan(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "scan_refusal", "scan")
 }

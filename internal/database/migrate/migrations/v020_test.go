@@ -15,16 +15,20 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	v010 "github.com/nexthop-ai/openpsirt/internal/database/migrate/v010"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
+// v010 is the last migration the v0.1.0 release shipped.
+const v010 = 36
+
 // A database the v0.1.0 release built, holding a row in every table, is
 // upgraded into exactly the schema a fresh install makes, and every value it
-// held is still there.
+// held is still there. Rolled back, it is v0.1.0's schema again, and upgraded
+// a second time it is the fresh install's.
 func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -34,9 +38,10 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		}
 
 		rollBack(t, ctx, db)
-		if err := v010.Up(ctx, db, quiet()); err != nil {
+		if err := migrate.UpTo(ctx, db, quiet(), v010); err != nil {
 			t.Fatalf("build the v0.1.0 schema: %v", err)
 		}
+		released := describe(t, ctx, db)
 		seed(t, ctx, db)
 		before := snapshot(t, ctx, db)
 
@@ -66,6 +71,19 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		// A second start finds nothing to do.
 		if err := schema.Up(ctx, db, quiet()); err != nil {
 			t.Fatalf("a start after the upgrade: %v", err)
+		}
+
+		if err := schema.Down(ctx, db, quiet()); err != nil {
+			t.Fatalf("roll the upgrade back: %v", err)
+		}
+		if diff := setDiff(released, describe(t, ctx, db)); diff != "" {
+			t.Errorf("rolled back, the schema differs from v0.1.0's:\n%s", diff)
+		}
+		if err := schema.Up(ctx, db, quiet()); err != nil {
+			t.Fatalf("upgrade again: %v", err)
+		}
+		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
+			t.Errorf("upgraded a second time, the schema differs from a fresh install's:\n%s", diff)
 		}
 		dbtest.Reset(t, db)
 	})

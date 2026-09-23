@@ -16,18 +16,18 @@ func init() {
 
 // A word somebody put on a finding.
 //
-// People mark work regardless. At a dozen products and thousands of
+// **People mark work regardless.** At a dozen products and thousands of
 // findings they do it with nowhere to put it — inside the reasoning text,
 // where nothing can filter on it and an approver reads it as part of the
 // argument. A tag is where that goes instead.
 //
-// No fixed vocabulary, because none has been earned yet. A tag that
+// **No fixed vocabulary**, because none has been earned yet. A tag that
 // becomes universal is a signal that it should be promoted to a real concept:
 // "waiting on vendor" is a state the tool would want to reason about rather
 // than a string somebody typed, and inventing the vocabulary first would be
 // guessing at which states matter.
 //
-// At the grain somebody looks at: one issue, in one component, in one
+// **At the grain somebody looks at**: one issue, in one component, in one
 // product. Not per place — a kernel flaw at sixty places is one thing somebody
 // is marking — and not per build, because a tag is about the work rather than
 // about a release.
@@ -59,7 +59,7 @@ func upTag(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "finding_tag_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		// The list's filter: everything in a product carrying a tag.
+		// What the list filters on: everything in a product carrying a tag.
 		`CREATE INDEX "finding_tag_named_idx" ON "finding_tag" ("product_id", "tag")`,
 	}
 

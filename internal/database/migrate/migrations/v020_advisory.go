@@ -3,17 +3,6 @@
 
 package migrations
 
-import (
-	"context"
-	"database/sql"
-
-	"github.com/pressly/goose/v3"
-)
-
-func init() {
-	goose.AddMigrationContext(upAdvisory, downAdvisory)
-}
-
 // The advisory, the issues it covers, what it says, who agreed to it, and
 // that it went out.
 //
@@ -47,14 +36,6 @@ func init() {
 // passed. The digest beside it is over the part of those bytes that says what
 // the document states, so "is what is published still what we generate" stays
 // a question with a yes or no.
-func upAdvisory(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-	return apply(ctx, tx, advisoryStatements(t))
-}
-
 func advisoryStatements(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "advisory" (
@@ -229,11 +210,4 @@ func advisoryStatements(t *columnTypes) []string {
 				FOREIGN KEY ("removed_by") REFERENCES "person"("id")
 		)` + t.suffix,
 	}
-}
-
-func downAdvisory(ctx context.Context, tx *sql.Tx) error {
-	// An issuance points at the edition it published and an approval at the
-	// edition it agreed to, so both go before the editions do.
-	return dropTables(ctx, tx, "advisory_approval", "advisory_issuance",
-		"advisory_edition", "advisory_issue", "advisory")
 }

@@ -90,7 +90,7 @@ Engine-specific code is confined to these places:
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
 | Listing the harness's own databases | The one query in the harness that does branch. PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
-| Upgrading a release's database | Changing an existing table is spelled per engine: PostgreSQL drops a column's refusal of a null where the other two servers restate the column, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes a table already has |
+| Migration 37 | Changing an existing table is spelled per engine: PostgreSQL drops or restores a column's refusal of a null where the other two servers restate the column, MySQL and MariaDB drop a foreign key by a word of their own, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes a table already has |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
 This list is the complete set and is checked by grep rather than trusted —
@@ -214,16 +214,22 @@ engine. A timestamp column has no portable spelling: PostgreSQL has no
 `DATETIME`, and MySQL's `TIMESTAMP` is a 32-bit value that can acquire an
 implicit default and an on-update clause depending on server configuration.
 
-Below 1.0 a migration is edited rather than added to (REQ-72 and REQ-76). A
-change to a table edits the migration that created it, and anybody holding a
-development database recreates it. The migrations that exist are kept only
-because walking the chain up and down catches an ordering mistake between two of
-them, and they collapse into a single initial migration before 1.0.
+The chain has two parts.
 
-Every migration creates something. A migration that alters what an earlier one
-created costs a rollback per engine that exists only because the column arrived
-late, a file per alteration to read before anybody knows what one table holds,
-and one more migration for the collapse at 1.0 to unpick.
+| Migrations | What they are |
+|---|---|
+| 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again; a test holds each file to the digest of the tagged one |
+| 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. § Release upgrades says how |
+
+Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
+declares the table rather than adding a migration beside it. Until v0.2.0 is
+tagged, that is v0.2.0's declaration of the table, which migration 37 reads.
+The chain collapses into a single initial migration before 1.0 (REQ-72), and a
+database any 0.x release built is recreated then.
+
+Migrations 1 to 36 each create something, which is why rolling one back is
+dropping what it made. Migration 37 is the one that changes an existing table,
+and rolling it back changes the table back.
 
 A migration is its statements and nothing else. What every one of them does
 around those statements — asking which engine this is, refusing an engine there
@@ -263,28 +269,22 @@ when one stops half way.
 
 ### Release upgrades
 
-A database a tagged release built is changed into this build's schema in one
-step, before the migrations run. One release has an upgrade: v0.1.0. It exists
-to show the project can carry a deployment from one release to the next before
-1.0. Nothing is promised past it, and REQ-76 is unchanged: every other database
-from an earlier build is recreated, and migrations are still edited in place.
-
-A release's migration numbers and this build's mean different things, so
-running this build's migrations over a release's database would apply a later
-number's idea of an earlier table. The migration library refuses first, naming
-the numbers it finds missing.
+Migration 37 carries a database from v0.1.0 to v0.2.0. A database v0.1.0
+built applies it and nothing else; a fresh install walks the whole chain and
+applies it last. It is the one migration here shaped the way every migration
+after 1.0 will be, and it exists to show the project can carry a deployment
+from one release to the next.
 
 | Rule | |
 |---|---|
-| A release is recognized by exactly which migrations it applied | The highest number says nothing. v0.1.0 applied 1 to 5, 7, 9 to 12, 16, 18 to 31 and 33 to 36, and no build since has issued 30 |
-| One transaction, with the bookkeeping replaced last | The release's rows in the bookkeeping table become one row per migration this build carries, so the migrations that follow find nothing to do |
-| Every table and index is made by the fresh install's own statement | Read out of the migration that makes it. A column the upgrade adds is declared as that statement declares it. What the upgrade writes itself is the order, the rows, and how an existing table is changed on each engine |
-| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as a fresh install declares it and costs no row rewrite on either server |
-| SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by the fresh install's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes later migrations put on the table are read from the catalog first and made again |
+| Every table and index is made by v0.2.0's own statement | v0.2.0's declaration of each table it creates or changes sits beside it, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
+| One transaction of its own | Registered without the migration library's transaction, because SQLite's foreign keys have to be switched off before a transaction begins, and because the rows it moves are read back by name |
+| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as v0.2.0 declares it and costs no row rewrite on either server |
+| SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by v0.2.0's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
 | SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
 | Rows written with their own identifiers keep them | References into a moved table still land. PostgreSQL's identity does not move past a value it did not generate, so it is moved past them; the other three move on the insert |
-| A column added is last in its table | A fresh install declares it in place. No query reads a column by position |
-| On MySQL and MariaDB a failure part way is recovered from a backup | Both commit every data-definition statement as it runs, so the transaction does not hold the upgrade together there. The operator page says to take one first |
+| A column added is last in its table | v0.2.0 declares it in place. No query reads a column by position |
+| On MySQL and MariaDB a failure part way is recovered from a backup | Both commit every data-definition statement as it runs, so the transaction does not hold the migration together there, and the version is not recorded. The operator page says to take one first |
 
 What v0.1.0's rows become:
 
@@ -302,22 +302,31 @@ What v0.1.0's rows become:
 | A notification | Carried alone. Only a kind of message v0.1.0 did not have is carried together |
 | A column v0.1.0 did not have and that takes a null | Null |
 
-A test builds a v0.1.0 database from that release's migrations, frozen and
-kept apart from this build's, on each of the four engines. It writes a row into
-every table, every column holding a value, plus the rows each move above
-reads. It upgrades that database and compares every column, index and
-constraint against a fresh install. Then it compares every value the release
-held with what the upgrade left, and checks each move in the table above.
+Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
+place for goes with the tables and columns that held it: an embargo shortened,
+a report not yet judged, a file attached to a report, and every issue an
+advisory covers but its first. On MySQL and MariaDB a foreign key served by an
+index v0.2.0 added is dropped and declared again, so that the engine makes the
+key an index of its own as it did in v0.1.0; one made by hand would outlive
+the next upgrade.
+
+A test on each of the four engines builds a database to migration 36, writes a
+row into every table, every column holding a value, plus the rows each move
+above reads, and applies migration 37. It compares every column, index and
+constraint against a database that walked the chain empty, compares every
+value the release held with what the upgrade left, and checks each move in the
+table above. It then rolls migration 37 back and compares against the schema
+migration 36 built, and applies it again.
 
 The upgrade over a v0.1.0 database holding 524,288 findings, which is the
-largest table and the one every engine changes:
+largest table and one every engine changes:
 
 | Engine | Time |
 |---|---|
 | PostgreSQL 16 | 0.7 s |
 | SQLite | 7.5 s |
-| MySQL 8.4 | 12.5 s |
-| MariaDB 11.4 | 19.7 s |
+| MySQL 8.4 | 12.1 s |
+| MariaDB 11.4 | 19.3 s |
 
 ## Migration locks
 
@@ -902,9 +911,8 @@ and the granularity are open questions.
   Index a hash, not the raw string.
 - Timestamp semantics differ between engines. Store UTC and be explicit about
   types.
-- The upgrade from v0.1.0 is kept or removed on the measurement above. It costs
-  a frozen copy of that release's migrations, which only the test builds from,
-  and an upgrade that has to be read again whenever a migration it takes a
-  statement from changes. A statement it reads changing is caught by the test
-  comparing against a fresh install; a row it moves meaning something new is
-  not.
+- Migration 37 is kept or collapsed on the measurement above. The lasting test
+  compares an upgraded database with one that walked the same chain empty, so
+  a column the migration leaves out is missing from both and nothing notices.
+  That the chain builds the schema the per-table migrations it replaced built
+  was checked once, when it was written, and matched on all four engines.

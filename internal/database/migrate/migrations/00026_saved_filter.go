@@ -16,12 +16,12 @@ func init() {
 
 // A narrowing of the findings list that somebody kept.
 //
-// Personal, and nothing is shared. No ownership, no permissions,
+// **Personal, and nothing is shared**. No ownership, no permissions,
 // no arguing about whose filter is authoritative — and nobody hesitates to save
 // something half-formed. The same rule the look follows, for the same reason: a
 // preference that changes nothing anybody else sees needs no policy around it.
 //
-// The query is kept, as text. Not a column per filter: the filters
+// **What is kept is the query, as text.** Not a column per filter: the filters
 // are the list's own and they move, and a table that mirrored them would need a
 // migration every time one was added and would still be a second place where
 // what a filter means is decided. A saved filter is a way back to a list, and
