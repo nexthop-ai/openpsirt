@@ -158,10 +158,15 @@
 .refs a:hover {
   text-decoration: underline;
 }
+.refs .ref {
+  min-width: 0;
+}
+/* On a line of their own under the link: a commit address is long, and names
+   wrapped beside it read as a column of fragments. */
 .refs .branches {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
-  gap: 0 var(--gap-tight);
+  gap: 0 var(--gap);
 }
 
 .deciding {

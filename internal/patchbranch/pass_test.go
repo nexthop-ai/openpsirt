@@ -1,6 +1,7 @@
 package patchbranch_test
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -302,6 +304,57 @@ func TestACopyLargerThanTheCacheIsNotKeptAndWaitsADay(t *testing.T) {
 		pass.Now = func() time.Time { return time.Now().Add(patchbranch.RetryAfter + time.Minute) }
 		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("project") {
 			t.Errorf("a day later it was not tried again: %q, %v", visited, err)
+		}
+	})
+}
+
+func TestAVisitStoppedPartwayIsNeitherFinishedNorFailed(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		empty(t, db)
+		made := project(t)
+		issue(t, db, "CVE-2025-0014", "critical", link("project", made.fix))
+		turnOn(t, db)
+		// Shutdown arrives as the fetch begins.
+		ctx, stop := context.WithCancel(t.Context())
+		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
+			patchbranch.Excluded{}, func(string) string {
+				stop()
+				return made.dir
+			})
+		if _, err := pass.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		repositories, _, err := patchbranch.Progress(t.Context(), db.DB, patchbranch.Excluded{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(repositories) != 1 {
+			t.Fatalf("the report says %+v", repositories)
+		}
+		got := repositories[0]
+		if got.State != patchbranch.Waiting || got.ReachedAt != nil || got.Reason != "" {
+			t.Errorf("a stopped visit reads as %s, finished %v, reason %q; want waiting, unfinished, no reason",
+				got.State, got.ReachedAt, got.Reason)
+		}
+	})
+}
+
+func TestAVisitKeepsTheLeaseAsItGoes(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		empty(t, db)
+		ctx := t.Context()
+		turnOn(t, db)
+		pass := patchbranch.NewLeasedPass(db.DB, "this-replica")
+		if err := pass.StillMine(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// Another replica asking now is refused: the visit holds the work.
+		other, err := queue.NewLeases(db.DB).Take(ctx, patchbranch.Lease, "other-replica", time.Minute)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if other {
+			t.Error("a second replica took the lease from a visit in progress")
 		}
 	})
 }

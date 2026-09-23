@@ -53,3 +53,14 @@ func (p *Pass) Fetch(ctx context.Context, repository string) error {
 	_, err := p.copies.ensure(ctx, p.git, repository)
 	return err
 }
+
+// NewLeasedPass is a pass holding leases as replica, run at the interval the
+// server passes, which is none.
+func NewLeasedPass(db *bun.DB, replica string) *Pass {
+	pass := NewPass(db, slog.New(slog.NewTextHandler(io.Discard, nil)), replica, Options{Dir: "unused"})
+	pass.interval = betweenCycles
+	return pass
+}
+
+// StillMine is the check a visit makes as it goes.
+func (p *Pass) StillMine(ctx context.Context) error { return p.stillMine(ctx) }

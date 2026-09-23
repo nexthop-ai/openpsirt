@@ -154,8 +154,10 @@ export function References({
         {sorted.slice(0, 12).map((ref) => (
           <li key={ref.url}>
             <span className={ref.kind === "patch" ? "kind patch" : "kind"}>{ref.kind}</span>{" "}
-            <Away url={ref.url} />
-            <OnBranches of={ref} />
+            <span className="ref">
+              <Away url={ref.url} />
+              <OnBranches of={ref} />
+            </span>
           </li>
         ))}
       </ul>

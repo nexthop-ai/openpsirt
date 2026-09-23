@@ -13,13 +13,15 @@ import (
 type State string
 
 const (
-	// Waiting is a repository with commits never looked up and no visit yet.
+	// Waiting is a repository with commits never looked up and no visit
+	// under way.
 	Waiting State = "waiting"
 	// Working is a repository a visit has begun and not finished.
 	Working State = "working"
 	// Failed is a repository whose last visit stopped on an error.
 	Failed State = "failed"
-	// Done is a repository whose last visit finished.
+	// Done is a repository whose last visit finished with every commit
+	// looked up.
 	Done State = "done"
 	// Refused is a repository on a host an administrator excluded. Nothing
 	// is fetched from it.
@@ -139,7 +141,7 @@ func stateOf(one RepositoryProgress, excluded Excluded) State {
 		return Failed
 	case one.FetchedAt != nil && (one.ReachedAt == nil || one.ReachedAt.Before(*one.FetchedAt)):
 		return Working
-	case one.ReachedAt != nil:
+	case one.ReachedAt != nil && one.Looked == one.Commits:
 		return Done
 	default:
 		return Waiting

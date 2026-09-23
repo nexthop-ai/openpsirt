@@ -215,6 +215,10 @@ function VulnerabilityData() {
   );
 }
 
+// The repositories listed. Sorted by work left, so a stuck one is at the top
+// and the tail is the repositories with one or two commits each.
+const REPOSITORIES = 20;
+
 // How far looking up the branches patch links' commits are on has got, and
 // what the repository copies take on disk.
 //
@@ -224,7 +228,7 @@ function PatchBranches() {
   const progress = useQuery({
     queryKey: ["patch-branches"],
     queryFn: async () =>
-      unwrap(await api.GET("/v1/patch-branches", { params: { query: { limit: MOST } } })),
+      unwrap(await api.GET("/v1/patch-branches", { params: { query: { limit: REPOSITORIES } } })),
   });
 
   if (progress.isPending) return <Loading />;

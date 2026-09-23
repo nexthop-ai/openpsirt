@@ -106,6 +106,9 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 			return
 		}
 		p.interval = interval
+		if p.interval <= 0 {
+			p.interval = betweenCycles
+		}
 		mine, err := p.holding(ctx)
 		if err != nil {
 			p.logger.Error("deciding which replica looks up patch branches", "error", err)
@@ -115,6 +118,17 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 			return
 		}
 		visited, err := p.Once(ctx)
+		if ctx.Err() != nil && p.leases != nil {
+			// Shutting down mid-visit. The lease is handed back so the
+			// replica that starts next carries on at once rather than
+			// waiting for it to lapse.
+			releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			defer cancel()
+			if err := p.leases.Release(releasing, Lease, p.replica); err != nil {
+				p.logger.Warn("handing back the lease on looking up patch branches", "error", err)
+			}
+			return
+		}
 		if err != nil {
 			p.logger.Error("looking up the branches patches are on", "error", err)
 			return
@@ -299,9 +313,11 @@ func (p *Pass) visit(ctx context.Context, c candidate, commits map[Commit]urgenc
 	}
 	switch {
 	case errors.Is(err, errStopped), ctx.Err() != nil:
-		// Nothing about the repository to record. Marked as reached, so
-		// the report does not show a visit in progress that is not.
-		return p.finish(ctx, c.repository.ID, dir, nil)
+		// Nothing about the repository to record: the visit neither
+		// finished nor failed. The moment it began is put back to the last
+		// one that finished, so the report shows no visit in progress and
+		// no finish that did not happen.
+		return p.finish(ctx, c.repository.ID, dir, errStopped)
 	case err != nil:
 		p.logger.Warn("a repository patch links point into could not be read",
 			"repository", c.repository.URL, "error", err)
@@ -364,14 +380,12 @@ func (p *Pass) stillMine(ctx context.Context) error {
 	if !on {
 		return errStopped
 	}
-	if p.interval > 0 {
-		mine, err := p.holding(ctx)
-		if err != nil {
-			return fmt.Errorf("keep the lease on looking up patch branches: %w", err)
-		}
-		if !mine {
-			return errStopped
-		}
+	mine, err := p.holding(ctx)
+	if err != nil {
+		return fmt.Errorf("keep the lease on looking up patch branches: %w", err)
+	}
+	if !mine {
+		return errStopped
 	}
 	return nil
 }
@@ -418,9 +432,12 @@ func (p *Pass) record(ctx context.Context, id int64, found bool, branches []stri
 // finish records how a visit ended, and makes room in the cache.
 func (p *Pass) finish(ctx context.Context, id int64, dir string, failed error) error {
 	update := p.db.NewUpdate().Model((*repositoryRow)(nil)).Where("id = ?", id)
-	if failed != nil {
+	switch {
+	case errors.Is(failed, errStopped):
+		update = update.Set("fetched_at = reached_at")
+	case failed != nil:
 		update = update.Set("failed = ?", bound.HeadRunes(failed.Error(), MostReason))
-	} else {
+	default:
 		update = update.Set("failed = NULL").Set("reached_at = ?", p.Now().UTC())
 	}
 	if dir != "" {
