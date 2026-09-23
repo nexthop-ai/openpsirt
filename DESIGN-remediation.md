@@ -147,7 +147,7 @@ A finding with no deadline states which reason applies:
 | Reason | Reported as | Precedence |
 |---|---|---|
 | Below the line its product triages at | `below-the-line` | The narrowest statement about this finding, so it is the one stated |
-| **Upstream has released no fix, or has declined to** | `nothing-to-take` | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
+| **Upstream has released no fix, or has declined to on an issue nobody is exploiting** | `nothing-to-take` | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
 | **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
 | Its release is past end-of-life (REQ-15) | `out-of-support` | |
 
@@ -168,10 +168,24 @@ the act the deadline exists to ask for and cannot be the answer to. An overdue
 list carrying rows no upgrade would answer is one people stop reading, and what
 they stop reading is the rest of it.
 
-How much of a real overdue list that is has not been measured here. The
-proportion belongs beside this rule once somebody has it from a deployment, and
-it is left out rather than estimated: a figure nobody can re-run is one a reader
-has to take on trust, which is the opposite of what a number is for.
+Measured on the demo deployment's two SONiC images, seeded 2026-09-23:
+95,497 of 335,491 open findings have no fix released (28.5%), and 14,196 more
+are an upstream refusal (4.2%).
+
+An upstream refusal of an **exploited** issue keeps its deadline. Exploited is
+either signal: the feed's, or a record that this product was attacked. The
+refusal will never be reversed, so what remains is work only this deployment can
+do — patching the package itself, replacing it, or recording what stands in the
+way — and on an issue somebody is using that work has a date. A missing fix does
+not get the same exception: one may arrive, and a deadline set against it could
+only be met by waiting.
+
+| Writer | Where the exception is asked |
+|---|---|
+| A scan opening a finding, or answering one already open | The one deadline rule, with either exploitation signal |
+| A scan learning exploitation, for every other build of the issue | Only a missing fix loses the clock just given |
+| A record of this product being attacked, set or cleared | The recount, with either signal |
+| An edited window | The sweep that removes clocks passes over an exploited refusal |
 
 A scanner that did not answer is not upstream saying no. Reading silence as
 "no fix exists" is a claim about the world made out of a gap in a report, and it

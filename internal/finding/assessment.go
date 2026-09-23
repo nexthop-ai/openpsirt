@@ -547,12 +547,14 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 					if err != nil {
 						return err
 					}
-					// And off again where there is nothing to take. An issue
+					// And off again where no fix has been released. An issue
 					// becoming exploited says how long there is; it does not
 					// say there is a version to take, so the clock the scan
 					// path took off would otherwise be handed straight back —
 					// and on a tag, scanned once and never again, it stays
-					// handed back.
+					// handed back. An upstream refusal keeps the clock this
+					// gave it, because on an exploited issue a refusal leaves
+					// work only this deployment can do (Clocked).
 					//
 					// A second statement rather than a condition inside the
 					// first: a CASE choosing between NULL and a parameter
@@ -561,7 +563,7 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 					_, err = tx.NewUpdate().Model((*Finding)(nil)).
 						Set("due_at = NULL").
 						Where("id IN (?)", bun.List(batch)).
-						Where("fix_state IN (?)", bun.List([]FixState{NoFix, WontFix})).
+						Where("fix_state = ?", NoFix).
 						Exec(ctx)
 					return err
 				}); err != nil {
@@ -698,7 +700,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 		// The one rule, asked here rather than restated. A recount that worked
 		// the deadline out its own way is a second policy nobody chose, and
 		// the two agreed only until one of them moved.
-		due := Deadline(group.FixState, group.OpenedAt, recountedAt,
+		due := Deadline(group.FixState, group.Exploited || group.ExploitedHere,
+			group.OpenedAt, recountedAt,
 			group.LearnedAt, group.FixedAt,
 			windows.For(group.Exploited, group.Severity))
 		if due == nil || !floor.Admits(group.Exploited || group.ExploitedHere, group.Severity) {

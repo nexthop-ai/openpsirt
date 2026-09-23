@@ -885,7 +885,9 @@ The record of being exploited here moves no deadline. How long a fix may take
 is a question about the work and about upstream, and being attacked says
 nothing about either; what it does is admit the finding to the triage line
 whatever the rating says, so a finding that was below the line gains the clock
-its severity earns and one whose record is cleared may lose it again.
+its severity earns and one whose record is cleared may lose it again. It also
+puts an upstream refusal back on that clock, which `DESIGN-remediation.md`
+describes beside the other reasons a finding carries none.
 `DESIGN-obligations.md` § Windows holds why the clock an obligation runs on is
 not this one.
 

@@ -257,7 +257,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 					// From this run, which for a new finding is when it was
 					// first seen. One already open is answered in the loop
 					// below, from its own opening.
-					entry.DueAt = Deadline(entry.FixState, startedAt, startedAt,
+					entry.DueAt = Deadline(entry.FixState,
+						rated.Exploited || rated.ExploitedHere, startedAt, startedAt,
 						entry.ExploitedLearnedAt, entry.FixedAt, window)
 				}
 				wanted[key{vulnerabilityID, at}] = entry
@@ -336,8 +337,8 @@ func (s *Store) Apply(ctx context.Context, targetID, runID int64, reported []Rep
 			}
 			window, onClock := windowFor[k]
 			if onClock {
-				f.DueAt = Deadline(f.FixState, already.OpenedAt, startedAt,
-					learned, f.FixedAt, window)
+				f.DueAt = Deadline(f.FixState, f.RankExploited || f.RankExploitedHere,
+					already.OpenedAt, startedAt, learned, f.FixedAt, window)
 			}
 			// Asked of the answer rather than of what moved. A fix appearing
 			// upstream starts a clock that was not running, and one being

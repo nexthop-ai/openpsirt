@@ -539,6 +539,28 @@ func (f *fixture) deadlineOrZero(t *testing.T, identifier string) time.Time {
 	return *due
 }
 
+// deadlineIn is deadlineOrZero on one build, for the checks about what
+// reaches a build other than the one being scanned.
+func (f *fixture) deadlineIn(t *testing.T, target int64, identifier string) time.Time {
+	t.Helper()
+	var due *time.Time
+	err := f.db.DB.NewSelect().
+		TableExpr("\"finding\" AS \"f\"").
+		Join("JOIN \"vulnerability\" AS \"v\" ON v.id = f.vulnerability_id").
+		ColumnExpr("f.due_at").
+		Where("v.identifier = ?", identifier).
+		Where("f.target_id = ?", target).
+		Where("f.closed_at IS NULL").
+		Limit(1).Scan(t.Context(), &due)
+	if err != nil {
+		t.Fatalf("read the stored deadline for %s: %v", identifier, err)
+	}
+	if due == nil {
+		return time.Time{}
+	}
+	return *due
+}
+
 // urgency reads where an issue's findings sit in the order.
 func (f *fixture) urgency(t *testing.T, identifier string) int64 {
 	t.Helper()
@@ -1131,5 +1153,132 @@ func TestAFixDatedAfterWeSawItIsNotWhatTheClockRunsFrom(t *testing.T) {
 			t.Errorf("the deadline is %s, want %s — the fix date is in the future",
 				got.Format(time.RFC3339), want.Format(time.RFC3339))
 		}
+	})
+}
+
+func TestAnUpstreamRefusalOfAnExploitedIssueKeepsItsDeadline(t *testing.T) {
+	// A refusal leaves nothing to take, and on an issue nobody is using that
+	// is no clock. On one somebody is using, the refusal leaves work only this
+	// deployment can do, so the clock stays. Each case reaches one writer of
+	// the column: the scan opening a finding, the scan learning exploitation
+	// on one already open, a record that this product was attacked, and the
+	// recount an edited window runs.
+	refused := func(identifier string, exploited bool) finding.Reported {
+		return finding.Reported{
+			Issue: finding.Named{Identifier: identifier, Severity: "high",
+				Exploited: exploited},
+			Component: libnl, FixState: finding.WontFix,
+		}
+	}
+
+	t.Run("opened exploited", func(t *testing.T) {
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, twoConsumers())
+			missing := refused("CVE-2026-NOFIX-USED", true)
+			missing.FixState = finding.NoFix
+			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+				[]finding.Reported{refused("CVE-2026-REFUSED-USED", true), missing}); err != nil {
+				t.Fatal(err)
+			}
+			if f.deadlineOrZero(t, "CVE-2026-REFUSED-USED").IsZero() {
+				t.Error("an exploited issue upstream refuses to fix carries no deadline")
+			}
+			// A missing fix is not a refusal: one may arrive, and waiting is
+			// the only way to meet a deadline set against it.
+			if due := f.deadlineOrZero(t, "CVE-2026-NOFIX-USED"); !due.IsZero() {
+				t.Errorf("an exploited issue with no fix released carries a deadline of %s", due)
+			}
+		})
+	})
+
+	t.Run("exploitation learned while open", func(t *testing.T) {
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+				[]finding.Reported{refused("CVE-2026-REFUSED-LATER", false)}); err != nil {
+				t.Fatal(err)
+			}
+			if due := f.deadlineOrZero(t, "CVE-2026-REFUSED-LATER"); !due.IsZero() {
+				t.Fatalf("a refusal nobody is exploiting carries a deadline of %s", due)
+			}
+			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+				[]finding.Reported{refused("CVE-2026-REFUSED-LATER", true)}); err != nil {
+				t.Fatal(err)
+			}
+			if f.deadlineOrZero(t, "CVE-2026-REFUSED-LATER").IsZero() {
+				t.Error("an issue became exploited, upstream refuses to fix it, and it carries no deadline")
+			}
+		})
+	})
+
+	t.Run("learned by scanning another build", func(t *testing.T) {
+		// Learning reaches every open finding of the issue, and a build that
+		// is not being scanned hears of it here or not at all.
+		each(t, func(t *testing.T, f *fixture) {
+			other := f.anotherBranch(t, "release-2")
+			f.shippedTo(t, other, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), other, f.runOn(t, other),
+				[]finding.Reported{refused("CVE-2026-REFUSED-ELSEWHERE", false)}); err != nil {
+				t.Fatal(err)
+			}
+			if due := f.deadlineIn(t, other, "CVE-2026-REFUSED-ELSEWHERE"); !due.IsZero() {
+				t.Fatalf("a refusal nobody is exploiting carries a deadline of %s", due)
+			}
+			f.shipped(t, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+				[]finding.Reported{refused("CVE-2026-REFUSED-ELSEWHERE", true)}); err != nil {
+				t.Fatal(err)
+			}
+			if f.deadlineIn(t, other, "CVE-2026-REFUSED-ELSEWHERE").IsZero() {
+				t.Error("a scan of one build learned the issue is exploited, and the refusal on another build carries no deadline")
+			}
+		})
+	})
+
+	t.Run("attacked here", func(t *testing.T) {
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+				[]finding.Reported{refused("CVE-2026-REFUSED-HERE", false)}); err != nil {
+				t.Fatal(err)
+			}
+			issue := f.issue(t, "CVE-2026-REFUSED-HERE")
+			if err := finding.ExploitedHereChanged(t.Context(), f.db.DB,
+				f.productID, issue, true); err != nil {
+				t.Fatal(err)
+			}
+			if f.deadlineOrZero(t, "CVE-2026-REFUSED-HERE").IsZero() {
+				t.Error("this product was attacked through an issue upstream refuses to fix, and it carries no deadline")
+			}
+			if err := finding.ExploitedHereChanged(t.Context(), f.db.DB,
+				f.productID, issue, false); err != nil {
+				t.Fatal(err)
+			}
+			if due := f.deadlineOrZero(t, "CVE-2026-REFUSED-HERE"); !due.IsZero() {
+				t.Errorf("the record was cleared and the refusal still carries a deadline of %s", due)
+			}
+		})
+	})
+
+	t.Run("a window edited", func(t *testing.T) {
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), f.target, f.run(t),
+				[]finding.Reported{
+					refused("CVE-2026-REFUSED-KEPT", true),
+					refused("CVE-2026-REFUSED-IDLE", false),
+				}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.store.Recompute(t.Context(), testWindows); err != nil {
+				t.Fatal(err)
+			}
+			if f.deadlineOrZero(t, "CVE-2026-REFUSED-KEPT").IsZero() {
+				t.Error("editing a window took the deadline off an exploited refusal")
+			}
+			if due := f.deadlineOrZero(t, "CVE-2026-REFUSED-IDLE"); !due.IsZero() {
+				t.Errorf("editing a window gave a refusal nobody exploits a deadline of %s", due)
+			}
+		})
 	})
 }

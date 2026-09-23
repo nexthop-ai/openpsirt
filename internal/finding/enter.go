@@ -411,7 +411,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				// fix state and no fix date, which is exactly the condition
 				// that stops holding the first time the form gains one — and
 				// the comment above promises they cannot differ.
-				row.DueAt = Deadline(row.FixState, now, now, nil, row.FixedAt,
+				row.DueAt = Deadline(row.FixState, ranked.ExploitedHere, now, now, nil, row.FixedAt,
 					// The world's word, which a flaw recorded here does not
 					// carry. Being attacked here admits the finding to the
 					// line above and moves no window: how long a fix may take
