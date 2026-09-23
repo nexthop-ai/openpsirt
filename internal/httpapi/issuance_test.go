@@ -120,6 +120,56 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 	})
 }
 
+func TestAnAdvisoryNamesWhoAgreesAndSaysWhetherItMovedSinceItWentOut(t *testing.T) {
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		flaw := r.embargoed(t)
+		named := advisoryOver(t, r, "private-triage", "mine", flaw)
+		at := "/v1/advisories/" + named
+
+		type standing struct {
+			AgreedBy []struct {
+				Person   string `json:"person"`
+				AgreedAt string `json:"agreed_at"`
+			} `json:"agreed_by"`
+			Changed *bool `json:"changed"`
+		}
+		var before standing
+		read(t, r, "private-triage", at, &before)
+		if len(before.AgreedBy) != 0 || before.Changed != nil {
+			t.Errorf("with nobody agreeing and nothing gone out it reads %+v", before)
+		}
+
+		agreedTo(t, r, at)
+		if got := asPerson(t, r, "private-triage", http.MethodPost, at+"/issuance",
+			`{}`); got.Code != http.StatusCreated {
+			t.Fatalf("recording that it went out answered %d: %s", got.Code, got.Body.String())
+		}
+		var sent standing
+		read(t, r, "private-triage", at, &sent)
+		if len(sent.AgreedBy) != 1 || sent.AgreedBy[0].Person != "private-dispatcher" ||
+			sent.AgreedBy[0].AgreedAt == "" {
+			t.Errorf("who agrees reads as %+v", sent.AgreedBy)
+		}
+		if sent.Changed == nil || *sent.Changed {
+			t.Errorf("straight after it went out, changed reads %v", sent.Changed)
+		}
+
+		if got := asPerson(t, r, "private-triage", http.MethodPatch, at,
+			`{"title":"A different title"}`); got.Code != http.StatusOK {
+			t.Fatalf("retitling answered %d: %s", got.Code, got.Body.String())
+		}
+		var moved standing
+		read(t, r, "private-triage", at, &moved)
+		if moved.Changed == nil || !*moved.Changed {
+			t.Errorf("after a retitle, changed reads %v", moved.Changed)
+		}
+		if len(moved.AgreedBy) != 0 {
+			t.Errorf("an agreement to the old title still names %+v", moved.AgreedBy)
+		}
+	})
+}
+
 // agreedTo has a second person agree to what the advisory at this path says,
 // which is what an issuance asks for.
 //
@@ -201,4 +251,95 @@ func TestAWriteOnAnAdvisoryNeedsTheRoleOnEveryProductItCovers(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestEveryObjectInACSAFDocumentHasItsKeysInOrder(t *testing.T) {
+	// The standard's optional sorting test reads every key at every depth,
+	// and a customer's validator reports a document that fails it.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		flaw := r.embargoed(t)
+		named := advisoryOver(t, r, "private-triage", "mine", flaw)
+		at := "/v1/advisories/" + named
+
+		got := asPerson(t, r, "private-triage", http.MethodGet, at+"/document", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("generating answered %d: %s", got.Code, got.Body.String())
+		}
+		objects := sortedObjects(t, got.Body.Bytes())
+
+		// And the bytes kept as it went out, which are what a directory serves.
+		agreedTo(t, r, at)
+		if sent := asPerson(t, r, "private-triage", http.MethodPost, at+"/issuance",
+			`{}`); sent.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", sent.Code, sent.Body.String())
+		}
+		var kept string
+		if err := r.db.DB.NewSelect().TableExpr(`"advisory_issuance"`).
+			Column("document").Limit(1).Scan(t.Context(), &kept); err != nil {
+			t.Fatal(err)
+		}
+		objects += sortedObjects(t, []byte(kept))
+		// A walk that reached nothing looks like a walk that found nothing
+		// wrong. The document holds a tracking, a publisher, a product tree
+		// and a vulnerability at the least, twice over.
+		if objects < 10 {
+			t.Fatalf("only %d objects were reached, so this proves little", objects)
+		}
+	})
+}
+
+// sortedObjects fails every object in a JSON document whose keys are out of
+// order, and answers how many objects it read.
+func sortedObjects(t *testing.T, body []byte) int {
+	t.Helper()
+	reader := json.NewDecoder(strings.NewReader(string(body)))
+	type frame struct {
+		object bool
+		last   string
+		key    bool
+	}
+	var stack []frame
+	objects := 0
+	for {
+		token, err := reader.Token()
+		if err != nil {
+			break
+		}
+		top := len(stack) - 1
+		switch held := token.(type) {
+		case json.Delim:
+			switch held {
+			case '{':
+				objects++
+				if top >= 0 && stack[top].object {
+					stack[top].key = true
+				}
+				stack = append(stack, frame{object: true, key: true})
+			case '[':
+				if top >= 0 && stack[top].object {
+					stack[top].key = true
+				}
+				stack = append(stack, frame{})
+			default:
+				stack = stack[:top]
+			}
+		case string:
+			if top >= 0 && stack[top].object && stack[top].key {
+				if held < stack[top].last {
+					t.Errorf("%q comes after %q", held, stack[top].last)
+				}
+				stack[top].last, stack[top].key = held, false
+				continue
+			}
+			if top >= 0 && stack[top].object {
+				stack[top].key = true
+			}
+		default:
+			if top >= 0 && stack[top].object {
+				stack[top].key = true
+			}
+		}
+	}
+	return objects
 }

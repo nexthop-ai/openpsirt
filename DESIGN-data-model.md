@@ -149,7 +149,7 @@ The rules below hold at all three levels, except where a row says otherwise.
 |---|---|
 | The matching name and the spelling shown move together | A name people type is matched without regard to capitals, and both halves are derived from one string. Moved apart, a variant is matched as one thing and shown as another |
 | A name another variant of the product holds is refused, retired ones included | The name stays spoken for while a variant is retired, which is what lets declaring it again bring that variant back rather than making a second |
-| A name is refused once a document naming it has been published | A published OpenVEX document is identified by the build it describes, and a published advisory names each affected release in its product tree the same way. The product, the release and the variant are all inside that identifier. Renamed afterwards, the next document names the same thing differently: a reader holding the first reads it as a second document rather than as a revision of theirs, and one matching the identifier against an advisory finds it absent, which reads as no longer affected about a customer who still is. What went out is not rewritten, so nothing there can be corrected to match: an issued document is kept as the bytes that were sent, and a record that keeps only the build and the revision number names no name at all |
+| A name is refused once a document naming it has been published | A published OpenVEX document is identified by the build it describes, and a published advisory names each affected release in its product tree the same way. The product, the release and the variant are all inside that identifier. Renamed afterwards, the next document names the same thing differently: a reader holding the first reads it as a second document rather than as a revision of theirs, and one matching the identifier against an advisory finds it absent, which reads as no longer affected about a customer who still is. What went out is not rewritten, so nothing there can be corrected to match: an issued document, advisory or VEX, is kept as the bytes that were sent |
 | A release is asked about the advisories that named it, rather than about its product | A release reaches an advisory's product tree by holding one of the issues that advisory covers, so that is the question. Asked of the product, a release no advisory ever named would be refused because a sibling release was named once — and a release cannot be retired and declared again to get round it, because the second one holds none of the first one's history |
 | An issue taken back off an advisory still counts | It was on the document that went out, which is the document readers hold |
 | A product's displayed name moves freely | It is what a screen shows, what a report is titled with, and what a published document names the product in prose. Nothing is identified by it. A release and a variant have no displayed name set apart from their name, so for those the two move together |
@@ -452,8 +452,11 @@ no way to tell which is the build's.
 | A page is cut after the comparison | What is read is the scan's own change — the names it opened or closed a row of — so the cost is what the upload moved rather than what the build contains |
 
 Over a year of nightly scans that cost stays flat: listing an upload that moved
-seven names takes 2 to 4 ms on SQLite and 2 to 6 ms on PostgreSQL, behind 73
-nights of history and behind 365. MySQL and MariaDB are unmeasured for this.
+seven names takes 2 to 4 ms on SQLite, 2 to 6 ms on PostgreSQL, 2 to 5 ms on
+MariaDB and 3 to 17 ms on MySQL, behind 73 nights of history and behind 365.
+The two server engines of the MySQL family were measured on 2026-09-23, one at a
+time; MySQL's highest figure is the night-73 point and every later one is 7 ms or
+under.
 
 ### The size a change is against
 

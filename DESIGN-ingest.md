@@ -882,17 +882,22 @@ document has been read.
 | A supplier is matched by name without regard to capitals, and a product out of use takes none | Two spellings of one name are one supplier, on every engine, because the stored value is lowered rather than an engine asked to fold. A product taken out of use accepts no scan, so what a supplier would be read against is a build list nothing adds to — and nothing lists the product, so nothing could withdraw the supplier either |
 | Only claims naming a component the product ships are recorded | A publisher's feed is about their whole catalog. One real advisory about a kernel carries 95,139 claims, so a deployment taking them whole would store a supplier's catalog rather than evidence about its own |
 | What the product ships is read as the pass runs, so a component that arrives later has no evidence behind it | An advisory read before a build first shipped the component it names is not read again: the mark has passed it. The evidence for that component arrives with the publisher's next advisory about it, and the one already issued is taken by uploading it |
-| Reading starts at the moment the supplier was configured | A distribution's feed lists every advisory they have ever issued. Taking that history is tens of thousands of requests at somebody else's service, draining over months, for evidence about issues a scan reported long ago. One older document is taken by uploading it |
-| A supplier taken up again starts at today | A source withdrawn for a month and restored would otherwise fetch the month it was away |
+| A new supplier is read from a window before it was configured, a year unless a deployment says otherwise | A distribution's feed lists every advisory they have ever issued, so the whole of it is tens of thousands of requests at somebody else's service. A window drains at the per-pass bound; one older than it is taken by uploading it |
+| A supplier taken up again at the same address resumes where it stopped, no further back than that window | It takes what was issued while it was away and nothing it already read. Taken up at another address it starts where a new one does, since nothing at that address has been read |
+| A document is compared against the digest its publisher serves beside it | What was fetched and what the publisher says they published can differ — a cut transfer, a mirror behind, a file replaced — and recorded, it stands as their judgment. A mismatch is about the document, so the pass steps over it, and that revision is not read again until the publisher stamps it again. Mismatches are counted apart and logged per supplier, because a publisher whose digests keep disagreeing otherwise reads as healthy |
+| A document is read before its digest is asked for | A statement set listed beside the advisories is set aside whatever its digest says, and a distribution lists tens of thousands of them |
+| The digest a feed entry names is the one read; otherwise the file beside the document | The format puts it at the document's address with the algorithm's suffix, and a feed entry may name it outright. One https address per algorithm is taken from an entry, which bounds what one entry can ask for |
+| Both SHA-256 and SHA-512 are read, and whichever answered is asked for first after | Publishers split between them, and each serves one kind beside every document, so the one a publisher does not serve is asked for once a pass |
+| A publisher serving no digest is read unchecked | The format asks for one of its trusted providers only. A refusal, a page in place of a digest, a redirect, an address off the configured host, or nothing at all means none is served; a publisher that cannot be reached for the digest holds the mark, the way it does for a document. After two documents in a row with none beside them, the rest of the pass does not ask |
 | A VEX document in the same feed is left alone | A publisher's statement set replaces their whole answer for a product. Setting that aside is a judgment, and a pass on a timer makes none — it is taken by uploading it |
 | One replica reaches out, settled by a lease | The politeness the pass keeps to is a rate per deployment rather than per replica, and three replicas each keeping to it would be three times the traffic at a publisher's expense |
-| The lease is taken again as the pass runs | A supplier is up to twenty requests with a timeout each, and a slow publisher handing the pass to a second replica mid-flight is what a lease exists to prevent |
+| The lease is taken again as the pass runs, between suppliers and before each document | A document is up to three requests with a timeout each — itself and two digest files — so one supplier's pass outlasts a lease sized for the interval, and a slow publisher handing the pass to a second replica mid-flight is what a lease exists to prevent. A pass that loses the lease leaves the supplier due |
 | Bounded per supplier per wake, and a supplier that filled its bound stays due | A publisher having a busy week is not a reason to make a hundred requests of them in a minute. Left to the interval instead, the bound would be per day, and a publisher issuing more in a day than one pass takes would fall further behind every day |
 | Both shapes the format defines are read, at the labels that travel | A publisher serves a feed or a directory of documents, and the largest publisher of these serves only the second — so a reader that knows one takes the other's description, finds nothing, and reports that it worked. Only the labels a publisher serves to everybody are read: one that has to be arranged answers a refusal on every pass |
 | How many places a publisher may point at is bounded | Nothing in the format bounds it, and a description within the size bound can name tens of thousands of addresses — which is a pass running for hours and outliving the lease that says it is the one reading |
 | A listing that cannot be read does not stop the others | A publisher serving a restricted label beside a public one is ordinary, and failing the supplier on the first means the public one is never reached |
 | A stamp far in the future is not read | The mark moves forward only, so one entry stamped in 2099 would carry it past everything issued between now and then — and the fetch succeeds, so the supplier reads as healthy while it takes nothing |
-| A document that cannot be read is stepped over; a publisher that cannot be reached holds the mark | The two are different facts. A document refused the same way every time — withdrawn and answering 404, larger than what is read, malformed — would otherwise stop the supplier for ever, and the only way out would be to withdraw it and add it again, which starts from today and loses the gap. A publisher that cannot be reached has not shown what is behind the mark, so the mark stays |
+| A document that cannot be read is stepped over; a publisher that cannot be reached holds the mark | The two are different facts. A document refused the same way every time — withdrawn and answering 404, larger than what is read, malformed — would otherwise stop the supplier for ever. A publisher that cannot be reached has not shown what is behind the mark, so the mark stays |
 | The mark is a moment and the address read at it | A publisher stamps a batch with one moment, and a date-only stamp gives a whole day the same one. On the moment alone, a pass that stopped inside such a group would skip the rest of it for ever |
 | What identifies a recording is the document and what was kept of it | The store treats a document whose digest it already holds as one that changes nothing. For a fetched document the bytes are not the whole of what decides which claims get written — what the product ships that day is the other half — so keyed on the bytes alone, uploading the same advisory once a build ships a component the fetch narrowed away writes nothing and reports success |
 | A document is recorded even where nothing was kept | That write is the only thing that sets aside what an earlier revision of the same advisory said. Skipped, a publisher correcting one by dropping the component we ship leaves the old claim standing as evidence |
@@ -903,6 +908,35 @@ document has been read.
 | What stopped an attempt is kept bounded | The text carries a publisher's own address and a server's own reason phrase, neither of which they have agreed to bound. Unbounded, the write fails on two of the four engines, which leaves the attempt unrecorded and the supplier fetched again on every wake |
 | A feed entry nobody can date is left alone | It cannot be placed against the mark, so taking it would mean taking it again on every pass for ever |
 | A claim is recorded as the administrator who configured the supplier | Configuring one is the act that admitted this publisher's judgment, and it is the only decision anybody made. Nothing chose the individual document, which is the whole difference from an upload |
+
+What a year costs was measured against five publishers on 2026-09-23, by
+reading their listings and sampling their documents. Each wake takes twenty
+documents from a supplier and wakes every five minutes, so one supplier drains
+at up to 5,760 a day.
+
+| Publisher | Shape | Listed in a year | Listed in 30 days | Drains in | Digest served |
+|---|---|---|---|---|---|
+| Red Hat, advisories | Directory | 28,984 | 10,596 | 17 days, both directories together | SHA-256 |
+| Red Hat, VEX | Directory | 68,238 | 7,614 | | SHA-256 |
+| SUSE, advisories | Directory | 42,268 | 33,438 | Unreachable: see below | SHA-256 |
+| Cisco | Directory | 1,229 | 155 | About 5 hours | SHA-512 |
+| NCSC-NL | Directory | 503 | 75 | About 2 hours | SHA-512 |
+| Siemens | Feed | 178 | 18 | About 45 minutes | SHA-512 |
+
+A publisher restamps an entry every time it revises the document, so a year's
+listing is mostly revisions: 25,743 of Red Hat's 28,984 advisory entries fall
+in the last 90 days. A distribution's steady state is a few hundred entries a
+day, well inside the bound. The rest of the limits hold with room: the largest
+listing is 3.7 MB against 64 MB, and sampled documents run to a median of 55 KB
+and a largest of 5.2 MB for Red Hat's advisories, against 256 MB. A Red Hat
+document arrives in a quarter of a second, so a pass is the pause between
+requests and little else. Red Hat's VEX directory is listed beside its
+advisories, and every document in it is fetched and then set aside, because
+nothing in a directory says which profile its documents are.
+
+SUSE describes itself on one host and serves its directory from another, and a
+listing on any host but the configured one is refused. Its description names no
+directory on the host it is served from, so SUSE cannot be read by this path.
 
 Every request is the guarded client's: https only, to the host the
 configured address names, refusing a redirect and refusing an address inside

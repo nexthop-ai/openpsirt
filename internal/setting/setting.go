@@ -187,6 +187,14 @@ const (
 	// for. The length is a judgment about how patient to be with somebody
 	// else's service, so it is tuned here rather than compiled in.
 	SupplierSilentAfter = "scanning.supplier-silent-after"
+	// SupplierHistory is how many days before its configuration a supplier is
+	// first read from.
+	//
+	// A window rather than the whole of a publisher's history, which for a
+	// distribution is tens of thousands of documents. What it costs is
+	// requests at somebody else's service, drained at the per-pass bound, so
+	// how much history is worth asking for is a judgment about a deployment.
+	SupplierHistory = "scanning.supplier-history"
 	// UpstreamCurrency is whether this deployment asks public package
 	// indexes what the newest version of a component is.
 	//
@@ -462,6 +470,14 @@ const DefaultScanEvery = 24 * time.Hour
 // bad day is not an alert, and one that stopped answering is noticed in the
 // week it stopped.
 const DefaultSupplierSilentAfter = 7 * 24 * time.Hour
+
+// DefaultSupplierHistory is how many days before its configuration a supplier
+// is first read from, where nobody has said.
+//
+// A year. Measured on 2026-09-23, a year of Red Hat's two directories is 97,222
+// entries, which drains at the per-pass bound in about seventeen days; Cisco's
+// is 1,229 and NCSC-NL's 503, which drain in hours.
+const DefaultSupplierHistory = 365
 
 // DefaultDiscloseAfter is how long an undisclosed finding has before its date
 // arrives, where a deployment has not said otherwise.

@@ -164,7 +164,11 @@ func registerAdvisory(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-advisory", Method: http.MethodGet, Path: "/v1/advisories/{advisory}",
 		Summary: "Read an advisory",
-		Description: "The advisory and the issues it covers, in the order they were added.\n\n" +
+		Description: "The advisory and the issues it covers, in the order they were added, " +
+			"who agrees to what it says now, and whether what it would generate now differs " +
+			"from what last went out.\n\n" +
+			"`changed` is absent where nothing has gone out, where it covers nothing, and " +
+			"where no publisher is configured, since then there is no document to compare.\n\n" +
 			"An advisory covering a product you hold nothing on answers as one that does " +
 			"not exist. Told apart, the pair of answers says what exists.",
 		Tags: []string{"Findings"},
@@ -187,10 +191,61 @@ func registerAdvisory(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the advisory could not be read")
 		}
+		changed, err := store.Changed(ctx, subject, in.Publisher, input.Advisory)
+		if err != nil {
+			return nil, advisoryRefused(in, err, "the advisory could not be compared")
+		}
 		body := bodyFor(row, held)
 		body.Status, body.Agreed = where.Status, len(where.Agreed)
+		body.Changed = changed
+		body.AgreedBy = make([]AgreerBody, 0, len(where.Agreed))
+		for i, one := range where.Agreed {
+			body.AgreedBy = append(body.AgreedBy, AgreerBody{
+				Person: where.AgreedBy[i], AgreedAt: one.ApprovedAt.Format(time.RFC3339),
+			})
+		}
 		return &struct{ Body AdvisoryBody }{Body: body}, nil
 	})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "list-nameable-flaws", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/nameable-flaws",
+		Summary: "List the flaws an advisory may name",
+		Description: "Every flaw recorded here in this product, open or fixed, by identifier. " +
+			"These are the issues adding one to an advisory accepts in this product.\n\n" +
+			"`open` is how many of its findings are still open; none means it is fixed " +
+			"wherever it was found. At most 500, in identifier order; `total` says how many " +
+			"there are.\n\n" +
+			"A product you do not triage answers 404.",
+		Tags: []string{"Findings"},
+	}, perProduct, "Answers only what you may see.", triageRights()...),
+		func(ctx context.Context, input *struct {
+			Product string `path:"product"`
+		}) (*listOutput[NameableBody], error) {
+			subject, err := reading(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if in.DB == nil {
+				return nil, noDatabase(in.Logger)
+			}
+			rows, total, err := advisory.NewStore(in.DB.DB).Nameable(ctx, subject, input.Product)
+			if errors.Is(err, catalog.ErrNotFound) {
+				return nil, noSuchProduct()
+			}
+			if err != nil {
+				return nil, advisoryRefused(in, err, "the flaws could not be read")
+			}
+			out := &listOutput[NameableBody]{}
+			out.Body.Total = total
+			out.Body.Items = make([]NameableBody, 0, len(rows))
+			for _, one := range rows {
+				out.Body.Items = append(out.Body.Items, NameableBody{
+					Vulnerability: one.Identifier, Summary: one.Summary, Open: one.Open,
+				})
+			}
+			return out, nil
+		})
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "add-advisory-issue", Method: http.MethodPost,
@@ -517,8 +572,23 @@ type AdvisoryBody struct {
 	// where the advisory stands.
 	Status   string        `json:"status,omitempty" enum:"draft,final,interim" doc:"Where the document is in its life. Final where somebody agrees to what it says now, interim where it has gone out and nobody does, draft before either"`
 	Agreed   int           `json:"agreed,omitempty" doc:"How many people agree to what it says now. None means it cannot go out"`
+	AgreedBy []AgreerBody  `json:"agreed_by,omitempty" doc:"Who agrees to what it says now, oldest first"`
+	Changed  *bool         `json:"changed,omitempty" doc:"Whether the document generated now says something different from the last one that went out"`
 	MintedAt string        `json:"minted_at"`
 	Covers   []CoveredBody `json:"covers"`
+}
+
+// NameableBody is one flaw an advisory may name in a product.
+type NameableBody struct {
+	Vulnerability string `json:"vulnerability" doc:"The identifier the issue is filed under"`
+	Summary       string `json:"summary,omitempty"`
+	Open          int    `json:"open" doc:"How many of its findings in this product are still open. None means it is fixed wherever it was found"`
+}
+
+// AgreerBody is one person agreeing to what an advisory says now.
+type AgreerBody struct {
+	Person   string `json:"person" doc:"Who agrees, by sign-in identity"`
+	AgreedAt string `json:"agreed_at"`
 }
 
 // AgreementBody is one person's agreement to what an advisory says.

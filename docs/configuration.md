@@ -300,9 +300,21 @@ How often each supplier is read again is `scanning.every`, the same setting
 that paces re-scans. Shortening it makes more requests to every configured
 supplier as well as more scans here.
 
-Reading starts at the moment a supplier is added. A publisher's listing holds
-everything they have ever issued, and taking that history is tens of thousands
-of requests; to take an advisory published earlier, upload it.
+A new supplier is read from `scanning.supplier-history` days before it was
+added, 365 unless set. A publisher's listing holds everything they have ever
+issued, so this bounds how much of it is asked for: a year of Red Hat is about
+97,000 documents and takes about seventeen days to read, and a year of a vendor
+publishing a few hundred a year takes hours. To take an advisory published
+earlier, upload it. A supplier withdrawn and added again resumes where it
+stopped, no further back than the same window.
+
+Each document is checked against the SHA-256 or SHA-512 file its publisher
+serves beside it, and one that does not match is not read. A publisher serving
+neither is read unchecked.
+
+The directory has to be served from the host the configured address names.
+SUSE serves its description from `www.suse.com` and its directory from
+`ftp.suse.com`, so it cannot be read this way; upload its advisories instead.
 
 ## Upstream currency
 

@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 )
@@ -620,4 +621,68 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 func triages(subject access.Subject, productID int64) bool {
 	return subject.Holds(access.PublicTriage, productID) ||
 		subject.Holds(access.PrivateTriage, productID)
+}
+
+// Nameable is one flaw recorded in a product, as a list of what an advisory
+// may name reads it.
+type Nameable struct {
+	Identifier string `bun:"identifier"`
+	Summary    string `bun:"summary"`
+	// Open is how many of its findings in the product are still open. None
+	// means it is fixed wherever it was found, which is the ordinary state of
+	// a flaw an advisory is written about.
+	Open int `bun:"still_open"`
+}
+
+// mostNameable bounds the list of flaws a product offers an advisory. A flaw
+// recorded here is recorded by hand, one at a time.
+const mostNameable = 500
+
+// Nameable is every flaw recorded here in one product that this subject may
+// name on an advisory, open or fixed, up to a bound, and how many there are in
+// all.
+//
+// Fixed ones included, because an advisory is usually written after the fix
+// lands. The same rows naming one accepts: recorded by a person, at a
+// visibility this subject may see, in a product they triage. Somebody who does
+// not triage the product is answered as though it were not declared.
+func (s *Store) Nameable(ctx context.Context, subject access.Subject,
+	product string) ([]Nameable, int, error) {
+
+	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
+	if err != nil {
+		return nil, 0, err
+	}
+	if !triages(subject, named.ID) {
+		return nil, 0, catalog.ErrNotFound
+	}
+	grouped := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "t" ON t.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = t.stream_id`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`SUM(CASE WHEN f.closed_at IS NULL THEN 1 ELSE 0 END) AS "still_open"`).
+		Where("st.product_id = ?", named.ID).
+		Where("f.kind = ?", finding.Entered).
+		Where("f.visibility IN (?)", bun.List(access.Visible(subject, named.ID))).
+		GroupExpr("f.vulnerability_id")
+	var total int
+	if err := s.db.NewSelect().TableExpr(`(?) AS "recorded_flaw"`, grouped).
+		ColumnExpr("COUNT(*)").Scan(ctx, &total); err != nil {
+		return nil, 0, fmt.Errorf("count the flaws recorded in that product: %w", err)
+	}
+	var rows []Nameable
+	err = s.db.NewSelect().
+		TableExpr(`(?) AS "recorded_flaw"`, grouped).
+		Join(`JOIN "vulnerability" AS "vu" ON vu.id = recorded_flaw.vulnerability_id`).
+		ColumnExpr(`vu.identifier AS "identifier"`).
+		ColumnExpr(`COALESCE(vu.description, '') AS "summary"`).
+		ColumnExpr(`recorded_flaw.still_open AS "still_open"`).
+		OrderExpr("vu.identifier ASC").
+		Limit(mostNameable).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, 0, fmt.Errorf("read the flaws recorded in that product: %w", err)
+	}
+	return rows, total, nil
 }

@@ -286,6 +286,23 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	// for it. The document itself stays on the framework's own route,
 	// authenticated like everything else.
 	cfg.DocsPath = ""
+	// A response that writes its own bytes is sent as it writes them. The
+	// schema link the framework adds rebuilds the value as a type of its
+	// own, which drops the writer, so a CSAF document written with its keys
+	// in order would go out in declaration order with a key the standard
+	// does not define at its head.
+	cfg.CreateHooks = append(cfg.CreateHooks, func(c huma.Config) huma.Config {
+		for i, each := range c.Transformers {
+			inner := each
+			c.Transformers[i] = func(ctx huma.Context, status string, v any) (any, error) {
+				if _, writes := v.(json.Marshaler); writes {
+					return v, nil
+				}
+				return inner(ctx, status, v)
+			}
+		}
+		return c
+	})
 
 	api := humachi.New(router, cfg)
 	// Before anything registers, so no operation can be added without the

@@ -241,10 +241,10 @@ func (s *Store) For(ctx context.Context, subject access.Subject, productID int64
 // inserting a second under the same name would fail on a row nothing lists,
 // with a message about a supplier nobody can see.
 //
-// Taking one up again starts it where a new one starts: at the moment it was
-// configured. A source retired for a month and taken up today would otherwise
-// fetch the month it was away, which is a burst at a publisher nobody asked
-// for and evidence about issues a scan has already reported.
+// Taking one up again at the same address keeps how far it had been read, so
+// it takes what was issued while it was away and nothing it already read. How
+// far back that reaches is bounded by the history window a new supplier is
+// read from. Taken up at another address, it starts where a new one does.
 func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64,
 	name, address string) (*Source, error) {
 
@@ -287,16 +287,20 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 		CreatedBy: subject.ID, CreatedAt: now,
 	}
 	res, err := s.db.NewUpdate().Model((*Source)(nil)).
+		// The mark is kept only where the address is the one it was read
+		// at. An address never read has nothing behind it this supplier has
+		// seen, so it starts where a new one does. Ahead of the address
+		// itself, because one engine applies the assignments in order and
+		// would otherwise compare against the value just written.
+		Set(`"caught_up_to" = CASE WHEN "url" = ? THEN "caught_up_to" END`, row.URL).
+		Set(`"caught_up_mark" = CASE WHEN "url" = ? THEN "caught_up_mark" ELSE '' END`, row.URL).
 		Set("retired_at = ?", nil).
 		Set("display_name = ?", row.Display).
 		Set("url = ?", row.URL).
 		Set("created_by = ?", row.CreatedBy).
 		Set("created_at = ?", row.CreatedAt).
-		// Cleared, so the state a fresh source has is the state one taken up
-		// again has. A stale mark left behind would be read as a failure by
-		// the pass that has not run yet.
-		Set("caught_up_to = ?", nil).
-		Set("caught_up_mark = ?", "").
+		// Cleared, so a failure from before it was withdrawn is not read as
+		// one by the pass that has not run yet.
 		Set("fetched_at = ?", nil).
 		Set("reached_at = ?", nil).
 		Set("failed = ?", "").
@@ -462,18 +466,18 @@ const ahead = `"caught_up_to" IS NULL OR "caught_up_to" < ? ` +
 	`OR ("caught_up_to" = ? AND "caught_up_mark" < ?)`
 
 // From is where a source starts reading, as the pair a feed entry is compared
-// against.
+// against, given how far back the deployment reads a supplier's history.
 //
-// The moment it was configured, where nothing has been read yet, rather than
-// the beginning of the publisher's history. A publisher's feed lists every
-// advisory they have ever issued — tens of thousands for a distribution — and
-// taking them is a burst at somebody else's service that would drain over
-// months and arrive as evidence about issues a scan reported long ago. What a
-// deployment wants from history is one document at a time, which the upload
-// path already takes.
-func (s Source) From() (time.Time, string) {
-	if s.CaughtUpTo != nil {
+// Where it stopped, and never further back than that history before it was
+// configured. A publisher's feed lists every advisory they have ever issued —
+// tens of thousands for a distribution — so the history is a window rather than
+// the whole of it, drained at the per-pass bound. A supplier taken up again
+// carries the mark from before it was withdrawn, so it takes what was issued
+// while it was away and nothing it already read, within the same window.
+func (s Source) From(history time.Duration) (time.Time, string) {
+	floor := s.CreatedAt.Add(-history)
+	if s.CaughtUpTo != nil && !s.CaughtUpTo.Before(floor) {
 		return *s.CaughtUpTo, s.CaughtUpMark
 	}
-	return s.CreatedAt, ""
+	return floor, ""
 }

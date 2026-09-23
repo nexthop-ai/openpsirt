@@ -91,12 +91,16 @@ func registerAdvisorySources(api huma.API, in Ingest) {
 			"feed and a directory of documents. Only the listings a publisher labels " +
 			"TLP:WHITE or TLP:CLEAR are read.\n\n" +
 			"Only claims naming a component this product ships are recorded.\n\n" +
-			"Reading starts from the moment the supplier is added. To take an advisory " +
-			"published before that, upload it.\n\n" +
+			"A new supplier is read from the number of days before it was added that " +
+			"scanning.supplier-history names. To take an advisory published before " +
+			"that, upload it.\n\n" +
+			"Each document is checked against the digest file its publisher serves beside " +
+			"it, ending .sha256 or .sha512, and one that does not match is not read. A " +
+			"publisher serving neither is read unchecked.\n\n" +
 			"A VEX document listed beside the advisories is not read here. Upload it to " +
 			"the VEX endpoint to take it.\n\n" +
-			"A supplier withdrawn and added again under the same name starts from today, " +
-			"the way a new one does.\n\n" +
+			"A supplier withdrawn and added again under the same name resumes where it " +
+			"stopped, no further back than that same window.\n\n" +
 			"The name is matched without regard to capitals. A name already in use for " +
 			"this product is refused with 409; withdraw the supplier first to change its " +
 			"address.\n\n" +

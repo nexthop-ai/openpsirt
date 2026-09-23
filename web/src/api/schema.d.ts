@@ -137,7 +137,9 @@ export interface paths {
         };
         /**
          * Read an advisory
-         * @description The advisory and the issues it covers, in the order they were added.
+         * @description The advisory and the issues it covers, in the order they were added, who agrees to what it says now, and whether what it would generate now differs from what last went out.
+         *
+         *     `changed` is absent where nothing has gone out, where it covers nothing, and where no publisher is configured, since then there is no document to compare.
          *
          *     An advisory covering a product you hold nothing on answers as one that does not exist. Told apart, the pair of answers says what exists.
          *
@@ -2125,11 +2127,13 @@ export interface paths {
          *
          *     Only claims naming a component this product ships are recorded.
          *
-         *     Reading starts from the moment the supplier is added. To take an advisory published before that, upload it.
+         *     A new supplier is read from the number of days before it was added that scanning.supplier-history names. To take an advisory published before that, upload it.
+         *
+         *     Each document is checked against the digest file its publisher serves beside it, ending .sha256 or .sha512, and one that does not match is not read. A publisher serving neither is read unchecked.
          *
          *     A VEX document listed beside the advisories is not read here. Upload it to the VEX endpoint to take it.
          *
-         *     A supplier withdrawn and added again under the same name starts from today, the way a new one does.
+         *     A supplier withdrawn and added again under the same name resumes where it stopped, no further back than that same window.
          *
          *     The name is matched without regard to capitals. A name already in use for this product is refused with 409; withdraw the supplier first to change its address.
          *
@@ -2984,6 +2988,32 @@ export interface paths {
          *     Requires: public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
          */
         get: operations["list-mentionable"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/nameable-flaws": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the flaws an advisory may name
+         * @description Every flaw recorded here in this product, open or fixed, by identifier. These are the issues adding one to an advisory accepts in this product.
+         *
+         *     `open` is how many of its findings are still open; none means it is fixed wherever it was found. At most 500, in identifier order; `total` says how many there are.
+         *
+         *     A product you do not triage answers 404.
+         *
+         *     Requires: public-triage or private-triage on the product. Answers only what you may see.
+         */
+        get: operations["list-nameable-flaws"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4389,11 +4419,11 @@ export interface paths {
          * List the times a VEX document went out
          * @description What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
          *
-         *     Readable without generating a document. Somebody deciding whether to publish a revision is asking before they generate anything, and the digest beside each entry is what answers whether the last one still describes what this would produce.
+         *     The record itself is read without generating a document. `changed` generates the public one to compare, so it is absent where that cannot be done.
          *
-         *     The published document itself belongs to whoever published it. The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same.
+         *     The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same. `changed` says whether the public document generated now differs from the last one that went out.
          *
-         *     Answered whether or not a publisher is configured for this deployment. Nothing here is assembled and no author is named.
+         *     `changed` is absent where nothing has gone out, where no publisher is configured, and where the build now holds more statements than one document carries.
          *
          *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
          */
@@ -4401,7 +4431,7 @@ export interface paths {
         put?: never;
         /**
          * Record that a VEX document went out
-         * @description Records that the document for this build was published: when, by whom, and a digest of the document as it stands now.
+         * @description Records that the document for this build was published: when, by whom, and a digest of the document as it stands now. Answers with the document that was recorded, which is the one to send: it carries the version it is recorded under, and a document generated before recording may not.
          *
          *     A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once a claim is withdrawn, a decision is revised or a scan closes a finding.
          *
@@ -4412,6 +4442,30 @@ export interface paths {
          *     Requires: public-triage or private-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
          */
         post: operations["record-vex-issued"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a VEX document that went out
+         * @description The OpenVEX document recorded as one revision, byte for byte as it went out. It carries the version it was recorded under and the moment it was recorded.
+         *
+         *     A revision nobody recorded answers 404.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
+         */
+        get: operations["get-vex-issued"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5648,6 +5702,10 @@ export interface components {
              * @description How many people agree to what it says now. None means it cannot go out
              */
             agreed?: number;
+            /** @description Who agrees to what it says now, oldest first */
+            agreed_by?: components["schemas"]["AgreerBody"][] | null;
+            /** @description Whether the document generated now says something different from the last one that went out */
+            changed?: boolean;
             covers: components["schemas"]["CoveredBody"][] | null;
             minted_at: string;
             /**
@@ -5783,6 +5841,11 @@ export interface components {
              * @description Which edition was agreed to, counting from one within this advisory. A later edition is a document nobody has agreed to yet
              */
             edition: number;
+        };
+        AgreerBody: {
+            agreed_at: string;
+            /** @description Who agrees, by sign-in identity */
+            person: string;
         };
         AlsoBuild: {
             stream: string;
@@ -8284,6 +8347,17 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
+        ListBodyNameableBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyNameableBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["NameableBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
         ListBodyNoteBody: {
             /**
              * Format: uri
@@ -8515,17 +8589,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyVEXIssuanceBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyVEXIssuanceBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["VEXIssuanceBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         ListBodyVariantBody: {
             /**
              * Format: uri
@@ -8691,6 +8754,16 @@ export interface components {
             until: string;
             /** @description The embargo's previous end */
             was: string;
+        };
+        NameableBody: {
+            /**
+             * Format: int64
+             * @description How many of its findings in this product are still open. None means it is fixed wherever it was found
+             */
+            open: number;
+            summary?: string;
+            /** @description The identifier the issue is filed under */
+            vulnerability: string;
         };
         Named: {
             name: string;
@@ -11079,14 +11152,28 @@ export interface components {
             version: string;
         };
         VEXIssuanceBody: {
+            /** @description A digest of what the document said, so that what is published and what we would generate stay answerable against each other */
+            digest: string;
+            issued_at: string;
+            /** @description Who published it. The act leaves this row and nothing else, so the row names them */
+            issued_by: string;
+            /**
+             * Format: int64
+             * @description Which revision went out, counting from one. It is the version that document carries
+             */
+            version: number;
+        };
+        VEXRecordedBody: {
             /**
              * Format: uri
              * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/VEXIssuanceBody.json
+             * @example https://example.com/schemas/VEXRecordedBody.json
              */
             readonly $schema?: string;
             /** @description A digest of what the document said, so that what is published and what we would generate stay answerable against each other */
             digest: string;
+            /** @description The OpenVEX document recorded, as its bytes, carrying the version it is recorded under. This is the one to send */
+            document: unknown;
             issued_at: string;
             /** @description Who published it. The act leaves this row and nothing else, so the row names them */
             issued_by: string;
@@ -11116,6 +11203,17 @@ export interface components {
             open?: number;
             /** @description Whether it has been taken out of use. A release still lists what it was built as */
             retired?: boolean;
+        };
+        VexIssuancesBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/VexIssuancesBody.json
+             */
+            readonly $schema?: string;
+            /** @description Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured */
+            changed?: boolean;
+            items: components["schemas"]["VEXIssuanceBody"][] | null;
         };
         Vulnerability: {
             acknowledgments?: components["schemas"]["Acknowledgment"][] | null;
@@ -16120,6 +16218,37 @@ export interface operations {
             };
         };
     };
+    "list-nameable-flaws": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyNameableBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "get-product-overview": {
         parameters: {
             query?: never;
@@ -18251,7 +18380,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyVEXIssuanceBody"];
+                    "application/json": components["schemas"]["VexIssuancesBody"];
                 };
             };
             /** @description Error */
@@ -18284,7 +18413,42 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VEXIssuanceBody"];
+                    "application/json": components["schemas"]["VEXRecordedBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-vex-issued": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                stream: string;
+                variant: string;
+                /** @description Which revision, counting from one */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Error */

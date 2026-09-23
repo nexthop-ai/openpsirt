@@ -346,6 +346,9 @@ type Standing struct {
 	// at, oldest first. None is what a document that may not go out looks
 	// like.
 	Agreed []Approval
+	// AgreedBy is who gave each of them, by sign-in identity, in the same
+	// order.
+	AgreedBy []string
 }
 
 // Where reports where the advisory stands, without generating its document.
@@ -369,9 +372,43 @@ func (s *Store) Where(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
+	by, err := s.agreers(ctx, agreed)
+	if err != nil {
+		return nil, err
+	}
 	return &Standing{
-		Status: statusOf(len(gone) > 0, len(agreed) > 0), Agreed: agreed,
+		Status: statusOf(len(gone) > 0, len(agreed) > 0), Agreed: agreed, AgreedBy: by,
 	}, nil
+}
+
+// agreers is who gave each agreement, by sign-in identity, in the order given.
+func (s *Store) agreers(ctx context.Context, agreed []Approval) ([]string, error) {
+	if len(agreed) == 0 {
+		return nil, nil
+	}
+	ids := make([]int64, 0, len(agreed))
+	for _, one := range agreed {
+		ids = append(ids, one.ApprovedBy)
+	}
+	var rows []struct {
+		ID       int64  `bun:"id"`
+		Identity string `bun:"identity"`
+	}
+	if err := s.db.NewSelect().TableExpr(`"person" AS "pe"`).
+		ColumnExpr(`pe.id AS "id"`).ColumnExpr(`pe.identity AS "identity"`).
+		Where("pe.id IN (?)", bun.List(ids)).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read who has agreed to it: %w", err)
+	}
+	named := make(map[int64]string, len(rows))
+	for _, row := range rows {
+		named[row.ID] = row.Identity
+	}
+	out := make([]string, 0, len(agreed))
+	for _, one := range agreed {
+		out = append(out, named[one.ApprovedBy])
+	}
+	return out, nil
 }
 
 // agreed is the same, for a caller that has already narrowed.

@@ -26,6 +26,14 @@ const FetchLease = "supplier.fetch"
 // only once a day would take up to a day to notice they had.
 const betweenCycles = 5 * time.Minute
 
+// allHistory is the most days of a supplier's history read, whatever the
+// setting says.
+//
+// A century is further back than any publisher of these documents has issued,
+// so it reads as everything; a count past it would overflow the length of time
+// it is turned into.
+const allHistory = 100 * 365
+
 // Pass reads what every configured supplier publishes, on a schedule.
 //
 // On the scan schedule, because that is the same question: a supplier's
@@ -80,10 +88,11 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 			if ctx.Err() == nil {
 				p.logger.Error("reading what suppliers have published", "error", err)
 			}
-		case took.Documents > 0 || took.Refused > 0:
+		case took.Documents > 0 || took.Refused > 0 || took.Mismatched > 0:
 			p.logger.Info("read what suppliers have published",
-				"documents", took.Documents, "claims", took.Recorded,
-				"refused", took.Refused, "other_documents", took.Skipped)
+				"documents", took.Documents, "checked", took.Checked, "claims", took.Recorded,
+				"refused", took.Refused, "mismatched", took.Mismatched,
+				"other_documents", took.Skipped)
 		}
 	})
 }
@@ -102,6 +111,13 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 	if err != nil {
 		return took, err
 	}
+	history, err := setting.NewStore(p.db).Count(ctx, setting.SupplierHistory,
+		setting.DefaultSupplierHistory)
+	if err != nil {
+		return took, fmt.Errorf("read how far back to read a supplier: %w", err)
+	}
+	p.fetch.History = time.Duration(min(history, allHistory)) * 24 * time.Hour
+	p.fetch.Keep = p.fetching
 
 	// The deployment itself rather than anybody in it. Nobody is behind a
 	// background cycle, and what this asks for is the list of suppliers it is
@@ -116,10 +132,9 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 			return took, nil
 		}
 		// The lease is asked for again as the pass runs rather than sized from
-		// a guess at how long it takes: a supplier is up to MostPerPass
-		// requests with a timeout each, and a slow publisher handing the pass
-		// to a second replica mid-flight is the thing the lease exists to
-		// prevent.
+		// a guess at how long it takes: here between suppliers, and by the
+		// fetcher before each document. A slow publisher handing the pass to a
+		// second replica mid-flight is the thing the lease exists to prevent.
 		switch mine, err := p.fetching(ctx); {
 		case err != nil:
 			return took, fmt.Errorf("keep the lease on reading what suppliers publish: %w", err)
@@ -131,6 +146,15 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 		took.Recorded += one.Recorded
 		took.Skipped += one.Skipped
 		took.Refused += one.Refused
+		took.Checked += one.Checked
+		took.Mismatched += one.Mismatched
+		if one.Mismatched > 0 {
+			// Said per supplier, because a publisher whose digests keep
+			// disagreeing reads as healthy otherwise: every fetch succeeds and
+			// the documents are stepped over one at a time.
+			p.logger.Warn("documents did not match the digests their publisher serves",
+				"supplier", source.Display, "documents", one.Mismatched)
+		}
 		if err != nil {
 			// Recorded against the source and carried on. One publisher
 			// unreachable says nothing about the next, and a pass that stopped

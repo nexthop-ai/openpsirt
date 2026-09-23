@@ -26,9 +26,9 @@ func init() {
 //
 // What was published on a date cannot be worked out again once a decision is
 // revised, a claim is withdrawn or a scan closes a finding, so the act is
-// recorded when it happens. The document itself belongs to whoever published
-// it; the digest is what makes "is what is published still what we would
-// generate" a question with a yes or no.
+// recorded when it happens, with the bytes that went out. The digest is what
+// makes "is what is published still what we would generate" a question with a
+// yes or no.
 func upVexIssuance(ctx context.Context, tx *sql.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -51,6 +51,11 @@ func upVexIssuance(ctx context.Context, tx *sql.Tx) error {
 			-- that move for reasons other than the content are left out, so
 			-- that a document regenerated unchanged hashes the same.
 			"digest"    ` + t.hash + ` NOT NULL,
+			-- The bytes that went out, carrying the ordinal above as their
+			-- version. Generated in the write that takes the ordinal, so the
+			-- number a document states and the number it is recorded under
+			-- are one number.
+			"document"  ` + t.free + ` NOT NULL,
 			"issued_by" ` + t.ref + ` NOT NULL,
 			"issued_at" ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "vex_issuance_once" UNIQUE ("target_id", "ordinal"),

@@ -19,6 +19,7 @@
 package advisory
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -81,6 +82,29 @@ type Document struct {
 	// a path: a reader is asking whether they are affected, and the answer
 	// is a release.
 	Vulnerabilities []Vulnerability `json:"vulnerabilities"`
+}
+
+// MarshalJSON writes the document with every object's keys in alphabetical
+// order.
+//
+// The standard's optional test 6.2.13 asks for it. The fields here are
+// declared in the order a reader of this file follows, so the order is
+// imposed on the bytes rather than on the declarations: read back as generic
+// values, every object is a map, and a map is written with its keys sorted.
+// Numbers are carried through as the text they were written as.
+func (d Document) MarshalJSON() ([]byte, error) {
+	type declared Document
+	body, err := json.Marshal(declared(d))
+	if err != nil {
+		return nil, err
+	}
+	reader := json.NewDecoder(bytes.NewReader(body))
+	reader.UseNumber()
+	var generic any
+	if err := reader.Decode(&generic); err != nil {
+		return nil, err
+	}
+	return json.Marshal(generic)
 }
 
 // Meta is the document's own description.
@@ -920,6 +944,48 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	return s.issuances(ctx, row)
+}
+
+// Changed reports whether what an advisory's document says now differs from
+// what last went out, or nil where that has no answer.
+//
+// Nil where nothing has gone out, and where no publisher is configured, the
+// advisory covers nothing, or this reader may not generate it, since then
+// there is no document to compare. The
+// comparison is between settled digests, so a document whose dates, version
+// and status moved and nothing else reads as unchanged.
+func (s *Store) Changed(ctx context.Context, subject access.Subject, who publisher.Named,
+	identifier string) (*bool, error) {
+
+	if !who.Stated() {
+		return nil, nil
+	}
+	row, err := s.byName(ctx, subject, identifier)
+	if err != nil {
+		return nil, err
+	}
+	gone, err := s.issuances(ctx, row)
+	if err != nil || len(gone) == 0 {
+		return nil, err
+	}
+	// Generated as this reader, which a reader who may see the advisory
+	// cannot always do: an undisclosed flaw it covers is one they may not
+	// read. That is no answer to this question rather than a refusal of the
+	// advisory they asked for.
+	doc, _, err := s.forAdvisory(ctx, subject, who, identifier)
+	switch {
+	case errors.Is(err, ErrNothingToSay), errors.Is(err, ErrNoSuchIssue),
+		errors.Is(err, ErrNotOurs):
+		return nil, nil
+	case err != nil:
+		return nil, err
+	}
+	now, err := settledDigest(doc)
+	if err != nil {
+		return nil, err
+	}
+	changed := now != gone[len(gone)-1].Digest
+	return &changed, nil
 }
 
 // issuances is what has gone out for one advisory, oldest first.

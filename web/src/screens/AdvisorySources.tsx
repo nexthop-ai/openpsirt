@@ -107,8 +107,8 @@ export function AdvisorySources() {
       </div>
       <p className="hint" style={{ marginTop: 0 }}>
         Suppliers whose published advisories are read on the scan schedule. What arrives is evidence
-        and a prefill, never a decision. Reading starts when a supplier is added — upload an older
-        advisory to take one.
+        and a prefill, never a decision. Reading reaches back a set number of days before a supplier
+        is added — upload anything older below.
       </p>
 
       <div className="field">
@@ -181,6 +181,8 @@ export function AdvisorySources() {
         </Wide>
       )}
 
+      {product !== "" && <Upload product={product} />}
+
       <Declare
         title="Add supplier"
         open={adding}
@@ -207,5 +209,102 @@ export function AdvisorySources() {
         />
       </Declare>
     </div>
+  );
+}
+
+// The two kinds of document a publisher issues, by what each is uploaded as.
+const KINDS = {
+  advisory: { label: "Security advisory (CSAF)", part: "advisory" },
+  statements: { label: "VEX statement set (OpenVEX or CSAF)", part: "statements" },
+} as const;
+
+// Uploading one document a publisher issued, for this product.
+//
+// The same two endpoints a script uses. An advisory adds to what that
+// publisher has said; a statement set replaces their whole previous set. Each
+// endpoint refuses the other kind and says which one takes it.
+function Upload({ product }: { product: string }) {
+  const queries = useQueryClient();
+  const [kind, setKind] = useState<keyof typeof KINDS>("advisory");
+  const [file, setFile] = useState<File | null>(null);
+
+  const upload = useMutation({
+    mutationFn: async () => {
+      const form = new FormData();
+      if (file) form.append(KINDS[kind].part, file);
+      // The client would otherwise serialize this as JSON; a multipart body
+      // is handed to fetch as it is, which sets the boundary itself.
+      const sent = { body: form as never, bodySerializer: (body: unknown) => body as BodyInit };
+      if (kind === "advisory") {
+        const taken = unwrap(
+          await api.POST("/v1/products/{product}/supplier-advisories", {
+            params: { path: { product } },
+            ...sent,
+          }),
+        );
+        return `${taken.identifier} from ${taken.publisher}: ${taken.recorded} claims taken, ${taken.superseded} set aside.`;
+      }
+      const taken = unwrap(
+        await api.POST("/v1/products/{product}/vex-statements", {
+          params: { path: { product } },
+          ...sent,
+        }),
+      );
+      return `${taken.publisher}: ${taken.recorded} statements taken, ${taken.superseded} set aside.`;
+    },
+    onSuccess: () => {
+      setFile(null);
+      void queries.invalidateQueries({ queryKey: ["finding"] });
+    },
+  });
+
+  return (
+    <>
+      <h3 style={{ marginTop: 16 }}>Upload a document</h3>
+      <div className="filters">
+        <label className="field">
+          <span>Kind</span>
+          <select
+            value={kind}
+            onChange={(event) => {
+              setKind(event.target.value as keyof typeof KINDS);
+              upload.reset();
+            }}
+          >
+            {Object.entries(KINDS).map(([key, one]) => (
+              <option key={key} value={key}>
+                {one.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>File</span>
+          <input
+            type="file"
+            accept=".json,application/json"
+            onChange={(event) => {
+              setFile(event.target.files?.[0] ?? null);
+              upload.reset();
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="btn"
+          disabled={!file || upload.isPending}
+          onClick={() => upload.mutate()}
+        >
+          {upload.isPending ? "Uploading…" : "Upload"}
+        </button>
+      </div>
+      <p className="hint">
+        {kind === "advisory"
+          ? "Adds to what this publisher has said. The same advisory uploaded again replaces its earlier claims."
+          : "Replaces this publisher's whole previous statement set for the product."}
+      </p>
+      {upload.isSuccess && <p className="hint">{upload.data}</p>}
+      {upload.isError && <Failed error={upload.error} what="That document was not taken." />}
+    </>
   );
 }
