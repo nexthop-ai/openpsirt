@@ -1731,11 +1731,53 @@ of requests; to take an advisory published earlier, upload it.</p>
 <p>Off unless an administrator turns it on, under Settings. Everything a scan
 needs arrives as a file somebody imported, so a deployment that cannot reach out
 loses this answer and what a scan reports is unaffected.</p>
-<p>What goes out is a component's name. One request per component to that
-ecosystem's public index, carrying the name and nothing else — no version, no
-build, no product. For an open-source dependency that is public knowledge. For
+<p>What goes out is a component's name, to that ecosystem's public index, and
+nothing else — no version, no build, no product. Most indexes take one request
+per component; Maven Central takes two, the version list and the newest
+release's project document, and nuget.org up to five, the registration and up
+to four of its pages. For an open-source dependency that is public knowledge. For
 something built here it is the name of a project, a team, or a product nobody
 has announced, and a public index records every request made of it.</p>
+<table>
+<thead>
+<tr>
+<th>Ecosystem</th>
+<th>Host asked</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Go</td>
+<td><code>proxy.golang.org</code></td>
+</tr>
+<tr>
+<td>npm</td>
+<td><code>registry.npmjs.org</code></td>
+</tr>
+<tr>
+<td>PyPI</td>
+<td><code>pypi.org</code></td>
+</tr>
+<tr>
+<td>Cargo</td>
+<td><code>crates.io</code></td>
+</tr>
+<tr>
+<td>Maven</td>
+<td><code>repo1.maven.org</code></td>
+</tr>
+<tr>
+<td>NuGet</td>
+<td><code>api.nuget.org</code></td>
+</tr>
+</tbody>
+</table>
+<p>Nothing else is reached, and a redirect is not followed. A distribution
+package is never asked about.</p>
+<p>Where egress is restricted, allow the hosts for the ecosystems your builds
+carry. An index that cannot be reached is asked once a pass and then left for
+the rest of it, so the others are still asked; its components stay due, and
+each pass logs the failure.</p>
 <p>So names this deployment calls its own are never sent. Three sources, unioned:</p>
 <table>
 <thead>
@@ -1776,7 +1818,9 @@ has announced, and a public index records every request made of it.</p>
 </tbody>
 </table>
 <p>A name matches each part of a package's own name, either exactly or followed by
-<code>-</code>, <code>.</code> or <code>_</code>. A name carrying a dot also covers a host under it. So a
+<code>-</code>, <code>.</code> or <code>_</code>. A name without a dot also matches each dotted part, which is
+how a Maven group holds an organization's name after its top-level domain. A
+name carrying a dot also covers a host under it. So a
 deployment publishing under <code>example.test</code> holds back:</p>
 <table>
 <thead>
@@ -1801,6 +1845,14 @@ deployment publishing under <code>example.test</code> holds back:</p>
 <tr>
 <td><code>pkg:golang/go.example.test/team/agent</code></td>
 <td><code>example.test</code>, which covers a host under it</td>
+</tr>
+<tr>
+<td><code>pkg:maven/test.example.tools/agent</code></td>
+<td><code>test.example</code>, which is what a Maven group is</td>
+</tr>
+<tr>
+<td><code>pkg:nuget/Example.Agent</code></td>
+<td><code>example</code></td>
 </tr>
 </tbody>
 </table>
