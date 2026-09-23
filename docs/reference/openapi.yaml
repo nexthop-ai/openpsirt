@@ -1132,8 +1132,14 @@ components:
     CanBody:
       additionalProperties: false
       properties:
+        agrees_private:
+          description: "Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage"
+          type: boolean
+        agrees_public:
+          description: "Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage"
+          type: boolean
         may_agree:
-          description: Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override
+          description: Agree to somebody else's claim, or send it back, at either visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override
           type: boolean
         may_approve_rulings:
           description: "Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"
@@ -1175,6 +1181,8 @@ components:
         - may_assign
         - may_hide
         - may_agree
+        - agrees_public
+        - agrees_private
         - may_approve_rulings
       type: object
     CarriedBody:
@@ -18089,7 +18097,7 @@ paths:
 
         Narrow with `q`, which matches the identity and the displayed name without regard to capitals. This is not the people list: that is the deployment's directory and needs administration.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
+        Requires: public-read or public-triage or private-read or private-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
       operationId: list-holders
       parameters:
         - in: path
@@ -18148,7 +18156,7 @@ paths:
           - public-triage
           - private-read
           - private-triage
-        note: Asking about undisclosed findings needs private-read or private-triage.
+        note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
   /v1/products/{product}/issues/{vulnerability}/aliases/{alias}:
     put:
       description: |-
@@ -18976,7 +18984,7 @@ paths:
 
         `visibility` says which kind of finding the text is about. Asking about undisclosed findings requires being able to read them.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
+        Requires: public-read or public-triage or private-read or private-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
       operationId: list-mentionable
       parameters:
         - in: path
@@ -19035,7 +19043,7 @@ paths:
           - public-triage
           - private-read
           - private-triage
-        note: Asking about undisclosed findings needs private-read or private-triage.
+        note: Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
   /v1/products/{product}/nameable-flaws:
     get:
       description: |-
@@ -22315,7 +22323,7 @@ paths:
 
         Requires a publisher configured for this deployment: a document naming none has nobody as its author.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
+        Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
       operationId: get-vex
       parameters:
         - in: path
@@ -22361,8 +22369,6 @@ paths:
         any_of:
           - public-read
           - public-triage
-          - private-read
-          - private-triage
         note: "Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue."
   /v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance:
     get:
@@ -22375,7 +22381,7 @@ paths:
 
         `changed` is absent where nothing has gone out, where no publisher is configured, and where the build now holds more statements than one document carries.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
+        Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
       operationId: list-vex-issuances
       parameters:
         - in: path
@@ -22414,8 +22420,6 @@ paths:
         any_of:
           - public-read
           - public-triage
-          - private-read
-          - private-triage
         note: "Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document."
     post:
       description: |-
@@ -22427,7 +22431,7 @@ paths:
 
         The digest is taken from the document generated here rather than from anything sent: a digest of whatever a caller says answers nothing. The public document, never the preview that includes work nobody has announced.
 
-        Requires: public-triage or private-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
+        Requires: public-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
       operationId: record-vex-issued
       parameters:
         - in: path
@@ -22465,7 +22469,6 @@ paths:
         scope: product
         any_of:
           - public-triage
-          - private-triage
         note: The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
   /v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}:
     get:
@@ -22474,7 +22477,7 @@ paths:
 
         A revision nobody recorded answers 404.
 
-        Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
+        Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
       operationId: get-vex-issued
       parameters:
         - in: path
@@ -22521,8 +22524,6 @@ paths:
         any_of:
           - public-read
           - public-triage
-          - private-read
-          - private-triage
         note: "Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue."
   /v1/products/{product}/supplier-advisories:
     post:

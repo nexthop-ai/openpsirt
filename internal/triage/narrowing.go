@@ -6,7 +6,7 @@ package triage
 import (
 	"context"
 	"errors"
-	"sort"
+	"strings"
 
 	"github.com/uptrace/bun"
 
@@ -117,18 +117,6 @@ func readableBy(query *bun.SelectQuery, subject access.Subject, column string) *
 	return narrowedBy(query, subject, column, readable, onCases)
 }
 
-// sortedKeys is the products of a case map in a settled order, so that two
-// runs of the same query produce the same statement — which is what makes a
-// prepared statement cache and a slow-query log worth reading.
-func sortedKeys(cases map[int64][]int64) []int64 {
-	out := make([]int64, 0, len(cases))
-	for id := range cases {
-		out = append(out, id)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
-	return out
-}
-
 // readableFindings narrows a query that joins findings to the ones a subject
 // may read, per product: disclosed findings where they read disclosed ones on
 // that product, undisclosed where they read undisclosed ones.
@@ -166,10 +154,33 @@ func readableFindingsOn(subject access.Subject, finding, product string) (string
 	if all {
 		return "", nil
 	}
-	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
-		return subject.Reads(v, id)
-	})
-	return access.VisibleWhere(product, finding+".visibility", both, public, private)
+	both, public, private := access.Split(products, subject.Reads)
+	where, args := access.VisibleWhere(product, finding+".visibility", both, public, private)
+	return orBrought(subject, where, args, product, finding+".vulnerability_id")
+}
+
+// orBrought widens a narrowing by the cases this subject was brought into: one
+// issue in one product, at either visibility.
+//
+// Only where the product's own grant is not already wider. A case adds nothing
+// where somebody reads the product at both visibilities, and the narrower
+// clause would be dead weight on every read. Read from the subject rather than
+// from anything typed, so the pairs are the ones resolved at sign-in.
+func orBrought(subject access.Subject, where string, args []any,
+	product, vulnerability string) (string, []any) {
+
+	var brought []string
+	for _, id := range subject.CaseProducts() {
+		if subject.Reads(access.Public, id) && subject.Reads(access.Private, id) {
+			continue
+		}
+		brought = append(brought, "("+product+" = ? AND "+vulnerability+" IN (?))")
+		args = append(args, id, bun.List(subject.Cases(id)))
+	}
+	if len(brought) == 0 {
+		return where, args
+	}
+	return "(" + where + " OR " + strings.Join(brought, " OR ") + ")", args
 }
 
 // onlyDecidable narrows a places query to what this subject may argue about.
@@ -270,43 +281,11 @@ func narrowedBy(query *bun.SelectQuery, subject access.Subject, column string,
 	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
 		return allowed(subject, id, v)
 	})
-	brought := map[int64][]int64{}
+	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
 	if cases {
-		for _, id := range subject.CaseProducts() {
-			// Only where the product's own grant is not already wider. A case
-			// adds nothing where somebody reads the product at both
-			// visibilities, and the narrower clause would be dead weight on
-			// every read.
-			if !subject.Reads(access.Public, id) || !subject.Reads(access.Private, id) {
-				brought[id] = subject.Cases(id)
-			}
-		}
+		where, args = orBrought(subject, where, args, column+".product_id", column+".vulnerability_id")
 	}
-	if len(both) == 0 && len(private) == 0 && len(public) == 0 && len(brought) == 0 {
-		return query.Where("1 = 0")
-	}
-
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		if len(both) > 0 {
-			q = q.WhereOr(column+".product_id IN (?)", bun.List(both))
-		}
-		if len(public) > 0 {
-			q = q.WhereOr(column+".product_id IN (?) AND "+column+".visibility = ?",
-				bun.List(public), access.Public)
-		}
-		if len(private) > 0 {
-			q = q.WhereOr(column+".product_id IN (?) AND "+column+".visibility = ?",
-				bun.List(private), access.Private)
-		}
-		// One issue in one product, which is what a collaborator was brought
-		// into. Read from the subject rather than from anything typed, so the
-		// pairs are the ones resolved at sign-in.
-		for _, productID := range sortedKeys(brought) {
-			q = q.WhereOr(column+".product_id = ? AND "+column+".vulnerability_id IN (?)",
-				productID, bun.List(brought[productID]))
-		}
-		return q
-	})
+	return query.Where(where, args...)
 }
 
 // notApprovableBy narrows a query to the decisions a subject may not agree
@@ -323,27 +302,10 @@ func notApprovableBy(query *bun.SelectQuery, subject access.Subject, column stri
 	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
 		return mayApprove(subject, id, v)
 	})
-	if len(both) == 0 && len(private) == 0 && len(public) == 0 {
-		return query
-	}
-	return query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-		if len(both) > 0 {
-			q = q.Where(column+".product_id NOT IN (?)", bun.List(both))
-		}
-		for _, one := range []struct {
-			products   []int64
-			visibility access.Visibility
-		}{{public, access.Public}, {private, access.Private}} {
-			if len(one.products) == 0 {
-				continue
-			}
-			q = q.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.WhereOr(column+".product_id NOT IN (?)", bun.List(one.products)).
-					WhereOr(column+".visibility <> ?", one.visibility)
-			})
-		}
-		return q
-	})
+	// The complement of the same condition. Neither column is ever null, so
+	// negating it is exact.
+	where, args := access.VisibleWhere(column+".product_id", column+".visibility", both, public, private)
+	return query.Where("NOT ("+where+")", args...)
 }
 
 // readableVisibilities is what this person may read across the products a set

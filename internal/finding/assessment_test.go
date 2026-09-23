@@ -625,11 +625,10 @@ func TestAnIssueThisProductDoesNotCarryCannotBeRatedInIt(t *testing.T) {
 }
 
 func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
-	// Both halves of the narrowing. The visibility half alone admits every
-	// disclosed finding in the deployment, so an approver holding one product
-	// was told how many findings an issue has in products they hold nothing
-	// on — and how many products those are, which is a count of what somebody
-	// else ships.
+	// Narrowed to the products the reader holds. Otherwise an approver
+	// holding one product is told how many findings an issue has in products
+	// they hold nothing on — and how many products those are, which is a count
+	// of what somebody else ships.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		elsewhere := f.inAnotherProduct(t, "other-product")

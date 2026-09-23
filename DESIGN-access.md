@@ -128,7 +128,7 @@ may not ask.
 
 | Rule | Reason |
 |---|---|
-| No reading is asked for and none is implied | The population is what they hold — their own name and their teams' — at the visibility they may read it at. An undisclosed finding that became undisclosed after it was handed over drops out of the tree rather than arriving through it |
+| No reading is asked for and none is implied | The population is what they hold — their own name and their teams' — as an assignment carries it: a disclosed row whatever they read, an undisclosed one only where they read undisclosed work in that product. An undisclosed finding that became undisclosed after it was handed over drops out of the tree rather than arriving through it |
 | A node counts their work, never the build's | Merged by path rather than by component, because a tree is paths: the same library under two containers is two places somebody is looking at |
 | Where somebody holds work on more components than the tree assembles, it says so | The counts then under-report, and a number quietly short is worse than one with a caveat |
 | Drawn as it is, not opened | What is drawn is the chains, and there is nothing under them to expand |
@@ -464,10 +464,14 @@ answer would have to be qualified at every call site.
 
 | Question | Asked at |
 |---|---|
-| An act on one finding | The finding's own visibility |
-| An act about the product rather than one finding — a routing rule, a rating, a tag, a scan sent by hand, a record of being exploited, taking unowned work | Triage at either visibility. The finding-level question narrows further wherever there is a finding to ask it of |
-| Publishing a VEX document | Public triage. What goes out is disclosed work alone |
-| A list, count or export spanning products | Per product and per visibility: both, disclosed only, or undisclosed only, as the grants on each product say |
+| An act on one finding — a claim, a tag, giving work to somebody else or taking what they hold | The finding's own visibility |
+| Approving somebody else's claim | Reading at the claim's visibility, with the approver capability or triage there. The session answer says which visibilities, so a screen offers it only where it succeeds |
+| An act about the product rather than one finding — a routing rule, a rating, a scan sent by hand, a record of being exploited, taking unowned work | Triage at either visibility. The finding-level question narrows further wherever there is a finding to ask it of |
+| Taking unowned work, handing back your own | Rows at a visibility they read, and a disclosed row of their own whatever they read, because the assignment carried it to them |
+| Reading or publishing a VEX document, and what has gone out | Public reading to read, public triage to publish. A document is disclosed work alone, and a row saying one went out is as much a disclosure as the document |
+| A release note between two builds | Public reading at both. Undisclosed work is added only where asked for and read |
+| An advisory, draft or issued | Every issue it covers at a visibility read in that issue's product |
+| A list, count or export spanning products | Per product and per visibility: both, disclosed only, or undisclosed only, as the grants on each product say. The assignment carry reaches the work list alone |
 
 ## Judgments about an issue
 
@@ -924,10 +928,10 @@ were served to anybody who asked, including the running version the endpoint
 reporting it is authenticated to withhold.
 
 A read is narrowed twice: to the products somebody holds anything on, and within
-those to what has been disclosed to them. Forgetting the first is silent —
-the visibility half alone admits every disclosed finding in the deployment, in
-products the asker holds nothing on, which reads as working because the numbers
-are plausible.
+those to the visibilities they read in each — both, disclosed work alone, or
+undisclosed work alone. The visibility half is written per product, so it
+admits nothing in a product the asker holds nothing on; the product half states
+that bound outright, beside it.
 
 The pair is one call. Where a product is already pinned — a build's readiness, one
 product's releases — a set membership would say less, so those have their own name

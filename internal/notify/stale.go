@@ -129,7 +129,7 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 				continue
 			}
 			at := per[row.ProductID]
-			if !at.approves || !at.reads(private) {
+			if !at.approves || !at.readsAll(row.Rows-row.PrivateRows, row.PrivateRows) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)
@@ -240,6 +240,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		Product     string    `bun:"product"`
 		ProposedBy  int64     `bun:"proposed_by"`
 		SentBackAt  time.Time `bun:"sent_back_at"`
+		Rows        int       `bun:"rows_written"`
 		PrivateRows int       `bun:"private_rows"`
 	}
 	err = w.db.NewSelect().
@@ -250,6 +251,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		ColumnExpr(`de.proposed_by AS "proposed_by"`).
 		ColumnExpr(`MIN(p.name) AS "product"`).
 		ColumnExpr(`MIN(de.sent_back_at) AS "sent_back_at"`).
+		ColumnExpr(`COUNT(*) AS "rows_written"`).
 		ColumnExpr(`SUM(CASE WHEN de.visibility = ? THEN 1 ELSE 0 END) AS "private_rows"`,
 			access.Private).
 		Where("de.state = ?", triage.Proposed).
@@ -277,7 +279,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		// A proposer who has since lost the reading that made the claim
 		// possible hears nothing. The condition is about a finding, and an
 		// alert is not a way back in.
-		if !at.reads(private) {
+		if !at.readsAll(row.Rows-row.PrivateRows, row.PrivateRows) {
 			continue
 		}
 		days := int(now.Sub(row.SentBackAt).Hours() / 24)
@@ -365,7 +367,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	for _, row := range rows {
 		private := row.PrivateRows > 0
 		at := reach[row.ProposedBy][row.ProductID]
-		if !at.reads(private) {
+		if !at.readsAll(row.Places-row.PrivateRows, row.PrivateRows) {
 			continue
 		}
 		out[row.ProposedBy] = append(out[row.ProposedBy], Holds{
@@ -502,7 +504,10 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		}
 		for _, personID := range members {
 			at := reach[personID][row.ProductID]
-			if !at.reads(private) {
+			// Disclosed work travels with the assignment to whoever holds
+			// it, so a member reading the product at either visibility may
+			// take it. Undisclosed work needs one who reads it.
+			if (private && !at.reads(true)) || (!private && !at.readsIn()) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)

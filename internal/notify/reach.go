@@ -48,6 +48,13 @@ func (a acts) reads(private bool) bool {
 	return a.readsPublic
 }
 
+// readsAll is whether they read every row of something spanning both
+// visibilities: a claim may mix disclosed and undisclosed places, and a
+// condition about it is sent to somebody who reads every one of them.
+func (a acts) readsAll(public, private int) bool {
+	return (public == 0 || a.readsPublic) && (private == 0 || a.readsPrivate)
+}
+
 // readsIn is whether they read the product at either visibility: the question
 // for something about the product that names no finding.
 func (a acts) readsIn() bool { return a.readsPublic || a.readsPrivate }

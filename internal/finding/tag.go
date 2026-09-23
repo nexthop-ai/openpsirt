@@ -62,8 +62,8 @@ func (s *Store) TagIt(ctx context.Context, subject access.Subject, productID,
 	if folded == "" {
 		return fmt.Errorf("a tag has to say something")
 	}
-	if !subject.TriagesIn(productID) {
-		return access.Denied(fmt.Sprintf("mark work in product %d", productID))
+	if err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID); err != nil {
+		return err
 	}
 	row := &Tag{
 		ProductID: productID, VulnerabilityID: vulnerabilityID, ComponentID: componentID,
@@ -83,8 +83,8 @@ func (s *Store) TagIt(ctx context.Context, subject access.Subject, productID,
 func (s *Store) Untag(ctx context.Context, subject access.Subject, productID,
 	vulnerabilityID, componentID int64, typed string) error {
 
-	if !subject.TriagesIn(productID) {
-		return access.Denied(fmt.Sprintf("mark work in product %d", productID))
+	if err := s.mayMark(ctx, subject, productID, vulnerabilityID, componentID); err != nil {
+		return err
 	}
 	if _, err := s.db.NewDelete().Model((*Tag)(nil)).
 		Where("product_id = ?", productID).
@@ -92,6 +92,37 @@ func (s *Store) Untag(ctx context.Context, subject access.Subject, productID,
 		Where("component_id = ?", componentID).
 		Where("tag = ?", TagAs(typed)).Exec(ctx); err != nil {
 		return fmt.Errorf("take the mark off: %w", err)
+	}
+	return nil
+}
+
+// mayMark refuses somebody who may not argue about this finding.
+//
+// A tag names one issue at one component, so it is asked of the finding
+// rather than of the product: triage at a visibility some finding of it in
+// this product carries. Somebody triaging undisclosed work alone does not mark
+// a disclosed finding because the same issue is undisclosed at another
+// component.
+func (s *Store) mayMark(ctx context.Context, subject access.Subject, productID,
+	vulnerabilityID, componentID int64) error {
+
+	refused := access.Denied(fmt.Sprintf("mark work in product %d", productID))
+	triaged := triagedIn(subject, productID)
+	if len(triaged) == 0 {
+		return refused
+	}
+	there, err := s.db.NewSelect().Model((*Finding)(nil)).
+		Column("id").
+		Where(inThisProduct, productID).
+		Where("vulnerability_id = ?", vulnerabilityID).
+		Where("component_id = ?", componentID).
+		Where("visibility IN (?)", bun.List(triaged)).
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("read whether that finding may be marked: %w", err)
+	}
+	if !there {
+		return refused
 	}
 	return nil
 }

@@ -132,6 +132,12 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromTarget,
 			both = append(both, v)
 		}
 	}
+	// Disclosed work is what a release note is. Somebody reading only
+	// undisclosed work at either end is refused rather than handed a note
+	// reading "nothing fixed, nothing new", which looks complete.
+	if !slices.Contains(both, access.Public) {
+		return nil, access.Denied("read disclosed work in both builds")
+	}
 	visible = both
 
 	at := func(productID, targetID int64) *bun.SelectQuery {

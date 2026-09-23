@@ -23,6 +23,9 @@ export type Can = {
   // Triage of private findings, which recording an undisclosed one asks for.
   may_hide: boolean;
   may_agree: boolean;
+  // Agreeing to a claim at one visibility, which is how approving is asked.
+  agrees_public: boolean;
+  agrees_private: boolean;
   // Agreeing to somebody else's ruling on vulnerability reports.
   may_approve_rulings: boolean;
 };

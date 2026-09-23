@@ -51,6 +51,13 @@ A path below the address is refused for the same reason:
 somewhere it does not answer. If this deployment is served under a path, that
 is a thing to raise rather than to configure here.
 
+`private-read` and `private-triage` used to include disclosed findings. Each
+now reaches only findings nobody has announced. Grant `public-read` or
+`public-triage` beside them — directly, in a group binding, or in a token's
+holds — wherever somebody should keep the disclosed findings. Nothing is
+granted on upgrade, so until then a holder of a private role alone sees no
+disclosed finding they are not assigned.
+
 ## Serving
 
 | Variable | Meaning | Default |

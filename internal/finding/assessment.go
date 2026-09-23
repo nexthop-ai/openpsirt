@@ -909,10 +909,9 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = ?", claim.ProductID).
 		GroupExpr("f.urgency_exploited, f.urgency_exploited_here, " + rating.EffectiveExpr)
-	// The visibility half as well as the product. The visibility half alone
-	// admits every disclosed finding in the deployment, so an approver holding
-	// one product was told how many findings this issue has in products they
-	// hold nothing on.
+	// Narrowed across every product, not only the claim's: an approver
+	// holding one product is not told how many findings this issue has in
+	// products they hold nothing on.
 	q = onlyReadable(q, subject, products, all)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return Consequence{}, fmt.Errorf("read what this issue is open against: %w", err)

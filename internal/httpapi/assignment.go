@@ -708,7 +708,9 @@ func seenBy(ctx context.Context, in Ingest, identity string, productID int64, un
 	if undisclosed {
 		return them.Reads(access.Private, productID)
 	}
-	return them.Reads(access.Public, productID)
+	// A disclosed finding travels with the assignment to whoever holds it,
+	// so reading the product at either visibility is enough to be told.
+	return them.ReadsIn(productID)
 }
 
 // teamMayHold reports whether a team may be handed work whose strictest

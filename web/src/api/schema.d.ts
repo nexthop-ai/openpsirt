@@ -2549,7 +2549,7 @@ export interface paths {
          *
          *     Narrow with `q`, which matches the identity and the displayed name without regard to capitals. This is not the people list: that is the deployment's directory and needs administration.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
+         *     Requires: public-read or public-triage or private-read or private-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
          */
         get: operations["list-holders"];
         put?: never;
@@ -2985,7 +2985,7 @@ export interface paths {
          *
          *     `visibility` says which kind of finding the text is about. Asking about undisclosed findings requires being able to read them.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. Asking about undisclosed findings needs private-read or private-triage.
+         *     Requires: public-read or public-triage or private-read or private-triage on the product. Asking about disclosed findings, the default, needs public-read or public-triage; about undisclosed findings, private-read or private-triage.
          */
         get: operations["list-mentionable"];
         put?: never;
@@ -4397,7 +4397,7 @@ export interface paths {
          *
          *     Requires a publisher configured for this deployment: a document naming none has nobody as its author.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
+         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
          */
         get: operations["get-vex"];
         put?: never;
@@ -4425,7 +4425,7 @@ export interface paths {
          *
          *     `changed` is absent where nothing has gone out, where no publisher is configured, and where the build now holds more statements than one document carries.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
+         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
          */
         get: operations["list-vex-issuances"];
         put?: never;
@@ -4439,7 +4439,7 @@ export interface paths {
          *
          *     The digest is taken from the document generated here rather than from anything sent: a digest of whatever a caller says answers nothing. The public document, never the preview that includes work nobody has announced.
          *
-         *     Requires: public-triage or private-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
+         *     Requires: public-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
          */
         post: operations["record-vex-issued"];
         delete?: never;
@@ -4461,7 +4461,7 @@ export interface paths {
          *
          *     A revision nobody recorded answers 404.
          *
-         *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
+         *     Requires: public-read or public-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
          */
         get: operations["get-vex-issued"];
         put?: never;
@@ -6258,7 +6258,11 @@ export interface components {
             version: string;
         };
         CanBody: {
-            /** @description Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
+            /** @description Agree to somebody else's claim about findings nobody has disclosed, or send it back: reading them, with the approver capability or private-triage */
+            agrees_private: boolean;
+            /** @description Agree to somebody else's claim about disclosed findings, or send it back: reading them, with the approver capability or public-triage */
+            agrees_public: boolean;
+            /** @description Agree to somebody else's claim, or send it back, at either visibility. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
             may_agree: boolean;
             /** @description Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work */
             may_approve_rulings: boolean;

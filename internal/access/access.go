@@ -633,7 +633,13 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 	return false
 }
 
-// Products returns the products whose findings this subject may read.
+// Products returns the products whose findings this subject may read, at
+// either visibility.
+//
+// Membership says only that they read something there. A query narrows with
+// Split and VisibleWhere, per product and per visibility, and never on
+// membership alone: somebody who reads only undisclosed work in a product is
+// in this list and does not read its disclosed findings.
 //
 // Not every product, for an administrator. Administering the
 // catalog is knowing a product exists, which is what Sees answers; this is
@@ -650,12 +656,10 @@ func (s Subject) Products() (ids []int64, all bool) {
 	for id := range s.grants {
 		// The read roles directly, not Sees. Sees answers "may they know this
 		// product exists", which is true for an administrator everywhere and
-		// true for anybody holding a bare capability here — so an
-		// administrator who granted themselves nothing but the ability to
-		// approve or to assign on a product got that product into the set
-		// that narrows findings, counts, aggregates and exports, and read
-		// every disclosed finding in it. A capability grants no visibility of
-		// its own, and this is where that stopped being true.
+		// true for anybody holding a bare capability here, and a capability
+		// grants no visibility of its own: holding nothing but the ability to
+		// approve or to assign on a product does not put it in the set that
+		// narrows findings, counts, aggregates and exports.
 		if s.ReadsIn(id) {
 			ids = append(ids, id)
 		}

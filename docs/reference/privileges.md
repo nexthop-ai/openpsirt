@@ -45,9 +45,11 @@ nobody has announced and no others, so somebody working private reports is not
 handed every public finding as well. Somebody who works both holds both. A
 triage role carries reading at its own visibility.
 
-A disclosed finding assigned to somebody is theirs to see whatever they read,
-because an assignment carries what was assigned. An undisclosed one goes only to
-somebody who reads undisclosed work in that product.
+A disclosed finding assigned to somebody is listed among their work whatever
+they read, drawn in the tree of what they hold, and theirs to hand back, because
+an assignment carries what was assigned. Opening the finding, like every other
+screen about the product, takes reading at its visibility. An undisclosed one
+goes only to somebody who reads undisclosed work in that product.
 
 `approver` and `assigner` grant no visibility of their own. Each is a
 capability bounded by what its holder may read, so granted alone it reaches
