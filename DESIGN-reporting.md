@@ -471,8 +471,8 @@ and an approval from a role since withdrawn is correct behavior, so neither
 raises anything. The same two people agreeing is what a small team looks like,
 so the pairs section raises a condition only past two thresholds: a share of a
 product's agreements, among at least a set number of people who may approve.
-Both are settings a product may override. `DESIGN-notifications.md` § One pair
-agreeing to most of the work holds the rule, and why a pair counted without the
+Both are settings a product may override. `DESIGN-notifications.md` § Concentrated
+approval pairs holds the rule, and why a pair counted without the
 second threshold would be an alert nobody can clear (REQ-49).
 
 Four filters: who proposed it, who has a standing agreement on it, which issue,

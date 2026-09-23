@@ -253,7 +253,7 @@ than about anybody's work.
 | A claim still waiting for its second person is not this | It suppresses nothing and hides nothing while it waits, and somebody is looking at it |
 | Counted across every product and the whole record | The condition is about the deployment. What the report behind the link shows is narrowed to what its reader holds, so an administrator granted no product reads the count and an empty page — the same answer their dashboard gives, and the reason the link asks for everything rather than the quarter the sheet opens on |
 
-### One pair agreeing to most of the work
+### Concentrated approval pairs
 
 | Rule | Reason |
 |---|---|
