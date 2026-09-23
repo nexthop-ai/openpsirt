@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { THE_LINE } from "../ui/severities";
 import { useState } from "react";
 import { Loading } from "../ui/Loading";

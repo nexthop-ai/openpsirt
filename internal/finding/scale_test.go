@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build measure
 
 // A year of nightly scans against this, measured rather than assumed.

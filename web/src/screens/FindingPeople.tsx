@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The people involved with this finding, and what hangs off it.
 //
 // Collaborators brought into an undisclosed case, whoever is holding the work,

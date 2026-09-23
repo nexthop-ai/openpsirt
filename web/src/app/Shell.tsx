@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useApprovable } from "../api/intake";
 import { notACredential } from "../ui/noautofill";
 import { useEffect, useRef, useState, type ReactNode } from "react";

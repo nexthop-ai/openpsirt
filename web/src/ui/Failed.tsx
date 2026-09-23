@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { Refused } from "../api/queries";
 
 // A failure says what the server said. Inventing a friendlier sentence here

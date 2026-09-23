@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A size in bytes, between the form the server takes and the form a person
 // reads.
 //

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package finding_test
 
 // The fixture every test file in this package builds on: one migrated

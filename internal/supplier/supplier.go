@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package supplier fetches the security advisories a supplier publishes and
 // records them as evidence.
 //

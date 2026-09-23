@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { matchPath, useLocation } from "react-router-dom";
 
 import { SCOPE_KEPT } from "./drafts";

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // What tsc cannot see.
 //
 // The type check here is already strict — unused locals and parameters,

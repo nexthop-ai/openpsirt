@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { signOut } from "./session";
 import { belongTo, keep, restore } from "./drafts";

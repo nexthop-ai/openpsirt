@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package bound cuts a string to a number of bytes without splitting a
 // character.
 //

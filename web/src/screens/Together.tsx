@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { notACredential } from "../ui/noautofill";
 import { Icon } from "../ui/Icons";
 import { useMemo, useState } from "react";

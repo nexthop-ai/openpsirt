@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package outward is the one HTTP client this process reaches the internet
 // with.
 //

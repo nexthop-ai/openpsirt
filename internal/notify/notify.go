@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package notify records what somebody is told, and reads it back.
 //
 // It is the in-app notification area — the one channel that works with nothing

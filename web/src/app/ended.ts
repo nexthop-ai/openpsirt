@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A session ended under somebody who is still on a screen.
 //
 // The person is looking at a drawn screen, and quite possibly halfway through

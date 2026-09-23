@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command engines prints the database engines the application supports, one
 // per line, so that the makefile's checks read the enumeration rather than
 // repeating it.

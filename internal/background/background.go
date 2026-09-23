@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package background runs a pass on a timer until its context ends.
 //
 // One body for every recurring pass: default a non-positive interval to a

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Working a list from the keyboard.
 //
 // The list is where a triager spends the day, against four keys in the whole

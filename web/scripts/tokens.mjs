@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Design tokens referred to and never defined.
 //
 // A `var(--thing)` naming a token that does not exist is not an error anywhere:

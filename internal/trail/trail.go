@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package trail records what somebody changed about how this deployment works.
 //
 // Not what was triaged — that is the decision history, and it is kept beside

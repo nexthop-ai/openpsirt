@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package finding
 
 // Grouping what is open by the thing that would answer it, rather than by the

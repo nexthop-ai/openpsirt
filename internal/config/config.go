@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package config loads runtime settings.
 //
 // Settings come from the environment. Every one has a working default, so an

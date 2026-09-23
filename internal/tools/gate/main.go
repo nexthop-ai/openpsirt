@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command gate names the checks a change has to pass.
 //
 // The full gate is minutes and most changes cannot fail most of it. A prose
@@ -60,9 +63,9 @@ const (
 // the fast and specific before the slow and broad.
 var runs = map[tier][]string{
 	documents: {"docs-check", "unclaimed"},
-	web:       {"web-check"},
+	web:       {"web-check", "spdx"},
 	code: {"build", "vet", "lint", "unreachable", "readable", "negatives", "confined", "granted",
-		"narrowed", "attached", "vendored", "test"},
+		"narrowed", "attached", "vendored", "spdx", "test"},
 	api:     {"openapi-current", "web-api"},
 	engines: {"reserved", "test-all", "check-engines"},
 	// Everything, the container and the chart included. Those are the one
@@ -79,7 +82,7 @@ var runs = map[tier][]string{
 // The order targets are printed in, which is the order make runs them.
 var order = []string{
 	"build", "vet", "lint", "unreachable", "readable", "negatives", "reserved", "confined", "granted",
-	"narrowed", "attached", "vendored",
+	"narrowed", "attached", "vendored", "spdx",
 	"docs-check", "unclaimed", "openapi-current",
 	"test", "test-all", "check-engines", "web-check", "web-api", "check", "check-packaging",
 }

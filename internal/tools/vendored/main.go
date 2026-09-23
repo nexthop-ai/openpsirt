@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command vendored checks the license of every file somebody else wrote that
 // the tree carries.
 //
@@ -28,28 +31,21 @@ import (
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/provenance"
 )
 
 // entry is one file held in the tree, and what it may be kept under.
-type entry struct {
-	path    string
-	license string
-	source  string
-}
+type entry = provenance.Entry
 
-// The licenses a data file may carry beyond what code may. Code is held to
-// the list the dependency check uses; a document or a table of data may also
-// be dedicated to the public domain, published under an attribution license,
-// or published under terms of its own.
+// held is the list the tree is held to.
+var held = provenance.Held
+
+// The names the list is written in.
 const (
-	// ours is a file this project wrote, or produced by running a tool, and
-	// holds under its own license.
-	ours = "ours"
-	// publicDomain is a work of the United States government.
-	publicDomain = "LicenseRef-public-domain"
-	// cweTerms is the terms MITRE publishes the weakness catalog under,
-	// which allow reproduction with attribution.
-	cweTerms = "LicenseRef-CWE-terms-of-use"
+	ours         = provenance.Ours
+	publicDomain = provenance.PublicDomain
+	cweTerms     = provenance.CWETerms
 )
 
 var dataLicenses = []string{"CC0-1.0", "CC-BY-4.0", publicDomain, cweTerms}
@@ -69,8 +65,13 @@ var marks = []*regexp.Regexp{
 	regexp.MustCompile("`NOTICE` records"),
 }
 
-// itself is where this program lives.
-const itself = "internal/tools/vendored"
+// ownLicense is the identifier naming this tree's own license and nothing
+// else.
+var ownLicense = regexp.MustCompile(`SPDX-License-Identifier:\s*Apache-2\.0\s*(?:\*/)?\s*$`)
+
+// itself is where this program and the list it reads live, both of which
+// spell every mark it looks for.
+var itself = map[string]bool{"internal/tools/vendored": true, "internal/tools/provenance": true}
 
 // Our own name, which a copyright line naming is not somebody else's.
 const owner = "Nexthop Systems Inc."
@@ -125,7 +126,7 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 	}
 	holds := map[string]entry{}
 	for _, each := range held {
-		holds[each.path] = each
+		holds[each.Path] = each
 	}
 	inNotice := map[string]bool{}
 	for _, each := range noticed(notice) {
@@ -150,7 +151,7 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 		if _, ok := holds[each]; !ok {
 			faults = append(faults, fmt.Sprintf(
 				"%s %s, and nothing says where it came from or what it may be kept under: "+
-					"add it to internal/tools/vendored/held.go", each, why))
+					"add it to internal/tools/provenance/held.go", each, why))
 		}
 	}
 	if found == 0 {
@@ -158,19 +159,19 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 	}
 
 	for _, each := range held {
-		if !in[each.path] {
-			faults = append(faults, fmt.Sprintf("%s is held and is not in the tree", each.path))
+		if !in[each.Path] {
+			faults = append(faults, fmt.Sprintf("%s is held and is not in the tree", each.Path))
 		}
-		if !keepable(each.license, permitted) {
+		if !keepable(each.License, permitted) {
 			faults = append(faults, fmt.Sprintf("%s is under %s, which is not a license this tree may carry",
-				each.path, each.license))
+				each.Path, each.License))
 		}
-		if each.license != ours && each.source == "" {
-			faults = append(faults, fmt.Sprintf("%s says nothing about where it came from", each.path))
+		if each.License != ours && each.Source == "" {
+			faults = append(faults, fmt.Sprintf("%s says nothing about where it came from", each.Path))
 		}
-		if !asksNothing(each.license) && !inNotice[each.path] {
+		if !asksNothing(each.License) && !inNotice[each.Path] {
 			faults = append(faults, fmt.Sprintf("%s is under %s, which asks for attribution, and NOTICE does not name it",
-				each.path, each.license))
+				each.Path, each.License))
 		}
 	}
 
@@ -185,7 +186,7 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 			faults = append(faults, fmt.Sprintf("NOTICE names %s, which is not in the tree", each))
 		case !ok:
 			faults = append(faults, fmt.Sprintf("NOTICE names %s, and the list does not hold it", each))
-		case one.license == ours:
+		case one.License == ours:
 			faults = append(faults, fmt.Sprintf("NOTICE names %s, and the list holds it as ours", each))
 		}
 	}
@@ -198,11 +199,11 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 //
 // NOTICE and LICENSE are the statements themselves. A markdown file is prose
 // about the tree, and the fixture READMEs describe licenses in words. This
-// program's own source spells every mark it looks for.
+// program's own source, and the list it reads, spell every mark it looks for.
 func needed(file string, read func(string) ([]byte, error)) (string, error) {
 	base := path.Base(file)
 	if file == "NOTICE" || file == "LICENSE" || strings.HasSuffix(base, ".md") ||
-		path.Dir(file) == itself {
+		itself[path.Dir(file)] {
 		return "", nil
 	}
 	if strings.HasPrefix(file, "testdata/") || strings.Contains(file, "/testdata/") {
@@ -215,8 +216,18 @@ func needed(file string, read func(string) ([]byte, error)) (string, error) {
 	if !utf8.Valid(content) {
 		return "", nil
 	}
-	for _, line := range strings.Split(string(content), "\n") {
-		if strings.Contains(line, owner) {
+	lines := strings.Split(string(content), "\n")
+	// A file carrying our copyright is ours, and the license identifier
+	// beside it naming this tree's own license says nothing more. Any other
+	// identifier in it is still somebody else's terms.
+	mine := false
+	for _, line := range lines {
+		if strings.Contains(line, "Copyright "+owner) {
+			mine = true
+		}
+	}
+	for _, line := range lines {
+		if strings.Contains(line, owner) || (mine && ownLicense.MatchString(line)) {
 			continue
 		}
 		for _, mark := range marks {

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A tree row, and the build it is drawn for.
 //
 // A file of their own so the shapes the tree is built on are stated once,

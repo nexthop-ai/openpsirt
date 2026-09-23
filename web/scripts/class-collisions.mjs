@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Class names of ours that Tailwind also defines.
 //
 // Tailwind is imported wholesale into our stylesheet, and it emits a utility

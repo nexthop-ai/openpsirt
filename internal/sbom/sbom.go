@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package sbom reads the inventory a build produced.
 //
 // A build sends what it shipped: every component, and the edges between them

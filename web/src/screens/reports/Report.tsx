@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { type ReactElement } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { Backlog } from "./Backlog";

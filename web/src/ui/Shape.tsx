@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { ROLLED } from "./severities";
 
 // The parts of a count, as one bar whose widths are the counts.

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // How a stylesheet's class rules are read, and which of them cannot be right.
 //
 // A module of its own so that a test can import it. The program beside this

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command granted reports a query that asks one grant table and not the other.
 //
 // A role is held two ways: against one product, and across every product. What

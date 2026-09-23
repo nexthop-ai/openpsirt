@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The place somebody was on a page, kept so that coming back is coming back.
 //
 // A browser restores scroll on a real navigation and an application like this

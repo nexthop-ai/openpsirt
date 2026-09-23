@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The severity ladder, in one place.
 //
 // It was written out five times in the interface and three more in the server,

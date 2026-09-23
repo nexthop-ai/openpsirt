@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package currency asks each ecosystem's index what the newest version of
 // something is, and when it shipped.
 //

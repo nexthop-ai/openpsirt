@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { bandOf, ratedAs } from "./severities";
 
 // Severity reads at a glance and never borrows the accent color: "urgent" and

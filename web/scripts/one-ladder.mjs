@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The severity ladder, written down more than once.
 //
 // `src/ui/severities.ts` exists because the order and membership of these

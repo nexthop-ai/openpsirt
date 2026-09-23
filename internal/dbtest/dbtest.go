@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package dbtest runs a test against every database available to it.
 //
 // SQLite always runs, so the suite is useful with nothing installed. The

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package attach
 
 // AfterPage runs fn between the collection pass reading its page and acting on

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { Link } from "react-router-dom";
 import { useScope } from "../../app/scope";
 import { CATALOG, leadsTo, scopeWords } from "./catalog";

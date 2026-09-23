@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The words of the notification area, apart from its drawing.
 //
 // Here rather than inside the component so both can be tested without a DOM:

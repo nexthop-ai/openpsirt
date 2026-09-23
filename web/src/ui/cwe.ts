@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The kind of flaw, by the classification the world uses.
 //
 // Suggested, never restricted. Anything may be recorded. A picker that

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // One claim, whole, and every act at that grain.
 //
 // A claim is one argument however many decisions it wrote, so this is the page

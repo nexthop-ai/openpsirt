@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useSelection } from "./useSelection";
 import { FindingsTable } from "./FindingsTable";

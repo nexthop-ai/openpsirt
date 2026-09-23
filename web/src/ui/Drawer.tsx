@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useEffect, type ReactNode } from "react";
 import { Icon } from "./Icons";
 

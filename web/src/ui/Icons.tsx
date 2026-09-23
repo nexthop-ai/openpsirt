@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The rail's and the bar's icons: stroke paths on a 24-unit grid, the
 // mockup's, so a screen is found by its shape as well as its word.
 

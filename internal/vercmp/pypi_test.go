@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0 AND (Apache-2.0 OR BSD-2-Clause)
+
 package vercmp_test
 
 import (

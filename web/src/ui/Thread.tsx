@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useState, type ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { Editor, forget, mentioning } from "./Editor";

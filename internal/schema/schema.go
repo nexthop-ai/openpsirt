@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package schema applies this application's schema to a database.
 //
 // It exists so that using the migration machinery necessarily registers the

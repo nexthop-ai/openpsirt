@@ -1,3 +1,6 @@
+/* Copyright Nexthop Systems Inc. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
 /* The parts every screen is built from — a panel, a table, a form, a chip, a
    filter bar. Nothing here belongs to one screen, which is what makes it the
    file to check before inventing a shape. */

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package database
 
 // EncryptionAsAsked is the refusal a deployment's stated transport produces,

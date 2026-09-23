@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package patchbranch labels a patch link with the branches that carry it.
 //
 // A fix is backported as a separate commit to each branch its maintainers

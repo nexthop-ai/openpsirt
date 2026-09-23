@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package obligation holds what a deployment answers to after its product is
 // attacked: the windows it says it is under, the record that somebody outside
 // was told, and the shelf that watches both.

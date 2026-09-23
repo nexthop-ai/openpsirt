@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package setting holds what an administrator changes from inside the
 // application, as opposed to what an operator sets when deploying it.
 //

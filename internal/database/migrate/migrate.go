@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package migrate applies schema changes.
 //
 // Migrations are embedded in the binary, so a deployment is one artifact and

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command confined reports engine-specific code outside where it is allowed.
 //
 // Queries here are written once and run against four engines. The places that

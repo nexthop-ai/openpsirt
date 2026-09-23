@@ -1,3 +1,6 @@
+# Copyright Nexthop Systems Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 # The base every stage that is not somebody else's toolchain image starts from.
 # Declared here because an argument a `FROM` line reads has to be declared
 # before the first one, and pinned in one place so three stages cannot drift

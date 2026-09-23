@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import type { ReactNode } from "react";
 import { Drawer, Fab } from "./Drawer";
 import { Failed } from "./Failed";

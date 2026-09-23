@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useWho } from "../app/session";
 
 // The bound on what a screen acting on a selection may do at once.

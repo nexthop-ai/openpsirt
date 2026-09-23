@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package httpapi
 
 // The subject a handler is answering, and the reach that alone gives.

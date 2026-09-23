@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // What the advisory screens work out, apart from what draws them.
 
 // The editorial statuses, with the word on screen and what reaching it means.

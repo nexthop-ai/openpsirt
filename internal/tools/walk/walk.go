@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package walk visits the files of this repository for the gate programs.
 //
 // "Part of this repository" is decided six times over, with five

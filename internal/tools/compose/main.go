@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command compose joins several CycloneDX inventories into one that has a
 // graph.
 //

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A place's decision state, in the words every screen says it in.
 //
 // One vocabulary, because a register, a comparison and a document all state

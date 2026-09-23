@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useState } from "react";
 
 // The date something goes out of support, and a way to say so.

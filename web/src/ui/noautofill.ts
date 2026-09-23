@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The attributes that tell a password manager a field is not a credential.
 //
 // Settings, filters and declaration forms are full of short text and number

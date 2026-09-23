@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0 AND BSD-2-Clause
+
 package finding
 
 import (

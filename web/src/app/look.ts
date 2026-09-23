@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The look this browser draws, of the two.
 //
 // A look is a token set on the root element and nothing else — the markup is

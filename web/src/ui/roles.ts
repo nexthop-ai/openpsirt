@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The roles, with what each allows — the same words the API reference uses.
 //
 // A bare token in a list is what showing a justification in words fixed, and

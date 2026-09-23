@@ -1,3 +1,6 @@
+# Copyright Nexthop Systems Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 # The image, and what is built from it: the seeded demo deployment, the
 # hot-reload loop, and the offline scanner bundle an operator carries across an
 # air gap.

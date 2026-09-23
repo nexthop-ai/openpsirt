@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from "vitest";
 import { CATALOG, leadsTo, reportAt, scopeWords } from "./catalog";
 import { PAGES } from "./Report";

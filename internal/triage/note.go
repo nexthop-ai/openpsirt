@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package triage
 
 // Notes on an issue in a product: what somebody wanted whoever decides to

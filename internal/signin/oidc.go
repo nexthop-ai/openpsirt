@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package signin turns a provider's answer into somebody we already know.
 //
 // Nothing here creates an account. A provider establishes who somebody is;

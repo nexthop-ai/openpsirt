@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package supplier
 
 // FetchForTest points the pass at a fetcher that answers without a network.

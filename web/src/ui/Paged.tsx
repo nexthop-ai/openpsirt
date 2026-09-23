@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A list that is a page of something larger says so.
 //
 // A page of fifty drawn as if it were everything reads as a count, and the

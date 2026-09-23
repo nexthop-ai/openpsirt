@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package advisory turns what is held about a flaw in our own product into a
 // document somebody can publish.
 //

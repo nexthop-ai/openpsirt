@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package publisher is the identity this deployment publishes under.
 //
 // One type for both formats. A VEX document and an advisory name the same

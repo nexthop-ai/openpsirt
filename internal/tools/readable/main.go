@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command readable reports source files that a text tool will not read.
 //
 // A single stray NUL byte in a TypeScript file made grep treat it as binary,

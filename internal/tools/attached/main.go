@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // attached refuses a doc comment describing something other than the
 // declaration it sits on.
 //

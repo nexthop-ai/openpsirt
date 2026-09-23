@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from "vitest";
 import type { Report } from "../api/intake";
 import { dispositionSaid, needsReason, needsSecond, ready, rulable, standing } from "./inbox";

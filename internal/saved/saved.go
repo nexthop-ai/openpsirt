@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package saved is a narrowing of a list that somebody kept, and the claim it
 // prepares.
 //

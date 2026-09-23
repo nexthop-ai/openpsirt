@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The answers the decision form is still waiting for.
 //
 // Nothing is chosen for anybody, so an empty form is the ordinary state and

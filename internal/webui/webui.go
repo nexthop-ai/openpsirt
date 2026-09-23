@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package webui carries the built web interface into the binary.
 //
 // A package of its own so that the embed directive names a directory that is

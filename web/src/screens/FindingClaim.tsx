@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The claims made about this finding, and their fate.
 //
 // The state the head reads, the timeline, the revisions a claim went through,

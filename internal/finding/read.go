@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package finding
 
 // Reading findings back, and the naming layer every other read here shares.

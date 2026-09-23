@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package finding
 
 // FixedBecause is how a closure is said in a release note, for the test.

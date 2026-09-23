@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { decidedAs } from "../ui/decided";
 import { useQuery } from "@tanstack/react-query";
 import { Loading } from "../ui/Loading";
