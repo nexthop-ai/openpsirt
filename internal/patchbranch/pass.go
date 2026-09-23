@@ -40,11 +40,6 @@ const LookAgainAfter = 7 * 24 * time.Hour
 // for the second.
 const RetryAfter = 24 * time.Hour
 
-// renewEvery is how many commits a visit looks up before it asks for the lease
-// again, and reads the setting again. At 0.22 seconds a commit that is well
-// inside the lease.
-const renewEvery = 200
-
 // Pass fetches the repositories patch links point into and records which
 // branches each linked commit is on.
 type Pass struct {
@@ -71,8 +66,6 @@ type Options struct {
 	// Excluded is where no repository is fetched from, on top of this
 	// network.
 	Excluded Excluded
-	// Git is the program. Empty means whatever the environment resolves.
-	Git string
 }
 
 // NewPass returns the pass over db as whichever replica this is.
@@ -81,14 +74,16 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, options Options) *
 	if quota <= 0 {
 		quota = DefaultQuota
 	}
-	return &Pass{
+	pass := &Pass{
 		db: db, logger: logger,
-		git:      git{path: options.Git, excluded: options.Excluded, transport: "https"},
+		git:      git{excluded: options.Excluded, transport: "https"},
 		copies:   copies{root: options.Dir, quota: quota, now: time.Now, poll: 15 * time.Second},
 		excluded: options.Excluded,
 		Now:      time.Now,
 		leases:   queue.NewLeases(db), replica: replica,
 	}
+	pass.copies.gone = pass.forget
+	return pass
 }
 
 // Run looks for work until the context ends.
@@ -294,36 +289,76 @@ func (c *candidate) before(other *candidate) bool {
 // lease was lost. Not a failure of the repository.
 var errStopped = errors.New("stopped")
 
+// ourFault is a failure of this deployment rather than of the repository: the
+// database, the lease, the setting. A visit that meets one leaves the
+// repository as it was, because blaming the repository for a dropped
+// connection puts it out of reach for a day and says the wrong thing on the
+// screen.
+type ourFault struct{ err error }
+
+func (f ourFault) Error() string { return f.err.Error() }
+func (f ourFault) Unwrap() error { return f.err }
+
+// renewTick is how often a visit asks for the lease again and reads the
+// switch. Throughout the visit, the fetch and the index write included: a
+// first fetch of the kernel from kernel.org takes a quarter of an hour, and
+// the lease is half an hour.
+const renewTick = time.Minute
+
 // visit brings one repository's copy up to date and looks up every commit due
 // in it, most urgent first.
 func (p *Pass) visit(ctx context.Context, c candidate, commits map[Commit]urgency) error {
-	started := p.Now()
 	if _, err := p.db.NewUpdate().Model((*repositoryRow)(nil)).
-		Set("fetched_at = ?", started.UTC()).
+		Set("fetched_at = ?", p.Now().UTC()).
 		Set("failed = NULL").
 		Where("id = ?", c.repository.ID).Exec(ctx); err != nil {
 		return fmt.Errorf("record that a visit began: %w", err)
 	}
-	dir, err := p.copies.ensure(ctx, p.git, c.repository.URL)
+	held, stop := context.WithCancelCause(ctx)
+	defer stop(nil)
+	go func() {
+		tick := time.NewTicker(renewTick)
+		defer tick.Stop()
+		for {
+			select {
+			case <-held.Done():
+				return
+			case <-tick.C:
+				if err := p.stillMine(held); err != nil {
+					stop(err)
+					return
+				}
+			}
+		}
+	}()
+
+	dir, err := p.copies.ensure(held, p.git, c.repository.URL)
 	if err == nil {
-		err = p.git.graph(ctx, dir)
+		err = p.git.graph(held, dir)
 	}
 	if err == nil {
-		err = p.lookUp(ctx, c, commits, dir)
+		err = p.lookUp(held, c, commits, dir)
 	}
+	// Why the visit's context ended outranks what the work reported, because
+	// ending it is what made the work fail.
+	if cause := context.Cause(held); held.Err() != nil && cause != nil {
+		err = cause
+	}
+	var ours ourFault
 	switch {
+	case errors.As(err, &ours):
+		if stopped := p.finish(ctx, c.repository, dir, errStopped); stopped != nil {
+			p.logger.Warn("recording that a visit stopped", "error", stopped)
+		}
+		return err
 	case errors.Is(err, errStopped), ctx.Err() != nil:
-		// Nothing about the repository to record: the visit neither
-		// finished nor failed. The moment it began is put back to the last
-		// one that finished, so the report shows no visit in progress and
-		// no finish that did not happen.
-		return p.finish(ctx, c.repository.ID, dir, errStopped)
+		return p.finish(ctx, c.repository, dir, errStopped)
 	case err != nil:
 		p.logger.Warn("a repository patch links point into could not be read",
 			"repository", c.repository.URL, "error", err)
-		return p.finish(ctx, c.repository.ID, dir, err)
+		return p.finish(ctx, c.repository, dir, err)
 	}
-	return p.finish(ctx, c.repository.ID, dir, nil)
+	return p.finish(ctx, c.repository, dir, nil)
 }
 
 // lookUp asks the copy about every due commit, most urgent first.
@@ -348,24 +383,20 @@ func (p *Pass) lookUp(ctx context.Context, c candidate, commits map[Commit]urgen
 	if err != nil {
 		return err
 	}
-	for at, row := range c.due {
-		if at > 0 && at%renewEvery == 0 {
-			if err := p.stillMine(ctx); err != nil {
-				return err
-			}
-		}
+	for _, row := range c.due {
 		if ctx.Err() != nil {
 			return errStopped
 		}
 		var branches []string
+		count := 0
 		name, found := full[row.Hash]
 		if found {
-			if branches, err = p.git.branches(ctx, dir, name); err != nil {
+			if branches, count, err = p.git.branches(ctx, dir, name); err != nil {
 				return err
 			}
 		}
-		if err := p.record(ctx, row.ID, found, branches); err != nil {
-			return err
+		if err := p.record(ctx, row.ID, found, branches, count); err != nil {
+			return ourFault{err}
 		}
 	}
 	return nil
@@ -375,14 +406,14 @@ func (p *Pass) lookUp(ctx context.Context, c candidate, commits map[Commit]urgen
 func (p *Pass) stillMine(ctx context.Context) error {
 	on, err := p.enabled(ctx)
 	if err != nil {
-		return fmt.Errorf("read whether patch branches are looked up: %w", err)
+		return ourFault{fmt.Errorf("read whether patch branches are looked up: %w", err)}
 	}
 	if !on {
 		return errStopped
 	}
 	mine, err := p.holding(ctx)
 	if err != nil {
-		return fmt.Errorf("keep the lease on looking up patch branches: %w", err)
+		return ourFault{fmt.Errorf("keep the lease on looking up patch branches: %w", err)}
 	}
 	if !mine {
 		return errStopped
@@ -390,17 +421,11 @@ func (p *Pass) stillMine(ctx context.Context) error {
 	return nil
 }
 
-// record writes what the copy said about one commit.
-func (p *Pass) record(ctx context.Context, id int64, found bool, branches []string) error {
-	sort.Slice(branches, func(i, j int) bool { return versionLess(branches[i], branches[j]) })
-	count := len(branches)
+// record writes what the copy said about one commit: the branches kept, in
+// version order, and how many held it in all.
+func (p *Pass) record(ctx context.Context, id int64, found bool, branches []string, count int) error {
 	var kept []branchRow
 	for _, name := range branches {
-		// A name wider than the column is dropped rather than cut: a cut name
-		// is a different branch. It is still counted.
-		if len([]rune(name)) > database.NameWidth || len(kept) == MostBranches {
-			continue
-		}
 		kept = append(kept, branchRow{CommitID: id, Branch: name})
 	}
 	now := p.Now().UTC()
@@ -430,11 +455,15 @@ func (p *Pass) record(ctx context.Context, id int64, found bool, branches []stri
 }
 
 // finish records how a visit ended, and makes room in the cache.
-func (p *Pass) finish(ctx context.Context, id int64, dir string, failed error) error {
-	update := p.db.NewUpdate().Model((*repositoryRow)(nil)).Where("id = ?", id)
+//
+// A visit that stopped puts back what the repository held before it began —
+// when a visit last began and what stopped it — so a redeploy in the middle
+// of a retry leaves yesterday's failure standing rather than erasing it.
+func (p *Pass) finish(ctx context.Context, before repositoryRow, dir string, failed error) error {
+	update := p.db.NewUpdate().Model((*repositoryRow)(nil)).Where("id = ?", before.ID)
 	switch {
 	case errors.Is(failed, errStopped):
-		update = update.Set("fetched_at = reached_at")
+		update = update.Set("fetched_at = ?", utc(before.FetchedAt)).Set("failed = ?", before.Failed)
 	case failed != nil:
 		update = update.Set("failed = ?", bound.HeadRunes(failed.Error(), MostReason))
 	default:
@@ -450,12 +479,32 @@ func (p *Pass) finish(ctx context.Context, id int64, dir string, failed error) e
 	if _, err := update.Exec(recording); err != nil {
 		return fmt.Errorf("record how a visit ended: %w", err)
 	}
-	removed, err := p.copies.evict(dir, 0)
-	if err != nil {
-		return err
+	_, err := p.copies.evict(dir, 0)
+	return err
+}
+
+// utc is a moment in UTC, or nothing.
+func utc(moment *time.Time) *time.Time {
+	if moment == nil {
+		return nil
 	}
-	if len(removed) > 0 {
-		p.logger.Info("removed repository copies to stay within the cache", "removed", len(removed))
+	in := moment.UTC()
+	return &in
+}
+
+// forget records that copies are no longer on this disk, named as the cache
+// names them: the digest of the repository's address, which is also the key
+// the repository row carries.
+func (p *Pass) forget(names []string) {
+	if len(names) == 0 {
+		return
 	}
-	return nil
+	p.logger.Info("removed repository copies to stay within the cache", "removed", len(names))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if _, err := p.db.NewUpdate().Model((*repositoryRow)(nil)).
+		Set("held_bytes = NULL").
+		Where(`"url_identity" IN (?)`, bun.List(names)).Exec(ctx); err != nil {
+		p.logger.Warn("recording that repository copies were removed", "error", err)
+	}
 }

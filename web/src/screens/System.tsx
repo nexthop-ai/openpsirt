@@ -242,7 +242,7 @@ function PatchBranches() {
   }
   const it = progress.data;
   const rows = it?.repositories ?? [];
-  const held = rows.reduce((sum, row) => sum + (row.held_bytes ?? 0), 0);
+  const held = it?.held_bytes ?? 0;
 
   return (
     <section className="panel">

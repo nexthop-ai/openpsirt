@@ -180,6 +180,84 @@ func TestEachPatchLinkIsLabeledWithTheBranchesHoldingItsCommit(t *testing.T) {
 	})
 }
 
+func TestACopyMadeWithoutFilesTakesTheCommitsThatLandAfter(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		empty(t, db)
+		ctx := t.Context()
+		made := project(t)
+		// Served through the protocol a host speaks, with the filter a host
+		// honors, so the copy holds commits and no files — which a copy of a
+		// plain directory never does.
+		gitIn(t, made.dir, "config", "uploadpack.allowFilter", "true")
+		// A file the copy never holds, which the commit landing later still
+		// carries. A host sending that commit leaves it out, because the
+		// copy has the commit it came from.
+		if err := os.WriteFile(filepath.Join(made.dir, "readme"), []byte("readme\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		gitIn(t, made.dir, "add", "readme")
+		gitIn(t, made.dir, "commit", "--quiet", "-m", "say what this is")
+		issue(t, db, "CVE-2025-0015", "high", link("project", made.fix))
+		turnOn(t, db)
+		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
+			patchbranch.Excluded{}, func(string) string { return "file://" + made.dir })
+		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("project") {
+			t.Fatalf("visited %q, %v", visited, err)
+		}
+		// A fix lands upstream after the copy was made, with a file in it.
+		if err := os.WriteFile(filepath.Join(made.dir, "fixed"), []byte("fixed\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		gitIn(t, made.dir, "add", "fixed")
+		gitIn(t, made.dir, "commit", "--quiet", "-m", "fix another flaw")
+		later := gitIn(t, made.dir, "rev-parse", "HEAD")
+		issue(t, db, "CVE-2025-0016", "high", link("project", later))
+		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("project") {
+			t.Fatalf("the second visit went to %q, %v", visited, err)
+		}
+		repositories, _, err := patchbranch.Progress(ctx, db.DB, patchbranch.Excluded{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(repositories) != 1 || repositories[0].Reason != "" {
+			t.Fatalf("the second visit failed: %+v", repositories)
+		}
+		labels, err := patchbranch.Labels(ctx, db.DB, []string{link("project", later)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := labels[link("project", later)]; !got.Found || !slices.Equal(got.Branches, []string{"main"}) {
+			t.Errorf("the commit that landed later is labeled %+v, want on main", got)
+		}
+	})
+}
+
+func TestABranchNameNoEngineCanStoreIsCountedAndNotKept(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		empty(t, db)
+		ctx := t.Context()
+		made := project(t)
+		// git allows any byte in a branch name; two of the four engines refuse
+		// text that is not UTF-8.
+		gitIn(t, made.dir, "branch", "release-\xff", made.fix)
+		issue(t, db, "CVE-2025-0017", "high", link("project", made.fix))
+		turnOn(t, db)
+		pass := passOver(t, db, patchbranch.DefaultQuota, patchbranch.Excluded{},
+			map[string]upstream{"project": made})
+		if _, err := pass.Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		labels, err := patchbranch.Labels(ctx, db.DB, []string{link("project", made.fix)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := labels[link("project", made.fix)]
+		if !slices.Equal(got.Branches, []string{"main", "release-2.y"}) || got.Count != 3 {
+			t.Errorf("labeled %v of %d, want main and release-2.y of 3", got.Branches, got.Count)
+		}
+	})
+}
+
 func TestNothingIsFetchedWhileTheLookupsAreOff(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		empty(t, db)
@@ -359,6 +437,77 @@ func TestAVisitKeepsTheLeaseAsItGoes(t *testing.T) {
 	})
 }
 
+func TestAVisitStoppedPartwayLeavesAnEarlierFailureStanding(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		empty(t, db)
+		made := project(t)
+		issue(t, db, "CVE-2025-0018", "critical", link("project", made.fix))
+		turnOn(t, db)
+		// A visit that fails: the copy cannot fit.
+		failing := patchbranch.NewLocalPass(db.DB, t.TempDir(), 1, patchbranch.Excluded{},
+			func(string) string { return made.dir })
+		if _, err := failing.Once(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		before, _, err := patchbranch.Progress(t.Context(), db.DB, patchbranch.Excluded{})
+		if err != nil || len(before) != 1 || before[0].Reason == "" {
+			t.Fatalf("the first visit did not fail: %+v, %v", before, err)
+		}
+		// A day on, the retry is cut short by a shutdown.
+		ctx, stop := context.WithCancel(t.Context())
+		retry := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
+			patchbranch.Excluded{}, func(string) string {
+				stop()
+				return made.dir
+			})
+		retry.Now = func() time.Time { return time.Now().Add(patchbranch.RetryAfter + time.Minute) }
+		if visited, err := retry.Once(ctx); err != nil || visited == "" {
+			t.Fatalf("the retry did not begin: %q, %v", visited, err)
+		}
+		after, _, err := patchbranch.Progress(t.Context(), db.DB, patchbranch.Excluded{})
+		if err != nil || len(after) != 1 {
+			t.Fatalf("the report says %+v, %v", after, err)
+		}
+		if after[0].Reason != before[0].Reason || after[0].State != patchbranch.Failed ||
+			!after[0].FetchedAt.Equal(*before[0].FetchedAt) {
+			t.Errorf("after a stopped retry the repository reads %s, %q, began %v; want it as it was: %s, %q, began %v",
+				after[0].State, after[0].Reason, after[0].FetchedAt,
+				before[0].State, before[0].Reason, before[0].FetchedAt)
+		}
+	})
+}
+
+func TestAFailureOfOursIsNotRecordedAsTheRepositorys(t *testing.T) {
+	// SQLite alone: what this pins is which side a failure is charged to, not
+	// what any engine does, and breaking a table under a shared server
+	// database would break the tests beside it.
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		made := project(t)
+		issue(t, db, "CVE-2025-0019", "critical", link("project", made.fix))
+		turnOn(t, db)
+		// The table a lookup is recorded in goes away once the visit begins,
+		// which is this deployment failing and not the repository.
+		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
+			patchbranch.Excluded{}, func(string) string {
+				if _, err := db.ExecContext(t.Context(),
+					`ALTER TABLE "patch_commit_branch" RENAME TO "patch_commit_branch_away"`); err != nil {
+					t.Fatal(err)
+				}
+				return made.dir
+			})
+		if _, err := pass.Once(t.Context()); err == nil {
+			t.Error("a visit that could not record what it found reported nothing")
+		}
+		repositories, _, err := patchbranch.Progress(t.Context(), db.DB, patchbranch.Excluded{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(repositories) != 1 || repositories[0].State == patchbranch.Failed || repositories[0].Reason != "" {
+			t.Errorf("the repository reads %+v, want it not blamed", repositories)
+		}
+	})
+}
+
 func TestProgressCountsWhatIsLookedUpAgainstWhatIsLinked(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		empty(t, db)
@@ -384,12 +533,14 @@ func TestProgressCountsWhatIsLookedUpAgainstWhatIsLinked(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if after != (patchbranch.Totals{Links: 3, Commits: 2, Looked: 2, Found: 1}) {
-			t.Errorf("after the pass the totals are %+v", after)
-		}
 		if len(repositories) != 1 || repositories[0].State != patchbranch.Done ||
 			repositories[0].HeldBytes == nil || *repositories[0].HeldBytes == 0 {
-			t.Errorf("the report says %+v, want the repository done and its size", repositories)
+			t.Fatalf("the report says %+v, want the repository done and its size", repositories)
+		}
+		want := patchbranch.Totals{Links: 3, Commits: 2, Looked: 2, Found: 1,
+			HeldBytes: *repositories[0].HeldBytes}
+		if after != want {
+			t.Errorf("after the pass the totals are %+v, want %+v", after, want)
 		}
 	})
 }

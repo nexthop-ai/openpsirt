@@ -9054,6 +9054,11 @@ export interface components {
             found: number;
             /**
              * Format: int64
+             * @description What every repository copy on disk took when its last visit finished, together, in bytes
+             */
+            held_bytes: number;
+            /**
+             * Format: int64
              * @description How many patch links reports carry
              */
             links: number;
@@ -9767,7 +9772,7 @@ export interface components {
              */
             kind: "patch" | "advisory" | "report" | "other";
             /**
-             * @description Whether the commit was found in a copy of its repository. Absent where no copy has been asked, or where the link names no commit
+             * @description 'found' is a commit the copy of its repository holds, 'absent' one it does not. Omitted where no copy has been asked, or where the link names no commit
              * @enum {string}
              */
             lookup?: "found" | "absent";

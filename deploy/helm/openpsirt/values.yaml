@@ -196,6 +196,11 @@ ingress:
 #
 # Raise both together with the ingest bounds. `OPENPSIRT_INGEST_*` allows about
 # 250 MB for one document being read, and that is the server's half.
+#
+# Patch branch lookups, where an administrator turns them on, add git as a
+# third process in the same cgroup: 1.3 GB at the peak of a first fetch of the
+# kernel from kernel.org, which can coincide with a scan. Raise the limit to 4Gi
+# before turning them on; over the limit, the kernel may kill the server itself.
 resources:
   requests:
     cpu: 100m
@@ -294,6 +299,8 @@ scanner:
 # repositories reports link to. Off until an administrator turns it on under
 # Settings; nothing here turns it on.
 patchBranches:
+  # Needs the memory limit raised: see `resources` above.
+  #
   # Hosts and networks no repository is fetched from. A report chooses the
   # host, so list your internal domains and networks here. Loopback and
   # private address space are refused regardless.
@@ -306,6 +313,10 @@ patchBranches:
   # A claim to keep the copies on. Without one they are scratch space and are
   # fetched again after every restart — fifteen minutes and 5 GB for the kernel.
   existingClaim: ""
-  # The bound on that scratch space.
-  sizeLimit: 24Gi
+  # The bound on that scratch space. Empty follows the quota with a fifth
+  # beside it, 24 GB for the built-in one: a copy arriving adds to the copies
+  # kept, and scratch space past its bound gets the pod evicted, after which
+  # the copies are fetched again and it happens again. A claim of your own
+  # needs the same headroom.
+  sizeLimit: ""
 

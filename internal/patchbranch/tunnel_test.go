@@ -51,3 +51,26 @@ func TestATunnelTheGuardOpensCarriesTLSEndToEnd(t *testing.T) {
 		t.Errorf("the tunnel carried %q", body)
 	}
 }
+
+func TestTheGuardRefusesAnAddressInAnExcludedNetworkWhateverNameReachedIt(t *testing.T) {
+	excluded, err := ParseExcluded("203.0.113.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A public name the administrator never mentioned, resolving into a
+	// network they did. The name passes; the address it resolved to does not.
+	door, err := openGuard("git.example.org", excluded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer door.close()
+	if excluded.Host("git.example.org") {
+		t.Fatal("the name itself was excluded, so this tests nothing about the address")
+	}
+	if err := door.reachable("203.0.113.9:443"); err == nil {
+		t.Error("the guard would connect to an address in an excluded network")
+	}
+	if err := door.reachable("198.51.100.9:443"); err != nil {
+		t.Errorf("the guard refused an address outside every excluded network: %v", err)
+	}
+}

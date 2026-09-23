@@ -33,6 +33,7 @@ type PatchBranchesOutput struct {
 		Commits      int                   `json:"commits" doc:"How many distinct commits in a recognized repository those links name"`
 		Looked       int                   `json:"looked" doc:"How many of those commits have been looked up"`
 		Found        int                   `json:"found" doc:"How many of those the repository holds"`
+		HeldBytes    int64                 `json:"held_bytes" doc:"What every repository copy on disk took when its last visit finished, together, in bytes"`
 		Repositories []PatchRepositoryBody `json:"repositories" doc:"The repositories those commits are in, most commits still to look up first"`
 		Total        int                   `json:"total" doc:"How many repositories there are in all"`
 	}
@@ -74,6 +75,7 @@ func registerPatchBranches(api huma.API, in Ingest) {
 		}
 		out.Body.Links, out.Body.Commits = totals.Links, totals.Commits
 		out.Body.Looked, out.Body.Found = totals.Looked, totals.Found
+		out.Body.HeldBytes = totals.HeldBytes
 		out.Body.Total = len(repositories)
 		start := min(input.Offset, len(repositories))
 		end := min(start+input.Limit, len(repositories))

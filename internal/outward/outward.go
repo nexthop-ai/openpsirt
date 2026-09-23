@@ -140,9 +140,11 @@ func Reachable(address string) error {
 
 // sharedAddressSpace covers the ranges the standard library does not treat as
 // private but which are not the public internet either: the carrier-grade
-// translation block, and the block meaning "this network".
+// translation block, the block meaning "this network", and the two prefixes a
+// NAT64 gateway translates into IPv4 — on a network with DNS64, a name
+// answering 64:ff9b::a00:5 reaches 10.0.0.5.
 func sharedAddressSpace(ip net.IP) bool {
-	for _, block := range []string{"100.64.0.0/10", "0.0.0.0/8"} {
+	for _, block := range []string{"100.64.0.0/10", "0.0.0.0/8", "64:ff9b::/96", "64:ff9b:1::/48"} {
 		_, network, err := net.ParseCIDR(block)
 		if err == nil && network.Contains(ip) {
 			return true

@@ -6350,6 +6350,10 @@ components:
           description: How many of those the repository holds
           format: int64
           type: integer
+        held_bytes:
+          description: What every repository copy on disk took when its last visit finished, together, in bytes
+          format: int64
+          type: integer
         links:
           description: How many patch links reports carry
           format: int64
@@ -6378,6 +6382,7 @@ components:
         - commits
         - looked
         - found
+        - held_bytes
         - repositories
         - total
       type: object
@@ -7485,7 +7490,7 @@ components:
             - other
           type: string
         lookup:
-          description: Whether the commit was found in a copy of its repository. Absent where no copy has been asked, or where the link names no commit
+          description: "'found' is a commit the copy of its repository holds, 'absent' one it does not. Omitted where no copy has been asked, or where the link names no commit"
           enum:
             - found
             - absent

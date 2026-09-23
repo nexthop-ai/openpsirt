@@ -174,8 +174,11 @@ spec:
               value: {{ join "," . | quote }}
             {{- end }}
             {{- with .Values.patchBranches.quota }}
+            # Through int64: a whole number in a values file is read as a
+            # float and would render as 5.36870912e+10, which the server
+            # refuses.
             - name: OPENPSIRT_PATCH_QUOTA
-              value: {{ . | quote }}
+              value: {{ . | int64 | quote }}
             {{- end }}
             {{- if .Values.mail.server }}
             - name: OPENPSIRT_MAIL_SERVER
@@ -265,10 +268,15 @@ spec:
             claimName: {{ .Values.patchBranches.existingClaim }}
           {{- else }}
           # Holds nothing until the lookups are turned on. Bounded like every
-          # other scratch volume here, and a little above the quota, because
+          # other scratch volume here, and a fifth above the quota, because
           # the quota is what is kept and a copy arriving adds to it briefly.
+          # The built-in quota is 20 GB, which is what an empty quota means.
           emptyDir:
+            {{- if .Values.patchBranches.sizeLimit }}
             sizeLimit: {{ .Values.patchBranches.sizeLimit }}
+            {{- else }}
+            sizeLimit: {{ div (mul (int64 (.Values.patchBranches.quota | default 21474836480)) 6) 5 }}
+            {{- end }}
           {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}

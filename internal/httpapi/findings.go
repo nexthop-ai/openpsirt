@@ -626,7 +626,7 @@ type ReferenceBody struct {
 	// which.
 	Branches    []string `json:"branches,omitempty" doc:"The branches of its repository that contain the commit this patch link names, in version order. At most 100 are listed"`
 	BranchCount int      `json:"branch_count,omitempty" doc:"How many branches contain the commit, which may be more than are listed"`
-	Lookup      string   `json:"lookup,omitempty" enum:"found,absent" doc:"Whether the commit was found in a copy of its repository. Absent where no copy has been asked, or where the link names no commit"`
+	Lookup      string   `json:"lookup,omitempty" enum:"found,absent" doc:"'found' is a commit the copy of its repository holds, 'absent' one it does not. Omitted where no copy has been asked, or where the link names no commit"`
 }
 
 // LinkBody is somewhere to read about this issue or this package, worked out

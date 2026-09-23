@@ -25,8 +25,9 @@ type Commit struct {
 	// report carried.
 	Repository string
 	// Hash is the commit's name, lowered. A link may abbreviate it, and an
-	// abbreviation is kept as written: the copy resolves it, and two
-	// spellings of one commit are two rows only until then.
+	// abbreviation is kept as written: the copy resolves it, and an
+	// abbreviation and the full name stay two rows, each looked up in its own
+	// right.
 	Hash string
 }
 

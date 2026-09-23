@@ -158,7 +158,9 @@ func openGuard(host string, excluded Excluded) (*guard, error) {
 // address is what git is told its proxy is.
 func (g *guard) address() string { return "http://" + g.listener.Addr().String() }
 
-// close stops the guard and every tunnel through it.
+// close stops the guard taking new tunnels. One already open is git's
+// connection and ends when git closes its side, or a moment after the far
+// end closes.
 func (g *guard) close() {
 	_ = g.server.Close()
 }

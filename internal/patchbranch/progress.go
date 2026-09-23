@@ -54,6 +54,9 @@ type Totals struct {
 	Commits int
 	Looked  int
 	Found   int
+	// HeldBytes is what every copy took when its last visit finished,
+	// together. A copy removed to make room is not counted.
+	HeldBytes int64
 }
 
 // Progress answers where every repository stands, most work left first.
@@ -81,6 +84,7 @@ func Progress(ctx context.Context, db bun.IDB, excluded Excluded) ([]RepositoryP
 	}
 	byURL := map[string]*RepositoryProgress{}
 	idOf := map[string]int64{}
+	var held int64
 	for _, repository := range repositories {
 		one := &RepositoryProgress{
 			URL: repository.URL, Host: repository.Host,
@@ -90,10 +94,13 @@ func Progress(ctx context.Context, db bun.IDB, excluded Excluded) ([]RepositoryP
 		if repository.Failed != nil {
 			one.Reason = *repository.Failed
 		}
+		if repository.HeldBytes != nil {
+			held += *repository.HeldBytes
+		}
 		byURL[repository.URL] = one
 		idOf[repository.URL] = repository.ID
 	}
-	totals := Totals{Links: links}
+	totals := Totals{Links: links, HeldBytes: held}
 	for commit := range commits {
 		one := byURL[commit.Repository]
 		if one == nil {

@@ -54,12 +54,10 @@ func (p *Pass) Fetch(ctx context.Context, repository string) error {
 	return err
 }
 
-// NewLeasedPass is a pass holding leases as replica, run at the interval the
+// NewLeasedPass is a pass holding leases as replica, at the interval the
 // server passes, which is none.
 func NewLeasedPass(db *bun.DB, replica string) *Pass {
-	pass := NewPass(db, slog.New(slog.NewTextHandler(io.Discard, nil)), replica, Options{Dir: "unused"})
-	pass.interval = betweenCycles
-	return pass
+	return NewPass(db, slog.New(slog.NewTextHandler(io.Discard, nil)), replica, Options{Dir: "unused"})
 }
 
 // StillMine is the check a visit makes as it goes.

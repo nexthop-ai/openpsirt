@@ -39,8 +39,11 @@ type copies struct {
 	root  string
 	quota int64
 	now   func() time.Time
-	// poll is how often a clone in progress is measured against the quota.
+	// poll is how often a copy being written is measured against the quota.
 	poll time.Duration
+	// gone is told the names of copies removed to make room, so what the
+	// database says each copy takes stops counting them. Nil answers nothing.
+	gone func(names []string)
 }
 
 // ErrTooLarge is a repository whose copy alone is larger than the cache may
@@ -86,7 +89,16 @@ func (c copies) prepare() error {
 func (c copies) ensure(ctx context.Context, g git, repository string) (string, error) {
 	dir := c.dirFor(repository)
 	if c.has(repository) {
-		if err := g.fetch(ctx, repository, dir); err != nil {
+		err := c.watched(ctx, dir, false, func(ctx context.Context) error {
+			return g.fetch(ctx, repository, dir)
+		})
+		if errors.Is(err, ErrTooLarge) {
+			// A copy that has outgrown the quota is not kept, whichever
+			// fetch took it there.
+			_ = os.RemoveAll(dir)
+			c.forgotten([]string{filepath.Base(dir)})
+		}
+		if err != nil {
 			return "", err
 		}
 		c.touch(dir)
@@ -96,7 +108,10 @@ func (c copies) ensure(ctx context.Context, g git, repository string) (string, e
 		return "", err
 	}
 	making := dir + partial
-	if err := c.clone(ctx, g, repository, making); err != nil {
+	err := c.watched(ctx, making, true, func(ctx context.Context) error {
+		return g.clone(ctx, repository, c.root, making)
+	})
+	if err != nil {
 		_ = os.RemoveAll(making)
 		return "", err
 	}
@@ -108,38 +123,56 @@ func (c copies) ensure(ctx context.Context, g git, repository string) (string, e
 	return dir, nil
 }
 
-// clone makes a copy at dir, stopping it once it is past the quota.
-//
-// Stopped rather than finished and then removed, because a copy that alone
-// cannot fit is never kept, and the disk it would fill is shared with
+// watched runs write, which adds to the copy at dir, measuring the copy as it
+// grows. Room is made as it grows rather than after, so the directory never
+// holds much more than the quota; a copy that alone outgrows the quota is
+// stopped, because it is never kept and the disk it would fill is shared with
 // everything else this deployment keeps.
-func (c copies) clone(ctx context.Context, g git, repository, dir string) error {
+//
+// A copy still arriving is named apart from the finished ones, so it is
+// counted as arriving; one being fetched into is a finished copy, and is kept
+// while others make room for it.
+func (c copies) watched(ctx context.Context, dir string, arriving bool, write func(context.Context) error) error {
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
+	// The watcher is stopped and waited for before this returns. A tick
+	// landing after the write finished would measure a copy that has moved,
+	// and remove copies beside whatever the caller does next.
+	quit, stopped := make(chan struct{}), make(chan struct{})
 	go func() {
+		defer close(stopped)
 		ticker := time.NewTicker(c.poll)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case <-quit:
+				return
 			case <-ticker.C:
-				growing := size(dir)
-				if growing > c.quota {
+				grown := size(dir)
+				if grown > c.quota {
 					cancel(ErrTooLarge)
 					return
 				}
-				// Room is made as the copy grows rather than after it lands,
-				// so the directory never holds much more than the quota.
-				if _, err := c.evict("", growing); err != nil {
+				var err error
+				if arriving {
+					_, err = c.evict("", grown)
+				} else {
+					_, err = c.evict(dir, 0)
+				}
+				if err != nil {
 					cancel(err)
 					return
 				}
 			}
 		}
 	}()
-	err := g.clone(ctx, repository, c.root, dir)
-	if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) {
+	err := write(ctx)
+	close(quit)
+	<-stopped
+	if cause := context.Cause(ctx); cause != nil && !errors.Is(cause, context.Canceled) &&
+		!errors.Is(cause, context.DeadlineExceeded) {
 		return cause
 	}
 	if err == nil && size(dir) > c.quota {
@@ -208,7 +241,15 @@ func (c copies) evict(keep string, pending int64) ([]string, error) {
 		total -= one.size
 		removed = append(removed, filepath.Base(one.dir))
 	}
+	c.forgotten(removed)
 	return removed, nil
+}
+
+// forgotten tells whoever is listening which copies were removed.
+func (c copies) forgotten(names []string) {
+	if c.gone != nil && len(names) > 0 {
+		c.gone(names)
+	}
 }
 
 // size is how many bytes a directory holds.

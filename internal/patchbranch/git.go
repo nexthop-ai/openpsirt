@@ -6,11 +6,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // fetchBudget bounds one clone or fetch.
@@ -113,8 +118,8 @@ func (g git) settings(proxy string) []string {
 	return out
 }
 
-// run runs git with the settings above and answers what it printed.
-func (g git) run(ctx context.Context, budget time.Duration, dir, proxy string, stdin []byte, args ...string) ([]byte, error) {
+// run runs git with the settings above, writing what it prints to stdout.
+func (g git) run(ctx context.Context, budget time.Duration, dir, proxy string, stdin []byte, stdout io.Writer, args ...string) error {
 	ctx, cancel := context.WithTimeout(ctx, budget)
 	defer cancel()
 	program := g.path
@@ -127,8 +132,11 @@ func (g git) run(ctx context.Context, budget time.Duration, dir, proxy string, s
 	if stdin != nil {
 		command.Stdin = bytes.NewReader(stdin)
 	}
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	var stderr bytes.Buffer
+	command.Stdout = stdout
 	command.Stderr = &limited{buffer: &stderr, most: 4096}
 	// Where the program is killed at the deadline, the pipes it held are not
 	// waited on for ever by anything it started.
@@ -136,14 +144,14 @@ func (g git) run(ctx context.Context, budget time.Duration, dir, proxy string, s
 	if err := command.Run(); err != nil {
 		complaint := strings.TrimSpace(stderr.String())
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("git %s did not finish within %s", args[0], budget)
+			return fmt.Errorf("git %s did not finish within %s", args[0], budget)
 		}
 		if complaint == "" {
-			return nil, fmt.Errorf("git %s: %w", args[0], err)
+			return fmt.Errorf("git %s: %w", args[0], err)
 		}
-		return nil, fmt.Errorf("git %s: %s", args[0], lastLine(complaint))
+		return fmt.Errorf("git %s: %s", args[0], lastLine(complaint))
 	}
-	return stdout.Bytes(), nil
+	return nil
 }
 
 // reaching runs git with a guard for the repository's host in front of it.
@@ -162,7 +170,7 @@ func (g git) reaching(ctx context.Context, repository, dir string, args ...strin
 		defer door.close()
 		proxy = door.address()
 	}
-	_, err := g.run(ctx, fetchBudget, dir, proxy, nil, args...)
+	err := g.run(ctx, fetchBudget, dir, proxy, nil, nil, args...)
 	if err != nil && door != nil {
 		// The proxy's reason is the useful half. Git reports only that the
 		// proxy said no.
@@ -186,9 +194,15 @@ func (g git) clone(ctx context.Context, repository, parent, dir string) error {
 
 // fetch brings a copy's branches up to date, dropping branches the repository
 // no longer has.
+//
+// From the remote the clone recorded rather than from the address. The clone
+// recorded the filter beside the remote, and a fetch that names the address
+// asks for whole trees on top of commits the copy holds without them: the host
+// sends a pack that depends on trees the copy never had, and the fetch fails
+// for want of them.
 func (g git) fetch(ctx context.Context, repository, dir string) error {
 	return g.reaching(ctx, repository, dir,
-		"fetch", "--quiet", "--prune", "--no-tags", "--", g.source(repository), "+refs/heads/*:refs/heads/*")
+		"fetch", "--quiet", "--prune", "--no-tags", "origin", "+refs/heads/*:refs/heads/*")
 }
 
 // graph writes the index that makes asking which branches contain a commit
@@ -197,8 +211,7 @@ func (g git) fetch(ctx context.Context, repository, dir string) error {
 // Measured on the kernel's stable tree: 28 seconds a commit without it, 0.22
 // with it, and 22 seconds and 116 MB to write.
 func (g git) graph(ctx context.Context, dir string) error {
-	_, err := g.run(ctx, fetchBudget, dir, "", nil, "commit-graph", "write", "--reachable")
-	return err
+	return g.run(ctx, fetchBudget, dir, "", nil, nil, "commit-graph", "write", "--reachable")
 }
 
 // resolve answers the full name of each hash that names a commit in the copy.
@@ -210,13 +223,14 @@ func (g git) resolve(ctx context.Context, dir string, hashes []string) (map[stri
 	for _, hash := range hashes {
 		in.WriteString(hash + "^{commit}\n")
 	}
-	out, err := g.run(ctx, lookupBudget, dir, "", in.Bytes(),
-		"cat-file", "--batch-check=%(objectname) %(objecttype)")
-	if err != nil {
+	// One line per hash asked, so what comes back is bounded by the question.
+	var out bytes.Buffer
+	if err := g.run(ctx, lookupBudget, dir, "", in.Bytes(), &out,
+		"cat-file", "--batch-check=%(objectname) %(objecttype)"); err != nil {
 		return nil, err
 	}
 	found := map[string]string{}
-	lines := bufio.NewScanner(bytes.NewReader(out))
+	lines := bufio.NewScanner(&out)
 	for _, hash := range hashes {
 		if !lines.Scan() {
 			return nil, errors.New("git cat-file answered fewer lines than it was asked")
@@ -231,20 +245,90 @@ func (g git) resolve(ctx context.Context, dir string, hashes []string) (map[stri
 	return found, nil
 }
 
-// branches answers every branch containing a commit.
-func (g git) branches(ctx context.Context, dir, commit string) ([]string, error) {
-	out, err := g.run(ctx, lookupBudget, dir, "", nil,
-		"for-each-ref", "--contains", commit, "--format=%(refname:strip=2)", "refs/heads/")
-	if err != nil {
-		return nil, err
+// branches answers the branches containing a commit that are kept, in
+// version order, and how many contain it in all.
+//
+// Read as git prints it rather than held whole. A repository chooses its own
+// branch names and how many there are, so what one lookup prints is bounded by
+// nothing but that repository (REQ-69).
+func (g git) branches(ctx context.Context, dir, commit string) ([]string, int, error) {
+	var out branchLines
+	if err := g.run(ctx, lookupBudget, dir, "", nil, &out,
+		"for-each-ref", "--contains", commit, "--format=%(refname:strip=2)", "refs/heads/"); err != nil {
+		return nil, 0, err
 	}
-	var names []string
-	for _, line := range strings.Split(string(out), "\n") {
-		if line = strings.TrimSpace(line); line != "" {
-			names = append(names, line)
+	out.end()
+	return out.kept(), out.count, nil
+}
+
+// longestLine is the most of one line kept while it arrives. A branch name
+// wider than the column is counted and never kept, so nothing past this is
+// needed to decide that.
+const longestLine = 4 * database.NameWidth
+
+// branchLines reads branch names one line at a time, counting every one and
+// keeping the first MostBranches in version order.
+type branchLines struct {
+	line     []byte
+	overlong bool
+	names    []string
+	count    int
+}
+
+func (b *branchLines) Write(p []byte) (int, error) {
+	for _, c := range p {
+		if c != '\n' {
+			if len(b.line) < longestLine {
+				b.line = append(b.line, c)
+			} else {
+				b.overlong = true
+			}
+			continue
 		}
+		b.take()
 	}
-	return names, nil
+	return len(p), nil
+}
+
+// end takes a last line that arrived without a newline.
+func (b *branchLines) end() {
+	if len(b.line) > 0 || b.overlong {
+		b.take()
+	}
+}
+
+// take ends one line.
+func (b *branchLines) take() {
+	name := strings.TrimSpace(string(b.line))
+	overlong := b.overlong
+	b.line, b.overlong = b.line[:0], false
+	if name == "" && !overlong {
+		return
+	}
+	b.count++
+	// Kept only where the column can hold it and every engine will store
+	// it. git allows any byte in a name, and text that is not valid UTF-8 is
+	// refused by two of the four; a cut name is another branch.
+	if overlong || !utf8.ValidString(name) || utf8.RuneCountInString(name) > database.NameWidth {
+		return
+	}
+	b.names = append(b.names, name)
+	if len(b.names) > 2*MostBranches {
+		b.trim()
+	}
+}
+
+// trim keeps the first MostBranches names in version order.
+func (b *branchLines) trim() {
+	sort.Slice(b.names, func(i, j int) bool { return versionLess(b.names[i], b.names[j]) })
+	if len(b.names) > MostBranches {
+		b.names = b.names[:MostBranches]
+	}
+}
+
+func (b *branchLines) kept() []string {
+	b.trim()
+	return b.names
 }
 
 // limited keeps the last bytes written to it and drops the rest, so a

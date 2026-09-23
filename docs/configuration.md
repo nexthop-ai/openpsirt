@@ -396,13 +396,15 @@ sends whole history:
 
 | The kernel's stable tree | From git.kernel.org | From a host that sends commits alone |
 |---|---|---|
-| Copy on disk | 5.2 GB | 1.2 GB |
+| Copy on disk | 5.1 GB, and 116 MB of index | 1.1 GB, and 116 MB of index |
 | First fetch | 15 minutes | 90 seconds |
 | Memory at the peak of the first fetch | 1.3 GB | 0.6 GB |
 
 Size the quota to hold the kernel and the other repositories your reports link
-to, and the volume a little larger than the quota. A copy that alone outgrows
-the quota is abandoned and tried again a day later.
+to, and the volume a fifth larger than the quota. The chart sizes its scratch
+volume that way from `patchBranches.quota`; a claim of your own needs the same
+room. A copy that alone outgrows the quota is abandoned and tried again a day
+later.
 
 git runs inside the same memory limit as the server and the scanner, and a
 first kernel fetch can coincide with a scan. Raise the limit to 4 GiB before

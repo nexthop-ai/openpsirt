@@ -310,9 +310,26 @@ that has no row, chooses one repository, and visits it.
 | Never a host an administrator excluded, and not for a day after a failed visit | A host having a bad hour and a repository that is gone look the same from here |
 
 A visit fetches the repository's branches, writes git's commit-graph index,
-and looks up every due commit in it, most urgent first. The switch and the
-lease are read again every two hundred lookups, so turning the lookups off
-stops a visit in progress.
+and looks up every due commit in it, most urgent first.
+
+| How a visit ends | Recorded |
+|---|---|
+| Every due commit looked up | The moment it finished and the size of the copy |
+| The repository could not be fetched or read | What stopped it, in the repository's own words. Retried a day after the visit began |
+| The switch was turned off, the lease was lost, or the process is shutting down | Nothing. The repository is left as it was before the visit began, a failure from an earlier visit included |
+| This deployment failed: the database, the setting, the lease | Nothing, and the failure is logged. A dropped connection is not the repository's fault, and recorded as one it would put the repository out of reach for a day |
+
+The switch and the lease are read every minute for the whole of a visit, the
+fetch and the index write included. A first fetch of the kernel from
+kernel.org takes a quarter of an hour, and the lease is half an hour. A
+process shutting down in the middle of a visit hands the lease back, so the
+next one carries on at once.
+
+A lookup is read as git prints it, one branch at a time. Every branch is
+counted and the first hundred in version order are kept, so a repository with
+a hundred thousand branches holding one commit costs the server a hundred
+names. A name that is not valid UTF-8 is counted and not kept: git allows any
+byte in a name, and two of the four engines refuse such text.
 
 Only commits a report still links to are due. A commit no issue names any
 more keeps what was last recorded about it.
@@ -340,7 +357,7 @@ instead, and that proxy is the one way out.
 |---|---|
 | A tunnel only, to the https port of the one host the repository is on | A redirect, a submodule or a lazily fetched object elsewhere has no route |
 | The host is refused where an administrator excluded it by name, or by a network holding its address | An internal name on a public address is excluded by name, and a public name pointing inward by network |
-| Loopback, private, link-local and shared address space is refused regardless | The same check every other outbound request here makes, on the address a name resolved to, at the moment of connecting (REQ-69) |
+| Loopback, private, link-local and shared address space is refused regardless, and so are the two NAT64 prefixes | The same check every other outbound request here makes, on the address a name resolved to, at the moment of connecting (REQ-69). On a network with DNS64, a NAT64 address is an IPv4 address inside it |
 | Git reads no system or personal configuration, no credential helper, no hooks, no terminal | Any of those would change where git goes or what it sends |
 | https only, no redirects, and a transfer below 1 KB a second for two minutes is abandoned | A stalled host does not hold a visit for the three hours a first fetch is allowed |
 | One thread for packing and indexing, and small windows onto the pack files | Git runs inside the server's memory limit. The windows are what brought the commit-graph write from 1.7 GB to 0.6 GB, and indexing the kernel's full history from 2.4 GB to 1.3 GB |
@@ -356,8 +373,10 @@ never chooses a path on this disk (REQ-66).
 |---|---|
 | The copies share a quota, 20 GB unless configured | Room for the full kernel tree and several ordinary repositories beside it |
 | The least recently used copy is removed first | A copy is used when it is visited, and each visit writes that down beside it |
-| Room is made while a new copy arrives, not after | The directory stays within the quota plus fifteen seconds of transfer |
-| A copy that alone outgrows the quota is stopped and removed, and the visit fails | Retried a day later, which is the moment a raised quota takes effect |
+| Room is made while a copy is written, not after | Whether a new copy arriving or a fetch into one already held. The directory stays within the quota plus fifteen seconds of transfer |
+| A copy that alone outgrows the quota is stopped and removed, and the visit fails | Retried a day later, which is the moment a raised quota takes effect. A host that sent a small first copy and then an endless fetch is stopped the same way |
+| A copy removed to make room stops counting towards the size the report shows | The report reads the size recorded at the end of each visit, and that record is cleared when the copy goes |
+| An update of a copy asks the remote the copy was made from, not the address | The copy records how it was made beside that remote. Asked by address, a host sends whole trees on top of commits the copy holds without them, and the fetch fails for want of them |
 | A copy left half made by a process that died is removed before the next one starts | It is named apart from finished copies, so nothing mistakes it for one |
 
 ### Display
