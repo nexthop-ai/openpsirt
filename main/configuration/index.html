@@ -426,6 +426,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#upgrading" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -555,6 +566,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patch-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch branches
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Patch branches">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sizing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -802,6 +841,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#upgrading" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -931,6 +981,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patch-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch branches
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Patch branches">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#sizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sizing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1120,6 +1198,72 @@ refusal to start.</p>
 duration is written as Go reads it: <code>30s</code>, <code>5m</code>, <code>12h</code>. A number is a positive
 whole number; zero reads as unset everywhere, so it is refused rather than
 taken.</p>
+<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
+<p>What this deployment does beyond scanning and triage, and what turns each on.
+Everything marked off does nothing until the thing in the last column is set.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Default</th>
+<th>Turned on by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#scanning">Scheduled rescanning</a></td>
+<td>On, daily</td>
+<td><code>scanning.every</code> under Settings sets how often</td>
+</tr>
+<tr>
+<td><a href="#an-air-gapped-install">Vulnerability data updates</a></td>
+<td>On</td>
+<td><code>GRYPE_DB_AUTO_UPDATE</code>; set it to <code>false</code> where the deployment cannot reach the network</td>
+</tr>
+<tr>
+<td><a href="#upstream-currency">Upstream currency</a></td>
+<td>Off</td>
+<td><code>upstream.currency</code> under Settings</td>
+</tr>
+<tr>
+<td><a href="#patch-branches">Patch branches</a></td>
+<td>Off</td>
+<td><code>patch.branches</code> under Settings. Set <code>OPENPSIRT_PATCH_EXCLUDED</code> first</td>
+</tr>
+<tr>
+<td><a href="#supplier-advisories">Supplier advisories</a></td>
+<td>Off</td>
+<td>Naming a supplier under Settings</td>
+</tr>
+<tr>
+<td><a href="#mail">Mail</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_MAIL_FROM</code> and <code>OPENPSIRT_MAIL_SERVER</code>, both</td>
+</tr>
+<tr>
+<td>Webhooks</td>
+<td>Off</td>
+<td>Adding a destination under Settings</td>
+</tr>
+<tr>
+<td><a href="#attachment-storage">Attachments</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_ATTACHMENT_BUCKET</code>, or <code>OPENPSIRT_ATTACHMENT_DIR</code> for a trial</td>
+</tr>
+<tr>
+<td><a href="#advisory-publication">Advisory generation</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_PUBLISHER_NAME</code> and <code>OPENPSIRT_PUBLISHER_NAMESPACE</code>, both</td>
+</tr>
+<tr>
+<td><a href="#the-published-advisory-directory">The published advisory directory</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_DIRECTORY_URL</code> and a bucket or directory to write to, with advisory generation on</td>
+</tr>
+</tbody>
+</table>
+<p>A sign-in method is not in this list because one is required: the process
+refuses to start without one. <a href="#sign-in">Sign-in</a> says which.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
 <p><code>OPENPSIRT_BASE_URL</code> is checked at startup, and a value with no scheme is now
 refused where it used to be accepted. <code>psirt.example.com</code> has to become
@@ -1676,6 +1820,90 @@ affected and no upgrade step is needed.</p>
 the default is costing; names no public index has heard of are private modules
 and vendored forks, and they are the candidates to promote into
 <code>OPENPSIRT_UPSTREAM_INTERNAL</code> so they stop being asked about at all.</p>
+<h2 id="patch-branches">Patch branches<a class="headerlink" href="#patch-branches" title="Permanent link">&para;</a></h2>
+<p>A patch link to a commit is labeled with the branches of its repository that
+contain the commit, on the finding it belongs to. A fix backported to five
+branches arrives as five bare commit links, and the label is what says which
+one applies to the branch you ship.</p>
+<p>Off unless an administrator turns it on, under Settings. It fetches a copy of
+each repository a patch link names, from the host the link names, and asks the
+copy which branches hold each commit. Progress, failures and the size of each
+copy are on the System screen and at <code>/v1/patch-branches</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PATCH_EXCLUDED</code></td>
+<td>Hosts and networks no repository is fetched from, separated by commas. A name covers itself and every host under it; a network is written as <code>10.0.0.0/8</code> and covers every address a name resolves to inside it</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PATCH_DIR</code></td>
+<td>Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume</td>
+<td><code>/var/cache/openpsirt/repositories</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PATCH_QUOTA</code></td>
+<td>How many bytes the copies may hold together. The least recently used is removed to make room</td>
+<td><code>21474836480</code> (20 GB)</td>
+</tr>
+</tbody>
+</table>
+<p>List your internal networks and domains in <code>OPENPSIRT_PATCH_EXCLUDED</code>. A report
+chooses the host, and loopback, private, link-local and shared address space
+are refused regardless, but an internal service on a public address or behind a
+public name is only kept out by this list:</p>
+<pre><code>OPENPSIRT_PATCH_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
+</code></pre>
+<p>Only https is used, redirects are not followed, and git runs with no
+configuration, credentials or hooks from the environment.</p>
+<h3 id="sizing">Sizing<a class="headerlink" href="#sizing" title="Permanent link">&para;</a></h3>
+<p>The Linux kernel is the largest repository reports link to, and git.kernel.org
+sends whole history:</p>
+<table>
+<thead>
+<tr>
+<th>The kernel's stable tree</th>
+<th>From git.kernel.org</th>
+<th>From a host that sends commits alone</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Copy on disk</td>
+<td>5.1 GB, and 116 MB of index</td>
+<td>1.1 GB, and 116 MB of index</td>
+</tr>
+<tr>
+<td>First fetch</td>
+<td>15 minutes</td>
+<td>90 seconds</td>
+</tr>
+<tr>
+<td>Memory at the peak of the first fetch</td>
+<td>1.3 GB</td>
+<td>0.6 GB</td>
+</tr>
+</tbody>
+</table>
+<p>Size the quota to hold the kernel and the other repositories your reports link
+to, and the volume a fifth larger than the quota. The chart sizes its scratch
+volume that way from <code>patchBranches.quota</code>; a claim of your own needs the same
+room. A copy that alone outgrows the quota is abandoned and tried again a day
+later.</p>
+<p>git runs inside the same memory limit as the server and the scanner, and a
+first kernel fetch can coincide with a scan. Raise the limit to 4 GiB before
+turning this on where reports link to git.kernel.org. Where the limit is
+exceeded, the kernel kills the largest process, the visit fails, and it is
+retried a day later.</p>
+<p>Keep the copies on a persistent volume. Scratch space loses them on every
+restart, and the kernel is fetched again from the start.</p>
 <h2 id="sign-in">Sign-in<a class="headerlink" href="#sign-in" title="Permanent link">&para;</a></h2>
 <p>The process refuses to start until somebody can administer it, and naming
 somebody grants a role — it does not let anybody in without signing in.</p>
@@ -2161,6 +2389,10 @@ so nothing in the failure points at the limit.</p>
 <tr>
 <td>The scanner importing its vulnerability database</td>
 <td>The largest single draw, and it happens on every start where the data is not kept</td>
+</tr>
+<tr>
+<td>Fetching a repository for <a href="#patch-branches">patch branches</a></td>
+<td>Off unless turned on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org</td>
 </tr>
 </tbody>
 </table>
