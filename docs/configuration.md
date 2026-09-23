@@ -12,6 +12,27 @@ duration is written as Go reads it: `30s`, `5m`, `12h`. A number is a positive
 whole number; zero reads as unset everywhere, so it is refused rather than
 taken.
 
+## Features
+
+What this deployment does beyond scanning and triage, and what turns each on.
+Everything marked off does nothing until the thing in the last column is set.
+
+| Feature | Default | Turned on by |
+|---|---|---|
+| [Scheduled rescanning](#scanning) | On, daily | `scanning.every` under Settings sets how often |
+| [Vulnerability data updates](#an-air-gapped-install) | On | `GRYPE_DB_AUTO_UPDATE`; set it to `false` where the deployment cannot reach the network |
+| [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
+| [Patch branches](#patch-branches) | Off | `patch.branches` under Settings. Set `OPENPSIRT_PATCH_EXCLUDED` first |
+| [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
+| [Mail](#mail) | Off | `OPENPSIRT_MAIL_FROM` and `OPENPSIRT_MAIL_SERVER`, both |
+| Webhooks | Off | Adding a destination under Settings |
+| [Attachments](#attachment-storage) | Off | `OPENPSIRT_ATTACHMENT_BUCKET`, or `OPENPSIRT_ATTACHMENT_DIR` for a trial |
+| [Advisory generation](#advisory-publication) | Off | `OPENPSIRT_PUBLISHER_NAME` and `OPENPSIRT_PUBLISHER_NAMESPACE`, both |
+| [The published advisory directory](#the-published-advisory-directory) | Off | `OPENPSIRT_DIRECTORY_URL` and a bucket or directory to write to, with advisory generation on |
+
+A sign-in method is not in this list because one is required: the process
+refuses to start without one. [Sign-in](#sign-in) says which.
+
 ## Upgrading
 
 `OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is now
