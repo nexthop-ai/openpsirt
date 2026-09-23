@@ -1318,5 +1318,6 @@ question next year should find the answer rather than the question.
 | A code host's API is never asked | Every host answers through git, and only some offer an API that says which branches hold a commit. The same answer from two routes is two things to keep right |
 | A repository's copy is fetched from the host the link names | The kernel's stable tree is 5.1 GB from git.kernel.org and 1.1 GB from a mirror that sends commits alone, and nothing here knows the two are one repository |
 | The copies are one replica's disk | A second replica taking the lease over starts from none, or from a volume the replicas share |
+| A deployment that reaches the internet only through a proxy of its own fetches nothing | git is pointed at the loopback guard and at nothing else, so the guard is the one way out, and the guard dials directly |
 | A ruling carries one disposition and one reason for every report it covers | Reports needing different reasons are different rulings. Splitting one is withdrawing it and proposing two |
 | Accepting a report takes no ruling and no second person | Accepting re-exposes risk, and an issue already carries its own triage |

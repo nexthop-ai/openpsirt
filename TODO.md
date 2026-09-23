@@ -46,6 +46,7 @@ Mandatory, and wrong to do earlier.
 | Asking a code host's API which branches hold a commit | GitLab answers it in one request, and GitHub one branch at a time with a token for the rate. Git answers every host and is the one route built; an API would spare a copy for a repository with a few linked commits |
 | Fetching a repository from a substitute address | An administrator naming a mirror for a repository — the kernel's stable tree from a host that sends commits alone is 1.2 GB against 5.2 GB — and one copy standing for both the stable and mainline trees, since the first holds the second |
 | Marking the patch for the branch a component ships | Matching `linux-6.12.y` to a component at 6.12.41 is per project, and no convention covers `release-1.4` or `stable/2024.1` |
+| Fetching repositories through an outbound proxy | The guard git reaches out through dials directly. Chaining it through the proxy a deployment names, while still checking the resolved address, is what a network with no direct route needs |
 
 ## Decided, not built
 
