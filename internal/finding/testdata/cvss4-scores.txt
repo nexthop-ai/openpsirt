@@ -6,7 +6,8 @@
 # first vector for each class-and-score pair. They are not this code's own
 # output, which is the whole point: a mistyped table entry moves a score here.
 #
-# Copyright FIRST.ORG, Inc., Red Hat, and contributors. BSD-2-Clause.
+# Copyright (c) 2023 FIRST.ORG, Inc., Red Hat, and contributors. BSD-2-Clause,
+# whose conditions and disclaimer NOTICE carries.
 CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:N 9.9
 CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H 10.0
 CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:L/SI:L/SA:L 9.3
