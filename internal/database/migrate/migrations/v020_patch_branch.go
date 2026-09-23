@@ -3,17 +3,6 @@
 
 package migrations
 
-import (
-	"context"
-	"database/sql"
-
-	"github.com/pressly/goose/v3"
-)
-
-func init() {
-	goose.AddMigrationContext(upPatchBranch, downPatchBranch)
-}
-
 // The repositories patch links point into, the commits they name, and the
 // branches each commit was found on.
 //
@@ -25,13 +14,8 @@ func init() {
 // Nothing here records which copy of a repository answered. The copies are
 // one replica's disk and these rows are every replica's, so what is kept is
 // what the history said rather than where it was read.
-func upPatchBranch(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-
-	statements := []string{
+func patchBranchStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "patch_repository" (
 			"id"           ` + t.id + `,
 			-- The address the history is fetched from, as built from a link
@@ -94,10 +78,4 @@ func upPatchBranch(ctx context.Context, tx *sql.Tx) error {
 				REFERENCES "patch_commit"("id")
 		)` + t.suffix,
 	}
-
-	return apply(ctx, tx, statements)
-}
-
-func downPatchBranch(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "patch_commit_branch", "patch_commit", "patch_repository")
 }

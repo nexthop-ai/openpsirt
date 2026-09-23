@@ -14,7 +14,7 @@ func init() {
 	goose.AddMigrationContext(upAccess, downAccess)
 }
 
-// Permissions.
+// Who may do what.
 //
 // A person exists because somebody granted them access, never because they
 // managed to authenticate. Authenticating proves who someone is and says
@@ -203,7 +203,7 @@ func upAccess(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "role_grant_all_unique" UNIQUE ("person_id", "role", "source")
 		)` + t.suffix,
 
-		// One person's route in.
+		// How one person signs in.
 		//
 		// A username moves — people change their name at work, and a forge
 		// login can be renamed and the old one then claimed by somebody

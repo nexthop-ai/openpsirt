@@ -695,6 +695,10 @@ type Issuance struct {
 	// record today is a different document — so a directory of published
 	// advisories that regenerated them would move a file whose own date says
 	// it has not moved.
+	//
+	// Every issuance written here has one. One v0.1.0 recorded has none,
+	// because it kept the digest and not the bytes, and no read here selects
+	// this column from those.
 	Document string `bun:"document,notnull"`
 	// Digest is the part of those bytes that says what the document states,
 	// hashed. It answers "is what is published still what we generate" where

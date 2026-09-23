@@ -17,9 +17,9 @@ import (
 // The sources of every migration in this package.
 //
 // Embedded so that a database somebody built earlier can be recognized as
-// still built by these. Until the first release a schema change edits the
-// migration that created the thing rather than adding one beside it, so the
-// set of migration names says nothing about whether a database matches the
+// still built by these. Below 1.0 a schema change edits what declares the
+// thing rather than adding a migration beside it, so the set of migration
+// names says nothing about whether a database matches the
 // schema this build expects — the version stays where it was and the tables
 // are wrong. Only the content distinguishes them.
 //

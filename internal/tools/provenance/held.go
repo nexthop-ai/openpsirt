@@ -74,6 +74,10 @@ var Held = []Entry{
 
 	// Written here, or produced here by running a tool over something this
 	// project builds or a public image. The fixture READMEs say which.
+	{"internal/database/migrate/migrations/testdata/v010-schema-mariadb.txt", Ours, ""},
+	{"internal/database/migrate/migrations/testdata/v010-schema-mysql.txt", Ours, ""},
+	{"internal/database/migrate/migrations/testdata/v010-schema-postgres.txt", Ours, ""},
+	{"internal/database/migrate/migrations/testdata/v010-schema-sqlite.txt", Ours, ""},
 	{"internal/sbom/testdata/advisory-named-products.csaf.json", Ours, ""},
 	{"internal/sbom/testdata/advisory-opaque-products.csaf.json", Ours, ""},
 	{"internal/sbom/testdata/advisory-platform-packages.csaf.json", Ours, ""},

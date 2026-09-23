@@ -20,6 +20,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
+// lastOfV010 is the last migration the v0.1.0 release shipped. A database at
+// it is one that release built.
+const lastOfV010 = 36
+
 // running serializes migration work within this process.
 //
 // It exists because the migration library keeps its dialect and logger in
@@ -93,16 +97,25 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 			return fmt.Errorf("read schema version: %w", err)
 		}
 		if err := goose.UpContext(ctx, db.DB.DB, "."); err != nil {
+			// A database v0.1.0 built is upgraded by the migration after the
+			// ones it shipped. On MySQL and MariaDB one that fails part way
+			// leaves the schema part changed and the version where it was, so
+			// the backup is what recovers it.
+			if before == lastOfV010 {
+				return fmt.Errorf("upgrade the v0.1.0 schema: %w — on MySQL and "+
+					"MariaDB an upgrade that fails part way leaves the schema part "+
+					"changed; restore the backup taken before it and start again", err)
+			}
 			// Named, because the commonest way this fails says a migration is
-			// missing and then prints the path of a file that is sitting
-			// right there. Below 1.0 a schema change edits the migration that
-			// made the thing, and one that moves between numbers leaves an
-			// older database holding a version this set no longer issues — so
-			// what the operator has is a schema built by a build that is gone,
-			// and recreating is the answer rather than migrating.
-			return fmt.Errorf("apply migrations: %w — before 1.0 a migration is "+
-				"edited rather than added beside, so a database built by an "+
-				"earlier build is recreated rather than migrated", err)
+			// missing and then prints the path of a file that is sitting right
+			// there. Below 1.0 a schema change edits what declares the thing
+			// rather than adding a migration beside it, so a database an
+			// unreleased build made can hold a version this set no longer
+			// issues, and recreating it is the answer rather than migrating.
+			return fmt.Errorf("apply migrations: %w — before 1.0 a schema change "+
+				"edits what declares the thing rather than adding a migration, so "+
+				"a database built by an unreleased build is recreated rather than "+
+				"migrated", err)
 		}
 		after, err := goose.GetDBVersionContext(ctx, db.DB.DB)
 		if err != nil {

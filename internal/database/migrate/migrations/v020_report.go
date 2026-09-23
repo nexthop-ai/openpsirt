@@ -4,18 +4,10 @@
 package migrations
 
 import (
-	"context"
-	"database/sql"
 	"strconv"
-
-	"github.com/pressly/goose/v3"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
-
-func init() {
-	goose.AddMigrationContext(upReport, downReport)
-}
 
 // What somebody told us, and what became of it.
 //
@@ -42,13 +34,8 @@ func init() {
 // Researchers are assumed to email, so these are facts somebody has in
 // hand when they type the record in rather than ceremony. A public intake form
 // stays out of scope; this is the inside half.
-func upReport(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-
-	statements := []string{
+func reportStatements(t *columnTypes) []string {
+	return []string{
 		// One act of saying what one or more claims are, where the answer is
 		// not an issue here. It is kept apart from the reports it covers
 		// because one act answers many of them — twenty slop reports rejected
@@ -194,10 +181,4 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "report_ruled_report_idx"
 			ON "report_ruled" ("flaw_report_id")`,
 	}
-
-	return apply(ctx, tx, statements)
-}
-
-func downReport(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "report_ruled", "flaw_report", "report_ruling")
 }

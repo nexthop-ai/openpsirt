@@ -21,8 +21,8 @@ Mandatory, and wrong to do earlier.
 
 | | |
 |---|---|
-| Collapse the schema into one initial migration | Thirty-seven migrations describe the order things were thought of. They are kept until then because walking the chain catches an ordering mistake between two of them (REQ-72) |
-| Start keeping schema and API compatibility | Until 1.0 a schema change edits the migration that created the thing, and a development database is recreated (REQ-61, REQ-72 and REQ-76) |
+| Collapse the schema into one initial migration | Migrations 1 to 36 are kept because a database v0.1.0 built has applied them, and migration 37 because it upgrades one (REQ-72) |
+| Start keeping schema and API compatibility | Until 1.0 a schema change edits what declares the thing rather than adding a migration beside it, and a development database is recreated (REQ-61, REQ-72 and REQ-76) |
 
 ## Deferred by the owner
 

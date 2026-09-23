@@ -5695,7 +5695,7 @@ export interface components {
              * @example https://example.com/schemas/AdvisoryBody.json
              */
             readonly $schema?: string;
-            /** @description The identifier this deployment minted, which is what the document is tracked by */
+            /** @description The identifier the advisory is tracked by */
             advisory: string;
             /**
              * Format: int64
@@ -11675,7 +11675,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The identifier this deployment minted */
+                /** @description The identifier the advisory is tracked by */
                 advisory: string;
             };
             cookie?: never;

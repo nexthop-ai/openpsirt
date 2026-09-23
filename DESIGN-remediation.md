@@ -484,7 +484,7 @@ It names the issues it covers and the products each of those is covered in.
 | Rule | |
 |---|---|
 | An advisory is keyed on itself | Not on the product and the issue. The standard carries vulnerabilities as an array and means the document's tracking identifier to be the publisher's own name for the document, so a key made of one product and one issue cannot express a document about two and hands out somebody else's name for one of them |
-| The identifier is minted here | A year and a number under a prefix the deployment configures. It is the name a reader cites the document by and the name a revision of it keeps, so it belongs to the document rather than to whichever issue was first |
+| The identifier is minted here | A year and a number under a prefix the deployment configures. It is the name a reader cites the document by and the name a revision of it keeps, so it belongs to the document rather than to whichever issue was first. An advisory v0.1.0 issued keeps the name it went out under, numbered in year zero (`DESIGN-database.md` § Release upgrades) |
 | An advisory names many issues, across many products | Several embargoed flaws released together is one document on one date, which is what coordinated release is. One issue in two products is two entries, because the releases that carry it differ |
 | An issue is named once per product | The pair is what a status is stated about. Named twice, a reader gets two answers about one release and the document is refused |
 | Only a flaw recorded here | An issue a scanner reported against a third-party component is dependency hygiene a consumer reads out of the inventory. Refused when it is added rather than when the document is generated, so the refusal names the issue somebody chose |

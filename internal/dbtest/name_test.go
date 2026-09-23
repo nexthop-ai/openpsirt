@@ -41,8 +41,8 @@ func TestAnEditedMigrationNamesADifferentDatabase(t *testing.T) {
 	// A database is kept between runs and re-used rather than re-migrated, so
 	// what stops a run from testing against last week's schema is that the
 	// name carries the migrations. The applied version cannot do it: below 1.0
-	// a schema change edits the migration that created the thing rather than
-	// adding one beside it, so the version stays where it was
+	// a schema change edits what declares the thing rather than adding a
+	// migration beside it, so the version stays where it was
 	// while the tables underneath are different.
 	path := "github.com/nexthop-ai/openpsirt/internal/httpapi.test"
 	dir := "/home/somebody/git/openpsirt/internal/httpapi"

@@ -3,17 +3,6 @@
 
 package migrations
 
-import (
-	"context"
-	"database/sql"
-
-	"github.com/pressly/goose/v3"
-)
-
-func init() {
-	goose.AddMigrationContext(upAdvisorySource, downAdvisorySource)
-}
-
 // The suppliers whose published advisories this deployment fetches.
 //
 // A supplier's security advisory already arrives by upload, which is somebody
@@ -29,13 +18,8 @@ func init() {
 // Named as well as addressed, for the reason a destination is: the name is what
 // a screen and a log line call it, and an address a supplier moves is a change
 // to a row rather than a different supplier.
-func upAdvisorySource(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-
-	statements := []string{
+func advisorySourceStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "advisory_source" (
 			"id"           ` + t.id + `,
 			"product_id"   ` + t.ref + ` NOT NULL,
@@ -96,10 +80,4 @@ func upAdvisorySource(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "advisory_source_due_idx" ON "advisory_source"
 			("retired_at", "fetched_at")`,
 	}
-
-	return apply(ctx, tx, statements)
-}
-
-func downAdvisorySource(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "advisory_source")
 }
