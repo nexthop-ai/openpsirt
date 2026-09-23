@@ -36,6 +36,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/uptrace/bun"
 )
 
 // Role is what somebody may do with a product.
@@ -422,35 +424,38 @@ func (s Subject) Holds(role Role, productID int64) bool {
 // Reads reports whether this subject may read something of this visibility in
 // this product.
 //
+// Each visibility is its own grant. Reading undisclosed findings does not
+// carry reading disclosed ones: somebody handling private reports is not
+// handed the public stream as well, and somebody who wants both holds both.
+//
 // Triage implies reading at the same visibility: somebody who may decide about
 // a finding can necessarily see it, and a deployment that had to grant both
 // would eventually grant one.
 func (s Subject) Reads(visibility Visibility, productID int64) bool {
 	// The deployment reads everything, which is the whole of what it is for.
-	// Products and Sees already answered that way and this did not, so a pass
-	// that narrowed its own query correctly was still refused by any check
-	// asking the question one product at a time.
+	// A pass that narrows its own query correctly is otherwise refused by any
+	// check asking the question one product at a time.
 	if s.unnarrowed {
 		return true
 	}
-	switch visibility {
-	case Public:
-		return s.Holds(PublicRead, productID) || s.Holds(PublicTriage, productID) ||
-			s.Holds(PrivateRead, productID) || s.Holds(PrivateTriage, productID)
-	default:
-		return s.Holds(PrivateRead, productID) || s.Holds(PrivateTriage, productID)
+	if visibility == Public {
+		return s.Holds(PublicRead, productID) || s.Holds(PublicTriage, productID)
 	}
+	return s.Holds(PrivateRead, productID) || s.Holds(PrivateTriage, productID)
+}
+
+// ReadsIn reports whether this subject reads findings of either visibility in
+// this product.
+func (s Subject) ReadsIn(productID int64) bool {
+	return s.Reads(Public, productID) || s.Reads(Private, productID)
 }
 
 // Triages reports whether a subject may argue about findings of this
 // visibility in this product.
 //
-// The write-side counterpart of Reads, and the same shape: a claim about an
-// undisclosed finding needs the role that reads one, and a claim about a
-// disclosed one needs either. Here rather than in each package that asks it —
-// it was written out twice, byte for byte, and open-coded at six more sites,
-// which is seven places for one rule to be got wrong and no place to correct
-// it once.
+// The write-side counterpart of Reads, and the same shape: each visibility is
+// its own role. Here rather than in each package that asks it, so the rule has
+// one place to be got wrong and one place to correct it.
 //
 // Not folded into Reads. Triage implies reading and reading does not imply
 // triage, so a single question would have to be answered "which of the two do
@@ -459,10 +464,67 @@ func (s Subject) Triages(visibility Visibility, productID int64) bool {
 	if s.Kind != Person {
 		return false
 	}
-	if visibility == Private {
-		return s.Holds(PrivateTriage, productID)
+	if visibility == Public {
+		return s.Holds(PublicTriage, productID)
 	}
-	return s.Holds(PublicTriage, productID) || s.Holds(PrivateTriage, productID)
+	return s.Holds(PrivateTriage, productID)
+}
+
+// TriagesIn reports whether this subject triages findings of either visibility
+// in this product.
+//
+// The question an act about the product rather than about one finding asks:
+// routing, a rating, an obligation, taking unowned work. The finding-level
+// question narrows further where there is a finding to ask it of.
+func (s Subject) TriagesIn(productID int64) bool {
+	return s.Triages(Public, productID) || s.Triages(Private, productID)
+}
+
+// Split sorts products by which visibilities a rule allows in each: both, only
+// disclosed, or only undisclosed. A product the rule allows neither in is in
+// none of the three.
+//
+// A query narrowing to what a subject may reach writes one clause per group —
+// the product alone for the first, the product and a visibility for the other
+// two — so every narrowing spells the rule the same way.
+func Split(products []int64, allowed func(Visibility, int64) bool) (both, public, private []int64) {
+	for _, id := range products {
+		pub, priv := allowed(Public, id), allowed(Private, id)
+		switch {
+		case pub && priv:
+			both = append(both, id)
+		case pub:
+			public = append(public, id)
+		case priv:
+			private = append(private, id)
+		}
+	}
+	return both, public, private
+}
+
+// VisibleWhere is one condition over the three groups Split sorts
+// products into: the product alone where both visibilities are allowed, the
+// product and its visibility where one is. Nothing allowed anywhere is a
+// condition nothing satisfies.
+func VisibleWhere(product, visibility string, both, public, private []int64) (string, []any) {
+	var clauses []string
+	var args []any
+	if len(both) > 0 {
+		clauses = append(clauses, product+" IN (?)")
+		args = append(args, bun.List(both))
+	}
+	if len(public) > 0 {
+		clauses = append(clauses, "("+product+" IN (?) AND "+visibility+" = ?)")
+		args = append(args, bun.List(public), Public)
+	}
+	if len(private) > 0 {
+		clauses = append(clauses, "("+product+" IN (?) AND "+visibility+" = ?)")
+		args = append(args, bun.List(private), Private)
+	}
+	if len(clauses) == 0 {
+		return "1 = 0", nil
+	}
+	return "(" + strings.Join(clauses, " OR ") + ")", args
 }
 
 // VisibleOn is which visibilities this subject may read of one named issue in
@@ -536,7 +598,7 @@ func (s Subject) Sees(productID int64) bool {
 	// bounded by what its holder may read, so holding one alone is not a way
 	// in — otherwise granting somebody the ability to approve would show them
 	// every release and variant there is to approve.
-	return s.Reads(Public, productID) || s.Reads(Private, productID)
+	return s.ReadsIn(productID)
 }
 
 // HoldsAnywhere reports whether this subject holds one of these roles on any
@@ -594,7 +656,7 @@ func (s Subject) Products() (ids []int64, all bool) {
 		// that narrows findings, counts, aggregates and exports, and read
 		// every disclosed finding in it. A capability grants no visibility of
 		// its own, and this is where that stopped being true.
-		if s.Reads(Public, id) || s.Reads(Private, id) {
+		if s.ReadsIn(id) {
 			ids = append(ids, id)
 		}
 	}

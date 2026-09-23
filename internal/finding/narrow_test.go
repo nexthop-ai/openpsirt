@@ -626,7 +626,7 @@ func TestSearchingFindsAnIssueByNameAndByAlias(t *testing.T) {
 			[]finding.Reported{reported, found("CVE-2026-7000", swss)}); err != nil {
 			t.Fatal(err)
 		}
-		who := f.holding(t, access.PrivateRead)
+		who := f.holding(t, access.PublicRead, access.PrivateRead)
 
 		for _, term := range []string{"CVE-2026-8899", "cve-2026-8899", "GHSA-aaaa-bbbb-cccc", "8899"} {
 			rows, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0,
@@ -688,7 +688,7 @@ func TestARowNamesWhatPullsItInEvenWhereTheRouteUpIsUnknown(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		who := f.holding(t, access.PrivateRead)
+		who := f.holding(t, access.PublicRead, access.PrivateRead)
 		rows, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, finding.Filter{})
 		if err != nil {
 			t.Fatal(err)
@@ -729,7 +729,7 @@ func TestNarrowingToWhatSomebodyRecordedHere(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		if _, _, err := f.store.Enter(t.Context(), who, finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",

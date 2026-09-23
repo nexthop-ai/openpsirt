@@ -127,7 +127,7 @@ func registerObligations(api huma.API, in Ingest) {
 			body := ObligationBody{
 				ExploitedHereBody: exploitedHereBody(entry.Record, entry.Issue, people),
 				Undisclosed:       entry.Private,
-				MayTell:           subject.Triages(access.Public, entry.Record.ProductID),
+				MayTell:           subject.TriagesIn(entry.Record.ProductID),
 				Windows:           make([]DueBody, 0, len(entry.Windows)),
 			}
 			body.Product, body.ProductName = entry.Product, entry.ProductName

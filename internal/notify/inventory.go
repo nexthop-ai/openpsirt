@@ -95,7 +95,7 @@ func moved(ctx context.Context, db *bun.DB, stored ingest.Stored) error {
 		// documents a build sent — so reading the product is the whole of
 		// the question, and telling somebody the screen would refuse is an
 		// alarm pointing at a refusal.
-		if !per[placed.ProductID].public() {
+		if !per[placed.ProductID].readsIn() {
 			continue
 		}
 		productID := placed.ProductID

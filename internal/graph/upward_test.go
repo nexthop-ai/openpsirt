@@ -56,7 +56,7 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 		// were handed.
 		const party = 77
 		boss := access.NewPerson(1, "boss", false,
-			map[int64][]access.Role{*f.scope.ProductID: {access.PrivateTriage, access.Assigner}}, 1)
+			map[int64][]access.Role{*f.scope.ProductID: {access.PublicTriage, access.PrivateTriage, access.Assigner}}, 1)
 		holder := access.NewPerson(2, "holder", false, nil, party)
 		to := int64(party)
 		for _, each := range []struct {
@@ -157,7 +157,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		}
 		const party = 79
 		boss := access.NewPerson(1, "boss", false,
-			map[int64][]access.Role{*f.scope.ProductID: {access.PrivateTriage, access.Assigner}}, 1)
+			map[int64][]access.Role{*f.scope.ProductID: {access.PublicTriage, access.PrivateTriage, access.Assigner}}, 1)
 		issue := issueID(t, f, "CVE-2026-9")
 		component, err := f.store.ComponentAt(t.Context(), f.targetID, zlib.Name)
 		if err != nil {
@@ -195,7 +195,7 @@ func TestUndisclosedWorkStaysOutOfTheTreeSeenUpward(t *testing.T) {
 		// Somebody who may read it sees it, so the emptiness above is the
 		// visibility clause rather than the tree being broken.
 		reader := access.NewPerson(3, "reader", false,
-			map[int64][]access.Role{*f.scope.ProductID: {access.PrivateRead}}, party)
+			map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead, access.PrivateRead}}, party)
 		rows, _, err = f.store.Ours(t.Context(), reader, f.targetID)
 		if err != nil {
 			t.Fatal(err)

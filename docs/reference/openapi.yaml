@@ -1145,25 +1145,33 @@ components:
           description: Argue about a finding nobody has disclosed
           type: boolean
         may_see:
-          description: Read findings that have been disclosed
+          description: Read findings here at either visibility
           type: boolean
         may_triage:
-          description: Argue about a finding
+          description: Argue about a finding here at either visibility
           type: boolean
         name:
           description: The label shown for it
           type: string
         product:
           type: string
-        sees_all:
+        reads_private:
           description: Read findings nobody has disclosed yet
+          type: boolean
+        reads_public:
+          description: Read findings that have been disclosed
+          type: boolean
+        triages_public:
+          description: Argue about a finding that has been disclosed
           type: boolean
       required:
         - product
         - name
         - may_see
-        - sees_all
+        - reads_public
+        - reads_private
         - may_triage
+        - triages_public
         - may_assign
         - may_hide
         - may_agree
@@ -16328,7 +16336,7 @@ paths:
 
         From here it behaves like any other finding: triaged, assigned, decided, on the same clock and in the same reports. No scan will close it, so it is closed by a person through the resolve endpoint or it stays open.
 
-        Requires: public-triage or private-triage on the product. private-triage where the finding is undisclosed.
+        Requires: public-triage or private-triage on the product. public-triage where the finding is disclosed, private-triage where it is not.
       operationId: record-finding
       parameters:
         - in: path
@@ -16363,7 +16371,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
-        note: private-triage where the finding is undisclosed.
+        note: public-triage where the finding is disclosed, private-triage where it is not.
   /v1/products/{product}/findings.{format}:
     get:
       description: |-
@@ -18364,7 +18372,7 @@ paths:
 
         `invalid` never means the finding exists but does not apply. That is a triage decision of `not-applicable` with the justification that fits.
 
-        Requires: public-triage or private-triage on the product. private-triage where the finding is undisclosed.
+        Requires: public-triage or private-triage on the product. public-triage where the finding is disclosed, private-triage where it is not.
       operationId: set-affected-builds
       parameters:
         - in: path
@@ -18406,7 +18414,7 @@ paths:
         any_of:
           - public-triage
           - private-triage
-        note: private-triage where the finding is undisclosed.
+        note: public-triage where the finding is disclosed, private-triage where it is not.
   /v1/products/{product}/issues/{vulnerability}/collaborators:
     get:
       description: |-

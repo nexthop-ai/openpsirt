@@ -102,7 +102,7 @@ func (s *Store) Assess(ctx context.Context, subject access.Subject,
 	// Triage on this product, rather than triage somewhere. Asked before
 	// anything in the request is resolved, so a product somebody holds
 	// nothing on refuses in the same words whether or not the issue is there.
-	if !subject.Triages(access.Public, productID) {
+	if !subject.TriagesIn(productID) {
 		return nil, access.Denied("say what this product thinks of an issue")
 	}
 	severity = strings.TrimSpace(strings.ToLower(severity))
@@ -237,7 +237,7 @@ func (s *Store) Agree(ctx context.Context, subject access.Subject, id int64) (*A
 		// claim gets rather than as a denial: "you may not agree to this"
 		// about a product somebody holds nothing on says the claim is there.
 		if !subject.Holds(access.Approver, claim.ProductID) &&
-			!subject.Triages(access.Public, claim.ProductID) {
+			!subject.TriagesIn(claim.ProductID) {
 			return ErrNoSuchAssessment
 		}
 		told, err := MayBeToldOfWithin(ctx, tx, subject, claim.ProductID, claim.VulnerabilityID)
@@ -290,7 +290,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, id int64) 
 		if err := tx.NewSelect().Model(claim).Where("id = ?", id).Scan(ctx); err != nil {
 			return ErrNoSuchAssessment
 		}
-		if !subject.Triages(access.Public, claim.ProductID) {
+		if !subject.TriagesIn(claim.ProductID) {
 			return ErrNoSuchAssessment
 		}
 		told, err := MayBeToldOfWithin(ctx, tx, subject, claim.ProductID, claim.VulnerabilityID)

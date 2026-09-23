@@ -349,7 +349,7 @@ func upload(ctx context.Context, in Ingest, input *UploadInput) (*UploadOutput, 
 		if !subject.MaySend(named.ProductID, named.StreamID, named.VariantID) {
 			return nil, huma.Error403Forbidden("not authorized")
 		}
-	case !subject.Triages(access.Public, named.ProductID):
+	case !subject.TriagesIn(named.ProductID):
 		return nil, huma.Error403Forbidden("not authorized")
 	}
 

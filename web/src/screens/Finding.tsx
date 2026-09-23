@@ -283,11 +283,12 @@ export function Finding() {
   });
 
   const it = finding.data;
-  // Whether this reader may argue about findings in this product, which is
-  // what every control on this screen turns on. Read once: asked at each
-  // control, the copies drift and one of them ends up offering a button that
-  // answers 403.
-  const mayTriage = !!who.data?.reach.find((r) => r.product === product)?.may_triage;
+  // Whether this reader may argue about this finding, which is what every
+  // control on this screen turns on: triage at the finding's own visibility,
+  // since each is its own role. Read once: asked at each control, the copies
+  // drift and one of them ends up offering a button that answers 403.
+  const here = who.data?.reach.find((r) => r.product === product);
+  const mayTriage = !!(it?.undisclosed ? here?.may_hide : here?.triages_public);
   const places = useMemo(() => it?.places ?? [], [it]);
   // A place is the component and what pulls it in; two chains reaching the
   // same pair are one place, and the head counts what a decision covers.

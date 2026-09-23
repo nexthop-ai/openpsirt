@@ -192,21 +192,25 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error
 // readable is the visibilities this subject may read anywhere.
 //
 // A statement spanning products cannot bind one product's answer, so what it
-// binds is the union: public always, and private where this subject reads it
-// on any product. On its own it is too loose — a public flaw in a product
-// they hold nothing on reads as visible — so the clause above it asks the
-// product half, and neither stands without the other.
+// binds is the union: each visibility this subject reads on any product. On
+// its own it is too loose — a public flaw in a product they hold nothing on
+// reads as visible — so the clause above it asks the product half, and neither
+// stands without the other.
 func readable(subject access.Subject) []access.Visibility {
 	products, all := subject.Products()
 	if all {
 		return []access.Visibility{access.Public, access.Private}
 	}
-	for _, id := range products {
-		if subject.Reads(access.Private, id) {
-			return []access.Visibility{access.Public, access.Private}
+	var out []access.Visibility
+	for _, v := range []access.Visibility{access.Public, access.Private} {
+		for _, id := range products {
+			if subject.Reads(v, id) {
+				out = append(out, v)
+				break
+			}
 		}
 	}
-	return []access.Visibility{access.Public}
+	return out
 }
 
 // AnyIssuedForProduct reports whether an advisory covering one product has

@@ -308,7 +308,7 @@ demo-down:
 # implied by a flag. Idempotent, so re-seeding is not a special case.
 demo-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(1) %{http_code}\n" \
 	  -X POST -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
-	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
+	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"public-triage\"},{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
 	  "$(DEMO_URL)/v1/people"
 
 demo-seed:
@@ -676,7 +676,7 @@ dev-down:
 dev-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(1) %{http_code}\n" \
 	  -X POST -H "X-User: $(DEMO_USER)" -H "Origin: $(DEV_URL)" \
 	  -H 'Content-Type: application/json' \
-	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
+	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(1)\",\"role\":\"public-triage\"},{\"product\":\"$(1)\",\"role\":\"private-triage\"},{\"product\":\"$(1)\",\"role\":\"assigner\"},{\"product\":\"$(1)\",\"role\":\"approver\"}]}" \
 	  "http://$(DEV_API)/v1/people"
 
 dev-seed:

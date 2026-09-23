@@ -2385,7 +2385,7 @@ export interface paths {
          *
          *     From here it behaves like any other finding: triaged, assigned, decided, on the same clock and in the same reports. No scan will close it, so it is closed by a person through the resolve endpoint or it stays open.
          *
-         *     Requires: public-triage or private-triage on the product. private-triage where the finding is undisclosed.
+         *     Requires: public-triage or private-triage on the product. public-triage where the finding is disclosed, private-triage where it is not.
          */
         post: operations["record-finding"];
         delete?: never;
@@ -2672,7 +2672,7 @@ export interface paths {
          *
          *     `invalid` never means the finding exists but does not apply. That is a triage decision of `not-applicable` with the justification that fits.
          *
-         *     Requires: public-triage or private-triage on the product. private-triage where the finding is undisclosed.
+         *     Requires: public-triage or private-triage on the product. public-triage where the finding is disclosed, private-triage where it is not.
          */
         put: operations["set-affected-builds"];
         post?: never;
@@ -6266,15 +6266,19 @@ export interface components {
             may_assign: boolean;
             /** @description Argue about a finding nobody has disclosed */
             may_hide: boolean;
-            /** @description Read findings that have been disclosed */
+            /** @description Read findings here at either visibility */
             may_see: boolean;
-            /** @description Argue about a finding */
+            /** @description Argue about a finding here at either visibility */
             may_triage: boolean;
             /** @description The label shown for it */
             name: string;
             product: string;
             /** @description Read findings nobody has disclosed yet */
-            sees_all: boolean;
+            reads_private: boolean;
+            /** @description Read findings that have been disclosed */
+            reads_public: boolean;
+            /** @description Argue about a finding that has been disclosed */
+            triages_public: boolean;
         };
         CarriedBody: {
             /**

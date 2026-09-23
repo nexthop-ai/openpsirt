@@ -276,8 +276,10 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err := rights.Claim(ctx, adminReader.ID, "admin-reader"); err != nil {
 		return cast{}, err
 	}
-	if err := rights.GrantRole(ctx, adminReader.ID, mine.ID, access.PrivateRead); err != nil {
-		return cast{}, err
+	for _, role := range []access.Role{access.PublicRead, access.PrivateRead} {
+		if err := rights.GrantRole(ctx, adminReader.ID, mine.ID, role); err != nil {
+			return cast{}, err
+		}
 	}
 	// Somebody holding the audit permission and no role at all: the
 	// whole of what it is for is a reader of the deployment's own records
@@ -296,8 +298,12 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// theirs and giving work to somebody else is not, and a cast
 	// where everybody could do both would test neither.
 	for who, roles := range map[string][]access.Role{
-		"reader":   {access.PublicRead},
-		"private":  {access.PrivateRead},
+		"reader": {access.PublicRead},
+		// Reading at both visibilities. Each is its own grant, and the
+		// identities named for undisclosed work are the ones that hold
+		// all of it; the ones holding the undisclosed half alone are
+		// named for that.
+		"private":  {access.PublicRead, access.PrivateRead},
 		"triager":  {access.PublicTriage},
 		"assigner": {access.PublicTriage, access.Assigner},
 		// The capability without the triage right it sits on, plus enough
@@ -306,11 +312,15 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		// is consulted. Assigning is triage *and* assigner, and this is
 		// the identity that shows it.
 		"dispatcher":     {access.PublicRead, access.Assigner},
-		"private-triage": {access.PrivateTriage},
-		// Private triage plus the right to hand work to somebody else,
-		// for the tests about what a recipient is told.
-		"private-dispatcher": {access.PrivateTriage, access.Assigner},
-		"approver":           {access.Approver},
+		"private-triage": {access.PublicTriage, access.PrivateTriage},
+		// Triage at both visibilities plus the right to hand work to
+		// somebody else, for the tests about what a recipient is told.
+		"private-dispatcher": {access.PublicTriage, access.PrivateTriage, access.Assigner},
+		// The undisclosed half alone: somebody working private reports
+		// who is not handed the disclosed stream.
+		"embargo-reader":  {access.PrivateRead},
+		"embargo-triager": {access.PrivateTriage},
+		"approver":        {access.Approver},
 		// Assigning is the other capability that grants
 		// nothing on its own, and the dispatcher above holds
 		// it alongside a read role, so this is the identity

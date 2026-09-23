@@ -76,7 +76,7 @@ func registerEntry(api huma.API, in Ingest) {
 			"same clock and in the same reports. No scan will close it, so it is closed " +
 			"by a person through the resolve endpoint or it stays open.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
-	}, perProduct, "private-triage where the finding is undisclosed.", triageRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "public-triage where the finding is disclosed, private-triage where it is not.", triageRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Body    struct {
 			// Builds is which builds ship it, rather than one in
@@ -689,7 +689,7 @@ func registerAffects(api huma.API, in Ingest) {
 			"`invalid` never means the finding exists but does not apply. That is a triage " +
 			"decision of `not-applicable` with the justification that fits.",
 		Tags: []string{"Findings"},
-	}, perProduct, "private-triage where the finding is undisclosed.",
+	}, perProduct, "public-triage where the finding is disclosed, private-triage where it is not.",
 		triageRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability" doc:"The identifier it was filed under"`

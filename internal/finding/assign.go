@@ -100,7 +100,7 @@ func (s *Store) moveWork(ctx context.Context, db bun.IDB, subject access.Subject
 func (s *Store) HandOverWithin(ctx context.Context, tx bun.IDB, subject access.Subject,
 	productID int64, work [][2]int64, to *int64) (int64, error) {
 
-	if !subject.Triages(access.Public, productID) {
+	if !subject.TriagesIn(productID) {
 		return 0, access.Denied(fmt.Sprintf(
 			"decide who deals with findings in product %d", productID))
 	}
@@ -166,7 +166,7 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 	// otherwise need somebody's attention before anybody could start.
 	// Putting work on somebody else, or taking what they are holding, is a
 	// different act and asks for the right that names it.
-	triages := subject.Triages(access.Public, productID)
+	triages := subject.TriagesIn(productID)
 	if !triages {
 		return 0, false, access.Denied(fmt.Sprintf("decide who deals with findings in product %d", productID))
 	}
@@ -247,9 +247,9 @@ func (s *Store) Assign(ctx context.Context, subject access.Subject, targetID, vu
 //
 // The question routing asks: work goes to a party that can read all of what is
 // routed there, and one undisclosed place among fifty public ones makes the
-// whole of it undisclosed for that purpose. Reading what is undisclosed
-// implies reading what is not, so the strictest is the only one worth asking
-// about.
+// whole of it undisclosed for that purpose. A disclosed row travels with the
+// assignment to whoever holds it, so the strictest is the only one worth
+// asking about.
 //
 // Narrowed by what the caller may see, like every other read here. A place
 // they cannot see is not one they can route.
@@ -956,8 +956,9 @@ func inOneProduct(q *bun.SelectQuery, subject access.Subject, productID int64,
 
 // onlyVisible narrows a query to what this subject may read, per product.
 //
-// Holding private read on one product does not make undisclosed findings on
-// another visible, so the clause is per product rather than a single flag.
+// Each visibility is its own grant on each product: reading undisclosed
+// findings on one product does not make them visible on another, and does not
+// make the disclosed ones visible anywhere.
 //
 // An administrator is not narrowed at all, and the shape makes that easy to
 // get backwards: Products() reports "everything" as an empty list with a flag,
@@ -969,17 +970,17 @@ func onlyVisible(q *bun.SelectQuery, subject access.Subject, products []int64, a
 	if all {
 		return q
 	}
-	held := make([]int64, 0, len(products))
-	for _, id := range products {
-		if subject.Reads(access.Private, id) {
-			held = append(held, id)
-		}
+	both, public, private := access.Split(products, func(v access.Visibility, id int64) bool {
+		return subject.Reads(v, id)
+	})
+	where, args := access.VisibleWhere("st.product_id", "f.visibility", both, public, private)
+	// An assignment carries a disclosed row to whoever holds it, whatever
+	// they read: it is what gives a bare capability content, and a disclosed
+	// finding handed to somebody who reads only undisclosed work is theirs to
+	// see. An undisclosed row carries no further than private reading does.
+	if mine := subject.Mine(); len(mine) > 0 {
+		where = "(" + where + " OR (f.assigned_to IN (?) AND f.visibility = ?))"
+		args = append(args, bun.List(mine), access.Public)
 	}
-	if len(held) == 0 {
-		// Nothing undisclosed anywhere, which is a real answer rather than an
-		// empty condition to be filled in.
-		return q.Where("f.visibility = ?", access.Public)
-	}
-	return q.Where("(f.visibility = ? OR st.product_id IN (?))",
-		access.Public, bun.List(held))
+	return q.Where(where, args...)
 }

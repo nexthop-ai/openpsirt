@@ -73,12 +73,10 @@ export function Me() {
                             hold: the mapping from one to the other is the
                             server's, and a second copy of it here would be
                             the one that drifts. */}
-                        {where.sees_all
-                          ? chip("Reads everything, including undisclosed")
-                          : where.may_see && chip("Reads disclosed findings")}
-                        {where.may_hide
-                          ? chip("Argues about undisclosed findings")
-                          : where.may_triage && chip("Argues about findings")}
+                        {where.reads_public && chip("Reads public findings")}
+                        {where.reads_private && chip("Reads private findings")}
+                        {where.triages_public && chip("Argues about public findings")}
+                        {where.may_hide && chip("Argues about private findings")}
                         {where.may_assign && chip("Hands work to others")}
                         {where.may_agree && chip("Agrees to somebody else's claim")}
                       </span>

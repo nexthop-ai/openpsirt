@@ -108,7 +108,7 @@ func registerAssigning(api huma.API, in Ingest) {
 		// Resolving first and refusing after answers "does this person have an
 		// account here" for anybody who can merely read the product, which is
 		// a directory of the organization for the price of one request.
-		if !subject.Triages(access.Public, product) {
+		if !subject.TriagesIn(product) {
 			return nil, noSuchFinding()
 		}
 
@@ -171,17 +171,14 @@ func registerAssigning(api huma.API, in Ingest) {
 				return nil, noSuchTeamNamed(input.Body.Team)
 			}
 			// At least one member has to be able to read what is
-			// being routed there. Asked at the strictest
-			// visibility present, since reading what is
-			// undisclosed implies reading what is not — so a team
-			// with one member who may read an embargoed finding
-			// can hold a queue of both kinds.
+			// being routed there, asked at the strictest
+			// visibility present.
 			strictest, err := finding.NewStore(in.DB.DB).StrictestOf(ctx, subject,
 				target, issue, component)
 			if err != nil {
 				return nil, refusedFinding(in, err)
 			}
-			reads, err := rights.AnyMemberReads(ctx, team.ID, product, strictest)
+			reads, err := teamMayHold(ctx, rights, team.ID, product, strictest)
 			if err != nil {
 				return nil, wentWrong(in.Logger, "cannot tell whether that team may see this", err)
 			}
@@ -712,4 +709,21 @@ func seenBy(ctx context.Context, in Ingest, identity string, productID int64, un
 		return them.Reads(access.Private, productID)
 	}
 	return them.Reads(access.Public, productID)
+}
+
+// teamMayHold reports whether a team may be handed work whose strictest
+// visibility is this: at least one member reads it.
+//
+// Undisclosed work needs a member who reads undisclosed work. Disclosed work
+// travels with the assignment to whoever holds it, so a member who reads the
+// product at either visibility is enough — a team of people working private
+// reports may be handed a disclosed finding and see it.
+func teamMayHold(ctx context.Context, rights *access.Store, teamID, productID int64,
+	strictest access.Visibility) (bool, error) {
+
+	reads, err := rights.AnyMemberReads(ctx, teamID, productID, strictest)
+	if err != nil || reads || strictest == access.Private {
+		return reads, err
+	}
+	return rights.AnyMemberReads(ctx, teamID, productID, access.Private)
 }

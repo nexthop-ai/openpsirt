@@ -10,12 +10,17 @@ import { rememberForward, signedOutHere } from "../screens/SignIn";
 export type Can = {
   product: string;
   name: string;
+  // Either visibility. Each is its own grant, so reading or triaging one
+  // says nothing about the other.
   may_see: boolean;
-  sees_all: boolean;
+  reads_public: boolean;
+  reads_private: boolean;
   may_triage: boolean;
+  triages_public: boolean;
   // Giving work to somebody else, or taking what they hold. Taking work
   // nobody owns and handing back your own are triage and need only may_triage.
   may_assign: boolean;
+  // Triage of private findings, which recording an undisclosed one asks for.
   may_hide: boolean;
   may_agree: boolean;
   // Agreeing to somebody else's ruling on vulnerability reports.

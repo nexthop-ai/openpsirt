@@ -62,7 +62,7 @@ func (s *Store) TagIt(ctx context.Context, subject access.Subject, productID,
 	if folded == "" {
 		return fmt.Errorf("a tag has to say something")
 	}
-	if !subject.Triages(access.Public, productID) {
+	if !subject.TriagesIn(productID) {
 		return access.Denied(fmt.Sprintf("mark work in product %d", productID))
 	}
 	row := &Tag{
@@ -83,7 +83,7 @@ func (s *Store) TagIt(ctx context.Context, subject access.Subject, productID,
 func (s *Store) Untag(ctx context.Context, subject access.Subject, productID,
 	vulnerabilityID, componentID int64, typed string) error {
 
-	if !subject.Triages(access.Public, productID) {
+	if !subject.TriagesIn(productID) {
 		return access.Denied(fmt.Sprintf("mark work in product %d", productID))
 	}
 	if _, err := s.db.NewDelete().Model((*Tag)(nil)).

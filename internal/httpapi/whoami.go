@@ -30,9 +30,11 @@ import (
 type CanBody struct {
 	Product           string `json:"product"`
 	Name              string `json:"name" doc:"The label shown for it"`
-	MaySee            bool   `json:"may_see" doc:"Read findings that have been disclosed"`
-	SeesAll           bool   `json:"sees_all" doc:"Read findings nobody has disclosed yet"`
-	MayTriage         bool   `json:"may_triage" doc:"Argue about a finding"`
+	MaySee            bool   `json:"may_see" doc:"Read findings here at either visibility"`
+	ReadsPublic       bool   `json:"reads_public" doc:"Read findings that have been disclosed"`
+	ReadsPrivate      bool   `json:"reads_private" doc:"Read findings nobody has disclosed yet"`
+	MayTriage         bool   `json:"may_triage" doc:"Argue about a finding here at either visibility"`
+	TriagesPublic     bool   `json:"triages_public" doc:"Argue about a finding that has been disclosed"`
 	MayAssign         bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
 	MayHide           bool   `json:"may_hide" doc:"Argue about a finding nobody has disclosed"`
 	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override"`
@@ -143,14 +145,16 @@ func registerWhoAmI(api huma.API, in Ingest) {
 			// endpoint refuses somebody who holds the second and not the
 			// first, so an interface drawing the control from this would
 			// offer an action that always fails.
-			triages := subject.Triages(access.Public, product.ID)
+			triages := subject.TriagesIn(product.ID)
 			body.Reach = append(body.Reach, CanBody{
 				Product: product.Name, Name: product.DisplayName,
-				MaySee:    subject.Reads(access.Public, product.ID),
-				SeesAll:   subject.Reads(access.Private, product.ID),
-				MayAssign: triages && subject.Holds(access.Assigner, product.ID),
-				MayTriage: triages,
-				MayHide:   subject.Holds(access.PrivateTriage, product.ID),
+				MaySee:        subject.ReadsIn(product.ID),
+				ReadsPublic:   subject.Reads(access.Public, product.ID),
+				ReadsPrivate:  subject.Reads(access.Private, product.ID),
+				MayAssign:     triages && subject.Holds(access.Assigner, product.ID),
+				MayTriage:     triages,
+				TriagesPublic: subject.Triages(access.Public, product.ID),
+				MayHide:       subject.Triages(access.Private, product.ID),
 				// The capability, or a triage role — which is what the
 				// operation accepts, and what makes a two-person team where
 				// neither holds the capability able to review at all. Asked

@@ -129,7 +129,7 @@ func (w *Watch) waitingClaims(ctx context.Context) (map[int64][]Holds, error) {
 				continue
 			}
 			at := per[row.ProductID]
-			if !at.approves || !at.public() || (private && !at.private()) {
+			if !at.approves || !at.reads(private) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)
@@ -205,7 +205,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 			// to work reports, over the right to read them, and never its
 			// proposer.
 			at := per[row.ProductID]
-			if personID == row.ProposedBy || !at.private() ||
+			if personID == row.ProposedBy || !at.reads(true) ||
 				(!at.approves && !at.triages(true)) {
 				continue
 			}
@@ -277,7 +277,7 @@ func (w *Watch) sentBackWaiting(ctx context.Context) (map[int64][]Holds, error) 
 		// A proposer who has since lost the reading that made the claim
 		// possible hears nothing. The condition is about a finding, and an
 		// alert is not a way back in.
-		if !at.public() || (private && !at.private()) {
+		if !at.reads(private) {
 			continue
 		}
 		days := int(now.Sub(row.SentBackAt).Hours() / 24)
@@ -365,7 +365,7 @@ func (w *Watch) deferralsEnding(ctx context.Context) (map[int64][]Holds, error) 
 	for _, row := range rows {
 		private := row.PrivateRows > 0
 		at := reach[row.ProposedBy][row.ProductID]
-		if !at.public() || (private && !at.private()) {
+		if !at.reads(private) {
 			continue
 		}
 		out[row.ProposedBy] = append(out[row.ProposedBy], Holds{
@@ -502,7 +502,7 @@ func (w *Watch) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		}
 		for _, personID := range members {
 			at := reach[personID][row.ProductID]
-			if !at.public() || (private && !at.private()) {
+			if !at.reads(private) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)

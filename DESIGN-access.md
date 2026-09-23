@@ -69,6 +69,7 @@ should be here.
 
 | Rule | Reason |
 |---|---|
+| Each visibility is its own grant | Somebody working private reports is not handed every public finding with them. Somebody who works both holds both, and no role reaches a visibility it does not name |
 | Triage implies reading at the same visibility | Nobody decides about what they cannot see, and a deployment forced to grant both would eventually grant one and wonder why nothing worked |
 | A capability grants no visibility, and a capability has to grant something | What an approver reaches is bounded by what they may read. The converse held the other way too: approving asked for the triage role, which made the approver capability do nothing at all — somebody granted exactly the right to approve could approve nothing |
 | An administrator is not every role (REQ-42) | Administration is people, roles, credentials, settings and the catalog. Reading and triaging a product are granted per product like anybody else's, and an administrator who wants them grants them to themselves, so the grant sits in the same record as everybody else's. Read the other way, it costs separation of duties: one account proposes a decision and approves it, re-rates severities and reads every embargo, so the second person a dismissal asks for is optional for whoever holds admin. It also makes a read-only auditor impossible to express |
@@ -103,7 +104,7 @@ no read role, which an assignment gives content to.
 
 | Rule | Reason |
 |---|---|
-| An assignment carries the row it was made about, at the visibility the holder may read it at | The "what am I dealing with" list answers for somebody who reads nothing, and the product it sits in stays one they may not know exists. The findings list, the dependency tree and the product's other screens answer a question about a product, and holding one row in it is not an answer to that |
+| An assignment carries the row it was made about: a disclosed one to anybody, an undisclosed one only to somebody who reads undisclosed work there | The "what am I dealing with" list answers for somebody who reads nothing, and the product it sits in stays one they may not know exists. The findings list, the dependency tree and the product's other screens answer a question about a product, and holding one row in it is not an answer to that |
 | Assigning asks about the level, not the row | Whether they can already see the row is the wrong question — before the assignment they cannot, by construction. What is checked is that an undisclosed finding goes only to somebody who may read undisclosed work in that product. For a team it asks whether at least one member can |
 | The notification's own check stays beside it | A different check at a different moment. A channel that leaks only when another rule is wrong is a channel nobody notices is leaking |
 | The narrowing is not a switch an administrator turns on | It is what not granting reading already meant. There is no fourth state where somebody holds reading and is narrowed anyway |
@@ -374,7 +375,7 @@ precedence rule nobody would remember.
 |---|---|
 | Team names are answered to anybody, membership to an administrator | Routing work to a team means naming one; who is on a team is the same question as who is here |
 | A team assignment is a queue, not a holding | Work routed to a team is unheld until a person takes it, and taking it is the ordinary act of picking up unowned work — triage alone, no dispatch right. *Filling* the queue is dispatching. The alternative marks rows as held by the team, and hundreds then read as owned while nobody has looked at them |
-| Routing asks that at least one member may read it, not every member | Asked at the strictest visibility any open place carries, so one undisclosed place among fifty makes the whole undisclosed for this purpose. Requiring every member turns routing pressure into access pressure; requiring nobody leaves work showing as held in every administrative view and sitting in nobody's list |
+| Routing asks that at least one member may read it, not every member | Asked at the strictest visibility any open place carries, so one undisclosed place among fifty makes the whole undisclosed for this purpose. Disclosed work travels with the assignment, so for it a member reading the product at either visibility is enough. Requiring every member turns routing pressure into access pressure; requiring nobody leaves work showing as held in every administrative view and sitting in nobody's list |
 | The queue is narrowed per viewer, counts included | A badge reading "Kernel team · 14" shown to everybody says two embargoed items exist. Asserted by a matrix test rather than assumed from the row query being right |
 | Retiring a team keeps its row and does not free its name | Work already routed has to keep resolving to something a screen can name. Declaring that name again brings the team back, because declaring is idempotent everywhere else and the alternative was a refusal citing a team the person asking cannot see |
 
@@ -460,6 +461,13 @@ asked in one place. Both live on the subject: a rule written out per package is
 a rule with a spelling per package. They stay two questions rather than one,
 because triage implies reading and reading does not imply triage, so a single
 answer would have to be qualified at every call site.
+
+| Question | Asked at |
+|---|---|
+| An act on one finding | The finding's own visibility |
+| An act about the product rather than one finding — a routing rule, a rating, a tag, a scan sent by hand, a record of being exploited, taking unowned work | Triage at either visibility. The finding-level question narrows further wherever there is a finding to ask it of |
+| Publishing a VEX document | Public triage. What goes out is disclosed work alone |
+| A list, count or export spanning products | Per product and per visibility: both, disclosed only, or undisclosed only, as the grants on each product say |
 
 ## Judgments about an issue
 

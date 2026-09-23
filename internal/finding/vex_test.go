@@ -21,7 +21,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 	// index over the three columns is usable.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		// The issue the statements are about. Asked for by identifier here
 		// and matched by name in the query, because which name a publisher
@@ -108,7 +108,7 @@ func TestAStatementAboutOnePackageIsNotShownAgainstAnotherOfTheSameName(t *testi
 	// name on it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
 			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
 		if err != nil {
@@ -164,7 +164,7 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 	// says nobody has spoken.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
 			[]finding.Named{{Identifier: "CVE-2026-2", Severity: "high"}})
 		if err != nil {
@@ -210,7 +210,7 @@ func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T)
 	// the last document anybody uploaded.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
 			[]finding.Named{
 				{Identifier: "CVE-2026-1", Severity: "high"},
@@ -285,7 +285,7 @@ func TestAStatementSetAndAnAdvisoryDoNotReplaceEachOther(t *testing.T) {
 	// advisory sets aside the statement set.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
 			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
 		if err != nil {
@@ -334,7 +334,7 @@ func TestAnAdvisoryWithNoNameOfItsOwnIsRefusedByTheStore(t *testing.T) {
 	// else's.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		for _, each := range []struct {
 			what string
 			from finding.Supplied
@@ -404,7 +404,7 @@ func TestRecordingTheSameClaimsAgainStatesNoKeyItWasGiven(t *testing.T) {
 	// repeat is exactly that one.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		claims := []finding.Statement{{
 			Vulnerability: "CVE-2026-1", Component: "libnl", Status: "fixed",
 		}, {

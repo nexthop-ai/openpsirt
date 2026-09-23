@@ -647,12 +647,14 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 		Scan(ctx, &productID); err != nil {
 		return nil, fmt.Errorf("look up which product this line belongs to: %w", err)
 	}
-	if !mayDecide(subject, productID, access.Public) {
-		return nil, ErrNotTheirs
+	var readable []access.Visibility
+	for _, v := range []access.Visibility{access.Public, access.Private} {
+		if mayDecide(subject, productID, v) {
+			readable = append(readable, v)
+		}
 	}
-	readable := []access.Visibility{access.Public}
-	if mayDecide(subject, productID, access.Private) {
-		readable = append(readable, access.Private)
+	if len(readable) == 0 {
+		return nil, ErrNotTheirs
 	}
 
 	var rows []struct {

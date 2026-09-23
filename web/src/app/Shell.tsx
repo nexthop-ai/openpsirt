@@ -50,9 +50,9 @@ const UNOWNED_QUERY = listQuery(asAsked(new URLSearchParams(UNOWNED), "issues"))
 export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const { product, stream, variant } = useScope();
   const whole = !!(product && stream && variant);
-  // Reading reports takes reading undisclosed work, which is what sees_all says.
-  const reportsAnywhere = who.reach.some((each) => each.sees_all);
-  const reportsHere = !!product && !!mayOf(who, product)?.sees_all;
+  // Reading reports takes reading undisclosed work, which is what reads_private says.
+  const reportsAnywhere = who.reach.some((each) => each.reads_private);
+  const reportsHere = !!product && !!mayOf(who, product)?.reads_private;
   const scope = [product ?? "all products", stream, variant].filter(Boolean).join(" · ");
   const build = whole
     ? `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}/variants/${encodeURIComponent(variant)}`

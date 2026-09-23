@@ -77,7 +77,7 @@ func TestMeasureAnUnboundedPromise(t *testing.T) {
 			t.Fatal(err)
 		}
 		who := access.NewPerson(person.ID, "triager", false,
-			map[int64][]access.Role{product.ID: {access.PrivateTriage}}, 0)
+			map[int64][]access.Role{product.ID: {access.PublicTriage, access.PrivateTriage}}, 0)
 
 		// One component per size, each under the same containers, so the three
 		// acts do not decide about each other's places — and each with its own

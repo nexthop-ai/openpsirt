@@ -292,7 +292,7 @@ func TestOneUndisclosedPlaceMakesTheWholeGroupUndisclosed(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		who := f.holding(t, access.PrivateTriage)
+		who := f.holding(t, access.PublicTriage, access.PrivateTriage)
 		groups, _, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0, finding.Filter{})
 		if err != nil {
 			t.Fatal(err)

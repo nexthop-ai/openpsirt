@@ -79,7 +79,7 @@ func registerRouting(api huma.API, in Ingest) {
 		// three siblings enforce it, so this one does too — read against each
 		// other they say different things, which is the whole failure mode
 		// this pair is kept in step to avoid.
-		if !subject.Triages(access.Public, product.ID) {
+		if !subject.TriagesIn(product.ID) {
 			return nil, noSuchProduct()
 		}
 		rules, err := finding.NewStore(in.DB.DB).Rules(ctx, product.ID)
@@ -135,7 +135,7 @@ func registerRouting(api huma.API, in Ingest) {
 		// narrowed to what the asker may read, but a preview is part of
 		// writing a rule and nobody who may not write one has a reason to run
 		// it.
-		if !subject.Triages(access.Public, product.ID) {
+		if !subject.TriagesIn(product.ID) {
 			return nil, noSuchProduct()
 		}
 		if input.Upstream == "" && input.Beneath == "" {

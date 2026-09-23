@@ -205,12 +205,18 @@ func (s *Store) For(ctx context.Context, subject access.Subject, who publisher.N
 	if err != nil {
 		return nil, err
 	}
-	visible := []access.Visibility{access.Public}
+	var visible []access.Visibility
+	if subject.Reads(access.Public, named.ProductID) {
+		visible = append(visible, access.Public)
+	}
 	if undisclosed {
 		if !subject.Reads(access.Private, named.ProductID) {
 			return nil, access.Denied("read undisclosed work here")
 		}
 		visible = append(visible, access.Private)
+	}
+	if len(visible) == 0 {
+		return nil, access.Denied("read disclosed work here")
 	}
 	return s.document(ctx, who, named, target, visible)
 }
@@ -243,7 +249,7 @@ func (s *Store) locate(ctx context.Context, subject access.Subject,
 	// case here — the names their own issue sits at have to resolve, or the
 	// grant refuses them the one thing it gave — and that is not an answer to
 	// this one. Asked before the build is resolved any further.
-	if !subject.Reads(access.Public, named.ProductID) {
+	if !subject.ReadsIn(named.ProductID) {
 		return nil, nil, access.Denied(
 			fmt.Sprintf("read findings in product %d", named.ProductID))
 	}
