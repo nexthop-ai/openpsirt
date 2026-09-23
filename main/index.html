@@ -338,6 +338,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#builds-over-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Builds over time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -716,6 +727,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#builds-over-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Builds over time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#features" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -932,6 +954,81 @@ system as it is being built, and changes as it is.</p>
 <li>Work out what is in a product — the component list always comes from the build</li>
 <li>Build or deploy fixes</li>
 </ul>
+<h2 id="builds-over-time">Builds over time<a class="headerlink" href="#builds-over-time" title="Permanent link">&para;</a></h2>
+<p>A build's inventory moves every night. Each move is recorded as what it did to
+the findings and to the judgments standing on them.</p>
+<table>
+<thead>
+<tr>
+<th>When a build changes</th>
+<th>What is recorded</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An upload arrives</td>
+<td>A receipt naming the components it added, removed and moved. An upload that moves more of the build than the deployment allows is raised</td>
+</tr>
+<tr>
+<td>A component's version moves</td>
+<td>The finding at the old version closes as upgraded, or as superseded where the issue came with it. The new finding records the version it arrived from</td>
+</tr>
+<tr>
+<td>The version moves and the fix does not arrive</td>
+<td>The finding is marked as an incomplete upgrade</td>
+</tr>
+<tr>
+<td>The shipped version changes and the upstream one does not</td>
+<td>The finding closes as revised, which is what a carried patch looks like from outside</td>
+</tr>
+<tr>
+<td>A component leaves the build</td>
+<td>Its findings close as removed</td>
+</tr>
+<tr>
+<td>The scanner stops reporting something present and unchanged</td>
+<td>The finding closes as unexplained, and that is flagged at any volume</td>
+</tr>
+<tr>
+<td>The vulnerability data moves</td>
+<td>The scheduled rescan finds it, in shipped releases as well as current ones</td>
+</tr>
+<tr>
+<td>A judged component moves version</td>
+<td>A judgment about risk lapses and returns to triage. A claim that the scanner matched the wrong thing stands</td>
+</tr>
+<tr>
+<td>Another release or variant ships the same code</td>
+<td>The judgment already made there applies</td>
+</tr>
+<tr>
+<td>A fix is declared for a set of releases</td>
+<td>The next scan of each release says whether it arrived</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Cost</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A finding is a component at one place</td>
+<td>One switch image is 335,021 findings, 305,487 of them one kernel across 62 modules. Tracking at that grain is heavier per build than tracking per package, and it is what lets a judgment be true in one place and not another</td>
+</tr>
+<tr>
+<td>A finding is stored once</td>
+<td>With when it opened and when it closed, never once per scan</td>
+</tr>
+<tr>
+<td>Nightly branch scans are transient</td>
+<td>Tagged releases are retained</td>
+</tr>
+</tbody>
+</table>
 <h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
 <p>What the tool is specified to do. <a href="built/">Current state</a> says how far
 each area has got, and <a href="https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md">REQUIREMENTS.md</a> carries the reasoning
