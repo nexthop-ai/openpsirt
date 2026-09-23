@@ -198,7 +198,12 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 			ProductID: &row.ProductID,
 		}
 		for personID, per := range reach {
-			if personID == row.ProposedBy || !per[row.ProductID].triages(true) {
+			// Whoever may agree to it: the approver capability or the right
+			// to work reports, over the right to read them, and never its
+			// proposer.
+			at := per[row.ProductID]
+			if personID == row.ProposedBy || !at.private() ||
+				(!at.approves && !at.triages(true)) {
 				continue
 			}
 			out[personID] = append(out[personID], holds)
@@ -608,10 +613,9 @@ func (w *Watch) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 			holds.VulnerabilityID = nil
 		}
 		for personID, per := range reach {
-			// Whoever may triage work nobody has announced there, judged or
-			// not, because that is who may open the report — asked as a read
-			// instead, the notice named a report to somebody the report
-			// itself refuses.
+			// Whoever may work reports there, judged or not, because
+			// answering is working one. Everybody told may also open it,
+			// since reading a report asks for less.
 			if !per[row.ProductID].triages(true) {
 				continue
 			}

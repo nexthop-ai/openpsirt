@@ -84,10 +84,16 @@ func TestSlopIsRejectedInOneActThatASecondPersonApproves(t *testing.T) {
 			http.StatusConflict {
 			t.Errorf("the proposer approving answered %d: %s", got.Code, got.Body.String())
 		}
-		// Somebody who may read undisclosed work but not work reports. A
-		// ruling they may not reach answers as one nobody issued.
-		if code := r.as(t, "private", http.MethodPost, at+"/approval"); code != http.StatusNotFound {
+		// Somebody who may read undisclosed work and neither approve nor work
+		// reports. They can read the ruling, so they are refused in words
+		// rather than told it is not there.
+		if code := r.as(t, "private", http.MethodPost, at+"/approval"); code != http.StatusForbidden {
 			t.Errorf("a private reader approving answered %d", code)
+		}
+		// Somebody who may not read reports at all is told it is not there.
+		if code := r.as(t, "triager", http.MethodPost, at+"/approval"); code != http.StatusNotFound &&
+			code != http.StatusForbidden {
+			t.Errorf("a public triager approving answered %d", code)
 		}
 		got = asPerson(t, r, "private-dispatcher", http.MethodPost, at+"/approval", "")
 		if got.Code != http.StatusOK {
@@ -145,9 +151,13 @@ func TestADuplicateIsListedOnTheIssueItDuplicates(t *testing.T) {
 		if len(listed.Items) != 1 || listed.Items[0].Reference != claimed {
 			t.Errorf("the issue lists duplicates %+v", listed.Items)
 		}
-		// Somebody who reads the issue and may not work reports reads none.
-		if code := r.as(t, "private", http.MethodGet, duplicates); code != http.StatusForbidden {
+		// Somebody who reads undisclosed work reads them; somebody who
+		// triages announced work only reads the issue and none of them.
+		if code := r.as(t, "private", http.MethodGet, duplicates); code != http.StatusOK {
 			t.Errorf("a private reader reading duplicates answered %d", code)
+		}
+		if code := r.as(t, "triager", http.MethodGet, duplicates); code != http.StatusForbidden {
+			t.Errorf("a public triager reading duplicates answered %d", code)
 		}
 
 		// Somebody who may not work reports is refused alike whether the
@@ -219,10 +229,17 @@ func TestRulingsAcrossProductsAreThoseInProductsTheReaderWorksReportsIn(t *testi
 			t.Errorf("a ruling across products names its product as %+v", named.Items)
 		}
 
-		// Nothing from a product the reader may not work reports in, not
-		// even the count: a public triager, a private reader, and a reader
-		// of the whole estate who may triage nothing undisclosed.
-		for _, who := range []string{"triager", "private", "estate-reader"} {
+		// A reader of undisclosed work reads them.
+		var private across
+		read(t, r, "private", "/v1/report-rulings", &private)
+		if private.Total != 1 {
+			t.Errorf("a private reader reads %+v", private)
+		}
+
+		// Nothing from a product the reader may not read reports in, not
+		// even the count: a public triager, and a reader of the whole estate
+		// who may read nothing undisclosed.
+		for _, who := range []string{"triager", "estate-reader"} {
 			var none across
 			read(t, r, who, "/v1/report-rulings", &none)
 			if none.Total != 0 || len(none.Items) != 0 {

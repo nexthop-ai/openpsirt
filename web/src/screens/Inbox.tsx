@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { mayOf, useWho } from "../app/session";
 import { PAGE, useRecordReport, useReports, useRulings } from "../api/intake";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
@@ -25,6 +26,9 @@ export function Inbox() {
     setParams(next === "waiting" ? { waiting: "1" } : {}, { replace: true });
   const [recording, setRecording] = useState(false);
   const waiting = useRulings(product, true, 0);
+  // Reading reports and working them are different rights, so a reader of
+  // undisclosed work sees every report and none of the controls that write.
+  const works = !!mayOf(useWho().data, product)?.may_hide;
 
   return (
     <div>
@@ -33,9 +37,11 @@ export function Inbox() {
         <p>
           Reports sent to <Link to={`/products/${encodeURIComponent(product)}`}>{product}</Link>
         </p>
-        <button type="button" className="btn" onClick={() => setRecording((was) => !was)}>
-          {recording ? "Cancel" : "Record a report"}
-        </button>
+        {works && (
+          <button type="button" className="btn" onClick={() => setRecording((was) => !was)}>
+            {recording ? "Cancel" : "Record a report"}
+          </button>
+        )}
       </div>
 
       {recording && <RecordReport product={product} />}
@@ -60,12 +66,16 @@ export function Inbox() {
         </button>
       </div>
 
-      {tab === "reports" ? <Reports product={product} /> : <Waiting product={product} />}
+      {tab === "reports" ? (
+        <Reports product={product} works={works} />
+      ) : (
+        <Waiting product={product} />
+      )}
     </div>
   );
 }
 
-function Reports({ product }: { product: string }) {
+function Reports({ product, works }: { product: string; works: boolean }) {
   const [offset, setOffset] = useState(0);
   const [chosen, setChosen] = useState<string[]>([]);
   const listed = useReports(product, offset);
@@ -100,7 +110,7 @@ function Reports({ product }: { product: string }) {
         <table>
           <thead>
             <tr>
-              <th>
+              <th hidden={!works}>
                 <input
                   type="checkbox"
                   aria-label="Select every open report on this page"
@@ -121,7 +131,7 @@ function Reports({ product }: { product: string }) {
               const stands = standing(row);
               return (
                 <tr key={row.reference} className="row">
-                  <td>
+                  <td hidden={!works}>
                     {rulable(row) && (
                       <input
                         type="checkbox"

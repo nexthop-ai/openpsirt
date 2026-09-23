@@ -142,7 +142,7 @@ func (s *Store) ReportFor(ctx context.Context, subject access.Subject,
 	case err != nil:
 		return nil, fmt.Errorf("read who told us: %w", err)
 	}
-	if err := mayHandle(subject, row.ProductID); err != nil {
+	if err := mayReadReports(subject, row.ProductID); err != nil {
 		return nil, nil
 	}
 	return row, nil
@@ -169,6 +169,10 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject,
 		return err
 	}
 	if told == nil {
+		return nil
+	}
+	// Answering is working the report, which reading it does not grant.
+	if err := mayHandle(subject, told.ProductID); err != nil {
 		return nil
 	}
 	return s.answered(ctx, subject, told.ID)

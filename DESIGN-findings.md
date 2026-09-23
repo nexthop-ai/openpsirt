@@ -441,14 +441,28 @@ it lives.
 | Another report is already that issue's record | One report is one issue's record. A second pointed at the same issue is a duplicate, which is a ruling of its own |
 | A ruling holds the report | A report waiting to be rejected and accepted by somebody else in the meantime would be two things when the approval lands. Asked in the write |
 | The issue is not one the judge may be told of here | Resolving first and refusing after makes the refusal informative: an identifier nobody has filed and one filed on work this person cannot see would come back differently, which turns this into a way to ask which identifiers are open here |
-| The judge may not work reports here | Asked before the issue's name is resolved. Asked after, an identifier nobody has filed and one filed here come back in different words to somebody who may not judge a report at all. The same holds for the issue a duplicate names, and for the issue whose duplicates are listed |
+| The judge may not work reports here | Asked before the issue's name is resolved. Asked after, an identifier nobody has filed and one filed here come back in different words to somebody who may not judge a report at all. The same holds for the issue a duplicate names, and, for somebody who may not read reports, for the issue whose duplicates are listed |
 
 ### Report visibility
 
 A claim is undisclosed: there is no issue to be public about, and nobody has
-decided the claim is safe to repeat. So recording one, reading one, listing a
-product's reports and reading what arrived with one all ask for the right to
-triage work nobody has announced in that product.
+decided the claim is safe to repeat. This is the **report rule**.
+
+| Act | Asks for |
+|---|---|
+| Reading a report, listing a product's reports, reading what arrived with one, reading a ruling and the duplicates on an issue | The right to read work nobody has announced in that product |
+| Recording a report, answering it, judging it, attaching to it, proposing or withdrawing a ruling | The right to triage work nobody has announced there |
+| Agreeing to somebody else's ruling | The approver capability or that triage right, over the right to read |
+
+Reading and working are apart because somebody who reads every embargoed issue
+in a product already reads what a stranger's claim could point at, so the claim
+is no more than they hold. Working one is a write, and the rule that writes
+ask for a writing role is the one every other surface here follows.
+
+Asked before any reference is resolved. Somebody who may not read the
+product's reports is told a named report or ruling is not there, the answer
+one nobody minted gets; somebody who reads them and may not act on one is
+refused in words, since they can open it.
 
 Every reader of the row, including the one that reaches it through the issue
 it turned out to be. Asked there as the issue's own visibility, judging a
@@ -502,7 +516,7 @@ one act, with one reason, covering one or more reports in one product.
 | A report under a waiting ruling reads as unjudged | Who judged it is written when the ruling takes effect. Before then one person has said it and nobody has agreed |
 | Withdrawing needs nobody else | It returns every report the ruling covered to the inbox unanswered, which re-exposes risk. Sending a waiting ruling back and undoing one in force are this one act, and the proposer may withdraw their own |
 | A withdrawn ruling stays on record with the reports it covered | The live pointer on each report is cleared; the list of what the ruling covered is kept apart from it |
-| Rulings are read and approved under the report rule | A ruling says what a stranger's claim is, and reading it reads the claim. The approver capability alone reaches no ruling. Listed across products, a product the reader may not work reports in contributes nothing, not even to the count |
+| Rulings are read and approved under the report rule | A ruling says what a stranger's claim is, and reading it reads the claim. The approver capability over reading undisclosed work may agree to one, as a triager of undisclosed work may; the capability alone reaches none. Listed across products, a product the reader may not read reports in contributes nothing, not even to the count |
 
 #### Duplicates on the issue
 

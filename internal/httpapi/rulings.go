@@ -103,8 +103,8 @@ func registerRulings(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-rulings-across", Method: http.MethodGet, Path: "/v1/report-rulings",
 		Summary: "List rulings on reports across products",
-		Description: "Every ruling in the products you may work reports in, newest first, " +
-			"including withdrawn ones. A product you may not work reports in contributes " +
+		Description: "Every ruling in the products you may read reports in, newest first, " +
+			"including withdrawn ones. A product you may not read reports in contributes " +
 			"nothing, not even to the count.\n\n" +
 			"`waiting` narrows to those waiting for a second person. `from` and `to` narrow " +
 			"to those proposed in a period, `to` exclusive, as the record's own period is.",
@@ -158,7 +158,7 @@ func registerRulings(api huma.API, in Ingest) {
 		Description: "Every ruling in this product, newest first, including withdrawn ones. " +
 			"`waiting` narrows to those waiting for a second person.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Waiting bool   `query:"waiting" doc:"Only rulings waiting for a second person"`
 		Limit   int    `query:"limit" minimum:"1" maximum:"200" default:"50"`
@@ -188,7 +188,7 @@ func registerRulings(api huma.API, in Ingest) {
 		Description: "What was said, about which reports, by whom, and whether it is waiting, " +
 			"in force or withdrawn.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Ruling  int64  `path:"ruling"`
 	}) (*struct{ Body RulingBody }, error) {
@@ -210,7 +210,7 @@ func registerRulings(api huma.API, in Ingest) {
 			"report it covers.\n\n" +
 			"Refused to whoever proposed it, and refused on a ruling that is not waiting.",
 		Tags: []string{"Findings"},
-	}, perProduct, "The proposer may not approve their own.", access.PrivateTriage),
+	}, perProduct, "The proposer may not approve their own.", access.Approver, access.PrivateTriage),
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 			Ruling  int64  `path:"ruling"`
@@ -261,7 +261,7 @@ func registerRulings(api huma.API, in Ingest) {
 			"attachments.\n\n" +
 			"An issue that is not here and one you may not be told of answer alike.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*listOutput[ReportBody], error) {
@@ -269,7 +269,7 @@ func registerRulings(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		if err := finding.MayWorkReports(subject, product.ID); err != nil {
+		if err := finding.MayReadReports(subject, product.ID); err != nil {
 			return nil, asked(in.Logger, err)
 		}
 		issue, err := issueHere(ctx, in, subject, product.ID, input.Vulnerability)

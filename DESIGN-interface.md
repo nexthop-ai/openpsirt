@@ -1090,8 +1090,9 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 
 | Rule | |
 |---|---|
-| The link appears only for somebody who may work reports | Triage of undisclosed work in the product, which is what every read of a report asks. A link leading to a refusal is worse than none. The product page's link says how many rulings wait for approval there |
-| The rail carries it under the scope, for somebody who may work reports anywhere | It needs a product picked, and declines and says so where none is or where the reader may not work reports in the one picked |
+| The link appears only for somebody who may read reports | Reading undisclosed work in the product, which is what every read of a report asks. A link leading to a refusal is worse than none. The product page's link says how many rulings wait for approval there |
+| The rail carries it under the scope, for somebody who may read reports anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read reports in the one picked |
+| A reader of reports sees no control that writes | Recording, answering, accepting, attaching, proposing and withdrawing are working reports. Approve is offered where the reader may agree to a ruling, which the answer to what they may do reports as its own field |
 | The claim and a ruling's reason offer no mentions | Nothing reads a mention in either. An autocomplete there names somebody who is never told |
 | Two tabs: the reports, and the rulings waiting for approval | The second is where the waiting notice points. Its count is on the tab, because it is somebody else's turn and nothing else on the screen says so |
 | A report's status is one word, and a waiting ruling says so in it | "Rejected, waiting" reads differently from "Rejected", which is the whole of what the second person changes |

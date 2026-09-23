@@ -323,11 +323,16 @@ func TestADuplicateIsReadFromTheIssueItPointsAt(t *testing.T) {
 		}
 
 		// Read under the report's rule, not the issue's. Whoever triages
-		// announced work reads the issue and not what a stranger sent.
-		public := f.somebody(t, "public@example.com", access.PublicTriage, access.PrivateRead)
+		// announced work reads the issue and not what a stranger sent;
+		// whoever reads undisclosed work reads both.
+		public := f.somebody(t, "public@example.com", access.PublicTriage)
 		if _, err := f.store.DuplicatesOf(t.Context(), public, f.productID,
 			issue); !errors.Is(err, access.ErrDenied) {
-			t.Errorf("somebody who may not work reports read a duplicate: %v", err)
+			t.Errorf("somebody who may not read reports read a duplicate: %v", err)
+		}
+		reader := f.somebody(t, "reader@example.com", access.PrivateRead)
+		if _, err := f.store.DuplicatesOf(t.Context(), reader, f.productID, issue); err != nil {
+			t.Errorf("somebody who reads undisclosed work could not read a duplicate: %v", err)
 		}
 	})
 }
@@ -443,7 +448,7 @@ func TestARulingNamingOneReportItCannotWriteWritesNothing(t *testing.T) {
 	})
 }
 
-func TestOnlySomebodyWhoWorksReportsRulesOnThem(t *testing.T) {
+func TestRulingsAreProposedByWhoWorksReportsAndAgreedByWhoMayApprove(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		owner := f.planner(t, access.PrivateTriage)
 		named := f.claims(t, owner, 1)
@@ -453,6 +458,9 @@ func TestOnlySomebodyWhoWorksReportsRulesOnThem(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Proposing and withdrawing are working reports; reading a ruling is
+		// reading them; agreeing is the approver capability or working them,
+		// over reading them.
 		for _, held := range [][]access.Role{
 			{access.PublicTriage}, {access.PrivateRead}, {access.Approver, access.PrivateRead},
 		} {
@@ -462,18 +470,36 @@ func TestOnlySomebodyWhoWorksReportsRulesOnThem(t *testing.T) {
 			}); !errors.Is(err, access.ErrDenied) {
 				t.Errorf("%v ruled on a report: %v", held, err)
 			}
-			if _, err := f.store.ApproveRuling(t.Context(), stranger, f.productID,
-				ruling.ID); !errors.Is(err, finding.ErrNoSuchRuling) {
-				t.Errorf("%v approved a ruling: %v", held, err)
-			}
 			if _, err := f.store.WithdrawRuling(t.Context(), stranger, f.productID,
 				ruling.ID); !errors.Is(err, finding.ErrNoSuchRuling) {
 				t.Errorf("%v withdrew a ruling: %v", held, err)
 			}
+		}
+		for _, held := range [][]access.Role{{access.PublicTriage}, {access.Approver}} {
+			stranger := f.somebody(t, "outside@example.com", held...)
 			if _, _, err := f.store.RulingsIn(t.Context(), stranger, f.productID, false,
 				50, 0); !errors.Is(err, access.ErrDenied) {
 				t.Errorf("%v listed the rulings: %v", held, err)
 			}
+			if _, err := f.store.ApproveRuling(t.Context(), stranger, f.productID,
+				ruling.ID); !errors.Is(err, finding.ErrNoSuchRuling) {
+				t.Errorf("%v approved a ruling: %v", held, err)
+			}
+		}
+		reader := f.somebody(t, "reader@example.com", access.PrivateRead)
+		if _, _, err := f.store.RulingsIn(t.Context(), reader, f.productID, false,
+			50, 0); err != nil {
+			t.Errorf("somebody who reads undisclosed work could not list the rulings: %v", err)
+		}
+		// Refused in words rather than as a ruling that is not there, since
+		// they can list it.
+		if _, err := f.store.ApproveRuling(t.Context(), reader, f.productID,
+			ruling.ID); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody who only reads was answered %v approving a ruling, want a refusal", err)
+		}
+		lead := f.somebody(t, "lead@example.com", access.Approver, access.PrivateRead)
+		if _, err := f.store.ApproveRuling(t.Context(), lead, f.productID, ruling.ID); err != nil {
+			t.Errorf("an approver who reads undisclosed work could not agree to a ruling: %v", err)
 		}
 
 		// A ruling is reached in its own product and nowhere else.

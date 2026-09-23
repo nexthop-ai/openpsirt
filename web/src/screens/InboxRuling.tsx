@@ -1,3 +1,4 @@
+import { mayOf, useWho } from "../app/session";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -148,6 +149,10 @@ export function RulingCard({
   const product = ruling.product;
   const approve = useApproveRuling(product);
   const withdraw = useWithdrawRuling(product);
+  // Agreeing and withdrawing are different rights from reading, and from each
+  // other: an approver who reads undisclosed work may agree and may not send
+  // a ruling back, which is working the reports.
+  const may = mayOf(useWho().data, product);
   const at = `/products/${encodeURIComponent(product)}/inbox`;
   const state =
     ruling.state === "waiting"
@@ -202,7 +207,7 @@ export function RulingCard({
 
       {!record && ruling.state !== "withdrawn" && (
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          {ruling.state === "waiting" && !ruling.yours && (
+          {ruling.state === "waiting" && !ruling.yours && may?.may_approve_rulings && (
             <button
               type="button"
               className="btn"
@@ -215,6 +220,7 @@ export function RulingCard({
           <button
             type="button"
             className="btn quiet"
+            hidden={!may?.may_hide}
             disabled={withdraw.isPending}
             title="Returns every report it covers to the inbox"
             onClick={() => withdraw.mutate(ruling.id)}

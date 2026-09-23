@@ -90,7 +90,7 @@ func registerIntake(api huma.API, in Ingest) {
 			"A report already turned into an issue stays in the list, because it is the " +
 			"evidence that the issue came from outside.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Limit   int    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 		Offset  int    `query:"offset" minimum:"0" default:"0"`
@@ -121,7 +121,7 @@ func registerIntake(api huma.API, in Ingest) {
 			"A reference nobody minted and one recorded against another product answer " +
 			"alike, so asking is not a way to find out which references exist.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593" doc:"The reference this deployment minted"`
 	}) (*struct{ Body ReportBody }, error) {
@@ -194,9 +194,9 @@ func registerIntake(api huma.API, in Ingest) {
 		}
 		// Authorized before the issue's name is resolved, so an issue nobody
 		// filed and one filed here answer alike to somebody who may not judge
-		// a report at all. Refused as the report route refuses everything.
-		if err := finding.MayWorkReports(subject, product.ID); err != nil {
-			return nil, huma.Error404NotFound(finding.ErrNoSuchReport.Error())
+		// a report at all.
+		if err := finding.MayWorkReference(subject, product.ID); err != nil {
+			return nil, refusedReport(in, err, "that report could not be judged")
 		}
 		// Propagated rather than flattened. It already answers alike for an
 		// issue that is not here and one this subject may not be told of,
@@ -295,7 +295,7 @@ func registerIntake(api huma.API, in Ingest) {
 			"A file an administrator removed is still listed, saying so, because the text " +
 			"that pointed at it still does.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*struct {

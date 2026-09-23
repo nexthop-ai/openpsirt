@@ -96,11 +96,12 @@ func TestAClaimWithNothingInItIsRefused(t *testing.T) {
 	})
 }
 
-func TestOnlySomebodyWhoTriagesUnannouncedWorkReachesAClaim(t *testing.T) {
+func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 	// A claim nobody has judged is undisclosed by definition: there is no
 	// issue to be public about, and nobody has decided it is safe to repeat.
-	// So reading one, listing them and recording one all ask for the right to
-	// triage work nobody has announced.
+	// So reading one and listing them ask for the right to read work nobody
+	// has announced, and recording one, answering one or judging one ask for
+	// the right to triage it.
 	each(t, func(t *testing.T, f *fixture) {
 		owner := f.planner(t, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), owner, f.productID,
@@ -109,9 +110,7 @@ func TestOnlySomebodyWhoTriagesUnannouncedWorkReachesAClaim(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, held := range []access.Role{
-			access.PublicRead, access.PublicTriage, access.PrivateRead,
-		} {
+		for _, held := range []access.Role{access.PublicRead, access.PublicTriage} {
 			stranger := f.somebody(t, "stranger@example.com", held)
 			if _, err := f.store.ReportBy(t.Context(), stranger, f.productID,
 				row.Reference); !errors.Is(err, finding.ErrNoSuchReport) {
@@ -121,9 +120,39 @@ func TestOnlySomebodyWhoTriagesUnannouncedWorkReachesAClaim(t *testing.T) {
 				50, 0); !errors.Is(err, access.ErrDenied) {
 				t.Errorf("%s listed the claims: %v", held, err)
 			}
+		}
+
+		reader := f.somebody(t, "reader@example.com", access.PrivateRead)
+		if _, err := f.store.ReportBy(t.Context(), reader, f.productID,
+			row.Reference); err != nil {
+			t.Errorf("somebody who reads undisclosed work could not read the claim: %v", err)
+		}
+		if _, _, err := f.store.ReportsIn(t.Context(), reader, f.productID,
+			50, 0); err != nil {
+			t.Errorf("somebody who reads undisclosed work could not list the claims: %v", err)
+		}
+
+		for _, held := range []access.Role{
+			access.PublicRead, access.PublicTriage, access.PrivateRead,
+		} {
+			stranger := f.somebody(t, "writer@example.com", held)
 			if _, err := f.store.Record(t.Context(), stranger, f.productID,
 				finding.Claimed{Summary: "Theirs."}); !errors.Is(err, access.ErrDenied) {
 				t.Errorf("%s recorded a claim: %v", held, err)
+			}
+			// Somebody who may not read the claim is told it is not here;
+			// somebody who reads it is refused in words.
+			want := finding.ErrNoSuchReport
+			if held == access.PrivateRead {
+				want = access.ErrDenied
+			}
+			if err := f.store.AcknowledgeReport(t.Context(), stranger, f.productID,
+				row.Reference); !errors.Is(err, want) {
+				t.Errorf("%s answering a claim was answered %v, want %v", held, err, want)
+			}
+			if _, err := f.store.JudgeAsIssue(t.Context(), stranger, f.productID,
+				row.Reference, 1); !errors.Is(err, want) {
+				t.Errorf("%s judging a claim was answered %v, want %v", held, err, want)
 			}
 		}
 

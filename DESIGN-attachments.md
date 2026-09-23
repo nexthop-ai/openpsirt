@@ -78,8 +78,8 @@ another product reads as public here. Any reader of any product could then
 confirm whether a name exists anywhere in the deployment, one request at a time.
 
 For a file on a report, the report's own answer, which `DESIGN-findings.md`
-§ Report visibility holds: the right to triage work nobody has announced in
-that product, whether or not the claim has been judged. The record and what
+§ Report visibility holds: the right to read work nobody has announced in that
+product, whether or not the claim has been judged. The record and what
 arrived with it have one answer rather than two.
 
 A file on a report does not follow the issue the claim turned out to be. What
@@ -89,11 +89,10 @@ issue instead.
 
 The same holds for a duplicate. Its files are listed where the issue it
 duplicates is read, and reached under the report's answer: somebody who reads
-the issue and may not work reports sees neither the duplicate nor its files.
+the issue and may not read reports sees neither the duplicate nor its files.
 
-Reaching a file on a report and attaching one to it are the same right.
-Reaching a claim already asks for a role that writes, so there is nothing
-narrower for a writer to be refused by.
+Attaching a file to a report asks for more than reaching one: the right to
+triage work nobody has announced there, since attaching is working the report.
 
 A file the reader may not see and a file that does not exist answer identically,
 in the same words (REQ-42).

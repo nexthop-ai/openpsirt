@@ -1113,6 +1113,9 @@ components:
         may_agree:
           description: Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override
           type: boolean
+        may_approve_rulings:
+          description: "Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"
+          type: boolean
         may_assign:
           description: Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage
           type: boolean
@@ -1142,6 +1145,7 @@ components:
         - may_assign
         - may_hide
         - may_agree
+        - may_approve_rulings
       type: object
     CarriedBody:
       additionalProperties: false
@@ -18386,7 +18390,7 @@ paths:
 
         An issue that is not here and one you may not be told of answer alike.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: list-duplicate-reports
       parameters:
         - in: path
@@ -18418,6 +18422,7 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
   /v1/products/{product}/issues/{vulnerability}/exploited-here:
     post:
@@ -18834,7 +18839,7 @@ paths:
       description: |-
         Every ruling in this product, newest first, including withdrawn ones. `waiting` narrows to those waiting for a second person.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: list-report-rulings
       parameters:
         - in: path
@@ -18885,6 +18890,7 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
     post:
       description: |-
@@ -18935,7 +18941,7 @@ paths:
       description: |-
         What was said, about which reports, by whom, and whether it is waiting, in force or withdrawn.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: get-report-ruling
       parameters:
         - in: path
@@ -18968,6 +18974,7 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
   /v1/products/{product}/report-rulings/{ruling}/approval:
     post:
@@ -18976,7 +18983,7 @@ paths:
 
         Refused to whoever proposed it, and refused on a ruling that is not waiting.
 
-        Requires: private-triage on the product. The proposer may not approve their own.
+        Requires: approver or private-triage on the product. The proposer may not approve their own.
       operationId: approve-report-ruling
       parameters:
         - in: path
@@ -19009,6 +19016,7 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
+          - approver
           - private-triage
         note: The proposer may not approve their own.
   /v1/products/{product}/report-rulings/{ruling}/withdrawal:
@@ -19059,7 +19067,7 @@ paths:
 
         A report already turned into an issue stays in the list, because it is the evidence that the issue came from outside.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: list-reports
       parameters:
         - in: path
@@ -19103,6 +19111,7 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
     post:
       description: |-
@@ -19155,7 +19164,7 @@ paths:
 
         A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: get-recorded-report
       parameters:
         - in: path
@@ -19190,6 +19199,7 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
   /v1/products/{product}/reports/{reference}/acknowledgement:
     post:
@@ -19237,7 +19247,7 @@ paths:
 
         A file an administrator removed is still listed, saying so, because the text that pointed at it still does.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: list-report-attachments
       parameters:
         - in: path
@@ -19270,6 +19280,7 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
     post:
       description: |-
@@ -22677,7 +22688,7 @@ paths:
   /v1/report-rulings:
     get:
       description: |-
-        Every ruling in the products you may work reports in, newest first, including withdrawn ones. A product you may not work reports in contributes nothing, not even to the count.
+        Every ruling in the products you may read reports in, newest first, including withdrawn ones. A product you may not read reports in contributes nothing, not even to the count.
 
         `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
 

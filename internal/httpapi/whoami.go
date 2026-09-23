@@ -25,14 +25,15 @@ import (
 // server's rule, and the copy that drifts is the one that offers a button
 // leading to a refusal.
 type CanBody struct {
-	Product   string `json:"product"`
-	Name      string `json:"name" doc:"The label shown for it"`
-	MaySee    bool   `json:"may_see" doc:"Read findings that have been disclosed"`
-	SeesAll   bool   `json:"sees_all" doc:"Read findings nobody has disclosed yet"`
-	MayTriage bool   `json:"may_triage" doc:"Argue about a finding"`
-	MayAssign bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
-	MayHide   bool   `json:"may_hide" doc:"Argue about a finding nobody has disclosed"`
-	MayAgree  bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override"`
+	Product           string `json:"product"`
+	Name              string `json:"name" doc:"The label shown for it"`
+	MaySee            bool   `json:"may_see" doc:"Read findings that have been disclosed"`
+	SeesAll           bool   `json:"sees_all" doc:"Read findings nobody has disclosed yet"`
+	MayTriage         bool   `json:"may_triage" doc:"Argue about a finding"`
+	MayAssign         bool   `json:"may_assign" doc:"Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage"`
+	MayHide           bool   `json:"may_hide" doc:"Argue about a finding nobody has disclosed"`
+	MayAgree          bool   `json:"may_agree" doc:"Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override"`
+	MayApproveRulings bool   `json:"may_approve_rulings" doc:"Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"`
 }
 
 // WhoBody is the caller, as the caller.
@@ -154,6 +155,11 @@ func registerWhoAmI(api huma.API, in Ingest) {
 				// from this hides approve and reject from somebody the
 				// server accepts, with nothing saying why.
 				MayAgree: subject.Holds(access.Approver, product.ID) || triages,
+				// Asked as the ruling store asks it: reading the reports, and
+				// a right to agree that reaches undisclosed work.
+				MayApproveRulings: subject.Reads(access.Private, product.ID) &&
+					(subject.Holds(access.Approver, product.ID) ||
+						subject.Triages(access.Private, product.ID)),
 			})
 		}
 		sort.Slice(body.Reach, func(i, j int) bool {

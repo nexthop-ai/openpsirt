@@ -39,15 +39,16 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 		}
 		proposer := person("proposer@example.com", access.PrivateTriage)
 		second := person("second@example.com", access.PrivateTriage)
-		// Approving a ruling asks what reading a report asks, so the approver
-		// capability alone and triage of announced work are told nothing.
+		// Approving a ruling asks for reading reports as well as a right to
+		// agree, so the approver capability alone, triage of announced work
+		// and reading undisclosed work alone are told nothing.
 		approver := person("approver@example.com", access.Approver)
 		announced := person("announced@example.com", access.PublicTriage)
-		// And somebody who may read undisclosed work and approve it, which
-		// is the role the rule turns on: the notice is private, so the two
-		// above never read it whoever it is written for.
 		reads := person("reads@example.com", access.PrivateRead)
-		if err := rights.GrantRole(ctx, reads.ID, product.ID, access.Approver); err != nil {
+		// And somebody who may read undisclosed work and approve, which is
+		// the pairing the rule turns on: told, because they may agree to it.
+		lead := person("lead@example.com", access.PrivateRead)
+		if err := rights.GrantRole(ctx, lead.ID, product.ID, access.Approver); err != nil {
 			t.Fatal(err)
 		}
 
@@ -93,6 +94,9 @@ func TestARulingWaitingOnASecondPersonIsRaisedToWhoeverMayApproveIt(t *testing.T
 				}
 			}
 			return out
+		}
+		if n := len(waitingOn(lead)); n != 1 {
+			t.Errorf("an approver who reads undisclosed work was told %d things, want 1", n)
 		}
 		told := waitingOn(second)
 		if len(told) != 1 {

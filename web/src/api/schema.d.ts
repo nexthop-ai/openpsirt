@@ -2807,7 +2807,7 @@ export interface paths {
          *
          *     An issue that is not here and one you may not be told of answer alike.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["list-duplicate-reports"];
         put?: never;
@@ -3053,7 +3053,7 @@ export interface paths {
          * List rulings on reports
          * @description Every ruling in this product, newest first, including withdrawn ones. `waiting` narrows to those waiting for a second person.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["list-report-rulings"];
         put?: never;
@@ -3087,7 +3087,7 @@ export interface paths {
          * Show a ruling on reports
          * @description What was said, about which reports, by whom, and whether it is waiting, in force or withdrawn.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["get-report-ruling"];
         put?: never;
@@ -3113,7 +3113,7 @@ export interface paths {
          *
          *     Refused to whoever proposed it, and refused on a ruling that is not waiting.
          *
-         *     Requires: private-triage on the product. The proposer may not approve their own.
+         *     Requires: approver or private-triage on the product. The proposer may not approve their own.
          */
         post: operations["approve-report-ruling"];
         delete?: never;
@@ -3159,7 +3159,7 @@ export interface paths {
          *
          *     A report already turned into an issue stays in the list, because it is the evidence that the issue came from outside.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["list-reports"];
         put?: never;
@@ -3195,7 +3195,7 @@ export interface paths {
          *
          *     A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["get-recorded-report"];
         put?: never;
@@ -3245,7 +3245,7 @@ export interface paths {
          *
          *     A file an administrator removed is still listed, saying so, because the text that pointed at it still does.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["list-report-attachments"];
         put?: never;
@@ -4669,7 +4669,7 @@ export interface paths {
         };
         /**
          * List rulings on reports across products
-         * @description Every ruling in the products you may work reports in, newest first, including withdrawn ones. A product you may not work reports in contributes nothing, not even to the count.
+         * @description Every ruling in the products you may read reports in, newest first, including withdrawn ones. A product you may not read reports in contributes nothing, not even to the count.
          *
          *     `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
          *
@@ -6171,6 +6171,8 @@ export interface components {
         CanBody: {
             /** @description Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
             may_agree: boolean;
+            /** @description Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work */
+            may_approve_rulings: boolean;
             /** @description Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage */
             may_assign: boolean;
             /** @description Argue about a finding nobody has disclosed */

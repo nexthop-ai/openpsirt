@@ -117,11 +117,12 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 	})
 }
 
-func TestAClaimNobodyHasJudgedIsReachedOnlyByWhoeverTriagesUnannouncedWork(t *testing.T) {
+func TestAClaimNobodyHasJudgedIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 	// The matrix over the routes: a claim has no issue to be public about and
-	// nobody has decided it is safe to repeat, so every role short of
-	// triaging unannounced work reaches none of it — and a product somebody
-	// holds nothing on answers as one that is not declared.
+	// nobody has decided it is safe to repeat, so a role short of reading
+	// unannounced work reaches none of it, a reader of unannounced work reads
+	// it and may not work it — and a product somebody holds nothing on
+	// answers as one that is not declared.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		got := asPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/reports",
@@ -146,7 +147,14 @@ func TestAClaimNobodyHasJudgedIsReachedOnlyByWhoeverTriagesUnannouncedWork(t *te
 			// answer alike, so asking is not a way to find out which
 			// references a product holds.
 			{"reader", http.MethodGet, at, http.StatusNotFound},
-			{"private", http.MethodGet, "/v1/products/mine/reports", http.StatusForbidden},
+			{"private", http.MethodGet, "/v1/products/mine/reports", http.StatusOK},
+			{"private", http.MethodGet, at, http.StatusOK},
+			{"private", http.MethodGet, at + "/attachments", http.StatusOK},
+			// Working one is refused in words, since they can open it, and
+			// before the reference is looked up.
+			{"private", http.MethodPost, "/v1/products/mine/reports", http.StatusForbidden},
+			{"private", http.MethodPost, at + "/acknowledgement", http.StatusForbidden},
+			{"private", http.MethodPut, at + "/issue", http.StatusForbidden},
 			{"triager", http.MethodGet, "/v1/products/mine/reports", http.StatusForbidden},
 			{"triager", http.MethodGet, at, http.StatusNotFound},
 			{"triager", http.MethodGet, at + "/attachments", http.StatusNotFound},

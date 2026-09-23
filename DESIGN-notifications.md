@@ -172,16 +172,17 @@ A claim nobody has judged is raised the same way and named differently. It has
 no issue to name, so the alert carries the reference it was minted with and
 points at the report.
 
-Both are told to whoever may triage work nobody has announced there, which is
-who may open the report. An alert about a letter somebody cannot read is one
-they can do nothing with.
+Both are told to whoever may triage work nobody has announced there, because
+answering a report is working it. Everybody told may also open it: reading a
+report asks for less.
 
 A ruling waiting for approval takes the period a waiting claim does, because it
 is the same thing: one act setting something aside, which takes effect only
 once somebody else agrees. One alert per ruling, however many reports it
 covers, pointing at the inbox narrowed to what is waiting. It is undisclosed,
-and reaches whoever may approve it, which is the report rule — the approver
-capability alone reaches no ruling. A ruling answers what a claim is and not
+and reaches whoever may approve it under the report rule: the approver
+capability or triage of undisclosed work, over reading it, and never its
+proposer. A ruling answers what a claim is and not
 the reporter, so a rejected report nobody acknowledged is still raised as
 unanswered.
 
