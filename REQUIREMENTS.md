@@ -87,6 +87,7 @@ inputs.
 | REQ-12 | The scanner, its vulnerability database and the exploitation feeds all work with no network | A scan has to be reproducible, and one that reaches out is a scan whose answer depends on what somebody else served that minute. It also keeps every content network out of the path a scan is available through, which is the half that fails at the worst moment. Air-gapped operation falls out of both and was never the goal |
 | REQ-13 | Every finding records what produced it — which scanner, which version, which database, and how the match was made | "Why is this here" is unanswerable afterwards otherwise, and a scanner upgrade changes results |
 | REQ-14 | Static analysis and fuzzing findings are intended scope. **Not built** | The finding model carries a kind from the start, so a second kind needs no rewrite |
+| REQ-78 | Where a report links to a patch that is a commit in a git repository, the deployment keeps a copy of that repository's history and looks up which branches contain the commit, and labels the patch link with them. It runs in the background, highest-severity issues first, is off unless an administrator turns it on, and never fetches from an address inside this network or a host an administrator excluded | One fix is backported as a separate commit to each maintained branch, and a report lists those commits without saying which is which |
 
 ### 3.4 The tracked unit
 
@@ -202,7 +203,7 @@ inputs.
 | REQ-66 | Untrusted input never becomes SQL, markup or a filesystem path. Values are parameterized, identifiers come from an allowlist, and text a scan file supplied is never rendered | A placeholder cannot bind a column name, so a sort column from a query parameter is the live hole. A scan file is a third party's data rendered to staff who hold the most access |
 | REQ-67 | Markdown a person writes is policed on the server at submission, before storage: no raw HTML, restricted link schemes, and nothing fetched from anywhere when it renders | A rendered document that fetches a remote image leaks who read it and when |
 | REQ-68 | Credentials are stored hashed, shown once, and never logged at any level | A credential this deployment can read back is one an operator, a backup, a support session and anybody who reaches a log already holds. Shown once is what makes the hash honest: a value that can be recovered was never really hashed, it was merely stored twice |
-| REQ-69 | Ingest is bounded — file size, nesting depth, component count — every written field is length-bounded, and outbound requests reach only their configured host | A scan file is hostile input, and the deployment sits inside somebody's network |
+| REQ-69 | Ingest is bounded — file size, nesting depth, component count — every written field is length-bounded, and outbound requests reach only their configured host. Fetching the repository a patch link names is the one exception (REQ-78): it reaches any host outside this network that an administrator has not excluded | A scan file is hostile input, and the deployment sits inside somebody's network |
 | REQ-70 | Attachments are stored outside the database, in no public bucket, and every fetch is authorized against the issue or the report the file hangs off before any URL is issued | A signed URL issued before the check is the check not happening |
 
 ### 3.16 Data and operations
