@@ -18,6 +18,7 @@ place to triage what it finds and track it through to a fix.
 
 - [Scope](#scope)
 - [Out of scope](#out-of-scope)
+- [Builds over time](#builds-over-time)
 - [Features](#features)
   - [Ingest](#ingest)
   - [Scanning](#scanning)
@@ -57,6 +58,30 @@ place to triage what it finds and track it through to a fix.
 - Generate SBOMs — your build does that
 - Work out what is in a product — the component list always comes from the build
 - Build or deploy fixes
+
+## Builds over time
+
+A build's inventory moves every night. Each move is recorded as what it did to
+the findings and to the judgments standing on them.
+
+| When a build changes | What is recorded |
+|---|---|
+| An upload arrives | A receipt naming the components it added, removed and moved. An upload that moves more of the build than the deployment allows is raised |
+| A component's version moves | The finding at the old version closes as upgraded, or as superseded where the issue came with it. The new finding records the version it arrived from |
+| The version moves and the fix does not arrive | The finding is marked as an incomplete upgrade |
+| The shipped version changes and the upstream one does not | The finding closes as revised, which is what a carried patch looks like from outside |
+| A component leaves the build | Its findings close as removed |
+| The scanner stops reporting something present and unchanged | The finding closes as unexplained, and that is flagged at any volume |
+| The vulnerability data moves | The scheduled rescan finds it, in shipped releases as well as current ones |
+| A judged component moves version | A judgment about risk lapses and returns to triage. A claim that the scanner matched the wrong thing stands |
+| Another release or variant ships the same code | The judgment already made there applies |
+| A fix is declared for a set of releases | The next scan of each release says whether it arrived |
+
+| Cost | |
+|---|---|
+| A finding is a component at one place | One switch image is 335,021 findings, 305,487 of them one kernel across 62 modules. Tracking at that grain is heavier per build than tracking per package, and it is what lets a judgment be true in one place and not another |
+| A finding is stored once | With when it opened and when it closed, never once per scan |
+| Nightly branch scans are transient | Tagged releases are retained |
 
 ## Features
 
