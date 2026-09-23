@@ -110,7 +110,7 @@ inputs.
 
 | # | Requirement | Why |
 |---|---|---|
-| REQ-23 | Every finding takes one outcome from a fixed set: affected, not applicable, deferred, will not fix, already fixed here, and the two that promise work | A free-text disposition cannot be counted, exported or turned into a VEX statement |
+| REQ-23 | Every finding takes one outcome from a fixed set: affected, not applicable, deferred, will not fix, already fixed here, a wrong match, and the two that promise work | A free-text disposition cannot be counted, exported or turned into a VEX statement |
 | REQ-24 | Dismissing something needs a written explanation and a **second person's approval**. The proposer and approver are never the same person, with no override. A short deferral is exempt at a threshold the deployment sets, applied to cumulative deferred time | Hiding risk needs agreement; re-exposing it does not. Every deferral needing a second person makes triage unaffordable, and unlimited deferral makes approval meaningless |
 | REQ-25 | A decision survives re-scans and carries automatically to other releases, tags and variants whose chains already match, and whose versions match where the claim is about them. A judgment about risk lapses when the software changes. A claim that the scanner matched something that is not there does not lapse and is not matched on a version, because it is a claim about identity | A decision that lapsed nightly would be re-made nightly, and the same finding across a dozen builds is one judgment. No version makes a wrong match right, so a claim about identity that expired on one would be answered again at every release |
 | REQ-26 | One judgment covers every place a finding sits at by default; narrowing it is deliberate | The default has to be the honest answer, because it is the one people take |
@@ -140,7 +140,7 @@ inputs.
 | # | Requirement | Why |
 |---|---|---|
 | REQ-37 | A flaw recorded here starts undisclosed and carries a disclosure date, defaulting to 90 days from when the report was received. Reaching it escalates rather than publishing | The reporter has a publication scheduled; ours is the clock that has to keep up |
-| REQ-38 | Extending a disclosure date needs a reason and, past a threshold, approval — and it is raised before the date rather than on it | An extension nobody can agree to in time is an approval in name only |
+| REQ-38 | Moving a disclosure date needs a reason and, past a threshold, approval — and it is raised before the date rather than on it. Bringing a date forward is recorded as its own act, never as an extension in reverse | An extension nobody can agree to in time is an approval in name only, and an embargo shortened because it leaked is a different event from one extended because the fix slipped |
 | REQ-39 | An advisory is published about flaws in our own product, as a machine-readable document. A VEX document is generated per build from approved dismissals. **Delivery adapters are not built** | Known issues in shipped third-party components are tracked and fixed, not published about — but VEX is precisely the document for them, and it does not drift from prose nobody regenerates |
 | REQ-40 | When an undisclosed finding is disclosed, the whole record goes public — comments, decisions, actors | People writing in the record have to know that from the first word |
 
