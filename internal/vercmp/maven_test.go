@@ -335,7 +335,7 @@ func TestAVersionTooLongToBeOneIsRefused(t *testing.T) {
 	// operands are read before either is compared.
 	long := "1" + strings.Repeat("-1", 64<<10)
 	for _, scheme := range []vercmp.Scheme{
-		vercmp.Maven, vercmp.PyPI, vercmp.Debian, vercmp.RPM, vercmp.APK, vercmp.Semantic,
+		vercmp.Maven, vercmp.PyPI, vercmp.NuGet, vercmp.Debian, vercmp.RPM, vercmp.APK, vercmp.Semantic,
 	} {
 		if _, ok := vercmp.Order(scheme, long, "1.0"); ok {
 			t.Errorf("%v ordered a version of %d bytes", scheme, len(long))

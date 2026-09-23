@@ -41,7 +41,7 @@ func serving(t *testing.T, body string) *answering {
 
 func client(a *answering) *currency.Client {
 	c := currency.New()
-	c.GoProxy, c.NPM, c.PyPI, c.Crates = a.URL, a.URL, a.URL, a.URL
+	c.GoProxy, c.NPM, c.PyPI, c.Crates, c.Maven, c.NuGet = a.URL, a.URL, a.URL, a.URL, a.URL, a.URL
 	// The guard the real client carries pins the public index hosts, refuses
 	// plain HTTP and refuses to connect inside this network — all three of
 	// which describe a test server exactly. It is stood down here so that what
@@ -180,12 +180,12 @@ func TestAPythonReleaseIsDatedByItsEarliestFile(t *testing.T) {
 // simply nothing to ask.
 func TestAnEcosystemWithNoIndexIsNotAsked(t *testing.T) {
 	c := currency.New()
-	for _, ecosystem := range []string{"generic", "oci", "github", "maven", "deb", ""} {
+	for _, ecosystem := range []string{"generic", "oci", "github", "gem", "deb", ""} {
 		if c.For(ecosystem) != nil {
 			t.Errorf("%q reports an index it does not have", ecosystem)
 		}
 	}
-	for _, ecosystem := range []string{"golang", "npm", "pypi", "cargo"} {
+	for _, ecosystem := range []string{"golang", "npm", "pypi", "cargo", "maven", "nuget"} {
 		if c.For(ecosystem) == nil {
 			t.Errorf("%q has no index", ecosystem)
 		}

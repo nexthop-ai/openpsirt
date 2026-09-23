@@ -226,14 +226,18 @@ newest version — one line saying what the package is, and where it is develope
 | Rule | Reason |
 |---|---|
 | One line, never the long description | What some indexes call a description is the package's whole README, measured at 2,894 characters for one ordinary package. That is a document; a row of a table wants a label |
+| The first paragraph of a description written in markup, on one line | A Maven project document's description sits inside an XML element, indented and broken across lines. nuget.org's summary is usually empty and its description is a paragraph, because the readme is a file of its own there |
 | Absent is the ordinary case, not a gap | The module protocol for one ecosystem has no such field anywhere, and no index is asked about a distribution package, so a version with no summary beside it is normal. A screen shows what there is rather than a space where something failed |
 | The address the index states beats one worked out from the name | A publisher said where the project lives; a template guessed. Where the index says nothing, the name still yields one, so there is usually an address either way |
-| The project's own pages before its repository | Three of the indexes carry both and publishers fill in whichever they bothered with, so they are asked for in the order a reader wants rather than by picking one |
+| The project's own pages before its repository | Most of the indexes carry both and publishers fill in whichever they bothered with, so they are asked for in the order a reader wants rather than by picking one |
 | Bounded and judged before it is stored | Both arrive over the network from a third party and are rendered to staff holding the most access. The summary is cut to a label on a rune boundary, and the address is judged against the two schemes anything else here may link to — at storage as well as at rendering, because a value that should never have been stored is one somebody later reads out by another route (REQ-66 and REQ-69) |
 | An unusable half does not cost the rest | A refused address leaves the version and the summary recorded. One field a publisher filled in badly is not a reason to know nothing about the package |
 
-Asking is the same pass that asks for the newest version, so it costs no extra
-request: this is reading more of an answer already fetched. It is off unless a
+Asking is the same pass that asks for the newest version, and for most indexes
+it costs no extra request: this is reading more of an answer already fetched.
+Maven Central is the exception. Its metadata document names versions and
+nothing else, so the project document of the newest release is a second
+request, and the date comes from it too. It is off unless a
 deployment turns it on, like everything else that reaches the network.
 
 What no index gives is a distribution package's description. Those live in a

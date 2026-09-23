@@ -295,6 +295,18 @@ build, no product. For an open-source dependency that is public knowledge. For
 something built here it is the name of a project, a team, or a product nobody
 has announced, and a public index records every request made of it.
 
+| Ecosystem | Host asked |
+|---|---|
+| Go | `proxy.golang.org` |
+| npm | `registry.npmjs.org` |
+| PyPI | `pypi.org` |
+| Cargo | `crates.io` |
+| Maven | `repo1.maven.org` |
+| NuGet | `api.nuget.org` |
+
+Nothing else is reached, and a redirect is not followed. A distribution
+package is never asked about.
+
 So names this deployment calls its own are never sent. Three sources, unioned:
 
 | Source | What it yields |
@@ -317,6 +329,8 @@ deployment publishing under `example.test` holds back:
 | `pkg:golang/github.com/example-corp/thing` | `example` |
 | `pkg:golang/test.example/lib` | `test.example`, the same organization spelled the way a module path spells it |
 | `pkg:golang/go.example.test/team/agent` | `example.test`, which covers a host under it |
+| `pkg:maven/test.example.tools/agent` | `test.example`, which is what a Maven group is |
+| `pkg:nuget/Example.Agent` | `example` |
 
 `pkg:npm/exampler` is left alone. Case does not decide.
 

@@ -459,9 +459,9 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 	// who hold the most access, so both are bounded and the address is judged
 	// before it is stored rather than only before it is drawn.
 	//
-	// Absent is normal and overwrites nothing: three of the four indexes serve
-	// a summary and the module proxy serves none, so a package with a version
-	// and no summary is the ordinary case rather than a half-written row.
+	// Absent is normal and overwrites nothing: the module proxy serves no
+	// summary at all, so a package with a version and no summary is the
+	// ordinary case rather than a half-written row.
 	if summary := clip(latest.Summary, MostSummary); summary != "" {
 		q = q.Set("summary = ?", summary)
 	}

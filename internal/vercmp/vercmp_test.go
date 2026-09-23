@@ -1,6 +1,7 @@
 package vercmp_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -132,6 +133,10 @@ func TestOrderingIsAntisymmetric(t *testing.T) {
 		{vercmp.Maven, "1.0.0.rc1", "1.0.0-rc2"},
 		{vercmp.Maven, "1-snapshot", "1"},
 		{vercmp.Maven, "1", "1-abc"},
+		{vercmp.NuGet, "1.0.0-beta", "1.0.0"},
+		{vercmp.NuGet, "1.0.0", "1.0.0.1"},
+		{vercmp.NuGet, "1.0.0-1", "1.0.0-a"},
+		{vercmp.NuGet, "1.0.0-rc.2", "1.0.0-rc.10"},
 	} {
 		forward, ok := vercmp.Order(each.scheme, each.a, each.b)
 		if !ok {
@@ -170,6 +175,7 @@ func TestAnEcosystemIsOrderedByTheSchemeItsIdentifierNames(t *testing.T) {
 		{"apk", vercmp.APK},
 		{"pypi", vercmp.PyPI},
 		{"maven", vercmp.Maven},
+		{"nuget", vercmp.NuGet},
 		// Ecosystems that plainly do have an ordering, and whose algorithm is
 		// not written here. Claiming one is the confident wrong answer this
 		// package exists to refuse.
@@ -257,6 +263,7 @@ func TestTheSchemeFollowsThePackageIdentifierARealScanCarries(t *testing.T) {
 		{"pkg:golang/github.com/example/mod@v1.2.3", vercmp.Semantic},
 		{"pkg:pypi/requests@2.31.0", vercmp.PyPI},
 		{"pkg:maven/org.apache.logging.log4j/log4j-core@2.17.1", vercmp.Maven},
+		{"pkg:nuget/Newtonsoft.Json@13.0.3", vercmp.NuGet},
 		{"pkg:gem/rack@3.1.8", vercmp.Unordered},
 	} {
 		if got := vercmp.SchemeOf(graph.EcosystemOf(each.purl)); got != each.want {
@@ -563,5 +570,53 @@ func bothWays(t *testing.T, scheme vercmp.Scheme, a, b string, want int) {
 	}
 	if back != -want {
 		t.Errorf("%q against %q is %d, and back again is %d — want %d", a, b, got, back, -want)
+	}
+}
+
+func TestAVersionLeadingToAReleaseIsToldApartFromOne(t *testing.T) {
+	// What an index asker filters on. Maven Central's own "release" field
+	// names 3.0.0-beta3 for a library whose newest release is 2.25, and
+	// telling somebody they are behind a beta is not a claim to act on.
+	for _, each := range []struct {
+		scheme vercmp.Scheme
+		v      string
+		want   bool
+	}{
+		{vercmp.Maven, "3.0.0-beta3", true},
+		{vercmp.Maven, "2.0.0.M1", true},
+		{vercmp.Maven, "1.0-SNAPSHOT", true},
+		{vercmp.Maven, "1.0-rc-1", true},
+		// A word nested a level down still leads.
+		{vercmp.Maven, "1.0-1-alpha", true},
+		{vercmp.Maven, "2.25.1", false},
+		// A word Maven has never heard of sorts above the release.
+		{vercmp.Maven, "33.0.0-jre", false},
+		{vercmp.Maven, "1.0-sp1", false},
+		{vercmp.Maven, "1.0.Final", false},
+		{vercmp.NuGet, "14.0.1-beta2", true},
+		{vercmp.NuGet, "13.0.4", false},
+		{vercmp.NuGet, "13.0.4+sha.abc", false},
+	} {
+		got, ok := vercmp.Leads(each.scheme, each.v)
+		if !ok {
+			t.Errorf("%v: %q could not be read", each.scheme, each.v)
+		} else if got != each.want {
+			t.Errorf("%v: %q leads to a release is %v, want %v", each.scheme, each.v, got, each.want)
+		}
+	}
+	for _, each := range []struct {
+		scheme vercmp.Scheme
+		v      string
+	}{
+		{vercmp.Maven, "unfixed"},
+		{vercmp.NuGet, "1.0-"},
+		{vercmp.NuGet, ""},
+		{vercmp.NuGet, "1" + strings.Repeat(".1", 4096)},
+		// A scheme no index is asked under.
+		{vercmp.Semantic, "1.0.0-rc.1"},
+	} {
+		if _, ok := vercmp.Leads(each.scheme, each.v); ok {
+			t.Errorf("%v: %q was read, want a refusal", each.scheme, each.v)
+		}
 	}
 }
