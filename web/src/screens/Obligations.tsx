@@ -293,7 +293,9 @@ function Windows({ windows }: { windows: Window[] }) {
               · {each.hours} hours
               {each.lead_hours ? ` · warned ${each.lead_hours} hours before` : ""}
               {" · "}
-              {(each.products ?? []).length > 0 ? (each.products ?? []).join(", ") : "every product"}
+              {(each.products ?? []).length > 0
+                ? (each.products ?? []).join(", ")
+                : "every product"}
             </span>{" "}
             <button type="button" className="linkish" onClick={() => setEditing(each.id)}>
               Edit
