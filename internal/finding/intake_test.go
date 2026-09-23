@@ -6,12 +6,14 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
@@ -536,4 +538,107 @@ func referenceFor(reference, product string, year int) bool {
 	}
 	n, err := strconv.Atoi(strings.TrimPrefix(reference, prefix))
 	return err == nil && n > 0
+}
+
+func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
+	// The claim was a flaw nobody had recorded yet. Recording it from the
+	// report writes one report rather than two, accepts that report as the
+	// flaw in the same act, and counts the embargo from the day the report
+	// says it arrived.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PrivateTriage)
+		claim, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
+			Summary: "The management socket lets anybody in.",
+			Told:    finding.Told{ReportedBy: "A Researcher", Received: "2026-06-01"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		entering := finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary:    "The management socket accepts a request nobody authenticated.",
+			FromReport: strings.ToLower(claim.Reference),
+		}
+		_, identifier, err := f.store.Enter(t.Context(), who, entering)
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue, err := finding.NewVulnerabilities(f.db.DB).ByName(t.Context(), identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		back, err := f.store.ReportBy(t.Context(), who, f.productID, claim.Reference)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if back.VulnerabilityID == nil || *back.VulnerabilityID != issue {
+			t.Errorf("the report points at %v, want the flaw it was recorded as, %d",
+				back.VulnerabilityID, issue)
+		}
+		if back.EvaluatedBy == nil || *back.EvaluatedBy != who.ID {
+			t.Errorf("the report was judged by %v", back.EvaluatedBy)
+		}
+		var reports int
+		if err := f.db.DB.NewSelect().TableExpr(`"flaw_report" AS "fr"`).
+			ColumnExpr("COUNT(*)").Where("fr.product_id = ?", f.productID).
+			Scan(t.Context(), &reports); err != nil {
+			t.Fatal(err)
+		}
+		if reports != 1 {
+			t.Errorf("recording from a report left %d reports, want the one", reports)
+		}
+		var disclose *time.Time
+		if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
+			ColumnExpr("MIN(f.disclose_at)").Where("f.vulnerability_id = ?", issue).
+			Scan(t.Context(), &disclose); err != nil {
+			t.Fatal(err)
+		}
+		want := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC).Add(setting.DefaultDiscloseAfter)
+		if disclose == nil || !disclose.Equal(want) {
+			t.Errorf("the embargo ends %v, want %v: counted from the day the report arrived",
+				disclose, want)
+		}
+
+		// Once accepted it is judged, and a second flaw from it is refused.
+		entering.Summary = "A second flaw from the same claim."
+		if _, _, err := f.store.Enter(t.Context(), who, entering); !errors.Is(err,
+			finding.ErrAlreadyJudged) {
+			t.Errorf("recording a second flaw from a judged report answered %v", err)
+		}
+	})
+}
+
+func TestAFlawRecordedFromAReportIsRefusedWhatTheReportAlreadySays(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PrivateTriage)
+		claim, err := f.store.Record(t.Context(), who, f.productID,
+			finding.Claimed{Summary: "A claim."})
+		if err != nil {
+			t.Fatal(err)
+		}
+		base := finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary: "A flaw.", FromReport: claim.Reference,
+		}
+		twice := base
+		twice.Told = finding.Told{ReportedBy: "Somebody else"}
+		if _, _, err := f.store.Enter(t.Context(), who, twice); !errors.Is(err, finding.ErrToldTwice) {
+			t.Errorf("naming a reporter beside a report answered %v", err)
+		}
+		missing := base
+		missing.FromReport = "SONIC-R-2026-100000"
+		if _, _, err := f.store.Enter(t.Context(), who, missing); !errors.Is(err, finding.ErrNoSuchReport) {
+			t.Errorf("a reference nobody minted answered %v", err)
+		}
+		// A reader of undisclosed work who triages announced work may record a
+		// disclosed flaw, and may not judge a report while doing it.
+		reader := f.somebody(t, "reader@example.com", access.PrivateRead, access.PublicTriage)
+		public := base
+		public.Disclosed = true
+		if _, _, err := f.store.Enter(t.Context(), reader, public); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("somebody who may not work reports judged one by recording a flaw: %v", err)
+		}
+	})
 }

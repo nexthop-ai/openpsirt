@@ -441,6 +441,7 @@ it lives.
 | Another report is already that issue's record | One report is one issue's record. A second pointed at the same issue is a duplicate, which is a ruling of its own |
 | A ruling holds the report | A report waiting to be rejected and accepted by somebody else in the meantime would be two things when the approval lands. Asked in the write |
 | The issue is not one the judge may be told of here | Resolving first and refusing after makes the refusal informative: an identifier nobody has filed and one filed on work this person cannot see would come back differently, which turns this into a way to ask which identifiers are open here |
+| A flaw may be recorded from a report | The claim turned out to be a flaw nobody had recorded. Recording it from the report accepts that report as the new flaw in the same write, so one report is the record rather than two, and who told us and when are read from it — naming a reporter as well is refused. The embargo counts from the day the report says it arrived. A report already judged, or under a ruling, is refused |
 | The judge may not work reports here | Asked before the issue's name is resolved. Asked after, an identifier nobody has filed and one filed here come back in different words to somebody who may not judge a report at all. The same holds for the issue a duplicate names, and, for somebody who may not read reports, for the issue whose duplicates are listed |
 
 ### Report visibility

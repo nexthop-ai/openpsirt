@@ -2,7 +2,8 @@ import { notACredential } from "../ui/noautofill";
 import { RECORDABLE } from "../ui/severities";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useReport } from "../api/intake";
 import { api } from "../api/client";
 import { at as choicesAt, unwrap } from "../api/queries";
 import { useScope } from "../app/scope";
@@ -39,7 +40,15 @@ export function Record() {
   const navigate = useNavigate();
   const queries = useQueryClient();
 
-  const [product, setProduct] = useState(scope.product ?? "");
+  // A vulnerability report this flaw is the record of, where the form was
+  // opened from one. It fixes the product, fills the summary from the claim,
+  // and takes who reported it from the report rather than asking again.
+  const [params] = useSearchParams();
+  const fromReport = params.get("from") ?? "";
+  const [product, setProduct] = useState(
+    fromReport ? (params.get("product") ?? "") : (scope.product ?? ""),
+  );
+  const report = useReport(fromReport ? product : "", fromReport);
   // The lines, and the ways they are built. Both are sets: the same code
   // goes out on several lines and as several variants at once, and a flaw in
   // it is one issue in every build that ships it. The builds are the product
@@ -74,6 +83,11 @@ export function Record() {
   // which of their files did not attach.
   const [onward, setOnward] = useState("");
   const [weaknesses, setWeaknesses] = useState<string[]>([]);
+  // The claim's words as a starting point, once they arrive and only while the
+  // summary is still empty.
+  useReseed(report.data?.reference ?? "", () => {
+    if (report.data?.summary && summary === "") setSummary(report.data.summary);
+  });
 
   const may = mayOf(who.data, product);
   // Recording something nobody has announced is triage work on undisclosed
@@ -153,10 +167,14 @@ export function Record() {
             // endpoint's list of severities does not contain.
             ...(severity ? { severity: severity as (typeof SEVERITIES)[number] } : {}),
             ...(component.trim() ? { component: component.trim() } : {}),
-            ...(reportedBy.trim() ? { reported_by: reportedBy.trim() } : {}),
-            ...(contact.trim() ? { contact: contact.trim() } : {}),
-            ...(credit.trim() ? { credit: credit.trim() } : {}),
-            ...(received ? { received } : {}),
+            ...(fromReport
+              ? { from_report: fromReport }
+              : {
+                  ...(reportedBy.trim() ? { reported_by: reportedBy.trim() } : {}),
+                  ...(contact.trim() ? { contact: contact.trim() } : {}),
+                  ...(credit.trim() ? { credit: credit.trim() } : {}),
+                  ...(received ? { received } : {}),
+                }),
             ...(version ? { version } : {}),
             ...(ecosystem ? { ecosystem } : {}),
             ...(vector ? { vector } : {}),
@@ -514,67 +532,85 @@ export function Record() {
             record say so where they are typed — the day it arrived is what
             the embargo runs from, and how they wish to be credited is what an
             advisory's acknowledgments say. */}
-        <div className="field">
-          <span className="l">The reporter</span>
-          <span className="hint" style={{ marginBottom: 6 }}>
-            Optional. Only where somebody outside reported it.
-          </span>
-          <div className="filters">
-            <label className="field" style={{ margin: 0 }}>
-              <span>Reported by</span>
-              <input
-                {...notACredential}
-                type="text"
-                value={reportedBy}
-                placeholder="as they gave their name"
-                onChange={(event) => setReportedBy(event.target.value)}
-              />
-            </label>
-            <label className="field" style={{ margin: 0 }}>
-              <span>Contact</span>
-              <input
-                {...notACredential}
-                type="text"
-                value={contact}
-                placeholder="an address"
-                onChange={(event) => setContact(event.target.value)}
-              />
-            </label>
-            <label className="field" style={{ margin: 0 }}>
-              <span>Credited as</span>
-              <input
-                {...notACredential}
-                type="text"
-                value={credit}
-                placeholder="where it differs; anonymous is an answer"
-                onChange={(event) => setCredit(event.target.value)}
-              />
-            </label>
-            <label className="field" style={{ margin: 0 }}>
-              <span>Arrived on</span>
-              <input
-                {...notACredential}
-                type="date"
-                style={{ width: 180 }}
-                value={received}
-                onChange={(event) => setReceived(event.target.value)}
-              />
-            </label>
-          </div>
-          {!disclosed && (
+        {fromReport ? (
+          <div className="field">
+            <span className="l">The reporter</span>
             <span className="hint">
-              The embargo is counted from the day it arrived rather than from today: they are
-              counting from the day they sent it, and they are the party who will publish
-              regardless.
-              {received && (
-                <>
-                  {" "}
-                  Ninety days from <b>{received}</b> unless this deployment says otherwise.
-                </>
-              )}
+              From{" "}
+              <Link
+                className="id"
+                to={`/products/${encodeURIComponent(product)}/inbox/${encodeURIComponent(fromReport)}`}
+              >
+                {fromReport}
+              </Link>
+              {report.data?.reported_by && <> · {report.data.reported_by}</>}
+              {report.data?.received && <> · arrived {report.data.received}</>}. The report is
+              accepted as this flaw when it is recorded.
             </span>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="field">
+            <span className="l">The reporter</span>
+            <span className="hint" style={{ marginBottom: 6 }}>
+              Optional. Only where somebody outside reported it.
+            </span>
+            <div className="filters">
+              <label className="field" style={{ margin: 0 }}>
+                <span>Reported by</span>
+                <input
+                  {...notACredential}
+                  type="text"
+                  value={reportedBy}
+                  placeholder="as they gave their name"
+                  onChange={(event) => setReportedBy(event.target.value)}
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                <span>Contact</span>
+                <input
+                  {...notACredential}
+                  type="text"
+                  value={contact}
+                  placeholder="an address"
+                  onChange={(event) => setContact(event.target.value)}
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                <span>Credited as</span>
+                <input
+                  {...notACredential}
+                  type="text"
+                  value={credit}
+                  placeholder="where it differs; anonymous is an answer"
+                  onChange={(event) => setCredit(event.target.value)}
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                <span>Arrived on</span>
+                <input
+                  {...notACredential}
+                  type="date"
+                  style={{ width: 180 }}
+                  value={received}
+                  onChange={(event) => setReceived(event.target.value)}
+                />
+              </label>
+            </div>
+            {!disclosed && (
+              <span className="hint">
+                The embargo is counted from the day it arrived rather than from today: they are
+                counting from the day they sent it, and they are the party who will publish
+                regardless.
+                {received && (
+                  <>
+                    {" "}
+                    Ninety days from <b>{received}</b> unless this deployment says otherwise.
+                  </>
+                )}
+              </span>
+            )}
+          </div>
+        )}
 
         {record.error != null && choices.length === 0 && (
           <Failed error={record.error} what="That could not be recorded." />

@@ -95,7 +95,17 @@ type Entering struct {
 	// The day it arrived is what the embargo runs from, which is why it
 	// travels with the record rather than being filled in afterwards.
 	Told Told
+	// FromReport names a vulnerability report already recorded in this
+	// product, which the flaw is the record of. The report is judged to be
+	// this flaw in the same act, and who told us, and when, is read from it
+	// rather than stated again.
+	FromReport string
 }
+
+// ErrToldTwice is a flaw recorded from a report that also says who told us.
+// The report already says it, and two answers would leave nothing saying
+// which is the record.
+var ErrToldTwice = errors.New("a flaw recorded from a report takes who told us from the report")
 
 // rated is the severity words somebody may record. The same set a report may
 // carry, so that a finding a person entered ranks and expires beside the ones a
@@ -191,6 +201,16 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	if subject.ID == 0 {
 		return nil, "", access.Denied("record a finding without being anybody")
 	}
+	if in.FromReport != "" {
+		if in.Told.Stated() {
+			return nil, "", ErrToldTwice
+		}
+		// Judging a report is working it, asked before its reference is
+		// looked up.
+		if err := mayWorkReference(subject, productID); err != nil {
+			return nil, "", err
+		}
+	}
 	if strings.TrimSpace(in.Summary) == "" {
 		return nil, "", ErrNothingSaid
 	}
@@ -246,6 +266,28 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// identifier is minted in and every timestamp written, and a retry
 		// crossing midnight would otherwise file a flaw under last year.
 		now := s.now().UTC().Truncate(time.Microsecond)
+		// The report the flaw is recorded from, read here because whether it
+		// is still unjudged, and when it arrived, are facts a retry has to
+		// ask again.
+		var reported *FlawReport
+		received := in.Told.When()
+		if in.FromReport != "" {
+			reported = new(FlawReport)
+			err := tx.NewSelect().Model(reported).
+				Where("fr.reference = ?", foldReference(in.FromReport)).
+				Where("fr.product_id = ?", productID).
+				Scan(ctx)
+			if database.IsNoRows(err) {
+				return ErrNoSuchReport
+			}
+			if err != nil {
+				return fmt.Errorf("read the report this is recorded from: %w", err)
+			}
+			if reported.VulnerabilityID != nil || reported.RulingID != nil {
+				return ErrAlreadyJudged
+			}
+			received = reported.ReceivedOn
+		}
 		// Resolved in every build, inside the transaction that writes
 		// the rows. A name one build holds and another does not is a
 		// question about which builds are affected — so it is refused,
@@ -394,7 +436,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// found ourselves.
 			if visibility == access.Private {
 				from := now
-				if received := in.Told.When(); received != nil {
+				if received != nil {
 					from = received.UTC()
 				}
 				at := from.Add(embargo)
@@ -430,6 +472,29 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// timeline is evidenced to. Written through the transaction
 		// rather than through the store, because the store holds a
 		// database and this is inside one of its transactions.
+		if reported != nil {
+			res, err := tx.NewUpdate().Model((*FlawReport)(nil)).
+				Set("vulnerability_id = ?", vulnerabilityID).
+				Set("evaluated_at = ?", now).
+				Set("evaluated_by = ?", subject.ID).
+				Where("id = ?", reported.ID).
+				// Still unjudged and under no ruling when this lands, for
+				// the reason accepting a report as an existing issue asks.
+				Where("vulnerability_id IS NULL").
+				Where("ruling_id IS NULL").
+				Exec(ctx)
+			if err != nil {
+				return fmt.Errorf("judge the report this is recorded from: %w", err)
+			}
+			changed, err := database.Affected(res)
+			if err != nil {
+				return fmt.Errorf("judge the report this is recorded from: %w", err)
+			}
+			if changed == 0 {
+				return ErrAlreadyJudged
+			}
+			return nil
+		}
 		if told := in.Told; told.Stated() {
 			reference, err := mintReference(ctx, tx, product, now.Year())
 			if err != nil {

@@ -47,6 +47,9 @@ export function useReports(
 export function useReport(product: string, reference: string): UseQueryResult<Report> {
   return useQuery({
     queryKey: ["recorded-report", product, reference],
+    // Nothing to ask for until both names are known, which is the ordinary
+    // case on the record form opened from anywhere but a report.
+    enabled: product !== "" && reference !== "",
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/reports/{reference}", {

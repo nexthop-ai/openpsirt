@@ -2353,6 +2353,8 @@ export interface paths {
          *
          *     `component` names what in the build carries it, as the build calls it. Leave it out for the build itself, which is where a flaw in how the pieces fit together goes. A name the build holds at more than one version is refused with the choices rather than resolved to one; send `version`, and `ecosystem` where two share a version.
          *
+         *     `from_report` records the flaw from a vulnerability report already in this product and accepts the report as it in the same act; it needs private-triage. A report already judged, or under a ruling, is refused with 409.
+         *
          *     From here it behaves like any other finding: triaged, assigned, decided, on the same clock and in the same reports. No scan will close it, so it is closed by a person through the resolve endpoint or it stays open.
          *
          *     Requires: public-triage or private-triage on the product. private-triage where the finding is undisclosed.
@@ -9657,6 +9659,8 @@ export interface components {
             disclosed?: boolean;
             /** @description The ecosystem, where two share a name and a version */
             ecosystem?: string;
+            /** @description A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the four fields above are refused beside it */
+            from_report?: string;
             /**
              * Format: date
              * @description The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless

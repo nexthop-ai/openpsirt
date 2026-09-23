@@ -160,8 +160,13 @@ function Judge({ product, reference }: { product: string; reference: string }) {
           </button>
         </div>
         <span className="hint">
-          An issue already recorded in {product}. <Link to="/record">Record a flaw</Link> first if
-          there is none.
+          An issue already recorded in {product}, or{" "}
+          <Link
+            to={`/record?product=${encodeURIComponent(product)}&from=${encodeURIComponent(reference)}`}
+          >
+            record it as a new flaw
+          </Link>
+          .
         </span>
         {accept.error != null && <Failed error={accept.error} what="It was not accepted." />}
       </div>
