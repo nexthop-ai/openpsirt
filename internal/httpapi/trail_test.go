@@ -199,6 +199,11 @@ var administrativeActs = []trailedAct{
 		body: `{"floor":"high"}`, kind: "setting", about: "triage floor of mine",
 	},
 	{
+		id: "set-product-pair-thresholds", what: "when one pair's agreements are raised",
+		method: http.MethodPut, path: "/v1/products/mine/pair-thresholds",
+		body: `{"share":90,"approvers":4}`, kind: "setting", about: "pair thresholds of mine",
+	},
+	{
 		id: "set-product-end-of-life", what: "a support date", method: http.MethodPut,
 		path: "/v1/products/mine/end-of-life", body: `{"on":"2027-01-01"}`,
 		kind: "support", about: "mine",

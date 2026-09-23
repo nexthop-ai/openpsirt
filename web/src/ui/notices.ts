@@ -40,6 +40,8 @@ export function label(kind?: string): string {
       return "vulnerability data not moving";
     case "risk-unagreed":
       return "hidden with nobody agreeing";
+    case "pairs-concentrated":
+      return "one pair agreeing to most of the work";
     // The four things that are wrong because nothing has happened. Each says
     // what has stopped rather than what took place, which is what makes a row
     // of them read as a list of things to pick up.

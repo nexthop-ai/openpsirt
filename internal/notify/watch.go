@@ -104,8 +104,8 @@ func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened,
 		cleared += c
 	}
 
-	// The tool's own health, and a control that did not hold. Both are a
-	// report that has to come back empty, asked as a condition — see health.go
+	// The tool's own health, and the second-person control. Each is a report
+	// that nobody opens unless it has something to say, asked as a condition — see health.go
 	// for why that is not the same as mailing the report.
 	for _, each := range []struct {
 		kind Kind
@@ -114,6 +114,7 @@ func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened,
 	}{
 		{VulnerabilityDataStale, w.dataStale, "that the vulnerability data has stopped moving"},
 		{RiskUnagreed, w.riskUnagreed, "what stands with nobody agreeing"},
+		{PairsConcentrated, w.pairsConcentrated, "which pairs agree to most of a product's work"},
 	} {
 		holding, err := each.of(ctx)
 		if err != nil {

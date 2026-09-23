@@ -57,7 +57,7 @@ func Kinds() []Kind {
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
-		VulnerabilityDataStale, RiskUnagreed, InventoryMoved,
+		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, InventoryMoved,
 		ObligationOpen, ObligationNear, ObligationPassed,
 	}
 }
@@ -239,6 +239,11 @@ const (
 	// require a second person, so one standing alone means the write path was
 	// got around rather than that somebody is behind.
 	RiskUnagreed Kind = "risk-unagreed"
+	// PairsConcentrated is one pair of people giving each other most of a
+	// product's agreements, in a product with enough people who may approve
+	// that it is a choice. Told to administrators, and cleared by the share
+	// falling back under the threshold or the period moving past it.
+	PairsConcentrated Kind = "pairs-concentrated"
 )
 
 // Notification is one thing somebody was told.

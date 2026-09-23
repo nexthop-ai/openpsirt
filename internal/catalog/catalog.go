@@ -67,8 +67,13 @@ type Product struct {
 	// has an opinion of its own. Empty means the deployment's line applies
 	// — stating the default instead would stop this product following it
 	// when the default changed.
-	TriageFloor *string   `bun:"triage_floor"`
-	CreatedAt   time.Time `bun:"created_at,notnull"`
+	TriageFloor *string `bun:"triage_floor"`
+	// PairShare and PairApprovers are this product's own thresholds for
+	// raising one pair agreeing to each other's work, where it states them.
+	// Nil follows the deployment.
+	PairShare     *int      `bun:"pair_share"`
+	PairApprovers *int      `bun:"pair_approvers"`
+	CreatedAt     time.Time `bun:"created_at,notnull"`
 	// RetiredAt is when this was taken out of use, or absent while it is in
 	// use. Beside EOLOn rather than instead of it: a support date hides
 	// nothing, and this takes the product out of every list and refuses new
@@ -609,6 +614,30 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	return out, nil
+}
+
+// SetPairThresholds records this product's own thresholds for raising one pair
+// agreeing to each other's work. Nil clears one, so the product follows the
+// deployment again, for the reason clearing the triage line does.
+func (s *Store) SetPairThresholds(ctx context.Context, productID int64,
+	share, approvers *int) error {
+
+	res, err := s.db.NewUpdate().Model((*Product)(nil)).
+		Set("pair_share = ?", share).
+		Set("pair_approvers = ?", approvers).
+		Where("id = ?", productID).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("record this product's thresholds for one pair: %w", err)
+	}
+	n, err := database.Affected(res)
+	if err != nil {
+		return fmt.Errorf("record this product's thresholds for one pair: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("product %d: %w", productID, ErrNotFound)
+	}
+	return nil
 }
 
 // SetTriageFloor records what a product considers worth triaging, or clears it

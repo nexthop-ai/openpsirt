@@ -353,6 +353,52 @@ func TestAProductStatesWhatItTriagesAndCanStopSayingSo(t *testing.T) {
 	})
 }
 
+func TestAProductStatesItsOwnPairThresholdsAndClearsThem(t *testing.T) {
+	// Teams differ in size product to product, so each may state its own
+	// thresholds, and clearing one follows the deployment again rather than
+	// copying its current value.
+	eachCatalog(t, func(t *testing.T, d *declaring) {
+		d.post(t, "/v1/products", `{"name": "sonic"}`)
+		d.post(t, "/v1/products", `{"name": "onie"}`)
+		thresholds := func(product string) (float64, float64) {
+			t.Helper()
+			_, body := d.get(t, "/v1/products")
+			items, _ := body["items"].([]any)
+			for _, each := range items {
+				row, _ := each.(map[string]any)
+				if row["name"] == product {
+					share, _ := row["pair_share"].(float64)
+					approvers, _ := row["pair_approvers"].(float64)
+					return share, approvers
+				}
+			}
+			t.Fatalf("%s is not listed", product)
+			return 0, 0
+		}
+
+		code, body := d.put(t, "/v1/products/sonic/pair-thresholds",
+			`{"share": 90, "approvers": 4}`)
+		if code != http.StatusNoContent {
+			t.Fatalf("stating thresholds returned %d, want 204: %v", code, body)
+		}
+		if share, approvers := thresholds("sonic"); share != 90 || approvers != 4 {
+			t.Errorf("the product reports %v%% over %v approvers, want 90%% over 4", share, approvers)
+		}
+		if share, approvers := thresholds("onie"); share != 0 || approvers != 0 {
+			t.Errorf("another product picked up %v%% over %v approvers", share, approvers)
+		}
+
+		code, body = d.put(t, "/v1/products/sonic/pair-thresholds", `{"share": 90}`)
+		if code != http.StatusNoContent {
+			t.Fatalf("restating thresholds returned %d, want 204: %v", code, body)
+		}
+		if share, approvers := thresholds("sonic"); share != 90 || approvers != 0 {
+			t.Errorf("leaving the approvers off left %v%% over %v, want 90%% and the deployment's floor",
+				share, approvers)
+		}
+	})
+}
+
 func TestALineAProductCannotHoldIsRefused(t *testing.T) {
 	// The same words the deployment's line takes, checked the same way. A
 	// product that could be set to something the deployment could not would be

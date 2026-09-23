@@ -6312,6 +6312,29 @@ components:
         - undecided
         - waiting
       type: object
+    PairThresholdsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PairThresholdsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        approvers:
+          description: The fewest people who may approve here for one pair's share to be raised. Zero or left off follows the deployment
+          format: int64
+          maximum: 10000
+          minimum: 0
+          type: integer
+        share:
+          description: The share of this product's agreements one pair may give each other, as a percentage. Zero or left off follows the deployment
+          format: int64
+          maximum: 100
+          minimum: 0
+          type: integer
+      type: object
     PairingBody:
       additionalProperties: false
       properties:
@@ -6849,6 +6872,14 @@ components:
           type: string
         open:
           description: Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
+          format: int64
+          type: integer
+        pair_approvers:
+          description: The fewest people who may approve in this product for one pair's share to be raised, where the product states its own. Absent means it follows the deployment
+          format: int64
+          type: integer
+        pair_share:
+          description: The share of this product's agreements one pair may give each other before administrators are told, as a percentage, where the product states its own. Absent means it follows the deployment
           format: int64
           type: integer
         tags:
@@ -18729,6 +18760,39 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/pair-thresholds:
+    put:
+      description: |-
+        Sets this product's own thresholds for telling administrators that one pair of people is agreeing to most of its work: the share of its agreements, as a percentage, and the fewest people who may approve here for that share to count. Both are replaced by what is sent, and zero or left off follows the deployment again. Recorded in the administrative trail.
+
+        Requires: administrator
+      operationId: set-product-pair-thresholds
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairThresholdsBody"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Set when one pair's agreements are raised for a product
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
   /v1/products/{product}/releases:
     get:
       description: |-

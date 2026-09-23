@@ -466,11 +466,14 @@ condition carries a count and a link and never these rows.
 
 The rubber-stamp report is not the same shape, despite asking the same
 question in one of its sections. Only what stands with nobody agreeing has to
-be empty; bulk agreement is the control working at the grain somebody acted at,
-an approval from a role since withdrawn is correct behavior, and the same two
-people agreeing is what a small team looks like. A condition over any of those
-would be permanently true in a deployment with two triagers, which is an alert
-nobody can clear (REQ-49).
+be empty. Bulk agreement is the control working at the grain somebody acted at,
+and an approval from a role since withdrawn is correct behavior, so neither
+raises anything. The same two people agreeing is what a small team looks like,
+so the pairs section raises a condition only past two thresholds: a share of a
+product's agreements, among at least a set number of people who may approve.
+Both are settings a product may override. `DESIGN-notifications.md` § One pair
+agreeing to most of the work holds the rule, and why a pair counted without the
+second threshold would be an alert nobody can clear (REQ-49).
 
 Four filters: who proposed it, who has a standing agreement on it, which issue,
 and which component. An agreement later taken back does not match the approver

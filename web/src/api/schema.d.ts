@@ -2994,6 +2994,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/pair-thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set when one pair's agreements are raised for a product
+         * @description Sets this product's own thresholds for telling administrators that one pair of people is agreeing to most of its work: the share of its agreements, as a percentage, and the fewest people who may approve here for that share to count. Both are replaced by what is sent, and zero or left off follows the deployment again. Recorded in the administrative trail.
+         *
+         *     Requires: administrator
+         */
+        put: operations["set-product-pair-thresholds"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/releases": {
         parameters: {
             query?: never;
@@ -9002,6 +9024,24 @@ export interface components {
              */
             waiting: number;
         };
+        PairThresholdsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PairThresholdsBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The fewest people who may approve here for one pair's share to be raised. Zero or left off follows the deployment
+             */
+            approvers?: number;
+            /**
+             * Format: int64
+             * @description The share of this product's agreements one pair may give each other, as a percentage. Zero or left off follows the deployment
+             */
+            share?: number;
+        };
         PairingBody: {
             approver: string;
             /** Format: int64 */
@@ -9343,6 +9383,16 @@ export interface components {
              * @description Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
              */
             open?: number;
+            /**
+             * Format: int64
+             * @description The fewest people who may approve in this product for one pair's share to be raised, where the product states its own. Absent means it follows the deployment
+             */
+            pair_approvers?: number;
+            /**
+             * Format: int64
+             * @description The share of this product's agreements one pair may give each other before administrators are told, as a percentage, where the product states its own. Absent means it follows the deployment
+             */
+            pair_share?: number;
             /**
              * Format: int64
              * @description The number of tags declared
@@ -15916,6 +15966,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["OverviewOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "set-product-pair-thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairThresholdsBody"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

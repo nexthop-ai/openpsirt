@@ -87,6 +87,11 @@ type ProductBody struct {
 	// is a different statement from stating the same word — a product that
 	// stated it would stop following when the deployment changed its mind.
 	TriageFloor string `json:"triage_floor,omitempty" enum:"everything,low,medium,high,critical" doc:"The product's own triage line, where it says something other than the deployment. Absent means it follows the deployment"`
+	// PairShare and PairApprovers are this product's own thresholds for one
+	// pair agreeing to each other's work, where it states them. Absent follows
+	// the deployment.
+	PairShare     int `json:"pair_share,omitempty" doc:"The share of this product's agreements one pair may give each other before administrators are told, as a percentage, where the product states its own. Absent means it follows the deployment"`
+	PairApprovers int `json:"pair_approvers,omitempty" doc:"The fewest people who may approve in this product for one pair's share to be raised, where the product states its own. Absent means it follows the deployment"`
 	// EndOfLife is when support ends for every release that has not stated its
 	// own. Absent means nothing has said one, which reads as supported.
 	EndOfLife string `json:"end_of_life,omitempty" doc:"The date support ends for releases that have not stated their own, as YYYY-MM-DD"`
@@ -98,6 +103,22 @@ type EndOfLifeBody struct {
 	// ends on a day. Empty clears it — for a release that means following its
 	// product again, and for a product that means nothing has said one.
 	On string `json:"on" pattern:"^(\\d{4}-\\d{2}-\\d{2})?$" doc:"The date support ends, as YYYY-MM-DD, or empty to clear it"`
+}
+
+// PairThresholdsBody is a product's own thresholds for one pair agreeing to
+// each other's work.
+type PairThresholdsBody struct {
+	Share     int `json:"share,omitempty" minimum:"0" maximum:"100" doc:"The share of this product's agreements one pair may give each other, as a percentage. Zero or left off follows the deployment"`
+	Approvers int `json:"approvers,omitempty" minimum:"0" maximum:"10000" doc:"The fewest people who may approve here for one pair's share to be raised. Zero or left off follows the deployment"`
+}
+
+// countedOr is a stated threshold, or zero where the product follows the
+// deployment.
+func countedOr(n *int) int {
+	if n == nil {
+		return 0
+	}
+	return *n
 }
 
 // TriageFloorBody is what a product considers worth triaging.

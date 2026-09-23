@@ -33,6 +33,9 @@ func declaredBody(method, path, name string) io.Reader {
 	if method == http.MethodPut && strings.HasSuffix(path, "/triage-floor") {
 		return strings.NewReader(`{"floor": "high"}`)
 	}
+	if method == http.MethodPut && strings.HasSuffix(path, "/pair-thresholds") {
+		return strings.NewReader(`{"share": 90, "approvers": 4}`)
+	}
 	if method == http.MethodPut && strings.HasSuffix(path, "/end-of-life") {
 		return strings.NewReader(`{"on": "2030-01-01"}`)
 	}

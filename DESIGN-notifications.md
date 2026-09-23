@@ -231,8 +231,9 @@ sent when it does not reaches somebody who was not looking.
 |---|---|
 | The vulnerability data has stopped moving | Nothing failed. Every scan since answers as confidently as ever against what was known a month ago, and a finding newer data would have opened has not |
 | Something is hidden with nobody's agreement | Anything that hides risk needs a second person, so one standing with none means the write path was got around |
+| One pair is agreeing to most of a product's work | The second person is there, and in form only. Not a report that must be empty, and it carries thresholds for that reason: below them one pair doing everything is what a small team looks like |
 
-Both go to administrators, like the other conditions about the deployment rather
+All three go to administrators, like the other conditions about the deployment rather
 than about anybody's work.
 
 | Rule | Reason |
@@ -251,6 +252,19 @@ than about anybody's work.
 | Whether somebody agreed is asked of the record | No approval from anybody other than the proposer, and none taken back. A flag there would be the row's own account of itself, and the failure this exists to find is a row the write path should never have produced |
 | A claim still waiting for its second person is not this | It suppresses nothing and hides nothing while it waits, and somebody is looking at it |
 | Counted across every product and the whole record | The condition is about the deployment. What the report behind the link shows is narrowed to what its reader holds, so an administrator granted no product reads the count and an empty page — the same answer their dashboard gives, and the reason the link asks for everything rather than the quarter the sheet opens on |
+
+### One pair agreeing to most of the work
+
+| Rule | Reason |
+|---|---|
+| Raised where one pair's share of a product's agreements passes a threshold, among at least a set number of people who may approve | Two thresholds, both passed. A share alone is permanently true in a team of two, which is an alert nobody can clear (REQ-49). The count of people who may approve is what makes the pattern a choice |
+| Each threshold is a deployment setting a product may override | Teams differ in size by product. A product's own value follows the triage line's shape: cleared, it follows the deployment rather than copying its current value |
+| A pair is two people, whichever proposed | The pattern is two people each agreeing to what the other proposes. Counted by direction, the pair it exists to find reads as two halves under the threshold |
+| Counted in claims | A claim over sixty places is one thing proposed and one agreed to |
+| Over the last ninety days of proposals | The rubber-stamp report's own period, so the report the link opens holds what raised it. What it asks about is how agreement is given now; a pattern a team has moved away from is not a control failing today. Older agreements are left out of the whole as well as of the pair, so a spread-out past does not hide a concentrated present |
+| People who may approve are counted, not people who did | One pair doing everything while others who may approve do nothing is the case itself. A triager may approve somebody else's claim, and so may somebody holding the approver capability, each only where they may read |
+| Keyed on the product and the two people | A pair that stays dominant stays one condition, and a different pair taking over is a different one |
+| It names the two people | Which pair is the fact. The claims they agreed to are on the report the link opens |
 
 ### Data that stopped moving
 

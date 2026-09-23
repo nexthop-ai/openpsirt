@@ -55,6 +55,12 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 			-- — a product with no opinion should not have to state the default, or it
 			-- would stop following it when the default changes.
 			"triage_floor" ` + t.kind + ` NULL,
+			-- The two thresholds past which one pair agreeing to each other's
+			-- work is raised: a percentage of the product's agreements and the
+			-- fewest people who may approve. Null follows the deployment, for
+			-- the reason the triage line does. Teams differ in size by product.
+			"pair_share"     INTEGER NULL,
+			"pair_approvers" INTEGER NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
 			-- Out of use, the way a variant and a release are. Not eol_on
 			-- above: that says support ended and hides nothing, because an

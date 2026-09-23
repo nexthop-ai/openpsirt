@@ -153,6 +153,17 @@ const (
 	// weekly is not a fault.
 	DeltaShare = "scanning.delta-share"
 	DeltaFloor = "scanning.delta-floor"
+	// PairShare and PairApprovers are when the same two people agreeing to
+	// each other's work is raised with administrators.
+	//
+	// Two rather than one, and both have to be passed. A share alone is
+	// permanently true in a team of two, where one pair is every agreement
+	// there is. The count of people who may approve is what says the team is
+	// large enough that one pair doing everything is a choice rather than the
+	// shape of the team. A product may state its own of either, because teams
+	// differ in size product to product.
+	PairShare     = "triage.pair-share"
+	PairApprovers = "triage.pair-approvers"
 	// ScanEvery is how often everything tracked is scanned again against
 	// the vulnerability data of the day.
 	//
@@ -382,6 +393,22 @@ const DefaultQuietAfter = 7 * 24 * time.Hour
 // publisher having a slow few days is not an alert, short enough that a feed
 // that stopped being fetched is noticed in the week it stopped.
 const DefaultVulnerabilityDataStaleAfter = 7 * 24 * time.Hour
+
+// DefaultPairShare is the share of a product's agreements one pair may give
+// each other before administrators are told, as a percentage, where nobody has
+// said.
+//
+// Four in five: past what an ordinary rota produces in a team of three or
+// more, and short of the whole, so a pair covering nearly everything is caught
+// before it covers all of it.
+const DefaultPairShare = 80
+
+// DefaultPairApprovers is the fewest people who may approve in a product for
+// one pair's share to be worth raising, where nobody has said.
+//
+// Three: the smallest team in which one pair doing everything is not simply
+// what the team is.
+const DefaultPairApprovers = 3
 
 // DefaultDeltaShare is how much of a build's inventory may move in one upload
 // before the deployment is told, as a percentage, where nobody has said.
