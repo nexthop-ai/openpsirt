@@ -452,8 +452,11 @@ no way to tell which is the build's.
 | A page is cut after the comparison | What is read is the scan's own change — the names it opened or closed a row of — so the cost is what the upload moved rather than what the build contains |
 
 Over a year of nightly scans that cost stays flat: listing an upload that moved
-seven names takes 2 to 4 ms on SQLite and 2 to 6 ms on PostgreSQL, behind 73
-nights of history and behind 365. MySQL and MariaDB are unmeasured for this.
+seven names takes 2 to 4 ms on SQLite, 2 to 6 ms on PostgreSQL, 2 to 5 ms on
+MariaDB and 3 to 17 ms on MySQL, behind 73 nights of history and behind 365.
+The two server engines of the MySQL family were measured on 2026-09-23, one at a
+time; MySQL's highest figure is the night-73 point and every later one is 7 ms or
+under.
 
 ### The size a change is against
 

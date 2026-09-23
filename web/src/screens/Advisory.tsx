@@ -18,6 +18,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
+import { Moved } from "../ui/Moved";
 import { notACredential } from "../ui/noautofill";
 import { useReseed } from "../ui/reseed";
 import { Wide } from "../ui/Wide";
@@ -32,9 +33,9 @@ import { agreeing, missing, nameable, standing, statusLabel } from "./advisory";
 // document and the screen is for care rather than throughput. No bulk
 // anything, and the review step is a person reading text.
 //
-// Who may agree is the store's rule and is enforced there. This screen knows
-// how many people agree and not which, so the control is offered to whoever
-// reaches it and the refusal is the server's own sentence.
+// Who may agree is the store's rule and is enforced there. The screen is told
+// who agrees and not who wrote the edition standing, so the control is offered
+// to whoever reaches it and the refusal is the server's own sentence.
 
 export function Advisory() {
   const { advisory = "" } = useParams();
@@ -88,8 +89,8 @@ export function Advisory() {
 
       <Says advisory={advisory} title={it?.title ?? ""} covers={covers} />
       <Document advisory={advisory} covers={covers.length} read={document} />
-      <Agreement advisory={advisory} agreed={agreed} />
-      <Issued advisory={advisory} read={issuances} agreed={agreed} />
+      <Agreement advisory={advisory} agreed={agreed} by={it?.agreed_by ?? []} />
+      <Issued advisory={advisory} read={issuances} agreed={agreed} changed={it?.changed} />
     </>
   );
 }
@@ -143,30 +144,15 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
   const takeOff = useTakeAFlawOff();
   const catalog = useCatalog(true);
 
-  // The flaws recorded in the chosen product. One row per issue and
-  // component, so the list is folded to distinct issues, and what this
-  // advisory already names there is left out.
-  //
-  // Asked across every branch and tag and both states of support: a flaw is
-  // recorded against whichever build somebody found it in, and the list's own
-  // defaults would hide one recorded against a tag or a release past its end
-  // of life.
+  // Every flaw recorded in the chosen product, open or fixed: an advisory is
+  // usually written after the fix lands.
   const recorded = useQuery({
     enabled: product !== "",
     queryKey: ["advisory-flaws", product],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/findings", {
-          params: {
-            path: { product },
-            query: {
-              origin: "manual",
-              on: ["branch", "tag"],
-              support: ["in-support", "past-eol"],
-              below_floor: true,
-              limit: 200,
-            },
-          },
+        await api.GET("/v1/products/{product}/nameable-flaws", {
+          params: { path: { product } },
         }),
       ),
   });
@@ -271,7 +257,7 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
           <datalist id="advisory-flaws">
             {offered.map((each) => (
               <option key={each.vulnerability} value={each.vulnerability}>
-                {each.summary}
+                {each.fixed ? `Fixed · ${each.summary}` : each.summary}
               </option>
             ))}
           </datalist>
@@ -290,13 +276,11 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
           {name.isPending ? "Naming…" : "Name it"}
         </button>
       </div>
-      {/* The read stops at the endpoint's own maximum, and folding to
-          distinct issues hides how close it came — so a truncated list reads
-          as the whole of what is recorded there. Typing reaches the rest. */}
-      {(recorded.data?.total ?? 0) > (recorded.data?.items ?? []).length && (
-        <p className="hint">
-          More is recorded in that product than this list holds. Type the identifier in full.
-        </p>
+      {/* The read stops at the endpoint's own maximum, and a truncated list
+          reads as the whole of what is recorded there. Typing reaches the
+          rest. */}
+      {(recorded.data?.items ?? []).length >= mostOffered && (
+        <p className="hint">The list stops at {mostOffered}. Type the identifier in full.</p>
       )}
       {/* A failed read is not an answer about what is recorded here. Drawn as
           an empty list it reads as "this product has none", which is the one
@@ -323,6 +307,9 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
     </div>
   );
 }
+
+// The most flaws the product's list answers with.
+const mostOffered = 500;
 
 // The CSAF document, shown as text and never rendered.
 function Document({
@@ -370,7 +357,15 @@ function Document({
 }
 
 // Who agrees to what it says now.
-function Agreement({ advisory, agreed }: { advisory: string; agreed: number }) {
+function Agreement({
+  advisory,
+  agreed,
+  by,
+}: {
+  advisory: string;
+  agreed: number;
+  by: { person: string; agreed_at: string }[];
+}) {
   const agree = useAgree();
   const back = useTakeAgreementBack();
 
@@ -378,6 +373,9 @@ function Agreement({ advisory, agreed }: { advisory: string; agreed: number }) {
     <div className="card" style={{ marginBottom: 12 }}>
       <h3>Agreement</h3>
       <p>{agreeing(agreed)} to what it says now.</p>
+      {by.length > 0 && (
+        <p className="hint">{by.map((one) => `${one.person}, ${on(one.agreed_at)}`).join(" · ")}</p>
+      )}
       <div className="actions">
         <button
           type="button"
@@ -409,10 +407,12 @@ function Issued({
   advisory,
   read,
   agreed,
+  changed,
 }: {
   advisory: string;
   read: ReturnType<typeof useIssuances>;
   agreed: number;
+  changed?: boolean;
 }) {
   const [summary, setSummary] = useState("");
   const record = useRecordIssued();
@@ -428,28 +428,31 @@ function Issued({
       ) : gone.length === 0 ? (
         <p className="hint">It has not gone out.</p>
       ) : (
-        <Wide>
-          <table>
-            <thead>
-              <tr>
-                <th className="num">Version</th>
-                <th>Published</th>
-                <th>This revision</th>
-                <th>Digest</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gone.map((row) => (
-                <tr key={row.version} className="row">
-                  <td className="num">{row.version}</td>
-                  <td className="hint">{on(row.issued_at)}</td>
-                  <td>{row.summary}</td>
-                  <td className="id">{row.digest}</td>
+        <>
+          {changed !== undefined && <Moved changed={changed} />}
+          <Wide>
+            <table>
+              <thead>
+                <tr>
+                  <th className="num">Version</th>
+                  <th>Published</th>
+                  <th>This revision</th>
+                  <th>Digest</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Wide>
+              </thead>
+              <tbody>
+                {gone.map((row) => (
+                  <tr key={row.version} className="row">
+                    <td className="num">{row.version}</td>
+                    <td className="hint">{on(row.issued_at)}</td>
+                    <td>{row.summary}</td>
+                    <td className="id">{row.digest}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Wide>
+        </>
       )}
 
       <div className="filters" style={{ marginTop: 10 }}>

@@ -69,6 +69,7 @@ const Advisories = lazy(() =>
   import("../screens/Advisories").then((m) => ({ default: m.Advisories })),
 );
 const Advisory = lazy(() => import("../screens/Advisory").then((m) => ({ default: m.Advisory })));
+const VEX = lazy(() => import("../screens/VEX").then((m) => ({ default: m.VEX })));
 
 const build = "/products/:product/streams/:stream/variants/:variant";
 
@@ -102,6 +103,7 @@ export const ROUTES = {
   inventoryChanges: `${build}/scans/:scan/changes`,
   run: `${build}/runs/:run`,
   upgrades: `${build}/pending-upgrades`,
+  vex: `${build}/vex`,
   comparison: "/products/:product/comparison",
   inbox: "/products/:product/inbox",
   inboxReport: "/products/:product/inbox/:reference",
@@ -224,6 +226,7 @@ export function App() {
               <Route path={ROUTES.inventoryChanges} element={<InventoryChanges />} />
               <Route path={ROUTES.run} element={<Run />} />
               <Route path={ROUTES.upgrades} element={<Upgrades />} />
+              <Route path={ROUTES.vex} element={<VEX />} />
               <Route path={ROUTES.comparison} element={<Compare />} />
               <Route path={ROUTES.inbox} element={<Inbox />} />
               <Route path={ROUTES.inboxReport} element={<InboxReport />} />

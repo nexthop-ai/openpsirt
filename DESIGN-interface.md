@@ -1151,15 +1151,30 @@ advisory is and § Editorial state holds who may agree.
 | The panels are compose, review, approve, publish, in that order | They are the four acts in the order they happen. Panel order is decided rather than accumulated |
 | What is left before it can go out is said once, at the top | Naming no flaw and nobody agreeing are the two. Naming no flaw comes first: an advisory covering nothing generates no document, so an agreement is not the next thing to go looking for |
 | A control is disabled only on a fact the server has answered | Taking an agreement back and recording an issuance are disabled where the advisory reports nobody agreeing, which is the server's own count. Agreeing is offered to whoever reaches the screen: who may agree turns on who wrote the edition standing, which the screen is not told, so hiding it would be hiding on a guess |
+| Who agrees is named, with when | Somebody about to publish checks who vouched for the words, and a count does not say |
+| Whether it changed since it went out is said above what went out | The server's answer, compared on the settled digest. Drawn as an alert where it changed and a line where it did not, and absent where the server has no answer |
 | The refusal a control reaches is the server's sentence | Agreeing as the person who started it, and naming a flaw a scanner reported. Each says what the store said rather than a sentence invented on the screen |
-| A flaw is typed as well as picked | The list offered is what this deployment still holds open in the chosen product, folded to one entry per issue and without what the advisory already names there. A flaw already closed is typed rather than picked — the server takes any flaw recorded here. A read that failed says so and leaves the typing, because an empty picker reads as "this product has none", which is the one thing a failed read did not say |
-| The picker says when it is holding less than what is there | It stops at the endpoint's own maximum, and folding to distinct issues hides how close it came. A truncated list otherwise reads as the whole of what a product holds |
+| A flaw is typed as well as picked | The list offered is every flaw recorded in the chosen product, open or fixed, without what the advisory already names there, and a fixed one says so. A read that failed says so and leaves the typing, because an empty picker reads as "this product has none", which is the one thing a failed read did not say |
+| The picker says when it is holding less than what is there | It stops at the endpoint's own maximum, and a truncated list otherwise reads as the whole of what a product holds |
 | Retitling and taking a flaw off are on the compose panel | They are the other two acts that open an edition, so each takes back every agreement standing, which is said beside the control. `DESIGN-remediation.md` § Editions and agreement holds the rule |
 | The document is asked for only where a flaw is named | One covering nothing is refused, and a refusal on every visit draws a failure on a screen where nothing failed |
 | Shown as text and never rendered (REQ-66) | What a reader has to check is exactly what a customer's tooling will receive |
 | What has already gone out is readable without generating anything | Every issuance is in the document's own revision history, which is right for a reader of the document — but it made "has an advisory gone out, and is what is published still what we would generate" a question you had to build a CSAF document to answer |
 | Recording that it went out is its own act | What was published on a date cannot be worked out again once a release is added or a decision is revised, and without the record a second document cannot be a revision — which a customer's validator checks |
 | The three editorial statuses are shown under the standard's own names | Draft, final and interim, each with what reaching it means on hover. Interim is not "it has changed since it went out": a withdrawn agreement reaches it with nothing a reader acts on having moved |
+
+#### The VEX document
+
+One build's VEX document has a screen of its own, reached from the release's
+customer documents. `DESIGN-remediation.md` § The VEX document holds what it
+says and § Issuance records what recording keeps.
+
+| Rule | |
+|---|---|
+| What has gone out is listed with who published it, and each revision is a download | The kept bytes are what a customer holds |
+| Recording offers the document it recorded | It is the one to send, because it carries the version it is recorded under |
+| The control is offered to whoever reaches the screen | Recording asks for a triage role on the product. The refusal is the server's sentence rather than a control hidden on a guess about roles |
+| Whether it changed since it went out is said the way the advisory says it | One component draws both, so the two documents cannot come to say it differently |
 
 #### The panel on a flaw
 
@@ -1450,6 +1465,7 @@ since a person only ever sees products they hold a role on.
 | **A setting's control is identified by a generated id, never by its key** | The prose moved off the control and the key stayed on it as `id`, and `signin.claim-window` is a sign-in field to a manager reading attributes however many ignore flags sit beside it. `name` was already pinned to a constant for this; `id` was the half that was missed. Generated rather than sanitized, because sanitizing moves the problem to the next key somebody adds |
 | **Webhooks are configured here** | Adding one is administration and this is where a deployment is set to things. Administrators only, and the panel as a whole rather than its controls: the address authenticates to two of the services it names, and the endpoint refuses anybody else — so drawn for an auditor it is a table that can only fail to load. Whether they arrive is the system screen's |
 | **Advisory sources are configured here** | Naming a supplier is administration, and the panel is administrator-only for the reason the one above it is: the endpoint refuses anybody else. It takes a product before it takes an address, because a claim is recorded against a product and a supplier feeding two is two rows |
+| **A publisher's document is uploaded on the same panel** | An advisory and a statement set, each to the endpoint a script uses. The panel says what each does to what the publisher said before — an advisory adds, a statement set replaces — because that is the difference somebody holding a file needs, and the endpoint refusing the other kind names the one that takes it |
 | **A supplier nothing has reached reads differently from one that failed** | "Not yet" and "failed three days ago" are different facts, and a single last-read moment collapses them. What stopped the last attempt is on hover, where the address is not — a publisher unreachable for a week is otherwise invisible |
 
 ## The System screen

@@ -65,18 +65,19 @@ export function missing(covers: number, agreed: number): Missing {
   return "";
 }
 
-// One flaw somebody may name on this advisory.
-export type Nameable = { vulnerability: string; summary: string };
+// One flaw somebody may name on this advisory, and whether it is fixed
+// wherever it was found.
+export type Nameable = { vulnerability: string; summary: string; fixed: boolean };
 
 // The flaws recorded in a product that this advisory does not already name
 // there.
 //
-// The rows are one issue at one component, so a flaw recorded against two
-// components arrives twice and is offered once. Already covered is per
-// product: the pair is what an advisory names, and the same issue in a second
-// product is a second thing to say.
+// A flaw arriving twice is offered once. Already covered is per product: the
+// pair is what an advisory names, and the same issue in a second product is a
+// second thing to say. A row that does not say how much of it is open is not
+// called fixed.
 export function nameable(
-  rows: readonly { vulnerability?: string; summary?: string }[],
+  rows: readonly { vulnerability?: string; summary?: string; open?: number }[],
   covers: readonly { product?: string; vulnerability?: string }[],
   product: string,
 ): Nameable[] {
@@ -89,7 +90,7 @@ export function nameable(
     const name = row.vulnerability ?? "";
     if (name === "" || already.has(name) || seen.has(name)) continue;
     seen.add(name);
-    out.push({ vulnerability: name, summary: row.summary ?? "" });
+    out.push({ vulnerability: name, summary: row.summary ?? "", fixed: row.open === 0 });
   }
   return out;
 }

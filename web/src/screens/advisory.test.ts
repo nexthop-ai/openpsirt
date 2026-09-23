@@ -77,7 +77,7 @@ describe("the flaws offered for an advisory", () => {
     { vulnerability: "CVE-2026-2", summary: "two" },
   ];
 
-  it("offer a flaw recorded at two components once", () => {
+  it("offer a flaw that arrives twice once", () => {
     expect(nameable(rows, [], "switch").map((one) => one.vulnerability)).toEqual([
       "CVE-2026-1",
       "CVE-2026-2",
@@ -111,8 +111,20 @@ describe("the flaws offered for an advisory", () => {
 
   it("offer a flaw carrying no summary, with nothing where the summary goes", () => {
     expect(nameable([{ vulnerability: "CVE-2026-3" }], [], "switch")).toEqual([
-      { vulnerability: "CVE-2026-3", summary: "" },
+      { vulnerability: "CVE-2026-3", summary: "", fixed: false },
     ]);
+  });
+
+  it("call a flaw fixed only where none of it is open", () => {
+    const offered = nameable(
+      [
+        { vulnerability: "CVE-2026-4", open: 0 },
+        { vulnerability: "CVE-2026-5", open: 2 },
+      ],
+      [],
+      "switch",
+    );
+    expect(offered.map((one) => one.fixed)).toEqual([true, false]);
   });
 
   it("are not narrowed by a covered entry carrying no identifier", () => {

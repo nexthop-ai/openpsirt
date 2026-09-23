@@ -19,6 +19,7 @@
 package advisory
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -81,6 +82,29 @@ type Document struct {
 	// a path: a reader is asking whether they are affected, and the answer
 	// is a release.
 	Vulnerabilities []Vulnerability `json:"vulnerabilities"`
+}
+
+// MarshalJSON writes the document with every object's keys in alphabetical
+// order.
+//
+// The standard's optional test 6.2.13 asks for it. The fields here are
+// declared in the order a reader of this file follows, so the order is
+// imposed on the bytes rather than on the declarations: read back as generic
+// values, every object is a map, and a map is written with its keys sorted.
+// Numbers are carried through as the text they were written as.
+func (d Document) MarshalJSON() ([]byte, error) {
+	type declared Document
+	body, err := json.Marshal(declared(d))
+	if err != nil {
+		return nil, err
+	}
+	reader := json.NewDecoder(bytes.NewReader(body))
+	reader.UseNumber()
+	var generic any
+	if err := reader.Decode(&generic); err != nil {
+		return nil, err
+	}
+	return json.Marshal(generic)
 }
 
 // Meta is the document's own description.

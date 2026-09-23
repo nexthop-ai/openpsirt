@@ -272,15 +272,15 @@ export function Release({ product, stream }: { product: string; stream: string }
           {variants.map((variant) => (
             <li key={`vex-${variant.name}`}>
               <div>
-                <a
-                  href={
-                    `/v1/products/${encodeURIComponent(product)}` +
+                <Link
+                  to={
+                    `/products/${encodeURIComponent(product)}` +
                     `/streams/${encodeURIComponent(stream)}` +
                     `/variants/${encodeURIComponent(variant.name ?? "")}/vex`
                   }
                 >
                   VEX document · {variant.name}
-                </a>
+                </Link>
               </div>
               <div className="hint">
                 For a customer&rsquo;s own scanner. Approved dismissals and public findings only,
