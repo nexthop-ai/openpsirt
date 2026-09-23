@@ -105,7 +105,7 @@ used; this is where they live.
 
 | Rule | |
 |---|---|
-| git is the distribution's package, run as a child | Nothing of it is linked into the binary. It is GPL-2.0, as the base's busybox is |
+| git is the distribution's package, run as a child | Nothing of it is linked into the binary |
 | The copies need a writable path, and the chart mounts one | The root filesystem is read-only. The image makes the directory and owns it to the unprivileged user |
 | Scratch space unless a claim is named | Holds nothing until the lookups are turned on. Bounded a little above the quota, because a copy arriving adds to the copies kept |
 | The chart makes no claim for it | A deployment turning this on chooses its storage. A claim named in values is mounted instead |
