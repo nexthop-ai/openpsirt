@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { notYours, statusOf, unwrap } from "../api/queries";
 import { useDuplicates } from "../api/intake";
+import { mayOf, useWho } from "../app/session";
 import { linkable } from "../ui/addressable";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
@@ -254,6 +255,9 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
 export function Reporter({ product, vulnerability }: { product: string; vulnerability: string }) {
   const queries = useQueryClient();
   const [alias, setAlias] = useState("");
+  // Reading who reported it asks for reading undisclosed work; answering them
+  // is working the report, which asks for triage of it.
+  const mayAnswer = !!mayOf(useWho().data, product)?.may_hide;
   const told = useQuery({
     queryKey: ["report", product, vulnerability],
     queryFn: async () =>
@@ -328,6 +332,7 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
               <button
                 type="button"
                 className="btn"
+                hidden={!mayAnswer}
                 style={{ marginLeft: "auto" }}
                 disabled={answered.isPending}
                 onClick={() => answered.mutate()}

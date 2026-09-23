@@ -284,12 +284,10 @@ func namedCase(ctx context.Context, in Ingest, productID, issueID int64) (string
 // caseAtTriaging is the same, for the routes that ask for the right to argue
 // about findings rather than only to read them.
 //
-// Named separately because the difference is not cosmetic: what hangs off a
-// recorded flaw includes a reporter's name and the address to reach them at,
-// which is a third party's contact details. A route carrying it that declares
-// triage and enforces a read role has the annotation on the operation and the
-// check in the handler saying different things — and the annotation is what
-// the generated reference tells an operator the rule is.
+// Named separately because the difference is not cosmetic: a route that
+// declares triage and enforces a read role has the annotation on the
+// operation and the check in the handler saying different things — and the
+// annotation is what the generated reference tells an operator the rule is.
 func caseAtTriaging(ctx context.Context, in Ingest, product, vulnerability string) (
 	access.Subject, *access.Store, int64, int64, error) {
 

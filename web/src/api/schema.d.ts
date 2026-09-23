@@ -2903,9 +2903,9 @@ export interface paths {
          *
          *     The received date is what the embargo runs from: a report arriving on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the one the reporter has a publication scheduled against, and they are the party who will publish regardless.
          *
-         *     Answers 404 where nobody recorded a reporter, which is every flaw we found ourselves.
+         *     Answers 404 where nobody recorded a reporter, which is every flaw we found ourselves, and to somebody who may not read the product's vulnerability reports.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["get-report"];
         put?: never;
