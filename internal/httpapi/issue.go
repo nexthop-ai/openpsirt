@@ -34,6 +34,7 @@ type IssueOutput struct {
 		Severity      string         `json:"severity,omitempty"`
 		Score         float64        `json:"score,omitempty"`
 		ScoreVersion  string         `json:"score_version,omitempty" doc:"The scoring system the number is on"`
+		Ratings       []RatingBody   `json:"ratings,omitempty" doc:"Every published rating of the issue, one per generation of the scoring system, newest first"`
 		Exploited     bool           `json:"exploited,omitempty"`
 		Description   string         `json:"description,omitempty"`
 		Items         []SightingBody `json:"items"`
@@ -125,6 +126,7 @@ func registerIssue(api huma.API, in Ingest) {
 		out.Body.Severity = known.Severity
 		out.Body.Score = known.Score
 		out.Body.ScoreVersion = known.ScoreVersion
+		out.Body.Ratings = ratingBodies(known.Ratings)
 		out.Body.Exploited = known.Exploited
 		out.Body.Description = known.Description
 		out.Body.Items = make([]SightingBody, 0, len(rows))

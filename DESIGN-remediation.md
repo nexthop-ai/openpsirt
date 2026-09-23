@@ -568,7 +568,7 @@ somebody deciding whether to act.
 | Element | What fills it | |
 |---|---|---|
 | References | The issue's write-up and everywhere else a report points, each address once, and last the address this document is published at | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's. Its own address is stated only where the deployment has said where its documents are reachable, because a reader's tooling follows a self reference and one pointing at nothing is worse than none — and it is built from the same rule the directory writes the file under, so the two cannot name different files |
-| Scores | The CVSS base vector, scored here | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. A vector this deployment cannot score, or one on a scheme the standard's score object has no field for — version 4, which arrives with the standard's next version — yields nothing rather than a number in the wrong place |
+| Scores | The version 3 rating, scored here from its vector | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. The standard's score object has a field for version 2 and version 3, and version 4 arrives with the standard's next version — so an issue rated under both states its version 3 rating, and one rated under version 4 alone states none rather than a number in the wrong place. The ratings a report stated are asked newest first, then the vector a flaw assessed here was given |
 | Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gives it so somebody can reply, not so it can be published, and "anonymous" is a real answer to the question the credit field asks |
 | Remediations | Stated for the releases that still carry the flaw, and the details name the releases that do not | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
 | Distribution | Whether anything it covers is still held back — RED while anything is, WHITE otherwise | Handing a document about a flaw nobody outside has been told about to somebody who may pass it on is the disclosure the embargo exists to hold, and that is true of a document at any point in its editorial life. The labels are the standard's four, which is why a disclosed document is WHITE rather than the word the protocol renamed it to |
@@ -801,6 +801,11 @@ standard's trusted provider role adds on top of the directory, and key
 material is a class of configuration this deployment does not take. The layout
 leaves room: a signature sits beside the document under the same name, and the
 feed already names the file beside each entry that answers for it.
+
+A version 4 score in the published document. The standard's score object gains
+a field for one in CSAF 2.1, and the document is written as CSAF 2.0; the
+rating is held, and is stated once the document is written in a version that
+carries it.
 
 Prose of the deployment's own in the document beyond its title. An edition
 carries the title, and the rest of what a reader acts on is assembled from the

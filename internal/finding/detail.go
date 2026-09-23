@@ -61,6 +61,10 @@ type Evidence struct {
 	ScoreVersion string
 	ScoreSource  string
 	ScoreKind    string
+	// Ratings is every published rating of the issue, one per generation of
+	// the scheme and newest first. The screen shows the first and names the
+	// others beside it.
+	Ratings []CVSS
 	// Exploited and LikelihoodPPM are what separate the handful that matter
 	// from the thousands that can wait.
 	Exploited     bool
@@ -640,6 +644,9 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 	}
 
 	evidence := evidenceFrom(rows, issue, component, aliases, references, weaknesses)
+	if evidence.Ratings, err = NewVulnerabilities(s.db).Ratings(ctx, vulnerabilityID); err != nil {
+		return nil, err
+	}
 
 	// opened is when this first appeared here and what produced it. The
 	// earliest place, because that is the age the deadline relates to, and

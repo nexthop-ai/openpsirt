@@ -7250,6 +7250,8 @@ export interface components {
             places: components["schemas"]["SittingBody"][] | null;
             /** @description Decisions made at these places that lapsed or were withdrawn, newest first, with their reasoning */
             previous: components["schemas"]["EarlierBody"][] | null;
+            /** @description Every published rating of the issue, one per generation of the scoring system, newest first. A report commonly rates one issue under version 3 and version 4 */
+            ratings?: components["schemas"]["RatingBody"][] | null;
             /** @description Somebody recorded this here rather than a scanner reporting it. Only such a finding can be closed as fixed by hand */
             recorded?: boolean;
             references?: components["schemas"]["ReferenceBody"][] | null;
@@ -7822,6 +7824,8 @@ export interface components {
              * @description The number of your products carrying it
              */
             products: number;
+            /** @description Every published rating of the issue, one per generation of the scoring system, newest first */
+            ratings?: components["schemas"]["RatingBody"][] | null;
             /** Format: double */
             score?: number;
             /** @description The scoring system the number is on */
@@ -9479,6 +9483,21 @@ export interface components {
              */
             overdue: number;
             severity: string;
+        };
+        RatingBody: {
+            /** @description The rating's rank: primary or secondary */
+            kind?: string;
+            /**
+             * Format: double
+             * @description The base score
+             */
+            score: number;
+            /** @description The publisher, where the report names them */
+            source?: string;
+            /** @description The vector the score is worked out from */
+            vector: string;
+            /** @description The scoring system's version, as the report states it */
+            version: string;
         };
         ReachBody: {
             /**

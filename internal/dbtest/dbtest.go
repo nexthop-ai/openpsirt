@@ -779,6 +779,7 @@ var tables = []string{
 	"scan_run",
 	"vulnerability_alias",
 	"vulnerability_weakness",
+	"vulnerability_rating",
 	"vulnerability",
 	"scan_document_chunk",
 	"scan_document",

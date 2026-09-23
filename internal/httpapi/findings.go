@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -281,7 +282,7 @@ func (n Narrowing) filter(floor finding.Floor) (finding.Filter, error) {
 		SortBy:    finding.SortKey(n.Sort),
 		Ascending: n.Ascending,
 
-		LikelihoodAtLeast: int(n.Likelihood * 1_000_000),
+		LikelihoodAtLeast: int(math.Round(n.Likelihood * 1_000_000)),
 		OpenedBefore:      daysBack(n.OpenFor),
 		DueBefore:         daysAhead(n.DueWithin, n.Overdue),
 		Overdue:           n.Overdue,
@@ -655,6 +656,34 @@ type SittingBody struct {
 	Chain []StepBody `json:"chain,omitempty" doc:"The way down to here, the build first and this component last. Empty where the inventory left the component unplaced"`
 }
 
+// RatingBody is one published rating of an issue.
+type RatingBody struct {
+	Version string  `json:"version" doc:"The scoring system's version, as the report states it"`
+	Score   float64 `json:"score" doc:"The base score"`
+	Vector  string  `json:"vector" doc:"The vector the score is worked out from"`
+	Source  string  `json:"source,omitempty" doc:"The publisher, where the report names them"`
+	Kind    string  `json:"kind,omitempty" doc:"The rating's rank: primary or secondary"`
+}
+
+// ratingBodies is the ratings an issue holds, in the order they were read.
+func ratingBodies(ratings []finding.CVSS) []RatingBody {
+	if len(ratings) == 0 {
+		return nil
+	}
+	out := make([]RatingBody, 0, len(ratings))
+	for _, rating := range ratings {
+		version := rating.Version
+		if version == "" {
+			version = strconv.Itoa(rating.Generation)
+		}
+		out = append(out, RatingBody{
+			Version: version, Score: float64(rating.ScoreCenti) / 100,
+			Vector: rating.Vector, Source: rating.Source, Kind: rating.Kind,
+		})
+	}
+	return out
+}
+
 // EvidenceBody is everything held about one issue in one component.
 type EvidenceBody struct {
 	Vulnerability string   `json:"vulnerability"`
@@ -670,11 +699,12 @@ type EvidenceBody struct {
 	// ScoreVersion is where the number came from. Everything else a scan
 	// says carries its provenance; the one number a deadline is set from
 	// carries none.
-	ScoreVersion string  `json:"score_version,omitempty" doc:"The scoring system the number is on, as the report states it"`
-	ScoreSource  string  `json:"score_source,omitempty" doc:"The publisher, where the report names them"`
-	ScoreKind    string  `json:"score_kind,omitempty" doc:"The rating's rank: primary or secondary"`
-	Exploited    bool    `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
-	Likelihood   float64 `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
+	ScoreVersion string       `json:"score_version,omitempty" doc:"The scoring system the number is on, as the report states it"`
+	ScoreSource  string       `json:"score_source,omitempty" doc:"The publisher, where the report names them"`
+	ScoreKind    string       `json:"score_kind,omitempty" doc:"The rating's rank: primary or secondary"`
+	Ratings      []RatingBody `json:"ratings,omitempty" doc:"Every published rating of the issue, one per generation of the scoring system, newest first. A report commonly rates one issue under version 3 and version 4"`
+	Exploited    bool         `json:"exploited,omitempty" doc:"Somebody is known to be exploiting this"`
+	Likelihood   float64      `json:"likelihood,omitempty" doc:"Published probability of exploitation, 0 to 1"`
 	// ExploitedHere is what has been recorded in this product about being
 	// exploited through the issue, newest first. Not the flag above: that is a
 	// feed's word about the world, and this is somebody here saying this
@@ -963,6 +993,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		Assessed: e.Assessed,
 		Score:    float64(e.ScoreCenti) / 100, Vector: e.Vector,
 		ScoreVersion: e.ScoreVersion, ScoreSource: e.ScoreSource, ScoreKind: e.ScoreKind,
+		Ratings:   ratingBodies(e.Ratings),
 		Exploited: e.Exploited, Likelihood: float64(e.LikelihoodPPM) / 1_000_000,
 		LikelihoodPercentile: float64(e.LikelihoodPercentilePPM) / 1_000_000,
 		// The day rather than an instant: the estimate is computed per day,

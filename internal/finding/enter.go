@@ -384,6 +384,11 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		if scored != nil {
 			named.Vector = scored.Vector
 			named.Score = float64(scored.ScoreCenti) / 100
+			named.Ratings = []CVSS{{
+				Generation: GenerationOf(scored.Scheme(), scored.Vector),
+				ScoreCenti: scored.ScoreCenti, Vector: scored.Vector,
+				Version: scored.Scheme(),
+			}}
 		}
 		interned, err := NewVulnerabilities(tx).Intern(ctx, []Named{named})
 		if err != nil {
