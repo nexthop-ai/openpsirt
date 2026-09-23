@@ -1,3 +1,4 @@
+import { useApprovable } from "../api/intake";
 import { notACredential } from "../ui/noautofill";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { initials } from "../ui/initials";
@@ -98,6 +99,9 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
       unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
     refetchInterval: 60_000,
   });
+  // Rulings on vulnerability reports waiting for this reader, which sit in the
+  // same queue as the claims.
+  const approvable = useApprovable();
   // Across every product a reader can see, like the entry it sits under and
   // unlike the scoped count below: the badge is what the address opens, and
   // that address names no product.
@@ -190,8 +194,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               to="/review-queue"
               icon="inbox"
               label="Review queue"
-              count={queue.data?.total}
-              unread={queue.isError}
+              count={
+                queue.data?.total === undefined
+                  ? undefined
+                  : queue.data.total + (approvable.data ?? 0)
+              }
+              unread={queue.isError || approvable.isError}
               unit="claims waiting"
             />
             <Rail

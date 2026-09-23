@@ -552,30 +552,46 @@ type RulingsAsked struct {
 	ProductIDs []int64
 	// Waiting keeps those waiting for a second person.
 	Waiting bool
+	// Approvable keeps those this subject may agree to: waiting, proposed by
+	// somebody else, in a product where they may agree to a ruling. It is
+	// the count a queue of what is pending their approval adds.
+	Approvable bool
 	// Since and Until keep those proposed in a period, Until exclusive.
 	Since, Until *time.Time
 	Limit        int
 	Offset       int
 }
 
-// RulingsAcross is the rulings in every product this subject may work reports
+// RulingsAcross is the rulings in every product this subject may read reports
 // in, newest first, with how many there are.
 //
-// A product somebody may not work reports in contributes nothing, not even to
+// A product somebody may not read reports in contributes nothing, not even to
 // the count: a ruling says what a stranger's claim is, and reading it reads
 // the claim.
 func (s *Store) RulingsAcross(ctx context.Context, subject access.Subject,
 	asked RulingsAsked) ([]ReportRuling, int, error) {
 
 	products := reportProducts(subject, asked.ProductIDs)
+	if asked.Approvable {
+		kept := products[:0:0]
+		for _, id := range products {
+			if mayApproveRuling(subject, id) == nil {
+				kept = append(kept, id)
+			}
+		}
+		products = kept
+	}
 	if len(products) == 0 {
 		return []ReportRuling{}, 0, nil
 	}
 	var rows []ReportRuling
 	q := named(s.db.NewSelect().Model(&rows)).
 		Where("rr.product_id IN (?)", bun.List(products))
-	if asked.Waiting {
+	if asked.Waiting || asked.Approvable {
 		q = q.Where("rr.settled_at IS NULL").Where("rr.withdrawn_at IS NULL")
+	}
+	if asked.Approvable {
+		q = q.Where("rr.proposed_by <> ?", subject.ID)
 	}
 	if asked.Since != nil {
 		q = q.Where("rr.proposed_at >= ?", *asked.Since)

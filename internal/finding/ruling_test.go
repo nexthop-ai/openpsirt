@@ -687,3 +687,40 @@ func TestRulingsAcrossProductsReachOnlyTheProductsTheReaderWorksReportsIn(t *tes
 		}
 	})
 }
+
+func TestTheRulingsSomebodyMayApproveAreWaitingOthersInProductsTheyMayAgreeIn(t *testing.T) {
+	// The count a queue of what is pending your approval adds: not your own,
+	// not settled, and only where you may agree to a ruling at all.
+	each(t, func(t *testing.T, f *fixture) {
+		owner := f.planner(t, access.PrivateTriage)
+		named := f.claims(t, owner, 3)
+		for _, reference := range named {
+			if _, err := f.store.Rule(t.Context(), owner, f.productID, finding.Ruled{
+				References: []string{reference}, Disposition: finding.Rejected, Reasoning: "Slop.",
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		approvable := func(who access.Subject) int {
+			t.Helper()
+			_, total, err := f.store.RulingsAcross(t.Context(), who, finding.RulingsAsked{
+				Approvable: true, Limit: 50,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return total
+		}
+		if n := approvable(owner); n != 0 {
+			t.Errorf("the proposer may approve %d of their own rulings", n)
+		}
+		lead := f.somebody(t, "lead@example.com", access.Approver, access.PrivateRead)
+		if n := approvable(lead); n != 3 {
+			t.Errorf("an approver who reads undisclosed work may approve %d, want 3", n)
+		}
+		reader := f.somebody(t, "reader@example.com", access.PrivateRead)
+		if n := approvable(reader); n != 0 {
+			t.Errorf("somebody who only reads may approve %d", n)
+		}
+	})
+}

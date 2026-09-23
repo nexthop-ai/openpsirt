@@ -106,16 +106,18 @@ func registerRulings(api huma.API, in Ingest) {
 		Description: "Every ruling in the products you may read reports in, newest first, " +
 			"including withdrawn ones. A product you may not read reports in contributes " +
 			"nothing, not even to the count.\n\n" +
-			"`waiting` narrows to those waiting for a second person. `from` and `to` narrow " +
+			"`waiting` narrows to those waiting for a second person, and `approvable` to those " +
+			"you may agree to. `from` and `to` narrow " +
 			"to those proposed in a period, `to` exclusive, as the record's own period is.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product []string `query:"product,explode" doc:"Limit to these products, by name. Repeatable; any of them matches"`
-		Waiting bool     `query:"waiting" doc:"Only rulings waiting for a second person"`
-		From    string   `query:"from" doc:"Only rulings proposed on or after this date, as YYYY-MM-DD"`
-		To      string   `query:"to" doc:"Only rulings proposed before this date, as YYYY-MM-DD"`
-		Limit   int      `query:"limit" minimum:"1" maximum:"500" default:"50"`
-		Offset  int      `query:"offset" minimum:"0" default:"0"`
+		Product    []string `query:"product,explode" doc:"Limit to these products, by name. Repeatable; any of them matches"`
+		Waiting    bool     `query:"waiting" doc:"Only rulings waiting for a second person"`
+		Approvable bool     `query:"approvable" doc:"Only rulings you may agree to: waiting, proposed by somebody else, in a product where you may approve a ruling"`
+		From       string   `query:"from" doc:"Only rulings proposed on or after this date, as YYYY-MM-DD"`
+		To         string   `query:"to" doc:"Only rulings proposed before this date, as YYYY-MM-DD"`
+		Limit      int      `query:"limit" minimum:"1" maximum:"500" default:"50"`
+		Offset     int      `query:"offset" minimum:"0" default:"0"`
 	}) (*listOutput[RulingBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -124,8 +126,8 @@ func registerRulings(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		asked := finding.RulingsAsked{Waiting: input.Waiting, Limit: input.Limit,
-			Offset: input.Offset}
+		asked := finding.RulingsAsked{Waiting: input.Waiting, Approvable: input.Approvable,
+			Limit: input.Limit, Offset: input.Offset}
 		for _, name := range input.Product {
 			named, err := productNamedVisibly(ctx, in, subject, name)
 			if err != nil {

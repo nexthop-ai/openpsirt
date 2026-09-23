@@ -22696,7 +22696,7 @@ paths:
       description: |-
         Every ruling in the products you may read reports in, newest first, including withdrawn ones. A product you may not read reports in contributes nothing, not even to the count.
 
-        `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
+        `waiting` narrows to those waiting for a second person, and `approvable` to those you may agree to. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-rulings-across
@@ -22718,6 +22718,13 @@ paths:
           name: waiting
           schema:
             description: Only rulings waiting for a second person
+            type: boolean
+        - description: "Only rulings you may agree to: waiting, proposed by somebody else, in a product where you may approve a ruling"
+          explode: false
+          in: query
+          name: approvable
+          schema:
+            description: "Only rulings you may agree to: waiting, proposed by somebody else, in a product where you may approve a ruling"
             type: boolean
         - description: Only rulings proposed on or after this date, as YYYY-MM-DD
           explode: false

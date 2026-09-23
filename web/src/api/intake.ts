@@ -241,3 +241,22 @@ export async function uploadReportFile(product: string, reference: string, file:
     }),
   );
 }
+
+// useApprovable is how many rulings this reader may agree to, in one product
+// or across every product: waiting, proposed by somebody else, where they may
+// approve a ruling. What a count of what is pending their approval adds to the
+// claims the review queue counts.
+export function useApprovable(product?: string): UseQueryResult<number> {
+  return useQuery({
+    queryKey: ["rulings", "approvable", product ?? ""],
+    refetchInterval: 60_000,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/report-rulings", {
+          params: {
+            query: { limit: 1, approvable: true, ...(product ? { product: [product] } : {}) },
+          },
+        }),
+      ).total ?? 0,
+  });
+}

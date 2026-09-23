@@ -889,6 +889,13 @@ the heading names it. The exports narrow the same way, so a file taken from a
 narrowed screen is the narrowed backlog. Nothing narrower is offered — a claim is
 decided in a product and no finer.
 
+The count beside the queue on the rail, and the home screen's figure for what is
+pending your approval, add the rulings on vulnerability reports the reader may
+agree to — waiting, proposed by somebody else, in a product where they may
+approve a ruling — because those sit in the same queue. Rating downgrades and
+disclosure-date movements waiting on somebody are not in that count; they are
+their own sections of the queue.
+
 ## The claim page
 
 One claim, whole, and every act at that grain: revise, withdraw, comment,
