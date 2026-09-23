@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { reasonOffered, reasonsFor } from "./Outcome";
 import { notACredential } from "./noautofill";
 import { useState } from "react";

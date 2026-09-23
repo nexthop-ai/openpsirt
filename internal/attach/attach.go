@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package attach holds files that hang off an issue or a report, and the
 // rules about what may be stored and what may be served back.
 //

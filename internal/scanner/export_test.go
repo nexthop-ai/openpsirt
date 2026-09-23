@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package scanner
 
 import "github.com/nexthop-ai/openpsirt/internal/finding"

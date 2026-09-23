@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { rankedWhy, upgradeCount } from "../ui/ranked";
 import { ROLLED } from "../ui/severities";
 // The findings list's other ways of looking at the same rows.

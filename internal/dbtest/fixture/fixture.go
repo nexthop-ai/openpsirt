@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package fixture seeds a world for a test to run against.
 //
 // It is a sibling of dbtest rather than part of it, because dbtest is imported

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { Shape } from "../ui/Shape";
 import { notACredential } from "../ui/noautofill";
 import { useMemo, useState } from "react";

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command reserved reports SQL identifiers this code writes bare.
 //
 // Queries here are written once and run against four engines, and a name this

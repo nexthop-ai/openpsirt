@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useEffect } from "react";
 import { useLocation, useNavigationType } from "react-router-dom";
 import { markPlace, placeOf } from "./place";

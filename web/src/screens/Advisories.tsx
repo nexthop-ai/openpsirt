@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PAGE, useAdvisories, useStartAdvisory } from "../api/advisories";

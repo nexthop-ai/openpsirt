@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package scanner
 
 // Limits bound what one execution of a scanner may produce.

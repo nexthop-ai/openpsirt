@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useEffect, useState } from "react";
 import { Failed } from "./Failed";
 import { useReseed } from "./reseed";

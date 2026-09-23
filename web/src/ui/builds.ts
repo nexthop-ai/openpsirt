@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // One build of one product, as a string a checkbox set or a React list can be
 // keyed on.
 //

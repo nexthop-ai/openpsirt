@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build measure
 
 // The cost of an unbounded bulk promise, measured rather than assumed.

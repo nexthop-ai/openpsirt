@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package catalog holds what a scan can be filed against: the products, the
 // branches and tags within them, and the variants each of those is built as.
 //

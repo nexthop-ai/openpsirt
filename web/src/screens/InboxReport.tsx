@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { mayOf, useWho } from "../app/session";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";

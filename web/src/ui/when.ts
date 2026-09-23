@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The form a stored moment takes on screen.
 //
 // The absolute forms and the relative one, and nothing machine-shaped: never

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package vercmp orders two versions of one package, where the ecosystem it
 // came from defines an ordering, and refuses where it does not.
 //

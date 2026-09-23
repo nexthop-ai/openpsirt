@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Unsent text, kept where a closed tab, a crashed browser or a sleeping laptop
 // cannot take it.
 //

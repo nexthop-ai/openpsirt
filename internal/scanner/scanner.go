@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package scanner runs a vulnerability scan over an inventory.
 //
 // The scanner sits behind an interface with one implementation, the same shape

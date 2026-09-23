@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { type Scoped } from "../../app/scope";
 
 // The named reports, and where each is read.

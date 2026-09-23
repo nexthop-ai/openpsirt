@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
 import { unwrap } from "./queries";

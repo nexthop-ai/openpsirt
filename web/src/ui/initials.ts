@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The two letters standing for somebody where there is no room for a name.
 //
 // One function, because there were three and they had drifted: two split an

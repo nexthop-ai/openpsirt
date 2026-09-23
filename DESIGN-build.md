@@ -111,7 +111,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make govulncheck` | Known vulnerabilities in dependencies |
 | `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
 | `make web-audit` | Known vulnerabilities in what the interface installs |
-| `make secrets` | Credentials in the working tree, pinned scanner |
+| `make secrets` | Credentials in what a commit could carry — tracked files as they stand and untracked files git does not ignore — with a pinned scanner |
 | `make openapi` | Regenerates the API document from the code |
 | `make openapi-current` | The committed API document against what the code generates |
 | `make sbom` | This project's own CycloneDX inventory |
@@ -125,6 +125,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
 | `make unclaimed` | Every requirement is named by a design document |
 | `make vendored` | Every file somebody else wrote is accounted for, under a license this tree may carry, and named in `NOTICE` where its license asks. See below |
+| `make spdx` | Every source file opens with this project's copyright and an SPDX license identifier. `make spdx-fix` writes it where missing. See below |
 | `make pins-check` | Every version pinned in two files still agrees |
 | `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
 | `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
@@ -153,8 +154,8 @@ query runs both.
 | Touched | Adds |
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
-| `web/**` alone | `web-check` |
-| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `test` |
+| `web/**` alone | `web-check`, `spdx` |
+| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
@@ -610,12 +611,32 @@ from and the license its source states.
 | Rule | |
 |---|---|
 | A file is found in the tree, then looked for in the list | Every file under a `testdata` directory, and every file carrying a copyright line that is not this project's, a license identifier, a document's data license, or a comment saying `NOTICE` records it. A file copied in without a line in the list fails the gate |
+| This project's own header is not a mark | A file carrying this project's copyright is ours, and the identifier beside it naming this tree's own license says nothing more. Any other identifier in it is still somebody else's terms |
 | Found broadly, and a file written here is listed as ours | A file the search misses is one nobody is asked about. A fixture written here costs a line saying so |
-| Not searched | `NOTICE` and `LICENSE`, which are the statements; markdown, which is prose about the tree; a file that is not text; and the gate's own source, which spells every mark it looks for |
+| Not searched | `NOTICE` and `LICENSE`, which are the statements; markdown, which is prose about the tree; a file that is not text; and the gate's own source and the list it reads, which spell every mark it looks for |
 | Held to a license this tree may carry | The dependency allowlist, and beside it the licenses data is published under: a dedication to the public domain, CC-BY-4.0, and the weakness catalog's own terms. An expression is evaluated as the dependency check evaluates one |
 | Named in `NOTICE` where the license asks for attribution | Every license here but a public-domain dedication asks for it. A file under one that `NOTICE` does not name fails the gate |
 | Every path `NOTICE` names is in the tree and held as somebody else's | The other direction, so a file removed or renamed leaves no attribution pointing at nothing |
 | What a file's license is, is read by a person | A data file states its license in its own words where it states one at all. The list is where somebody writes down what they read, and the gate holds them to having written it |
+
+### License headers
+
+Every source file opens with this project's copyright and an SPDX license
+identifier, checked by `make spdx` and written where missing by `make
+spdx-fix`.
+
+    // Copyright Nexthop Systems Inc.
+    // SPDX-License-Identifier: Apache-2.0
+
+| Rule | |
+|---|---|
+| Source is Go, TypeScript, JavaScript, CSS, shell, Python, a makefile and a Dockerfile | The files a license scanner reads as code. Markdown, configuration and data carry none |
+| Each writes it in its own comment | Two slashes, a slash-star pair per line in CSS, and a hash elsewhere |
+| It comes first, after only what has to | An interpreter line, and a Dockerfile's parser directives, which are read only from the top. A blank line follows it, so a Go file's package comment stays attached to the package |
+| A file carrying somebody else's work states their terms beside this tree's own | The expression is this license joined with the one the list of copied files holds for it, so the two gates cannot disagree about a file |
+| A fixture and a file a third party's tool writes whole carry none | A fixture is data the copied-files list accounts for. A generated file loses the header every time it is written; the generators that are this project's write it themselves |
+| A wrong header is reported and not rewritten | Which of the two is right is a person's to read |
+| No year | The dated notice is in `NOTICE`. A year per file is either touched every January or wrong, and a wrong one reads worse than none |
 
 ## The API document
 

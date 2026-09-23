@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package database opens and describes the supported databases.
 //
 // Four engines are supported and all four are tested. Queries elsewhere in the

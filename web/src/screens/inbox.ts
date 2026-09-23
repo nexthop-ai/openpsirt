@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Disposition, Report, Rulable } from "../api/intake";
 
 // What a report was judged to be, in the words every screen says it in.

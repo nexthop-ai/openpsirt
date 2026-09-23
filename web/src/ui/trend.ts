@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The words the trend panels use, and the cases where they say nothing.
 //
 // Kept out of the screen so the sentences can be tested as sentences. A figure

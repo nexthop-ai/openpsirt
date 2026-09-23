@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package weakness answers what a weakness identifier is called.
 //
 // A published advisory cannot state one without the other. CSAF carries a

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A URL a third party supplied, judged before it becomes somewhere to click.
 //
 // A scanner's advisory references and the records an enrichment feed carries

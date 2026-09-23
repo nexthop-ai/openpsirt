@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { FLOORS } from "../ui/severities";
 import { labeled } from "../ui/Outcome";
 import { notACredential } from "../ui/noautofill";

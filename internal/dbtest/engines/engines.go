@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package engines holds the rule for which engines a test run may touch.
 //
 // It exists as a package of its own, below dbtest, because two of the tests

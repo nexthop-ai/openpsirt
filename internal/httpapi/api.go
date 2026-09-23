@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package httpapi builds the HTTP surface.
 //
 // The OpenAPI document is generated from the operations registered here — it is

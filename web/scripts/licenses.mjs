@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The license of everything the interface ships, against the allowlist.
 //
 // The Go side of this has been checked since the build was written: nothing

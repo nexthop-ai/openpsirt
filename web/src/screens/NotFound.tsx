@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { Link, useLocation } from "react-router-dom";
 
 // An address this application does not answer.

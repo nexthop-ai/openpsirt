@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Notes on the issue in this product, which record no judgment.
 //
 // The thread that is here whether or not anybody has decided anything. The

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package build holds no code. It exists so that the makefiles this project
 // is built by are checked by the gate they run, the way internal/docs checks
 // the documents.

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A person's form in a picker, and the resolution of what was typed.
 //
 // The name is what somebody recognizes and the identity is what the server

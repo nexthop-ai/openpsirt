@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, expect, it } from "vitest";
 import { BANDS, BELOW_LOW, ROLLED, bandOf, isBand, ratedAs } from "./severities";
 

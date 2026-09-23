@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The groups of the rail that are folded away.
 //
 // The rail asks for about 935 pixels of entries, which is taller than the

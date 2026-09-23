@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useSearchParams } from "react-router-dom";
 
 import type { Body } from "../api/client";

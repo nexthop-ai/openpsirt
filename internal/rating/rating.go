@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package rating is how a product's own rating of an issue is read in SQL.
 //
 // A leaf, and deliberately a small one. What a finding's severity *is* has one

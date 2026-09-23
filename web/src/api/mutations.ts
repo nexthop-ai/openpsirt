@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import { unwrap } from "./queries";

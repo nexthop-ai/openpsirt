@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package access answers who is asking and what they may reach.
 //
 // Two things are kept apart deliberately. Authenticating establishes who

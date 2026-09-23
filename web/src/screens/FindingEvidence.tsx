@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The record of the flaw, as against what anybody has said about it.
 //
 // The component's place, upstream's releases, the route the scanner

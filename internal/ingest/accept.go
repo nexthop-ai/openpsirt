@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package ingest decides what happens to a scan that arrives, and records it.
 //
 // The decisions here are about the scan's metadata rather than its contents:

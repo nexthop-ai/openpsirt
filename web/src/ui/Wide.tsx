@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 // A table that may be wider than the box it is in.

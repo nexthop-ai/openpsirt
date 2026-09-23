@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useEffect, type RefObject } from "react";
 
 // Closing something open when the reader's attention leaves it.

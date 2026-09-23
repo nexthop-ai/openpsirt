@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useState } from "react";
 
 // Local state that has to start again when the thing it was seeded from moves.

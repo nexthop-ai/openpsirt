@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command negatives reports a 404 built from an error's own text.
 //
 // A 404 asserts that a name reaches nothing. Building its body from an

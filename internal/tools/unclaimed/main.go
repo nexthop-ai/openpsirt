@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command unclaimed reports requirements that no design document names.
 //
 // The chain this repository is organized around runs one way: code satisfies a

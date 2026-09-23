@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // What a list of upgrade candidates says about itself.
 //
 // The flag changes what the count means rather than what it says. Ranked, a

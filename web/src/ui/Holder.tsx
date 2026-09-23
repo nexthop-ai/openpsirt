@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { useRef, useState } from "react";
 import { useClickAway } from "./away";
 import { useQuery } from "@tanstack/react-query";

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package triage holds what people decide about findings, and the rules for
 // when a decision stops applying.
 //

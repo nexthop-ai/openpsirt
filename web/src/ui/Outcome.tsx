@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The outcomes. All but "affected" hide risk, which is the distinction that
 // decides whether a second person has to agree — and the two that promise work
 // hide it only until the date they promised, which is what they are gated on

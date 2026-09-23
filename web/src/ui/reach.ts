@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The guided review's own question, decided apart from the sheet
 // that draws it.
 //

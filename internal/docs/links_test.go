@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package docs holds no code. It exists so that the documents this project
 // leans on are checked by the same gate the code is.
 package docs_test

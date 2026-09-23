@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A version shared by every component at one level of the dependency tree.
 //
 // A version shared by components of *different names* is not describing any of

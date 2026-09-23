@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package vex writes what we have decided about the third-party components a
 // build ships, in the format a customer's own scanner reads.
 //

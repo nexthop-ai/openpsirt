@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Whether what a document says now is what last went out.
 //
 // The server compares what would be generated now with what was kept when it

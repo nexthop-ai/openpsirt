@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // The placeholder a screen shows while it is waiting.
 //
 // One component rather than the sentence typed out thirty-nine times in four

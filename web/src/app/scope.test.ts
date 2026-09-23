@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { beforeEach, describe, expect, it } from "vitest";
 import { findingsPath, needsBuild, onFindings, remember, rescoped, scopeQuery } from "./scope";
 

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { Link, useParams } from "react-router-dom";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";

@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command narrowed reports a build resolved for a case collaborator whose
 // names then reach a read that carries no subject.
 //

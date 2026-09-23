@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // A decision's address, which resolves to the claim it is one row of.
 //
 // Every act belongs to the claim — the reasoning, the agreement, the

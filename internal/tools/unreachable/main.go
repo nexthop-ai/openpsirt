@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Command unreachable reports exported functions and methods that nothing
 // outside their own declaration ever names.
 //

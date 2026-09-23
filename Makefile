@@ -1,3 +1,6 @@
+# Copyright Nexthop Systems Inc.
+# SPDX-License-Identifier: Apache-2.0
+
 # Everything CI runs is reachable from here, so a developer can reproduce any
 # failure with one command using the same versions.
 
@@ -151,7 +154,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: vendored attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
+.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
 
 all: check build
 
@@ -600,7 +603,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed vendored reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+check: build vet lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -674,9 +677,20 @@ web-check:
 # is still in the objects, and finding that is what the platform product is
 # for. Nothing here should ever have been in a commit, which is the point of
 # running this before one.
+#
+# What is scanned is what a commit could carry: every tracked file as it stands
+# in the working tree, and every untracked file git does not ignore, copied
+# aside. The scanner reads no ignore file, so pointed at the checkout it walks
+# the demo's data and the build output as well: 14.6 MB that a commit carries
+# scans in a second, and beside the demo's 7.7 GB the scan runs past twenty
+# minutes.
 secrets:
-	$(GO) run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir . \
-		--no-banner --redact
+	@into=$$(mktemp -d) && trap 'rm -rf "$$into"' EXIT && \
+	git ls-files -z --cached --others --exclude-standard \
+	  | while IFS= read -r -d '' file; do [ -f "$$file" ] && printf '%s\0' "$$file"; done \
+	  | tar --null -T - -cf - | tar -C "$$into" -xf - && \
+	cd "$$into" && $(GO) run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir . \
+		--no-banner --redact --config .gitleaks.toml
 
 # Known vulnerabilities in what the interface installs.
 #
@@ -795,6 +809,15 @@ unclaimed:
 # license this tree may carry, and named in NOTICE where the license asks.
 vendored:
 	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) $(GO) run ./internal/tools/vendored
+
+# Every source file opens with its copyright and its license identifier, so a
+# scanner reads the license file by file. spdx-fix writes the header into every
+# file missing one.
+spdx:
+	$(GO) run ./internal/tools/spdx
+
+spdx-fix:
+	$(GO) run ./internal/tools/spdx -fix
 
 # CI fails when the committed document has drifted, so check the same thing.
 openapi-current: openapi

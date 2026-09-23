@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 import { Link } from "react-router-dom";
 
 // The place you are in, and the way back up. The findings list is bound to one

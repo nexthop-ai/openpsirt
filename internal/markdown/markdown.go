@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Package markdown is the one place text a person typed becomes markup.
 //
 // Two halves, kept apart deliberately.

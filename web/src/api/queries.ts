@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 // Thrown when the server refuses. Carries the status so a caller can tell an
 // ended session from a real failure, and the server's own sentence so the
 // screen shows what the server said rather than a sentence invented here.

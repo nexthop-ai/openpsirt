@@ -1,3 +1,6 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 package database
 
 // PageSize is how many rows a paged read returns, given what was asked for.
