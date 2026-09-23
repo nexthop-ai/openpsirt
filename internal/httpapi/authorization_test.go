@@ -320,7 +320,11 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		// who is not handed the disclosed stream.
 		"embargo-reader":  {access.PrivateRead},
 		"embargo-triager": {access.PrivateTriage},
-		"approver":        {access.Approver},
+		// Reading the disclosed half and triaging the undisclosed one:
+		// a right asked at one visibility is answered at that one, and
+		// this is the identity where the two answers differ.
+		"split-triager": {access.PublicRead, access.PrivateTriage},
+		"approver":      {access.Approver},
 		// Assigning is the other capability that grants
 		// nothing on its own, and the dispatcher above holds
 		// it alongside a read role, so this is the identity
