@@ -677,9 +677,20 @@ web-check:
 # is still in the objects, and finding that is what the platform product is
 # for. Nothing here should ever have been in a commit, which is the point of
 # running this before one.
+#
+# What is scanned is what a commit could carry: every tracked file as it stands
+# in the working tree, and every untracked file git does not ignore, copied
+# aside. The scanner reads no ignore file, so pointed at the checkout it walks
+# the demo's data and the build output as well: 14.6 MB that a commit carries
+# scans in a second, and beside the demo's 7.7 GB the scan runs past twenty
+# minutes.
 secrets:
-	$(GO) run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir . \
-		--no-banner --redact
+	@into=$$(mktemp -d) && trap 'rm -rf "$$into"' EXIT && \
+	git ls-files -z --cached --others --exclude-standard \
+	  | while IFS= read -r -d '' file; do [ -f "$$file" ] && printf '%s\0' "$$file"; done \
+	  | tar --null -T - -cf - | tar -C "$$into" -xf - && \
+	cd "$$into" && $(GO) run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir . \
+		--no-banner --redact --config .gitleaks.toml
 
 # Known vulnerabilities in what the interface installs.
 #

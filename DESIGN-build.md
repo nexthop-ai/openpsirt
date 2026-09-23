@@ -111,7 +111,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make govulncheck` | Known vulnerabilities in dependencies |
 | `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
 | `make web-audit` | Known vulnerabilities in what the interface installs |
-| `make secrets` | Credentials in the working tree, pinned scanner |
+| `make secrets` | Credentials in what a commit could carry — tracked files as they stand and untracked files git does not ignore — with a pinned scanner |
 | `make openapi` | Regenerates the API document from the code |
 | `make openapi-current` | The committed API document against what the code generates |
 | `make sbom` | This project's own CycloneDX inventory |
