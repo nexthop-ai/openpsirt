@@ -60,6 +60,7 @@ var called = map[Kind]string{
 	VulnerabilityDataStale: "The vulnerability data has stopped moving",
 	RiskUnagreed:           "Something is hidden with nobody agreeing",
 	PairsConcentrated:      "One pair is agreeing to most of a product's work",
+	SupplierSilent:         "A supplier has stopped answering",
 }
 
 // generalSubject is what a notification of no known kind is called.

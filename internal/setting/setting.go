@@ -179,6 +179,14 @@ const (
 	// on the cadence the vulnerability data does. Shortening it multiplies
 	// requests to third parties as well as scans here.
 	ScanEvery = "scanning.every"
+	// SupplierSilentAfter is how long a configured supplier may go without a
+	// successful read before administrators are told.
+	//
+	// A supplier that stopped answering looks exactly like one that has
+	// published nothing, which is the silent failure the system screen exists
+	// for. The length is a judgment about how patient to be with somebody
+	// else's service, so it is tuned here rather than compiled in.
+	SupplierSilentAfter = "scanning.supplier-silent-after"
 	// UpstreamCurrency is whether this deployment asks public package
 	// indexes what the newest version of a component is.
 	//
@@ -436,6 +444,14 @@ const DefaultDeltaFloor = 10
 // advisory published this morning waits for the difference before anybody sees
 // it against a release that has not been rebuilt in a year.
 const DefaultScanEvery = 24 * time.Hour
+
+// DefaultSupplierSilentAfter is how long a supplier may go unread before the
+// deployment is told, where nobody has said.
+//
+// A week, for the reason the quiet-build window is a week: a publisher having a
+// bad day is not an alert, and one that stopped answering is noticed in the
+// week it stopped.
+const DefaultSupplierSilentAfter = 7 * 24 * time.Hour
 
 // DefaultDiscloseAfter is how long an undisclosed finding has before its date
 // arrives, where a deployment has not said otherwise.

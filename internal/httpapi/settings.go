@@ -158,6 +158,8 @@ var settable = []struct {
 		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultDeltaFloor) }, false},
 	{setting.ScanEvery, "How often everything tracked is scanned again against the vulnerability data of the day. A release that is never rebuilt has the same components it always had and a different answer every month, so this is what finds an advisory published after it shipped. It is also how often each configured supplier is read again, so shortening it makes more requests to third parties as well as more scans here",
 		aDuration, nil, func(Ingest) string { return setting.DefaultScanEvery.String() }, false},
+	{setting.SupplierSilentAfter, "How long a configured supplier may go without being read successfully before administrators are told. Never shorter in effect than two scan intervals, since a supplier is read once each",
+		aDuration, nil, func(Ingest) string { return setting.DefaultSupplierSilentAfter.String() }, false},
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: a deployment that cannot reach out loses this answer, and what a scan reports is unaffected. What goes out is a component's name, one request per component, carrying the name and nothing else — so names this deployment calls its own are held back, and the report of what has no upstream answer says which",
 		aSwitch, theSwitch, func(Ingest) string { return setting.Off }, false},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time",

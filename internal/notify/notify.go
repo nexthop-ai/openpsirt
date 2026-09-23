@@ -57,7 +57,8 @@ func Kinds() []Kind {
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
-		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, InventoryMoved,
+		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
+		InventoryMoved,
 		ObligationOpen, ObligationNear, ObligationPassed,
 	}
 }
@@ -244,6 +245,11 @@ const (
 	// that it is a choice. Told to administrators, and cleared by the share
 	// falling back under the threshold or the period moving past it.
 	PairsConcentrated Kind = "pairs-concentrated"
+	// SupplierSilent is a configured supplier that has not been read
+	// successfully in longer than the deployment allows. Told to
+	// administrators, and cleared by a read succeeding or the supplier being
+	// withdrawn.
+	SupplierSilent Kind = "supplier-silent"
 )
 
 // Notification is one thing somebody was told.

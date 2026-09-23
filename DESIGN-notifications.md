@@ -211,12 +211,12 @@ population: one routing rule places thousands of findings in a sweep.
 
 ## Reports that must come back empty
 
-Two of them, and being empty is what they are for. The disposition register
-filtered for what one person decided should return nothing, because every
-outcome that hides risk needs a second person; and the vulnerability data
-should never have stopped moving.
+Being empty is what these are for. The disposition register filtered for what
+one person decided should return nothing, because every outcome that hides risk
+needs a second person; the vulnerability data should never have stopped moving;
+and a configured supplier should never stop answering.
 
-Neither is a report anybody opens, and neither is mailed on a schedule.
+None is a report anybody opens, and none is mailed on a schedule.
 
 | Shape | Why it fails |
 |---|---|
@@ -231,9 +231,10 @@ sent when it does not reaches somebody who was not looking.
 |---|---|
 | The vulnerability data has stopped moving | Nothing failed. Every scan since answers as confidently as ever against what was known a month ago, and a finding newer data would have opened has not |
 | Something is hidden with nobody's agreement | Anything that hides risk needs a second person, so one standing with none means the write path was got around |
+| A supplier has stopped answering | One that stopped and one that published nothing look the same everywhere but the supplier's own panel. Raised once a configured supplier has gone unread past a setting, a week by default and never shorter than two scan intervals; cleared by a read succeeding or the supplier being withdrawn |
 | One pair is agreeing to most of a product's work | The second person is there, and in form only. Not a report that must be empty, and it carries thresholds for that reason: below them one pair doing everything is what a small team looks like |
 
-All three go to administrators, like the other conditions about the deployment rather
+Each goes to administrators, like the other conditions about the deployment rather
 than about anybody's work.
 
 | Rule | Reason |

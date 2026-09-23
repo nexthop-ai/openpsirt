@@ -115,6 +115,7 @@ func (w *Watch) tellAdministrators(ctx context.Context, admins []int64) (opened,
 		{VulnerabilityDataStale, w.dataStale, "that the vulnerability data has stopped moving"},
 		{RiskUnagreed, w.riskUnagreed, "what stands with nobody agreeing"},
 		{PairsConcentrated, w.pairsConcentrated, "which pairs agree to most of a product's work"},
+		{SupplierSilent, w.suppliersSilent, "which suppliers have stopped answering"},
 	} {
 		holding, err := each.of(ctx)
 		if err != nil {
