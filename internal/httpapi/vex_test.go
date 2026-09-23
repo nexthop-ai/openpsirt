@@ -669,3 +669,29 @@ func TestAWrongMatchPublishesAsNotAffectedAndStaysThereWhenTheVersionMoves(t *te
 		}
 	})
 }
+
+func TestComparingABuildPastTheCeilingAnswersAsTooLarge(t *testing.T) {
+	// The issuance list maps this answer to no comparison rather than a
+	// failed read: what went out is still what went out.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		recordedIssuance(t, r, "triager")
+		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-1000"} {
+			claim, _ := r.claimed(t, "triager", issue, "linux-image", dismissal)
+			if ok := asPerson(t, r, "reviewer", http.MethodPost,
+				fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); ok.Code != http.StatusOK {
+				t.Fatalf("approving answered %d: %s", ok.Code, ok.Body.String())
+			}
+		}
+		who, err := r.rights.Resolve(t.Context(), "triager")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = vex.NewStoreCarrying(r.db.DB, 1).Changed(t.Context(), who,
+			publisher.Named{Name: "Example Networks", Namespace: "https://example.test"},
+			"mine", "master", "broadcom")
+		if !errors.Is(err, vex.ErrTooLarge) {
+			t.Fatalf("comparing a build past the ceiling answered %v", err)
+		}
+	})
+}

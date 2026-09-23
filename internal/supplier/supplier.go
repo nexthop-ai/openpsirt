@@ -241,9 +241,10 @@ func (s *Store) For(ctx context.Context, subject access.Subject, productID int64
 // inserting a second under the same name would fail on a row nothing lists,
 // with a message about a supplier nobody can see.
 //
-// Taking one up again keeps how far it had been read, so it takes what was
-// issued while it was away and nothing it already read. How far back that
-// reaches is bounded by the history window a new supplier is read from.
+// Taking one up again at the same address keeps how far it had been read, so
+// it takes what was issued while it was away and nothing it already read. How
+// far back that reaches is bounded by the history window a new supplier is
+// read from. Taken up at another address, it starts where a new one does.
 func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64,
 	name, address string) (*Source, error) {
 
@@ -286,13 +287,20 @@ func (s *Store) Add(ctx context.Context, subject access.Subject, productID int64
 		CreatedBy: subject.ID, CreatedAt: now,
 	}
 	res, err := s.db.NewUpdate().Model((*Source)(nil)).
+		// The mark is kept only where the address is the one it was read
+		// at. An address never read has nothing behind it this supplier has
+		// seen, so it starts where a new one does. Ahead of the address
+		// itself, because one engine applies the assignments in order and
+		// would otherwise compare against the value just written.
+		Set(`"caught_up_to" = CASE WHEN "url" = ? THEN "caught_up_to" END`, row.URL).
+		Set(`"caught_up_mark" = CASE WHEN "url" = ? THEN "caught_up_mark" ELSE '' END`, row.URL).
 		Set("retired_at = ?", nil).
 		Set("display_name = ?", row.Display).
 		Set("url = ?", row.URL).
 		Set("created_by = ?", row.CreatedBy).
 		Set("created_at = ?", row.CreatedAt).
 		// Cleared, so a failure from before it was withdrawn is not read as
-		// one by the pass that has not run yet. The mark is kept.
+		// one by the pass that has not run yet.
 		Set("fetched_at = ?", nil).
 		Set("reached_at = ?", nil).
 		Set("failed = ?", "").

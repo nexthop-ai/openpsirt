@@ -121,7 +121,7 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 }
 
 func TestAnAdvisoryNamesWhoAgreesAndSaysWhetherItMovedSinceItWentOut(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		flaw := r.embargoed(t)
 		named := advisoryOver(t, r, "private-triage", "mine", flaw)

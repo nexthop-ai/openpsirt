@@ -949,8 +949,9 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 // Changed reports whether what an advisory's document says now differs from
 // what last went out, or nil where that has no answer.
 //
-// Nil where nothing has gone out, and where no publisher is configured or the
-// advisory covers nothing, since then there is no document to compare. The
+// Nil where nothing has gone out, and where no publisher is configured, the
+// advisory covers nothing, or this reader may not generate it, since then
+// there is no document to compare. The
 // comparison is between settled digests, so a document whose dates, version
 // and status moved and nothing else reads as unchanged.
 func (s *Store) Changed(ctx context.Context, subject access.Subject, who publisher.Named,
@@ -959,19 +960,25 @@ func (s *Store) Changed(ctx context.Context, subject access.Subject, who publish
 	if !who.Stated() {
 		return nil, nil
 	}
-	doc, row, err := s.forAdvisory(ctx, subject, who, identifier)
-	if errors.Is(err, ErrNothingToSay) {
-		return nil, nil
-	}
+	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
 		return nil, err
 	}
 	gone, err := s.issuances(ctx, row)
-	if err != nil {
+	if err != nil || len(gone) == 0 {
 		return nil, err
 	}
-	if len(gone) == 0 {
+	// Generated as this reader, which a reader who may see the advisory
+	// cannot always do: an undisclosed flaw it covers is one they may not
+	// read. That is no answer to this question rather than a refusal of the
+	// advisory they asked for.
+	doc, _, err := s.forAdvisory(ctx, subject, who, identifier)
+	switch {
+	case errors.Is(err, ErrNothingToSay), errors.Is(err, ErrNoSuchIssue),
+		errors.Is(err, ErrNotOurs):
 		return nil, nil
+	case err != nil:
+		return nil, err
 	}
 	now, err := settledDigest(doc)
 	if err != nil {

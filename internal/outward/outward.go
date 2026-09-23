@@ -14,6 +14,7 @@
 package outward
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -82,7 +83,8 @@ func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 	return &http.Client{
 		Timeout: within,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			return fmt.Errorf("refused a redirect to %s: a provider's endpoints are configured, not followed", req.URL.Host)
+			return fmt.Errorf("%w a redirect to %s: a provider's endpoints are configured, not followed",
+				ErrRefused, req.URL.Host)
 		},
 		Transport: &guard{
 			allowed: allowed,
@@ -90,6 +92,11 @@ func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 		},
 	}
 }
+
+// ErrRefused says the guarded client turned a request away itself: a redirect,
+// a scheme other than https, or a host nobody configured. Nothing was asked of
+// the address, so a caller can tell this from a provider that did not answer.
+var ErrRefused = errors.New("refused")
 
 // guard refuses a request to anywhere but the hosts a provider was configured
 // with.
@@ -105,10 +112,11 @@ type guard struct {
 
 func (g *guard) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Scheme != "https" {
-		return nil, fmt.Errorf("refused a request to %s: a provider is reached over https", req.URL)
+		return nil, fmt.Errorf("%w a request to %s: a provider is reached over https", ErrRefused, req.URL)
 	}
 	if !g.allowed[strings.ToLower(req.URL.Hostname())] {
-		return nil, fmt.Errorf("refused a request to %s: not a configured provider host", req.URL.Hostname())
+		return nil, fmt.Errorf("%w a request to %s: not a configured provider host",
+			ErrRefused, req.URL.Hostname())
 	}
 	return g.inner.RoundTrip(req)
 }

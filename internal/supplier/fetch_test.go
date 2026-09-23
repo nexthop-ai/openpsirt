@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
@@ -30,9 +31,10 @@ type publisher struct {
 	// failing answers a status instead of a body at these paths, so a test can
 	// tell a refusal about one document from a publisher having a bad day.
 	failing map[string]int
-	// linked names a digest file in a document's feed entry, by the
-	// document's path.
-	linked map[string]string
+	// linked names digest files in a document's feed entry, by the
+	// document's path, and moved answers a redirect at these paths.
+	linked map[string][]string
+	moved  map[string]string
 	asked  []string
 	// override answers everything where a test needs a directory this
 	// publisher would not serve. Set before the first request.
@@ -43,7 +45,7 @@ func serving(t *testing.T) *publisher {
 	t.Helper()
 	p := &publisher{
 		documents: map[string]string{}, stamped: map[string]string{},
-		failing: map[string]int{}, linked: map[string]string{},
+		failing: map[string]int{}, linked: map[string][]string{}, moved: map[string]string{},
 	}
 	// https, because the fetcher refuses anything else: what comes back is
 	// read as a publisher's own judgment, and over plain http it is read as
@@ -52,6 +54,10 @@ func serving(t *testing.T) *publisher {
 		p.asked = append(p.asked, r.URL.Path)
 		if p.override != nil {
 			p.override(w, r)
+			return
+		}
+		if to, moving := p.moved[r.URL.Path]; moving {
+			http.Redirect(w, r, to, http.StatusFound)
 			return
 		}
 		if code, refusing := p.failing[r.URL.Path]; refusing {
@@ -66,8 +72,11 @@ func serving(t *testing.T) *publisher {
 			entries := make([]string, 0, len(p.documents))
 			for path, stamp := range p.stamped {
 				hash := ""
-				if sum, named := p.linked[path]; named {
-					hash = fmt.Sprintf(`,{"rel":"hash","href":%q}`, p.server.URL+sum)
+				for _, sum := range p.linked[path] {
+					if !strings.HasPrefix(sum, "https://") {
+						sum = p.server.URL + sum
+					}
+					hash += fmt.Sprintf(`,{"rel":"hash","href":%q}`, sum)
 				}
 				entries = append(entries, fmt.Sprintf(
 					`{"link":[{"rel":"self","href":%q}%s],"updated":%q,"content":{"type":"application/json","src":%q}}`,
@@ -117,7 +126,7 @@ func (p *publisher) reaching() func(string) *http.Client {
 		return &http.Client{
 			Transport: pinned{host: host, inner: trusting.Transport},
 			CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-				return fmt.Errorf("refused a redirect to %s", req.URL.Host)
+				return fmt.Errorf("%w a redirect to %s", outward.ErrRefused, req.URL.Host)
 			},
 		}
 	}
@@ -130,8 +139,8 @@ type pinned struct {
 
 func (p pinned) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !strings.EqualFold(req.URL.Hostname(), p.host) {
-		return nil, fmt.Errorf("refused a request to %s: not a configured provider host",
-			req.URL.Hostname())
+		return nil, fmt.Errorf("%w a request to %s: not a configured provider host",
+			outward.ErrRefused, req.URL.Hostname())
 	}
 	return p.inner.RoundTrip(req)
 }

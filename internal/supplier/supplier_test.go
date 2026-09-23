@@ -131,6 +131,34 @@ func TestAWithdrawnSupplierTakenUpAgainResumesWhereItStopped(t *testing.T) {
 	})
 }
 
+func TestASupplierTakenUpAgainAtAnotherAddressStartsAfresh(t *testing.T) {
+	// Nothing at the new address has been read, so the mark from the old one
+	// would skip what is there without saying so.
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+
+		row, err := store.Add(ctx, f.admin, f.product, "SUSE", described)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Reached(ctx, row.ID, time.Now().UTC(), supplier.Mark("a"), nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := store.Retire(ctx, f.admin, f.product, "SUSE"); err != nil {
+			t.Fatal(err)
+		}
+		again, err := store.Add(ctx, f.admin, f.product, "SUSE",
+			"https://elsewhere.example/.well-known/csaf/provider-metadata.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.CaughtUpTo != nil || again.CaughtUpMark != "" {
+			t.Errorf("a new address carries the old mark: %v %q", again.CaughtUpTo, again.CaughtUpMark)
+		}
+	})
+}
+
 func TestOnlyAnAdministratorConfiguresASupplier(t *testing.T) {
 	// Configuring one admits a third party's judgment into this deployment's
 	// evidence and points it at an address of their choosing.

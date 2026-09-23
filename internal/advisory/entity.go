@@ -639,21 +639,22 @@ type Nameable struct {
 const mostNameable = 500
 
 // Nameable is every flaw recorded here in one product that this subject may
-// name on an advisory, open or fixed.
+// name on an advisory, open or fixed, up to a bound, and how many there are in
+// all.
 //
 // Fixed ones included, because an advisory is usually written after the fix
 // lands. The same rows naming one accepts: recorded by a person, at a
 // visibility this subject may see, in a product they triage. Somebody who does
 // not triage the product is answered as though it were not declared.
 func (s *Store) Nameable(ctx context.Context, subject access.Subject,
-	product string) ([]Nameable, error) {
+	product string) ([]Nameable, int, error) {
 
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if !triages(subject, named.ID) {
-		return nil, catalog.ErrNotFound
+		return nil, 0, catalog.ErrNotFound
 	}
 	grouped := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -665,6 +666,11 @@ func (s *Store) Nameable(ctx context.Context, subject access.Subject,
 		Where("f.kind = ?", finding.Entered).
 		Where("f.visibility IN (?)", bun.List(access.Visible(subject, named.ID))).
 		GroupExpr("f.vulnerability_id")
+	var total int
+	if err := s.db.NewSelect().TableExpr(`(?) AS "recorded_flaw"`, grouped).
+		ColumnExpr("COUNT(*)").Scan(ctx, &total); err != nil {
+		return nil, 0, fmt.Errorf("count the flaws recorded in that product: %w", err)
+	}
 	var rows []Nameable
 	err = s.db.NewSelect().
 		TableExpr(`(?) AS "recorded_flaw"`, grouped).
@@ -676,7 +682,7 @@ func (s *Store) Nameable(ctx context.Context, subject access.Subject,
 		Limit(mostNameable).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read the flaws recorded in that product: %w", err)
+		return nil, 0, fmt.Errorf("read the flaws recorded in that product: %w", err)
 	}
-	return rows, nil
+	return rows, total, nil
 }

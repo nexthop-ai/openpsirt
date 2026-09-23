@@ -60,16 +60,15 @@ func registerVEX(api huma.API, in Ingest) {
 		Summary: "List the times a VEX document went out",
 		Description: "What has been published for this build, oldest first: which revision, " +
 			"when, and what the document hashed to at the time.\n\n" +
-			"Readable without generating a document. Somebody deciding whether to publish a " +
-			"revision is asking before they generate anything, and the digest beside each " +
-			"entry is what answers whether the last one still describes what this would " +
-			"produce.\n\n" +
+			"The record itself is read without generating a document. `changed` generates " +
+			"the public one to compare, so it is absent where that cannot be done.\n\n" +
 			"The digest is over what the document says, with the moment it was generated, " +
 			"the version and the build of OpenPSIRT that wrote it left out, so a document " +
 			"regenerated unchanged hashes the same. `changed` says whether the public " +
 			"document generated now differs from the last one that went out.\n\n" +
-			"Answered whether or not a publisher is configured for this deployment. Without " +
-			"one, nothing can be generated to compare, and `changed` is absent.",
+			"`changed` is absent where nothing has gone out, where no publisher is " +
+			"configured, and where the build now holds more statements than one document " +
+			"carries.",
 		Tags: []string{"Findings"},
 	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
 		"a row saying a document about this build went out is as much a disclosure as the "+
@@ -94,7 +93,13 @@ func registerVEX(api huma.API, in Ingest) {
 			}
 			changed, err := store.Changed(ctx, subject, in.Publisher,
 				input.Product, input.Stream, input.Variant)
-			if err != nil {
+			switch {
+			case errors.Is(err, vex.ErrTooLarge):
+				// What went out is still what went out. A build that grew past
+				// one document has no document to compare, which is no answer
+				// rather than a failed read.
+				changed = nil
+			case err != nil:
 				return nil, vexRefused(in, err, "what has gone out could not be compared")
 			}
 			out := &vexIssuances{}
@@ -151,10 +156,6 @@ func registerVEX(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, vexRefused(in, err, "that could not be recorded")
 			}
-			doc := new(vex.Statements)
-			if err := json.Unmarshal([]byte(recorded.Document), doc); err != nil {
-				return nil, wentWrong(in.Logger, "the recorded document could not be read", err)
-			}
 			return &struct {
 				Status int
 				Body   VEXRecordedBody
@@ -164,7 +165,7 @@ func registerVEX(api huma.API, in Ingest) {
 					IssuedBy: subject.Identity,
 					IssuedAt: recorded.IssuedAt.Format(time.RFC3339),
 				},
-				Document: doc,
+				Document: json.RawMessage(recorded.Document),
 			}}, nil
 		})
 
@@ -172,8 +173,9 @@ func registerVEX(api huma.API, in Ingest) {
 		OperationID: "get-vex-issued", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}",
 		Summary: "Read a VEX document that went out",
-		Description: "The document recorded as one revision, as it went out. It carries the " +
-			"version it was recorded under and the moment it was recorded.\n\n" +
+		Description: "The OpenVEX document recorded as one revision, byte for byte as it went " +
+			"out. It carries the version it was recorded under and the moment it was " +
+			"recorded.\n\n" +
 			"A revision nobody recorded answers 404.",
 		Tags: []string{"Findings"},
 	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
@@ -184,7 +186,7 @@ func registerVEX(api huma.API, in Ingest) {
 			Stream  string `path:"stream"`
 			Variant string `path:"variant"`
 			Version int    `path:"version" minimum:"1" doc:"Which revision, counting from one"`
-		}) (*struct{ Body *vex.Statements }, error) {
+		}) (*struct{ Body json.RawMessage }, error) {
 			subject, err := reading(ctx)
 			if err != nil {
 				return nil, err
@@ -200,11 +202,9 @@ func registerVEX(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, vexRefused(in, err, "what went out could not be read")
 			}
-			doc := new(vex.Statements)
-			if err := json.Unmarshal([]byte(sent), doc); err != nil {
-				return nil, wentWrong(in.Logger, "what went out could not be read", err)
-			}
-			return &struct{ Body *vex.Statements }{Body: doc}, nil
+			// The bytes as kept, handed over untouched: they are what a
+			// customer was sent.
+			return &struct{ Body json.RawMessage }{Body: json.RawMessage(sent)}, nil
 		})
 }
 
@@ -221,7 +221,7 @@ type vexIssuances struct {
 // recorded.
 type VEXRecordedBody struct {
 	VEXIssuanceBody
-	Document *vex.Statements `json:"document" doc:"The document recorded, carrying the version it is recorded under. This is the one to send"`
+	Document json.RawMessage `json:"document" doc:"The OpenVEX document recorded, as its bytes, carrying the version it is recorded under. This is the one to send"`
 }
 
 // VEXIssuanceBody is one time the document for a build went out.

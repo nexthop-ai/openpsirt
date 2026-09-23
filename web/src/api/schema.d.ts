@@ -3007,7 +3007,7 @@ export interface paths {
          * List the flaws an advisory may name
          * @description Every flaw recorded here in this product, open or fixed, by identifier. These are the issues adding one to an advisory accepts in this product.
          *
-         *     `open` is how many of its findings are still open; none means it is fixed wherever it was found. At most 500, in identifier order.
+         *     `open` is how many of its findings are still open; none means it is fixed wherever it was found. At most 500, in identifier order; `total` says how many there are.
          *
          *     A product you do not triage answers 404.
          *
@@ -4419,11 +4419,11 @@ export interface paths {
          * List the times a VEX document went out
          * @description What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
          *
-         *     Readable without generating a document. Somebody deciding whether to publish a revision is asking before they generate anything, and the digest beside each entry is what answers whether the last one still describes what this would produce.
+         *     The record itself is read without generating a document. `changed` generates the public one to compare, so it is absent where that cannot be done.
          *
          *     The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same. `changed` says whether the public document generated now differs from the last one that went out.
          *
-         *     Answered whether or not a publisher is configured for this deployment. Without one, nothing can be generated to compare, and `changed` is absent.
+         *     `changed` is absent where nothing has gone out, where no publisher is configured, and where the build now holds more statements than one document carries.
          *
          *     Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
          */
@@ -4457,7 +4457,7 @@ export interface paths {
         };
         /**
          * Read a VEX document that went out
-         * @description The document recorded as one revision, as it went out. It carries the version it was recorded under and the moment it was recorded.
+         * @description The OpenVEX document recorded as one revision, byte for byte as it went out. It carries the version it was recorded under and the moment it was recorded.
          *
          *     A revision nobody recorded answers 404.
          *
@@ -11172,8 +11172,8 @@ export interface components {
             readonly $schema?: string;
             /** @description A digest of what the document said, so that what is published and what we would generate stay answerable against each other */
             digest: string;
-            /** @description The document recorded, carrying the version it is recorded under. This is the one to send */
-            document: components["schemas"]["Statements"];
+            /** @description The OpenVEX document recorded, as its bytes, carrying the version it is recorded under. This is the one to send */
+            document: unknown;
             issued_at: string;
             /** @description Who published it. The act leaves this row and nothing else, so the row names them */
             issued_by: string;
@@ -18448,7 +18448,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Statements"];
+                    "application/json": unknown;
                 };
             };
             /** @description Error */

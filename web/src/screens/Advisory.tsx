@@ -279,8 +279,10 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
       {/* The read stops at the endpoint's own maximum, and a truncated list
           reads as the whole of what is recorded there. Typing reaches the
           rest. */}
-      {(recorded.data?.items ?? []).length >= mostOffered && (
-        <p className="hint">The list stops at {mostOffered}. Type the identifier in full.</p>
+      {(recorded.data?.total ?? 0) > (recorded.data?.items ?? []).length && (
+        <p className="hint">
+          More is recorded in that product than this list holds. Type the identifier in full.
+        </p>
       )}
       {/* A failed read is not an answer about what is recorded here. Drawn as
           an empty list it reads as "this product has none", which is the one
@@ -307,9 +309,6 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
     </div>
   );
 }
-
-// The most flaws the product's list answers with.
-const mostOffered = 500;
 
 // The CSAF document, shown as text and never rendered.
 function Document({

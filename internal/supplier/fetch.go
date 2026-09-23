@@ -122,8 +122,10 @@ type Taken struct {
 	Refused int
 	// Checked is how many of the documents read were compared against a
 	// digest the publisher serves beside them. The rest came from a publisher
-	// serving none.
-	Checked int
+	// serving none. Mismatched is how many were stepped over because they did
+	// not match theirs.
+	Checked    int
+	Mismatched int
 	// Filled says the pass stopped at its bound rather than because there was
 	// nothing left, which is what leaves the supplier due for the next wake.
 	Filled bool
@@ -148,6 +150,12 @@ type Fetcher struct {
 	// Now is the clock a publisher's own stamps are judged against, so a test
 	// can hand one a date in the future without waiting for the future.
 	Now func() time.Time
+	// Keep is asked before each document whether this replica still holds
+	// the work, renewing its claim. A document is a request for itself and up
+	// to two for its digests, each with a timeout, so a supplier's pass is
+	// longer than a lease sized for the interval. Nil where nothing else
+	// could be reading, which is a fetcher a test drives directly.
+	Keep func(ctx context.Context) (bool, error)
 	// History is how far before its configuration a supplier is first read
 	// from. The pass sets it from the deployment's setting on every wake; a
 	// fetcher built by hand reads nothing from before its configuration.
@@ -240,6 +248,17 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 		if err := f.wait(ctx); err != nil {
 			return took, nil
 		}
+		if f.Keep != nil {
+			switch mine, err := f.Keep(ctx); {
+			case err != nil:
+				return took, fmt.Errorf("keep the lease on reading what suppliers publish: %w", err)
+			case !mine:
+				// Another replica has the work. Left due, so whichever of
+				// them reads next starts from the mark this one reached.
+				took.Filled = true
+				return took, nil
+			}
+		}
 		recorded, checked, err := f.document(ctx, client, by, source, one, ships, sums)
 		switch {
 		case errors.Is(err, errWithdrawn):
@@ -254,6 +273,8 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			// product, and a pass on a timer setting that aside is a judgment
 			// nobody made.
 			took.Skipped++
+		case errors.Is(err, errMismatched):
+			took.Mismatched++
 		case errors.As(err, &unreadable{}):
 			// About this document rather than about the publisher, so the pass
 			// steps over it. Held instead, one withdrawn advisory still listed
@@ -467,12 +488,30 @@ func (f *Fetcher) fromFeed(ctx context.Context, client *http.Client,
 	return out, nil
 }
 
-// sumsIn is where one feed entry says the digests of its document are.
+// sumsIn is where one feed entry says the digests of its document are: the
+// first https address it names for each algorithm, and nothing else.
+//
+// One per algorithm is all the comparison can use, and a count bounded by the
+// algorithms is what keeps an entry naming thousands of them from holding one
+// document past the lease.
 func sumsIn(one feedEntry) []string {
-	var out []string
+	byKind := make([]string, len(algorithms))
 	for _, link := range one.Links {
-		if strings.EqualFold(link.Rel, "hash") && strings.TrimSpace(link.Href) != "" {
-			out = append(out, strings.TrimSpace(link.Href))
+		href := strings.TrimSpace(link.Href)
+		if !strings.EqualFold(link.Rel, "hash") || href == "" {
+			continue
+		}
+		if at, err := url.Parse(href); err != nil || at.Scheme != "https" || at.Host == "" {
+			continue
+		}
+		if kind := algorithmOf(href); kind >= 0 && byKind[kind] == "" {
+			byKind[kind] = href
+		}
+	}
+	var out []string
+	for _, href := range byKind {
+		if href != "" {
+			out = append(out, href)
 		}
 	}
 	return out
@@ -556,6 +595,10 @@ var errWithdrawn = errors.New("that supplier is no longer read from")
 // document reads one advisory and records what it says about a component this
 // product ships, answering how many claims it left and whether a digest the
 // publisher serves was compared against it.
+//
+// Read before its digest is asked for. A statement set listed beside the
+// advisories is set aside whatever its digest says, and a distribution lists
+// tens of thousands of them.
 func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.Subject,
 	source Source, one entry, ships map[string]bool, sums *digests) (int, bool, error) {
 
@@ -563,37 +606,36 @@ func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.S
 	if err != nil {
 		return 0, false, err
 	}
-	checked, err := f.matches(ctx, client, one, body, sums)
-	if err != nil {
-		return 0, false, err
-	}
-	recorded, err := f.record(ctx, by, source, one, body, ships)
-	return recorded, checked, err
-}
-
-// record reads one fetched advisory and writes what it says about a component
-// this product ships.
-func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, one entry,
-	body []byte, ships map[string]bool) (int, error) {
-
-	sum := sha256.Sum256(body)
 	advisory, err := sbom.ReadAdvisory(strings.NewReader(string(body)), f.limits)
 	if err != nil {
 		// A document that cannot be parsed is refused the same way every time,
 		// including the one this reader refuses on purpose — a statement set,
 		// which is told apart above so it can be counted as what it is.
 		if errors.Is(err, sbom.ErrWrongProfile) {
-			return 0, err
+			return 0, false, err
 		}
-		return 0, unreadable{err}
+		return 0, false, unreadable{err}
 	}
 	if err := shaped(advisory); err != nil {
-		return 0, unreadable{err}
+		return 0, false, unreadable{err}
 	}
+	checked, err := f.matches(ctx, client, one, body, sums)
+	if err != nil {
+		return 0, false, err
+	}
+	recorded, err := f.record(ctx, by, source, one, body, advisory, ships)
+	return recorded, checked, err
+}
 
+// record writes what one fetched advisory says about a component this product
+// ships.
+func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, one entry,
+	body []byte, advisory sbom.Advisory, ships map[string]bool) (int, error) {
+
+	sum := sha256.Sum256(body)
 	statements := ours(advisory, ships)
 	var recorded int
-	err = database.Within(ctx, f.db, func(ctx context.Context, tx bun.IDB) error {
+	err := database.Within(ctx, f.db, func(ctx context.Context, tx bun.IDB) error {
 		// Asked inside the transaction rather than trusted from before it. A
 		// pass takes minutes, and a supplier withdrawn during one goes on
 		// fetching and recording — which is the request leaving this
@@ -636,9 +678,7 @@ const mostSumBytes = 4 << 10
 // algorithms are the digests a publisher may serve beside a document, by the
 // suffix the format gives each file.
 //
-// Both, because publishers split between them. Measured on 2026-09-23: Red Hat
-// and SUSE serve a SHA-256 file and no SHA-512 file; Cisco, NCSC-NL and Siemens
-// serve a SHA-512 file and no SHA-256 file.
+// Both, because publishers split between them.
 var algorithms = []struct {
 	suffix string
 	sum    func() hash.Hash
@@ -648,11 +688,18 @@ var algorithms = []struct {
 }
 
 // digests remembers, across one pass over one publisher, which digest file
-// answered last, so it is asked for first.
+// answered last, so it is asked for first, and how many documents in a row
+// had none beside them.
 //
-// A publisher serves the same kind beside every document. Remembered, the file
-// that is not there is asked for once a pass rather than once a document.
-type digests struct{ first int }
+// A publisher serves the same kind beside every document, or none. Remembered,
+// the file that is not there is asked for once a pass rather than once a
+// document, and a publisher serving neither is asked twice and then read
+// unchecked for the rest of the pass.
+type digests struct{ first, missed int }
+
+// probesBeforeGivingUp is how many documents in a row with no digest beside
+// them end the looking for one, for the rest of a pass.
+const probesBeforeGivingUp = 2
 
 // order is the algorithms in the order to ask for them.
 func (d *digests) order() []int {
@@ -688,16 +735,20 @@ func (f *Fetcher) matches(ctx context.Context, client *http.Client, one entry,
 			return found, err
 		}
 	}
+	if sums.missed >= probesBeforeGivingUp {
+		return false, nil
+	}
 	for _, kind := range sums.order() {
 		found, err := f.compare(ctx, client, one.address+algorithms[kind].suffix, kind, body)
 		if err != nil {
 			return false, err
 		}
 		if found {
-			sums.first = kind
+			sums.first, sums.missed = kind, 0
 			return true, nil
 		}
 	}
+	sums.missed++
 	return false, nil
 }
 
@@ -716,9 +767,10 @@ func algorithmOf(address string) int {
 //
 // A refusal naming the file says the publisher does not serve that one, which
 // is ordinary; a missing file is answered 404 by some and 403 by others. A
-// file past the size of a digest file is not one either. A
-// publisher that cannot be reached holds the mark, the way it does for the
-// document.
+// file past the size of a digest file is not one either, and nor is an
+// address the guarded client turns away itself — a redirect, or a host nobody
+// configured. A publisher that cannot be reached holds the mark, the way it
+// does for the document.
 func (f *Fetcher) compare(ctx context.Context, client *http.Client, address string,
 	kind int, body []byte) (bool, error) {
 
@@ -728,7 +780,7 @@ func (f *Fetcher) compare(ctx context.Context, client *http.Client, address stri
 	served, err := f.fetch(ctx, client, address, mostSumBytes)
 	var refused unreadable
 	switch {
-	case errors.As(err, &refused):
+	case errors.As(err, &refused), errors.Is(err, outward.ErrRefused):
 		return false, nil
 	case err != nil:
 		return false, err
@@ -743,11 +795,16 @@ func (f *Fetcher) compare(ctx context.Context, client *http.Client, address stri
 	sum := algorithms[kind].sum()
 	sum.Write(body)
 	if !bytes.Equal(sum.Sum(nil), want) {
-		return true, unreadable{fmt.Errorf(
-			"that document does not match the digest its publisher serves beside it")}
+		return true, errMismatched
 	}
 	return true, nil
 }
+
+// errMismatched says a document did not match the digest its publisher serves
+// beside it. Stepped over like any unreadable document, and counted apart so a
+// publisher whose digests keep disagreeing is said to be one.
+var errMismatched = unreadable{errors.New(
+	"that document does not match the digest its publisher serves beside it")}
 
 // stated is the digest a digest file holds, and whether it holds one.
 //

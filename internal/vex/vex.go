@@ -23,6 +23,7 @@ package vex
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -73,6 +74,17 @@ type Statements struct {
 	// the first, and the next one generated after an issuance is the second.
 	Version    int         `json:"version"`
 	Statements []Statement `json:"statements"`
+}
+
+// MarshalJSON writes the document as the format defines it and nothing else.
+//
+// A type that writes its own bytes is sent as it writes them, so the schema
+// link the API framework adds to a response, a key OpenVEX does not define
+// naming this deployment's own address, stays out of a document a customer
+// is handed.
+func (s Statements) MarshalJSON() ([]byte, error) {
+	type declared Statements
+	return json.Marshal(declared(s))
 }
 
 // Statement is what we say about one issue in one component.

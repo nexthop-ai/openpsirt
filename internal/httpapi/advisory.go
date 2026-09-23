@@ -214,7 +214,8 @@ func registerAdvisory(api huma.API, in Ingest) {
 		Description: "Every flaw recorded here in this product, open or fixed, by identifier. " +
 			"These are the issues adding one to an advisory accepts in this product.\n\n" +
 			"`open` is how many of its findings are still open; none means it is fixed " +
-			"wherever it was found. At most 500, in identifier order.\n\n" +
+			"wherever it was found. At most 500, in identifier order; `total` says how many " +
+			"there are.\n\n" +
 			"A product you do not triage answers 404.",
 		Tags: []string{"Findings"},
 	}, perProduct, "Answers only what you may see.", triageRights()...),
@@ -228,7 +229,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 			if in.DB == nil {
 				return nil, noDatabase(in.Logger)
 			}
-			rows, err := advisory.NewStore(in.DB.DB).Nameable(ctx, subject, input.Product)
+			rows, total, err := advisory.NewStore(in.DB.DB).Nameable(ctx, subject, input.Product)
 			if errors.Is(err, catalog.ErrNotFound) {
 				return nil, noSuchProduct()
 			}
@@ -236,6 +237,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 				return nil, advisoryRefused(in, err, "the flaws could not be read")
 			}
 			out := &listOutput[NameableBody]{}
+			out.Body.Total = total
 			out.Body.Items = make([]NameableBody, 0, len(rows))
 			for _, one := range rows {
 				out.Body.Items = append(out.Body.Items, NameableBody{

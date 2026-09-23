@@ -356,7 +356,7 @@ func TestAProductYouCannotSeeAnswersLikeOneNobodyDeclared(t *testing.T) {
 func TestAFixedFlawIsOfferedToAnAdvisory(t *testing.T) {
 	// An advisory is usually written after the fix lands, so a list of what
 	// is still open offers nothing for the flaw it is about.
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		flaw := r.embargoed(t)
 		const at = "/v1/products/mine/nameable-flaws"
@@ -367,11 +367,15 @@ func TestAFixedFlawIsOfferedToAnAdvisory(t *testing.T) {
 				Summary       string `json:"summary"`
 				Open          int    `json:"open"`
 			} `json:"items"`
+			Total int `json:"total"`
 		}
 		var open offered
 		read(t, r, "private-triage", at, &open)
 		if len(open.Items) != 1 || open.Items[0].Vulnerability != flaw || open.Items[0].Open != 1 {
 			t.Fatalf("an open flaw is offered as %+v", open.Items)
+		}
+		if open.Total != 1 {
+			t.Errorf("the list says it holds %d of one", open.Total)
 		}
 
 		if _, err := r.db.DB.NewUpdate().TableExpr(`"finding"`).
@@ -394,6 +398,31 @@ func TestAFixedFlawIsOfferedToAnAdvisory(t *testing.T) {
 		}
 		if got := asPerson(t, r, "reader", http.MethodGet, at, ""); got.Code != http.StatusNotFound {
 			t.Errorf("somebody who does not triage the product answered %d", got.Code)
+		}
+	})
+}
+
+func TestAReaderWhoMayNotGenerateAnAdvisoryStillReadsIt(t *testing.T) {
+	// Whether it changed since it went out is worked out by generating the
+	// document as the reader. One who may see the advisory and not every
+	// flaw it covers is answered without that, rather than told it is not
+	// there.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		flaw := r.embargoed(t)
+		named := advisoryOver(t, r, "private-triage", "mine", flaw)
+		at := "/v1/advisories/" + named
+		before := asPerson(t, r, "reader", http.MethodGet, at, "")
+
+		agreedTo(t, r, at)
+		if got := asPerson(t, r, "private-triage", http.MethodPost, at+"/issuance",
+			`{}`); got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+		after := asPerson(t, r, "reader", http.MethodGet, at, "")
+		if after.Code != before.Code {
+			t.Errorf("once it went out a reader got %d where before they got %d: %s",
+				after.Code, before.Code, after.Body.String())
 		}
 	})
 }

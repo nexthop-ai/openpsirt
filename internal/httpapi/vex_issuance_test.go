@@ -192,7 +192,7 @@ func TestTheVEXDocumentRecordedStatesTheVersionItIsRecordedUnder(t *testing.T) {
 }
 
 func TestTheVEXRecordSaysWhetherTheDocumentMovedSinceItWentOut(t *testing.T) {
-	twoReach(t, func(t *testing.T, r *reach) {
+	eachReach(t, func(t *testing.T, r *reach) {
 		r.scannedTwoIssues(t)
 
 		var gone struct {
@@ -364,6 +364,57 @@ func TestEveryDateTheDocumentStatesIsOneTheStandardParses(t *testing.T) {
 		// it was released and when each revision happened.
 		if checked < 4 {
 			t.Fatalf("only %d dates were reached, so this proves little", checked)
+		}
+	})
+}
+
+func TestAVEXDocumentThatWentOutIsHandedBackAsItsKeptBytes(t *testing.T) {
+	// What a customer was sent, byte for byte: no key the format does not
+	// define, and nothing encoded differently on the way back out.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+		recordedIssuance(t, r, "triager")
+
+		got := asPerson(t, r, "reader", http.MethodGet, aBuild+"/issuance/1", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("reading what went out answered %d: %s", got.Code, got.Body.String())
+		}
+		var kept string
+		if err := r.db.DB.NewSelect().TableExpr(`"vex_issuance"`).
+			Column("document").Limit(1).Scan(t.Context(), &kept); err != nil {
+			t.Fatal(err)
+		}
+		if strings.TrimSpace(got.Body.String()) != kept {
+			t.Errorf("what was handed back is not what was kept:\n%s\n%s", got.Body.String(), kept)
+		}
+		generated := asPerson(t, r, "reader", http.MethodGet, aBuild, "")
+		if strings.Contains(generated.Body.String(), `"$schema"`) {
+			t.Errorf("the generated document carries a key OpenVEX does not define")
+		}
+	})
+}
+
+func TestAVEXDocumentThatWentOutHoldsNothingNobodyHasAnnounced(t *testing.T) {
+	// Kept bytes are read by anybody who may read the product, so what is
+	// recorded has to be the public document whoever recorded it.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		hidden := r.embargoed(t)
+		claim, _ := r.claimed(t, "private-triage", hidden, "libnl-3-200", dismissal)
+		if got := asPerson(t, r, "private-dispatcher", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "private-triage", http.MethodPost, aBuild+"/issuance",
+			""); got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+		got := asPerson(t, r, "reader", http.MethodGet, aBuild+"/issuance/1", "")
+		if got.Code != http.StatusOK {
+			t.Fatalf("reading what went out answered %d: %s", got.Code, got.Body.String())
+		}
+		if strings.Contains(got.Body.String(), hidden) {
+			t.Errorf("a document that went out names %s, which nobody has announced", hidden)
 		}
 	})
 }
