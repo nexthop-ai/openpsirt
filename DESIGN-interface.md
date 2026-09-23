@@ -685,6 +685,12 @@ The references sit above what publishers say, at the head of what is read to
 decide. A write-up is what somebody triaging reads first, and a third party's
 claim about the finding is read against it rather than before it.
 
+A patch link carries the branches its commit is on, once its repository has
+been asked (`DESIGN-findings.md` § Patch branches): three by name in version
+order, the rest as a count, all of them on hover. A commit its repository does
+not hold says so. A link not yet looked up carries nothing, because "not yet"
+is not a fact about the patch.
+
 A publisher's claim carries the version it was made about. A supplier's
 advisory names the version that carries the fix, which is not the version
 shipped here, so a status shown alone reads as the opposite of what it says.
@@ -1460,6 +1466,7 @@ What this deployment is doing, rather than what it has found.
 | What a full queue needs is both numbers | An operator adds workers or raises the limit, and neither is decided from the depth alone. Said beside the count rather than drawn as a bar, because at the limit is a state rather than a proportion |
 | A resolved issue is counted at the severity it held while it was open | The step it left in no longer has one, and counting it as unrated would make every answered critical disappear from the answered column |
 | The signing secret is never shown, so changing one means recording the destination again | It signs our requests rather than authenticating anybody to us. A configuration screen that showed it would put a shared secret on a page |
+| Patch branch lookups are reported per repository, with the work left and the disk each copy takes | A host that stops answering leaves labels missing from findings, and nothing on a finding says so. Sorted by commits still to look up, so a stuck repository sits at the top; what stopped its last visit is on hover over its state |
 
 ## The administration screens
 

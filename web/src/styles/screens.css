@@ -158,6 +158,11 @@
 .refs a:hover {
   text-decoration: underline;
 }
+.refs .branches {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0 var(--gap-tight);
+}
 
 .deciding {
   margin-top: 18px;

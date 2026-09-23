@@ -59,6 +59,7 @@ Satisfies REQ-01, REQ-61, REQ-63, REQ-75.
 | `internal/vex/`, `internal/publisher/` | What we have decided about what a build ships, and who says so. See `DESIGN-remediation.md` |
 | `internal/directory/` | The advisories that have gone out, written where somebody else's web server serves them. See `DESIGN-remediation.md` |
 | `internal/supplier/` | The publishers whose advisories are read on a schedule, and what a pass over one takes. See `DESIGN-ingest.md` |
+| `internal/patchbranch/` | Which branches hold the commits patch links name, the repository copies that answer it, and the proxy git reaches out through. See `DESIGN-findings.md` |
 | `internal/vercmp/` | Ordering two versions of one package, where the ecosystem defines one. See `DESIGN-remediation.md` |
 | `internal/outward/` | The one HTTP client this process reaches the internet with. See `DESIGN-access.md` |
 | `internal/background/`, `internal/bound/` | A pass on a timer, and cutting a string to a number of bytes without splitting a character |

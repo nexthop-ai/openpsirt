@@ -124,12 +124,22 @@ export function Places({
 
 // Patches first: for somebody deciding whether to backport rather than
 // upgrade, the change itself is the answer.
+//
+// A patch carries the branches its commit is on, where a copy of its
+// repository was asked. One fix backported to five branches arrives as five
+// bare commit links, and the branch is what says which one applies.
 export function References({
   advisory,
   refs,
 }: {
   advisory?: string;
-  refs: { url?: string; kind?: string }[];
+  refs: {
+    url?: string;
+    kind?: string;
+    branches?: string[] | null;
+    branch_count?: number;
+    lookup?: string;
+  }[];
 }) {
   const all = advisory ? [{ url: advisory, kind: "advisory" }, ...refs] : refs;
   if (all.length === 0) return null;
@@ -145,11 +155,44 @@ export function References({
           <li key={ref.url}>
             <span className={ref.kind === "patch" ? "kind patch" : "kind"}>{ref.kind}</span>{" "}
             <Away url={ref.url} />
+            <OnBranches of={ref} />
           </li>
         ))}
       </ul>
       <p className="hint">Patches first.</p>
     </div>
+  );
+}
+
+// The branches shown before the rest are folded into a count.
+const SHOWN_BRANCHES = 3;
+
+// Which branches hold a patch's commit. Nothing where nobody has looked.
+function OnBranches({
+  of,
+}: {
+  of: { branches?: string[] | null; branch_count?: number; lookup?: string };
+}) {
+  if (of.lookup === "absent") {
+    return <span className="hint branches">not in repository</span>;
+  }
+  const branches = of.branches ?? [];
+  if (of.lookup !== "found") return null;
+  if (branches.length === 0) {
+    return <span className="hint branches">on no branch</span>;
+  }
+  const total = Math.max(of.branch_count ?? 0, branches.length);
+  const shown = branches.slice(0, SHOWN_BRANCHES);
+  const more = total - shown.length;
+  return (
+    <span className="branches" title={branches.join("\n")}>
+      {shown.map((branch) => (
+        <span key={branch} className="id">
+          {branch}
+        </span>
+      ))}
+      {more > 0 && <span className="hint">+{more}</span>}
+    </span>
   );
 }
 

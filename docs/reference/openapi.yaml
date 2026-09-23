@@ -6332,6 +6332,105 @@ components:
         - rows
         - share
       type: object
+    PatchBranchesOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PatchBranchesOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        commits:
+          description: How many distinct commits in a recognized repository those links name
+          format: int64
+          type: integer
+        found:
+          description: How many of those the repository holds
+          format: int64
+          type: integer
+        links:
+          description: How many patch links reports carry
+          format: int64
+          type: integer
+        looked:
+          description: How many of those commits have been looked up
+          format: int64
+          type: integer
+        "on":
+          description: Whether the lookups are turned on
+          type: boolean
+        repositories:
+          description: The repositories those commits are in, most commits still to look up first
+          items:
+            $ref: "#/components/schemas/PatchRepositoryBody"
+          type:
+            - array
+            - "null"
+        total:
+          description: How many repositories there are in all
+          format: int64
+          type: integer
+      required:
+        - "on"
+        - links
+        - commits
+        - looked
+        - found
+        - repositories
+        - total
+      type: object
+    PatchRepositoryBody:
+      additionalProperties: false
+      properties:
+        commits:
+          description: How many commits patch links name in this repository
+          format: int64
+          type: integer
+        fetched_at:
+          description: When a visit last began
+          type: string
+        found:
+          description: How many of those the repository holds
+          format: int64
+          type: integer
+        held_bytes:
+          description: The size of the repository's copy when the last visit finished, in bytes
+          format: int64
+          type: integer
+        host:
+          type: string
+        looked:
+          description: How many of those have been looked up
+          format: int64
+          type: integer
+        reached_at:
+          description: When a visit last finished
+          type: string
+        reason:
+          description: What stopped the last visit
+          type: string
+        state:
+          description: "'waiting' has not been visited. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is a last visit that finished. 'excluded' is on a host OPENPSIRT_PATCH_EXCLUDED lists, and is never fetched"
+          enum:
+            - waiting
+            - working
+            - failed
+            - done
+            - excluded
+          type: string
+        url:
+          description: The address the repository is fetched from
+          type: string
+      required:
+        - url
+        - host
+        - state
+        - commits
+        - looked
+        - found
+      type: object
     PendingMovementBody:
       additionalProperties: false
       properties:
@@ -7366,6 +7465,17 @@ components:
     ReferenceBody:
       additionalProperties: false
       properties:
+        branch_count:
+          description: How many branches contain the commit, which may be more than are listed
+          format: int64
+          type: integer
+        branches:
+          description: The branches of its repository that contain the commit this patch link names, in version order. At most 100 are listed
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         kind:
           description: The kind of reference. A patch is the change itself
           enum:
@@ -7373,6 +7483,12 @@ components:
             - advisory
             - report
             - other
+          type: string
+        lookup:
+          description: Whether the commit was found in a copy of its repository. Absent where no copy has been asked, or where the link names no commit
+          enum:
+            - found
+            - absent
           type: string
         url:
           type: string
@@ -14290,6 +14406,54 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Stop sending a kind somewhere
+      tags:
+        - Administration
+      x-openpsirt-requires:
+        scope: deployment
+  /v1/patch-branches:
+    get:
+      description: |-
+        The repositories patch links point into, and how many of the commits each link names have been looked up in a copy of the repository.
+
+        A link that names no commit in a recognized repository — a pull request, a mailing-list post, a patch tracker — is counted in `links` and nowhere else.
+
+        Requires: administrator
+      operationId: list-patch-branch-progress
+      parameters:
+        - description: The number returned
+          explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            description: The number returned
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - description: The number skipped
+          explode: false
+          in: query
+          name: offset
+          schema:
+            description: The number skipped
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatchBranchesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Show how far patch branch lookups have got
       tags:
         - Administration
       x-openpsirt-requires:

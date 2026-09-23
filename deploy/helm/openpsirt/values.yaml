@@ -289,3 +289,23 @@ scanner:
     # The bound on the scratch space used when neither of the two above is
     # set. It is node disk, so it is bounded rather than left open.
     sizeLimit: 10Gi
+
+# Labeling a patch link with the branches its commit is on, which fetches the
+# repositories reports link to. Off until an administrator turns it on under
+# Settings; nothing here turns it on.
+patchBranches:
+  # Hosts and networks no repository is fetched from. A report chooses the
+  # host, so list your internal domains and networks here. Loopback and
+  # private address space are refused regardless.
+  excluded: []
+  #   - corp.example.com
+  #   - 203.0.113.0/24
+  # How many bytes the copies may hold together, as a whole number. Empty takes
+  # the built-in 20 GB, which holds the kernel's full history beside others.
+  quota: ""
+  # A claim to keep the copies on. Without one they are scratch space and are
+  # fetched again after every restart — fifteen minutes and 5 GB for the kernel.
+  existingClaim: ""
+  # The bound on that scratch space.
+  sizeLimit: 24Gi
+

@@ -338,6 +338,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	registerSettings(api, in)
 	// Components with no upstream answer, and the reason for each.
 	registerUpstream(api, in)
+	registerPatchBranches(api, in)
 	// Work the queue set aside, and putting it back.
 	registerWork(api, in)
 	registerTrail(api, in)

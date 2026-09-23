@@ -338,6 +338,60 @@ the default is costing; names no public index has heard of are private modules
 and vendored forks, and they are the candidates to promote into
 `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
 
+## Patch branches
+
+A patch link to a commit is labeled with the branches of its repository that
+contain the commit, on the finding it belongs to. A fix backported to five
+branches arrives as five bare commit links, and the label is what says which
+one applies to the branch you ship.
+
+Off unless an administrator turns it on, under Settings. It fetches a copy of
+each repository a patch link names, from the host the link names, and asks the
+copy which branches hold each commit. Progress, failures and the size of each
+copy are on the System screen and at `/v1/patch-branches`.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `OPENPSIRT_PATCH_EXCLUDED` | Hosts and networks no repository is fetched from, separated by commas. A name covers itself and every host under it; a network is written as `10.0.0.0/8` and covers every address a name resolves to inside it | unset |
+| `OPENPSIRT_PATCH_DIR` | Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume | `/var/cache/openpsirt/repositories` |
+| `OPENPSIRT_PATCH_QUOTA` | How many bytes the copies may hold together. The least recently used is removed to make room | `21474836480` (20 GB) |
+
+List your internal networks and domains in `OPENPSIRT_PATCH_EXCLUDED`. A report
+chooses the host, and loopback, private, link-local and shared address space
+are refused regardless, but an internal service on a public address or behind a
+public name is only kept out by this list:
+
+```
+OPENPSIRT_PATCH_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
+```
+
+Only https is used, redirects are not followed, and git runs with no
+configuration, credentials or hooks from the environment.
+
+### Sizing
+
+The Linux kernel is the largest repository reports link to, and git.kernel.org
+sends whole history:
+
+| The kernel's stable tree | From git.kernel.org | From a host that sends commits alone |
+|---|---|---|
+| Copy on disk | 5.2 GB | 1.2 GB |
+| First fetch | 15 minutes | 90 seconds |
+| Memory at the peak of the first fetch | 1.3 GB | 0.6 GB |
+
+Size the quota to hold the kernel and the other repositories your reports link
+to, and the volume a little larger than the quota. A copy that alone outgrows
+the quota is abandoned and tried again a day later.
+
+git runs inside the same memory limit as the server and the scanner, and a
+first kernel fetch can coincide with a scan. Raise the limit to 4 GiB before
+turning this on where reports link to git.kernel.org. Where the limit is
+exceeded, the kernel kills the largest process, the visit fails, and it is
+retried a day later.
+
+Keep the copies on a persistent volume. Scratch space loses them on every
+restart, and the kernel is fetched again from the start.
+
 ## Sign-in
 
 The process refuses to start until somebody can administer it, and naming
@@ -603,6 +657,7 @@ resources:
 | The server reading one scanner report | Bounded by `OPENPSIRT_SCANNER_MAX_OUTPUT`. A read and a scan run in separate loops, so a pod can be doing both |
 | The scanner itself | Not bounded by anything here. It is a separate program, and its report is bounded only once written |
 | The scanner importing its vulnerability database | The largest single draw, and it happens on every start where the data is not kept |
+| Fetching a repository for [patch branches](#patch-branches) | Off unless turned on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org |
 
 Raise the limit for a bigger inventory, for raised scan-file bounds, or where
 the database is imported on every start.

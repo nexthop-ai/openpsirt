@@ -199,8 +199,12 @@ FROM alpine:${ALPINE_VERSION} AS runtime
 #
 # Outbound TLS needs root certificates: the ranking feeds are fetched over
 # HTTPS, and without these every fetch fails with an unhelpful error.
+#
+# git fetches the repositories patch links point into and answers which
+# branches hold a commit. The program alone, from the distribution: the
+# server runs it as a child and links nothing of it.
 RUN apk upgrade --no-cache \
- && apk add --no-cache ca-certificates tzdata
+ && apk add --no-cache ca-certificates tzdata git
 
 # Runs as a normal user. Nothing here needs root, and a container that does not
 # need it should not have it.
@@ -226,7 +230,7 @@ COPY --from=scanner /out/grype /usr/local/bin/grype
 # mounted volume — the chart provides one.
 ENV GRYPE_DB_CACHE_DIR=/var/cache/openpsirt/grype \
     OPENPSIRT_SCANNER_PATH=/usr/local/bin/grype
-RUN mkdir -p /var/cache/openpsirt/grype \
+RUN mkdir -p /var/cache/openpsirt/grype /var/cache/openpsirt/repositories \
  && chown -R 65532:65532 /var/cache/openpsirt
 
 # What the whole image ships, read off the assembled filesystem.

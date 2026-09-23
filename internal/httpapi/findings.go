@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 )
 
 // sortOrder is the query parameter for which order to page in, and it takes
@@ -618,6 +620,13 @@ func beneathIn(ctx context.Context, in Ingest, scope finding.Scope, name string)
 type ReferenceBody struct {
 	URL  string `json:"url"`
 	Kind string `json:"kind" enum:"patch,advisory,report,other" doc:"The kind of reference. A patch is the change itself"`
+	// Branches is filled from a copy of the repository a patch link names,
+	// where this deployment keeps one (REQ-78). A fix is backported as a
+	// separate commit to each maintained branch, and this says which link is
+	// which.
+	Branches    []string `json:"branches,omitempty" doc:"The branches of its repository that contain the commit this patch link names, in version order. At most 100 are listed"`
+	BranchCount int      `json:"branch_count,omitempty" doc:"How many branches contain the commit, which may be more than are listed"`
+	Lookup      string   `json:"lookup,omitempty" enum:"found,absent" doc:"Whether the commit was found in a copy of its repository. Absent where no copy has been asked, or where the link names no commit"`
 }
 
 // LinkBody is somewhere to read about this issue or this package, worked out
@@ -897,6 +906,9 @@ func registerFindingDetail(api huma.API, in Ingest) {
 			return nil, noSuchFinding()
 		}
 		body := evidenceBody(*evidence)
+		if err := labelPatches(ctx, in.DB.DB, body.References); err != nil {
+			return nil, wentWrong(in.Logger, "which branches carry the patches could not be read", err)
+		}
 		// The record kept in this product, where one stands. Read here rather
 		// than in the detail because it is the triage record's, and what it
 		// carries — the moment something became known, the grounds, who wrote
@@ -1040,4 +1052,35 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		body.Places = append(body.Places, sitting)
 	}
 	return body
+}
+
+// labelPatches fills in the branches each patch link's commit is on, where a
+// copy of its repository has been asked.
+func labelPatches(ctx context.Context, db bun.IDB, references []ReferenceBody) error {
+	var links []string
+	for _, reference := range references {
+		if reference.Kind == string(finding.Patch) {
+			links = append(links, reference.URL)
+		}
+	}
+	if len(links) == 0 {
+		return nil
+	}
+	labels, err := patchbranch.Labels(ctx, db, links)
+	if err != nil {
+		return err
+	}
+	for i, reference := range references {
+		label, ok := labels[reference.URL]
+		if !ok || reference.Kind != string(finding.Patch) {
+			continue
+		}
+		references[i].Branches = label.Branches
+		references[i].BranchCount = label.Count
+		references[i].Lookup = "absent"
+		if label.Found {
+			references[i].Lookup = "found"
+		}
+	}
+	return nil
 }
