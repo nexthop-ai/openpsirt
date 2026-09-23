@@ -3002,6 +3002,13 @@ components:
           type:
             - array
             - "null"
+        ratings:
+          description: Every published rating of the issue, one per generation of the scoring system, newest first
+          items:
+            $ref: "#/components/schemas/RatingBody"
+          type:
+            - array
+            - "null"
         recorded:
           description: Somebody recorded this here rather than a scanner reporting it. Only such a finding can be closed as fixed by hand
           type: boolean
@@ -3989,6 +3996,13 @@ components:
           description: The number of your products carrying it
           format: int64
           type: integer
+        ratings:
+          description: Every published rating of the issue, one per generation of the scoring system, newest first
+          items:
+            $ref: "#/components/schemas/RatingBody"
+          type:
+            - array
+            - "null"
         score:
           format: double
           type: number
@@ -7112,6 +7126,30 @@ components:
         - deferred
         - overdue
         - open
+      type: object
+    RatingBody:
+      additionalProperties: false
+      properties:
+        kind:
+          description: "The rating's rank: primary or secondary"
+          type: string
+        score:
+          description: The score the publisher states for the vector
+          format: double
+          type: number
+        source:
+          description: The publisher, where the report names them
+          type: string
+        vector:
+          description: The vector the score is worked out from
+          type: string
+        version:
+          description: The scoring system's version, as the report states it
+          type: string
+      required:
+        - version
+        - score
+        - vector
       type: object
     ReachBody:
       additionalProperties: false

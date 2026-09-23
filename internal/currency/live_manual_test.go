@@ -37,6 +37,10 @@ func TestAgainstTheRealIndexes(t *testing.T) {
 		{"npm", "@types/node", true, true},
 		{"pypi", "requests", true, true},
 		{"cargo", "serde", true, true},
+		{"maven", "org.apache.logging.log4j/log4j-core", true, true},
+		// Large enough that its registration is paged.
+		{"nuget", "Microsoft.Extensions.Logging", true, true},
+		{"nuget", "Newtonsoft.Json", true, true},
 	} {
 		asker := client.For(each.ecosystem)
 		if asker == nil {

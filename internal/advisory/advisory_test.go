@@ -589,6 +589,42 @@ func TestAFlawAssessedUnderAnUncarriedSchemeStatesNoScore(t *testing.T) {
 	})
 }
 
+func TestAFlawRatedUnderBothGenerationsStatesTheOneTheDocumentCarries(t *testing.T) {
+	// Assessed here under version 4, which the document has no field for, and
+	// rated under version 3 by a report as well. The version 3 rating is the
+	// one stated: publishing nothing where a carried rating is held throws
+	// away the answer a consumer expects.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		_, identifier, err := f.finds.Enter(ctx, f.who, finding.Entering{
+			TargetIDs: []int64{f.master}, Component: carrier.Name,
+			Summary: "The management socket answers before anyone authenticated.",
+			Vector:  "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H",
+		})
+		if err != nil {
+			t.Fatalf("recording a flaw: %v", err)
+		}
+		three := "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H"
+		if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{{
+			Identifier: identifier,
+			Ratings:    []finding.CVSS{{Generation: 3, ScoreCenti: 810, Vector: three, Version: "3.1"}},
+		}}); err != nil {
+			t.Fatalf("recording a report's rating: %v", err)
+		}
+		doc, err := f.document(t, "sonic", identifier)
+		if err != nil {
+			t.Fatalf("generating: %v", err)
+		}
+		scores := doc.Vulnerabilities[0].Scores
+		if len(scores) != 1 || scores[0].CVSSv3 == nil {
+			t.Fatalf("the document states %d scores, want the version 3 one", len(scores))
+		}
+		if got := scores[0].CVSSv3; got.VectorString != three || got.BaseScore != 8.1 {
+			t.Errorf("the document states %+v, want the version 3 rating", got)
+		}
+	})
+}
+
 func TestTheDocumentCarriesWhatIsHeldAboutTheFlaw(t *testing.T) {
 	// The score, the credit, the places to go and what to do about it are all
 	// held, and the document carried none of them: a reader got which

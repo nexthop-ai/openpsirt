@@ -14,8 +14,8 @@
 // supplier fetched from is an address an administrator configured, and an index
 // is a service everybody shares.
 //
-// A component's name leaves. One request per component, carrying
-// the name and nothing else. For an open-source dependency that is public
+// A component's name leaves, and nothing else: one request per component for
+// most indexes, and a few for the two that answer in pieces. For an open-source dependency that is public
 // knowledge; for something built here it is the name of a project, a team or a
 // product nobody has announced, so what this deployment calls its own is held
 // back rather than asked about — see Ours.
@@ -111,7 +111,7 @@ type Client struct {
 	// point them at a local server: without this the only way to exercise any
 	// of this code is to call somebody else's service, whose answers change,
 	// so in practice it was not exercised at all.
-	GoProxy, NPM, PyPI, Crates string
+	GoProxy, NPM, PyPI, Crates, Maven, NuGet string
 }
 
 // The public indexes, which is what a deployment talks to unless a test says
@@ -121,6 +121,8 @@ const (
 	DefaultNPM     = "https://registry.npmjs.org"
 	DefaultPyPI    = "https://pypi.org"
 	DefaultCrates  = "https://crates.io"
+	DefaultMaven   = "https://repo1.maven.org"
+	DefaultNuGet   = "https://api.nuget.org"
 )
 
 // New returns a client with sensible bounds.
@@ -140,10 +142,12 @@ func New() *Client {
 		HTTP: outward.Guarded(
 			hostOf(DefaultGoProxy), hostOf(DefaultNPM),
 			hostOf(DefaultPyPI), hostOf(DefaultCrates),
+			hostOf(DefaultMaven), hostOf(DefaultNuGet),
 		),
 		Agent:   "openpsirt (+https://github.com/nexthop-ai/openpsirt)",
 		GoProxy: DefaultGoProxy, NPM: DefaultNPM,
 		PyPI: DefaultPyPI, Crates: DefaultCrates,
+		Maven: DefaultMaven, NuGet: DefaultNuGet,
 	}
 }
 
@@ -172,6 +176,8 @@ var askers = map[string]func(*Client) Asker{
 	"npm":    func(c *Client) Asker { return npmRegistry{c} },
 	"pypi":   func(c *Client) Asker { return pyPI{c} },
 	"cargo":  func(c *Client) Asker { return cratesIO{c} },
+	"maven":  func(c *Client) Asker { return mavenCentral{c} },
+	"nuget":  func(c *Client) Asker { return nugetGallery{c} },
 }
 
 // Askable is every ecosystem this has an index for.
@@ -219,47 +225,9 @@ func (c *Client) get(ctx context.Context, at string, into any) error {
 }
 
 func (c *Client) getAs(ctx context.Context, at, accept string, into any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, at, nil)
-	if err != nil {
-		// The name could not be made into a request. That is a fact about the
-		// component and will not come right on a retry, so it is reported as
-		// such rather than as a transient failure the caller keeps returning
-		// to.
-		return fmt.Errorf("%w: %s: %w", ErrUnaskable, at, err)
-	}
-	req.Header.Set("User-Agent", c.Agent)
-	req.Header.Set("Accept", accept)
-	resp, err := c.HTTP.Do(req)
+	body, _, err := c.fetch(ctx, at, accept)
 	if err != nil {
 		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	switch {
-	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
-		return ErrUnknown
-	case resp.StatusCode == http.StatusTooManyRequests, resp.StatusCode >= 500:
-		// A bad day: asked for too much, or the index itself is unwell.
-		// Nothing is recorded, so the component stays due and the next pass
-		// asks again.
-		return fmt.Errorf("%w: %s answered %s", ErrNotAnswering, at, resp.Status)
-	case resp.StatusCode != http.StatusOK:
-		// Every other refusal is one the index will repeat: a package the
-		// registry withdrew, a region it will not serve, a request it will
-		// not accept in that shape. Recorded as asked, because an answer we
-		// will never get is still an answer about this component.
-		return fmt.Errorf("%w: %s answered %s", ErrUnaskable, at, resp.Status)
-	}
-	// One byte past the ceiling, so a document over it is refused as too large
-	// rather than cut off and reported as unreadable — which sent the
-	// component down the arm for a document nothing can parse and left it
-	// there.
-	body, err := io.ReadAll(io.LimitReader(resp.Body, mostBody+1))
-	if err != nil {
-		return fmt.Errorf("%w: %s: %w", ErrNotAnswering, at, err)
-	}
-	if int64(len(body)) > mostBody {
-		return fmt.Errorf("%w: %s answered more than the %d bytes this reads",
-			ErrUnaskable, at, mostBody)
 	}
 	if err := json.Unmarshal(body, into); err != nil {
 		// A document this cannot read is a fact about what the index serves
@@ -267,6 +235,52 @@ func (c *Client) getAs(ctx context.Context, at, accept string, into any) error {
 		return fmt.Errorf("%w: %s: %w", ErrUnaskable, at, err)
 	}
 	return nil
+}
+
+// fetch reads one document from an index, and the headers it came with, with
+// every refusal classified the way the pass needs it classified.
+func (c *Client) fetch(ctx context.Context, at, accept string) ([]byte, http.Header, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, at, nil)
+	if err != nil {
+		// The name could not be made into a request. That is a fact about the
+		// component and will not come right on a retry, so it is reported as
+		// such rather than as a transient failure the caller keeps returning
+		// to.
+		return nil, nil, fmt.Errorf("%w: %s: %w", ErrUnaskable, at, err)
+	}
+	req.Header.Set("User-Agent", c.Agent)
+	req.Header.Set("Accept", accept)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	switch {
+	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
+		return nil, nil, ErrUnknown
+	case resp.StatusCode == http.StatusTooManyRequests, resp.StatusCode >= 500:
+		// A bad day: asked for too much, or the index itself is unwell.
+		// Nothing is recorded, so the component stays due and the next pass
+		// asks again.
+		return nil, nil, fmt.Errorf("%w: %s answered %s", ErrNotAnswering, at, resp.Status)
+	case resp.StatusCode != http.StatusOK:
+		// Every other refusal is one the index will repeat: a package the
+		// registry withdrew, a region it will not serve, a request it will
+		// not accept in that shape. Recorded as asked, because an answer we
+		// will never get is still an answer about this component.
+		return nil, nil, fmt.Errorf("%w: %s answered %s", ErrUnaskable, at, resp.Status)
+	}
+	// One byte past the ceiling, so a document over it is refused as too large
+	// rather than cut off and reported as unreadable.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, mostBody+1))
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %s: %w", ErrNotAnswering, at, err)
+	}
+	if int64(len(body)) > mostBody {
+		return nil, nil, fmt.Errorf("%w: %s answered more than the %d bytes this reads",
+			ErrUnaskable, at, mostBody)
+	}
+	return body, resp.Header, nil
 }
 
 // goProxy asks the module proxy, which answers with the version and its time
@@ -485,7 +499,7 @@ func (r cratesIO) Latest(ctx context.Context, name string) (Latest, error) {
 
 // firstOf is the first of several fields an index might have filled in.
 //
-// Three of the four state where a project lives in more than one place and fill
+// Most of the indexes state where a project lives in more than one place and fill
 // in whichever the publisher bothered with, so the caller asks for them in the
 // order a reader would want rather than picking one and hoping.
 func firstOf(said ...string) string {

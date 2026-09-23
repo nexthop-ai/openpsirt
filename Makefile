@@ -151,7 +151,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
+.PHONY: vendored attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
 
 all: check build
 
@@ -600,7 +600,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+check: build vet lint unreachable unclaimed vendored reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -790,6 +790,11 @@ reserved-current: reserved-words
 # runs. A decision not built yet is not exempt — its design document says so.
 unclaimed:
 	$(GO) run ./internal/tools/unclaimed
+
+# Files copied into the tree rather than imported: each accounted for, under a
+# license this tree may carry, and named in NOTICE where the license asks.
+vendored:
+	@ALLOWED_LICENSES=$(ALLOWED_LICENSES) $(GO) run ./internal/tools/vendored
 
 # CI fails when the committed document has drifted, so check the same thing.
 openapi-current: openapi

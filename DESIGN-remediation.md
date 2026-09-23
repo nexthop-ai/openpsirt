@@ -251,10 +251,31 @@ name to a public index.
 | Rule | Reason |
 |---|---|
 | One replica asks, settled by a lease | These are free services somebody else runs, and the politeness the pass is built around — two hundred at a time, a quarter of a second apart — is a rate per deployment rather than per replica |
-| The lease is taken again as the pass runs | Sized from the interval between cycles it is a guess at how long a pass takes, and the arithmetic says so: two hundred requests with a timeout each is far past several intervals. A slow index then hands the pass to a second replica mid-flight and both ask |
+| The lease is taken again as the pass runs | Sized from the interval between cycles it is a guess at how long a pass takes, and the arithmetic says so: two hundred components of one or more requests each, with a timeout each, is far past several intervals. A slow index then hands the pass to a second replica mid-flight and both ask |
+| Taken again every twenty-five components or once half the lease has gone, whichever comes first | A component is one request to most indexes, two to Maven Central and up to five to nuget.org, so a count alone lets a slow index outlast the lease between renewals |
+| An index that fails is asked once a pass | Its components stay due, and the window is read again without that ecosystem for the rest of the pass. A deployment whose egress does not reach one index would otherwise fill every window with that index's never-asked components, and no other ecosystem would be asked again |
 | A pass that has lost the lease stops | Two replicas asking is what the lease exists to prevent, and it is at somebody else's expense |
 | The candidates are the ecosystems there is an index for | Maintained as the complement of one of them, every other unaskable ecosystem passed the filter, reached the asker, found none and was recorded empty — spending one of the pass's slots. An image with ten thousand distribution packages spent fifty passes writing nothing |
 | A distribution package is not asked about | The distribution is the maintainer, and the date it released says nothing about the age of the software inside |
+
+| Ecosystem | Index | The newest version is |
+|---|---|---|
+| Go | The module proxy | What it answers as the latest, with its time |
+| npm | The npm registry | The `latest` tag, dated from the full document where it comes back |
+| PyPI | pypi.org | The version it names, dated by its earliest file |
+| Cargo | crates.io | The newest stable version, or the newest of any where there is none |
+| Maven | Maven Central's repository | The furthest along of the versions its metadata lists that is a release, by the Maven ordering, or the furthest pre-release where there is no release. Dated by when the repository last modified that version's project document |
+| NuGet | nuget.org's registration | The furthest along listed release, by the NuGet ordering, or the furthest listed pre-release where there is none. Dated by when it was published |
+
+| Rule | Reason |
+|---|---|
+| An index that lists every version is read with the ecosystem's own ordering | Maven Central's metadata names a "release" and it is whatever was published last: measured on log4j-core, 3.0.0-beta3 while 2.26.1 was the newest release. An ordering is what says 2.25.1 is after 2.9.1 |
+| A pre-release is not what somebody is behind | Telling somebody they are behind a release candidate is not a claim to act on. It is offered only where a package has published nothing else |
+| An unlisted NuGet version is passed over | Its owner withdrew it from what anybody choosing a version is offered, and nuget.org dates it to 1900 |
+| A paged NuGet registration is read from its newest page back, at most four pages | Pages run oldest to newest, so the answer is usually on the last. The bound is for a package whose newest pages hold only pre-releases, which would otherwise cost a request per page back to its first release |
+| Where the bound stops the walk with no release found, there is no answer | A release may sit on a page that was not read, so the newest pre-release is not offered. The package is recorded as asked with no version |
+| A page is read only from the registration it came from | Its address is what the answer says it is. An index naming a page anywhere else is not followed |
+| A Maven name that would move the request is not asked | A group or an artifact that is empty, `.` or `..` names a different place in the repository rather than a package. Refused as unaskable, which records it |
 
 What comes back is classified, because the classes want opposite treatment.
 
@@ -294,6 +315,7 @@ So a name this deployment calls its own is never sent. Three sources, unioned:
 | Rule | Reason |
 |---|---|
 | A name is matched a part at a time, either exactly or followed by a separator | Matched anywhere in the string, one organization's name holds back every package containing those letters; matched only exactly, it misses the family of names the organization actually publishes, which is most of what it is for |
+| A name without a dot is matched against each dotted part as well | A Maven group starts with a top-level domain, so `com.skunkworks` never begins with `skunkworks`. Matched only at the start, a stated name was held back from npm and NuGet and sent to Maven Central |
 | The segment beside the package's name, never the whole namespace | A forge host is shared by everybody. Taking it would hold back most of an ecosystem while reporting that it was protecting one organization, which is the failure that makes an operator turn the feature off rather than tune it |
 | Nothing is derived from the root's own name | A product called "core" would hold back every package whose name starts that way. A default that wrong is one nobody tunes |
 | A label that names a kind of registration rather than an organization is dropped | Where a deployment publishes under a second-level registration, the generic part is nobody's name. It is a closed handful rather than a list of where each country's registrations begin, which is a file this does not have |
@@ -351,10 +373,12 @@ closes everything near the bottom.
 
 | Rule | Reason |
 |---|---|
-| An ordering is per ecosystem, and only where its algorithm is written down | Debian's, RPM's, Alpine's, PEP 440's, Maven's and dotted numeric releases are written here. Everything else is left unordered rather than approximated, because an ordering claimed before its algorithm exists is the confident wrong answer |
+| An ordering is per ecosystem, and only where its algorithm is written down | Debian's, RPM's, Alpine's, PEP 440's, Maven's, NuGet's and dotted numeric releases are written here. Everything else is left unordered rather than approximated, because an ordering claimed before its algorithm exists is the confident wrong answer |
 | The ecosystems with no ordering stay that way | Coverage can never be complete for a product whose deployers' ecosystems are unknowable, so an unranked list is the answer for the long tail rather than a gap waiting to be filled |
 | An algorithm is transcribed from the project that defines it | The tilde and caret rules, a numeric run outranking an alphabetic one, a leading zero turning a version part into text: each is a decision somebody made rather than something to reason out from a description |
-| A published suite is taken where its license permits | PEP 440's and Maven's are permissive and are taken whole. What that buys is that somebody else chose the cases: three of Maven's tables are a bug report each, and nobody reading a description of the format arrives at any of them |
+| A published suite is taken where its license permits | PEP 440's, Maven's and NuGet's are permissive and are taken whole. What that buys is that somebody else chose the cases: three of Maven's tables are a bug report each, and nobody reading a description of the format arrives at any of them |
+| A taken case that asserts nothing is left out, and says so | One of NuGet's "not equal" tables compares the two strings rather than two versions, so it passes for any comparer, and one of its pairs is one version under NuGet's own. What the suite asks of its strict parser and its formatting has no counterpart here and is left out too |
+| NuGet is not Semantic Versioning | A fourth number is permitted and compared, a missing number is zero, labels compare without regard to case, and a label is a number only where it fits a 32-bit integer — so a longer run of digits is a word and sorts above every number. Whitespace around a number is allowed and inside one is not |
 | A suite whose license forbids it is replaced by cases written here | Debian's, RPM's and Alpine's are GPL-licensed and this tree is Apache-2.0, so their files are not taken — the same answer the SBOM fixtures already give about the sample source beside the documents they do take. What is kept is the knowledge: a case per rule, with the ones that reverse the obvious answer marked as such. What is lost is that nobody else chose them, so a pair nobody here thought of is not covered, and each case says which rule it pins in exchange |
 | What a taken suite does not carry is written here | A reference implementation is asked about versions and raises on anything else, so none of them has a case for what a security feed writes where a version belongs. Every scheme is given those, and the candidate set that one unreadable version leaves unranked |
 | A scheme is added by adding its algorithm, never by mapping it onto one already here | Every scheme here is unlike the others in some detail that only shows on a pair nobody thought to try. Sharing a scheme is right where an ecosystem genuinely uses it — the language ecosystems do — and elsewhere it is the confident wrong answer wearing a familiar name |
@@ -365,7 +389,6 @@ closes everything near the bottom.
 | Where a scheme's own tool falls back, this refuses | Alpine compares what it can read and sorts the rest as text; RPM orders any two strings at all. Both are reasonable for a package manager resolving a dependency it has to resolve somehow, and neither is right here, where the answer is a recommendation rather than a resolution. So a version that does not read leaves the pair unordered, and a published suite's own "invalid" list is what says which those are |
 | Unranked means the two counts are equal and say so | An exact match still counts. What is never done is inferring that one version reaches another, so nothing overstates what an upgrade would close |
 | Which ecosystems are ordered and which have an index are separate lists | An index answers what the newest version upstream is, and an ordering answers which of two versions is further along. A distribution has an ordering and no index, because the distribution is the maintainer and the date it released says nothing about the software inside; an ecosystem may have an index and no ordering for as long as nobody has written its algorithm down |
-| An upstream index for Maven | Maven Central answers what the newest version is, and the ordering landing here does not make the asker exist |
 | Which scheme applies is read from the package identifier | Two ecosystems spell some versions identically and order them differently, so reading the shape of the string would order a package by whichever scheme its version happened to resemble |
 | The scanner already compared versions to match the finding | So refusing to compare does not make the tool comparison-free — it leaves it unable to rank what it has already been told. What is new here is saying which of the answers is furthest along, not deciding which findings apply |
 
@@ -549,7 +572,7 @@ somebody deciding whether to act.
 | Element | What fills it | |
 |---|---|---|
 | References | The issue's write-up and everywhere else a report points, each address once, and last the address this document is published at | On the document rather than on the vulnerability. The document is about one flaw, so the two lists would hold the same addresses, and the profile requires the document's. Its own address is stated only where the deployment has said where its documents are reachable, because a reader's tooling follows a self reference and one pointing at nothing is worse than none — and it is built from the same rule the directory writes the file under, so the two cannot name different files |
-| Scores | The CVSS base vector, scored here | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. A vector this deployment cannot score, or one on a scheme the standard's score object has no field for — version 4, which arrives with the standard's next version — yields nothing rather than a number in the wrong place |
+| Scores | The version 3 rating, scored here from its vector | Worked out from the vector rather than read beside it: a stored number and a stored vector that disagree have nothing to say which was meant. The standard's score object has a field for version 2 and version 3, and version 4 arrives with the standard's next version — so an issue rated under both states its version 3 rating, and one rated under version 4 alone states none rather than a number in the wrong place. The ratings a report stated are asked newest first, then the vector a flaw assessed here was given |
 | Acknowledgments | The credit the reporter asked to be named by | The credit alone. Reporting under a name gives it so somebody can reply, not so it can be published, and "anonymous" is a real answer to the question the credit field asks |
 | Remediations | Stated for the releases that still carry the flaw, and the details name the releases that do not | That is who a remediation is for: the standard defines the product identifiers as what the item applies to, and a vendor fix as one for the affected product. Pointed at the releases already fixed, the customer who has to act reads an advisory with no remediation for them. "Update to a release in which this flaw is fixed" is that instruction with the answer left out, so the details name them, by the names the product tree gives them and in the order it gives them — not the earliest, which would mean ordering release names, and an ordering that answers confidently for a pair it cannot order is worse than none. Nothing about planned work: a commitment is one build's internal plan, and the same sentence in a published advisory is a promise to a customer about a date |
 | Distribution | Whether anything it covers is still held back — RED while anything is, WHITE otherwise | Handing a document about a flaw nobody outside has been told about to somebody who may pass it on is the disclosure the embargo exists to hold, and that is true of a document at any point in its editorial life. The labels are the standard's four, which is why a disclosed document is WHITE rather than the word the protocol renamed it to |
@@ -782,6 +805,11 @@ standard's trusted provider role adds on top of the directory, and key
 material is a class of configuration this deployment does not take. The layout
 leaves room: a signature sits beside the document under the same name, and the
 feed already names the file beside each entry that answers for it.
+
+A version 4 score in the published document. The standard's score object gains
+a field for one in CSAF 2.1, and the document is written as CSAF 2.0; the
+rating is held, and is stated once the document is written in a version that
+carries it.
 
 Prose of the deployment's own in the document beyond its title. An edition
 carries the title, and the rest of what a reader acts on is assembled from the

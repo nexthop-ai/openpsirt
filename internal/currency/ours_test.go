@@ -103,6 +103,14 @@ func TestALabelMatchesAtSeparators(t *testing.T) {
 			"pkg:golang/nexthop.ai/sdk", true},
 		{"the last segment counts too, because not every package has a scope",
 			"pkg:cargo/nexthop", true},
+		{"a NuGet package, whose name is dotted and has no namespace at all",
+			"pkg:nuget/NextHop.Agent", true},
+		{"a group whose organization is a part other than the first",
+			"pkg:maven/com.nexthop.tools/lib", true},
+		{"a group holding a different organization's name as a part",
+			"pkg:maven/com.nexthopper/lib", false},
+		{"a NuGet package whose name only begins the same way",
+			"pkg:nuget/NextHopper.Agent", false},
 		{"a different organization whose name begins the same way",
 			"pkg:npm/nexthopper", false},
 		{"the letters in the middle of somebody else's name",
@@ -144,6 +152,11 @@ func TestWhatTheDeploymentStatedIsHeldBackToo(t *testing.T) {
 	}
 	if ours.HeldBack("pkg:npm/lodash") {
 		t.Fatal("an ordinary dependency was held back")
+	}
+	// A Maven group starts with a top-level domain, so a stated name is one of
+	// its parts rather than its start.
+	if !ours.HeldBack("pkg:maven/com.skunkworks/lib") {
+		t.Fatal("a stated name went to Maven Central as a group")
 	}
 	if got := ours.Labels(); !reflect.DeepEqual(got, []string{"acme-internal", "skunkworks"}) {
 		t.Fatalf("the labels read back as %q", got)

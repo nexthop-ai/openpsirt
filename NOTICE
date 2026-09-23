@@ -26,8 +26,44 @@ Copyright 2001-2019 The Apache Software Foundation
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
-Both are in internal/vercmp, as the cases each project's own suite uses to
-check the ordering its ecosystem defines.
+This product includes version-ordering test cases from NuGet, the NuGet.Client
+project, licensed under the Apache License, Version 2.0. Copyright (c) .NET
+Foundation and Contributors. See https://github.com/NuGet/NuGet.Client
+
+They are the cases each project's own suite uses to check the ordering its
+ecosystem defines, in internal/vercmp/pypi_test.go,
+internal/vercmp/maven_test.go and internal/vercmp/nuget_test.go.
+
+This product includes the version 4 class scores of the Common Vulnerability
+Scoring System from the reference calculator FIRST publishes, licensed under
+the 2-clause BSD License. See https://github.com/FIRSTdotorg/cvss-v4-calculator
+
+The scores are transcribed in internal/finding/cvss4.go, and the calculator's
+answers for a corpus of vectors are in
+internal/finding/testdata/cvss4-scores.txt.
+
+  Copyright (c) 2023 FIRST.ORG, Inc., Red Hat, and contributors
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 This product includes one security advisory published by SUSE, licensed under
 the Creative Commons Attribution 4.0 International license (CC-BY-4.0). See

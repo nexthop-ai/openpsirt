@@ -1135,7 +1135,11 @@ func (s *Store) cover(ctx context.Context, subject access.Subject,
 		// the score is the flaw's, and the flaw is the same flaw in each.
 		rated = append(rated, leaf.ID)
 	}
-	vulnerability.Scores = scoresFor(issue, rated)
+	ratings, err := finding.NewVulnerabilities(s.db).Ratings(ctx, issue.ID)
+	if err != nil {
+		return err
+	}
+	vulnerability.Scores = scoresFor(issue, ratings, rated)
 	vulnerability.Remediations = remediationsFor(fixed, vulnerability.Status.KnownAffected)
 
 	a.vulnerabilities = append(a.vulnerabilities, vulnerability)

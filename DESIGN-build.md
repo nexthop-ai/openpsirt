@@ -124,6 +124,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make confined` | Engine-specific code outside the two places allowed to hold it |
 | `make readable` | Source files a text tool will not read, which every text-based check here skips in silence |
 | `make unclaimed` | Every requirement is named by a design document |
+| `make vendored` | Every file somebody else wrote is accounted for, under a license this tree may carry, and named in `NOTICE` where its license asks. See below |
 | `make pins-check` | Every version pinned in two files still agrees |
 | `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
 | `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
@@ -153,7 +154,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check` |
-| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `test` |
+| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
@@ -597,6 +598,24 @@ An SPDX expression is evaluated rather than matched: `MIT AND ISC` needs both
 allowed and `(MPL-2.0 OR Apache-2.0)` needs either. Treating the string as a
 name refuses both, and adding the strings to the allowlist accepts every other
 expression spelled that way.
+
+### Copied files
+
+What is copied into the tree rather than imported is checked by `make
+vendored`: a version suite taken from another project, a specification's
+example document, a publisher's advisory, a table transcribed from a reference
+implementation, a generated catalog. Each is in one list, with where it came
+from and the license its source states.
+
+| Rule | |
+|---|---|
+| A file is found in the tree, then looked for in the list | Every file under a `testdata` directory, and every file carrying a copyright line that is not this project's, a license identifier, a document's data license, or a comment saying `NOTICE` records it. A file copied in without a line in the list fails the gate |
+| Found broadly, and a file written here is listed as ours | A file the search misses is one nobody is asked about. A fixture written here costs a line saying so |
+| Not searched | `NOTICE` and `LICENSE`, which are the statements; markdown, which is prose about the tree; a file that is not text; and the gate's own source, which spells every mark it looks for |
+| Held to a license this tree may carry | The dependency allowlist, and beside it the licenses data is published under: a dedication to the public domain, CC-BY-4.0, and the weakness catalog's own terms. An expression is evaluated as the dependency check evaluates one |
+| Named in `NOTICE` where the license asks for attribution | Every license here but a public-domain dedication asks for it. A file under one that `NOTICE` does not name fails the gate |
+| Every path `NOTICE` names is in the tree and held as somebody else's | The other direction, so a file removed or renamed leaves no attribution pointing at nothing |
+| What a file's license is, is read by a person | A data file states its license in its own words where it states one at all. The list is where somebody writes down what they read, and the gate holds them to having written it |
 
 ## The API document
 

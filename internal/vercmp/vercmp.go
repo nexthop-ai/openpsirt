@@ -49,6 +49,10 @@ const (
 	// between digits and letters, and a word decides whether the level it sits
 	// in leads to a release or follows one.
 	Maven
+	// NuGet is NuGet's own: up to four dotted numbers, release labels compared
+	// without regard to case, and build metadata that says nothing about
+	// order.
+	NuGet
 )
 
 // SchemeOf says how an ecosystem spells versions, given the type read out of a
@@ -72,6 +76,8 @@ func SchemeOf(ecosystem string) Scheme {
 		return PyPI
 	case "maven":
 		return Maven
+	case "nuget":
+		return NuGet
 	default:
 		// Every other ecosystem, including ones that plainly do have an
 		// ordering. Adding one is adding its algorithm and the tests that show
@@ -126,6 +132,8 @@ func Order(scheme Scheme, a, b string) (int, bool) {
 		return pypiOrder(a, b)
 	case Maven:
 		return mavenOrder(a, b)
+	case NuGet:
+		return nugetOrder(a, b)
 	default:
 		return 0, false
 	}
@@ -413,5 +421,37 @@ func sign(n int) int {
 		return 1
 	default:
 		return 0
+	}
+}
+
+// Leads says whether a version leads to a release rather than being one — an
+// alpha, a beta, a release candidate, a snapshot — and whether the scheme
+// could say.
+//
+// An index asked for the newest version answers with every version it holds,
+// and telling somebody they are behind a release candidate is not a claim
+// anybody should act on. Answered only for the schemes an index is asked
+// under and that serve every version rather than naming the newest release:
+// Maven Central's own "release" field names whatever was published last,
+// pre-release or not.
+func Leads(scheme Scheme, v string) (bool, bool) {
+	v = strings.TrimSpace(v)
+	if v == "" || len(v) > longest {
+		return false, false
+	}
+	switch scheme {
+	case Maven:
+		if !mavenIsVersion(v) {
+			return false, false
+		}
+		return mavenRead(v).leads(), true
+	case NuGet:
+		read, ok := nugetRead(v)
+		if !ok {
+			return false, false
+		}
+		return len(read.labels) > 0, true
+	default:
+		return false, false
 	}
 }

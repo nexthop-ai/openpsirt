@@ -161,8 +161,8 @@ func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
 // The lease covers several cycles rather than one, and is taken again inside
 // the pass as well as at the top of it. Sized from the interval alone it was
 // a guess at how long a pass takes, and the arithmetic beside it said the
-// guess was wrong: a pass is up to 200 requests with a timeout each, which is
-// far past five intervals. So a slow index handed the pass to a second replica
+// guess was wrong: a pass is 200 components of one or more requests each, with
+// a timeout on every request, which is far past five intervals. So a slow index handed the pass to a second replica
 // mid-flight and both asked — which is the thing a lease exists to prevent,
 // and the asking is at somebody else's expense.
 //
@@ -226,7 +226,13 @@ type stale struct {
 // Returns how many were asked about, which is how the caller knows whether a
 // backlog is still draining.
 func (r *Refresher) Once(ctx context.Context) (int, error) {
-	due, err := r.due(ctx)
+	// The ecosystems whose index had a bad day this pass. Their components
+	// stay due and are left out of the window for the rest of it: a failing
+	// index is asked once a pass rather than once per component, and a
+	// window full of never-asked components from an index this deployment
+	// cannot reach does not hold back every other ecosystem behind it.
+	failing := map[string]bool{}
+	due, err := r.due(ctx, failing)
 	if err != nil {
 		return 0, err
 	}
@@ -239,8 +245,11 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("read who publishes what was scanned: %w", err)
 	}
 	ours := r.Ours.With(roots...)
-	asked := 0
-	for at, component := range due {
+	asked, at := 0, 0
+	renewed := r.Now()
+	for len(due) > 0 {
+		component := due[0]
+		due = due[1:]
 		if ctx.Err() != nil {
 			return asked, nil
 		}
@@ -249,17 +258,23 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		// that has already lost the lease from going on asking: two replicas
 		// asking is the thing the lease exists to prevent, and the asking is
 		// at somebody else's expense.
-		if at > 0 && at%renewEvery == 0 {
+		//
+		// On a count and on the clock, whichever comes first. A component is
+		// one request to some indexes and several to others, so a count alone
+		// lets a slow index outlast the lease between renewals.
+		if at > 0 && (at%renewEvery == 0 || r.Now().Sub(renewed) > leaseFor(r.interval)/2) {
 			switch mine, err := r.asking(ctx, r.interval); {
 			case err != nil:
 				return asked, fmt.Errorf("keep the lease on asking upstream: %w", err)
 			case !mine:
 				return asked, nil
 			}
+			renewed = r.Now()
 		}
+		at++
 		// Read every time round rather than once per cycle. A pass is up to
-		// 200 requests with a timeout each, so reading it only at the top
-		// leaves an operator who has just turned this off waiting the better
+		// 200 components of one or more requests each, so reading it only at
+		// the top leaves an operator who has just turned this off waiting the better
 		// part of an hour while it keeps talking to the network — which is the
 		// one thing the setting exists to stop.
 		on, err := r.enabled(ctx)
@@ -297,11 +312,9 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 
 		// A question with nowhere to send it is still answered. Unrecorded, a
 		// component whose ecosystem has no index stays due for ever, and `due`
-		// takes the oldest 200 with never-asked first — so on a real image,
-		// where 3,929 components are `generic`, `oci`, `github` or `maven`
-		// against 3,010 that are askable, the window filled with rows nothing
-		// ever wrote and the pass asked upstream about nothing at all, every
-		// cycle, forever.
+		// takes the oldest 200 with never-asked first, so on an image where
+		// such components outnumber the askable ones the window fills with rows
+		// nothing writes and the pass asks upstream about nothing at all.
 		ecosystem, name, ok := Asked(component.Purl)
 		if !ok || r.Index(ecosystem) == nil {
 			if err := r.record(ctx, component.ID, Latest{}); err != nil {
@@ -341,8 +354,21 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			// the component unrecorded — and the window takes the never-asked
 			// first, so it held the head of every pass afterwards for ever,
 			// with the components behind it never reached.
+			//
+			// The rest of that ecosystem waits for the next pass, and the
+			// window is read again without it, bounded by what is left of
+			// the pass.
 			r.logger.Warn("an index did not answer",
 				"ecosystem", ecosystem, "package", name, "error", err)
+			failing[ecosystem] = true
+			if left := MostPerPass - at; left > 0 {
+				if due, err = r.due(ctx, failing); err != nil {
+					return asked, err
+				}
+				if len(due) > left {
+					due = due[:left]
+				}
+			}
 			r.pause(ctx)
 			continue
 		}
@@ -376,14 +402,18 @@ func (r *Refresher) pause(ctx context.Context) {
 //
 // Ordered oldest first, with never-asked before everything, so a first run
 // works through the list rather than circling the same slice of it.
-func (r *Refresher) due(ctx context.Context) ([]stale, error) {
+//
+// An ecosystem whose index failed earlier in the pass is left out.
+func (r *Refresher) due(ctx context.Context, failing map[string]bool) ([]stale, error) {
 	var rows []stale
 	err := r.db.NewSelect().
 		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`c.id AS "id"`).
 		ColumnExpr(`c.purl AS "purl"`).
 		Where("c.purl <> ''").
-		WhereGroup(" AND ", askableOnly).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return askableExcept(q, failing)
+		}).
 		// Never asked, or asked long enough ago — where "long enough" depends
 		// on whether we got an answer. A version we have goes stale in a day;
 		// a package the index has never heard of is left for a month.
@@ -422,8 +452,23 @@ func (r *Refresher) due(ctx context.Context) ([]stale, error) {
 // "pkg:DEB/..." was excluded by one engine and kept by another, and the row
 // that got through had no index and stuck.
 func askableOnly(q *bun.SelectQuery) *bun.SelectQuery {
+	return askableExcept(q, nil)
+}
+
+// askableExcept is askableOnly less the ecosystems named. With every one of
+// them named it matches nothing, rather than the condition being left empty
+// and matching everything.
+func askableExcept(q *bun.SelectQuery, except map[string]bool) *bun.SelectQuery {
+	some := false
 	for _, each := range Askable() {
+		if except[each] {
+			continue
+		}
 		q = q.WhereOr("LOWER(c.purl) LIKE ?", "pkg:"+each+"/%")
+		some = true
+	}
+	if !some {
+		q = q.Where("1 = 0")
 	}
 	return q
 }
@@ -459,9 +504,9 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 	// who hold the most access, so both are bounded and the address is judged
 	// before it is stored rather than only before it is drawn.
 	//
-	// Absent is normal and overwrites nothing: three of the four indexes serve
-	// a summary and the module proxy serves none, so a package with a version
-	// and no summary is the ordinary case rather than a half-written row.
+	// Absent is normal and overwrites nothing: the module proxy serves no
+	// summary at all, so a package with a version and no summary is the
+	// ordinary case rather than a half-written row.
 	if summary := clip(latest.Summary, MostSummary); summary != "" {
 		q = q.Set("summary = ?", summary)
 	}

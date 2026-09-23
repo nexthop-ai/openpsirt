@@ -228,14 +228,18 @@ newest version — one line saying what the package is, and where it is develope
 | Rule | Reason |
 |---|---|
 | One line, never the long description | What some indexes call a description is the package's whole README, measured at 2,894 characters for one ordinary package. That is a document; a row of a table wants a label |
+| The first paragraph of a description written in markup, on one line | A Maven project document's description sits inside an XML element, indented and broken across lines. nuget.org's summary is usually empty and its description is a paragraph, because the readme is a file of its own there |
 | Absent is the ordinary case, not a gap | The module protocol for one ecosystem has no such field anywhere, and no index is asked about a distribution package, so a version with no summary beside it is normal. A screen shows what there is rather than a space where something failed |
 | The address the index states beats one worked out from the name | A publisher said where the project lives; a template guessed. Where the index says nothing, the name still yields one, so there is usually an address either way |
-| The project's own pages before its repository | Three of the indexes carry both and publishers fill in whichever they bothered with, so they are asked for in the order a reader wants rather than by picking one |
+| The project's own pages before its repository | Most of the indexes carry both and publishers fill in whichever they bothered with, so they are asked for in the order a reader wants rather than by picking one |
 | Bounded and judged before it is stored | Both arrive over the network from a third party and are rendered to staff holding the most access. The summary is cut to a label on a rune boundary, and the address is judged against the two schemes anything else here may link to — at storage as well as at rendering, because a value that should never have been stored is one somebody later reads out by another route (REQ-66 and REQ-69) |
 | An unusable half does not cost the rest | A refused address leaves the version and the summary recorded. One field a publisher filled in badly is not a reason to know nothing about the package |
 
-Asking is the same pass that asks for the newest version, so it costs no extra
-request: this is reading more of an answer already fetched. It is off unless a
+Asking is the same pass that asks for the newest version, and for most indexes
+it costs no extra request: this is reading more of an answer already fetched.
+Maven Central is the exception. Its metadata document names versions and
+nothing else, so the project document of the newest release is a second
+request, and the date comes from it too. It is off unless a
 deployment turns it on, like everything else that reaches the network.
 
 What no index gives is a distribution package's description. Those live in a
@@ -694,6 +698,7 @@ report nobody acknowledged is still raised as unanswered.
 | A severity may be left unstated (REQ-18) | Making somebody choose a word to get the record written is how a guess ends up stored as a judgment. It is not given *no* deadline: the windows answer for a severity they do not recognize |
 | A person's severity is checked against the words rather than folded | A report's is folded, because a scanner that rated nothing is silent and silence is not a claim that something is mild. A person typing "urgent" is not silent; they are wrong, and folding would replace their judgment with one nobody made |
 | The scheme a score is on travels with it | A number alone is not readable across schemes. It is recorded from the vector on a flaw assessed here, and from what the report states on one a scan brought in |
+| The screen shows the newest generation's rating and names the others beside it | A report commonly rates one issue under version 3 and version 4. The number beside the issue is the newest generation's rating, whole, so a list and the finding screen show the same number on the same scheme. `DESIGN-ingest.md` holds which rating in a generation is kept |
 | Weaknesses are recorded as given, against no catalog | Trimmed, upper-cased, de-duplicated. A list refusing an identifier it had not heard of would refuse next year's. Where a published document has to name one, the name is looked up then rather than checked now, and an identifier no catalog assigns is left out of that document rather than out of the record |
 | Which one is the root cause is carried rather than picked | A published advisory states one weakness and an issue is commonly classified as several. The feeds say which they call primary, and a person recording a flaw names theirs first — the same statement made by hand. Choosing the lowest number or the earliest string instead is an answer with nothing behind it, and the two disagree: `CWE-20` is the lower number and `CWE-119` the earlier string |
 

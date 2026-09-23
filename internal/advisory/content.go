@@ -240,33 +240,48 @@ var carriedByCSAF = map[string]bool{"3.0": true, "3.1": true}
 // scoresFor is what the flaw scored, stated for every release the document
 // names.
 //
+// The rating the document has a field for. An issue rated under version 4
+// and version 3 is published with its version 3 score, and one rated under
+// version 4 alone is published with none: the number is recorded and shown
+// here, and the document states what it has a place to state. The ratings
+// held for the issue are asked newest first, and the issue's own vector last,
+// which is where a flaw assessed here records the one it was given.
+//
 // Worked out from the vector rather than read alongside it, which is the rule
 // the record is written under: a stored number and a stored vector that
 // disagree have nothing to say which was meant, and the standard's own
 // consumers recompute.
 //
-// A vector under a scheme this deployment does not score, or one the document
-// has no field for, yields nothing rather than a number in the wrong place.
-func scoresFor(issue *finding.Vulnerability, products []string) []Score {
-	if len(products) == 0 || strings.TrimSpace(issue.Vector) == "" {
+// A vector under a scheme this deployment does not score yields nothing
+// rather than a number in the wrong place.
+func scoresFor(issue *finding.Vulnerability, ratings []finding.CVSS, products []string) []Score {
+	if len(products) == 0 {
 		return nil
 	}
-	scored, err := finding.Score(issue.Vector)
-	if err != nil || scored == nil {
-		return nil
+	vectors := make([]string, 0, len(ratings)+1)
+	for _, rating := range ratings {
+		vectors = append(vectors, rating.Vector)
 	}
-	if !carriedByCSAF[scored.Scheme()] {
-		return nil
+	vectors = append(vectors, issue.Vector)
+	for _, vector := range vectors {
+		if strings.TrimSpace(vector) == "" {
+			continue
+		}
+		scored, err := finding.Score(vector)
+		if err != nil || scored == nil || !carriedByCSAF[scored.Scheme()] {
+			continue
+		}
+		return []Score{{
+			CVSSv3: &CVSSv3{
+				Version:      scored.Scheme(),
+				VectorString: scored.Vector,
+				BaseScore:    float64(scored.ScoreCenti) / 100,
+				BaseSeverity: strings.ToUpper(scored.Severity),
+			},
+			Products: products,
+		}}
 	}
-	return []Score{{
-		CVSSv3: &CVSSv3{
-			Version:      scored.Scheme(),
-			VectorString: scored.Vector,
-			BaseScore:    float64(scored.ScoreCenti) / 100,
-			BaseSeverity: strings.ToUpper(scored.Severity),
-		},
-		Products: products,
-	}}
+	return nil
 }
 
 // remediationsFor is what a reader can do, from what is true now.

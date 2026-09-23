@@ -310,11 +310,30 @@ Off unless an administrator turns it on, under Settings. Everything a scan
 needs arrives as a file somebody imported, so a deployment that cannot reach out
 loses this answer and what a scan reports is unaffected.
 
-What goes out is a component's name. One request per component to that
-ecosystem's public index, carrying the name and nothing else — no version, no
-build, no product. For an open-source dependency that is public knowledge. For
+What goes out is a component's name, to that ecosystem's public index, and
+nothing else — no version, no build, no product. Most indexes take one request
+per component; Maven Central takes two, the version list and the newest
+release's project document, and nuget.org up to five, the registration and up
+to four of its pages. For an open-source dependency that is public knowledge. For
 something built here it is the name of a project, a team, or a product nobody
 has announced, and a public index records every request made of it.
+
+| Ecosystem | Host asked |
+|---|---|
+| Go | `proxy.golang.org` |
+| npm | `registry.npmjs.org` |
+| PyPI | `pypi.org` |
+| Cargo | `crates.io` |
+| Maven | `repo1.maven.org` |
+| NuGet | `api.nuget.org` |
+
+Nothing else is reached, and a redirect is not followed. A distribution
+package is never asked about.
+
+Where egress is restricted, allow the hosts for the ecosystems your builds
+carry. An index that cannot be reached is asked once a pass and then left for
+the rest of it, so the others are still asked; its components stay due, and
+each pass logs the failure.
 
 So names this deployment calls its own are never sent. Three sources, unioned:
 
@@ -329,7 +348,9 @@ So names this deployment calls its own are never sent. Three sources, unioned:
 | `OPENPSIRT_UPSTREAM_INTERNAL` | Names never sent to a public index, separated by commas, on top of the two derived sources above. Here rather than among the settings an administrator tunes, beside the namespace the default is derived from: asking upstream is a switch an administrator throws, and what leaves the deployment when it is on is a boundary you drew | unset |
 
 A name matches each part of a package's own name, either exactly or followed by
-`-`, `.` or `_`. A name carrying a dot also covers a host under it. So a
+`-`, `.` or `_`. A name without a dot also matches each dotted part, which is
+how a Maven group holds an organization's name after its top-level domain. A
+name carrying a dot also covers a host under it. So a
 deployment publishing under `example.test` holds back:
 
 | Identifier | On the label |
@@ -338,6 +359,8 @@ deployment publishing under `example.test` holds back:
 | `pkg:golang/github.com/example-corp/thing` | `example` |
 | `pkg:golang/test.example/lib` | `test.example`, the same organization spelled the way a module path spells it |
 | `pkg:golang/go.example.test/team/agent` | `example.test`, which covers a host under it |
+| `pkg:maven/test.example.tools/agent` | `test.example`, which is what a Maven group is |
+| `pkg:nuget/Example.Agent` | `example` |
 
 `pkg:npm/exampler` is left alone. Case does not decide.
 

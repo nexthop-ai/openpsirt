@@ -327,7 +327,8 @@ func away(given, worst map[string]string, of ...string) float64 {
 // vector, so the class contributes no distance and the score of the class
 // below it is never read.
 //
-// Copyright FIRST.ORG, Inc., Red Hat, and contributors. BSD-2-Clause.
+// Copyright (c) 2023 FIRST.ORG, Inc., Red Hat, and contributors. BSD-2-Clause,
+// whose conditions and disclaimer NOTICE carries.
 var macroScores = map[string]float64{
 	"000100": 10.0, "000101": 9.6, "000200": 9.3, "000201": 9.0,
 	"001100": 9.3, "001101": 9.2, "001200": 8.8, "001201": 8.0,

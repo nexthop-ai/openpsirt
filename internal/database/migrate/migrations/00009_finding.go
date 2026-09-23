@@ -173,6 +173,32 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 		// The class-of-flaw filter's index: every issue of one kind.
 		`CREATE INDEX "vulnerability_weakness_cwe_idx" ON "vulnerability_weakness" ("cwe")`,
 
+		// Each published rating of an issue, one per generation of the
+		// scoring scheme. A report commonly rates one issue under version 3
+		// and version 4, and the two are different judgments rather than two
+		// spellings of one: the screen shows the newest, and a published
+		// advisory states the one its format has a field for.
+		//
+		// The first stated in each generation is kept whole, number and
+		// vector together, so the two never come from different publishers.
+		`CREATE TABLE "vulnerability_rating" (
+			"id"               ` + t.id + `,
+			"vulnerability_id" ` + t.ref + ` NOT NULL,
+			-- The major version of the scheme: 2, 3 or 4. Version 3.0 and 3.1
+			-- are one generation, because they share one formula and one
+			-- field in every format that carries them.
+			"generation"       ` + t.ref + ` NOT NULL,
+			"score_centi"      ` + t.ref + ` NOT NULL,
+			"vector"           ` + t.free + ` NOT NULL,
+			-- Unbounded, like the three the issue carries beside its own
+			-- score, and for the same reason.
+			"score_version"    ` + t.free + ` NULL,
+			"score_source"     ` + t.free + ` NULL,
+			"score_kind"       ` + t.free + ` NULL,
+			CONSTRAINT "vulnerability_rating_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "vulnerability_rating_unique" UNIQUE ("vulnerability_id", "generation")
+		)` + t.suffix,
+
 		`CREATE TABLE "vulnerability_alias" (
 			"id"               ` + t.id + `,
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
@@ -499,5 +525,5 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 }
 
 func downFinding(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "finding", "suppression", "scan_run", "vulnerability_reference", "vulnerability_alias", "vulnerability_weakness", "vulnerability")
+	return dropTables(ctx, tx, "finding", "suppression", "scan_run", "vulnerability_reference", "vulnerability_alias", "vulnerability_weakness", "vulnerability_rating", "vulnerability")
 }

@@ -343,6 +343,16 @@ export function Finding() {
   }
   if (!it) return null;
 
+  // The rating shown: the newest generation the issue is rated under, and the
+  // issue's own score where no rating is held beside it.
+  const newest = it.ratings?.[0] ?? {
+    score: it.score ?? 0,
+    version: it.score_version ?? "",
+    vector: it.vector ?? "",
+    source: it.score_source,
+    kind: it.score_kind,
+  };
+
   // Each claim kept with the summary it came from, paired before anything is
   // dropped. Filtering first and indexing the summary list afterwards paired
   // a claim with another claim's summary the moment one of the parallel reads
@@ -654,12 +664,20 @@ export function Finding() {
                 from, what it was matched in — and the one number a deadline is
                 set from carried none, so a reader asking who says 5.9 had
                 nowhere to go. */}
+            {/* The newest generation the issue is rated under, and the
+                others beside it: a version 3 and a version 4 rating are two
+                judgments. */}
             <div className="score">
-              <span className="n">{it.score ? it.score.toFixed(1) : "—"}</span>
-              <span className="l">CVSS{it.score_version ? ` ${it.score_version}` : ""}</span>
-              {scoredBy(it.score_source, it.score_kind) && (
-                <span className="l">{scoredBy(it.score_source, it.score_kind)}</span>
+              <span className="n">{newest.score ? newest.score.toFixed(1) : "—"}</span>
+              <span className="l">CVSS{newest.version ? ` ${newest.version}` : ""}</span>
+              {scoredBy(newest.source, newest.kind) && (
+                <span className="l">{scoredBy(newest.source, newest.kind)}</span>
               )}
+              {(it.ratings ?? []).slice(1).map((other) => (
+                <span className="l" key={other.version} title={other.vector}>
+                  also {other.score.toFixed(1)} on CVSS {other.version}
+                </span>
+              ))}
             </div>
             {/* The estimate, what it means, and whether it is current.
                 Nobody acts on 0.00042; "higher than 91% of everything
@@ -689,9 +707,9 @@ export function Finding() {
               links to where it is written up, and the two words a feed uses to
               say it has no classification are said rather than drawn as one. */}
           <Weaknesses of={it.weaknesses ?? []} />
-          {it.vector && (
+          {newest.vector && (
             <p className="mono" style={{ fontSize: "var(--step--1)", color: "var(--muted)" }}>
-              {it.vector}
+              {newest.vector}
             </p>
           )}
           {/* The control sits on the line that reports the rating, so

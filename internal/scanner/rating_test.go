@@ -41,9 +41,11 @@ func TestARatingIsRecordedUnderTheGenerationItWasStatedIn(t *testing.T) {
 			"4.0", four, 7.1,
 		},
 		{
+			// The newest generation, wherever the report put it, because it
+			// is the one a screen shows.
 			"both, version 3 first",
 			[]publishedRating{published("3.1", three, 8.2), published("4.0", four, 7.1)},
-			"3.1", three, 8.2,
+			"4.0", four, 7.1,
 		},
 		{
 			"a rating stating no vector, ahead of one that does",
@@ -52,7 +54,7 @@ func TestARatingIsRecordedUnderTheGenerationItWasStatedIn(t *testing.T) {
 		},
 	} {
 		t.Run(c.what, func(t *testing.T) {
-			got := rating(c.carries)
+			got, _ := rating(c.carries)
 			if got.version != c.version {
 				t.Errorf("recorded the generation as %q, want %q", got.version, c.version)
 			}
@@ -76,7 +78,7 @@ func TestARatingStatingNoGenerationTakesTheOneItsVectorStates(t *testing.T) {
 		{three, "3.1"},
 	} {
 		t.Run(c.want, func(t *testing.T) {
-			got := rating([]publishedRating{published("", c.vector, 7.1)})
+			got, _ := rating([]publishedRating{published("", c.vector, 7.1)})
 			if got.version != "" {
 				t.Fatalf("the reader invented a generation of %q", got.version)
 			}
@@ -97,7 +99,7 @@ func TestAVectorARatingCarriesIsOneThisCanScore(t *testing.T) {
 	// score would leave that number unexplainable here.
 	for _, vector := range []string{four, three} {
 		t.Run(vector, func(t *testing.T) {
-			got := rating([]publishedRating{published("", vector, 1)})
+			got, _ := rating([]publishedRating{published("", vector, 1)})
 			scored, err := finding.Score(got.vector)
 			if err != nil {
 				t.Fatalf("the vector as recorded does not score here: %v", err)
@@ -106,5 +108,42 @@ func TestAVectorARatingCarriesIsOneThisCanScore(t *testing.T) {
 				t.Error("the vector as recorded scores into no band")
 			}
 		})
+	}
+}
+
+func TestBothGenerationsAreKeptWhereAReportStatesBoth(t *testing.T) {
+	// The screen shows the newest and a published advisory states the one its
+	// format has a field for, so neither can be the one thrown away.
+	_, kept := rating([]publishedRating{
+		published("3.1", three, 8.2),
+		// A second version 3 rating from somebody else: the first stated in
+		// a generation is the one kept.
+		published("3.0", "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", 9.8),
+		published("4.0", four, 7.1),
+		// Version 2 names no scheme in its vector, and says so in its version.
+		published("2.0", "AV:N/AC:L/Au:N/C:P/I:P/A:P", 7.5),
+	})
+	if len(kept) != 3 {
+		t.Fatalf("kept %d ratings, want one per generation: %+v", len(kept), kept)
+	}
+	for at, want := range []struct {
+		generation, centi int
+		vector            string
+	}{
+		{4, 710, four},
+		{3, 820, three},
+		{2, 750, "AV:N/AC:L/Au:N/C:P/I:P/A:P"},
+	} {
+		got := kept[at]
+		if got.Generation != want.generation || got.ScoreCenti != want.centi || got.Vector != want.vector {
+			t.Errorf("rating %d is %+v, want generation %d at %d with its own vector",
+				at, got, want.generation, want.centi)
+		}
+		if got.Source != "nvd@nist.gov" || got.Kind != "Primary" {
+			t.Errorf("rating %d lost who published it: %+v", at, got)
+		}
+	}
+	if _, none := rating(nil); none != nil {
+		t.Errorf("a report stating no rating kept %+v", none)
 	}
 }

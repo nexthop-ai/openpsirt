@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"os/exec"
 	"regexp"
@@ -354,7 +355,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 	if match.Artifact.Name == "" {
 		return nil, nil
 	}
-	published := rating(match.Vulnerability.CVSS)
+	published, ratings := rating(match.Vulnerability.CVSS)
 	aliases := make([]string, 0, len(match.RelatedVulnerabilities))
 	// The other places this issue is written up, from every identifier it
 	// answers to. Deduplicated by `references`, which the matched
@@ -393,6 +394,7 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 			ScoreVersion:         published.version,
 			ScoreSource:          published.source,
 			ScoreKind:            published.kind,
+			Ratings:              ratings,
 			Weaknesses:           named,
 			PrimaryWeakness:      primary,
 		},
@@ -708,36 +710,70 @@ type publishedRating struct {
 	} `json:"metrics"`
 }
 
-// rating picks the severity score to record, and the vector it assumes.
+// rating picks the severity score to record, the vector it assumes, and
+// every rating the report states beside it.
 //
-// The first that states both. A report carries several ratings from different
-// sources and they disagree; taking the first stated is at least a stable
-// answer, and the vector travels with the number so that what the number
-// assumed is readable rather than lost. Who published it travels with them for
-// the same reason: everything else a scan says carries its provenance.
+// One per generation of the scheme, the first stated in each: a report
+// carries several ratings from different sources and they disagree, and
+// taking the first stated is at least a stable answer. The vector travels with
+// the number so that what the number assumed is readable rather than lost, and
+// who published it travels with them for the same reason: everything else a
+// scan says carries its provenance.
 //
-// A report commonly rates one issue under two generations of the scheme. Which
-// of them is recorded is which the report states first, and the other is not
-// kept: one issue holds one score. The two are not comparable as numbers, so
-// the generation is recorded beside the number rather than left to be guessed
-// from the vector.
+// A report commonly rates one issue under two generations of the scheme, and
+// both are kept. The score recorded beside the issue is the newest
+// generation's, which is what a screen shows; the others are what a published
+// document states where its format has no field for the newest. The two are
+// not comparable as numbers, so the generation is recorded beside each rather
+// than left to be guessed from the vector.
 //
 // The number is the publisher's and is recorded as given. A version 4 vector
 // carries every metric the scheme has, and where it states an exploit maturity
 // the number beside it is not a base score — recomputing it here would replace
 // what somebody published with an answer to a different question.
-func rating(ratings []publishedRating) rated {
-	for _, published := range ratings {
-		if published.Metrics.BaseScore > 0 && published.Vector != "" {
-			return rated{
-				score: published.Metrics.BaseScore, vector: published.Vector,
-				version: strings.TrimSpace(published.Version),
-				source:  strings.TrimSpace(published.Source),
-				kind:    strings.TrimSpace(published.Type),
-			}
-		}
+func rating(published []publishedRating) (rated, []finding.CVSS) {
+	type stated struct {
+		rated
+		kept finding.CVSS
 	}
-	return rated{}
+	var all []stated
+	held := map[int]bool{}
+	for _, each := range published {
+		if each.Metrics.BaseScore <= 0 || each.Vector == "" {
+			continue
+		}
+		one := rated{
+			score: each.Metrics.BaseScore, vector: each.Vector,
+			version: strings.TrimSpace(each.Version),
+			source:  strings.TrimSpace(each.Source),
+			kind:    strings.TrimSpace(each.Type),
+		}
+		generation := finding.GenerationOf(one.version, one.vector)
+		if held[generation] {
+			continue
+		}
+		held[generation] = true
+		all = append(all, stated{rated: one, kept: finding.CVSS{
+			// Rounded rather than cut: 8.2 is 819.999… hundredths as a float.
+			Generation: generation, ScoreCenti: int(math.Round(one.score * 100)),
+			Vector: one.vector, Version: one.version,
+			Source: one.source, Kind: one.kind,
+		}})
+	}
+	if len(all) == 0 {
+		return rated{}, nil
+	}
+	// Newest first, so the score beside the issue is the first of the ratings
+	// kept with it. A generation that could not be read sorts last, because
+	// nothing says it is newer than one that could.
+	sort.SliceStable(all, func(i, j int) bool {
+		return all[i].kept.Generation > all[j].kept.Generation
+	})
+	ratings := make([]finding.CVSS, 0, len(all))
+	for _, each := range all {
+		ratings = append(ratings, each.kept)
+	}
+	return all[0].rated, ratings
 }
 
 // estimate is the published likelihood, where it stands, and the day it is
