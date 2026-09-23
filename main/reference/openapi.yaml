@@ -1113,6 +1113,9 @@ components:
         may_agree:
           description: Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override
           type: boolean
+        may_approve_rulings:
+          description: "Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work"
+          type: boolean
         may_assign:
           description: Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage
           type: boolean
@@ -1142,6 +1145,7 @@ components:
         - may_assign
         - may_hide
         - may_agree
+        - may_approve_rulings
       type: object
     CarriedBody:
       additionalProperties: false
@@ -2540,6 +2544,9 @@ components:
           description: When the attack became known, plus the window
           format: date-time
           type: string
+        near:
+          description: Whether the window's warning has come and its end has not
+          type: boolean
         passed:
           description: Whether that moment has gone
           type: boolean
@@ -2549,6 +2556,7 @@ components:
         - window
         - ends_at
         - passed
+        - near
         - answered
       type: object
     EarlierBody:
@@ -2969,7 +2977,7 @@ components:
           description: The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix
           type: string
         no_deadline:
-          description: "The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
+          description: "The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
             - below-the-line
             - nothing-to-take
@@ -3260,7 +3268,7 @@ components:
           format: int64
           type: integer
         no_deadline:
-          description: "The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
+          description: "The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
             - below-the-line
             - nothing-to-take
@@ -5999,7 +6007,7 @@ components:
           description: The issue this is about
           type: string
         windows:
-          description: Every window in force, shortest first, as it runs from when the attack became known
+          description: Every window in force that applies to this product, shortest first, as it runs from when the attack became known
           items:
             $ref: "#/components/schemas/DueBody"
           type:
@@ -6307,6 +6315,29 @@ components:
         - overdue
         - undecided
         - waiting
+      type: object
+    PairThresholdsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PairThresholdsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        approvers:
+          description: The fewest people who may approve here for one pair's share to be raised. Zero or left off follows the deployment
+          format: int64
+          maximum: 10000
+          minimum: 0
+          type: integer
+        share:
+          description: The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators. Zero or left off follows the deployment
+          format: int64
+          maximum: 100
+          minimum: 0
+          type: integer
       type: object
     PairingBody:
       additionalProperties: false
@@ -6847,6 +6878,14 @@ components:
           description: Issues open against it, counted at components rather than at every place they sit. Absent unless counts were asked for
           format: int64
           type: integer
+        pair_approvers:
+          description: The fewest people who may approve in this product for one pair's share to be raised, where the product states its own. Absent means it follows the deployment
+          format: int64
+          type: integer
+        pair_share:
+          description: The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators, where the product states its own. Absent means it follows the deployment
+          format: int64
+          type: integer
         tags:
           description: The number of tags declared
           format: int64
@@ -7256,6 +7295,10 @@ components:
           type: boolean
         ecosystem:
           description: The ecosystem, where two share a name and a version
+          type: string
+        from_report:
+          description: A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the four fields above are refused beside it
+          maxLength: 593
           type: string
         received:
           description: The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless
@@ -9856,13 +9899,25 @@ components:
         id:
           format: int64
           type: integer
+        lead_hours:
+          description: How many hours before the end a second notice is raised. Absent where the window names none
+          format: int64
+          type: integer
         name:
           description: What the window is called here
           type: string
+        products:
+          description: The products the window is limited to, among those you may know exist. Empty for a window that applies to every product
+          items:
+            type: string
+          type:
+            - array
+            - "null"
       required:
         - id
         - name
         - hours
+        - products
         - declared_at
       type: object
     WindowSaid:
@@ -9881,11 +9936,25 @@ components:
           maximum: 8784
           minimum: 1
           type: integer
+        lead_hours:
+          description: How many hours before the end a second notice is raised. Left off or zero, the window raises none. Fewer hours than the window runs
+          format: int64
+          maximum: 8783
+          minimum: 0
+          type: integer
         name:
           description: What the window is called here. Unique among the windows in force, without regard to capitals
           maxLength: 191
           minLength: 1
           type: string
+        products:
+          description: The products the window applies to, by name. Left off, it applies to every product
+          items:
+            type: string
+          maxItems: 500
+          type:
+            - array
+            - "null"
       required:
         - name
         - hours
@@ -14040,6 +14109,8 @@ paths:
       description: |-
         Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
 
+        A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
+
         Requires: any signed-in person, and not a pipeline key
       operationId: list-obligation-windows
       responses:
@@ -14062,9 +14133,9 @@ paths:
         scope: person
     post:
       description: |-
-        Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
+        Adds a window every standing attack on the products it names is watched against, counted from the moment each became known. Recorded in the administrative trail.
 
-        A name already in force, in any capitals, is refused with 409: retire that window or pick another name.
+        A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
 
         Requires: administrator
       operationId: declare-obligation-window
@@ -14124,9 +14195,9 @@ paths:
         scope: deployment
     put:
       description: |-
-        Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+        Restates a window in force: its name, how long it runs, its warning and the products it applies to. Each field is replaced by what is sent, so a warning or a product list left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
 
-        A name another window in force holds is refused with 409. A retired or unknown window answers 404.
+        A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
 
         Requires: administrator
       operationId: change-obligation-window
@@ -15957,6 +16028,8 @@ paths:
         It is filed under an identifier this deployment mints — the product's name, the year and a number. A CVE assigned later becomes another name for the same issue; nothing about the finding, the decisions or the approvals moves.
 
         `component` names what in the build carries it, as the build calls it. Leave it out for the build itself, which is where a flaw in how the pieces fit together goes. A name the build holds at more than one version is refused with the choices rather than resolved to one; send `version`, and `ecosystem` where two share a version.
+
+        `from_report` records the flaw from a vulnerability report already in this product and accepts the report as it in the same act; it needs private-triage. A report already judged, or under a ruling, is refused with 409.
 
         From here it behaves like any other finding: triaged, assigned, decided, on the same clock and in the same reports. No scan will close it, so it is closed by a person through the resolve endpoint or it stays open.
 
@@ -18323,7 +18396,7 @@ paths:
 
         An issue that is not here and one you may not be told of answer alike.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: list-duplicate-reports
       parameters:
         - in: path
@@ -18349,12 +18422,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List reports that duplicate an issue
+      summary: List vulnerability reports that duplicate an issue
       tags:
         - Findings
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
   /v1/products/{product}/issues/{vulnerability}/exploited-here:
     post:
@@ -18515,9 +18589,9 @@ paths:
 
         The received date is what the embargo runs from: a report arriving on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the one the reporter has a publication scheduled against, and they are the party who will publish regardless.
 
-        Answers 404 where nobody recorded a reporter, which is every flaw we found ourselves.
+        Answers 404 where nobody recorded a reporter, which is every flaw we found ourselves, and to somebody who may not read the product's vulnerability reports.
 
-        Requires: public-triage or private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: get-report
       parameters:
         - in: path
@@ -18549,7 +18623,7 @@ paths:
       x-openpsirt-requires:
         scope: product
         any_of:
-          - public-triage
+          - private-read
           - private-triage
   /v1/products/{product}/issues/{vulnerability}/report/acknowledgement:
     post:
@@ -18697,6 +18771,39 @@ paths:
       x-openpsirt-requires:
         scope: person
         note: Answers only what you may see.
+  /v1/products/{product}/pair-thresholds:
+    put:
+      description: |-
+        Sets this product's own thresholds for telling administrators that one pair of people is agreeing to most of its work: the share of its agreements, as a percentage, and the fewest people who may approve here for that share to count. Both are replaced by what is sent, and zero or left off follows the deployment again. Recorded in the administrative trail.
+
+        Requires: administrator
+      operationId: set-product-pair-thresholds
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairThresholdsBody"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Set when one pair's agreements are raised for a product
+      tags:
+        - Catalog
+      x-openpsirt-requires:
+        scope: deployment
   /v1/products/{product}/releases:
     get:
       description: |-
@@ -18738,7 +18845,7 @@ paths:
       description: |-
         Every ruling in this product, newest first, including withdrawn ones. `waiting` narrows to those waiting for a second person.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: list-report-rulings
       parameters:
         - in: path
@@ -18783,12 +18890,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List rulings on reports
+      summary: List rulings on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
     post:
       description: |-
@@ -18827,7 +18935,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Rule on reports
+      summary: Rule on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
@@ -18839,7 +18947,7 @@ paths:
       description: |-
         What was said, about which reports, by whom, and whether it is waiting, in force or withdrawn.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: get-report-ruling
       parameters:
         - in: path
@@ -18866,12 +18974,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Show a ruling on reports
+      summary: Show a ruling on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
   /v1/products/{product}/report-rulings/{ruling}/approval:
     post:
@@ -18880,7 +18989,7 @@ paths:
 
         Refused to whoever proposed it, and refused on a ruling that is not waiting.
 
-        Requires: private-triage on the product. The proposer may not approve their own.
+        Requires: approver or private-triage on the product. The proposer may not approve their own.
       operationId: approve-report-ruling
       parameters:
         - in: path
@@ -18907,12 +19016,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Approve a ruling on reports
+      summary: Approve a ruling on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
         scope: product
         any_of:
+          - approver
           - private-triage
         note: The proposer may not approve their own.
   /v1/products/{product}/report-rulings/{ruling}/withdrawal:
@@ -18949,7 +19059,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Withdraw a ruling on reports
+      summary: Withdraw a ruling on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
@@ -18963,7 +19073,7 @@ paths:
 
         A report already turned into an issue stays in the list, because it is the evidence that the issue came from outside.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: list-reports
       parameters:
         - in: path
@@ -19001,12 +19111,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what was reported
+      summary: List vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
     post:
       description: |-
@@ -19045,7 +19156,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Record a report
+      summary: Record a vulnerability report
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19059,7 +19170,7 @@ paths:
 
         A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: get-recorded-report
       parameters:
         - in: path
@@ -19088,12 +19199,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Show a report
+      summary: Show a vulnerability report
       tags:
         - Findings
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
   /v1/products/{product}/reports/{reference}/acknowledgement:
     post:
@@ -19141,7 +19253,7 @@ paths:
 
         A file an administrator removed is still listed, saying so, because the text that pointed at it still does.
 
-        Requires: private-triage on the product
+        Requires: private-read or private-triage on the product
       operationId: list-report-attachments
       parameters:
         - in: path
@@ -19168,12 +19280,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List files that arrived with a report
+      summary: List files that arrived with a vulnerability report
       tags:
         - Findings
       x-openpsirt-requires:
         scope: product
         any_of:
+          - private-read
           - private-triage
     post:
       description: |-
@@ -19228,7 +19341,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Attach a file to a report
+      summary: Attach a file to a vulnerability report
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19279,7 +19392,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Record what a report turned out to be
+      summary: Accept a vulnerability report as an issue
       tags:
         - Findings
       x-openpsirt-requires:
@@ -22581,9 +22694,9 @@ paths:
   /v1/report-rulings:
     get:
       description: |-
-        Every ruling in the products you may work reports in, newest first, including withdrawn ones. A product you may not work reports in contributes nothing, not even to the count.
+        Every ruling in the products you may read reports in, newest first, including withdrawn ones. A product you may not read reports in contributes nothing, not even to the count.
 
-        `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
+        `waiting` narrows to those waiting for a second person, and `approvable` to those you may agree to. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-rulings-across
@@ -22605,6 +22718,13 @@ paths:
           name: waiting
           schema:
             description: Only rulings waiting for a second person
+            type: boolean
+        - description: "Only rulings you may agree to: waiting, proposed by somebody else, in a product where you may approve a ruling"
+          explode: false
+          in: query
+          name: approvable
+          schema:
+            description: "Only rulings you may agree to: waiting, proposed by somebody else, in a product where you may approve a ruling"
             type: boolean
         - description: Only rulings proposed on or after this date, as YYYY-MM-DD
           explode: false
@@ -22650,7 +22770,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List rulings on reports across products
+      summary: List rulings on vulnerability reports across products
       tags:
         - Findings
       x-openpsirt-requires:
