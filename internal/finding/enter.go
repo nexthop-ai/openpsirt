@@ -287,6 +287,12 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				return ErrAlreadyJudged
 			}
 			received = reported.ReceivedOn
+			// A report that does not say when it arrived was here no
+			// later than when it was recorded.
+			if received == nil {
+				at := reported.RecordedAt
+				received = &at
+			}
 		}
 		// Resolved in every build, inside the transaction that writes
 		// the rows. A name one build holds and another does not is a
@@ -432,8 +438,9 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// weeks behind the one the reporter has a publication
 			// scheduled against — and they are the party who will
 			// publish regardless, so ours is the clock that is
-			// wrong. It falls back to now, which is every flaw we
-			// found ourselves.
+			// wrong. A report that does not say counts from when it
+			// was recorded here. Without a report it falls back to
+			// now, which is every flaw we found ourselves.
 			if visibility == access.Private {
 				from := now
 				if received != nil {

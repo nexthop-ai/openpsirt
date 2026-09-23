@@ -540,3 +540,77 @@ func TestANoticeIsReadOnlyByWhoMayBeToldOfTheAttack(t *testing.T) {
 		}
 	})
 }
+
+func TestAWindowLimitedToProductsAppliesToThoseAlone(t *testing.T) {
+	// The products a window is limited to are stored, changed and read on
+	// every engine, and the shelf counts the window only where it applies.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.attacked(t)
+		other, err := catalog.NewStore(f.db.DB).ProductByName(ctx, "other")
+		if err != nil {
+			t.Fatal(err)
+		}
+		limited, err := f.store.DeclareWindow(ctx, f.admin, obligation.WindowSaid{
+			Name: "Early warning", Hours: 24, Products: []string{"sonic"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		counted := func(t *testing.T) (products []int64, onShelf bool) {
+			t.Helper()
+			windows, err := f.store.Windows(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, window := range windows {
+				if window.ID == limited.ID {
+					products = window.Products
+				}
+			}
+			shelf, err := f.store.Shelf(ctx, f.triager)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, entry := range shelf {
+				for _, due := range entry.Windows {
+					if due.Window.ID == limited.ID {
+						onShelf = true
+					}
+				}
+			}
+			return products, onShelf
+		}
+
+		products, onShelf := counted(t)
+		if len(products) != 1 || products[0] != f.product {
+			t.Errorf("a window limited to the product reads as limited to %v, want [%d]",
+				products, f.product)
+		}
+		if !onShelf {
+			t.Error("a window limited to the attacked product is not counted for it")
+		}
+
+		if _, err := f.store.ChangeWindow(ctx, f.admin, limited.ID, obligation.WindowSaid{
+			Name: "Early warning", Hours: 24, Products: []string{"other"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		products, onShelf = counted(t)
+		if len(products) != 1 || products[0] != other.ID {
+			t.Errorf("a window moved to another product reads as limited to %v, want [%d]",
+				products, other.ID)
+		}
+		if onShelf {
+			t.Error("a window limited to another product is counted for the attacked one")
+		}
+
+		if err := f.store.RetireWindow(ctx, f.admin, limited.ID); err != nil {
+			t.Fatal(err)
+		}
+		if products, _ = counted(t); products != nil {
+			t.Errorf("a retired window is still read, limited to %v", products)
+		}
+	})
+}

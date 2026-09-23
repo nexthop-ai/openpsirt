@@ -21,7 +21,7 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 	// published nothing, so the silence is looked for. Each supplier here
 	// reaches one arm: read a week and more ago, read recently, never read
 	// and configured long ago, never read and configured today, and one
-	// withdrawn.
+	// withdrawn. Then the product is retired.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Reset(t, db)
@@ -107,6 +107,21 @@ func TestASupplierThatStoppedAnsweringIsRaised(t *testing.T) {
 		}
 		if told := heard(admin); len(told) != 0 {
 			t.Errorf("under a fortnightly schedule, ten days unread raised %v", told)
+		}
+
+		// A retired product's suppliers are never read again, so their
+		// silence is not raised.
+		if err := setting.NewStore(db.DB).Set(ctx, setting.ScanEvery, "24h"); err != nil {
+			t.Fatal(err)
+		}
+		if told := heard(admin); len(told) == 0 {
+			t.Fatal("a daily schedule raised nothing, so the retired product checks nothing")
+		}
+		if err := catalog.NewStore(db.DB).RetireProduct(ctx, product.ID); err != nil {
+			t.Fatal(err)
+		}
+		if told := heard(admin); len(told) != 0 {
+			t.Errorf("the suppliers of a retired product were raised: %v", told)
 		}
 	})
 }

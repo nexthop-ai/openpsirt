@@ -32,10 +32,10 @@ export function label(kind?: string): string {
       return "window after an attack ending soon";
     case "obligation-passed":
       return "window after an attack passed";
-    // The two conditions about the deployment rather than about anybody's
-    // work. Both go to administrators, and both said their own slug here —
-    // which is the one place the fallthrough below reads as a tool that was
-    // not finished rather than as one the server has grown past.
+    // The conditions about the deployment rather than about anybody's work,
+    // all told to administrators. Each is named here, because on these the
+    // fallthrough below reads as a tool nobody finished rather than as one
+    // the server has grown past.
     case "vulnerability-data-stale":
       return "vulnerability data not moving";
     case "risk-unagreed":

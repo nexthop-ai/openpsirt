@@ -3,7 +3,7 @@ import { RECORDABLE } from "../ui/severities";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useReport } from "../api/intake";
+import { useAfterReport, useReport } from "../api/intake";
 import { api } from "../api/client";
 import { at as choicesAt, unwrap } from "../api/queries";
 import { useScope } from "../app/scope";
@@ -49,13 +49,17 @@ export function Record() {
     fromReport ? (params.get("product") ?? "") : (scope.product ?? ""),
   );
   const report = useReport(fromReport ? product : "", fromReport);
+  const afterReport = useAfterReport();
   // The lines, and the ways they are built. Both are sets: the same code
   // goes out on several lines and as several variants at once, and a flaw in
   // it is one issue in every build that ships it. The builds are the product
   // of the two, and the ones that do not exist are simply not offered.
   const [streams, setStreams] = useState<string[]>(scope.stream ? [scope.stream] : []);
   const [variants, setVariants] = useState<string[]>(scope.variant ? [scope.variant] : []);
-  const [summary, setSummary] = useState("");
+  // Seeded from the claim where it is already cached, which is the ordinary
+  // arrival from the report's own page. The reseed below covers a claim that
+  // arrives after the form is drawn.
+  const [summary, setSummary] = useState(report.data?.summary ?? "");
   const [severity, setSeverity] = useState("");
   const [component, setComponent] = useState("");
   // Only ever set by picking one of the choices a refusal offered. Asking for
@@ -211,6 +215,9 @@ export function Record() {
     onSuccess: ({ made, failed }) => {
       void queries.invalidateQueries({ queryKey: ["findings"] });
       void queries.invalidateQueries({ queryKey: ["disclosing"] });
+      // The report is judged now, and a page that still offers to judge it
+      // fails when somebody tries.
+      if (fromReport) afterReport();
       setRefused(failed);
       // Onto the first build it landed in. From here it behaves like any
       // other finding, and the next thing somebody does with a flaw they have
@@ -276,6 +283,9 @@ export function Record() {
               id="rec-product"
               {...notACredential}
               value={product}
+              // The report names its product, and the reference means nothing
+              // in any other.
+              disabled={!!fromReport}
               onChange={(event) => {
                 setProduct(event.target.value);
                 setStreams([]);

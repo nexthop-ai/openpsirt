@@ -606,6 +606,42 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 			finding.ErrAlreadyJudged) {
 			t.Errorf("recording a second flaw from a judged report answered %v", err)
 		}
+
+		// A report that says nothing about when it arrived was here no later
+		// than when it was recorded, so the embargo counts from then.
+		undated, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
+			Summary: "The console accepts a password it never checks.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		recorded := time.Date(2026, 6, 3, 9, 30, 0, 0, time.UTC)
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"flaw_report"`).
+			Set(`"recorded_at" = ?`, recorded).
+			Where(`"id" = ?`, undated.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		_, identifier, err = f.store.Enter(t.Context(), who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary:    "The console accepts any password.",
+			FromReport: undated.Reference,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if issue, err = finding.NewVulnerabilities(f.db.DB).ByName(t.Context(), identifier); err != nil {
+			t.Fatal(err)
+		}
+		disclose = nil
+		if err := f.db.DB.NewSelect().TableExpr(`"finding" AS "f"`).
+			ColumnExpr("MIN(f.disclose_at)").Where("f.vulnerability_id = ?", issue).
+			Scan(t.Context(), &disclose); err != nil {
+			t.Fatal(err)
+		}
+		if want := recorded.Add(setting.DefaultDiscloseAfter); disclose == nil || !disclose.Equal(want) {
+			t.Errorf("an undated report's embargo ends %v, want %v: counted from when it was recorded",
+				disclose, want)
+		}
 	})
 }
 

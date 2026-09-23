@@ -90,7 +90,7 @@ type ProductBody struct {
 	// PairShare and PairApprovers are this product's own thresholds for one
 	// pair agreeing to each other's work, where it states them. Absent follows
 	// the deployment.
-	PairShare     int `json:"pair_share,omitempty" doc:"The share of this product's agreements one pair may give each other before administrators are told, as a percentage, where the product states its own. Absent means it follows the deployment"`
+	PairShare     int `json:"pair_share,omitempty" doc:"The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators, where the product states its own. Absent means it follows the deployment"`
 	PairApprovers int `json:"pair_approvers,omitempty" doc:"The fewest people who may approve in this product for one pair's share to be raised, where the product states its own. Absent means it follows the deployment"`
 	// EndOfLife is when support ends for every release that has not stated its
 	// own. Absent means nothing has said one, which reads as supported.
@@ -108,7 +108,7 @@ type EndOfLifeBody struct {
 // PairThresholdsBody is a product's own thresholds for one pair agreeing to
 // each other's work.
 type PairThresholdsBody struct {
-	Share     int `json:"share,omitempty" minimum:"0" maximum:"100" doc:"The share of this product's agreements one pair may give each other, as a percentage. Zero or left off follows the deployment"`
+	Share     int `json:"share,omitempty" minimum:"0" maximum:"100" doc:"The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators. Zero or left off follows the deployment"`
 	Approvers int `json:"approvers,omitempty" minimum:"0" maximum:"10000" doc:"The fewest people who may approve here for one pair's share to be raised. Zero or left off follows the deployment"`
 }
 

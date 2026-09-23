@@ -133,3 +133,76 @@ func TestOnlyAnAllowedColumnReachesTheOrder(t *testing.T) {
 		}
 	})
 }
+
+func TestARefusalOnAnExploitedIssueIsNotCalledNothingToTake(t *testing.T) {
+	// Upstream declining takes the deadline off an issue nobody is using and
+	// leaves it on one somebody is. So an exploited refusal without a
+	// deadline is off the clock for another reason, and says that one.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		run := f.run(t)
+		refused := found("CVE-2026-USED", swss)
+		refused.FixState, refused.FixedIn = finding.WontFix, ""
+		refused.Issue.Exploited = true
+		ignored := found("CVE-2026-IDLE", teamd)
+		ignored.FixState, ignored.FixedIn = finding.WontFix, ""
+		if _, err := f.store.Apply(t.Context(), f.target, run,
+			[]finding.Reported{refused, ignored}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+
+		said := func(t *testing.T) (map[string]finding.Group, map[string]*finding.Evidence) {
+			t.Helper()
+			listed, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, finding.Filter{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			rows := make(map[string]finding.Group, len(listed))
+			for _, row := range listed {
+				rows[row.Vulnerability] = row
+			}
+			details := map[string]*finding.Evidence{}
+			for name, component := range map[string]string{
+				"CVE-2026-USED": swss.Name, "CVE-2026-IDLE": teamd.Name,
+			} {
+				evidence, err := f.store.Detail(t.Context(), who, f.target,
+					f.issueID(t, name), f.componentID(t, component))
+				if err != nil {
+					t.Fatal(err)
+				}
+				details[name] = evidence
+			}
+			return rows, details
+		}
+
+		rows, details := said(t)
+		if rows["CVE-2026-USED"].DueAt == nil || details["CVE-2026-USED"].DueAt == nil {
+			t.Error("an exploited issue upstream declined to fix carries no deadline")
+		}
+		if got := rows["CVE-2026-IDLE"].NoDeadline; got != finding.NothingToTake {
+			t.Errorf("a refusal nobody is using says %q on the list, want %q", got, finding.NothingToTake)
+		}
+		if got := details["CVE-2026-IDLE"].NoDeadline; got != finding.NothingToTake {
+			t.Errorf("a refusal nobody is using says %q in detail, want %q", got, finding.NothingToTake)
+		}
+
+		gone := time.Now().UTC().AddDate(0, 0, -1)
+		if err := catalog.NewStore(f.db.DB).SetStreamEndOfLife(
+			t.Context(), *f.scope.StreamID, &gone); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Recompute(t.Context(), finding.DefaultWindows()); err != nil {
+			t.Fatal(err)
+		}
+		rows, details = said(t)
+		if got := rows["CVE-2026-USED"].NoDeadline; got != finding.OutOfSupport {
+			t.Errorf("an exploited refusal past end of life says %q on the list, want %q",
+				got, finding.OutOfSupport)
+		}
+		if got := details["CVE-2026-USED"].NoDeadline; got != finding.OutOfSupport {
+			t.Errorf("an exploited refusal past end of life says %q in detail, want %q",
+				got, finding.OutOfSupport)
+		}
+	})
+}

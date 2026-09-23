@@ -180,9 +180,9 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 	now := time.Now().UTC()
 	for _, row := range rows {
 		days := int(now.Sub(row.ProposedAt).Hours() / 24)
-		reports := "one report"
+		reports := "one vulnerability report"
 		if row.Reports != 1 {
-			reports = fmt.Sprintf("%d reports", row.Reports)
+			reports = fmt.Sprintf("%d vulnerability reports", row.Reports)
 		}
 		holds := Holds{
 			About: identify(fmt.Sprintf("ruling-waiting %d", row.RulingID)),

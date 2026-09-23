@@ -470,9 +470,15 @@ func TestRulingsAreProposedByWhoWorksReportsAndAgreedByWhoMayApprove(t *testing.
 			}); !errors.Is(err, access.ErrDenied) {
 				t.Errorf("%v ruled on a report: %v", held, err)
 			}
+			// Somebody who can read the ruling is refused in words; somebody
+			// who cannot is told there is no such ruling.
+			want := finding.ErrNoSuchRuling
+			if slices.Contains(held, access.PrivateRead) {
+				want = access.ErrDenied
+			}
 			if _, err := f.store.WithdrawRuling(t.Context(), stranger, f.productID,
-				ruling.ID); !errors.Is(err, finding.ErrNoSuchRuling) {
-				t.Errorf("%v withdrew a ruling: %v", held, err)
+				ruling.ID); !errors.Is(err, want) {
+				t.Errorf("%v withdrew a ruling: %v, want %v", held, err, want)
 			}
 		}
 		for _, held := range [][]access.Role{{access.PublicTriage}, {access.Approver}} {

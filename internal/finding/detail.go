@@ -307,7 +307,9 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	// ends here rather than of the word above, because that word is "mixed"
 	// wherever the places disagree — which is not a state upstream is ever in,
 	// and reading it as one says a supported release is past its end of life.
-	evidence.nothingToTake = !Closable(FixState(least)) && !Closable(FixState(most))
+	exploited := evidence.Exploited || evidence.ExploitedHere
+	evidence.nothingToTake = !Clocked(FixState(least), exploited) &&
+		!Clocked(FixState(most), exploited)
 	// Any place answers. They all come from one line of a scanner's report,
 	// which the applier writes to every place of the group.
 	evidence.Matched = Matched(rows[0].Matched)

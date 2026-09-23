@@ -156,7 +156,7 @@ const (
 	// PairShare and PairApprovers are when the same two people agreeing to
 	// each other's work is raised with administrators.
 	//
-	// Two rather than one, and both have to be passed. A share alone is
+	// Two rather than one, and both have to be met. A share alone is
 	// permanently true in a team of two, where one pair is every agreement
 	// there is. The count of people who may approve is what says the team is
 	// large enough that one pair doing everything is a choice rather than the
@@ -402,9 +402,9 @@ const DefaultQuietAfter = 7 * 24 * time.Hour
 // that stopped being fetched is noticed in the week it stopped.
 const DefaultVulnerabilityDataStaleAfter = 7 * 24 * time.Hour
 
-// DefaultPairShare is the share of a product's agreements one pair may give
-// each other before administrators are told, as a percentage, where nobody has
-// said.
+// DefaultPairShare is the share of a product's agreements, as a percentage,
+// at which one pair agreeing to each other's work is raised with
+// administrators, where nobody has said.
 //
 // Four in five: past what an ordinary rota produces in a team of three or
 // more, and short of the whole, so a pair covering nearly everything is caught

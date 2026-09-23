@@ -112,7 +112,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 			return nil, huma.Error404NotFound("nobody is recorded as having reported this")
 		}
 		if err := store.Acknowledge(ctx, subject, issue); err != nil {
-			return nil, wentWrong(in.Logger, "that could not be recorded", err)
+			return nil, refused(in.Logger, err, "that could not be recorded")
 		}
 		return &struct{}{}, nil
 	})

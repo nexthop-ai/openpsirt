@@ -146,9 +146,16 @@ func TestOnePairAgreeingToMostOfAProductsWorkIsRaised(t *testing.T) {
 		if body == "" {
 			t.Fatal("one pair agreed to nine of ten claims among three approvers and nobody was told")
 		}
-		for _, want := range []string{"ana@example.com", "ben@example.com", "9 of the 10", "90%"} {
+		for _, want := range []string{"ana@example.com", "ben@example.com", "90%"} {
 			if !strings.Contains(body, want) {
 				t.Errorf("the alert says %q, want it to say %q", body, want)
+			}
+		}
+		// Every administrator is told, so how much work the product agreed
+		// to stays out of it.
+		for _, not := range []string{"10", "9 of"} {
+			if strings.Contains(body, not) {
+				t.Errorf("the alert says %q, which gives the product's volume as %q", body, not)
 			}
 		}
 		if told := tm.heard(t, tm.people["cat"]); told != "" {
@@ -160,9 +167,9 @@ func TestOnePairAgreeingToMostOfAProductsWorkIsRaised(t *testing.T) {
 func TestAPairIsNotRaisedUnderTheShare(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		tm := aTeam(t, db, "ana", "ben", "cat")
-		// Six of eight is three in four, under the four in five that ships.
-		tm.agreed(t, "ana", "ben", 6, 3)
-		tm.agreed(t, "cat", "ana", 2, 3)
+		// Seven of ten, under the four in five that ships.
+		tm.agreed(t, "ana", "ben", 7, 3)
+		tm.agreed(t, "cat", "ana", 3, 3)
 		if body := tm.heard(t, tm.admin); body != "" {
 			t.Errorf("a pair under the share raised %q", body)
 		}
@@ -203,10 +210,11 @@ func TestAPairIsCountedOverTheReportsPeriod(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		tm := aTeam(t, db, "ana", "ben", "cat")
 		// A pattern the team has since moved away from is not a control
-		// failing today.
-		tm.agreed(t, "ana", "ben", 9, 120)
-		tm.agreed(t, "cat", "ana", 3, 3)
-		tm.agreed(t, "ben", "cat", 3, 3)
+		// failing today. Counted over the whole record, the old pair is
+		// fifty of sixty and past the share.
+		tm.agreed(t, "ana", "ben", 50, 120)
+		tm.agreed(t, "cat", "ana", 5, 3)
+		tm.agreed(t, "ben", "cat", 5, 3)
 		if body := tm.heard(t, tm.admin); body != "" {
 			t.Errorf("claims proposed four months ago raised %q", body)
 		}
@@ -222,6 +230,42 @@ func TestOldAgreementsDoNotDiluteAPairsShareNow(t *testing.T) {
 		tm.agreed(t, "cat", "ana", 1, 3)
 		if body := tm.heard(t, tm.admin); body == "" {
 			t.Error("one pair agreed to nine of this quarter's ten claims and older work hid it")
+		}
+	})
+}
+
+func TestAPairIsNotRaisedOverTooFewClaims(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		tm := aTeam(t, db, "ana", "ben", "cat")
+		// Every claim, and a handful of them.
+		tm.agreed(t, "ana", "ben", 9, 3)
+		if body := tm.heard(t, tm.admin); body != "" {
+			t.Errorf("nine claims in a quarter raised %q", body)
+		}
+		tm.agreed(t, "ben", "ana", 1, 3)
+		if body := tm.heard(t, tm.admin); body == "" {
+			t.Error("one pair agreed to all of ten claims and nobody was told")
+		}
+	})
+}
+
+func TestAShareOfExactlyTheThresholdIsRaised(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		tm := aTeam(t, db, "ana", "ben", "cat")
+		// Eight of ten is the four in five that ships.
+		tm.agreed(t, "ana", "ben", 8, 3)
+		tm.agreed(t, "cat", "ana", 2, 3)
+		if body := tm.heard(t, tm.admin); body == "" {
+			t.Error("a pair at exactly the share was not raised")
+		}
+		// And a product asking for every agreement is told when it is.
+		dbtest.Reset(t, db)
+		tm = aTeam(t, db, "ana", "ben", "cat")
+		tm.agreed(t, "ana", "ben", 10, 3)
+		all := 100
+		tm.thresholds(t, &all, nil)
+		if body := tm.heard(t, tm.admin); body == "" {
+			t.Error("one pair gave every agreement under a share of 100 and nobody was told")
 		}
 	})
 }

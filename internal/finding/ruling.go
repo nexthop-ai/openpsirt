@@ -447,8 +447,14 @@ func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 	productID, rulingID int64) (*ReportRuling, error) {
 
-	if err := mayHandle(subject, productID); err != nil {
+	// Somebody who may not read the product's reports is told there is no
+	// such ruling. Somebody who can read it and may not withdraw it is refused
+	// in words, as approving is.
+	if err := mayReadReports(subject, productID); err != nil {
 		return nil, ErrNoSuchRuling
+	}
+	if err := mayHandle(subject, productID); err != nil {
+		return nil, err
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {

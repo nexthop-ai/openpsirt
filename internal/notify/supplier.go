@@ -23,7 +23,8 @@ import (
 // that each supplier is silent, which is an alert nobody can clear (REQ-49).
 //
 // One per supplier, told to administrators, who are the ones who configure
-// suppliers. It clears when a read succeeds or the supplier is withdrawn.
+// suppliers. It clears when a read succeeds, the supplier is withdrawn or its
+// product is retired.
 func (w *Watch) suppliersSilent(ctx context.Context) ([]Holds, error) {
 	settings := setting.NewStore(w.db)
 	after, err := settings.Duration(ctx, setting.SupplierSilentAfter,
@@ -48,6 +49,10 @@ func (w *Watch) suppliersSilent(ctx context.Context) ([]Holds, error) {
 		ColumnExpr(`p.display_name AS "product"`).
 		Join(`JOIN "product" AS "p" ON p.id = sp.product_id`).
 		Where("sp.retired_at IS NULL").
+		// A retired product's suppliers are never read again, and retiring
+		// the product does not withdraw them, so their silence is nobody's
+		// to clear.
+		Where("p.retired_at IS NULL").
 		Scan(ctx, &sources)
 	if err != nil {
 		return nil, fmt.Errorf("read which suppliers are configured: %w", err)

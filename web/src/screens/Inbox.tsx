@@ -120,7 +120,7 @@ function Reports({ product, works }: { product: string; works: boolean }) {
               <th hidden={!works}>
                 <input
                   type="checkbox"
-                  aria-label="Select every open report on this page"
+                  aria-label="Select every open vulnerability report on this page"
                   checked={open.length > 0 && open.every((each) => chosen.includes(each))}
                   disabled={open.length === 0}
                   onChange={(event) => setChosen(event.target.checked ? open : [])}

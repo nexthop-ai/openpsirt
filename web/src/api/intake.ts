@@ -82,6 +82,7 @@ export function useRulings(
 // the review queue and the record narrow what they list.
 export function useRulingsAcross(asked: {
   waiting?: boolean;
+  approvable?: boolean;
   products?: string[];
   from?: string;
   to?: string;
@@ -98,6 +99,7 @@ export function useRulingsAcross(asked: {
               limit: asked.limit ?? PAGE,
               offset: asked.offset ?? 0,
               ...(asked.waiting ? { waiting: true } : {}),
+              ...(asked.approvable ? { approvable: true } : {}),
               ...(asked.products && asked.products.length > 0 ? { product: asked.products } : {}),
               ...(asked.from ? { from: asked.from } : {}),
               ...(asked.to ? { to: asked.to } : {}),

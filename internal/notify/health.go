@@ -250,6 +250,12 @@ const everythingBack = "3650"
 // link opens holds what raised it.
 const pairsBack = "90"
 
+// pairsAtLeast is the fewest claims agreed in a product over that period for
+// one pair's share of them to be raised. Below it a share is a handful of acts:
+// one agreed claim is a hundred percent, and each claim ageing out moves the
+// share across the threshold and back.
+const pairsAtLeast = 10
+
 // pairsConcentrated is the condition that one pair of people is giving each
 // other most of a product's agreements, in a product with enough people who may
 // approve that this is a choice rather than the shape of the team.
@@ -319,7 +325,6 @@ func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 	type raised struct {
 		product catalog.Product
 		pair    triage.Pair
-		total   int
 		percent int
 	}
 	var found []raised
@@ -332,17 +337,18 @@ func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 		if product.PairApprovers != nil && *product.PairApprovers > 0 {
 			wantApprovers = *product.PairApprovers
 		}
-		if able[one.ProductID] < wantApprovers || one.Claims == 0 {
+		if able[one.ProductID] < wantApprovers || one.Claims < pairsAtLeast {
 			continue
 		}
 		for _, pair := range one.Pairs {
-			// Strictly past the share, compared in whole numbers so that
-			// nothing is lost to a division.
-			if pair.Claims*100 <= wantShare*one.Claims {
+			// At or past the share, compared in whole numbers so that
+			// nothing is lost to a division. A share of a hundred is one
+			// pair giving every agreement.
+			if pair.Claims*100 < wantShare*one.Claims {
 				continue
 			}
 			found = append(found, raised{
-				product: product, pair: pair, total: one.Claims,
+				product: product, pair: pair,
 				percent: pair.Claims * 100 / one.Claims,
 			})
 			named = append(named, pair.First, pair.Second)
@@ -360,11 +366,14 @@ func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 		out = append(out, Holds{
 			About: identify(fmt.Sprintf("pairs-concentrated %d %d %d",
 				productID, each.pair.First, each.pair.Second)),
-			Body: fmt.Sprintf("In %s, %s and %s agreed to each other's work on %d of the "+
-				"%d claims agreed to in the last %d days (%d%%). The product has enough "+
+			// The share and never the counts behind it. It goes to every
+			// administrator, and how much work a product agreed to is not
+			// theirs to read unless they hold a role there.
+			Body: fmt.Sprintf("In %s, %s and %s agreed to each other's work on %d%% of the "+
+				"claims agreed to in the last %d days. The product has enough "+
 				"people who may approve that one pair doing most of it is worth a look.",
 				each.product.DisplayName, people[each.pair.First], people[each.pair.Second],
-				each.pair.Claims, each.total, days, each.percent),
+				each.percent, days),
 			Link:      "/reports/rubber-stamp?days=" + pairsBack,
 			ProductID: &productID,
 		})

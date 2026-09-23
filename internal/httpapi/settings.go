@@ -150,7 +150,7 @@ var settable = []struct {
 		aDuration, nil, func(Ingest) string { return setting.DefaultVulnerabilityDataStaleAfter.String() }, false},
 	{setting.DeltaShare, "How much of a build's inventory may move in one upload before whoever may read the product is told, as a percentage of what the build held. Both this and the floor below have to be passed: a share alone reports a small inventory every time three names move",
 		aPercent, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultDeltaShare) }, false},
-	{setting.PairShare, "How much of a product's agreements one pair of people may give each other before administrators are told, as a percentage. Only asked where the product has at least as many people who may approve as the setting below. A product may state its own",
+	{setting.PairShare, "The share of a product's agreements, as a percentage, at which one pair of people agreeing to each other's work is raised with administrators. Only asked where the product has at least as many people who may approve as the setting below, and over at least ten claims agreed in ninety days. A product may state its own",
 		aPercent, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultPairShare) }, false},
 	{setting.PairApprovers, "The fewest people who may approve in a product for one pair's share of its agreements to be raised. A whole number. Below it, one pair doing everything is what a small team looks like. A product may state its own",
 		aCount, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultPairApprovers) }, false},

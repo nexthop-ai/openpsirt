@@ -7239,7 +7239,7 @@ export interface components {
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
@@ -7419,7 +7419,7 @@ export interface components {
              */
             middle?: number;
             /**
-             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
@@ -9042,7 +9042,7 @@ export interface components {
             approvers?: number;
             /**
              * Format: int64
-             * @description The share of this product's agreements one pair may give each other, as a percentage. Zero or left off follows the deployment
+             * @description The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators. Zero or left off follows the deployment
              */
             share?: number;
         };
@@ -9394,7 +9394,7 @@ export interface components {
             pair_approvers?: number;
             /**
              * Format: int64
-             * @description The share of this product's agreements one pair may give each other before administrators are told, as a percentage, where the product states its own. Absent means it follows the deployment
+             * @description The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators, where the product states its own. Absent means it follows the deployment
              */
             pair_share?: number;
             /**

@@ -200,7 +200,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
                   : queue.data.total + (approvable.data ?? 0)
               }
               unread={queue.isError || approvable.isError}
-              unit="claims waiting"
+              unit="waiting for your approval"
             />
             <Rail
               to={UNOWNED_LIST}

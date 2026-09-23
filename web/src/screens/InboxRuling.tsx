@@ -222,7 +222,7 @@ export function RulingCard({
             className="btn quiet"
             hidden={!may?.may_hide}
             disabled={withdraw.isPending}
-            title="Returns every report it covers to the inbox"
+            title="Returns every vulnerability report it covers to the inbox"
             onClick={() => withdraw.mutate(ruling.id)}
           >
             {ruling.state === "waiting" ? (ruling.yours ? "Withdraw" : "Send back") : "Undo"}
@@ -239,8 +239,11 @@ export function RulingCard({
 // may work reports in, for the review queue.
 export function WaitingRulings({ product }: { product?: string }) {
   const [offset, setOffset] = useState(0);
+  // The rulings this reader may agree to, which is what the badge counts and
+  // what the claims above are: somebody's own proposals wait for somebody else.
   const listed = useRulingsAcross({
     waiting: true,
+    approvable: true,
     products: product ? [product] : [],
     offset,
   });

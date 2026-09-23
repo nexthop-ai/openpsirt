@@ -173,7 +173,7 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject,
 	}
 	// Answering is working the report, which reading it does not grant.
 	if err := mayHandle(subject, told.ProductID); err != nil {
-		return nil
+		return err
 	}
 	return s.answered(ctx, subject, told.ID)
 }
