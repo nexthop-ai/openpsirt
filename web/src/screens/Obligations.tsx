@@ -403,7 +403,7 @@ function WindowForm({
         <p className="hint" title="None ticked is every product">
           Applies to{" "}
           {(products.data?.items ?? []).map((product) => (
-            <label key={product.name} style={{ marginRight: 12 }}>
+            <label key={product.name} style={{ marginLeft: 8, marginRight: 4 }}>
               <input
                 type="checkbox"
                 checked={limited.includes(product.name)}
