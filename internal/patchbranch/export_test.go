@@ -64,3 +64,10 @@ func NewLeasedPass(db *bun.DB, replica string) *Pass {
 
 // StillMine is the check a visit makes as it goes.
 func (p *Pass) StillMine(ctx context.Context) error { return p.stillMine(ctx) }
+
+// Unpolled stops the pass measuring a copy while it arrives, so what is
+// removed is decided after each visit alone.
+func (p *Pass) Unpolled() *Pass {
+	p.copies.poll = time.Hour
+	return p
+}

@@ -417,7 +417,10 @@ func TestTheLeastRecentlyUsedCopyIsRemovedFirst(t *testing.T) {
 			t.Fatal(err)
 		}
 		one := dirSize(t, cache)
-		pass := patchbranch.NewLocalPass(db.DB, cache, 2*one+one/2, patchbranch.Excluded{}, locate)
+		// Measured after each visit only. A copy arriving is briefly larger
+		// than it ends, so room made while it arrives can take a second copy
+		// — the order is the same, and the order is what this pins.
+		pass := patchbranch.NewLocalPass(db.DB, cache, 2*one+one/2, patchbranch.Excluded{}, locate).Unpolled()
 		issue(t, db, "CVE-2025-0012", "high", link("second", second.fix))
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
