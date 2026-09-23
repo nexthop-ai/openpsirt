@@ -30,7 +30,10 @@ type publisher struct {
 	// failing answers a status instead of a body at these paths, so a test can
 	// tell a refusal about one document from a publisher having a bad day.
 	failing map[string]int
-	asked   []string
+	// linked names a digest file in a document's feed entry, by the
+	// document's path.
+	linked map[string]string
+	asked  []string
 	// override answers everything where a test needs a directory this
 	// publisher would not serve. Set before the first request.
 	override http.HandlerFunc
@@ -40,7 +43,7 @@ func serving(t *testing.T) *publisher {
 	t.Helper()
 	p := &publisher{
 		documents: map[string]string{}, stamped: map[string]string{},
-		failing: map[string]int{},
+		failing: map[string]int{}, linked: map[string]string{},
 	}
 	// https, because the fetcher refuses anything else: what comes back is
 	// read as a publisher's own judgment, and over plain http it is read as
@@ -62,9 +65,13 @@ func serving(t *testing.T) *publisher {
 		case "/feed.json":
 			entries := make([]string, 0, len(p.documents))
 			for path, stamp := range p.stamped {
+				hash := ""
+				if sum, named := p.linked[path]; named {
+					hash = fmt.Sprintf(`,{"rel":"hash","href":%q}`, p.server.URL+sum)
+				}
 				entries = append(entries, fmt.Sprintf(
-					`{"link":[{"rel":"self","href":%q}],"updated":%q,"content":{"type":"application/json","src":%q}}`,
-					p.server.URL+path, stamp, p.server.URL+path))
+					`{"link":[{"rel":"self","href":%q}%s],"updated":%q,"content":{"type":"application/json","src":%q}}`,
+					p.server.URL+path, hash, stamp, p.server.URL+path))
 			}
 			_, _ = fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[%s]}}`,
 				strings.Join(entries, ","))
@@ -317,6 +324,7 @@ func from(t *testing.T, f *ships, p *publisher) supplier.Source {
 	// looks like.
 	row.CaughtUpTo = &long
 	row.CaughtUpMark = ""
+	row.CreatedAt = long
 	return *row
 }
 

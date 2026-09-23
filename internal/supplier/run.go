@@ -26,6 +26,14 @@ const FetchLease = "supplier.fetch"
 // only once a day would take up to a day to notice they had.
 const betweenCycles = 5 * time.Minute
 
+// allHistory is the most days of a supplier's history read, whatever the
+// setting says.
+//
+// A century is further back than any publisher of these documents has issued,
+// so it reads as everything; a count past it would overflow the length of time
+// it is turned into.
+const allHistory = 100 * 365
+
 // Pass reads what every configured supplier publishes, on a schedule.
 //
 // On the scan schedule, because that is the same question: a supplier's
@@ -82,7 +90,7 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 			}
 		case took.Documents > 0 || took.Refused > 0:
 			p.logger.Info("read what suppliers have published",
-				"documents", took.Documents, "claims", took.Recorded,
+				"documents", took.Documents, "checked", took.Checked, "claims", took.Recorded,
 				"refused", took.Refused, "other_documents", took.Skipped)
 		}
 	})
@@ -102,6 +110,12 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 	if err != nil {
 		return took, err
 	}
+	history, err := setting.NewStore(p.db).Count(ctx, setting.SupplierHistory,
+		setting.DefaultSupplierHistory)
+	if err != nil {
+		return took, fmt.Errorf("read how far back to read a supplier: %w", err)
+	}
+	p.fetch.History = time.Duration(min(history, allHistory)) * 24 * time.Hour
 
 	// The deployment itself rather than anybody in it. Nobody is behind a
 	// background cycle, and what this asks for is the list of suppliers it is
@@ -131,6 +145,7 @@ func (p *Pass) Once(ctx context.Context) (Taken, error) {
 		took.Recorded += one.Recorded
 		took.Skipped += one.Skipped
 		took.Refused += one.Refused
+		took.Checked += one.Checked
 		if err != nil {
 			// Recorded against the source and carried on. One publisher
 			// unreachable says nothing about the next, and a pass that stopped

@@ -922,6 +922,41 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 	return s.issuances(ctx, row)
 }
 
+// Changed reports whether what an advisory's document says now differs from
+// what last went out, or nil where that has no answer.
+//
+// Nil where nothing has gone out, and where no publisher is configured or the
+// advisory covers nothing, since then there is no document to compare. The
+// comparison is between settled digests, so a document whose dates, version
+// and status moved and nothing else reads as unchanged.
+func (s *Store) Changed(ctx context.Context, subject access.Subject, who publisher.Named,
+	identifier string) (*bool, error) {
+
+	if !who.Stated() {
+		return nil, nil
+	}
+	doc, row, err := s.forAdvisory(ctx, subject, who, identifier)
+	if errors.Is(err, ErrNothingToSay) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	gone, err := s.issuances(ctx, row)
+	if err != nil {
+		return nil, err
+	}
+	if len(gone) == 0 {
+		return nil, nil
+	}
+	now, err := settledDigest(doc)
+	if err != nil {
+		return nil, err
+	}
+	changed := now != gone[len(gone)-1].Digest
+	return &changed, nil
+}
+
 // issuances is what has gone out for one advisory, oldest first.
 //
 // Oldest first because it becomes the revision history, which a document

@@ -1,13 +1,16 @@
 package supplier
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"net/http"
 	"net/url"
@@ -117,6 +120,10 @@ type Taken struct {
 	// publisher.
 	Skipped int
 	Refused int
+	// Checked is how many of the documents read were compared against a
+	// digest the publisher serves beside them. The rest came from a publisher
+	// serving none.
+	Checked int
 	// Filled says the pass stopped at its bound rather than because there was
 	// nothing left, which is what leaves the supplier due for the next wake.
 	Filled bool
@@ -141,6 +148,10 @@ type Fetcher struct {
 	// Now is the clock a publisher's own stamps are judged against, so a test
 	// can hand one a date in the future without waiting for the future.
 	Now func() time.Time
+	// History is how far before its configuration a supplier is first read
+	// from. The pass sets it from the deployment's setting on every wake; a
+	// fetcher built by hand reads nothing from before its configuration.
+	History time.Duration
 }
 
 // NewFetcher returns a fetcher over db, reaching real suppliers.
@@ -166,8 +177,7 @@ func NewFetcher(db bun.IDB, limits sbom.Limits) *Fetcher {
 // seen.
 //
 // Read the other way round, one permanently unreadable document stops a
-// supplier for ever and the only way out is to withdraw it and add it again,
-// which starts from today and loses the gap.
+// supplier for ever.
 type unreadable struct{ err error }
 
 func (u unreadable) Error() string { return u.err.Error() }
@@ -204,7 +214,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			"describes neither a feed of advisories nor a directory of them")
 	}
 
-	at2, mark := source.From()
+	at2, mark := source.From(f.History)
 	due, filled, err := f.due(ctx, client, listed, at2, mark)
 	if err != nil {
 		return took, err
@@ -222,6 +232,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 		return took, err
 	}
 
+	sums := &digests{}
 	for _, one := range due {
 		if ctx.Err() != nil {
 			return took, nil
@@ -229,7 +240,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 		if err := f.wait(ctx); err != nil {
 			return took, nil
 		}
-		recorded, err := f.document(ctx, client, by, source, one, ships)
+		recorded, checked, err := f.document(ctx, client, by, source, one, ships, sums)
 		switch {
 		case errors.Is(err, errWithdrawn):
 			// The supplier was withdrawn while this pass was running. Nothing
@@ -248,6 +259,8 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 			// steps over it. Held instead, one withdrawn advisory still listed
 			// would stop everything issued after it, for ever.
 			took.Refused++
+		case ctx.Err() != nil:
+			return took, nil
 		case err != nil:
 			// The publisher could not be reached. The mark stops here: moved
 			// past, everything behind it would be skipped without having been
@@ -256,6 +269,9 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 		default:
 			took.Documents++
 			took.Recorded += recorded
+			if checked {
+				took.Checked++
+			}
 		}
 		took.CaughtUpTo, took.Mark = one.updated, Mark(one.address)
 	}
@@ -333,6 +349,9 @@ const changesFile = "changes.csv"
 type entry struct {
 	address string
 	updated time.Time
+	// sums is where a feed entry says the digests of the document are. A
+	// directory names none, and its digests are found beside the document.
+	sums []string
 }
 
 // due is the entries the publisher listed past the mark, oldest first and
@@ -443,9 +462,20 @@ func (f *Fetcher) fromFeed(ctx context.Context, client *http.Client,
 		if !listable(where) {
 			continue
 		}
-		out = append(out, entry{address: where, updated: stamped})
+		out = append(out, entry{address: where, updated: stamped, sums: sumsIn(one)})
 	}
 	return out, nil
+}
+
+// sumsIn is where one feed entry says the digests of its document are.
+func sumsIn(one feedEntry) []string {
+	var out []string
+	for _, link := range one.Links {
+		if strings.EqualFold(link.Rel, "hash") && strings.TrimSpace(link.Href) != "" {
+			out = append(out, strings.TrimSpace(link.Href))
+		}
+	}
+	return out
 }
 
 // fromChanges reads a directory's list of what moved and when.
@@ -524,14 +554,28 @@ func documentIn(one feedEntry) string {
 var errWithdrawn = errors.New("that supplier is no longer read from")
 
 // document reads one advisory and records what it says about a component this
-// product ships.
+// product ships, answering how many claims it left and whether a digest the
+// publisher serves was compared against it.
 func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.Subject,
-	source Source, one entry, ships map[string]bool) (int, error) {
+	source Source, one entry, ships map[string]bool, sums *digests) (int, bool, error) {
 
 	body, err := f.fetch(ctx, client, one.address, f.limits.OrDefault().MaxBytes)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
+	checked, err := f.matches(ctx, client, one, body, sums)
+	if err != nil {
+		return 0, false, err
+	}
+	recorded, err := f.record(ctx, by, source, one, body, ships)
+	return recorded, checked, err
+}
+
+// record reads one fetched advisory and writes what it says about a component
+// this product ships.
+func (f *Fetcher) record(ctx context.Context, by access.Subject, source Source, one entry,
+	body []byte, ships map[string]bool) (int, error) {
+
 	sum := sha256.Sum256(body)
 	advisory, err := sbom.ReadAdvisory(strings.NewReader(string(body)), f.limits)
 	if err != nil {
@@ -583,6 +627,143 @@ func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.S
 		return 0, err
 	}
 	return recorded, nil
+}
+
+// mostSumBytes bounds a digest file. One line holding a digest and a file name
+// is well under it.
+const mostSumBytes = 4 << 10
+
+// algorithms are the digests a publisher may serve beside a document, by the
+// suffix the format gives each file.
+//
+// Both, because publishers split between them. Measured on 2026-09-23: Red Hat
+// and SUSE serve a SHA-256 file and no SHA-512 file; Cisco, NCSC-NL and Siemens
+// serve a SHA-512 file and no SHA-256 file.
+var algorithms = []struct {
+	suffix string
+	sum    func() hash.Hash
+}{
+	{".sha256", sha256.New},
+	{".sha512", sha512.New},
+}
+
+// digests remembers, across one pass over one publisher, which digest file
+// answered last, so it is asked for first.
+//
+// A publisher serves the same kind beside every document. Remembered, the file
+// that is not there is asked for once a pass rather than once a document.
+type digests struct{ first int }
+
+// order is the algorithms in the order to ask for them.
+func (d *digests) order() []int {
+	if d.first == 0 {
+		return []int{0, 1}
+	}
+	return []int{1, 0}
+}
+
+// matches compares a fetched document against the digest its publisher serves
+// beside it, answering whether one was found.
+//
+// Where a feed entry names its digest files, those are read. Otherwise the
+// file is looked for where the format puts it: the document's own address with
+// the algorithm's suffix. A publisher serving neither is read without the
+// check, which is what the format allows everybody short of its trusted
+// provider role.
+//
+// A digest that does not match is about this document, so the pass steps over
+// it. What was fetched is not what the publisher says they published, whether
+// the transfer was cut, a mirror is behind, or the file was replaced; recorded,
+// it would stand as the publisher's judgment.
+func (f *Fetcher) matches(ctx context.Context, client *http.Client, one entry,
+	body []byte, sums *digests) (bool, error) {
+
+	for _, where := range one.sums {
+		kind := algorithmOf(where)
+		if kind < 0 {
+			continue
+		}
+		found, err := f.compare(ctx, client, where, kind, body)
+		if found || err != nil {
+			return found, err
+		}
+	}
+	for _, kind := range sums.order() {
+		found, err := f.compare(ctx, client, one.address+algorithms[kind].suffix, kind, body)
+		if err != nil {
+			return false, err
+		}
+		if found {
+			sums.first = kind
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// algorithmOf is which algorithm a digest file's address names, or -1.
+func algorithmOf(address string) int {
+	for i, one := range algorithms {
+		if strings.HasSuffix(strings.ToLower(address), one.suffix) {
+			return i
+		}
+	}
+	return -1
+}
+
+// compare fetches one digest file and checks the document against it,
+// answering whether the file was there to compare.
+//
+// A refusal naming the file says the publisher does not serve that one, which
+// is ordinary; a missing file is answered 404 by some and 403 by others. A
+// file past the size of a digest file is not one either. A
+// publisher that cannot be reached holds the mark, the way it does for the
+// document.
+func (f *Fetcher) compare(ctx context.Context, client *http.Client, address string,
+	kind int, body []byte) (bool, error) {
+
+	if err := f.wait(ctx); err != nil {
+		return false, err
+	}
+	served, err := f.fetch(ctx, client, address, mostSumBytes)
+	var refused unreadable
+	switch {
+	case errors.As(err, &refused):
+		return false, nil
+	case err != nil:
+		return false, err
+	}
+	want, held := stated(served, kind)
+	if !held {
+		// A server answering every address with a page of its own serves no
+		// digest, whatever status it gives. Refused, every document such a
+		// publisher issues would be stepped over.
+		return false, nil
+	}
+	sum := algorithms[kind].sum()
+	sum.Write(body)
+	if !bytes.Equal(sum.Sum(nil), want) {
+		return true, unreadable{fmt.Errorf(
+			"that document does not match the digest its publisher serves beside it")}
+	}
+	return true, nil
+}
+
+// stated is the digest a digest file holds, and whether it holds one.
+//
+// The file is what the usual checksum tools write: the digest in hexadecimal,
+// then optionally the file name. Only the first field is read, because the name
+// is the publisher's own and says nothing about the bytes.
+func stated(served []byte, kind int) ([]byte, bool) {
+	fields := strings.Fields(string(served))
+	if len(fields) == 0 {
+		return nil, false
+	}
+	want, err := hex.DecodeString(strings.ToLower(fields[0]))
+	if err != nil || len(want) != algorithms[kind].sum().Size() {
+		return nil, false
+	}
+	return want, true
 }
 
 // recording is what identifies this recording of a document.

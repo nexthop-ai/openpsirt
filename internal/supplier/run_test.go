@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
 
@@ -43,8 +44,8 @@ func TestThePassRecordsHowFarThroughAPublisherItHasRead(t *testing.T) {
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
 		p := serving(t)
-		p.publishes("/2026/EL-7.json", "2026-09-20T00:00:00Z",
-			advisory("EL-2026-0007", "libnl-3-200", "3.7.1", "CVE-2026-9111"))
+		p.publishes("/2020/EL-7.json", "2020-09-20T00:00:00Z",
+			advisory("EL-2020-0007", "libnl-3-200", "3.7.1", "CVE-2020-9111"))
 
 		store := supplier.NewStore(f.db.DB)
 		if _, err := store.Add(ctx, f.by, f.product, "Example Linux", p.described()); err != nil {
@@ -66,9 +67,9 @@ func TestThePassRecordsHowFarThroughAPublisherItHasRead(t *testing.T) {
 		if rows[0].Failed != "" {
 			t.Errorf("a pass that worked recorded %q", rows[0].Failed)
 		}
-		// A supplier configured now starts reading now, so a document dated
-		// before it was configured is not taken — and the mark stays where it
-		// was rather than jumping to the document's date.
+		// A supplier configured now reads a year back, so a document dated
+		// before that is not taken — and the mark stays where it was rather
+		// than jumping to the document's date.
 		if rows[0].CaughtUpTo != nil {
 			t.Errorf("a document published before the supplier was named was taken: %v",
 				rows[0].CaughtUpTo)
@@ -82,6 +83,42 @@ func TestThePassRecordsHowFarThroughAPublisherItHasRead(t *testing.T) {
 		}
 		if len(due) != 0 {
 			t.Errorf("the supplier is due again a moment after being read: %+v", due)
+		}
+	})
+}
+
+func TestANewSupplierIsReadFromTheHistoryWindowBeforeItWasNamed(t *testing.T) {
+	// A publisher's feed lists everything they have ever issued. The window
+	// is what bounds how much of that is asked for.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		now := time.Now().UTC()
+		p.publishes("/recent.json", now.Add(-10*24*time.Hour).Format(time.RFC3339),
+			advisory("EL-2026-0201", "libnl-3-200", "3.7.1", "CVE-2026-2201"))
+		p.publishes("/older.json", now.Add(-60*24*time.Hour).Format(time.RFC3339),
+			advisory("EL-2026-0202", "libnl-3-200", "3.7.1", "CVE-2026-2202"))
+		if err := setting.NewStore(f.db.DB).Set(ctx, setting.SupplierHistory, "30"); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := supplier.NewStore(f.db.DB).Add(ctx, f.by, f.product, "Example Linux",
+			p.described()); err != nil {
+			t.Fatal(err)
+		}
+		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{})
+		supplier.FetchForTest(pass, fetching(t, f, p))
+		took, err := pass.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if took.Documents != 1 {
+			t.Errorf("%d documents were read, want the one inside the window", took.Documents)
+		}
+		for _, path := range p.asked {
+			if path == "/older.json" {
+				t.Error("a document from before the window was fetched")
+			}
 		}
 	})
 }

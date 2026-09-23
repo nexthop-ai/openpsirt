@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -63,12 +64,12 @@ func registerVEX(api huma.API, in Ingest) {
 			"revision is asking before they generate anything, and the digest beside each " +
 			"entry is what answers whether the last one still describes what this would " +
 			"produce.\n\n" +
-			"The published document itself belongs to whoever published it. The digest is " +
-			"over what the document says, with the moment it was generated, the version and " +
-			"the build of OpenPSIRT that wrote it left out, so a document regenerated " +
-			"unchanged hashes the same.\n\n" +
-			"Answered whether or not a publisher is configured for this deployment. Nothing " +
-			"here is assembled and no author is named.",
+			"The digest is over what the document says, with the moment it was generated, " +
+			"the version and the build of OpenPSIRT that wrote it left out, so a document " +
+			"regenerated unchanged hashes the same. `changed` says whether the public " +
+			"document generated now differs from the last one that went out.\n\n" +
+			"Answered whether or not a publisher is configured for this deployment. Without " +
+			"one, nothing can be generated to compare, and `changed` is absent.",
 		Tags: []string{"Findings"},
 	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
 		"a row saying a document about this build went out is as much a disclosure as the "+
@@ -77,7 +78,7 @@ func registerVEX(api huma.API, in Ingest) {
 			Product string `path:"product"`
 			Stream  string `path:"stream"`
 			Variant string `path:"variant"`
-		}) (*listOutput[VEXIssuanceBody], error) {
+		}) (*vexIssuances, error) {
 			subject, err := reading(ctx)
 			if err != nil {
 				return nil, err
@@ -85,12 +86,19 @@ func registerVEX(api huma.API, in Ingest) {
 			if in.DB == nil {
 				return nil, noDatabase(in.Logger)
 			}
-			gone, err := vex.NewStore(in.DB.DB).Issuances(ctx, subject,
+			store := vex.NewStore(in.DB.DB)
+			gone, err := store.Issuances(ctx, subject,
 				input.Product, input.Stream, input.Variant)
 			if err != nil {
 				return nil, vexRefused(in, err, "what has gone out could not be read")
 			}
-			out := &listOutput[VEXIssuanceBody]{}
+			changed, err := store.Changed(ctx, subject, in.Publisher,
+				input.Product, input.Stream, input.Variant)
+			if err != nil {
+				return nil, vexRefused(in, err, "what has gone out could not be compared")
+			}
+			out := &vexIssuances{}
+			out.Body.Changed = changed
 			out.Body.Items = make([]VEXIssuanceBody, 0, len(gone))
 			for _, one := range gone {
 				out.Body.Items = append(out.Body.Items, VEXIssuanceBody{
@@ -106,7 +114,9 @@ func registerVEX(api huma.API, in Ingest) {
 		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance",
 		Summary: "Record that a VEX document went out",
 		Description: "Records that the document for this build was published: when, by whom, " +
-			"and a digest of the document as it stands now.\n\n" +
+			"and a digest of the document as it stands now. Answers with the document " +
+			"that was recorded, which is the one to send: it carries the version it is " +
+			"recorded under, and a document generated before recording may not.\n\n" +
 			"A fact about a moment rather than a derived value. What was published on a date " +
 			"cannot be worked out again once a claim is withdrawn, a decision is revised or a " +
 			"scan closes a finding.\n\n" +
@@ -127,7 +137,7 @@ func registerVEX(api huma.API, in Ingest) {
 			Variant string `path:"variant"`
 		}) (*struct {
 			Status int
-			Body   VEXIssuanceBody
+			Body   VEXRecordedBody
 		}, error) {
 			subject, err := reading(ctx)
 			if err != nil {
@@ -141,15 +151,77 @@ func registerVEX(api huma.API, in Ingest) {
 			if err != nil {
 				return nil, vexRefused(in, err, "that could not be recorded")
 			}
+			doc := new(vex.Statements)
+			if err := json.Unmarshal([]byte(recorded.Document), doc); err != nil {
+				return nil, wentWrong(in.Logger, "the recorded document could not be read", err)
+			}
 			return &struct {
 				Status int
-				Body   VEXIssuanceBody
-			}{Status: http.StatusCreated, Body: VEXIssuanceBody{
-				Version: recorded.Ordinal, Digest: recorded.Digest,
-				IssuedBy: subject.Identity,
-				IssuedAt: recorded.IssuedAt.Format(time.RFC3339),
+				Body   VEXRecordedBody
+			}{Status: http.StatusCreated, Body: VEXRecordedBody{
+				VEXIssuanceBody: VEXIssuanceBody{
+					Version: recorded.Ordinal, Digest: recorded.Digest,
+					IssuedBy: subject.Identity,
+					IssuedAt: recorded.IssuedAt.Format(time.RFC3339),
+				},
+				Document: doc,
 			}}, nil
 		})
+
+	huma.Register(api, requiring(huma.Operation{
+		OperationID: "get-vex-issued", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}",
+		Summary: "Read a VEX document that went out",
+		Description: "The document recorded as one revision, as it went out. It carries the " +
+			"version it was recorded under and the moment it was recorded.\n\n" +
+			"A revision nobody recorded answers 404.",
+		Tags: []string{"Findings"},
+	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
+		"the document is about the whole build rather than about one issue.",
+		readRights()...),
+		func(ctx context.Context, input *struct {
+			Product string `path:"product"`
+			Stream  string `path:"stream"`
+			Variant string `path:"variant"`
+			Version int    `path:"version" minimum:"1" doc:"Which revision, counting from one"`
+		}) (*struct{ Body *vex.Statements }, error) {
+			subject, err := reading(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if in.DB == nil {
+				return nil, noDatabase(in.Logger)
+			}
+			sent, err := vex.NewStore(in.DB.DB).Sent(ctx, subject,
+				input.Product, input.Stream, input.Variant, input.Version)
+			if errors.Is(err, vex.ErrNoSuchRevision) {
+				return nil, huma.Error404NotFound("no document went out as that revision")
+			}
+			if err != nil {
+				return nil, vexRefused(in, err, "what went out could not be read")
+			}
+			doc := new(vex.Statements)
+			if err := json.Unmarshal([]byte(sent), doc); err != nil {
+				return nil, wentWrong(in.Logger, "what went out could not be read", err)
+			}
+			return &struct{ Body *vex.Statements }{Body: doc}, nil
+		})
+}
+
+// vexIssuances is what has gone out for a build, and whether what would be
+// generated now differs from the last of it.
+type vexIssuances struct {
+	Body struct {
+		Items   []VEXIssuanceBody `json:"items"`
+		Changed *bool             `json:"changed,omitempty" doc:"Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured"`
+	}
+}
+
+// VEXRecordedBody is one issuance just recorded, with the document it
+// recorded.
+type VEXRecordedBody struct {
+	VEXIssuanceBody
+	Document *vex.Statements `json:"document" doc:"The document recorded, carrying the version it is recorded under. This is the one to send"`
 }
 
 // VEXIssuanceBody is one time the document for a build went out.
@@ -162,7 +234,7 @@ type VEXIssuanceBody struct {
 
 // vexRefused maps what the store refuses to what a caller is told.
 //
-// One mapping for the three routes, because generating the document,
+// One mapping for every route here, because generating the document,
 // recording that it went out and reading what has are the same names resolved
 // the same way. Spelled per route, the answer to a build nobody declared
 // differs by which route somebody happened to ask on.

@@ -120,6 +120,56 @@ func TestASecondAdvisoryIsARevisionOfTheFirst(t *testing.T) {
 	})
 }
 
+func TestAnAdvisoryNamesWhoAgreesAndSaysWhetherItMovedSinceItWentOut(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedWithEvidence(t)
+		flaw := r.embargoed(t)
+		named := advisoryOver(t, r, "private-triage", "mine", flaw)
+		at := "/v1/advisories/" + named
+
+		type standing struct {
+			AgreedBy []struct {
+				Person   string `json:"person"`
+				AgreedAt string `json:"agreed_at"`
+			} `json:"agreed_by"`
+			Changed *bool `json:"changed"`
+		}
+		var before standing
+		read(t, r, "private-triage", at, &before)
+		if len(before.AgreedBy) != 0 || before.Changed != nil {
+			t.Errorf("with nobody agreeing and nothing gone out it reads %+v", before)
+		}
+
+		agreedTo(t, r, at)
+		if got := asPerson(t, r, "private-triage", http.MethodPost, at+"/issuance",
+			`{}`); got.Code != http.StatusCreated {
+			t.Fatalf("recording that it went out answered %d: %s", got.Code, got.Body.String())
+		}
+		var sent standing
+		read(t, r, "private-triage", at, &sent)
+		if len(sent.AgreedBy) != 1 || sent.AgreedBy[0].Person != "private-dispatcher" ||
+			sent.AgreedBy[0].AgreedAt == "" {
+			t.Errorf("who agrees reads as %+v", sent.AgreedBy)
+		}
+		if sent.Changed == nil || *sent.Changed {
+			t.Errorf("straight after it went out, changed reads %v", sent.Changed)
+		}
+
+		if got := asPerson(t, r, "private-triage", http.MethodPatch, at,
+			`{"title":"A different title"}`); got.Code != http.StatusOK {
+			t.Fatalf("retitling answered %d: %s", got.Code, got.Body.String())
+		}
+		var moved standing
+		read(t, r, "private-triage", at, &moved)
+		if moved.Changed == nil || !*moved.Changed {
+			t.Errorf("after a retitle, changed reads %v", moved.Changed)
+		}
+		if len(moved.AgreedBy) != 0 {
+			t.Errorf("an agreement to the old title still names %+v", moved.AgreedBy)
+		}
+	})
+}
+
 // agreedTo has a second person agree to what the advisory at this path says,
 // which is what an issuance asks for.
 //

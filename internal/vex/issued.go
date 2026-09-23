@@ -3,8 +3,10 @@ package vex
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -45,21 +47,30 @@ type Issuance struct {
 	// TargetID is the build the document was about, which is what its
 	// identifier names.
 	TargetID int64 `bun:"target_id,notnull"`
-	// Ordinal is which issuance this is, counting from one. The document
-	// assembled at this moment carries it as its version, read from the same
-	// count — a document fetched earlier and sent later carries whatever the
-	// count said then, which is what the digest beside this is for.
+	// Ordinal is which issuance this is, counting from one, and the version
+	// the document kept beside it states.
 	Ordinal int `bun:"ordinal,notnull"`
-	// Digest is what the document said, hashed. The document itself belongs
-	// to whoever published it; this is what makes "is what is published still
-	// what we would generate" a question with a yes or no.
-	Digest   string    `bun:"digest,notnull"`
+	// Digest is what the document said, hashed. It is what makes "is what is
+	// published still what we would generate" a question with a yes or no.
+	Digest string `bun:"digest,notnull"`
+	// Document is what went out, as the bytes handed to whoever recorded it.
+	//
+	// Written in the transaction that takes the ordinal, so the version the
+	// document states is the one it is recorded under. A document generated
+	// before the write carries whatever the count said then, and a second
+	// issuance committing in between leaves an operator holding a document
+	// numbered one behind its record.
+	Document string    `bun:"document,notnull"`
 	IssuedBy int64     `bun:"issued_by,notnull"`
 	IssuedAt time.Time `bun:"issued_at,notnull"`
 }
 
 // Issued records that the document for a build went out, and returns what was
-// recorded.
+// recorded, the document itself included.
+//
+// The document handed back is the one to send. It carries the version it is
+// recorded under, which a document generated before recording does not
+// promise: somebody else recording in between moves the count.
 //
 // The digest is taken from the document as it is now, generated inside this
 // call rather than supplied by the caller. A caller-supplied digest is a
@@ -97,6 +108,9 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	if err != nil {
 		return nil, err
 	}
+	if s.generated != nil {
+		s.generated()
+	}
 
 	var recorded *Issuance
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
@@ -126,6 +140,16 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 			return err
 		}
 		recorded.Ordinal = highest + 1
+		// The bytes that go out, numbered and dated inside the write. What
+		// the digest covers was settled above; the version and the moment
+		// are what this transaction decides.
+		went := *doc
+		went.Version, went.Timestamp = recorded.Ordinal, issuedAt
+		body, err := json.Marshal(went)
+		if err != nil {
+			return fmt.Errorf("write down what went out: %w", err)
+		}
+		recorded.Document = string(body)
 		// The number is read and used here, and two people recording at the
 		// same moment still read the same one — what stops them sharing it is
 		// the unique constraint, whose answer is an error. Said as a lost
@@ -192,6 +216,79 @@ func (s *Store) Issuances(ctx context.Context, subject access.Subject,
 	}
 	return rows, nil
 }
+
+// Changed reports whether what the public document for a build says now
+// differs from what last went out, or nil where that has no answer.
+//
+// Nil where nothing has gone out, since there is nothing to differ from, and
+// where no publisher is configured, since nothing can be generated to compare.
+// The comparison is between settled digests, so a document regenerated with
+// nothing but its moment and its version moved reads as unchanged.
+func (s *Store) Changed(ctx context.Context, subject access.Subject, who publisher.Named,
+	product, stream, variant string) (*bool, error) {
+
+	if !who.Stated() {
+		return nil, nil
+	}
+	named, target, err := s.locate(ctx, subject, product, stream, variant)
+	if err != nil {
+		return nil, err
+	}
+	var last string
+	err = s.db.NewSelect().Model((*Issuance)(nil)).
+		Column("digest").
+		Where("target_id = ?", target.ID).
+		OrderExpr("ordinal DESC").
+		Limit(1).
+		Scan(ctx, &last)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read what last went out: %w", err)
+	}
+	doc, err := s.document(ctx, who, named, target, []access.Visibility{access.Public})
+	if err != nil {
+		return nil, err
+	}
+	now, err := settledDigest(doc)
+	if err != nil {
+		return nil, err
+	}
+	changed := now != last
+	return &changed, nil
+}
+
+// Sent is the document that went out as one revision, as the bytes that went
+// out.
+//
+// Narrowed the way the record of issuances is, because the bytes are what the
+// row describes.
+func (s *Store) Sent(ctx context.Context, subject access.Subject,
+	product, stream, variant string, ordinal int) (string, error) {
+
+	_, target, err := s.locate(ctx, subject, product, stream, variant)
+	if err != nil {
+		return "", err
+	}
+	var body string
+	err = s.db.NewSelect().Model((*Issuance)(nil)).
+		Column("document").
+		Where("target_id = ?", target.ID).
+		Where("ordinal = ?", ordinal).
+		Limit(1).
+		Scan(ctx, &body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNoSuchRevision
+	}
+	if err != nil {
+		return "", fmt.Errorf("read what went out: %w", err)
+	}
+	return body, nil
+}
+
+// ErrNoSuchRevision says no document went out as that revision.
+var ErrNoSuchRevision = errors.New("no document went out as that revision")
 
 // revision is which revision the document for this build is, counting from
 // one.

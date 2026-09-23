@@ -90,10 +90,9 @@ func TestASupplierIsConfiguredListedAndWithdrawn(t *testing.T) {
 	})
 }
 
-func TestAWithdrawnSupplierTakenUpAgainStartsAtToday(t *testing.T) {
-	// A source withdrawn for a month and restored would otherwise fetch the
-	// month it was away: a burst at a publisher nobody asked for, and evidence
-	// about issues a scan has already reported.
+func TestAWithdrawnSupplierTakenUpAgainResumesWhereItStopped(t *testing.T) {
+	// It takes what was issued while it was away and nothing it already read,
+	// and never further back than a new supplier would read.
 	each(t, func(t *testing.T, f *configured) {
 		ctx := t.Context()
 		store := supplier.NewStore(f.db.DB)
@@ -102,7 +101,7 @@ func TestAWithdrawnSupplierTakenUpAgainStartsAtToday(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		lastMonth := time.Now().UTC().Add(-30 * 24 * time.Hour)
+		lastMonth := time.Now().UTC().Add(-30 * 24 * time.Hour).Truncate(time.Microsecond)
 		if err := store.Reached(ctx, row.ID, lastMonth, supplier.Mark("a"), nil); err != nil {
 			t.Fatal(err)
 		}
@@ -118,14 +117,16 @@ func TestAWithdrawnSupplierTakenUpAgainStartsAtToday(t *testing.T) {
 		if again.ID != row.ID {
 			t.Errorf("a second row was made rather than the first taken up again")
 		}
-		if again.CaughtUpTo != nil {
-			t.Errorf("it carries the mark from before it was withdrawn: %v", again.CaughtUpTo)
-		}
 		if again.FetchedAt != nil {
 			t.Errorf("it reads as already read: %v", again.FetchedAt)
 		}
-		if from, _ := again.From(); from.Before(lastMonth.Add(time.Hour)) {
-			t.Errorf("it starts at %v, which is where it was when it was withdrawn", from)
+		year := 365 * 24 * time.Hour
+		if from, mark := again.From(year); !from.Equal(lastMonth) || mark != supplier.Mark("a") {
+			t.Errorf("inside the window it starts at %v %q, want where it stopped", from, mark)
+		}
+		week := 7 * 24 * time.Hour
+		if from, _ := again.From(week); from.Before(again.CreatedAt.Add(-week)) {
+			t.Errorf("it starts at %v, further back than the window", from)
 		}
 	})
 }

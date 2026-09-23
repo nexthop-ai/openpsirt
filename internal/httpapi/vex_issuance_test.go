@@ -120,6 +120,108 @@ func TestASecondVEXDocumentIsARevisionOfTheFirst(t *testing.T) {
 	})
 }
 
+func TestTheVEXDocumentRecordedStatesTheVersionItIsRecordedUnder(t *testing.T) {
+	// A document generated before recording carries whatever the count said
+	// then. Somebody else recording in between moves the count, and the
+	// document handed over would be numbered one behind its own record.
+	eachReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+
+		// Generated first, as a person about to publish would.
+		var fetched vexDocument
+		read(t, r, "triager", aBuild, &fetched)
+		if fetched.Version != 1 {
+			t.Fatalf("a document nobody has published is version %d", fetched.Version)
+		}
+		// Somebody else publishes in between.
+		recordedIssuance(t, r, "triager")
+
+		got := asPerson(t, r, "triager", http.MethodPost, aBuild+"/issuance", "")
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+		var recorded struct {
+			Version  int         `json:"version"`
+			IssuedAt string      `json:"issued_at"`
+			Document vexDocument `json:"document"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
+			t.Fatal(err)
+		}
+		if recorded.Version != 2 || recorded.Document.Version != 2 {
+			t.Errorf("recorded as version %d, the document handed back says %d",
+				recorded.Version, recorded.Document.Version)
+		}
+		if recorded.Document.ID != fetched.ID {
+			t.Errorf("the recorded document is called %q, the generated one %q",
+				recorded.Document.ID, fetched.ID)
+		}
+
+		// Each revision is kept, and read back as the one that went out.
+		var first, second struct {
+			Version   int    `json:"version"`
+			Timestamp string `json:"timestamp"`
+		}
+		read(t, r, "reader", aBuild+"/issuance/1", &first)
+		read(t, r, "reader", aBuild+"/issuance/2", &second)
+		if first.Version != 1 || second.Version != 2 {
+			t.Errorf("the kept revisions say %d and %d", first.Version, second.Version)
+		}
+		at, err := time.Parse(time.RFC3339, recorded.IssuedAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stamped, err := time.Parse(time.RFC3339Nano, second.Timestamp)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !stamped.Truncate(time.Second).Equal(at) {
+			t.Errorf("the document is dated %v and was recorded at %v", stamped, at)
+		}
+		if got := asPerson(t, r, "reader", http.MethodGet, aBuild+"/issuance/3", ""); got.Code !=
+			http.StatusNotFound {
+			t.Errorf("a revision nobody recorded answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "auditor", http.MethodGet,
+			"/v1/products/theirs/streams/master/variants/broadcom/vex/issuance/1",
+			""); got.Code != http.StatusNotFound {
+			t.Errorf("a stranger reading what went out answered %d: %s",
+				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestTheVEXRecordSaysWhetherTheDocumentMovedSinceItWentOut(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+
+		var gone struct {
+			Changed *bool `json:"changed"`
+		}
+		read(t, r, "reader", aBuild+"/issuance", &gone)
+		if gone.Changed != nil {
+			t.Errorf("with nothing gone out, changed reads %v", *gone.Changed)
+		}
+
+		recordedIssuance(t, r, "triager")
+		read(t, r, "reader", aBuild+"/issuance", &gone)
+		if gone.Changed == nil || *gone.Changed {
+			t.Errorf("straight after it went out, changed reads %v", gone.Changed)
+		}
+
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "linux-image", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		gone.Changed = nil
+		read(t, r, "reader", aBuild+"/issuance", &gone)
+		if gone.Changed == nil || !*gone.Changed {
+			t.Errorf("after a new statement stands, changed reads %v", gone.Changed)
+		}
+	})
+}
+
 // TestAVEXDocumentIsNamedTheSameHoweverTheBuildIsSpelled pins the identifier
 // against the names that were stored rather than the ones that were typed.
 //

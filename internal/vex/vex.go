@@ -134,6 +134,10 @@ type Store struct {
 	// fixture rather than building a fixture up to it, which is how the
 	// routing reach is tested for the same reason.
 	most int
+	// generated runs between the document being generated and the write that
+	// records it. Set by a test that has to commit a second issuance inside
+	// that window; nil everywhere else.
+	generated func()
 }
 
 // NewStore returns a store over db.
