@@ -631,7 +631,7 @@ deployment.</p>
 </tr>
 <tr>
 <td><code>private-read</code></td>
-<td>Read findings nobody has announced</td>
+<td>Read findings nobody has announced, and no others</td>
 </tr>
 <tr>
 <td><code>public-triage</code></td>
@@ -639,7 +639,7 @@ deployment.</p>
 </tr>
 <tr>
 <td><code>private-triage</code></td>
-<td>The same for findings nobody has announced, including recording one and moving its disclosure date</td>
+<td>The same for findings nobody has announced, including recording one and moving its disclosure date. Disclosed findings take <code>public-triage</code></td>
 </tr>
 <tr>
 <td><code>approver</code></td>
@@ -659,6 +659,15 @@ deployment.</p>
 role of its own. That is why there are two read roles rather than one: what has
 been announced and what has not are different populations, and a great many
 people should see the first without seeing the second.</p>
+<p>The two visibilities are separate grants. A private role reaches findings
+nobody has announced and no others, so somebody working private reports is not
+handed every public finding as well. Somebody who works both holds both. A
+triage role carries reading at its own visibility.</p>
+<p>A disclosed finding assigned to somebody is listed among their work whatever
+they read, drawn in the tree of what they hold, and theirs to hand back, because
+an assignment carries what was assigned. Opening the finding, like every other
+screen about the product, takes reading at its visibility. An undisclosed one
+goes only to somebody who reads undisclosed work in that product.</p>
 <p><code>approver</code> and <code>assigner</code> grant no visibility of their own. Each is a
 capability bounded by what its holder may read, so granted alone it reaches
 nothing — somebody who may agree to claims needs a read role as well, and a

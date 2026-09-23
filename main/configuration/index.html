@@ -1265,6 +1265,35 @@ Everything marked off does nothing until the thing in the last column is set.</p
 <p>A sign-in method is not in this list because one is required: the process
 refuses to start without one. <a href="#sign-in">Sign-in</a> says which.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
+<p>Stop every v0.1.0 process before upgrading. The upgrade drops and reshapes
+tables v0.1.0 reads and writes, so a v0.1.0 replica left serving during a
+rolling update fails on them. With the Helm chart, scale the deployment to zero
+first.</p>
+<p>Going back to v0.1.0 is <code>openpsirt migrate down</code>, run with this build before
+the v0.1.0 one is deployed. v0.1.0 started against the upgraded schema reports
+it current and cannot read it.</p>
+<p>A database built by v0.1.0 is upgraded in place, at startup or by <code>openpsirt
+migrate up</code>. Back it up first: on MySQL and MariaDB an upgrade that fails part
+way leaves the schema half changed, and the backup is what recovers it. A
+database built by any other earlier build is recreated.</p>
+<table>
+<thead>
+<tr>
+<th>After the upgrade</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An advisory v0.1.0 issued</td>
+<td>Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again</td>
+</tr>
+<tr>
+<td>A reported flaw</td>
+<td>Has a reference, minted as one recorded today would be</td>
+</tr>
+</tbody>
+</table>
 <p><code>OPENPSIRT_BASE_URL</code> is checked at startup, and a value with no scheme is now
 refused where it used to be accepted. <code>psirt.example.com</code> has to become
 <code>https://psirt.example.com</code>.</p>
@@ -1278,6 +1307,12 @@ check for as long as the value has been wrong.</p>
 <code>https://psirt.example.com/psirt</code> makes every link this deployment writes point
 somewhere it does not answer. If this deployment is served under a path, that
 is a thing to raise rather than to configure here.</p>
+<p><code>private-read</code> and <code>private-triage</code> used to include disclosed findings. Each
+now reaches only findings nobody has announced. Grant <code>public-read</code> or
+<code>public-triage</code> beside them — directly, in a group binding, or in a token's
+holds — wherever somebody should keep the disclosed findings. Nothing is
+granted on upgrade, so until then a holder of a private role alone sees no
+disclosed finding they are not assigned.</p>
 <h2 id="serving">Serving<a class="headerlink" href="#serving" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1345,7 +1380,7 @@ writes <code>text</code>.</p>
 </tr>
 <tr>
 <td><code>OPENPSIRT_AUTO_MIGRATE</code></td>
-<td>Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run <code>openpsirt migrate up</code> yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and <code>openpsirt migrate status</code> says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits the migration that made the thing, so a database can be at the expected version and still hold what an earlier build created</td>
+<td>Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run <code>openpsirt migrate up</code> yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and <code>openpsirt migrate status</code> says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits what declares the thing rather than adding a migration beside it, so a database can be at the expected version and still hold what an earlier build created</td>
 <td><code>true</code></td>
 </tr>
 <tr>
