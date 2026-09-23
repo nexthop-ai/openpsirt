@@ -34,8 +34,11 @@ func upAdvisorySource(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
+	return apply(ctx, tx, advisorySourceStatements(t))
+}
 
-	statements := []string{
+func advisorySourceStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "advisory_source" (
 			"id"           ` + t.id + `,
 			"product_id"   ` + t.ref + ` NOT NULL,
@@ -96,8 +99,6 @@ func upAdvisorySource(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "advisory_source_due_idx" ON "advisory_source"
 			("retired_at", "fetched_at")`,
 	}
-
-	return apply(ctx, tx, statements)
 }
 
 func downAdvisorySource(ctx context.Context, tx *sql.Tx) error {

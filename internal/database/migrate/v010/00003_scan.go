@@ -1,17 +1,15 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package migrations
+package v010
 
 import (
 	"context"
 	"database/sql"
-
-	"github.com/pressly/goose/v3"
 )
 
 func init() {
-	goose.AddMigrationContext(upScan, downScan)
+	register(upScan, downScan)
 }
 
 // The record of what arrived: which variant it was filed against, when the
@@ -27,11 +25,8 @@ func upScan(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
-	return apply(ctx, tx, scanStatements(t))
-}
 
-func scanStatements(t *columnTypes) []string {
-	return []string{
+	statements := []string{
 		`CREATE TABLE "scan" (
 			"id"             ` + t.id + `,
 			"target_id"      ` + t.ref + ` NOT NULL,
@@ -68,16 +63,6 @@ func scanStatements(t *columnTypes) []string {
 			-- "not known" rather than as zero.
 			"components"     INTEGER NULL,
 			"placed"         INTEGER NULL,
-			-- What the document called the thing it is about, in its own
-			-- spelling, and empty where it named no component of its own.
-			--
-			-- Kept here rather than on the component, because the component is
-			-- stored by name alone on purpose: a package identifier carries the
-			-- version, the version moves every build, and the root's identity
-			-- moving takes every edge hanging off it with it. This is a fact
-			-- about one document rather than an identity, so it belongs beside
-			-- the serial and what the inventory was made of.
-			"root_identifier" ` + t.text + ` NULL,
 			CONSTRAINT "scan_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
 			CONSTRAINT "scan_content_unique" UNIQUE ("target_id", "content_hash")
 		)` + t.suffix,
@@ -96,7 +81,7 @@ func scanStatements(t *columnTypes) []string {
 		// the deployment nothing to look at. The producer was told and
 		// nobody here was.
 		//
-		// The gain is a coverage report that can say a build has gone
+		// What that cost is a coverage report that can say a build has gone
 		// quiet and cannot say whether anybody is trying. Those want
 		// different people: one is a pipeline nobody wired up, the other is a
 		// pipeline failing nightly and reporting success to its own log.
@@ -126,6 +111,8 @@ func scanStatements(t *columnTypes) []string {
 			CONSTRAINT "scan_refusal_target_unique" UNIQUE ("target_id")
 		)` + t.suffix,
 	}
+
+	return apply(ctx, tx, statements)
 }
 
 func downScan(ctx context.Context, tx *sql.Tx) error {

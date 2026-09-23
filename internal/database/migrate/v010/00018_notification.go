@@ -1,20 +1,18 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package migrations
+package v010
 
 import (
 	"context"
 	"database/sql"
-
-	"github.com/pressly/goose/v3"
 )
 
 func init() {
-	goose.AddMigrationContext(upNotification, downNotification)
+	register(upNotification, downNotification)
 }
 
-// Everything somebody is told, and the two lifetimes that has.
+// What somebody is told, and the two different lifetimes that has.
 //
 // Everyone gets a notification area, not only administrators: a triager sees
 // work arriving, a proposer sees a dismissal sent back, an approver sees what
@@ -25,7 +23,7 @@ func init() {
 // sent into a void, and the people who most need telling that the tool itself
 // is unwell are exactly the ones who have not opted into anything.
 //
-// The lifetimes are the design, not a column somebody added for tidiness
+// **The lifetimes are the design, not a column somebody added for tidiness**
 // . An event happened once and is acknowledged by the person it
 // happened to: you were assigned this, your dismissal was sent back, somebody
 // named you. A condition is true for as long as it is true and clears itself
@@ -43,11 +41,7 @@ func upNotification(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
-	return apply(ctx, tx, notificationStatements(t))
-}
-
-func notificationStatements(t *columnTypes) []string {
-	return []string{
+	statements := []string{
 		`CREATE TABLE "notification" (
 			"id"        ` + t.id + `,
 			"person_id" ` + t.ref + ` NOT NULL,
@@ -112,17 +106,6 @@ func notificationStatements(t *columnTypes) []string {
 			-- digest can answer "was this person already told about this",
 			-- which is the whole of what a digest carries.
 			"concerns"  ` + t.name + ` NULL,
-			-- What makes one thing said to many people one thing to carry
-			-- outside this deployment. Empty for everything personal.
-			--
-			-- A message about somebody's own work names them and is theirs;
-			-- one saying a build's contents changed sharply is the same
-			-- sentence for every reader of that product, and a channel wants
-			-- it once however many people hold the product. The area inside
-			-- the application is per person either way — this decides what a
-			-- delivery is keyed on, which is the same question a condition's
-			-- "about" answers for the rows a sweep opens.
-			"together"  ` + t.name + ` NOT NULL,
 			-- When this was carried outside the application, and how many
 			-- times that has been tried.
 			--
@@ -150,7 +133,7 @@ func notificationStatements(t *columnTypes) []string {
 				REFERENCES "vulnerability"("id")
 		)` + t.suffix,
 
-		// The area's own read: one person's unread, newest first. The
+		// What the area reads: one person's unread, newest first. The
 		// visibility narrowing that follows it is over one person's unread
 		// rows, which is the small set this index already produces.
 		`CREATE INDEX "notification_unread_idx"
@@ -168,6 +151,7 @@ func notificationStatements(t *columnTypes) []string {
 		`CREATE UNIQUE INDEX "notification_condition_idx"
 			ON "notification" ("person_id", "kind", "about_open")`,
 	}
+	return apply(ctx, tx, statements)
 }
 
 func downNotification(ctx context.Context, tx *sql.Tx) error {

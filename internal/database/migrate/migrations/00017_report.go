@@ -48,7 +48,11 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 		return err
 	}
 
-	statements := []string{
+	return apply(ctx, tx, reportStatements(t))
+}
+
+func reportStatements(t *columnTypes) []string {
+	return []string{
 		// One act of saying what one or more claims are, where the answer is
 		// not an issue here. It is kept apart from the reports it covers
 		// because one act answers many of them — twenty slop reports rejected
@@ -194,8 +198,6 @@ func upReport(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "report_ruled_report_idx"
 			ON "report_ruled" ("flaw_report_id")`,
 	}
-
-	return apply(ctx, tx, statements)
 }
 
 func downReport(ctx context.Context, tx *sql.Tx) error {

@@ -90,6 +90,7 @@ Engine-specific code is confined to these places:
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
 | Listing the harness's own databases | The one query in the harness that does branch. PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
+| Upgrading a release's database | Changing an existing table is spelled per engine: PostgreSQL drops a column's refusal of a null where the other two servers restate the column, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes a table already has |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
 This list is the complete set and is checked by grep rather than trusted —
@@ -259,6 +260,64 @@ asked.
 CI runs the success path on four engines, which is where this hides: the
 engines agree about what a migration does and disagree only about what is left
 when one stops half way.
+
+### Release upgrades
+
+A database a tagged release built is changed into this build's schema in one
+step, before the migrations run. One release has an upgrade: v0.1.0. It exists
+to show the project can carry a deployment from one release to the next before
+1.0. Nothing is promised past it, and REQ-76 is unchanged: every other database
+from an earlier build is recreated, and migrations are still edited in place.
+
+A release's migration numbers and this build's mean different things, so
+running this build's migrations over a release's database would apply a later
+number's idea of an earlier table. The migration library refuses first, naming
+the numbers it finds missing.
+
+| Rule | |
+|---|---|
+| A release is recognized by exactly which migrations it applied | The highest number says nothing. v0.1.0 applied 1 to 5, 7, 9 to 12, 16, 18 to 31 and 33 to 36, and no build since has issued 30 |
+| One transaction, with the bookkeeping replaced last | The release's rows in the bookkeeping table become one row per migration this build carries, so the migrations that follow find nothing to do |
+| Every table and index is made by the fresh install's own statement | Read out of the migration that makes it. A column the upgrade adds is declared as that statement declares it. What the upgrade writes itself is the order, the rows, and how an existing table is changed on each engine |
+| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as a fresh install declares it and costs no row rewrite on either server |
+| SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by the fresh install's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes later migrations put on the table are read from the catalog first and made again |
+| SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
+| Rows written with their own identifiers keep them | References into a moved table still land. PostgreSQL's identity does not move past a value it did not generate, so it is moved past them; the other three move on the insert |
+| A column added is last in its table | A fresh install declares it in place. No query reads a column by position |
+| On MySQL and MariaDB a failure part way is recovered from a backup | Both commit every data-definition statement as it runs, so the transaction does not hold the upgrade together there. The operator page says to take one first |
+
+What v0.1.0's rows become:
+
+| In v0.1.0 | After the upgrade |
+|---|---|
+| An embargo extension | A disclosure movement whose act is an extension, under the same identifier. v0.1.0 refused a move that was not later |
+| An issuance, keyed on a product and an issue | An advisory per product and issue, with one edition, the one issue it covers, and its issuances beneath it keeping their identifiers, ordinals, digests and summaries |
+| The name an advisory was issued under | The advisory's identifier. v0.1.0 used the issue's own identifier as the tracking identifier, and a revision that changed it would read as a second document. These names were not minted here, so they are numbered in year zero, where no advisory minted from the configured prefix lands |
+| The first release date of an issued advisory | Frozen as the earliest recording of the issue in the product, which is what v0.1.0's document said |
+| The document an issuance sent | Not kept by v0.1.0, and nothing can work it out again. Stored as an empty object, which parses and states no distribution, so a published directory passes over it until the advisory is issued again |
+| A reported flaw | A reference minted the way one is today: the product's name, the year it was recorded, and six random digits |
+| A VEX statement | From a statement set, with no document name of its own: v0.1.0 read nothing else. The version it is about is read from its package identifier the way an upload is read today, and is empty where the identifier names none |
+| The weaknesses of a flaw recorded here | The first named is primary. v0.1.0 wrote them in the order named, in one statement. An issue a scanner reported has none marked until a scan reports it again |
+| A finding | Not exploited here. v0.1.0 had no record of that |
+| A notification | Carried alone. Only a kind of message v0.1.0 did not have is carried together |
+| A column v0.1.0 did not have and that takes a null | Null |
+
+A test builds a v0.1.0 database from that release's migrations, frozen and
+kept apart from this build's, on each of the four engines. It writes a row into
+every table, every column holding a value, plus the rows each move above
+reads. It upgrades that database and compares every column, index and
+constraint against a fresh install. Then it compares every value the release
+held with what the upgrade left, and checks each move in the table above.
+
+The upgrade over a v0.1.0 database holding 524,288 findings, which is the
+largest table and the one every engine changes:
+
+| Engine | Time |
+|---|---|
+| PostgreSQL 16 | 0.7 s |
+| SQLite | 7.5 s |
+| MySQL 8.4 | 12.5 s |
+| MariaDB 11.4 | 19.7 s |
 
 ## Migration locks
 
@@ -843,3 +902,9 @@ and the granularity are open questions.
   Index a hash, not the raw string.
 - Timestamp semantics differ between engines. Store UTC and be explicit about
   types.
+- The upgrade from v0.1.0 is kept or removed on the measurement above. It costs
+  a frozen copy of that release's migrations, which only the test builds from,
+  and an upgrade that has to be read again whenever a migration it takes a
+  statement from changes. A statement it reads changing is caught by the test
+  comparing against a fresh install; a row it moves meaning something new is
+  not.

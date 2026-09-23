@@ -1,20 +1,18 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-package migrations
+package v010
 
 import (
 	"context"
 	"database/sql"
-
-	"github.com/pressly/goose/v3"
 )
 
 func init() {
-	goose.AddMigrationContext(upCatalog, downCatalog)
+	register(upCatalog, downCatalog)
 }
 
-// A scan is filed against a product, one of its streams, and a
+// What a scan can be filed against: a product, one of its streams, and a
 // variant it is built as. All three are declared before anything may target
 // them, so a mistyped name is rejected rather than quietly creating a stream
 // that looks real.
@@ -28,11 +26,7 @@ func upCatalog(ctx context.Context, tx *sql.Tx) error {
 		return err
 	}
 
-	return apply(ctx, tx, catalogStatements(t))
-}
-
-func catalogStatements(t *columnTypes) []string {
-	return []string{
+	statements := []string{
 		// name is the normalized form — lower case, trimmed — and is what
 		// everything matches on. display_name keeps the spelling somebody
 		// typed, because "SONiC" is how people write it and reading it back
@@ -62,18 +56,7 @@ func catalogStatements(t *columnTypes) []string {
 			-- — a product with no opinion should not have to state the default, or it
 			-- would stop following it when the default changes.
 			"triage_floor" ` + t.kind + ` NULL,
-			-- The two thresholds past which one pair agreeing to each other's
-			-- work is raised: a percentage of the product's agreements and the
-			-- fewest people who may approve. Null follows the deployment, for
-			-- the reason the triage line does. Teams differ in size by product.
-			"pair_share"     INTEGER NULL,
-			"pair_approvers" INTEGER NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
-			-- Out of use, the way a variant and a release are. Not eol_on
-			-- above: that says support ended and hides nothing, because an
-			-- auditor asks about a product long after it stops being
-			-- supported. This says the product is not tracked here.
-			"retired_at"   ` + t.timestamp + ` NULL,
 			CONSTRAINT "product_name_unique" UNIQUE ("name")
 		)` + t.suffix,
 
@@ -95,11 +78,6 @@ func catalogStatements(t *columnTypes) []string {
 			-- first scan of it stands in: something was built on that day.
 			"released_on" ` + t.date + ` NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
-			-- Out of use, the way a variant is. Separate from eol_on beside
-			-- it: a date says support ended and hides nothing, because an
-			-- auditor asks about a release long after it stops being
-			-- supported. This says the release is not tracked here.
-			"retired_at" ` + t.timestamp + ` NULL,
 			CONSTRAINT "stream_name_unique" UNIQUE ("product_id", "name"),
 			CONSTRAINT "stream_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "stream_parent_fk" FOREIGN KEY ("parent_id") REFERENCES "stream"("id")
@@ -114,13 +92,6 @@ func catalogStatements(t *columnTypes) []string {
 		//
 		// customer_facing feeds ranking, and defaults true because an
 		// unclassified artifact should rank as though it ships.
-		//
-		// retired_at takes a variant out of use without taking anything it
-		// holds with it. Its findings, its decisions and the documents that
-		// went out for it all name it, so the row stays and the lists stop
-		// offering it — the same shape a team and a routing rule use. The
-		// name stays spoken for while it is retired, and declaring it again
-		// is what brings it back.
 		`CREATE TABLE "variant" (
 			"id"              ` + t.id + `,
 			"product_id"      ` + t.ref + ` NOT NULL,
@@ -128,12 +99,11 @@ func catalogStatements(t *columnTypes) []string {
 			"display_name"    ` + t.text + ` NOT NULL,
 			"customer_facing" ` + t.boolean + ` NOT NULL,
 			"created_at"      ` + t.timestamp + ` NOT NULL,
-			"retired_at"      ` + t.timestamp + ` NULL,
 			CONSTRAINT "variant_name_unique" UNIQUE ("product_id", "name"),
 			CONSTRAINT "variant_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
 		)` + t.suffix,
 
-		// The product variant a release was actually built as.
+		// Which of the product's variants a release was actually built as.
 		// This is what a scan is filed against and what everything downstream
 		// points at, so one identifier flows from a scan through to a finding.
 		//
@@ -165,6 +135,8 @@ func catalogStatements(t *columnTypes) []string {
 
 		`CREATE INDEX "target_variant_idx" ON "target" ("variant_id")`,
 	}
+
+	return apply(ctx, tx, statements)
 }
 
 func downCatalog(ctx context.Context, tx *sql.Tx) error {

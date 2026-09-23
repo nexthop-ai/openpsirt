@@ -37,8 +37,11 @@ func upVexIssuance(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
+	return apply(ctx, tx, vexIssuanceStatements(t))
+}
 
-	statements := []string{
+func vexIssuanceStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "vex_issuance" (
 			"id"        ` + t.id + `,
 			-- The build the document is about, which is what its identifier
@@ -67,8 +70,6 @@ func upVexIssuance(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vex_issuance_by_fk" FOREIGN KEY ("issued_by") REFERENCES "person"("id")
 		)` + t.suffix,
 	}
-
-	return apply(ctx, tx, statements)
 }
 
 func downVexIssuance(ctx context.Context, tx *sql.Tx) error {

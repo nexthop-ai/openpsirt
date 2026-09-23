@@ -35,6 +35,16 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 
 ## Upgrading
 
+A database built by v0.1.0 is upgraded in place, at startup or by `openpsirt
+migrate up`. Back it up first: on MySQL and MariaDB an upgrade that fails part
+way leaves the schema half changed, and the backup is what recovers it. A
+database built by any other earlier build is recreated.
+
+| After the upgrade | |
+|---|---|
+| An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
+| A reported flaw | Has a reference, minted as one recorded today would be |
+
 `OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is now
 refused where it used to be accepted. `psirt.example.com` has to become
 `https://psirt.example.com`.

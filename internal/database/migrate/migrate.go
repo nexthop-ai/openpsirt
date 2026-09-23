@@ -73,7 +73,8 @@ func LoggerFrom(ctx context.Context) *slog.Logger {
 	return slog.Default()
 }
 
-func gooseDialect(e database.Engine) (goose.Dialect, error) {
+// Dialect is the migration library's name for an engine.
+func Dialect(e database.Engine) (goose.Dialect, error) {
 	switch e {
 	case database.Postgres:
 		return goose.DialectPostgres, nil
@@ -88,6 +89,9 @@ func gooseDialect(e database.Engine) (goose.Dialect, error) {
 // Up applies every outstanding migration, holding the lock while it does.
 func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 	return withLock(ctx, db, logger, func(ctx context.Context) error {
+		if err := upgradeRelease(ctx, db, logger); err != nil {
+			return err
+		}
 		before, err := goose.GetDBVersionContext(ctx, db.DB.DB)
 		if err != nil {
 			return fmt.Errorf("read schema version: %w", err)
@@ -183,7 +187,7 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 }
 
 func prepare(db *database.DB) error {
-	dialect, err := gooseDialect(db.Server.Engine)
+	dialect, err := Dialect(db.Server.Engine)
 	if err != nil {
 		return err
 	}

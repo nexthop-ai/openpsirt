@@ -33,8 +33,11 @@ func upDisclosureMovement(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
+	return apply(ctx, tx, disclosureMovementStatements(t))
+}
 
-	statements := []string{
+func disclosureMovementStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "disclosure_movement" (
 			"id"               ` + t.id + `,
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
@@ -74,8 +77,6 @@ func upDisclosureMovement(ctx context.Context, tx *sql.Tx) error {
 		`CREATE INDEX "disclosure_movement_place_idx"
 			ON "disclosure_movement" ("vulnerability_id", "product_id")`,
 	}
-
-	return apply(ctx, tx, statements)
 }
 
 func downDisclosureMovement(ctx context.Context, tx *sql.Tx) error {

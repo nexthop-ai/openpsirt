@@ -30,8 +30,11 @@ func upPatchBranch(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
+	return apply(ctx, tx, patchBranchStatements(t))
+}
 
-	statements := []string{
+func patchBranchStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "patch_repository" (
 			"id"           ` + t.id + `,
 			-- The address the history is fetched from, as built from a link
@@ -94,8 +97,6 @@ func upPatchBranch(ctx context.Context, tx *sql.Tx) error {
 				REFERENCES "patch_commit"("id")
 		)` + t.suffix,
 	}
-
-	return apply(ctx, tx, statements)
 }
 
 func downPatchBranch(ctx context.Context, tx *sql.Tx) error {

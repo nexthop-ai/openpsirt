@@ -52,8 +52,11 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 	if err != nil {
 		return err
 	}
+	return apply(ctx, tx, advisoryStatements(t))
+}
 
-	statements := []string{
+func advisoryStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "advisory" (
 			"id"         ` + t.id + `,
 			-- The name a reader cites the document by, minted here: a prefix
@@ -226,8 +229,6 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 				FOREIGN KEY ("removed_by") REFERENCES "person"("id")
 		)` + t.suffix,
 	}
-
-	return apply(ctx, tx, statements)
 }
 
 func downAdvisory(ctx context.Context, tx *sql.Tx) error {

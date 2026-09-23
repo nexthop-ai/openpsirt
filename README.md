@@ -11,7 +11,8 @@ place to triage what it finds and track it through to a fix.
 
 > **Status: alpha.** Every version below 1.0 promises nothing about the API or
 > the schema — a schema change edits the migration that created it, and a
-> database is recreated rather than migrated.
+> database is recreated rather than migrated. A database v0.1.0 built is the
+> one exception, and is upgraded in place.
 > [Components](#components) says how far each area has got.
 
 ## Contents
