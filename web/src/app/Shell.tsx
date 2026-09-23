@@ -248,15 +248,19 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               needs={whole}
             />
             {/* What people outside have sent a product. Only for somebody who may
-              work reports somewhere, and it needs a product picked because an
-              inbox belongs to one. */}
+              read vulnerability reports somewhere, and it needs a product
+              picked because an inbox belongs to one. */}
             {reportsAnywhere && (
               <Rail
                 to={product ? `/products/${encodeURIComponent(product)}/inbox` : ""}
                 icon="letter"
                 label="Inbox"
                 needs={!!product && reportsHere}
-                why={product ? "You don't work reports in this product" : "Pick a product"}
+                why={
+                  product
+                    ? "You can't read vulnerability reports in this product"
+                    : "Pick a product"
+                }
               />
             )}
             {/* Recording a flaw is an act rather than a place, so it opens a

@@ -51,7 +51,7 @@ var called = map[Kind]string{
 	ApprovalUndone:    "An agreement to a claim of yours was taken back",
 	ClaimLapsed:       "A decision of yours stopped applying",
 	BroughtIn:         "You have been brought into a case",
-	Unanswered:        "Somebody's report has not been answered",
+	Unanswered:        "A vulnerability report has not been answered",
 	InventoryMoved:    "A build's contents changed sharply",
 	ObligationOpen:    "A window after an attack is running",
 	ObligationNear:    "A window after an attack is about to end",

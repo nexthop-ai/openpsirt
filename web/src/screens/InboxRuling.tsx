@@ -248,7 +248,10 @@ export function WaitingRulings({ product }: { product?: string }) {
   if (listed.isError) {
     return (
       <div style={{ marginTop: 22 }}>
-        <Failed error={listed.error} what="The rulings on reports could not be read." />
+        <Failed
+          error={listed.error}
+          what="The rulings on vulnerability reports could not be read."
+        />
       </div>
     );
   }
@@ -259,9 +262,9 @@ export function WaitingRulings({ product }: { product?: string }) {
     <>
       <div className="screen-head" id="rulings" style={{ marginTop: 22 }}>
         <h2>
-          Rulings on reports <span className="n">{total.toLocaleString()}</span>
+          Rulings on vulnerability reports <span className="n">{total.toLocaleString()}</span>
         </h2>
-        <p>Reports proposed as rejected or out of scope.</p>
+        <p>Vulnerability reports proposed as rejected or out of scope.</p>
       </div>
       {rows.map((ruling) => (
         <RulingCard key={ruling.id} ruling={ruling} named />

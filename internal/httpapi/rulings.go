@@ -48,7 +48,7 @@ func registerRulings(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "rule-reports", Method: http.MethodPost, Path: list,
-		Summary: "Rule on reports",
+		Summary: "Rule on vulnerability reports",
 		Description: "Says that one or more reports are duplicates, not reproducible, out of " +
 			"scope, or rejected. A report that turned out to be an issue here is pointed at " +
 			"that issue instead.\n\n" +
@@ -102,7 +102,7 @@ func registerRulings(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-rulings-across", Method: http.MethodGet, Path: "/v1/report-rulings",
-		Summary: "List rulings on reports across products",
+		Summary: "List rulings on vulnerability reports across products",
 		Description: "Every ruling in the products you may read reports in, newest first, " +
 			"including withdrawn ones. A product you may not read reports in contributes " +
 			"nothing, not even to the count.\n\n" +
@@ -154,7 +154,7 @@ func registerRulings(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-report-rulings", Method: http.MethodGet, Path: list,
-		Summary: "List rulings on reports",
+		Summary: "List rulings on vulnerability reports",
 		Description: "Every ruling in this product, newest first, including withdrawn ones. " +
 			"`waiting` narrows to those waiting for a second person.",
 		Tags: []string{"Findings"},
@@ -184,7 +184,7 @@ func registerRulings(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-report-ruling", Method: http.MethodGet, Path: one,
-		Summary: "Show a ruling on reports",
+		Summary: "Show a ruling on vulnerability reports",
 		Description: "What was said, about which reports, by whom, and whether it is waiting, " +
 			"in force or withdrawn.",
 		Tags: []string{"Findings"},
@@ -205,7 +205,7 @@ func registerRulings(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "approve-report-ruling", Method: http.MethodPost, Path: one + "/approval",
-		Summary: "Approve a ruling on reports",
+		Summary: "Approve a ruling on vulnerability reports",
 		Description: "Agrees to a waiting ruling, which is when it takes effect for every " +
 			"report it covers.\n\n" +
 			"Refused to whoever proposed it, and refused on a ruling that is not waiting.",
@@ -229,7 +229,7 @@ func registerRulings(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "withdraw-report-ruling", Method: http.MethodPost, Path: one + "/withdrawal",
-		Summary: "Withdraw a ruling on reports",
+		Summary: "Withdraw a ruling on vulnerability reports",
 		Description: "Takes a ruling back, waiting or in force, and returns every report it " +
 			"covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in " +
 			"force are this one act.\n\n" +
@@ -255,7 +255,7 @@ func registerRulings(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-duplicate-reports", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/issues/{vulnerability}/duplicates",
-		Summary: "List reports that duplicate an issue",
+		Summary: "List vulnerability reports that duplicate an issue",
 		Description: "Every report in this product ruled a duplicate of this issue, with the " +
 			"ruling in force. What arrived with each is listed on the report's own " +
 			"attachments.\n\n" +

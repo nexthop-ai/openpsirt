@@ -18416,7 +18416,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List reports that duplicate an issue
+      summary: List vulnerability reports that duplicate an issue
       tags:
         - Findings
       x-openpsirt-requires:
@@ -18884,7 +18884,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List rulings on reports
+      summary: List rulings on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
@@ -18929,7 +18929,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Rule on reports
+      summary: Rule on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
@@ -18968,7 +18968,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Show a ruling on reports
+      summary: Show a ruling on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19010,7 +19010,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Approve a ruling on reports
+      summary: Approve a ruling on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19053,7 +19053,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Withdraw a ruling on reports
+      summary: Withdraw a ruling on vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19105,7 +19105,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List what was reported
+      summary: List vulnerability reports
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19150,7 +19150,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Record a report
+      summary: Record a vulnerability report
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19193,7 +19193,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Show a report
+      summary: Show a vulnerability report
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19274,7 +19274,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List files that arrived with a report
+      summary: List files that arrived with a vulnerability report
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19335,7 +19335,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Attach a file to a report
+      summary: Attach a file to a vulnerability report
       tags:
         - Findings
       x-openpsirt-requires:
@@ -19386,7 +19386,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: Record what a report turned out to be
+      summary: Accept a vulnerability report as an issue
       tags:
         - Findings
       x-openpsirt-requires:
@@ -22757,7 +22757,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List rulings on reports across products
+      summary: List rulings on vulnerability reports across products
       tags:
         - Findings
       x-openpsirt-requires:

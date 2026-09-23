@@ -2802,7 +2802,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List reports that duplicate an issue
+         * List vulnerability reports that duplicate an issue
          * @description Every report in this product ruled a duplicate of this issue, with the ruling in force. What arrived with each is listed on the report's own attachments.
          *
          *     An issue that is not here and one you may not be told of answer alike.
@@ -3050,7 +3050,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List rulings on reports
+         * List rulings on vulnerability reports
          * @description Every ruling in this product, newest first, including withdrawn ones. `waiting` narrows to those waiting for a second person.
          *
          *     Requires: private-read or private-triage on the product
@@ -3058,7 +3058,7 @@ export interface paths {
         get: operations["list-report-rulings"];
         put?: never;
         /**
-         * Rule on reports
+         * Rule on vulnerability reports
          * @description Says that one or more reports are duplicates, not reproducible, out of scope, or rejected. A report that turned out to be an issue here is pointed at that issue instead.
          *
          *     `out-of-scope` and `rejected` wait for a second person, and nothing changes until somebody other than the proposer approves. The other two take effect at once. While a ruling waits, its reports cannot be accepted as an issue or ruled on again.
@@ -3084,7 +3084,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Show a ruling on reports
+         * Show a ruling on vulnerability reports
          * @description What was said, about which reports, by whom, and whether it is waiting, in force or withdrawn.
          *
          *     Requires: private-read or private-triage on the product
@@ -3108,7 +3108,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve a ruling on reports
+         * Approve a ruling on vulnerability reports
          * @description Agrees to a waiting ruling, which is when it takes effect for every report it covers.
          *
          *     Refused to whoever proposed it, and refused on a ruling that is not waiting.
@@ -3132,7 +3132,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Withdraw a ruling on reports
+         * Withdraw a ruling on vulnerability reports
          * @description Takes a ruling back, waiting or in force, and returns every report it covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
          *
          *     Needs nobody else, and the proposer may withdraw their own. The ruling stays on record as withdrawn.
@@ -3154,7 +3154,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what was reported
+         * List vulnerability reports
          * @description Every claim recorded against this product, newest first, judged or not.
          *
          *     A report already turned into an issue stays in the list, because it is the evidence that the issue came from outside.
@@ -3164,7 +3164,7 @@ export interface paths {
         get: operations["list-reports"];
         put?: never;
         /**
-         * Record a report
+         * Record a vulnerability report
          * @description Records a claim that arrived, and returns the reference it is reached by.
          *
          *     No issue is minted. What arrived is a claim, and whether it is a flaw is a judgment somebody makes afterwards — so a report nobody believes is answered and filed rather than either minting a flaw nobody believes or going unrecorded.
@@ -3190,7 +3190,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Show a report
+         * Show a vulnerability report
          * @description What was claimed, who claimed it, when it arrived, when somebody answered them, and what it turned out to be.
          *
          *     A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
@@ -3240,7 +3240,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List files that arrived with a report
+         * List files that arrived with a vulnerability report
          * @description What arrived with this report, and what text about it refers to. An upload nothing refers to yet is not listed, because it is not attached to anything.
          *
          *     A file an administrator removed is still listed, saying so, because the text that pointed at it still does.
@@ -3250,7 +3250,7 @@ export interface paths {
         get: operations["list-report-attachments"];
         put?: never;
         /**
-         * Attach a file to a report
+         * Attach a file to a vulnerability report
          * @description Stores one file against a report and returns the reference to put in text. A claim that has not been judged has no issue to hang a screenshot on, and the screenshot is often the whole of what was sent.
          *
          *     The file stays with the report once the report gains an issue, and stays as readable as the report: saying a claim is a disclosed issue does not publish what somebody sent with it. Attach it to the issue to put it there.
@@ -3277,7 +3277,7 @@ export interface paths {
         };
         get?: never;
         /**
-         * Record what a report turned out to be
+         * Accept a vulnerability report as an issue
          * @description Points a report at the issue it turned out to be, and records who said so and when.
          *
          *     The issue is one that already exists here. Recording a flaw is its own act, because it carries the builds the flaw ships in, the severity and the embargo — so agreeing that a claim is real is not the same keystroke as declaring where it lives.
@@ -4668,7 +4668,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List rulings on reports across products
+         * List rulings on vulnerability reports across products
          * @description Every ruling in the products you may read reports in, newest first, including withdrawn ones. A product you may not read reports in contributes nothing, not even to the count.
          *
          *     `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.

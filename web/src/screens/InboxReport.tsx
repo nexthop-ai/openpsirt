@@ -28,7 +28,8 @@ export function InboxReport() {
   const works = !!mayOf(useWho().data, product)?.may_hide;
 
   if (report.isPending) return <Loading />;
-  if (report.isError) return <Failed error={report.error} what="That report could not be read." />;
+  if (report.isError)
+    return <Failed error={report.error} what="That vulnerability report could not be read." />;
   const it = report.data;
   const stands = standing(it);
   const inbox = `/products/${encodeURIComponent(product)}/inbox`;

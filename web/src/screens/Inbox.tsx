@@ -35,11 +35,12 @@ export function Inbox() {
       <div className="screen-head">
         <h2>Inbox</h2>
         <p>
-          Reports sent to <Link to={`/products/${encodeURIComponent(product)}`}>{product}</Link>
+          Vulnerability reports sent to{" "}
+          <Link to={`/products/${encodeURIComponent(product)}`}>{product}</Link>
         </p>
         {works && (
           <button type="button" className="btn" onClick={() => setRecording((was) => !was)}>
-            {recording ? "Cancel" : "Record a report"}
+            {recording ? "Cancel" : "Record a vulnerability report"}
           </button>
         )}
       </div>
@@ -53,7 +54,7 @@ export function Inbox() {
           aria-selected={tab === "reports"}
           onClick={() => go("reports")}
         >
-          Reports
+          Vulnerability reports
         </button>
         <button
           type="button"
@@ -81,7 +82,8 @@ function Reports({ product, works }: { product: string; works: boolean }) {
   const listed = useReports(product, offset);
 
   if (listed.isPending) return <Loading />;
-  if (listed.isError) return <Failed error={listed.error} what="The reports could not be read." />;
+  if (listed.isError)
+    return <Failed error={listed.error} what="The vulnerability reports could not be read." />;
   const rows = listed.data?.items ?? [];
   const at = `/products/${encodeURIComponent(product)}/inbox`;
   const open = rows.filter(rulable).map((row) => row.reference);
@@ -91,7 +93,12 @@ function Reports({ product, works }: { product: string; works: boolean }) {
     );
 
   if (rows.length === 0) {
-    return <Empty title="No reports." detail="A report you record appears here." />;
+    return (
+      <Empty
+        title="No vulnerability reports."
+        detail="A vulnerability report you record appears here."
+      />
+    );
   }
   return (
     <>
@@ -234,7 +241,7 @@ function RecordReport({ product }: { product: string }) {
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
-      <h3>New report</h3>
+      <h3>New vulnerability report</h3>
       <div className="field">
         <Editor
           label="What was claimed"
@@ -316,7 +323,9 @@ function RecordReport({ product }: { product: string }) {
       >
         Record
       </button>
-      {record.error != null && <Failed error={record.error} what="The report was not recorded." />}
+      {record.error != null && (
+        <Failed error={record.error} what="The vulnerability report was not recorded." />
+      )}
     </div>
   );
 }
