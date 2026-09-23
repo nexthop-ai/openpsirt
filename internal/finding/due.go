@@ -115,8 +115,24 @@ func Closable(state FixState) bool {
 	}
 }
 
+// Clocked is whether a finding in this state carries a deadline at all.
+//
+// Upstream declining is the one answer exploitation overrides. A fix that has
+// not arrived may arrive tomorrow, and a deadline set against it could only be
+// met by waiting; a refusal will never be reversed, and on an issue somebody is
+// using that leaves work only this deployment can do — patching the package
+// itself, replacing it, or recording what stands in the way. A refusal on an
+// issue nobody is using stays off the clock, since otherwise it is red for
+// ever for a reason nothing here can act on.
+//
+// Exploited is either signal: the world's, or a record that this product was
+// attacked.
+func Clocked(state FixState, exploited bool) bool {
+	return Closable(state) || (state == WontFix && exploited)
+}
+
 // Deadline is when a finding in this state has to be answered by, or nothing
-// where nothing upstream would close it.
+// where it carries no clock (Clocked).
 //
 // Counted from the latest of the three moments that start the clock, never
 // from the earliest and never from now:
@@ -135,10 +151,10 @@ func Closable(state FixState) bool {
 // All three are facts about moments that have passed, so recounting this
 // answers the same thing every time — which is what keeps a deadline from
 // restarting nightly and never arriving.
-func Deadline(state FixState, openedAt, observedAt time.Time, exploitedLearnedAt,
-	fixedAt *time.Time, window time.Duration) *time.Time {
+func Deadline(state FixState, exploited bool, openedAt, observedAt time.Time,
+	exploitedLearnedAt, fixedAt *time.Time, window time.Duration) *time.Time {
 
-	if !Closable(state) {
+	if !Clocked(state, exploited) {
 		return nil
 	}
 	from := openedAt
@@ -679,20 +695,29 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	return changed + cleared + retired + fixed + nothing, nil
 }
 
-// clearNothingToTake removes the deadline from open findings upstream has
-// released no fix for, or has declined to fix.
+// clearNothingToTake removes the deadline from open findings that carry no
+// clock: upstream has released no fix, or has declined to fix an issue nobody
+// is exploiting (Clocked).
 //
-// Like a tag and unlike the line, this reaches a known-exploited finding too.
-// Being exploited says how long there is; it says nothing about there being a
-// version to take, and a deadline that no upgrade could meet is not made
-// meetable by the flaw being urgent.
+// Like a tag and unlike the line, a missing fix reaches a known-exploited
+// finding too. Being exploited says how long there is; it says nothing about
+// there being a version to take, and a deadline that no upgrade could meet is
+// not made meetable by the flaw being urgent. A refusal is the exception,
+// because on an exploited issue it leaves work only this deployment can do.
 func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
 	result, err := s.db.NewUpdate().
 		Model((*Finding)(nil)).
 		Set("due_at = NULL").
 		Where("closed_at IS NULL").
 		Where("due_at IS NOT NULL").
-		Where("fix_state IN (?)", bun.List([]FixState{NoFix, WontFix})).
+		WhereGroup(" AND ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
+			return q.Where("fix_state = ?", NoFix).
+				WhereGroup(" OR ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
+					return q.Where("fix_state = ?", WontFix).
+						Where("urgency_exploited = ?", false).
+						Where("urgency_exploited_here = ?", false)
+				})
+		}).
 		Exec(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("take the deadline off what has nothing to take: %w", err)

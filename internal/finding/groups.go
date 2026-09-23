@@ -525,7 +525,8 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		// is ever in — and reading it as one tells a reader that a supported
 		// release is past its end of life, on the ordinary shape where a
 		// scanner says one thing in one build and another in the next.
-		case !Closable(FixState(row.FixStateLeast)) && !Closable(FixState(row.FixStateMost)):
+		case !Clocked(FixState(row.FixStateLeast), group.Exploited || group.ExploitedHere) &&
+			!Clocked(FixState(row.FixStateMost), group.Exploited || group.ExploitedHere):
 			group.NoDeadline = NothingToTake
 		default:
 			group.NoDeadline = OutOfSupport
@@ -621,9 +622,10 @@ const (
 	// triaging . Still recorded, still counted, and off the clock.
 	BelowTheLine NoDeadline = "below-the-line"
 	// NothingToTake is a finding upstream has released no fix for, or has
-	// declined to fix. There is no version that would close it, so a
-	// deadline on it is unmeetable by construction — the same statement
-	// the two either side of it make, from a third direction.
+	// declined to fix on an issue nobody is using. There is no version that
+	// would close it, so a deadline on it is unmeetable by construction — the
+	// same statement the two either side of it make, from a third direction.
+	// A refusal on an exploited issue carries a deadline (Clocked).
 	NothingToTake NoDeadline = "nothing-to-take"
 	// OutOfSupport is a finding in a release that is past its end of life
 	// . Nothing is going to be fixed there, so nothing is late.

@@ -109,12 +109,17 @@ moment an attack became known.
 | A deployment declares its own, and none ships | A shipped window is an interpretation, which is the one thing this area refuses to encode |
 | Declaring, changing and retiring one is an administrator's act, in the administrative trail | A window decides what every standing attack is watched against, which is the layer a setting sits in |
 | A name and a length in whole hours, from one hour to a year | The shortest windows in force anywhere are a day, and a day is too coarse to count one in. Zero reads as unset everywhere, so it is refused rather than stored |
+| A warning, where the window names one: whole hours before the end, at least one and fewer than the window runs | A day's window and a fortnight's want warnings of different sizes, so each says its own. A warning at or before the window opens says nothing the condition raised when the record stands has not |
+| Limited to named products, or every product where it names none | Which window applies where is the administrator's statement. One deployment can ship a product under an obligation beside one that is under none, and a window over both raises alerts for the product it never applied to |
+| A product nobody declared refuses the whole window, naming it | A window silently applying to fewer products than were named is quiet about the one that was meant |
+| A change restates the whole window | Name, length, warning and products are all replaced, so a warning or a product list left off is removed |
 | Names are unique among the windows in force, without regard to capitals | A notice names the window it answers, and two in force under one name make that ambiguous |
 | Retired rather than deleted | A notice keeps naming the window it answered. Retiring releases the name, so it may be declared again |
 | An end is worked out when asked, from the window as it stands | Changing a window's length moves every incident's end with it, which is what changing it means |
 | The clock runs from the moment the record says the attack became known | It is not the remediation deadline and is not derived from it |
 | The remediation computation is not reused | That deadline stops where nothing upstream would close the finding, which is exactly the population a flaw of our own falls into, so reuse leaves the obligation with no clock at all. `DESIGN-remediation.md` § Deadlines has why that rule is right where it is |
-| Deployment-wide, never per product | What a deployment answers to is a fact about the organization running it rather than about one thing it ships |
+| Declared once for the deployment | What a deployment answers to is a fact about the organization running it. Declared per product, one rule would be restated for every product it covers |
+| Its products are named only to whoever may know they exist | The list of windows is readable by anybody signed in, and the list of products is itself a statement about what an organization ships. A window limited to products the reader may not know exist is left out of what they read |
 
 ## Notices outside
 
@@ -142,8 +147,8 @@ A record that somebody outside was told about an attack.
 
 ## The shelf
 
-Every standing record, earliest known first, with every window in force as it
-runs from that record and every notice given. Its own screen rather than a
+Every standing record, earliest known first, with every window in force that
+applies to its product as it runs from that record, and every notice given. Its own screen rather than a
 filter over the overdue list, and never reached by one.
 
 | Rule | Reason |
@@ -151,12 +156,13 @@ filter over the overdue list, and never reached by one.
 | A missed remediation deadline has no counterparty and one of these does | So they are different surfaces. The failure to design against is an obligation rendering as row 4,782 among four thousand unpenalized hygiene findings |
 | Each record is narrowed by the question that authorizes one issue in one product | The same question the record's own finding asks. Nothing is counted before the narrowing, so no total says how many records exist to somebody shown fewer |
 | Unpaged | The set is what this deployment's products have been attacked through and nobody has cleared. A deployment where that is long has a problem no paging would help with |
-| A window shows when it ends, whether that has passed, and whether a notice names it | Times and parties. No row says an obligation applies or was met |
+| A window shows when it ends, whether its warning has come, whether that end has passed, and whether a notice names it | Times and parties. No row says an obligation applies or was met |
 | A cleared record leaves the shelf | It stays readable at its finding, with who cleared it and why |
 | Hygiene deadlines stay soft | Correct as it is, and stated here so nobody hardens the wrong half |
 
 Each window raises a condition from the moment the record stands until a
-notice names it, and a second once its end has passed. `DESIGN-notifications.md`
+notice names it, a second once its warning has come where it names one, and a
+third once its end has passed. `DESIGN-notifications.md`
 § Obligation notices holds who hears and when each clears.
 
 ## Bulk acts
@@ -188,10 +194,11 @@ the claim this area refuses to make. The reasoning that a particular rule
 prompted this work belongs in a commit message and in this paragraph, and
 nowhere a deployment reads it as advice.
 
-A window is deployment-wide, and whether it applies to one incident is a
-judgment this software does not hold. A window judged not to apply to an
-incident goes on raising its condition until a notice names it, the record is
-cleared or the window is retired. The condition says only what is true: the
+A window applies to products, never to one incident, and whether it applies to
+a particular incident is a judgment this software does not hold. A window
+judged not to apply to one incident on a product it covers goes on raising its
+condition until a notice names it, the record is cleared or the window is
+retired. The condition says only what is true: the
 time, and that nothing is recorded.
 
 The shelf stores no end and no state. Every end is worked out from the record's

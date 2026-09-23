@@ -87,10 +87,12 @@ func registerCatalogReading(api huma.API, d Declaring) {
 			out.Body.Items = append(out.Body.Items, ProductBody{
 				Name: row.Name, DisplayName: row.DisplayName,
 				Branches: shape.Branches, Tags: shape.Tags, Variants: shape.Variants,
-				Open:        counted(in.Counts, open, row.ID),
-				LastScanAt:  seen[row.Name],
-				TriageFloor: stated(row.TriageFloor),
-				EndOfLife:   onDate(row.EOLOn),
+				Open:          counted(in.Counts, open, row.ID),
+				LastScanAt:    seen[row.Name],
+				TriageFloor:   stated(row.TriageFloor),
+				PairShare:     countedOr(row.PairShare),
+				PairApprovers: countedOr(row.PairApprovers),
+				EndOfLife:     onDate(row.EOLOn),
 			})
 		}
 		return out, nil

@@ -144,8 +144,8 @@ make the claim, using the same word.
 ## Corrections
 
 A correction says the scanner matched this against something it is not. The
-outcome is **wrong match**, and it is the one claim here about identity rather
-than about risk.
+outcome is **wrong match** (REQ-23), and it is the one claim here about
+identity rather than about risk (REQ-25).
 
 The case is a distribution-heavy inventory, where a package name matched
 against a vulnerability database's naming for an unrelated upstream project

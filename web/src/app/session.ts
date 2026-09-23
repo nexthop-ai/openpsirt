@@ -15,6 +15,8 @@ export type Can = {
   may_assign: boolean;
   may_hide: boolean;
   may_agree: boolean;
+  // Agreeing to somebody else's ruling on vulnerability reports.
+  may_approve_rulings: boolean;
 };
 
 export type Who = {

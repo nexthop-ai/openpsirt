@@ -26,9 +26,9 @@ import { useRulings } from "../api/intake";
 export function Product() {
   const { product = "" } = useParams();
   const who = useWho();
-  // The inbox asks what reading a report asks: triage of undisclosed work.
-  const mayWorkReports = !!mayOf(who.data, product)?.may_hide;
-  const waitingRulings = useRulings(product, true, 0, mayWorkReports);
+  // The inbox asks what reading a report asks: reading undisclosed work.
+  const mayReadReports = !!mayOf(who.data, product)?.sees_all;
+  const waitingRulings = useRulings(product, true, 0, mayReadReports);
   const overview = useQuery({
     queryKey: ["overview", product],
     queryFn: async () =>
@@ -56,7 +56,7 @@ export function Product() {
             <> · triaged at whatever the deployment says</>
           )}
           {it.end_of_life && <> · out of support {it.end_of_life}</>}
-          {mayWorkReports && (
+          {mayReadReports && (
             <>
               {" "}
               · <Link to={`/products/${encodeURIComponent(product)}/inbox`}>Inbox</Link>

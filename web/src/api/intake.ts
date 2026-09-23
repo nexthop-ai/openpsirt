@@ -47,6 +47,9 @@ export function useReports(
 export function useReport(product: string, reference: string): UseQueryResult<Report> {
   return useQuery({
     queryKey: ["recorded-report", product, reference],
+    // Nothing to ask for until both names are known, which is the ordinary
+    // case on the record form opened from anywhere but a report.
+    enabled: product !== "" && reference !== "",
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/products/{product}/reports/{reference}", {
@@ -79,6 +82,7 @@ export function useRulings(
 // the review queue and the record narrow what they list.
 export function useRulingsAcross(asked: {
   waiting?: boolean;
+  approvable?: boolean;
   products?: string[];
   from?: string;
   to?: string;
@@ -95,6 +99,7 @@ export function useRulingsAcross(asked: {
               limit: asked.limit ?? PAGE,
               offset: asked.offset ?? 0,
               ...(asked.waiting ? { waiting: true } : {}),
+              ...(asked.approvable ? { approvable: true } : {}),
               ...(asked.products && asked.products.length > 0 ? { product: asked.products } : {}),
               ...(asked.from ? { from: asked.from } : {}),
               ...(asked.to ? { to: asked.to } : {}),
@@ -237,4 +242,23 @@ export async function uploadReportFile(product: string, reference: string, file:
       bodySerializer: (body: unknown) => body as FormData,
     }),
   );
+}
+
+// useApprovable is how many rulings this reader may agree to, in one product
+// or across every product: waiting, proposed by somebody else, where they may
+// approve a ruling. What a count of what is pending their approval adds to the
+// claims the review queue counts.
+export function useApprovable(product?: string): UseQueryResult<number> {
+  return useQuery({
+    queryKey: ["rulings", "approvable", product ?? ""],
+    refetchInterval: 60_000,
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/report-rulings", {
+          params: {
+            query: { limit: 1, approvable: true, ...(product ? { product: [product] } : {}) },
+          },
+        }),
+      ).total ?? 0,
+  });
 }

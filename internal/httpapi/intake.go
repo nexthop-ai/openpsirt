@@ -37,7 +37,7 @@ func registerIntake(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "record-report", Method: http.MethodPost, Path: list,
-		Summary: "Record a report",
+		Summary: "Record a vulnerability report",
 		Description: "Records a claim that arrived, and returns the reference it is reached " +
 			"by.\n\n" +
 			"No issue is minted. What arrived is a claim, and whether it is a flaw is a " +
@@ -84,13 +84,13 @@ func registerIntake(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-reports", Method: http.MethodGet, Path: list,
-		Summary: "List what was reported",
+		Summary: "List vulnerability reports",
 		Description: "Every claim recorded against this product, newest first, judged or " +
 			"not.\n\n" +
 			"A report already turned into an issue stays in the list, because it is the " +
 			"evidence that the issue came from outside.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		Limit   int    `query:"limit" minimum:"1" maximum:"200" default:"50"`
 		Offset  int    `query:"offset" minimum:"0" default:"0"`
@@ -115,13 +115,13 @@ func registerIntake(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-recorded-report", Method: http.MethodGet, Path: one,
-		Summary: "Show a report",
+		Summary: "Show a vulnerability report",
 		Description: "What was claimed, who claimed it, when it arrived, when somebody " +
 			"answered them, and what it turned out to be.\n\n" +
 			"A reference nobody minted and one recorded against another product answer " +
 			"alike, so asking is not a way to find out which references exist.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593" doc:"The reference this deployment minted"`
 	}) (*struct{ Body ReportBody }, error) {
@@ -169,7 +169,7 @@ func registerIntake(api huma.API, in Ingest) {
 
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "judge-report", Method: http.MethodPut, Path: one + "/issue",
-		Summary: "Record what a report turned out to be",
+		Summary: "Accept a vulnerability report as an issue",
 		Description: "Points a report at the issue it turned out to be, and records who said " +
 			"so and when.\n\n" +
 			"The issue is one that already exists here. Recording a flaw is its own act, " +
@@ -194,9 +194,9 @@ func registerIntake(api huma.API, in Ingest) {
 		}
 		// Authorized before the issue's name is resolved, so an issue nobody
 		// filed and one filed here answer alike to somebody who may not judge
-		// a report at all. Refused as the report route refuses everything.
-		if err := finding.MayWorkReports(subject, product.ID); err != nil {
-			return nil, huma.Error404NotFound(finding.ErrNoSuchReport.Error())
+		// a report at all.
+		if err := finding.MayWorkReference(subject, product.ID); err != nil {
+			return nil, refusedReport(in, err, "that report could not be judged")
 		}
 		// Propagated rather than flattened. It already answers alike for an
 		// issue that is not here and one this subject may not be told of,
@@ -221,7 +221,7 @@ func registerIntake(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "upload-report-attachment", Method: http.MethodPost,
 		Path:    one + "/attachments",
-		Summary: "Attach a file to a report",
+		Summary: "Attach a file to a vulnerability report",
 		Description: "Stores one file against a report and returns the reference to put in " +
 			"text. A claim that has not been judged has no issue to hang a screenshot on, and " +
 			"the screenshot is often the whole of what was sent.\n\n" +
@@ -288,14 +288,14 @@ func registerIntake(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-report-attachments", Method: http.MethodGet,
 		Path:    one + "/attachments",
-		Summary: "List files that arrived with a report",
+		Summary: "List files that arrived with a vulnerability report",
 		Description: "What arrived with this report, and what text about it refers to. An " +
 			"upload nothing refers to yet is not listed, because it is not attached to " +
 			"anything.\n\n" +
 			"A file an administrator removed is still listed, saying so, because the text " +
 			"that pointed at it still does.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", access.PrivateTriage), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*struct {

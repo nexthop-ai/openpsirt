@@ -1,3 +1,4 @@
+import { mayOf, useWho } from "../app/session";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -148,6 +149,10 @@ export function RulingCard({
   const product = ruling.product;
   const approve = useApproveRuling(product);
   const withdraw = useWithdrawRuling(product);
+  // Agreeing and withdrawing are different rights from reading, and from each
+  // other: an approver who reads undisclosed work may agree and may not send
+  // a ruling back, which is working the reports.
+  const may = mayOf(useWho().data, product);
   const at = `/products/${encodeURIComponent(product)}/inbox`;
   const state =
     ruling.state === "waiting"
@@ -202,7 +207,7 @@ export function RulingCard({
 
       {!record && ruling.state !== "withdrawn" && (
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          {ruling.state === "waiting" && !ruling.yours && (
+          {ruling.state === "waiting" && !ruling.yours && may?.may_approve_rulings && (
             <button
               type="button"
               className="btn"
@@ -215,8 +220,9 @@ export function RulingCard({
           <button
             type="button"
             className="btn quiet"
+            hidden={!may?.may_hide}
             disabled={withdraw.isPending}
-            title="Returns every report it covers to the inbox"
+            title="Returns every vulnerability report it covers to the inbox"
             onClick={() => withdraw.mutate(ruling.id)}
           >
             {ruling.state === "waiting" ? (ruling.yours ? "Withdraw" : "Send back") : "Undo"}
@@ -233,8 +239,11 @@ export function RulingCard({
 // may work reports in, for the review queue.
 export function WaitingRulings({ product }: { product?: string }) {
   const [offset, setOffset] = useState(0);
+  // The rulings this reader may agree to, which is what the badge counts and
+  // what the claims above are: somebody's own proposals wait for somebody else.
   const listed = useRulingsAcross({
     waiting: true,
+    approvable: true,
     products: product ? [product] : [],
     offset,
   });
@@ -242,7 +251,10 @@ export function WaitingRulings({ product }: { product?: string }) {
   if (listed.isError) {
     return (
       <div style={{ marginTop: 22 }}>
-        <Failed error={listed.error} what="The rulings on reports could not be read." />
+        <Failed
+          error={listed.error}
+          what="The rulings on vulnerability reports could not be read."
+        />
       </div>
     );
   }
@@ -253,9 +265,9 @@ export function WaitingRulings({ product }: { product?: string }) {
     <>
       <div className="screen-head" id="rulings" style={{ marginTop: 22 }}>
         <h2>
-          Rulings on reports <span className="n">{total.toLocaleString()}</span>
+          Rulings on vulnerability reports <span className="n">{total.toLocaleString()}</span>
         </h2>
-        <p>Reports proposed as rejected or out of scope.</p>
+        <p>Vulnerability reports proposed as rejected or out of scope.</p>
       </div>
       {rows.map((ruling) => (
         <RulingCard key={ruling.id} ruling={ruling} named />

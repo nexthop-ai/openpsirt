@@ -713,7 +713,9 @@ var tables = []string{
 	"issue_note",
 	// Before the record of being exploited and the window it points at.
 	"told_outside",
-	// Before person, which it points at.
+	// Before the window and the product it points at.
+	"obligation_window_product",
+	// Before person, which it points at, and after the rows naming it.
 	"obligation_window",
 	// Before person, product and vulnerability, all of which it points at,
 	// and after the notices that point at it.

@@ -1,3 +1,4 @@
+import { useApprovable } from "../api/intake";
 import { BANDS } from "../ui/severities";
 import { useQuery } from "@tanstack/react-query";
 import { on } from "../ui/when";
@@ -421,6 +422,8 @@ function Figures({
     enabled: widely,
     queryFn: async () => unwrap(await api.GET("/v1/trend", { params: { query: { weeks: 12 } } })),
   });
+  const rulings = useApprovable(at.product || undefined);
+  const allRulings = useApprovable();
   const allQueue = useQuery({
     queryKey: ["queue", "count", "all"],
     enabled: widely,
@@ -563,8 +566,16 @@ function Figures({
         <span className="l">
           <i style={{ background: "var(--wait)" }} /> Pending your approval
         </span>
-        <span className="n">{queue.isError ? "—" : (queue.data?.total ?? 0).toLocaleString()}</span>
-        {everywhere(allQueue.data?.total) ?? (
+        <span className="n">
+          {queue.isError || rulings.isError
+            ? "—"
+            : ((queue.data?.total ?? 0) + (rulings.data ?? 0)).toLocaleString()}
+        </span>
+        {everywhere(
+          allQueue.data?.total === undefined
+            ? undefined
+            : allQueue.data.total + (allRulings.data ?? 0),
+        ) ?? (
           <span
             className="d"
             title="A claim is decided in a product and no finer, so this counts the whole product"
@@ -658,6 +669,8 @@ function Pending() {
     queryFn: async () =>
       unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 3, ...product } } })),
   });
+  const rulings = useApprovable(at.product || undefined);
+  const allRulings = useApprovable();
   const everywhere = useQuery({
     queryKey: ["queue", "home", "all"],
     enabled: !!at.product,
@@ -680,13 +693,26 @@ function Pending() {
           }
         >
           {at.product
-            ? `${(everywhere.data?.total ?? 0).toLocaleString()} all products`
+            ? `${((everywhere.data?.total ?? 0) + (allRulings.data ?? 0)).toLocaleString()} all products`
             : "all products"}
         </span>
-        <span className="tally">{queue.isError ? "—" : (queue.data?.total ?? 0)}</span>
+        <span className="tally">
+          {queue.isError || rulings.isError ? "—" : (queue.data?.total ?? 0) + (rulings.data ?? 0)}
+        </span>
       </header>
       {queue.isError && <Failed error={queue.error} what="This could not be read." />}
-      {items.length === 0 && !queue.isError && <p className="reading">Nothing is pending.</p>}
+      {items.length === 0 && !queue.isError && !(rulings.data ?? 0) && (
+        <p className="reading">Nothing is pending.</p>
+      )}
+      {(rulings.data ?? 0) > 0 && (
+        <p className="reading">
+          <Link to="/review-queue#rulings">
+            {rulings.data === 1
+              ? "1 ruling on vulnerability reports"
+              : `${(rulings.data ?? 0).toLocaleString()} rulings on vulnerability reports`}
+          </Link>
+        </p>
+      )}
       <ul>
         {items.map((row) => {
           const claim = claimOf(row);

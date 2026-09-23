@@ -535,6 +535,19 @@ func TestAFlawReportIsReadableOnlyWhereItWasMade(t *testing.T) {
 		if again.AcknowledgedAt != nil {
 			t.Error("somebody who cannot read the report cleared its condition")
 		}
+
+		// Somebody who reads the report and may not work it is refused in
+		// words, and nothing is recorded.
+		reader := access.NewPerson(3, "reader", false,
+			map[int64][]access.Role{f.productID: {access.PublicTriage, access.PrivateRead}}, 0)
+		if err := f.store.Acknowledge(ctx, reader, issue); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a reader answering the reporter was told %v, want a refusal", err)
+		}
+		if again, err = f.store.ReportFor(ctx, who, issue); err != nil {
+			t.Fatal(err)
+		} else if again.AcknowledgedAt != nil {
+			t.Error("somebody who may only read the report cleared its condition")
+		}
 	})
 }
 

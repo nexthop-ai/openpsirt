@@ -3,18 +3,21 @@ package notify
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// Two conditions about the deployment rather than about anybody's work: data
-// that has stopped moving, and a control that did not hold.
+// Conditions about the deployment rather than about anybody's work: data that
+// has stopped moving, a control that did not hold, and a control held in form
+// only.
 //
-// Both are questions a report already answers, asked as conditions. A
+// Each is a question a report already answers, asked as a condition. A
 // report that must come back empty is one nobody opens — checked twice, seen
 // to be empty, stopped — so it is read after something has gone wrong rather
 // than before. Mailing it on a schedule fails either way round: sent only when
@@ -241,6 +244,142 @@ func (w *Watch) riskUnagreed(ctx context.Context) ([]Holds, error) {
 // this exists to get past — so the two are pinned together by a test rather
 // than by a shared constant that does not exist.
 const everythingBack = "3650"
+
+// pairsBack is how far back the agreements one pair gave each other are
+// counted, in days: the rubber-stamp report's own period, so the report the
+// link opens holds what raised it.
+const pairsBack = "90"
+
+// pairsAtLeast is the fewest claims agreed in a product over that period for
+// one pair's share of them to be raised. Below it a share is a handful of acts:
+// one agreed claim is a hundred percent, and each claim ageing out moves the
+// share across the threshold and back.
+const pairsAtLeast = 10
+
+// pairsConcentrated is the condition that one pair of people is giving each
+// other most of a product's agreements, in a product with enough people who may
+// approve that this is a choice rather than the shape of the team.
+//
+// One per product, keyed on the product and the two people, so a pair that
+// stays dominant stays one condition and a different pair taking over is a
+// different one. Both thresholds are the product's own where it states them.
+//
+// Counted over a period rather than the whole record. What it asks about is how
+// agreement is being given now, and a pattern a team has since moved away from
+// is not a control failing today. The count of what stands with nobody
+// agreeing is the other shape, and covers the whole record.
+//
+// Asked as the deployment and told to administrators, like the conditions
+// beside it. It names the two people, which is the fact; the claims are on the
+// report the link opens.
+func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
+	days, err := strconv.Atoi(pairsBack)
+	if err != nil {
+		return nil, fmt.Errorf("read how far back pairs are counted: %w", err)
+	}
+	since := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour)
+	agreed, err := triage.NewStore(w.db).AgreedSince(ctx, since)
+	if err != nil {
+		return nil, err
+	}
+	if len(agreed) == 0 {
+		return nil, nil
+	}
+	settings := setting.NewStore(w.db)
+	share, err := settings.Count(ctx, setting.PairShare, setting.DefaultPairShare)
+	if err != nil {
+		return nil, fmt.Errorf("read the share one pair may give: %w", err)
+	}
+	approvers, err := settings.Count(ctx, setting.PairApprovers, setting.DefaultPairApprovers)
+	if err != nil {
+		return nil, fmt.Errorf("read how many approvers a pair is counted among: %w", err)
+	}
+	var products []catalog.Product
+	if err := w.db.NewSelect().Model(&products).
+		Column("id", "display_name", "pair_share", "pair_approvers").
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read each product's thresholds for one pair: %w", err)
+	}
+	byID := make(map[int64]catalog.Product, len(products))
+	for _, product := range products {
+		byID[product.ID] = product
+	}
+	// Who may approve, product by product: a triager may agree to somebody
+	// else's claim, and so may somebody holding the approver capability,
+	// either one only where they may read.
+	reach, err := whoActs(ctx, w.db)
+	if err != nil {
+		return nil, err
+	}
+	able := map[int64]int{}
+	for _, per := range reach {
+		for productID, at := range per {
+			if at.public() && (at.approves || at.triages(false)) {
+				able[productID]++
+			}
+		}
+	}
+
+	var out []Holds
+	var named []int64
+	type raised struct {
+		product catalog.Product
+		pair    triage.Pair
+		percent int
+	}
+	var found []raised
+	for _, one := range agreed {
+		product := byID[one.ProductID]
+		wantShare, wantApprovers := share, approvers
+		if product.PairShare != nil && *product.PairShare > 0 {
+			wantShare = *product.PairShare
+		}
+		if product.PairApprovers != nil && *product.PairApprovers > 0 {
+			wantApprovers = *product.PairApprovers
+		}
+		if able[one.ProductID] < wantApprovers || one.Claims < pairsAtLeast {
+			continue
+		}
+		for _, pair := range one.Pairs {
+			// At or past the share, compared in whole numbers so that
+			// nothing is lost to a division. A share of a hundred is one
+			// pair giving every agreement.
+			if pair.Claims*100 < wantShare*one.Claims {
+				continue
+			}
+			found = append(found, raised{
+				product: product, pair: pair,
+				percent: pair.Claims * 100 / one.Claims,
+			})
+			named = append(named, pair.First, pair.Second)
+		}
+	}
+	if len(found) == 0 {
+		return nil, nil
+	}
+	people, err := triage.NewStore(w.db).PeopleNamed(ctx, named)
+	if err != nil {
+		return nil, err
+	}
+	for _, each := range found {
+		productID := each.product.ID
+		out = append(out, Holds{
+			About: identify(fmt.Sprintf("pairs-concentrated %d %d %d",
+				productID, each.pair.First, each.pair.Second)),
+			// The share and never the counts behind it. It goes to every
+			// administrator, and how much work a product agreed to is not
+			// theirs to read unless they hold a role there.
+			Body: fmt.Sprintf("In %s, %s and %s agreed to each other's work on %d%% of the "+
+				"claims agreed to in the last %d days. The product has enough "+
+				"people who may approve that one pair doing most of it is worth a look.",
+				each.product.DisplayName, people[each.pair.First], people[each.pair.Second],
+				each.percent, days),
+			Link:      "/reports/rubber-stamp?days=" + pairsBack,
+			ProductID: &productID,
+		})
+	}
+	return out, nil
+}
 
 // claimsSaid and rowsSaid put a count into words, because "1 claims" on the one
 // case somebody hopes never to see reads as a tool nobody finished.

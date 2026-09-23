@@ -24,6 +24,52 @@ import (
 // declarations they sit on.
 func registerCatalogPolicy(api huma.API, d Declaring) {
 	huma.Register(api, requiring(huma.Operation{
+		OperationID: "set-product-pair-thresholds", Method: http.MethodPut,
+		Path:    "/v1/products/{product}/pair-thresholds",
+		Summary: "Set when one pair's agreements are raised for a product",
+		Description: "Sets this product's own thresholds for telling administrators that one " +
+			"pair of people is agreeing to most of its work: the share of its agreements, as " +
+			"a percentage, and the fewest people who may approve here for that share to count. " +
+			"Both are replaced by what is sent, and zero or left off follows the deployment " +
+			"again. Recorded in the administrative trail.",
+		Tags: []string{"Catalog"}, DefaultStatus: http.StatusNoContent,
+	}, deploymentWide, ""), func(ctx context.Context, in *struct {
+		Product string `path:"product"`
+		Body    PairThresholdsBody
+	}) (*struct{}, error) {
+		if err := administrating(ctx); err != nil {
+			return nil, err
+		}
+		var share, approvers *int
+		if in.Body.Share > 0 {
+			share = &in.Body.Share
+		}
+		if in.Body.Approvers > 0 {
+			approvers = &in.Body.Approvers
+		}
+		return &struct{}{}, changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+			store, err := storeFor(d, tx)
+			if err != nil {
+				return err
+			}
+			product, err := store.ProductByName(ctx, in.Product)
+			if err != nil {
+				return undeclared(d.Logger, err, "that product could not be looked up")
+			}
+			was := thresholdsSaid(product.PairShare, product.PairApprovers)
+			if err := store.SetPairThresholds(ctx, product.ID, share, approvers); err != nil {
+				return wentWrong(d.Logger, "those thresholds could not be recorded", err)
+			}
+			became := thresholdsSaid(share, approvers)
+			if err := noted(ctx, tx, trail.Setting, "pair thresholds of "+product.Name,
+				trail.Said(was, was != ""), trail.Said(became, became != "")); err != nil {
+				return notRecorded(d.Logger, err)
+			}
+			return nil
+		})
+	})
+
+	huma.Register(api, requiring(huma.Operation{
 		OperationID: "set-product-triage-floor", Method: http.MethodPut,
 		Path:    "/v1/products/{product}/triage-floor",
 		Summary: "Set what a product considers worth triaging",
@@ -271,4 +317,17 @@ func registerCatalogPolicy(api huma.API, d Declaring) {
 		}
 		return &struct{}{}, nil
 	})
+}
+
+// thresholdsSaid is a product's own pair thresholds as the trail records them,
+// or empty where it follows the deployment on both.
+func thresholdsSaid(share, approvers *int) string {
+	var parts []string
+	if share != nil {
+		parts = append(parts, fmt.Sprintf("%d%%", *share))
+	}
+	if approvers != nil {
+		parts = append(parts, fmt.Sprintf("%d approvers", *approvers))
+	}
+	return strings.Join(parts, ", ")
 }

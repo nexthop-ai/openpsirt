@@ -45,10 +45,12 @@ func TestAFileArrivesWithAClaimNobodyHasJudged(t *testing.T) {
 	})
 }
 
-func TestAFileOnAnUnjudgedClaimIsReachedOnlyByWhoeverTriagesUnannouncedWork(t *testing.T) {
+func TestAFileOnAnUnjudgedClaimIsReadWithPrivateReadAndAttachedWithPrivateTriage(t *testing.T) {
 	// There is no issue to be public about, and nobody has decided the claim
-	// is safe to repeat. So the file takes the same answer the report does,
-	// and a reader who may see this product's announced work sees none of it.
+	// is safe to repeat. So the file takes the same answer the report does:
+	// a reader who may see only this product's announced work sees none of
+	// it, a reader of undisclosed work reads it, and attaching another asks
+	// for the right to work reports.
 	each(t, func(t *testing.T, f *fixture) {
 		owner := f.who(t, access.PrivateTriage)
 		report := f.aReport(t, owner, nil)
@@ -60,14 +62,7 @@ func TestAFileOnAnUnjudgedClaimIsReachedOnlyByWhoeverTriagesUnannouncedWork(t *t
 			t.Fatal(err)
 		}
 
-		// PrivateRead is the boundary: somebody who may read work nobody has
-		// announced still may not reach a claim. Without it, relaxing the
-		// rule from "triages privately" to "reads privately" leaves this
-		// green, and the sibling copy of the rule in internal/finding pins
-		// exactly that.
-		for _, held := range []access.Role{
-			access.PublicRead, access.PublicTriage, access.PrivateRead,
-		} {
+		for _, held := range []access.Role{access.PublicRead, access.PublicTriage} {
 			stranger := f.who(t, held)
 			if _, err := f.store.Find(t.Context(), stranger, stored.Token); err == nil {
 				t.Errorf("%s fetched a file on a claim nobody has judged", held)
@@ -76,8 +71,21 @@ func TestAFileOnAnUnjudgedClaimIsReachedOnlyByWhoeverTriagesUnannouncedWork(t *t
 				report); !errors.Is(err, access.ErrDenied) {
 				t.Errorf("%s listed what arrived with it: %v", held, err)
 			}
-			// Writing is the same right as reading here, because reaching a
-			// report already asks for a role that triages.
+		}
+
+		// PrivateRead is the boundary between the two halves: it reads what
+		// arrived and may not add to it.
+		reader := f.who(t, access.PrivateRead)
+		if _, err := f.store.Find(t.Context(), reader, stored.Token); err != nil {
+			t.Errorf("a reader of undisclosed work could not fetch the file: %v", err)
+		}
+		if _, err := f.store.ForReport(t.Context(), reader, f.product, report); err != nil {
+			t.Errorf("a reader of undisclosed work could not list what arrived: %v", err)
+		}
+		for _, held := range []access.Role{
+			access.PublicRead, access.PublicTriage, access.PrivateRead,
+		} {
+			stranger := f.who(t, held)
 			if _, err := f.store.Upload(t.Context(), stranger,
 				attach.Against{ProductID: f.product, FlawReportID: report},
 				"theirs.log", strings.NewReader("x"), 1,

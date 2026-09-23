@@ -109,7 +109,7 @@ function Incident({ incident, windows }: { incident: Incident; windows: Window[]
                     ? "notice recorded"
                     : due.passed
                       ? since(due.ends_at)
-                      : `ends ${since(due.ends_at)}`}
+                      : `${due.near ? "ending soon · " : ""}ends ${since(due.ends_at)}`}
                 </td>
               </tr>
             ))}
@@ -267,24 +267,12 @@ function Tell({
 // and retire. None ships.
 function Windows({ windows }: { windows: Window[] }) {
   const queries = useQueryClient();
-  const [name, setName] = useState("");
-  const [hours, setHours] = useState("");
+  const [editing, setEditing] = useState<number | null>(null);
   const done = () => {
-    setName("");
-    setHours("");
+    setEditing(null);
     void queries.invalidateQueries({ queryKey: ["obligation-windows"] });
     void queries.invalidateQueries({ queryKey: ["obligations"] });
   };
-
-  const declare = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.POST("/v1/obligation-windows", {
-          body: { name, hours: Number(hours) },
-        }),
-      ),
-    onSuccess: done,
-  });
   const retire = useMutation({
     mutationFn: async (id: number) =>
       unwrap(await api.DELETE("/v1/obligation-windows/{id}", { params: { path: { id } } })),
@@ -295,21 +283,94 @@ function Windows({ windows }: { windows: Window[] }) {
     <div className="card">
       <h3>Windows</h3>
       {windows.length === 0 && <p className="hint">None declared.</p>}
-      {windows.map((each) => (
-        <p key={each.id}>
-          {each.name} <span className="hint">· {each.hours} hours</span>{" "}
-          <button
-            type="button"
-            className="linkish"
-            disabled={retire.isPending}
-            onClick={() => retire.mutate(each.id)}
-          >
-            Retire
-          </button>
-        </p>
-      ))}
+      {windows.map((each) =>
+        editing === each.id ? (
+          <WindowForm key={each.id} window={each} onDone={done} onCancel={() => setEditing(null)} />
+        ) : (
+          <p key={each.id}>
+            {each.name}{" "}
+            <span className="hint">
+              · {each.hours} hours
+              {each.lead_hours ? ` · warned ${each.lead_hours} hours before` : ""}
+              {" · "}
+              {(each.products ?? []).length > 0
+                ? (each.products ?? []).join(", ")
+                : "every product"}
+            </span>{" "}
+            <button type="button" className="linkish" onClick={() => setEditing(each.id)}>
+              Edit
+            </button>{" "}
+            <button
+              type="button"
+              className="linkish"
+              disabled={retire.isPending}
+              onClick={() => retire.mutate(each.id)}
+            >
+              Retire
+            </button>
+          </p>
+        ),
+      )}
       {retire.error != null && <Failed error={retire.error} what="That window was not retired." />}
-      <div className="actions" style={{ marginTop: 8 }}>
+      {editing === null && <WindowForm onDone={done} />}
+    </div>
+  );
+}
+
+// WindowForm declares a window, or restates one when it is handed it. Every
+// field is sent, because a change replaces what the window says.
+function WindowForm({
+  window,
+  onDone,
+  onCancel,
+}: {
+  window?: Window;
+  onDone: () => void;
+  onCancel?: () => void;
+}) {
+  const [name, setName] = useState(window?.name ?? "");
+  const [hours, setHours] = useState(window ? String(window.hours) : "");
+  const [lead, setLead] = useState(window?.lead_hours ? String(window.lead_hours) : "");
+  const [limited, setLimited] = useState<string[]>(window?.products ?? []);
+  const products = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => unwrap(await api.GET("/v1/products", {})),
+  });
+
+  const body = () => ({
+    name,
+    hours: Number(hours),
+    ...(Number(lead) > 0 ? { lead_hours: Number(lead) } : {}),
+    ...(limited.length > 0 ? { products: limited } : {}),
+  });
+  const save = useMutation({
+    mutationFn: async () =>
+      window
+        ? unwrap(
+            await api.PUT("/v1/obligation-windows/{id}", {
+              params: { path: { id: window.id } },
+              body: body(),
+            }),
+          )
+        : unwrap(await api.POST("/v1/obligation-windows", { body: body() })),
+    onSuccess: () => {
+      if (!window) {
+        setName("");
+        setHours("");
+        setLead("");
+        setLimited([]);
+      }
+      onDone();
+    },
+  });
+  const toggle = (product: string) =>
+    setLimited((was) =>
+      was.includes(product) ? was.filter((each) => each !== product) : [...was, product],
+    );
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div className="actions">
         <input
           type="text"
           aria-label="Name"
@@ -327,17 +388,53 @@ function Windows({ windows }: { windows: Window[] }) {
           value={hours}
           onChange={(event) => setHours(event.target.value)}
         />
+        <input
+          aria-label="Warn this many hours before the end"
+          title="A second notice this many hours before the end. Leave empty for none"
+          type="number"
+          min={1}
+          placeholder="Warn at"
+          style={{ width: "10ch" }}
+          value={lead}
+          onChange={(event) => setLead(event.target.value)}
+        />
+      </div>
+      {(products.data?.items ?? []).length > 0 && (
+        <p className="hint" title="None ticked is every product">
+          Applies to{" "}
+          {(products.data?.items ?? []).map((product) => (
+            <label key={product.name} style={{ marginLeft: 8, marginRight: 4 }}>
+              <input
+                type="checkbox"
+                checked={limited.includes(product.name)}
+                onChange={() => toggle(product.name)}
+              />{" "}
+              {product.display_name || product.name}
+            </label>
+          ))}
+          {limited.length === 0 && "· every product"}
+        </p>
+      )}
+      <div className="actions">
         <button
           type="button"
           className="btn"
-          disabled={!name.trim() || !(Number(hours) > 0) || declare.isPending}
-          onClick={() => declare.mutate()}
+          disabled={!name.trim() || !(Number(hours) > 0) || save.isPending}
+          onClick={() => save.mutate()}
         >
-          Declare
+          {window ? "Save" : "Declare"}
         </button>
+        {onCancel && (
+          <button type="button" className="btn quiet" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
       </div>
-      {declare.error != null && (
-        <Failed error={declare.error} what="That window was not declared." />
+      {save.error != null && (
+        <Failed
+          error={save.error}
+          what={window ? "That window was not changed." : "That window was not declared."}
+        />
       )}
     </div>
   );

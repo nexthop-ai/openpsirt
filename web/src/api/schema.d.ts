@@ -1575,15 +1575,17 @@ export interface paths {
          * List obligation windows
          * @description Every window in force, shortest first. Each runs from the moment an attack on a product became known. None ships: a deployment declares the windows it answers to.
          *
+         *     A window limited to products you may not know exist is left out, and the products a window names are narrowed to those you may.
+         *
          *     Requires: any signed-in person, and not a pipeline key
          */
         get: operations["list-obligation-windows"];
         put?: never;
         /**
          * Declare an obligation window
-         * @description Adds a window every standing attack is watched against, counted from the moment each became known. Recorded in the administrative trail.
+         * @description Adds a window every standing attack on the products it names is watched against, counted from the moment each became known. Recorded in the administrative trail.
          *
-         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name.
+         *     A name already in force, in any capitals, is refused with 409: retire that window or pick another name. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
          *
          *     Requires: administrator
          */
@@ -1604,9 +1606,9 @@ export interface paths {
         get?: never;
         /**
          * Change an obligation window
-         * @description Renames a window in force or changes how long it runs. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
+         * @description Restates a window in force: its name, how long it runs, its warning and the products it applies to. Each field is replaced by what is sent, so a warning or a product list left off is removed. Every incident's end moves with it, and notices already recorded against it keep naming it. Recorded in the administrative trail.
          *
-         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404.
+         *     A name another window in force holds is refused with 409. A retired or unknown window answers 404. A product nobody declared is refused with 422 naming it, as is a warning at or past the window's own length.
          *
          *     Requires: administrator
          */
@@ -2351,6 +2353,8 @@ export interface paths {
          *
          *     `component` names what in the build carries it, as the build calls it. Leave it out for the build itself, which is where a flaw in how the pieces fit together goes. A name the build holds at more than one version is refused with the choices rather than resolved to one; send `version`, and `ecosystem` where two share a version.
          *
+         *     `from_report` records the flaw from a vulnerability report already in this product and accepts the report as it in the same act; it needs private-triage. A report already judged, or under a ruling, is refused with 409.
+         *
          *     From here it behaves like any other finding: triaged, assigned, decided, on the same clock and in the same reports. No scan will close it, so it is closed by a person through the resolve endpoint or it stays open.
          *
          *     Requires: public-triage or private-triage on the product. private-triage where the finding is undisclosed.
@@ -2800,12 +2804,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List reports that duplicate an issue
+         * List vulnerability reports that duplicate an issue
          * @description Every report in this product ruled a duplicate of this issue, with the ruling in force. What arrived with each is listed on the report's own attachments.
          *
          *     An issue that is not here and one you may not be told of answer alike.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["list-duplicate-reports"];
         put?: never;
@@ -2899,9 +2903,9 @@ export interface paths {
          *
          *     The received date is what the embargo runs from: a report arriving on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the one the reporter has a publication scheduled against, and they are the party who will publish regardless.
          *
-         *     Answers 404 where nobody recorded a reporter, which is every flaw we found ourselves.
+         *     Answers 404 where nobody recorded a reporter, which is every flaw we found ourselves, and to somebody who may not read the product's vulnerability reports.
          *
-         *     Requires: public-triage or private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["get-report"];
         put?: never;
@@ -2992,6 +2996,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/pair-thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set when one pair's agreements are raised for a product
+         * @description Sets this product's own thresholds for telling administrators that one pair of people is agreeing to most of its work: the share of its agreements, as a percentage, and the fewest people who may approve here for that share to count. Both are replaced by what is sent, and zero or left off follows the deployment again. Recorded in the administrative trail.
+         *
+         *     Requires: administrator
+         */
+        put: operations["set-product-pair-thresholds"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/releases": {
         parameters: {
             query?: never;
@@ -3026,15 +3052,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List rulings on reports
+         * List rulings on vulnerability reports
          * @description Every ruling in this product, newest first, including withdrawn ones. `waiting` narrows to those waiting for a second person.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["list-report-rulings"];
         put?: never;
         /**
-         * Rule on reports
+         * Rule on vulnerability reports
          * @description Says that one or more reports are duplicates, not reproducible, out of scope, or rejected. A report that turned out to be an issue here is pointed at that issue instead.
          *
          *     `out-of-scope` and `rejected` wait for a second person, and nothing changes until somebody other than the proposer approves. The other two take effect at once. While a ruling waits, its reports cannot be accepted as an issue or ruled on again.
@@ -3060,10 +3086,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Show a ruling on reports
+         * Show a ruling on vulnerability reports
          * @description What was said, about which reports, by whom, and whether it is waiting, in force or withdrawn.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["get-report-ruling"];
         put?: never;
@@ -3084,12 +3110,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve a ruling on reports
+         * Approve a ruling on vulnerability reports
          * @description Agrees to a waiting ruling, which is when it takes effect for every report it covers.
          *
          *     Refused to whoever proposed it, and refused on a ruling that is not waiting.
          *
-         *     Requires: private-triage on the product. The proposer may not approve their own.
+         *     Requires: approver or private-triage on the product. The proposer may not approve their own.
          */
         post: operations["approve-report-ruling"];
         delete?: never;
@@ -3108,7 +3134,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Withdraw a ruling on reports
+         * Withdraw a ruling on vulnerability reports
          * @description Takes a ruling back, waiting or in force, and returns every report it covered to the inbox, judged as nothing. Sending a waiting ruling back and undoing one in force are this one act.
          *
          *     Needs nobody else, and the proposer may withdraw their own. The ruling stays on record as withdrawn.
@@ -3130,17 +3156,17 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List what was reported
+         * List vulnerability reports
          * @description Every claim recorded against this product, newest first, judged or not.
          *
          *     A report already turned into an issue stays in the list, because it is the evidence that the issue came from outside.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["list-reports"];
         put?: never;
         /**
-         * Record a report
+         * Record a vulnerability report
          * @description Records a claim that arrived, and returns the reference it is reached by.
          *
          *     No issue is minted. What arrived is a claim, and whether it is a flaw is a judgment somebody makes afterwards — so a report nobody believes is answered and filed rather than either minting a flaw nobody believes or going unrecorded.
@@ -3166,12 +3192,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Show a report
+         * Show a vulnerability report
          * @description What was claimed, who claimed it, when it arrived, when somebody answered them, and what it turned out to be.
          *
          *     A reference nobody minted and one recorded against another product answer alike, so asking is not a way to find out which references exist.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["get-recorded-report"];
         put?: never;
@@ -3216,17 +3242,17 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List files that arrived with a report
+         * List files that arrived with a vulnerability report
          * @description What arrived with this report, and what text about it refers to. An upload nothing refers to yet is not listed, because it is not attached to anything.
          *
          *     A file an administrator removed is still listed, saying so, because the text that pointed at it still does.
          *
-         *     Requires: private-triage on the product
+         *     Requires: private-read or private-triage on the product
          */
         get: operations["list-report-attachments"];
         put?: never;
         /**
-         * Attach a file to a report
+         * Attach a file to a vulnerability report
          * @description Stores one file against a report and returns the reference to put in text. A claim that has not been judged has no issue to hang a screenshot on, and the screenshot is often the whole of what was sent.
          *
          *     The file stays with the report once the report gains an issue, and stays as readable as the report: saying a claim is a disclosed issue does not publish what somebody sent with it. Attach it to the issue to put it there.
@@ -3253,7 +3279,7 @@ export interface paths {
         };
         get?: never;
         /**
-         * Record what a report turned out to be
+         * Accept a vulnerability report as an issue
          * @description Points a report at the issue it turned out to be, and records who said so and when.
          *
          *     The issue is one that already exists here. Recording a flaw is its own act, because it carries the builds the flaw ships in, the severity and the embargo — so agreeing that a claim is real is not the same keystroke as declaring where it lives.
@@ -4644,10 +4670,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List rulings on reports across products
-         * @description Every ruling in the products you may work reports in, newest first, including withdrawn ones. A product you may not work reports in contributes nothing, not even to the count.
+         * List rulings on vulnerability reports across products
+         * @description Every ruling in the products you may read reports in, newest first, including withdrawn ones. A product you may not read reports in contributes nothing, not even to the count.
          *
-         *     `waiting` narrows to those waiting for a second person. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
+         *     `waiting` narrows to those waiting for a second person, and `approvable` to those you may agree to. `from` and `to` narrow to those proposed in a period, `to` exclusive, as the record's own period is.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -6147,6 +6173,8 @@ export interface components {
         CanBody: {
             /** @description Agree to somebody else's claim, or send it back. The approver capability or a triage role on the product — a triager may answer somebody else's claim, which is the ordinary shape of a small team; that the two are different people is checked separately and has no override */
             may_agree: boolean;
+            /** @description Agree to somebody else's ruling on vulnerability reports: reading undisclosed work, with the approver capability or triage of undisclosed work */
+            may_approve_rulings: boolean;
             /** @description Give work to somebody else, or take what they hold — triage as well as the assigner role. Taking work nobody owns, and handing back your own, need only may_triage */
             may_assign: boolean;
             /** @description Argue about a finding nobody has disclosed */
@@ -6968,6 +6996,8 @@ export interface components {
              * @description When the attack became known, plus the window
              */
             ends_at: string;
+            /** @description Whether the window's warning has come and its end has not */
+            near: boolean;
             /** @description Whether that moment has gone */
             passed: boolean;
             window: components["schemas"]["WindowBody"];
@@ -7209,7 +7239,7 @@ export interface components {
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
@@ -7389,7 +7419,7 @@ export interface components {
              */
             middle?: number;
             /**
-             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix or has declined to, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "below-the-line" | "nothing-to-take" | "out-of-support";
@@ -8829,7 +8859,7 @@ export interface components {
             undone?: number;
             /** @description The issue this is about */
             vulnerability?: string;
-            /** @description Every window in force, shortest first, as it runs from when the attack became known */
+            /** @description Every window in force that applies to this product, shortest first, as it runs from when the attack became known */
             windows: components["schemas"]["DueBody"][] | null;
         };
         ObligationsBody: {
@@ -8997,6 +9027,24 @@ export interface components {
              * @description Claims about this product waiting for a second person
              */
             waiting: number;
+        };
+        PairThresholdsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PairThresholdsBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The fewest people who may approve here for one pair's share to be raised. Zero or left off follows the deployment
+             */
+            approvers?: number;
+            /**
+             * Format: int64
+             * @description The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators. Zero or left off follows the deployment
+             */
+            share?: number;
         };
         PairingBody: {
             approver: string;
@@ -9341,6 +9389,16 @@ export interface components {
             open?: number;
             /**
              * Format: int64
+             * @description The fewest people who may approve in this product for one pair's share to be raised, where the product states its own. Absent means it follows the deployment
+             */
+            pair_approvers?: number;
+            /**
+             * Format: int64
+             * @description The share of this product's agreements, as a percentage, at which one pair agreeing to each other's work is raised with administrators, where the product states its own. Absent means it follows the deployment
+             */
+            pair_share?: number;
+            /**
+             * Format: int64
              * @description The number of tags declared
              */
             tags?: number;
@@ -9601,6 +9659,8 @@ export interface components {
             disclosed?: boolean;
             /** @description The ecosystem, where two share a name and a version */
             ecosystem?: string;
+            /** @description A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the four fields above are refused beside it */
+            from_report?: string;
             /**
              * Format: date
              * @description The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless
@@ -11092,8 +11152,15 @@ export interface components {
             hours: number;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: int64
+             * @description How many hours before the end a second notice is raised. Absent where the window names none
+             */
+            lead_hours?: number;
             /** @description What the window is called here */
             name: string;
+            /** @description The products the window is limited to, among those you may know exist. Empty for a window that applies to every product */
+            products: string[] | null;
         };
         WindowSaid: {
             /**
@@ -11107,8 +11174,15 @@ export interface components {
              * @description How long the window runs, in hours, from the moment an attack became known
              */
             hours: number;
+            /**
+             * Format: int64
+             * @description How many hours before the end a second notice is raised. Left off or zero, the window raises none. Fewer hours than the window runs
+             */
+            lead_hours?: number;
             /** @description What the window is called here. Unique among the windows in force, without regard to capitals */
             name: string;
+            /** @description The products the window applies to, by name. Left off, it applies to every product */
+            products?: string[] | null;
         };
         WindowsBody: {
             /**
@@ -15910,6 +15984,39 @@ export interface operations {
             };
         };
     };
+    "set-product-pair-thresholds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PairThresholdsBody"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     "list-releases": {
         parameters: {
             query?: never;
@@ -18425,6 +18532,8 @@ export interface operations {
                 product?: string[] | null;
                 /** @description Only rulings waiting for a second person */
                 waiting?: boolean;
+                /** @description Only rulings you may agree to: waiting, proposed by somebody else, in a product where you may approve a ruling */
+                approvable?: boolean;
                 /** @description Only rulings proposed on or after this date, as YYYY-MM-DD */
                 from?: string;
                 /** @description Only rulings proposed before this date, as YYYY-MM-DD */

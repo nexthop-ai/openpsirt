@@ -39,7 +39,8 @@ var (
 		"say what was claimed — a report with nothing in it records only that a mail arrived")
 )
 
-// mayHandle reports whether this subject may work a product's reports.
+// mayHandle reports whether this subject may work a product's reports:
+// record one, attach to one, answer one, or propose a ruling over some.
 //
 // The right to triage work nobody has announced, because that is what a
 // report is: nobody has judged it, so nobody has decided it is safe to
@@ -53,6 +54,63 @@ func mayHandle(subject access.Subject, productID int64) error {
 		return access.Denied(fmt.Sprintf("work the reports in product %d", productID))
 	}
 	return nil
+}
+
+// mayReadReports reports whether this subject may read a product's reports,
+// what arrived with them, and the rulings over them.
+//
+// The right to read work nobody has announced. Somebody who reads every
+// embargoed issue in a product already reads what a stranger's claim could
+// point at, so the claim is no more than they hold. Working one is a write and
+// stays with mayHandle.
+func mayReadReports(subject access.Subject, productID int64) error {
+	if subject.Kind != access.Person {
+		return access.Denied("read a product's reports without being a person")
+	}
+	if !subject.Reads(access.Private, productID) {
+		return access.Denied(fmt.Sprintf("read the reports in product %d", productID))
+	}
+	return nil
+}
+
+// mayApproveRuling reports whether this subject may agree to somebody else's
+// ruling over reports: the approver capability or the right to work reports,
+// over the right to read them. That the two people differ is checked beside
+// this and has no override.
+func mayApproveRuling(subject access.Subject, productID int64) error {
+	if err := mayReadReports(subject, productID); err != nil {
+		return err
+	}
+	if !subject.Holds(access.Approver, productID) && !subject.Triages(access.Private, productID) {
+		return access.Denied(fmt.Sprintf("agree to a ruling in product %d", productID))
+	}
+	return nil
+}
+
+// mayWorkReference is asked before an act on one named report, ahead of the
+// reference being looked up.
+//
+// Somebody who may not read the product's reports is told the reference is not
+// here, the answer one nobody minted gets. Somebody who reads them and may not
+// work them is refused in words: they can open the report, and "not here"
+// would contradict the read they just made.
+func mayWorkReference(subject access.Subject, productID int64) error {
+	if err := mayReadReports(subject, productID); err != nil {
+		return ErrNoSuchReport
+	}
+	return mayHandle(subject, productID)
+}
+
+// MayWorkReference is mayWorkReference for a caller that has a name to
+// resolve before it reaches the store and has to authorize first.
+func MayWorkReference(subject access.Subject, productID int64) error {
+	return mayWorkReference(subject, productID)
+}
+
+// MayReadReports is mayReadReports for a caller that has a name to resolve
+// before it reaches the store and has to authorize first.
+func MayReadReports(subject access.Subject, productID int64) error {
+	return mayReadReports(subject, productID)
 }
 
 // MayWorkReports reports whether this subject may work a product's reports,
@@ -127,7 +185,7 @@ func (s *Store) Record(ctx context.Context, subject access.Subject,
 func (s *Store) ReportBy(ctx context.Context, subject access.Subject,
 	productID int64, reference string) (*FlawReport, error) {
 
-	if err := mayHandle(subject, productID); err != nil {
+	if err := mayReadReports(subject, productID); err != nil {
 		return nil, ErrNoSuchReport
 	}
 	row := new(FlawReport)
@@ -162,7 +220,7 @@ func foldReference(typed string) string {
 func (s *Store) ReportsIn(ctx context.Context, subject access.Subject,
 	productID int64, limit, offset int) ([]FlawReport, int, error) {
 
-	if err := mayHandle(subject, productID); err != nil {
+	if err := mayReadReports(subject, productID); err != nil {
 		return nil, 0, err
 	}
 	var rows []FlawReport
@@ -190,6 +248,9 @@ func (s *Store) ReportsIn(ctx context.Context, subject access.Subject,
 func (s *Store) AcknowledgeReport(ctx context.Context, subject access.Subject,
 	productID int64, reference string) error {
 
+	if err := mayWorkReference(subject, productID); err != nil {
+		return err
+	}
 	row, err := s.ReportBy(ctx, subject, productID, reference)
 	if err != nil {
 		return err
@@ -207,6 +268,9 @@ func (s *Store) AcknowledgeReport(ctx context.Context, subject access.Subject,
 func (s *Store) JudgeAsIssue(ctx context.Context, subject access.Subject,
 	productID int64, reference string, vulnerabilityID int64) (*FlawReport, error) {
 
+	if err := mayWorkReference(subject, productID); err != nil {
+		return nil, err
+	}
 	row, err := s.ReportBy(ctx, subject, productID, reference)
 	if err != nil {
 		return nil, err

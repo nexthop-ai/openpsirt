@@ -390,7 +390,7 @@ contact address is published rather than at some volume of them.
 | It carries what was claimed | A report holding only who wrote in records that a mail arrived, which nobody can evaluate, answer or find again. The issue's own description carries the claim once there is one |
 | Everything about the reporter is optional | A claim arriving anonymously is an ordinary claim, and a flaw found by whoever is typing has no reporter at all. A form demanding one asks them to invent an answer |
 | One row per issue, not per finding | A flaw recorded against four builds is one report from one person, and four copies of their address is four places for it to be wrong |
-| **It records the product it was reported against, and that is who may read it** | An issue's identity spans its aliases, so the moment a CVE is recorded the same issue is open in every product a scan reports it in. Keyed on the issue alone, the reporter's name, address and received date were readable by anybody holding triage rights in any of those — and acknowledging from one of them cleared the unanswered condition out of another product's queue. The unanswered list stops fanning one letter out across every product the name reaches |
+| **It records the product it was reported against, and that is who may read it** | Read with the right every read of a report asks, reading undisclosed work in that product, on the issue as on the report itself: one reporter has one rule. Answering them is working the report and asks for triage there. An issue's identity spans its aliases, so the moment a CVE is recorded the same issue is open in every product a scan reports it in. Keyed on the issue alone, the reporter's name, address and received date were readable by anybody holding triage rights in any of those — and acknowledging from one of them cleared the unanswered condition out of another product's queue. The unanswered list stops fanning one letter out across every product the name reaches |
 | Credit preference is kept apart from the name reported under | "Anonymous" is a real answer, and so is a handle that is not the name on the mail |
 | The received date is what the embargo runs from (REQ-37) | A report that arrived a fortnight before anybody typed it in no longer puts this clock behind the reporter's. It falls back to when the record was made, and a date nobody can read is treated as one nobody gave |
 | The acknowledged date records that somebody answered, rather than answering | What reaches a researcher is a mail from an address somebody already has. Acknowledging twice keeps the first date, and the condition it raises fires at once rather than after a period |
@@ -441,14 +441,29 @@ it lives.
 | Another report is already that issue's record | One report is one issue's record. A second pointed at the same issue is a duplicate, which is a ruling of its own |
 | A ruling holds the report | A report waiting to be rejected and accepted by somebody else in the meantime would be two things when the approval lands. Asked in the write |
 | The issue is not one the judge may be told of here | Resolving first and refusing after makes the refusal informative: an identifier nobody has filed and one filed on work this person cannot see would come back differently, which turns this into a way to ask which identifiers are open here |
-| The judge may not work reports here | Asked before the issue's name is resolved. Asked after, an identifier nobody has filed and one filed here come back in different words to somebody who may not judge a report at all. The same holds for the issue a duplicate names, and for the issue whose duplicates are listed |
+| A flaw may be recorded from a report | The claim turned out to be a flaw nobody had recorded. Recording it from the report accepts that report as the new flaw in the same write, so one report is the record rather than two, and who told us and when are read from it — naming a reporter as well is refused. The embargo counts from the day the report says it arrived. A report already judged, or under a ruling, is refused |
+| The judge may not work reports here | Asked before the issue's name is resolved. Asked after, an identifier nobody has filed and one filed here come back in different words to somebody who may not judge a report at all. The same holds for the issue a duplicate names, and, for somebody who may not read reports, for the issue whose duplicates are listed |
 
 ### Report visibility
 
 A claim is undisclosed: there is no issue to be public about, and nobody has
-decided the claim is safe to repeat. So recording one, reading one, listing a
-product's reports and reading what arrived with one all ask for the right to
-triage work nobody has announced in that product.
+decided the claim is safe to repeat. This is the **report rule**.
+
+| Act | Asks for |
+|---|---|
+| Reading a report, listing a product's reports, reading what arrived with one, reading a ruling and the duplicates on an issue | The right to read work nobody has announced in that product |
+| Recording a report, answering it, judging it, attaching to it, proposing or withdrawing a ruling | The right to triage work nobody has announced there |
+| Agreeing to somebody else's ruling | The approver capability or that triage right, over the right to read |
+
+Reading and working are apart because somebody who reads every embargoed issue
+in a product already reads what a stranger's claim could point at, so the claim
+is no more than they hold. Working one is a write, and the rule that writes
+ask for a writing role is the one every other surface here follows.
+
+Asked before any reference is resolved. Somebody who may not read the
+product's reports is told a named report or ruling is not there, the answer
+one nobody minted gets; somebody who reads them and may not act on one is
+refused in words, since they can open it.
 
 Every reader of the row, including the one that reaches it through the issue
 it turned out to be. Asked there as the issue's own visibility, judging a
@@ -502,7 +517,7 @@ one act, with one reason, covering one or more reports in one product.
 | A report under a waiting ruling reads as unjudged | Who judged it is written when the ruling takes effect. Before then one person has said it and nobody has agreed |
 | Withdrawing needs nobody else | It returns every report the ruling covered to the inbox unanswered, which re-exposes risk. Sending a waiting ruling back and undoing one in force are this one act, and the proposer may withdraw their own |
 | A withdrawn ruling stays on record with the reports it covered | The live pointer on each report is cleared; the list of what the ruling covered is kept apart from it |
-| Rulings are read and approved under the report rule | A ruling says what a stranger's claim is, and reading it reads the claim. The approver capability alone reaches no ruling. Listed across products, a product the reader may not work reports in contributes nothing, not even to the count |
+| Rulings are read and approved under the report rule | A ruling says what a stranger's claim is, and reading it reads the claim. The approver capability over reading undisclosed work may agree to one, as a triager of undisclosed work may; the capability alone reaches none. Listed across products, a product the reader may not read reports in contributes nothing, not even to the count |
 
 #### Duplicates on the issue
 
@@ -885,7 +900,9 @@ The record of being exploited here moves no deadline. How long a fix may take
 is a question about the work and about upstream, and being attacked says
 nothing about either; what it does is admit the finding to the triage line
 whatever the rating says, so a finding that was below the line gains the clock
-its severity earns and one whose record is cleared may lose it again.
+its severity earns and one whose record is cleared may lose it again. It also
+puts an upstream refusal back on that clock, which `DESIGN-remediation.md`
+describes beside the other reasons a finding carries none.
 `DESIGN-obligations.md` § Windows holds why the clock an obligation runs on is
 not this one.
 

@@ -102,6 +102,25 @@ export function Products({ who }: { who: Who }) {
     onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
   });
 
+  const setPairs = useMutation({
+    mutationFn: async ({
+      product,
+      share,
+      approvers,
+    }: {
+      product: string;
+      share: number;
+      approvers: number;
+    }) =>
+      unwrap(
+        await api.PUT("/v1/products/{product}/pair-thresholds", {
+          params: { path: { product } },
+          body: { share, approvers },
+        }),
+      ),
+    onSuccess: () => void queries.invalidateQueries({ queryKey: ["products"] }),
+  });
+
   if (products.isPending) return <Loading />;
   if (products.isError) {
     return <Failed error={products.error} what="The products could not be read." />;
@@ -162,6 +181,9 @@ export function Products({ who }: { who: Who }) {
                   Open findings
                 </th>
                 <th>Triage from</th>
+                <th title="When one pair of people agreeing to most of the work is raised: a share of the agreements, among at least this many people who may approve">
+                  One pair
+                </th>
                 <th>Out of support</th>
                 <th>Last inventory</th>
                 <th />
@@ -202,6 +224,17 @@ export function Products({ who }: { who: Who }) {
                         stated={product.triage_floor ?? ""}
                         admin={who.admin}
                         onSet={(floor) => setFloor.mutate({ product: product.name ?? "", floor })}
+                      />
+                    </td>
+                    <td>
+                      <Pairs
+                        product={product.name ?? ""}
+                        share={product.pair_share ?? 0}
+                        approvers={product.pair_approvers ?? 0}
+                        admin={who.admin}
+                        onSet={(share, approvers) =>
+                          setPairs.mutate({ product: product.name ?? "", share, approvers })
+                        }
                       />
                     </td>
                     <td>
@@ -361,5 +394,76 @@ function Floor({
         </option>
       ))}
     </select>
+  );
+}
+
+// Pairs is a product's own thresholds for raising one pair of people agreeing
+// to most of its work. Empty follows the deployment.
+function Pairs({
+  product,
+  share,
+  approvers,
+  admin,
+  onSet,
+}: {
+  product: string;
+  share: number;
+  approvers: number;
+  admin: boolean;
+  onSet: (share: number, approvers: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [shareSaid, setShare] = useState(share ? String(share) : "");
+  const [approversSaid, setApprovers] = useState(approvers ? String(approvers) : "");
+  const said =
+    share || approvers ? (
+      <span>
+        {share ? `${share}%` : "deployment\u2019s share"}
+        {" · "}
+        {approvers ? `${approvers} people` : "deployment\u2019s floor"}
+      </span>
+    ) : (
+      <span className="hint">deployment&rsquo;s</span>
+    );
+  if (!admin) return said;
+  if (!editing) {
+    return (
+      <button type="button" className="linkish" onClick={() => setEditing(true)}>
+        {said}
+      </button>
+    );
+  }
+  return (
+    <span>
+      <input
+        type="number"
+        min={0}
+        max={100}
+        aria-label={`Share of ${product}'s agreements one pair may give, as a percentage`}
+        placeholder="%"
+        style={{ width: "6ch" }}
+        value={shareSaid}
+        onChange={(event) => setShare(event.target.value)}
+      />{" "}
+      <input
+        type="number"
+        min={0}
+        aria-label={`Fewest people who may approve in ${product}`}
+        placeholder="people"
+        style={{ width: "7ch" }}
+        value={approversSaid}
+        onChange={(event) => setApprovers(event.target.value)}
+      />{" "}
+      <button
+        type="button"
+        className="linkish"
+        onClick={() => {
+          onSet(Number(shareSaid) || 0, Number(approversSaid) || 0);
+          setEditing(false);
+        }}
+      >
+        Save
+      </button>
+    </span>
   );
 }

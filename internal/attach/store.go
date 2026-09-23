@@ -184,16 +184,22 @@ func mayAttachTo(ctx context.Context, db bun.IDB, subject access.Subject,
 	if issue := at.Issue(); issue != nil {
 		return mayAttach(ctx, db, subject, at.ProductID, *issue)
 	}
-	// Reaching a report and writing to one are the same right. What a report
-	// carries has not been judged, so reaching it already asks for the right
-	// to triage work nobody has announced — which is a writing role.
-	return mayReachReport(ctx, db, subject, at.ProductID, *at.Report())
+	// Writing to a report asks for the right to work reports, which reading
+	// one does not grant. The report has to be here first, for the reason a
+	// read asks it first.
+	if err := mayReachReport(ctx, db, subject, at.ProductID, *at.Report()); err != nil {
+		return err
+	}
+	if !subject.Triages(access.Private, at.ProductID) {
+		return access.Denied(fmt.Sprintf("reach attachments in product %d", at.ProductID))
+	}
+	return nil
 }
 
 // mayReachReport reports whether a subject may read what arrived with one
 // report.
 //
-// The right to triage work nobody has announced in that product, whether or
+// The right to read work nobody has announced in that product, whether or
 // not the report has been judged. A file that arrived with a claim is what a
 // stranger sent and nobody has reviewed it, so judging the claim to be a
 // disclosed issue must not publish it to everybody who reads that product —
@@ -201,9 +207,8 @@ func mayAttachTo(ctx context.Context, db bun.IDB, subject access.Subject,
 // somebody takes.
 //
 // The same rule the report itself takes, so the record and what arrived with
-// it have one answer rather than two. That makes reaching a report's files
-// and attaching one to it the same right, because reaching already asks for a
-// role that writes.
+// it have one answer rather than two. Attaching one asks for more, and is
+// checked where a file is attached.
 //
 // A file on an issue follows the issue instead, including an embargo ending.
 // The two differ because what they hang off differs: one is our own record of
@@ -234,7 +239,7 @@ func mayReachReport(ctx context.Context, db bun.IDB, subject access.Subject,
 	// not read, for the reason an issue's files give the same answer twice:
 	// telling somebody a file exists but is not theirs tells them the claim
 	// exists.
-	if here == 0 || !subject.Triages(access.Private, productID) {
+	if here == 0 || !subject.Reads(access.Private, productID) {
 		return access.Denied(fmt.Sprintf("reach attachments in product %d", productID))
 	}
 	return nil

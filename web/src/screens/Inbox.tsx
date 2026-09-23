@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { mayOf, useWho } from "../app/session";
 import { PAGE, useRecordReport, useReports, useRulings } from "../api/intake";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
@@ -25,17 +26,23 @@ export function Inbox() {
     setParams(next === "waiting" ? { waiting: "1" } : {}, { replace: true });
   const [recording, setRecording] = useState(false);
   const waiting = useRulings(product, true, 0);
+  // Reading reports and working them are different rights, so a reader of
+  // undisclosed work sees every report and none of the controls that write.
+  const works = !!mayOf(useWho().data, product)?.may_hide;
 
   return (
     <div>
       <div className="screen-head">
         <h2>Inbox</h2>
         <p>
-          Reports sent to <Link to={`/products/${encodeURIComponent(product)}`}>{product}</Link>
+          Vulnerability reports sent to{" "}
+          <Link to={`/products/${encodeURIComponent(product)}`}>{product}</Link>
         </p>
-        <button type="button" className="btn" onClick={() => setRecording((was) => !was)}>
-          {recording ? "Cancel" : "Record a report"}
-        </button>
+        {works && (
+          <button type="button" className="btn" onClick={() => setRecording((was) => !was)}>
+            {recording ? "Cancel" : "Record a vulnerability report"}
+          </button>
+        )}
       </div>
 
       {recording && <RecordReport product={product} />}
@@ -47,7 +54,7 @@ export function Inbox() {
           aria-selected={tab === "reports"}
           onClick={() => go("reports")}
         >
-          Reports
+          Vulnerability reports
         </button>
         <button
           type="button"
@@ -60,18 +67,23 @@ export function Inbox() {
         </button>
       </div>
 
-      {tab === "reports" ? <Reports product={product} /> : <Waiting product={product} />}
+      {tab === "reports" ? (
+        <Reports product={product} works={works} />
+      ) : (
+        <Waiting product={product} />
+      )}
     </div>
   );
 }
 
-function Reports({ product }: { product: string }) {
+function Reports({ product, works }: { product: string; works: boolean }) {
   const [offset, setOffset] = useState(0);
   const [chosen, setChosen] = useState<string[]>([]);
   const listed = useReports(product, offset);
 
   if (listed.isPending) return <Loading />;
-  if (listed.isError) return <Failed error={listed.error} what="The reports could not be read." />;
+  if (listed.isError)
+    return <Failed error={listed.error} what="The vulnerability reports could not be read." />;
   const rows = listed.data?.items ?? [];
   const at = `/products/${encodeURIComponent(product)}/inbox`;
   const open = rows.filter(rulable).map((row) => row.reference);
@@ -81,7 +93,12 @@ function Reports({ product }: { product: string }) {
     );
 
   if (rows.length === 0) {
-    return <Empty title="No reports." detail="A report you record appears here." />;
+    return (
+      <Empty
+        title="No vulnerability reports."
+        detail="A vulnerability report you record appears here."
+      />
+    );
   }
   return (
     <>
@@ -100,10 +117,10 @@ function Reports({ product }: { product: string }) {
         <table>
           <thead>
             <tr>
-              <th>
+              <th hidden={!works}>
                 <input
                   type="checkbox"
-                  aria-label="Select every open report on this page"
+                  aria-label="Select every open vulnerability report on this page"
                   checked={open.length > 0 && open.every((each) => chosen.includes(each))}
                   disabled={open.length === 0}
                   onChange={(event) => setChosen(event.target.checked ? open : [])}
@@ -121,7 +138,7 @@ function Reports({ product }: { product: string }) {
               const stands = standing(row);
               return (
                 <tr key={row.reference} className="row">
-                  <td>
+                  <td hidden={!works}>
                     {rulable(row) && (
                       <input
                         type="checkbox"
@@ -224,7 +241,7 @@ function RecordReport({ product }: { product: string }) {
 
   return (
     <div className="card" style={{ marginBottom: 14 }}>
-      <h3>New report</h3>
+      <h3>New vulnerability report</h3>
       <div className="field">
         <Editor
           label="What was claimed"
@@ -306,7 +323,9 @@ function RecordReport({ product }: { product: string }) {
       >
         Record
       </button>
-      {record.error != null && <Failed error={record.error} what="The report was not recorded." />}
+      {record.error != null && (
+        <Failed error={record.error} what="The vulnerability report was not recorded." />
+      )}
     </div>
   );
 }

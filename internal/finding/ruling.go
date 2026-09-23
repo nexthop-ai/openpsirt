@@ -381,8 +381,15 @@ func distinctReferences(typed []string) []string {
 func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 	productID, rulingID int64) (*ReportRuling, error) {
 
-	if err := mayHandle(subject, productID); err != nil {
+	// Somebody who may not read the product's reports is told there is no
+	// such ruling, the answer a number nobody minted gets. Somebody who reads
+	// them and may not agree is refused in words: they can list the ruling,
+	// and "no such ruling" would contradict the read they just made.
+	if err := mayReadReports(subject, productID); err != nil {
 		return nil, ErrNoSuchRuling
+	}
+	if err := mayApproveRuling(subject, productID); err != nil {
+		return nil, err
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
@@ -440,8 +447,14 @@ func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 	productID, rulingID int64) (*ReportRuling, error) {
 
-	if err := mayHandle(subject, productID); err != nil {
+	// Somebody who may not read the product's reports is told there is no
+	// such ruling. Somebody who can read it and may not withdraw it is refused
+	// in words, as approving is.
+	if err := mayReadReports(subject, productID); err != nil {
 		return nil, ErrNoSuchRuling
+	}
+	if err := mayHandle(subject, productID); err != nil {
+		return nil, err
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
@@ -506,7 +519,7 @@ func rulingIn(ctx context.Context, db bun.IDB, productID, rulingID int64) (*Repo
 func (s *Store) RulingBy(ctx context.Context, subject access.Subject,
 	productID, rulingID int64) (*ReportRuling, error) {
 
-	if err := mayHandle(subject, productID); err != nil {
+	if err := mayReadReports(subject, productID); err != nil {
 		return nil, ErrNoSuchRuling
 	}
 	ruling, err := rulingIn(ctx, s.db, productID, rulingID)
@@ -531,7 +544,7 @@ func named(q *bun.SelectQuery) *bun.SelectQuery {
 func (s *Store) RulingsIn(ctx context.Context, subject access.Subject, productID int64,
 	waiting bool, limit, offset int) ([]ReportRuling, int, error) {
 
-	if err := mayHandle(subject, productID); err != nil {
+	if err := mayReadReports(subject, productID); err != nil {
 		return nil, 0, err
 	}
 	return s.RulingsAcross(ctx, subject, RulingsAsked{
@@ -545,30 +558,46 @@ type RulingsAsked struct {
 	ProductIDs []int64
 	// Waiting keeps those waiting for a second person.
 	Waiting bool
+	// Approvable keeps those this subject may agree to: waiting, proposed by
+	// somebody else, in a product where they may agree to a ruling. It is
+	// the count a queue of what is pending their approval adds.
+	Approvable bool
 	// Since and Until keep those proposed in a period, Until exclusive.
 	Since, Until *time.Time
 	Limit        int
 	Offset       int
 }
 
-// RulingsAcross is the rulings in every product this subject may work reports
+// RulingsAcross is the rulings in every product this subject may read reports
 // in, newest first, with how many there are.
 //
-// A product somebody may not work reports in contributes nothing, not even to
+// A product somebody may not read reports in contributes nothing, not even to
 // the count: a ruling says what a stranger's claim is, and reading it reads
 // the claim.
 func (s *Store) RulingsAcross(ctx context.Context, subject access.Subject,
 	asked RulingsAsked) ([]ReportRuling, int, error) {
 
 	products := reportProducts(subject, asked.ProductIDs)
+	if asked.Approvable {
+		kept := products[:0:0]
+		for _, id := range products {
+			if mayApproveRuling(subject, id) == nil {
+				kept = append(kept, id)
+			}
+		}
+		products = kept
+	}
 	if len(products) == 0 {
 		return []ReportRuling{}, 0, nil
 	}
 	var rows []ReportRuling
 	q := named(s.db.NewSelect().Model(&rows)).
 		Where("rr.product_id IN (?)", bun.List(products))
-	if asked.Waiting {
+	if asked.Waiting || asked.Approvable {
 		q = q.Where("rr.settled_at IS NULL").Where("rr.withdrawn_at IS NULL")
+	}
+	if asked.Approvable {
+		q = q.Where("rr.proposed_by <> ?", subject.ID)
 	}
 	if asked.Since != nil {
 		q = q.Where("rr.proposed_at >= ?", *asked.Since)
@@ -592,21 +621,21 @@ func (s *Store) RulingsAcross(ctx context.Context, subject access.Subject,
 	return rows, total, nil
 }
 
-// reportProducts is the products this subject may work reports in, kept to
+// reportProducts is the products this subject may read reports in, kept to
 // those asked for where any were.
 func reportProducts(subject access.Subject, asked []int64) []int64 {
 
-	// The products read from, which include every product the subject
-	// triages undisclosed work in. An estate-wide role is one grant per
-	// product by the time it is asked here, and the one subject that reads
-	// every product unnarrowed holds no role and triages nothing.
+	// The products read from, which include every product the subject reads
+	// undisclosed work in. An estate-wide role is one grant per product by the
+	// time it is asked here, and the one subject that reads every product
+	// unnarrowed holds no role and reads no undisclosed work by it.
 	candidates, _ := subject.Products()
 	if len(asked) > 0 {
 		candidates = asked
 	}
 	out := make([]int64, 0, len(candidates))
 	for _, id := range candidates {
-		if subject.Triages(access.Private, id) {
+		if subject.Reads(access.Private, id) {
 			out = append(out, id)
 		}
 	}
@@ -690,7 +719,7 @@ func (s *Store) RulingsOf(ctx context.Context, reports []FlawReport) (map[int64]
 func (s *Store) DuplicatesOf(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64) ([]FlawReport, error) {
 
-	if err := mayHandle(subject, productID); err != nil {
+	if err := mayReadReports(subject, productID); err != nil {
 		return nil, err
 	}
 	var rows []FlawReport

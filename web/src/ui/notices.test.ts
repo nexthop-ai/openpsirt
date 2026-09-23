@@ -16,6 +16,7 @@ describe("what a notification is called", () => {
     expect(label("build-quiet")).toBe("not being scanned");
     expect(label("inventory-moved")).toBe("a build's contents changed sharply");
     expect(label("obligation-open")).toBe("window after an attack running");
+    expect(label("obligation-near")).toBe("window after an attack ending soon");
     expect(label("obligation-passed")).toBe("window after an attack passed");
     // The one of the ten this list left out.
     expect(label("critical-on-release")).toBe("critical on a release");

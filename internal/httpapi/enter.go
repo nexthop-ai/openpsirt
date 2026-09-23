@@ -66,6 +66,9 @@ func registerEntry(api huma.API, in Ingest) {
 			"goes. A name the build holds at more than one version is refused with the " +
 			"choices rather than resolved to one; send `version`, and `ecosystem` where two " +
 			"share a version.\n\n" +
+			"`from_report` records the flaw from a vulnerability report already in this " +
+			"product and accepts the report as it in the same act; it needs private-triage. " +
+			"A report already judged, or under a ruling, is refused with 409.\n\n" +
 			"From here it behaves like any other finding: triaged, assigned, decided, on the " +
 			"same clock and in the same reports. No scan will close it, so it is closed " +
 			"by a person through the resolve endpoint or it stays open.",
@@ -101,6 +104,7 @@ func registerEntry(api huma.API, in Ingest) {
 			Contact    string `json:"contact,omitempty" maxLength:"191" doc:"The address to reach them at. A researcher has no account here, which is the shape of the thing"`
 			Credit     string `json:"credit,omitempty" maxLength:"191" doc:"The credit they asked for in an advisory, where that is not the name they reported under. \"anonymous\" is a real answer"`
 			Received   string `json:"received,omitempty" format:"date" doc:"The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless"`
+			FromReport string `json:"from_report,omitempty" maxLength:"593" doc:"A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the four fields above are refused beside it"`
 		}
 	}) (*struct {
 		Status int
@@ -137,6 +141,7 @@ func registerEntry(api huma.API, in Ingest) {
 				ReportedBy: input.Body.ReportedBy, Contact: input.Body.Contact,
 				Credit: input.Body.Credit, Received: input.Body.Received,
 			},
+			FromReport: input.Body.FromReport,
 		})
 		if err != nil {
 			// Each of these is the caller's to fix, and says which. Falling
@@ -160,6 +165,12 @@ func registerEntry(api huma.API, in Ingest) {
 			case errors.Is(err, finding.ErrTooManyPlaces):
 				// The caller's to narrow, and the sentence says by how much.
 				return nil, asked(in.Logger, err)
+			case errors.Is(err, finding.ErrToldTwice):
+				return nil, asked(in.Logger, err)
+			case errors.Is(err, finding.ErrNoSuchReport):
+				return nil, huma.Error404NotFound(finding.ErrNoSuchReport.Error())
+			case errors.Is(err, finding.ErrAlreadyJudged):
+				return nil, huma.Error409Conflict(finding.ErrAlreadyJudged.Error())
 			}
 			return nil, refusedFinding(in, err)
 		}

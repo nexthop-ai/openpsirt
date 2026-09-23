@@ -32,6 +32,9 @@ type Due struct {
 	EndsAt time.Time
 	// Passed says that moment has gone.
 	Passed bool
+	// Near says the window's warning has come and its end has not, where it
+	// names a warning.
+	Near bool
 	// Answered says a notice recorded against this incident names this
 	// window. Whoever recorded it said so; nothing here judges whether the
 	// notice met anything.
@@ -148,19 +151,24 @@ func (s *Store) Shelf(ctx context.Context, subject access.Subject) ([]Entry, err
 	for _, one := range kept {
 		entries = append(entries, Entry{
 			Standing: one,
-			Windows:  Running(windows, one.Record.KnownAt, told[one.Record.ID], now),
-			Told:     told[one.Record.ID],
+			Windows: Running(windows, one.Record.ProductID, one.Record.KnownAt,
+				told[one.Record.ID], now),
+			Told: told[one.Record.ID],
 		})
 	}
 	return entries, nil
 }
 
-// Running is every window as it runs from one moment, with whether it has
+// Running is every window that applies to an attack on this product, as it
+// runs from one moment, with whether its warning has come, whether it has
 // passed and whether a notice names it.
 //
 // Worked out when asked rather than stored. A window changed by an
-// administrator moves every end with it, which is what changing it means.
-func Running(windows []Window, knownAt time.Time, told []Told, now time.Time) []Due {
+// administrator moves every end with it, which is what changing it means. A
+// window limited to other products is left out: which window applies where is
+// the administrator's statement, and nothing here second-guesses it.
+func Running(windows []Window, productID int64, knownAt time.Time, told []Told,
+	now time.Time) []Due {
 	answered := map[int64]bool{}
 	for _, one := range told {
 		if one.WindowID != nil {
@@ -169,10 +177,18 @@ func Running(windows []Window, knownAt time.Time, told []Told, now time.Time) []
 	}
 	out := make([]Due, 0, len(windows))
 	for _, window := range windows {
+		if !window.AppliesTo(productID) {
+			continue
+		}
 		ends := window.EndsAt(knownAt)
+		passed := !now.Before(ends)
+		near := false
+		if at, warns := window.NearAt(knownAt); warns {
+			near = !passed && !now.Before(at)
+		}
 		out = append(out, Due{
 			Window: window, EndsAt: ends,
-			Passed: !now.Before(ends), Answered: answered[window.ID],
+			Passed: passed, Near: near, Answered: answered[window.ID],
 		})
 	}
 	return out

@@ -59,13 +59,15 @@ func registerWhoTold(api huma.API, in Ingest) {
 			"one the reporter has a publication scheduled against, and they are the party who " +
 			"will publish regardless.\n\n" +
 			"Answers 404 where nobody recorded a reporter, which is every flaw we found " +
-			"ourselves.",
+			"ourselves, and to somebody who may not read the product's vulnerability reports.",
 		Tags: []string{"Findings"},
-	}, perProduct, "", triageRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "", privateRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*struct{ Body ReportBody }, error) {
-		subject, _, _, issue, err := caseAtTriaging(ctx, in, input.Product, input.Vulnerability)
+		// Read with the right every read of a report asks, which the store
+		// checks against the product it was reported in.
+		subject, _, _, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +114,7 @@ func registerWhoTold(api huma.API, in Ingest) {
 			return nil, huma.Error404NotFound("nobody is recorded as having reported this")
 		}
 		if err := store.Acknowledge(ctx, subject, issue); err != nil {
-			return nil, wentWrong(in.Logger, "that could not be recorded", err)
+			return nil, refused(in.Logger, err, "that could not be recorded")
 		}
 		return &struct{}{}, nil
 	})

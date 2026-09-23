@@ -70,6 +70,7 @@ true is cleared, and running the same pass twice changes nothing.
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |
 | A window after an attack running, with nobody outside recorded as told | condition | Described under obligation notices below |
+| The same window near its end, where it names a warning | condition | Described under obligation notices below |
 | The same window passed | condition | Described under obligation notices below |
 
 A new build notifies nobody. A build arriving is the ordinary state of a tool
@@ -171,16 +172,17 @@ A claim nobody has judged is raised the same way and named differently. It has
 no issue to name, so the alert carries the reference it was minted with and
 points at the report.
 
-Both are told to whoever may triage work nobody has announced there, which is
-who may open the report. An alert about a letter somebody cannot read is one
-they can do nothing with.
+Both are told to whoever may triage work nobody has announced there, because
+answering a report is working it. Everybody told may also open it: reading a
+report asks for less.
 
 A ruling waiting for approval takes the period a waiting claim does, because it
 is the same thing: one act setting something aside, which takes effect only
 once somebody else agrees. One alert per ruling, however many reports it
 covers, pointing at the inbox narrowed to what is waiting. It is undisclosed,
-and reaches whoever may approve it, which is the report rule — the approver
-capability alone reaches no ruling. A ruling answers what a claim is and not
+and reaches whoever may approve it under the report rule: the approver
+capability or triage of undisclosed work, over reading it, and never its
+proposer. A ruling answers what a claim is and not
 the reporter, so a rejected report nobody acknowledged is still raised as
 unanswered.
 
@@ -210,12 +212,12 @@ population: one routing rule places thousands of findings in a sweep.
 
 ## Reports that must come back empty
 
-Two of them, and being empty is what they are for. The disposition register
-filtered for what one person decided should return nothing, because every
-outcome that hides risk needs a second person; and the vulnerability data
-should never have stopped moving.
+Being empty is what these are for. The disposition register filtered for what
+one person decided should return nothing, because every outcome that hides risk
+needs a second person; the vulnerability data should never have stopped moving;
+and a configured supplier should never stop answering.
 
-Neither is a report anybody opens, and neither is mailed on a schedule.
+None is a report anybody opens, and none is mailed on a schedule.
 
 | Shape | Why it fails |
 |---|---|
@@ -230,8 +232,10 @@ sent when it does not reaches somebody who was not looking.
 |---|---|
 | The vulnerability data has stopped moving | Nothing failed. Every scan since answers as confidently as ever against what was known a month ago, and a finding newer data would have opened has not |
 | Something is hidden with nobody's agreement | Anything that hides risk needs a second person, so one standing with none means the write path was got around |
+| A supplier has stopped answering | One that stopped and one that published nothing look the same everywhere but the supplier's own panel. Raised once a configured supplier has gone unread past a setting, a week by default and never shorter than two scan intervals; cleared by a read succeeding, the supplier being withdrawn or its product being retired, since a retired product's suppliers are never read again |
+| One pair is agreeing to most of a product's work | The second person is there, and in form only. Not a report that must be empty, and it carries thresholds for that reason: below them one pair doing everything is what a small team looks like |
 
-Both go to administrators, like the other conditions about the deployment rather
+Each goes to administrators, like the other conditions about the deployment rather
 than about anybody's work.
 
 | Rule | Reason |
@@ -250,6 +254,20 @@ than about anybody's work.
 | Whether somebody agreed is asked of the record | No approval from anybody other than the proposer, and none taken back. A flag there would be the row's own account of itself, and the failure this exists to find is a row the write path should never have produced |
 | A claim still waiting for its second person is not this | It suppresses nothing and hides nothing while it waits, and somebody is looking at it |
 | Counted across every product and the whole record | The condition is about the deployment. What the report behind the link shows is narrowed to what its reader holds, so an administrator granted no product reads the count and an empty page — the same answer their dashboard gives, and the reason the link asks for everything rather than the quarter the sheet opens on |
+
+### Concentrated approval pairs
+
+| Rule | Reason |
+|---|---|
+| Raised where one pair's share of a product's agreements reaches a threshold, among at least a set number of people who may approve | Two thresholds, both met. A share alone is permanently true in a team of two, which is an alert nobody can clear (REQ-49). The count of people who may approve is what makes the pattern a choice. A share of a hundred is one pair giving every agreement, and is raised |
+| Only over at least ten agreed claims in the period | A fixed floor. Below it a share is a handful of acts: one agreed claim is a hundred percent, and each claim ageing out moves the share across the threshold and back, raising and mailing a new condition each time |
+| Each threshold is a deployment setting a product may override | Teams differ in size by product. A product's own value follows the triage line's shape: cleared, it follows the deployment rather than copying its current value |
+| A pair is two people, whichever proposed | The pattern is two people each agreeing to what the other proposes. Counted by direction, the pair it exists to find reads as two halves under the threshold |
+| Counted in claims | A claim over sixty places is one thing proposed and one agreed to |
+| Over the last ninety days of proposals | The rubber-stamp report's own period, so the report the link opens holds what raised it. What it asks about is how agreement is given now; a pattern a team has moved away from is not a control failing today. Older agreements are left out of the whole as well as of the pair, so a spread-out past does not hide a concentrated present |
+| People who may approve are counted, not people who did | One pair doing everything while others who may approve do nothing is the case itself. A triager may approve somebody else's claim, and so may somebody holding the approver capability, each only where they may read |
+| Keyed on the product and the two people | A pair that stays dominant stays one condition, and a different pair taking over is a different one |
+| It names the two people and the share, never the counts behind it | Which pair is the fact. It goes to every administrator, and a product's volume of agreed work follows visibility (REQ-42, REQ-43). The claims they agreed to are on the report the link opens |
 
 ### Data that stopped moving
 
@@ -511,8 +529,10 @@ notices; what is said about them is here.
 
 | Rule | Reason |
 |---|---|
-| Two conditions, running and passed | They clear differently, the way the two embargo conditions do. The running one clears when the end arrives, and the passed one opens |
-| Raised from the moment the record stands, with no lead time | The windows in force anywhere are a day to a fortnight and an incident is rare, so a warning that waits gives back the hours it exists to save |
+| Three conditions: running, near its end, and passed | They clear differently, the way the embargo conditions do. The running one and the near one clear when the end arrives, and the passed one opens |
+| Running is raised from the moment the record stands | The windows in force anywhere are a day to a fortnight and an incident is rare, so a warning that waits gives back the hours it exists to save |
+| Near is raised at the warning the window names, and not at all where it names none | Beside the running one rather than instead of it. The first says an attack is being counted; the second says the count is nearly out |
+| Only for a product the window applies to | A window limited to other products raises nothing for this one |
 | One per record and window | Each window is answered separately, so each is said separately |
 | Cleared by a notice naming the window, by clearing the record, or by retiring the window | The same way every condition here clears: by the thing happening. Nobody dismisses it |
 | To whoever may triage the product, at the issue's visibility | The people who may record the notice. An undisclosed issue reaches nobody who may not read undisclosed work there, and what leaves the deployment about it is a link |

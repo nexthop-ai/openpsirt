@@ -1,3 +1,4 @@
+import { useApprovable } from "../api/intake";
 import { notACredential } from "../ui/noautofill";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { initials } from "../ui/initials";
@@ -46,9 +47,9 @@ const UNOWNED_QUERY = listQuery(asAsked(new URLSearchParams(UNOWNED), "issues"))
 export function Shell({ who, children }: { who: Who; children: ReactNode }) {
   const { product, stream, variant } = useScope();
   const whole = !!(product && stream && variant);
-  // Reports take triage of undisclosed work, which is what may_hide says.
-  const reportsAnywhere = who.reach.some((each) => each.may_hide);
-  const reportsHere = !!product && !!mayOf(who, product)?.may_hide;
+  // Reading reports takes reading undisclosed work, which is what sees_all says.
+  const reportsAnywhere = who.reach.some((each) => each.sees_all);
+  const reportsHere = !!product && !!mayOf(who, product)?.sees_all;
   const scope = [product ?? "all products", stream, variant].filter(Boolean).join(" · ");
   const build = whole
     ? `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(stream)}/variants/${encodeURIComponent(variant)}`
@@ -98,6 +99,9 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
       unwrap(await api.GET("/v1/review-queue", { params: { query: { limit: 1 } } })),
     refetchInterval: 60_000,
   });
+  // Rulings on vulnerability reports waiting for this reader, which sit in the
+  // same queue as the claims.
+  const approvable = useApprovable();
   // Across every product a reader can see, like the entry it sits under and
   // unlike the scoped count below: the badge is what the address opens, and
   // that address names no product.
@@ -190,9 +194,13 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               to="/review-queue"
               icon="inbox"
               label="Review queue"
-              count={queue.data?.total}
-              unread={queue.isError}
-              unit="claims waiting"
+              count={
+                queue.data?.total === undefined
+                  ? undefined
+                  : queue.data.total + (approvable.data ?? 0)
+              }
+              unread={queue.isError || approvable.isError}
+              unit="waiting for your approval"
             />
             <Rail
               to={UNOWNED_LIST}
@@ -248,15 +256,19 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               needs={whole}
             />
             {/* What people outside have sent a product. Only for somebody who may
-              work reports somewhere, and it needs a product picked because an
-              inbox belongs to one. */}
+              read vulnerability reports somewhere, and it needs a product
+              picked because an inbox belongs to one. */}
             {reportsAnywhere && (
               <Rail
                 to={product ? `/products/${encodeURIComponent(product)}/inbox` : ""}
                 icon="letter"
                 label="Inbox"
                 needs={!!product && reportsHere}
-                why={product ? "You don't work reports in this product" : "Pick a product"}
+                why={
+                  product
+                    ? "You can't read vulnerability reports in this product"
+                    : "Pick a product"
+                }
               />
             )}
             {/* Recording a flaw is an act rather than a place, so it opens a

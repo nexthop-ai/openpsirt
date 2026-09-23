@@ -151,12 +151,8 @@ func TestACVEAssignedLaterBecomesAnotherNameForTheSameIssue(t *testing.T) {
 }
 
 func TestWhoToldUsNeedsTheRightItSaysItNeeds(t *testing.T) {
-	// A reporter's name and the address to reach them at are a third party's
-	// contact details, and the routes carrying them declare the right to argue
-	// about findings. They enforced a read role — so the annotation on the
-	// operation and the check in the handler said different things, and the
-	// annotation is what the generated reference tells an operator the rule
-	// is.
+	// The route declares the rights it enforces, because the declaration is
+	// what the generated reference tells an operator the rule is.
 	twoReach(t, func(t *testing.T, r *reach) {
 		r.scannedWithEvidence(t)
 		got := asPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
@@ -175,16 +171,24 @@ func TestWhoToldUsNeedsTheRightItSaysItNeeds(t *testing.T) {
 		}
 
 		at := "/v1/products/mine/issues/" + recorded.Identifier + "/report"
-		// Somebody who may read undisclosed findings and may not argue about
-		// them does not get the reporter's details.
-		if refused := asPerson(t, r, "private", http.MethodGet, at, ""); refused.Code != http.StatusForbidden {
-			t.Errorf("a reader with no triage right read the reporter's details: %d",
-				refused.Code)
+		// Who reported it is read with the right that reads the report itself:
+		// undisclosed work in the product, whether or not the reader may act.
+		for _, who := range []string{"private", "private-triage"} {
+			if ok := asPerson(t, r, who, http.MethodGet, at, ""); ok.Code != http.StatusOK {
+				t.Errorf("%s was refused the reporter's details: %d %s",
+					who, ok.Code, ok.Body.String())
+			}
 		}
-		// And whoever the route says may, does.
-		if ok := asPerson(t, r, "private-triage", http.MethodGet, at, ""); ok.Code != http.StatusOK {
-			t.Errorf("somebody holding private triage was refused: %d %s",
-				ok.Code, ok.Body.String())
+		// Somebody who argues about public findings and reads nothing
+		// undisclosed is told nobody is recorded.
+		if refused := asPerson(t, r, "triager", http.MethodGet, at, ""); refused.Code != http.StatusNotFound {
+			t.Errorf("a triager who reads no undisclosed work was answered %d: %s",
+				refused.Code, refused.Body.String())
+		}
+		// Answering the reporter is working the report, which reading it does
+		// not grant.
+		if refused := asPerson(t, r, "private", http.MethodPost, at+"/acknowledgement", ""); refused.Code != http.StatusForbidden {
+			t.Errorf("a reader answered the reporter: %d", refused.Code)
 		}
 	})
 }

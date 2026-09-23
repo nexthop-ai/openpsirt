@@ -1,3 +1,4 @@
+import { mayOf, useWho } from "../app/session";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
@@ -24,9 +25,11 @@ export function InboxReport() {
   const report = useReport(product, reference);
   const ruling = useRuling(product, report.data?.ruling);
   const acknowledge = useAcknowledgeReport(product, reference);
+  const works = !!mayOf(useWho().data, product)?.may_hide;
 
   if (report.isPending) return <Loading />;
-  if (report.isError) return <Failed error={report.error} what="That report could not be read." />;
+  if (report.isError)
+    return <Failed error={report.error} what="That vulnerability report could not be read." />;
   const it = report.data;
   const stands = standing(it);
   const inbox = `/products/${encodeURIComponent(product)}/inbox`;
@@ -78,6 +81,7 @@ export function InboxReport() {
             <strong>Not answered.</strong>
             <span>Send them a note, then record it here.</span>
             <button
+              hidden={!works}
               type="button"
               className="btn"
               style={{ marginLeft: "auto" }}
@@ -93,7 +97,7 @@ export function InboxReport() {
         )}
       </div>
 
-      <Files product={product} reference={reference} />
+      <Files product={product} reference={reference} works={works} />
 
       <div className="card" style={{ marginTop: 14 }}>
         <h3>Judgment</h3>
@@ -118,8 +122,10 @@ export function InboxReport() {
           ) : (
             ruling.data && <RulingCard ruling={ruling.data} />
           )
-        ) : (
+        ) : works ? (
           <Judge product={product} reference={reference} />
+        ) : (
+          <p className="hint">Not judged yet.</p>
         )}
       </div>
     </div>
@@ -154,8 +160,13 @@ function Judge({ product, reference }: { product: string; reference: string }) {
           </button>
         </div>
         <span className="hint">
-          An issue already recorded in {product}. <Link to="/record">Record a flaw</Link> first if
-          there is none.
+          An issue already recorded in {product}, or{" "}
+          <Link
+            to={`/record?product=${encodeURIComponent(product)}&from=${encodeURIComponent(reference)}`}
+          >
+            record it as a new flaw
+          </Link>
+          .
         </span>
         {accept.error != null && <Failed error={accept.error} what="It was not accepted." />}
       </div>
@@ -167,7 +178,15 @@ function Judge({ product, reference }: { product: string; reference: string }) {
 
 // What arrived with the report. Held on the report whatever it is judged to
 // be, and read under the report's rule.
-function Files({ product, reference }: { product: string; reference: string }) {
+function Files({
+  product,
+  reference,
+  works,
+}: {
+  product: string;
+  reference: string;
+  works: boolean;
+}) {
   const queries = useQueryClient();
   const listed = useReportFiles(product, reference);
   const [sending, setSending] = useState(false);
@@ -221,7 +240,7 @@ function Files({ product, reference }: { product: string; reference: string }) {
           )}
         </ul>
       )}
-      <label className="btn quiet" style={{ marginTop: 8 }}>
+      <label className="btn quiet" style={{ marginTop: 8 }} hidden={!works}>
         {sending ? "Attaching…" : "Attach a file"}
         <input
           type="file"

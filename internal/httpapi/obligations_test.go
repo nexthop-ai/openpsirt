@@ -20,6 +20,7 @@ type shelf struct {
 			} `json:"window"`
 			EndsAt   string `json:"ends_at"`
 			Passed   bool   `json:"passed"`
+			Near     bool   `json:"near"`
 			Answered bool   `json:"answered"`
 		} `json:"windows"`
 		Told []struct {
@@ -360,6 +361,212 @@ func TestAWindowOrANoticeRefusedSaysWhy(t *testing.T) {
 			if got := asPerson(t, r, tc.who, tc.method, tc.path, tc.body); got.Code != tc.want {
 				t.Errorf("%s answered %d, want %d: %s", tc.what, got.Code, tc.want, got.Body.String())
 			}
+		}
+	})
+}
+
+// declaredAs adds a window as the administrator from a body of its own, and
+// returns the answer.
+func (r *reach) declaredAs(t *testing.T, body string) int {
+	t.Helper()
+	return asPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows", body).Code
+}
+
+func TestAWindowWarnsBeforeItsEndWhereItNamesAWarning(t *testing.T) {
+	// Each window says its own warning. One twenty hours into a day with six
+	// hours of warning is near its end; a fortnight with a day of warning is
+	// not, and one that names no warning never is.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		for _, body := range []string{
+			`{"name":"Early warning","hours":24,"lead_hours":6}`,
+			`{"name":"Final report","hours":336,"lead_hours":24}`,
+			`{"name":"Customer notice","hours":22}`,
+		} {
+			if code := r.declaredAs(t, body); code != http.StatusCreated {
+				t.Fatalf("declaring %s answered %d", body, code)
+			}
+		}
+		r.attackedAt(t, time.Now().UTC().Add(-20*time.Hour))
+
+		near := r.alerts(t, "private-triage", "obligation-near")
+		if len(near) != 1 || !contains(near[0], "Early warning") {
+			t.Fatalf("the windows near their end raised %v, want the early warning alone", near)
+		}
+		// The notice raised when the record stood stays beside it.
+		if open := r.alerts(t, "private-triage", "obligation-open"); len(open) != 3 {
+			t.Errorf("three running windows raised %d running notices: %v", len(open), open)
+		}
+		if told := r.alerts(t, "outsider", "obligation-near"); len(told) != 0 {
+			t.Errorf("somebody with nothing on the product was warned: %v", told)
+		}
+
+		var seen shelf
+		read(t, r, "private-triage", "/v1/obligations", &seen)
+		nearOnShelf := map[string]bool{}
+		for _, due := range seen.Items[0].Windows {
+			nearOnShelf[due.Window.Name] = due.Near
+		}
+		if !nearOnShelf["Early warning"] || nearOnShelf["Final report"] || nearOnShelf["Customer notice"] {
+			t.Errorf("the shelf reads near as %v", nearOnShelf)
+		}
+	})
+}
+
+func TestAWarningIsSomeHoursAndShorterThanItsWindow(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		for body, want := range map[string]int{
+			`{"name":"At the end","hours":24,"lead_hours":24}`:     http.StatusUnprocessableEntity,
+			`{"name":"Past the end","hours":24,"lead_hours":30}`:   http.StatusUnprocessableEntity,
+			`{"name":"Before the end","hours":24,"lead_hours":23}`: http.StatusCreated,
+			`{"name":"No warning","hours":24,"lead_hours":0}`:      http.StatusCreated,
+		} {
+			if code := r.declaredAs(t, body); code != want {
+				t.Errorf("declaring %s answered %d, want %d", body, code, want)
+			}
+		}
+	})
+}
+
+func TestAWindowLimitedToAnotherProductDoesNotRunForThisOne(t *testing.T) {
+	// Which window applies where is the administrator's statement. An attack
+	// on a product the window does not name is watched against nothing it
+	// says.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		if code := r.declaredAs(t,
+			`{"name":"Theirs only","hours":24,"products":["theirs"]}`); code != http.StatusCreated {
+			t.Fatalf("declaring a window for another product answered %d", code)
+		}
+		if code := r.declaredAs(t,
+			`{"name":"Ours","hours":72,"products":["MINE"]}`); code != http.StatusCreated {
+			t.Fatalf("declaring a window for this product answered %d", code)
+		}
+		r.attackedAt(t, time.Now().UTC().Add(-2*time.Hour))
+
+		var seen shelf
+		read(t, r, "private-triage", "/v1/obligations", &seen)
+		if len(seen.Items) != 1 || len(seen.Items[0].Windows) != 1 ||
+			seen.Items[0].Windows[0].Window.Name != "Ours" {
+			t.Fatalf("the shelf holds %+v, want the window naming this product alone", seen)
+		}
+		open := r.alerts(t, "private-triage", "obligation-open")
+		if len(open) != 1 || !contains(open[0], "Ours") {
+			t.Errorf("the running notices are %v, want the window naming this product alone", open)
+		}
+	})
+}
+
+func TestAWindowNamingAProductNobodyDeclaredIsRefusedWhole(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		got := asPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+			`{"name":"Half known","hours":24,"products":["mine","nowhere"]}`)
+		if got.Code != http.StatusUnprocessableEntity || !contains(got.Body.String(), "nowhere") {
+			t.Fatalf("a window naming an undeclared product answered %d: %s", got.Code, got.Body.String())
+		}
+		var listed struct {
+			Items []struct {
+				Name string `json:"name"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/obligation-windows", &listed)
+		if len(listed.Items) != 0 {
+			t.Errorf("the refused window was stored: %+v", listed.Items)
+		}
+	})
+}
+
+func TestAWindowNamesOnlyTheProductsItsReaderMayKnowExist(t *testing.T) {
+	// The list of products is itself a statement about what an organization
+	// ships, and the list of windows is readable by anybody signed in.
+	twoReach(t, func(t *testing.T, r *reach) {
+		for _, body := range []string{
+			`{"name":"Both","hours":24,"products":["mine","theirs"]}`,
+			`{"name":"Theirs only","hours":48,"products":["theirs"]}`,
+			`{"name":"Everywhere","hours":72}`,
+		} {
+			if code := r.declaredAs(t, body); code != http.StatusCreated {
+				t.Fatalf("declaring %s answered %d", body, code)
+			}
+		}
+		type listing struct {
+			Items []struct {
+				Name     string   `json:"name"`
+				Products []string `json:"products"`
+			} `json:"items"`
+		}
+		var theirs listing
+		read(t, r, "private-triage", "/v1/obligation-windows", &theirs)
+		got := map[string][]string{}
+		for _, one := range theirs.Items {
+			got[one.Name] = one.Products
+		}
+		if _, shown := got["Theirs only"]; shown {
+			t.Errorf("a window limited to a product the reader may not know exists was listed: %v", got)
+		}
+		if names := got["Both"]; len(names) != 1 || names[0] != "mine" {
+			t.Errorf("a window over two products names %v to somebody who may know one", names)
+		}
+		if names, shown := got["Everywhere"]; !shown || len(names) != 0 {
+			t.Errorf("a window over every product reads as %v, shown %v", names, shown)
+		}
+
+		var all listing
+		read(t, r, "admin", "/v1/obligation-windows", &all)
+		if len(all.Items) != 3 {
+			t.Errorf("an administrator sees %d windows, want every one", len(all.Items))
+		}
+	})
+}
+
+func TestChangingAWindowReplacesItsWarningAndProducts(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		got := asPerson(t, r, "admin", http.MethodPost, "/v1/obligation-windows",
+			`{"name":"Early warning","hours":24,"lead_hours":6,"products":["mine"]}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("declaring answered %d", got.Code)
+		}
+		var window struct {
+			ID        int64    `json:"id"`
+			LeadHours int      `json:"lead_hours"`
+			Products  []string `json:"products"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &window); err != nil {
+			t.Fatal(err)
+		}
+		if window.LeadHours != 6 || len(window.Products) != 1 {
+			t.Fatalf("the declared window reads %+v", window)
+		}
+		changed := asPerson(t, r, "admin", http.MethodPut,
+			fmt.Sprintf("/v1/obligation-windows/%d", window.ID),
+			`{"name":"Early warning","hours":24}`)
+		if changed.Code != http.StatusOK {
+			t.Fatalf("changing answered %d: %s", changed.Code, changed.Body.String())
+		}
+		// Decoded fresh, because a field left out of a payload is left alone
+		// by the decoder rather than cleared.
+		var after struct {
+			LeadHours int      `json:"lead_hours"`
+			Products  []string `json:"products"`
+		}
+		if err := json.Unmarshal(changed.Body.Bytes(), &after); err != nil {
+			t.Fatal(err)
+		}
+		if after.LeadHours != 0 || len(after.Products) != 0 {
+			t.Errorf("a change sending no warning and no products answered %+v", after)
+		}
+		// And as stored, which is what the answer to the change is built
+		// beside rather than read from.
+		var stored struct {
+			Items []struct {
+				LeadHours int      `json:"lead_hours"`
+				Products  []string `json:"products"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/obligation-windows", &stored)
+		if len(stored.Items) != 1 || stored.Items[0].LeadHours != 0 ||
+			len(stored.Items[0].Products) != 0 {
+			t.Errorf("a change sending no warning and no products stored %+v", stored.Items)
 		}
 	})
 }

@@ -881,13 +881,20 @@ adds:
 | **A bulk claim draws its outliers** (REQ-28) | The counts and the rows that stood out. Any can be set aside; the button then reads "approve N, reject M". An extension says which claim it rests on |
 | **Lapsed decisions and deferrals that ran out sit underneath** | The row carries the decision and not the build it was made in, so reaffirming happens on the finding, where its locations are. One list, because a deferral that ran out on code that then moved is both — asked as two, the section merged them by hand and the count over it added the two totals |
 | **A bulk approval can be taken back from where it was made** | The control appears only just after a batch is agreed to, because that is the moment somebody notices. A permanent control for undoing a batch named at some point in the past is one nobody can use safely |
-| **Rulings on reports waiting for approval sit underneath, with the rating and date-movement sections** | A ruling rejecting a report or declaring it out of scope waits for a second person, and this is where somebody goes to be one. Its own section, because a ruling is about claims somebody sent rather than about code. Listed across the products the reader may work reports in, and narrowed with the rest where the address names a product |
+| **Rulings on vulnerability reports waiting for approval sit underneath, with the rating and date-movement sections** | A ruling rejecting a report or declaring it out of scope waits for a second person, and this is where somebody goes to be one. Its own section, because a ruling is about claims somebody sent rather than about code. Listed across the products the reader may read reports in, and narrowed with the rest where the address names a product |
 
 The queue narrows to one product, which is what a figure on the home screen
 counts: the address carries the product it was counted for, and the line under
 the heading names it. The exports narrow the same way, so a file taken from a
 narrowed screen is the narrowed backlog. Nothing narrower is offered — a claim is
 decided in a product and no finer.
+
+The count beside the queue on the rail, and the home screen's figure for what is
+pending your approval, add the rulings on vulnerability reports the reader may
+agree to — waiting, proposed by somebody else, in a product where they may
+approve a ruling — because those sit in the same queue. Rating downgrades and
+disclosure-date movements waiting on somebody are not in that count; they are
+their own sections of the queue.
 
 ## The claim page
 
@@ -1090,8 +1097,10 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 
 | Rule | |
 |---|---|
-| The link appears only for somebody who may work reports | Triage of undisclosed work in the product, which is what every read of a report asks. A link leading to a refusal is worse than none. The product page's link says how many rulings wait for approval there |
-| The rail carries it under the scope, for somebody who may work reports anywhere | It needs a product picked, and declines and says so where none is or where the reader may not work reports in the one picked |
+| The link appears only for somebody who may read reports | Reading undisclosed work in the product, which is what every read of a report asks. A link leading to a refusal is worse than none. The product page's link says how many rulings wait for approval there |
+| The rail carries it under the scope, for somebody who may read reports anywhere | It needs a product picked, and declines and says so where none is or where the reader may not read reports in the one picked |
+| A reader of reports sees no control that writes | Recording, answering, accepting, attaching, proposing and withdrawing are working reports. Approve is offered where the reader may agree to a ruling, which the answer to what they may do reports as its own field |
+| A claim somebody sent is called a vulnerability report wherever a person reads it | The rail has a Reports entry for the named reports, and a bare "report" beside it reads as one of those |
 | The claim and a ruling's reason offer no mentions | Nothing reads a mention in either. An autocomplete there names somebody who is never told |
 | Two tabs: the reports, and the rulings waiting for approval | The second is where the waiting notice points. Its count is on the tab, because it is somebody else's turn and nothing else on the screen says so |
 | A report's status is one word, and a waiting ruling says so in it | "Rejected, waiting" reads differently from "Rejected", which is the whole of what the second person changes |
@@ -1100,10 +1109,10 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | A selection past the bulk cap holds the button back and says why | The server refuses a ruling past what one act may write, and a button that always fails is worse than none |
 | The button names the act | "Propose" where somebody else has to agree, "Submit" where nobody does. The count is on it where more than one report is covered |
 | A duplicate asks for the issue, and says a closed one is rejected instead | The server refuses a duplicate of an issue not open here; the hint says what to do before the refusal does |
-| Approve is not offered to the ruling's own proposer | The server tells them apart and says so on the ruling. Withdrawing is offered to everybody, and reads "Withdraw" to the proposer, "Send back" to anybody else while it waits, and "Undo" once it is in force — one act under three names, each the word for that moment |
+| Approve is not offered to the ruling's own proposer | The server tells them apart and says so on the ruling. Withdrawing is offered to whoever works reports, and reads "Withdraw" to the proposer, "Send back" to anybody else while it waits, and "Undo" once it is in force — one act under three names, each the word for that moment |
 | A report's page holds the claim, the answer to the reporter, the files and the judgment | In that order, which is the order they happen in. The judgment offers accepting as an issue and a ruling side by side while nothing answers the report, and the ruling itself once one does |
 | Files are attached from the report's page and held at once | A report carries no text a reference could be written into |
-| Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not work reports rather than drawn empty |
+| Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
 | Rulings sit beside the record, over its products and period | A ruling is a judgment somebody could be asked to account for, and an auditor asks about a period. Beside the judgments rather than among them: a ruling is about a claim rather than a finding and takes none of their filters. Printed with them, without the controls |
 
 ## Disclosure and advisories

@@ -57,8 +57,9 @@ func Kinds() []Kind {
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
 		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
-		VulnerabilityDataStale, RiskUnagreed, InventoryMoved,
-		ObligationOpen, ObligationPassed,
+		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
+		InventoryMoved,
+		ObligationOpen, ObligationNear, ObligationPassed,
 	}
 }
 
@@ -136,6 +137,13 @@ const (
 	// or when the window is retired — and when the end arrives, at which point
 	// the other opens.
 	ObligationOpen Kind = "obligation-open"
+	// ObligationNear is the same window once the warning it names has come
+	// and its end has not, still with no notice recorded against it.
+	//
+	// Beside the one raised when the record stands rather than instead of it.
+	// A day's window and a fortnight's want warnings of different sizes, so
+	// each window says its own, and one that says none raises none.
+	ObligationNear Kind = "obligation-near"
 	// ObligationPassed is the same window after its end, still with no
 	// notice recorded against it. Both halves are facts; whether anybody owed
 	// anything is not the tool's answer to give.
@@ -232,6 +240,16 @@ const (
 	// require a second person, so one standing alone means the write path was
 	// got around rather than that somebody is behind.
 	RiskUnagreed Kind = "risk-unagreed"
+	// PairsConcentrated is one pair of people giving each other most of a
+	// product's agreements, in a product with enough people who may approve
+	// that it is a choice. Told to administrators, and cleared by the share
+	// falling back under the threshold or the period moving past it.
+	PairsConcentrated Kind = "pairs-concentrated"
+	// SupplierSilent is a configured supplier that has not been read
+	// successfully in longer than the deployment allows. Told to
+	// administrators, and cleared by a read succeeding or the supplier being
+	// withdrawn.
+	SupplierSilent Kind = "supplier-silent"
 )
 
 // Notification is one thing somebody was told.

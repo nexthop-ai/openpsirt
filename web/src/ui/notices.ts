@@ -28,16 +28,22 @@ export function label(kind?: string): string {
     // anything is not the tool's answer to give.
     case "obligation-open":
       return "window after an attack running";
+    case "obligation-near":
+      return "window after an attack ending soon";
     case "obligation-passed":
       return "window after an attack passed";
-    // The two conditions about the deployment rather than about anybody's
-    // work. Both go to administrators, and both said their own slug here —
-    // which is the one place the fallthrough below reads as a tool that was
-    // not finished rather than as one the server has grown past.
+    // The conditions about the deployment rather than about anybody's work,
+    // all told to administrators. Each is named here, because on these the
+    // fallthrough below reads as a tool nobody finished rather than as one
+    // the server has grown past.
     case "vulnerability-data-stale":
       return "vulnerability data not moving";
     case "risk-unagreed":
       return "hidden with nobody agreeing";
+    case "pairs-concentrated":
+      return "one pair agreeing to most of the work";
+    case "supplier-silent":
+      return "supplier stopped answering";
     // The four things that are wrong because nothing has happened. Each says
     // what has stopped rather than what took place, which is what makes a row
     // of them read as a list of things to pick up.
