@@ -69,6 +69,9 @@ var marks = []*regexp.Regexp{
 	regexp.MustCompile("`NOTICE` records"),
 }
 
+// itself is where this program lives.
+const itself = "internal/tools/vendored"
+
 // Our own name, which a copyright line naming is not somebody else's.
 const owner = "Nexthop Systems Inc."
 
@@ -190,10 +193,12 @@ func check(tracked []string, read func(string) ([]byte, error), held []entry,
 // not.
 //
 // NOTICE and LICENSE are the statements themselves. A markdown file is prose
-// about the tree, and the fixture READMEs describe licenses in words.
+// about the tree, and the fixture READMEs describe licenses in words. This
+// program's own source spells every mark it looks for.
 func needed(file string, read func(string) ([]byte, error)) (string, error) {
 	base := path.Base(file)
-	if file == "NOTICE" || file == "LICENSE" || strings.HasSuffix(base, ".md") {
+	if file == "NOTICE" || file == "LICENSE" || strings.HasSuffix(base, ".md") ||
+		path.Dir(file) == itself {
 		return "", nil
 	}
 	if strings.HasPrefix(file, "testdata/") || strings.Contains(file, "/testdata/") {

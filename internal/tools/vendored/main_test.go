@@ -95,6 +95,7 @@ func TestAFileThatIsOursIsNotAskedAbout(t *testing.T) {
 		{"a markdown file describing a license", "pkg/testdata/README.md", "Copyright 2024 SUSE LLC"},
 		{"the license itself", "LICENSE", "Copyright 2026 Somebody"},
 		{"a file that is not text", "pkg/blob.bin", "\xff\xfeCopyright 2020 X"},
+		{"this program, which spells the marks", "internal/tools/vendored/main.go", "SPDX-License-Identifier:"},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			files, held, notice := passing()
