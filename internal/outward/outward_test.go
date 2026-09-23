@@ -156,6 +156,8 @@ func TestAProviderIsNeverReachedInsideThisNetwork(t *testing.T) {
 		"172.16.0.1:443",
 		"169.254.169.254:443", // the address cloud metadata services answer on
 		"0.0.0.0:443",
+		"[64:ff9b::a00:5]:443",   // 10.0.0.5 through a NAT64 gateway
+		"[64:ff9b:1::a00:5]:443", // the same, through a local-use NAT64 prefix
 	} {
 		if err := Reachable(address); err == nil {
 			t.Errorf("%s was allowed", address)

@@ -26,6 +26,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -77,6 +78,10 @@ type Ingest struct {
 	// once where the configuration is read: two derivations of one boundary
 	// are two boundaries the first time either moves.
 	Ours currency.Ours
+	// Excluded is where no repository a patch link names is fetched from. The
+	// same value the fetching pass holds, so the report of what is fetched
+	// from where says what the pass does.
+	Excluded patchbranch.Excluded
 	// Mode says where roles come from. Read per request rather than held, so
 	// an administrator turning group binding off takes effect at once.
 	Mode func(context.Context) access.Mode

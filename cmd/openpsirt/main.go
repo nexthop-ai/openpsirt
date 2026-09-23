@@ -26,6 +26,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
@@ -294,7 +295,8 @@ func run(args []string, stdout, stderr *os.File) error {
 		// that asks and by the report saying what it held back. Two
 		// derivations of one boundary would be two boundaries the first time
 		// either moved.
-		Ours: ours,
+		Ours:     ours,
+		Excluded: cfg.PatchExcluded,
 	})
 
 	// Every replica serves, reads and scans. Separate worker deployments would
@@ -348,6 +350,15 @@ func run(args []string, stdout, stderr *os.File) error {
 	// above hold theirs: the politeness it keeps to is a rate per deployment
 	// rather than per replica.
 	suppliers := supplier.NewPass(db.DB, logger, name, cfg.Limits())
+	// Fetches the repositories patch links point into and records which
+	// branches each linked commit is on. Started whatever the setting says
+	// and doing nothing until it is on, reading the setting each cycle so
+	// turning it off stops the fetching without a redeploy. One replica
+	// fetches, settled by a lease, because the copies are that replica's
+	// disk and a fetch of a large tree is not work to do twice.
+	branches := patchbranch.NewPass(db.DB, logger, name, patchbranch.Options{
+		Dir: cfg.PatchDir, Quota: int64(cfg.PatchQuota), Excluded: cfg.PatchExcluded,
+	})
 	// The messages that leave the application, where an operator configured
 	// somewhere for it to go. Nil when they did not, which is ordinary rather
 	// than broken: the notification area is the channel that always exists.
@@ -383,6 +394,7 @@ func run(args []string, stdout, stderr *os.File) error {
 		reader: reader, runner: runner, schedule: schedule, upstream: upstream,
 		watch: watch, post: post, outward: outward, keeper: keeper, routing: routing,
 		undertaker: undertaker, publish: writer, suppliers: suppliers,
+		branches: branches,
 	})
 }
 
@@ -615,11 +627,13 @@ type passes struct {
 	upstream *currency.Refresher
 	// suppliers reads what configured publishers say about their own flaws.
 	suppliers *supplier.Pass
-	watch     *notify.Watch
-	post      *notify.Post
-	outward   *notify.Signal
-	keeper    *attach.Keeper
-	routing   *finding.Sweeper
+	// branches looks up which branches the commits patch links name are on.
+	branches *patchbranch.Pass
+	watch    *notify.Watch
+	post     *notify.Post
+	outward  *notify.Signal
+	keeper   *attach.Keeper
+	routing  *finding.Sweeper
 	// undertaker sets aside work whose worker never came back, which is the
 	// only pass that observes a worker having died at all.
 	undertaker *queue.Undertaker
@@ -670,6 +684,7 @@ func (p passes) loops() []loop {
 		{"schedule rescans", p.schedule.Run, scheduleInterval},
 		{"ask upstream what is current", p.upstream.Run, askInterval},
 		{"read what suppliers publish", p.suppliers.Run, scheduleInterval},
+		{"look up the branches patches are on", p.branches.Run, 0},
 		{"watch for quiet builds", p.watch.Run, 0},
 		{"send what is owed outward", p.outward.Run, 0},
 		{"route unheld work to teams", p.routing.Run, readInterval},

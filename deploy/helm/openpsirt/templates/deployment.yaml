@@ -169,6 +169,17 @@ spec:
             - name: OPENPSIRT_TRUSTED_GROUPS_DELIMITER
               value: {{ .Values.auth.trustedHeader.groupsDelimiter | quote }}
             {{- end }}
+            {{- with .Values.patchBranches.excluded }}
+            - name: OPENPSIRT_PATCH_EXCLUDED
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- with .Values.patchBranches.quota }}
+            # Through int64: a whole number in a values file is read as a
+            # float and would render as 5.36870912e+10, which the server
+            # refuses.
+            - name: OPENPSIRT_PATCH_QUOTA
+              value: {{ . | int64 | quote }}
+            {{- end }}
             {{- if .Values.mail.server }}
             - name: OPENPSIRT_MAIL_SERVER
               value: {{ .Values.mail.server | quote }}
@@ -229,6 +240,11 @@ spec:
             # megabytes each time, points this at a claim instead.
             - name: scanner-cache
               mountPath: {{ .Values.scanner.cacheDir }}
+            # Copies of the repositories patch links point into, when the
+            # lookups are turned on. The image's default path, so nothing
+            # needs setting to use it.
+            - name: repositories
+              mountPath: /var/cache/openpsirt/repositories
       volumes:
         - name: tmp
           # Bounded, because an emptyDir without a limit is node disk that a
@@ -245,6 +261,22 @@ spec:
           {{- else }}
           emptyDir:
             sizeLimit: {{ .Values.scanner.persistence.sizeLimit }}
+          {{- end }}
+        - name: repositories
+          {{- if .Values.patchBranches.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.patchBranches.existingClaim }}
+          {{- else }}
+          # Holds nothing until the lookups are turned on. Bounded like every
+          # other scratch volume here, and a fifth above the quota, because
+          # the quota is what is kept and a copy arriving adds to it briefly.
+          # The built-in quota is 20 GB, which is what an empty quota means.
+          emptyDir:
+            {{- if .Values.patchBranches.sizeLimit }}
+            sizeLimit: {{ .Values.patchBranches.sizeLimit }}
+            {{- else }}
+            sizeLimit: {{ div (mul (int64 (.Values.patchBranches.quota | default 21474836480)) 6) 5 }}
+            {{- end }}
           {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}

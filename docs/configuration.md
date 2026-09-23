@@ -12,6 +12,27 @@ duration is written as Go reads it: `30s`, `5m`, `12h`. A number is a positive
 whole number; zero reads as unset everywhere, so it is refused rather than
 taken.
 
+## Features
+
+What this deployment does beyond scanning and triage, and what turns each on.
+Everything marked off does nothing until the thing in the last column is set.
+
+| Feature | Default | Turned on by |
+|---|---|---|
+| [Scheduled rescanning](#scanning) | On, daily | `scanning.every` under Settings sets how often |
+| [Vulnerability data updates](#an-air-gapped-install) | On | `GRYPE_DB_AUTO_UPDATE`; set it to `false` where the deployment cannot reach the network |
+| [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
+| [Patch branches](#patch-branches) | Off | `patch.branches` under Settings. Set `OPENPSIRT_PATCH_EXCLUDED` first |
+| [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
+| [Mail](#mail) | Off | `OPENPSIRT_MAIL_FROM` and `OPENPSIRT_MAIL_SERVER`, both |
+| Webhooks | Off | Adding a destination under Settings |
+| [Attachments](#attachment-storage) | Off | `OPENPSIRT_ATTACHMENT_BUCKET`, or `OPENPSIRT_ATTACHMENT_DIR` for a trial |
+| [Advisory generation](#advisory-publication) | Off | `OPENPSIRT_PUBLISHER_NAME` and `OPENPSIRT_PUBLISHER_NAMESPACE`, both |
+| [The published advisory directory](#the-published-advisory-directory) | Off | `OPENPSIRT_DIRECTORY_URL` and a bucket or directory to write to, with advisory generation on |
+
+A sign-in method is not in this list because one is required: the process
+refuses to start without one. [Sign-in](#sign-in) says which.
+
 ## Upgrading
 
 `OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is now
@@ -338,6 +359,62 @@ the default is costing; names no public index has heard of are private modules
 and vendored forks, and they are the candidates to promote into
 `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
 
+## Patch branches
+
+A patch link to a commit is labeled with the branches of its repository that
+contain the commit, on the finding it belongs to. A fix backported to five
+branches arrives as five bare commit links, and the label is what says which
+one applies to the branch you ship.
+
+Off unless an administrator turns it on, under Settings. It fetches a copy of
+each repository a patch link names, from the host the link names, and asks the
+copy which branches hold each commit. Progress, failures and the size of each
+copy are on the System screen and at `/v1/patch-branches`.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `OPENPSIRT_PATCH_EXCLUDED` | Hosts and networks no repository is fetched from, separated by commas. A name covers itself and every host under it; a network is written as `10.0.0.0/8` and covers every address a name resolves to inside it | unset |
+| `OPENPSIRT_PATCH_DIR` | Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume | `/var/cache/openpsirt/repositories` |
+| `OPENPSIRT_PATCH_QUOTA` | How many bytes the copies may hold together. The least recently used is removed to make room | `21474836480` (20 GB) |
+
+List your internal networks and domains in `OPENPSIRT_PATCH_EXCLUDED`. A report
+chooses the host, and loopback, private, link-local and shared address space
+are refused regardless, but an internal service on a public address or behind a
+public name is only kept out by this list:
+
+```
+OPENPSIRT_PATCH_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
+```
+
+Only https is used, redirects are not followed, and git runs with no
+configuration, credentials or hooks from the environment.
+
+### Sizing
+
+The Linux kernel is the largest repository reports link to, and git.kernel.org
+sends whole history:
+
+| The kernel's stable tree | From git.kernel.org | From a host that sends commits alone |
+|---|---|---|
+| Copy on disk | 5.1 GB, and 116 MB of index | 1.1 GB, and 116 MB of index |
+| First fetch | 15 minutes | 90 seconds |
+| Memory at the peak of the first fetch | 1.3 GB | 0.6 GB |
+
+Size the quota to hold the kernel and the other repositories your reports link
+to, and the volume a fifth larger than the quota. The chart sizes its scratch
+volume that way from `patchBranches.quota`; a claim of your own needs the same
+room. A copy that alone outgrows the quota is abandoned and tried again a day
+later.
+
+git runs inside the same memory limit as the server and the scanner, and a
+first kernel fetch can coincide with a scan. Raise the limit to 4 GiB before
+turning this on where reports link to git.kernel.org. Where the limit is
+exceeded, the kernel kills the largest process, the visit fails, and it is
+retried a day later.
+
+Keep the copies on a persistent volume. Scratch space loses them on every
+restart, and the kernel is fetched again from the start.
+
 ## Sign-in
 
 The process refuses to start until somebody can administer it, and naming
@@ -603,6 +680,7 @@ resources:
 | The server reading one scanner report | Bounded by `OPENPSIRT_SCANNER_MAX_OUTPUT`. A read and a scan run in separate loops, so a pod can be doing both |
 | The scanner itself | Not bounded by anything here. It is a separate program, and its report is bounded only once written |
 | The scanner importing its vulnerability database | The largest single draw, and it happens on every start where the data is not kept |
+| Fetching a repository for [patch branches](#patch-branches) | Off unless turned on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org |
 
 Raise the limit for a bigger inventory, for raised scan-file bounds, or where
 the database is imported on every start.

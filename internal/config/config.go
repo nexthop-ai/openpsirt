@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
@@ -249,6 +250,20 @@ type Config struct {
 	// boundary the person who deployed it drew, and a boundary that can be
 	// widened from inside the application is not one.
 	UpstreamInternal []string
+
+	// PatchDir is where copies of the repositories patch links point into
+	// are kept, and PatchQuota is how many bytes they may hold together.
+	// Zero takes the built-in default.
+	PatchDir   string
+	PatchQuota int
+	// PatchExcluded is where no repository is fetched from: host names,
+	// each covering the hosts under it, and networks. On top of this
+	// network, which is refused regardless.
+	//
+	// Here rather than among the settings for the reason UpstreamInternal
+	// is: fetching is a switch an administrator throws, and where a fetch
+	// may not go is a boundary the person who deployed it drew.
+	PatchExcluded patchbranch.Excluded
 	// SessionLifetime bounds a sign-in. Zero takes the built-in default.
 	SessionLifetime time.Duration
 
@@ -355,6 +370,8 @@ func Load() (Config, error) {
 		PublisherCategory:      env("PUBLISHER_CATEGORY", "vendor"),
 		AdvisoryPrefix:         env("ADVISORY_PREFIX", ""),
 		UpstreamInternal:       listed(env("UPSTREAM_INTERNAL", "")),
+		PatchDir:               env("PATCH_DIR", "/var/cache/openpsirt/repositories"),
+		PatchQuota:             r.number("PATCH_QUOTA", patchbranch.DefaultQuota),
 		TrustedGroupsHeader:    env("TRUSTED_GROUPS_HEADER", ""),
 		TrustedGroupsDelimiter: env("TRUSTED_GROUPS_DELIMITER", ","),
 		PlainHTTP:              r.boolean("PLAIN_HTTP", false),
@@ -393,6 +410,12 @@ func Load() (Config, error) {
 	}
 
 	c.BootstrapAdmins = access.Identities(env("BOOTSTRAP_ADMINS", ""))
+
+	excluded, err := patchbranch.ParseExcluded(env("PATCH_EXCLUDED", ""))
+	if err != nil {
+		return Config{}, fmt.Errorf("OPENPSIRT_PATCH_EXCLUDED: %w", err)
+	}
+	c.PatchExcluded = excluded
 
 	sources, err := access.ParseSources(env("TRUSTED_SOURCES", ""))
 	if err != nil {

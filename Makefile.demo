@@ -172,7 +172,7 @@ demo-image:
 	  --build-arg DATE=$(DATE) --build-arg CDXGOMOD_VERSION=$(CDXGOMOD_VERSION) . >/dev/null
 
 demo-up: demo-down
-	@mkdir -p $(DEMO_DIR)/data $(DEMO_DIR)/grype
+	@mkdir -p $(DEMO_DIR)/data $(DEMO_DIR)/grype $(DEMO_DIR)/repositories
 	@$(DOCKER) network create --subnet $(DEMO_SUBNET) $(DEMO_NET) >/dev/null 2>&1 || true
 	@# The vulnerability database is a gigabyte and does not change hourly, so
 	@# it is kept between runs. Removing it is "make demo-reset --hard", which
@@ -200,6 +200,7 @@ demo-up: demo-down
 	  $${https_proxy:+-e https_proxy="$$https_proxy"} \
 	  -v "$(DEMO_DIR)/data:/data" \
 	  -v "$(DEMO_DIR)/grype:/var/cache/openpsirt/grype" \
+	  -v "$(DEMO_DIR)/repositories:/var/cache/openpsirt/repositories" \
 	  -e OPENPSIRT_DATABASE_URL="sqlite:///data/dev.db" \
 	  -e OPENPSIRT_ADDR="0.0.0.0:8080" \
 	  -e OPENPSIRT_PLAIN_HTTP=1 \
@@ -309,6 +310,14 @@ demo-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(1
 
 demo-seed:
 	@command -v xz >/dev/null || { echo "xz is needed to read the fixtures"; exit 1; }
+	@# Patch links labeled with their branches. Off in a deployment until an
+	@# administrator turns it on; the demo turns it on, so the labels are
+	@# there to see. The copies are kept beside the scanner's data, and the
+	@# kernel's stable tree is the first one fetched: fifteen minutes and
+	@# 5 GB the first time, a small fetch after.
+	@curl -sS --noproxy '*' -o /dev/null -w "  patch branch lookups on %{http_code}\n" \
+	  -X PUT -H "Origin: $(DEMO_URL)" -H 'Content-Type: application/json' \
+	  -d '{"value":"on"}' "$(DEMO_URL)/v1/settings/patch.branches"
 	@for entry in $(DEMO_BUILDS); do \
 	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
 	  xz -dc "$$file" > "$(DEMO_DIR)/$$product-$$stream-$$variant.cdx.json"; \
@@ -611,11 +620,12 @@ demo-status:
 	done
 
 
-# Start over, keeping the vulnerability database: it is a gigabyte, it is not
-# what anybody is resetting, and downloading it again is the slow part.
+# Start over, keeping the vulnerability database and the repository copies:
+# they are gigabytes, they are not what anybody is resetting, and fetching them
+# again is the slow part.
 demo-reset: demo-down
 	@rm -rf $(DEMO_DIR)/data $(DEMO_DIR)/image.cdx.json
-	@echo "  removed the demo database. The scanner cache in $(DEMO_DIR)/grype was kept."
+	@echo "  removed the demo database. The scanner cache in $(DEMO_DIR)/grype and the repository copies in $(DEMO_DIR)/repositories were kept."
 
 # The developer loop: this machine's binary and the interface's dev server, for
 # editing the interface and seeing it reload. Needs Go, node and a scanner

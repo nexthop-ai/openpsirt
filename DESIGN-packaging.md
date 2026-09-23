@@ -2,14 +2,15 @@
 
 The container image, the Helm chart, and what a deployment looks like.
 
-Satisfies REQ-01, REQ-02, REQ-04, REQ-76, and the probe behavior REQ-72
-requires.
+Satisfies REQ-01, REQ-02, REQ-04, REQ-76, the probe behavior REQ-72
+requires, and the storage REQ-78 needs.
 
 ## Contents
 
 - [Image structure](#image-structure)
 - [Base version](#base-version)
 - [Bundled scanner](#bundled-scanner)
+- [Repository copies](#repository-copies)
 - [Pod sizing](#pod-sizing)
 - [Image and archive checks](#image-and-archive-checks)
 - [Chart probes](#chart-probes)
@@ -37,7 +38,7 @@ toolchain the module declares, the result run on Alpine.
 |---|---|
 | Size | ~40 MB |
 | User | Non-root, no login shell, no home directory |
-| Extras | The vulnerability scanner; root certificates for outbound TLS to the ranking feeds and the scanner's data; timezone data |
+| Extras | The vulnerability scanner; git, for labeling patch links with branches; root certificates for outbound TLS to the ranking feeds and the scanner's data; timezone data |
 | Healthcheck | Liveness only. Readiness needs the database and belongs to the orchestrator |
 
 The interface is built inside the image rather than taken from the build
@@ -96,6 +97,21 @@ Every replica mounts the one claim, because this is a Deployment rather than a
 set with a volume per pod. So the access mode has to allow as many nodes as
 there are replicas, and the pairing the chart can see it refuses at render time.
 
+## Repository copies
+
+Labeling a patch link with the branches that hold its commit keeps copies of
+repositories (REQ-78). `DESIGN-findings.md` § Patch branches holds how they are
+used; this is where they live.
+
+| Rule | |
+|---|---|
+| git is the distribution's package, run as a child | Nothing of it is linked into the binary |
+| The copies need a writable path, and the chart mounts one | The root filesystem is read-only. The image makes the directory and owns it to the unprivileged user |
+| Scratch space unless a claim is named | Holds nothing until the lookups are turned on. Bounded a fifth above the quota unless set, because a copy arriving adds to the copies kept and scratch space past its bound gets the pod evicted |
+| The quota is written as a whole number whatever the values file holds | A values file reads a whole number as a float, and 5.36870912e+10 is a value the server refuses |
+| The chart makes no claim for it | A deployment turning this on chooses its storage. A claim named in values is mounted instead |
+| The excluded hosts and the quota are chart values | Both are the deployment's boundary rather than an administrator's setting |
+
 ## Pod sizing
 
 The container holds two processes that use memory: the server, and the scanner
@@ -108,8 +124,9 @@ excess by killing the larger of the two.
 | The server's share is the ingest budget | About 250 MB for one document being read, which `DESIGN-ingest.md` sets and every bound of it is configurable. Raising those bounds raises the limit |
 | The scanner's share is not bounded by anything here | It is somebody else's program, and its report is bounded only once it has been written. What it needs to produce one is a number this project has not measured |
 | Importing the vulnerability database is the largest single draw | It happens on every start where the data is not kept, so a deployment that restarts pays that peak repeatedly. Keeping the data is what takes it off the common path |
+| A first copy of a large repository is the other large draw, and the chart says so beside the limit | Off unless patch branches are turned on. Measured for the kernel's stable tree: 1.3 GB fetched whole from git.kernel.org, 0.6 GB where the host sends commits alone. Either can coincide with a scan, so the operator documentation asks for 4 GiB before turning it on for the first |
 
-Neither default is measured. Both are set from the shape of the problem —
+Neither default is measured against the scanner. Both are set from the shape of the problem —
 two processes, one of them unmeasured, and a peak paid at start — and the
 number that would settle them is the scanner's own memory against a real
 inventory.

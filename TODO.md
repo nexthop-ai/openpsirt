@@ -40,6 +40,10 @@ Mandatory, and wrong to do earlier.
 | Where the ceiling on a sign-in belongs | Thirty days is in force and is a judgment rather than a commitment: it bounds how long a role a group withdrew can still be held, and ninety would be defensible. `DESIGN-access.md` records what is built; the number itself is the owner's to settle, and a decision row is theirs to add |
 | Test doubles at three boundaries that have none | The mail sender, the scanner subprocess and process startup. Each is at 0.0% while the pure code in the same file is not, and each is silent when it fails: a newline in an SMTP header, the argv a subprocess is handed, and a process that serves the API against a stale schema while reporting ready |
 | Six assertions that cannot be false | In the attachment name check, the SQLite migration lock, the sort conformance sweep, the connection-pool timeout, the upstream-currency retry and the empty-document reader. Each holds for every possible implementation of what it names, or compares a value against the only source that could have produced it |
+| Asking a code host's API which branches hold a commit | GitLab answers it in one request, and GitHub one branch at a time with a token for the rate. Git answers every host and is the one route built; an API would spare a copy for a repository with a few linked commits |
+| Fetching a repository from a substitute address | An administrator naming a mirror for a repository — the kernel's stable tree from a host that sends commits alone is 1.1 GB against 5.1 GB — and one copy standing for both the stable and mainline trees, since the first holds the second |
+| Marking the patch for the branch a component ships | Matching `linux-6.12.y` to a component at 6.12.41 is per project, and no convention covers `release-1.4` or `stable/2024.1` |
+| Fetching repositories through an outbound proxy | The guard git reaches out through dials directly. Chaining it through the proxy a deployment names, while still checking the resolved address, is what a network with no direct route needs |
 
 ## Decided, not built
 

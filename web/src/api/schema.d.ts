@@ -1714,6 +1714,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/patch-branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show how far patch branch lookups have got
+         * @description The repositories patch links point into, and how many of the commits each link names have been looked up in a copy of the repository.
+         *
+         *     A link that names no commit in a recognized repository — a pull request, a mailing-list post, a patch tracker — is counted in `links` and nowhere else.
+         *
+         *     Requires: administrator
+         */
+        get: operations["list-patch-branch-progress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/people": {
         parameters: {
             query?: never;
@@ -9059,6 +9083,84 @@ export interface components {
              */
             share: number;
         };
+        PatchBranchesOutputBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/PatchBranchesOutputBody.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description How many distinct commits in a recognized repository those links name
+             */
+            commits: number;
+            /**
+             * Format: int64
+             * @description How many of those the repository holds
+             */
+            found: number;
+            /**
+             * Format: int64
+             * @description What every repository copy on disk took when its last visit finished, together, in bytes
+             */
+            held_bytes: number;
+            /**
+             * Format: int64
+             * @description How many patch links reports carry
+             */
+            links: number;
+            /**
+             * Format: int64
+             * @description How many of those commits have been looked up
+             */
+            looked: number;
+            /** @description Whether the lookups are turned on */
+            on: boolean;
+            /** @description The repositories those commits are in, most commits still to look up first */
+            repositories: components["schemas"]["PatchRepositoryBody"][] | null;
+            /**
+             * Format: int64
+             * @description How many repositories there are in all
+             */
+            total: number;
+        };
+        PatchRepositoryBody: {
+            /**
+             * Format: int64
+             * @description How many commits patch links name in this repository
+             */
+            commits: number;
+            /** @description When a visit last began */
+            fetched_at?: string;
+            /**
+             * Format: int64
+             * @description How many of those the repository holds
+             */
+            found: number;
+            /**
+             * Format: int64
+             * @description The size of the repository's copy when the last visit finished, in bytes
+             */
+            held_bytes?: number;
+            host: string;
+            /**
+             * Format: int64
+             * @description How many of those have been looked up
+             */
+            looked: number;
+            /** @description When a visit last finished */
+            reached_at?: string;
+            /** @description What stopped the last visit */
+            reason?: string;
+            /**
+             * @description 'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_PATCH_EXCLUDED lists, and is never fetched
+             * @enum {string}
+             */
+            state: "waiting" | "working" | "failed" | "done" | "excluded";
+            /** @description The address the repository is fetched from */
+            url: string;
+        };
         PendingMovementBody: {
             /**
              * @description Which act is being asked for
@@ -9718,10 +9820,22 @@ export interface components {
         };
         ReferenceBody: {
             /**
+             * Format: int64
+             * @description How many branches contain the commit, which may be more than are listed
+             */
+            branch_count?: number;
+            /** @description The branches of its repository that contain the commit this patch link names, in version order. At most 100 are listed */
+            branches?: string[] | null;
+            /**
              * @description The kind of reference. A patch is the change itself
              * @enum {string}
              */
             kind: "patch" | "advisory" | "report" | "other";
+            /**
+             * @description 'found' is a commit the copy of its repository holds, 'absent' one it does not. Omitted where no copy has been asked, or where the link names no commit
+             * @enum {string}
+             */
+            lookup?: "found" | "absent";
             url: string;
         };
         ReleaseBody: {
@@ -13818,6 +13932,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-patch-branch-progress": {
+        parameters: {
+            query?: {
+                /** @description The number returned */
+                limit?: number;
+                /** @description The number skipped */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchBranchesOutputBody"];
+                };
             };
             /** @description Error */
             default: {

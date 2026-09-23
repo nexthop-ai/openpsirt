@@ -3,7 +3,8 @@
 What a scan run found, where it sits, and how it is ranked and closed.
 
 Satisfies REQ-08, REQ-11, REQ-13, REQ-14, REQ-15, REQ-17, REQ-18, REQ-19,
-REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-32, REQ-37.
+REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-32, REQ-37,
+REQ-78.
 
 ## Contents
 
@@ -15,6 +16,7 @@ REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-32, REQ-37.
 - [Report merging](#report-merging)
 - [Derived addresses](#derived-addresses)
 - [Index responses](#index-responses)
+- [Patch branches](#patch-branches)
 - [Match methods](#match-methods)
 - [Declared dependency scope](#declared-dependency-scope)
 - [Component interning](#component-interning)
@@ -240,6 +242,154 @@ What no index gives is a distribution package's description. Those live in a
 distribution's own package index, which is one file per release rather than one
 request per package — a different shape from the per-package asks here, and not
 built.
+
+## Patch branches
+
+A patch link to a commit is labeled with the branches of its repository that
+contain the commit (REQ-78). One fix is backported as a separate commit to
+each maintained branch, and a report lists the commits as bare links: one
+kernel issue carries five, for 6.1, 6.6, 6.12, 6.16 and the mainline, and
+nothing in the report says which is which. The repository's history does, so
+a copy of it is kept and asked.
+
+Off unless an administrator turns it on. It reaches out, and a scan needs
+none of it (REQ-12).
+
+### Link shapes
+
+| Shape | Hosts |
+|---|---|
+| `/{owner}/{repo}/commit/{hash}` | GitHub, Gitea, Forgejo, Gogs |
+| `/{owner}/{repo}/pull/{n}/commits/{hash}` | A commit inside a GitHub pull request |
+| `/{group…}/{repo}/-/commit/{hash}` | GitLab |
+| `/{path…}/commit/?id={hash}` | cgit |
+| `/stable/c/{hash}`, `/linus/{hash}` | git.kernel.org's short links, which name the stable and mainline trees |
+
+| Rule | Reason |
+|---|---|
+| The repository address is built from the parts recognized, never copied from the link | What reaches git is an address of a known shape. A path segment outside a narrow character set, a port, or credentials in the link name no repository |
+| A hash is seven to sixty-four hexadecimal characters, lowered | Shorter is as likely a pull request number as a commit. An abbreviation is kept as written and resolved by the copy |
+| A pull request, a merge request, a patch tracker and a mailing-list post name no commit | Each describes a fix without saying where it landed. A guessed repository is a request to somewhere the link never pointed |
+| On git.kernel.org, `/cgit/` names the repository under `/pub/scm/` | The site serves its pages and its repositories at different paths |
+
+Measured on this deployment's own demonstration data: 36,625 patch links, of
+which 36,000 are `git.kernel.org/stable/c/`.
+
+### Keying
+
+A row per repository, a row per commit in it, and a row per branch a commit
+was found on. Keyed on the commit, because one fix is linked from several
+issues' records and in several spellings, and the branches it is on are a fact
+about the commit in its repository.
+
+| Recorded per commit | |
+|---|---|
+| When it was last looked up | Null is never, which is what a visit takes first |
+| Whether the copy held it | A commit in an unmerged pull request, or one a history rewrite dropped, is linked and on no branch |
+| How many branches held it, and the names of up to a hundred | A mainline commit is on every branch cut since it landed. The count stays whole; a name wider than the column is counted and not kept, because a cut name is another branch |
+
+| Recorded per repository | |
+|---|---|
+| When a visit last began, when one last finished, and what stopped the last one | A visit that failed still happened, and how long a repository has been out of reach is the gap |
+| How large its copy was when a visit last finished | What an operator sizing the cache reads |
+
+The copies themselves are one replica's disk, and nothing in the database
+records which replica holds which.
+
+### The pass
+
+One replica works, settled by a lease taken again as a visit runs: a first visit
+to a large tree takes hours. Each cycle records any commit a patch link names
+that has no row, chooses one repository, and visits it.
+
+| Order | Reason |
+|---|---|
+| A repository whose copy is on this disk and that has commits never looked up | Bringing a held copy up to date is a small fetch, and every lookup after it costs a fraction of a second |
+| Then the one holding the most urgent commit never looked up | Urgency is the worst rating among the issues linking to the commit, then the score behind it |
+| Then the most urgent commit due again | A commit is due again a week after it was looked up |
+| Never a host an administrator excluded, and not for a day after a failed visit | A host having a bad hour and a repository that is gone look the same from here |
+
+A visit fetches the repository's branches, writes git's commit-graph index,
+and looks up every due commit in it, most urgent first.
+
+| How a visit ends | Recorded |
+|---|---|
+| Every due commit looked up | The moment it finished and the size of the copy |
+| The repository could not be fetched or read | What stopped it, in the repository's own words. Retried a day after the visit began |
+| The switch was turned off, the lease was lost, or the process is shutting down | Nothing. The repository is left as it was before the visit began, a failure from an earlier visit included |
+| This deployment failed: the database, the setting, the lease | Nothing, and the failure is logged. A dropped connection is not the repository's fault, and recorded as one it would put the repository out of reach for a day |
+
+The switch and the lease are read every minute for the whole of a visit, the
+fetch and the index write included. A first fetch of the kernel from
+kernel.org takes a quarter of an hour, and the lease is half an hour. A
+process shutting down in the middle of a visit hands the lease back, so the
+next one carries on at once.
+
+A lookup is read as git prints it, one branch at a time. Every branch is
+counted and the first hundred in version order are kept, so a repository with
+a hundred thousand branches holding one commit costs the server a hundred
+names. A name that is not valid UTF-8 is counted and not kept: git allows any
+byte in a name, and two of the four engines refuse such text.
+
+Only commits a report still links to are due. A commit no issue names any
+more keeps what was last recorded about it.
+
+| Measured on the kernel's stable tree | |
+|---|---|
+| Commits in it | 2,024,354 |
+| Copy without file contents, from a host that sends one | 1.1 GB, 90 seconds to fetch, 160 MB of memory |
+| Full copy, from git.kernel.org, which sends no other kind | 5.1 GB and 15 minutes to fetch. Indexing it: 2.4 GB of memory at git's defaults, 1.3 GB with the pack windows below |
+| Commit-graph index | 116 MB. 22 to 35 seconds to write; 1.7 GB of memory at git's defaults, 0.6 GB with the pack windows below |
+| One lookup | 28 seconds without the index, 0.12 to 0.22 with it |
+| Every commit the demonstration data links into it | About 25,000, so about ninety minutes of one core |
+
+The branches a backport sits on do not change. A mainline commit gains a branch
+each time one is cut, every few months. A week between lookups of the same
+commit keeps that current for about a seventh of the daily cost.
+
+### Fetching
+
+Git makes its own connections, so the dialer every other outbound request goes
+through never sees them. Git is pointed at a proxy on the loopback interface
+instead, and that proxy is the one way out.
+
+| Rule | Reason |
+|---|---|
+| A tunnel only, to the https port of the one host the repository is on | A redirect, a submodule or a lazily fetched object elsewhere has no route |
+| The host is refused where an administrator excluded it by name, or by a network holding its address | An internal name on a public address is excluded by name, and a public name pointing inward by network |
+| Loopback, private, link-local and shared address space is refused regardless, and so are the two NAT64 prefixes | The same check every other outbound request here makes, on the address a name resolved to, at the moment of connecting (REQ-69). On a network with DNS64, a NAT64 address is an IPv4 address inside it |
+| Git reads no system or personal configuration, no credential helper, no hooks, no terminal | Any of those would change where git goes or what it sends |
+| https only, no redirects, and a transfer below 1 KB a second for two minutes is abandoned | A stalled host does not hold a visit for the three hours a first fetch is allowed |
+| One thread for packing and indexing, and small windows onto the pack files | Git runs inside the server's memory limit. The windows are what brought the commit-graph write from 1.7 GB to 0.6 GB, and indexing the kernel's full history from 2.4 GB to 1.3 GB |
+| A copy holds commits and no files where the host will send that | A host that cannot sends everything, and the warning it prints is not a failure |
+| Objects the copy lacks are never fetched on demand | That fetch would happen outside the guarded, bounded one |
+
+A copy's directory is named by a digest of the repository address, so a report
+never chooses a path on this disk (REQ-66).
+
+### The cache
+
+| Rule | Reason |
+|---|---|
+| The copies share a quota, 20 GB unless configured | Room for the full kernel tree and several ordinary repositories beside it |
+| The least recently used copy is removed first | A copy is used when it is visited, and each visit writes that down beside it |
+| Room is made while a copy is written, not after | Whether a new copy arriving or a fetch into one already held. The directory stays within the quota plus fifteen seconds of transfer |
+| A copy that alone outgrows the quota is stopped and removed, and the visit fails | Retried a day later, which is the moment a raised quota takes effect. A host that sent a small first copy and then an endless fetch is stopped the same way |
+| A copy removed to make room stops counting towards the size the report shows | The report reads the size recorded at the end of each visit, and that record is cleared when the copy goes |
+| An update of a copy asks the remote the copy was made from, not the address | The copy records how it was made beside that remote. Asked by address, a host sends whole trees on top of commits the copy holds without them, and the fetch fails for want of them |
+| A copy left half made by a process that died is removed before the next one starts | It is named apart from finished copies, so nothing mistakes it for one |
+
+### Display
+
+A finding's patch links carry the branches, the count, and whether the copy
+held the commit. A link not yet looked up carries nothing, and a screen shows
+nothing for it. Branches are listed in version order: `linux-6.6.y` before
+`linux-6.12.y`.
+
+The System screen reports the whole of the work: patch links, the commits they
+name, how many are looked up and held, and per repository its state, its
+progress, its last finished visit and the size of its copy. Administrators
+only, like the rest of that screen.
 
 ## Match methods
 
@@ -1200,5 +1350,10 @@ question next year should find the answer rather than the question.
 | A derived address refuses a name that is nothing but dots, rather than escaping it | A name and a version become path segments, and "." and ".." are resolved by the browser before the request leaves it. Everything else, separators included, is escaped into its segment (REQ-66) |
 | An identifier is matched against an anchored scheme before it resolves | A flaw this deployment recorded is filed under a name it minted, and a loose match sends somebody to a public page about something else |
 | A package kind nothing here knows produces no link | A link that lands on the wrong thing costs more than no link, because it is followed before it is disbelieved |
+| A patch link is labeled with branches and never with the product's own branch | Matching a branch name to the version a component ships is per project: `linux-6.12.y` and `release-1.4` follow no one convention |
+| A code host's API is never asked | Every host answers through git, and only some offer an API that says which branches hold a commit. The same answer from two routes is two things to keep right |
+| A repository's copy is fetched from the host the link names | The kernel's stable tree is 5.1 GB from git.kernel.org and 1.1 GB from a mirror that sends commits alone, and nothing here knows the two are one repository |
+| The copies are one replica's disk | A second replica taking the lease over starts from none, or from a volume the replicas share |
+| A deployment that reaches the internet only through a proxy of its own fetches nothing | git is pointed at the loopback guard and at nothing else, so the guard is the one way out, and the guard dials directly |
 | A ruling carries one disposition and one reason for every report it covers | Reports needing different reasons are different rulings. Splitting one is withdrawing it and proposing two |
 | Accepting a report takes no ruling and no second person | Accepting re-exposes risk, and an issue already carries its own triage |

@@ -162,6 +162,8 @@ var settable = []struct {
 		aDuration, nil, func(Ingest) string { return setting.DefaultSupplierSilentAfter.String() }, false},
 	{setting.UpstreamCurrency, "Whether to ask public package indexes what the newest version of a component is. Off unless turned on: a deployment that cannot reach out loses this answer, and what a scan reports is unaffected. What goes out is a component's name, one request per component, carrying the name and nothing else — so names this deployment calls its own are held back, and the report of what has no upstream answer says which",
 		aSwitch, theSwitch, func(Ingest) string { return setting.Off }, false},
+	{setting.PatchBranches, "Whether to fetch the repositories patch links point into, to label each linked commit with the branches that carry it. Off unless turned on. What goes out is a fetch of the repository a report's link names, from any host outside this network that OPENPSIRT_PATCH_EXCLUDED does not list",
+		aSwitch, theSwitch, func(Ingest) string { return setting.Off }, false},
 	{setting.AttachmentMaxSize, "The largest single file this deployment accepts, in bytes. A whole number, not a length of time",
 		aSize, nil, func(Ingest) string { return strconv.Itoa(setting.DefaultAttachmentMaxSize) }, false},
 	{setting.AttachmentQuota, "How much this deployment will hold in attachments in total, in bytes. Storage somebody else fills on our behalf needs a ceiling, and this is it",
