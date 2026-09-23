@@ -100,7 +100,7 @@ func upgradeV020(ctx context.Context, tx bun.Tx) error {
 					{column: "ruling_id"},
 				},
 				relax: []string{"vulnerability_id"},
-				then:  u.mintReferences,
+				then:  u.referencesAndJudgments,
 				constraints: []string{"flaw_report_reference_unique", "flaw_report_answered_by_fk",
 					"flaw_report_judged_by_fk", "flaw_report_ruling_fk"},
 				indexes: []string{"flaw_report_product_idx", "flaw_report_ruling_idx"}})
@@ -478,6 +478,22 @@ func purlVersion(purl string) string {
 	return version
 }
 
+// referencesAndJudgments names every report, and records each one v0.1.0
+// wrote together with its flaw as judged when it was recorded. v0.1.0 wrote a
+// report only that way, which is the act a report recorded with its flaw
+// today is judged by.
+func (u *upgrader) referencesAndJudgments() error {
+	if err := u.mintReferences(); err != nil {
+		return err
+	}
+	if _, err := u.tx.ExecContext(u.ctx, `
+		UPDATE "flaw_report" SET "evaluated_at" = "recorded_at", "evaluated_by" = "recorded_by"
+		WHERE "vulnerability_id" IS NOT NULL`); err != nil {
+		return fmt.Errorf("record who judged each report: %w", err)
+	}
+	return nil
+}
+
 // mintReferences gives every report the name it is reached by, in the form a
 // report recorded today is given one: the product's name, the year it was
 // recorded, and six random digits.
@@ -548,21 +564,18 @@ type v010Issuance struct {
 	IssuedAt        time.Time
 }
 
-// heldDocument stands in for a document v0.1.0 issued and did not keep.
-//
-// The column holds what went out, and nothing can work that out again. An
-// empty object parses, and states no distribution a published directory may
-// serve, so the directory passes over it until the advisory is issued again.
-const heldDocument = "{}"
-
 // moveAdvisories turns each issue v0.1.0 issued an advisory for into an
 // advisory covering that one issue, with its issuances beneath it.
 //
-// An advisory that has been issued keeps the name it was issued under, which
-// in v0.1.0 was the issue's own identifier: a revision of a published document
-// that changed its tracking identifier would read as a second document. Those
-// names were not minted here, so they are numbered in year zero, which no
-// advisory minted from the configured prefix is.
+// An advisory that has been issued keeps the name it was issued under: a
+// revision of a published document that changed its tracking identifier would
+// read as a second document. v0.1.0 issued under the issue's own identifier,
+// which for a flaw recorded here is the name minted for it. An issue filed
+// under another name since keeps the minted one among its aliases, and that is
+// the name taken, which is wrong only for an issue refiled before it was first
+// issued; nothing v0.1.0 kept says which came first. Those names were not
+// minted from the configured prefix, so they are numbered in year zero, which
+// no advisory minted from it is.
 func (u *upgrader) moveAdvisories() error {
 	var old []v010Issuance
 	if err := u.tx.NewRaw(`
@@ -604,7 +617,7 @@ func (u *upgrader) moveAdvisories() error {
 			INSERT INTO "advisory_issuance" ("id", "advisory_id", "ordinal", "edition_id",
 				"document", "digest", "summary", "issued_by", "issued_at")
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			issued.ID, ids.advisory, issued.Ordinal, ids.edition, heldDocument,
+			issued.ID, ids.advisory, issued.Ordinal, ids.edition, nil,
 			issued.Digest, issued.Summary, issued.IssuedBy, issued.IssuedAt); err != nil {
 			return fmt.Errorf("carry issuance %d across: %w", issued.ID, err)
 		}
@@ -649,9 +662,13 @@ func (u *upgrader) advisoryFor(first v010Issuance, number int64) (advisory, edit
 		return 0, 0, fmt.Errorf("read when %s was first recorded: %w", first.Identifier, err)
 	}
 
+	name, err := u.issuedName(first)
+	if err != nil {
+		return 0, 0, err
+	}
 	row := &v020Advisory{
-		Identifier:   bound.HeadRunes(first.Identifier, database.NameWidth),
-		Folded:       bound.HeadRunes(strings.ToLower(strings.TrimSpace(first.Identifier)), database.NameWidth),
+		Identifier:   bound.HeadRunes(name, database.NameWidth),
+		Folded:       bound.HeadRunes(strings.ToLower(strings.TrimSpace(name)), database.NameWidth),
 		Number:       number,
 		ReleasedFrom: released,
 		MintedAt:     first.IssuedAt,
@@ -678,6 +695,33 @@ func (u *upgrader) advisoryFor(first v010Issuance, number int64) (advisory, edit
 	return advisory, edition, nil
 }
 
+// issuedName is the name minted for an issue recorded here: the product's
+// name, a year and six digits, the way v0.1.0 minted one. It is the issue's
+// identifier unless the issue has been filed under another name since, and
+// then it is among the aliases. An issue with neither goes by its identifier.
+func (u *upgrader) issuedName(first v010Issuance) (string, error) {
+	var product string
+	if err := u.tx.NewRaw(`SELECT "name" FROM "product" WHERE "id" = ?`, first.ProductID).
+		Scan(u.ctx, &product); err != nil {
+		return "", fmt.Errorf("read the product %s was issued in: %w", first.Identifier, err)
+	}
+	minted := regexp.MustCompile(`^` + regexp.QuoteMeta(strings.ToUpper(strings.TrimSpace(product))) + `-\d{4}-\d{6}$`)
+	if minted.MatchString(first.Identifier) {
+		return first.Identifier, nil
+	}
+	var aliases []string
+	if err := u.tx.NewRaw(`SELECT "identifier" FROM "vulnerability_alias" WHERE "vulnerability_id" = ? ORDER BY "id"`,
+		first.VulnerabilityID).Scan(u.ctx, &aliases); err != nil {
+		return "", fmt.Errorf("read the names %s goes by: %w", first.Identifier, err)
+	}
+	for _, alias := range aliases {
+		if minted.MatchString(alias) {
+			return alias, nil
+		}
+	}
+	return first.Identifier, nil
+}
+
 // continueIdentity moves a table's generated identifier past the rows written
 // into it with identifiers of their own. PostgreSQL's identity does not notice
 // an explicit value; the other three engines move past it on the insert.
@@ -685,7 +729,7 @@ func (u *upgrader) continueIdentity(table string) error {
 	if u.engine != database.Postgres {
 		return nil
 	}
-	// The table is one of the two names written in this file, never input.
+	// The table is a constant at every call, never input.
 	if _, err := u.raw.ExecContext(u.ctx, `SELECT setval(pg_get_serial_sequence('"`+table+`"', 'id'), `+ //nolint:gosec // G202: the name is a constant of this file
 		`(SELECT MAX("id") FROM "`+table+`"))`); err != nil {
 		return fmt.Errorf("continue %s's identifiers past the rows carried across: %w", table, err)

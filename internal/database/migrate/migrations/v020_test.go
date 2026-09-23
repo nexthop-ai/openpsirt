@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -15,7 +17,6 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
@@ -38,10 +39,9 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		}
 
 		rollBack(t, ctx, db)
-		if err := migrate.UpTo(ctx, db, quiet(), v010); err != nil {
-			t.Fatalf("build the v0.1.0 schema: %v", err)
-		}
+		dbtest.MigrateTo(t, db, v010)
 		released := describe(t, ctx, db)
+		shippedSchema(t, db.Server.Engine, released)
 		seed(t, ctx, db)
 		before := snapshot(t, ctx, db)
 
@@ -79,6 +79,7 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		if diff := setDiff(released, describe(t, ctx, db)); diff != "" {
 			t.Errorf("rolled back, the schema differs from v0.1.0's:\n%s", diff)
 		}
+		returned(t, ctx, db, before)
 		if err := schema.Up(ctx, db, quiet()); err != nil {
 			t.Fatalf("upgrade again: %v", err)
 		}
@@ -215,7 +216,7 @@ func columns(t *testing.T, ctx context.Context, db *database.DB) map[string][]co
 // one would not reach the branch that moves it.
 var overrides = map[string]any{
 	"finding.kind":               "entered",
-	"vulnerability.identifier":   "WIDGET-2025-123456",
+	"vulnerability.identifier":   "CVE-2025-1111",
 	"vulnerability_weakness.cwe": "CWE-79",
 	"vex_statement.purl":         "pkg:deb/debian/openssl@3.0.11-1%2Bdeb12u2?arch=amd64",
 	"product.name":               "widget",
@@ -258,15 +259,53 @@ func seed(t *testing.T, ctx context.Context, db *database.DB) {
 		}
 	}
 
+	// Identifiers a fresh table would not generate, so that keeping them is
+	// something the upgrade does rather than something it happens into.
+	exec(t, ctx, db, `UPDATE "disclosure_extension" SET "id" = 7`)
+	exec(t, ctx, db, `UPDATE "advisory_issuance" SET "id" = 7`)
+
+	// The flaw recorded here, refiled under a CVE after it was issued: the
+	// name it was minted and issued under is kept among its aliases.
+	exec(t, ctx, db, `INSERT INTO "vulnerability_alias" ("vulnerability_id", "identifier", "identifier_folded")
+		VALUES (1, 'WIDGET-2025-123456', 'widget-2025-123456')`)
+
+	// An issue a scanner reported, classified, and recorded here by nobody.
+	copyRow(t, ctx, db, tables["vulnerability"], "vulnerability", map[string]any{
+		"identifier": "CVE-2025-2222", "identifier_folded": "cve-2025-2222"})
+	exec(t, ctx, db, `INSERT INTO "vulnerability_weakness" ("vulnerability_id", "cwe") VALUES (2, 'CWE-89')`)
+	copyRow(t, ctx, db, tables["finding"], "finding", map[string]any{"vulnerability_id": 2, "kind": "vulnerability"})
+
 	// A second weakness named after the first, a second issuance of the same
 	// advisory, and a statement naming no version.
 	exec(t, ctx, db, `INSERT INTO "vulnerability_weakness" ("vulnerability_id", "cwe") VALUES (1, 'CWE-20')`)
-	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("product_id", "vulnerability_id", "ordinal", "digest",
-		"summary", "issued_by", "issued_at") VALUES (1, 1, 2, 'second', NULL, 1, ?)`, when.Add(time.Hour))
+	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("id", "product_id", "vulnerability_id", "ordinal", "digest",
+		"summary", "issued_by", "issued_at") VALUES (8, 1, 1, 2, 'second', NULL, 1, ?)`, when.Add(time.Hour))
 	exec(t, ctx, db, `INSERT INTO "vex_statement" ("product_id", "publisher", "vulnerability", "purl",
 		"component", "status", "statement", "document", "digest", "uploaded_by", "uploaded_at", "superseded_at")
 		SELECT "product_id", "publisher", 'CVE-2', 'pkg:generic/zlib', "component", "status", "statement",
 		"document", "digest", "uploaded_by", "uploaded_at", "superseded_at" FROM "vex_statement"`)
+}
+
+// copyRow writes a second row into a table, copied from its first with some
+// columns replaced.
+func copyRow(t *testing.T, ctx context.Context, db *database.DB, cols []column, table string, with map[string]any) {
+	t.Helper()
+	var names, values []string
+	var args []any
+	for _, c := range cols {
+		if c.generated {
+			continue
+		}
+		names = append(names, `"`+c.name+`"`)
+		if v, ok := with[c.name]; ok {
+			values = append(values, "?")
+			args = append(args, v)
+			continue
+		}
+		values = append(values, `"`+c.name+`"`)
+	}
+	exec(t, ctx, db, `INSERT INTO "`+table+`" (`+strings.Join(names, ", ")+`) SELECT `+
+		strings.Join(values, ", ")+` FROM "`+table+`" WHERE "id" = 1`, args...)
 }
 
 func ready(cols []column, name string, done map[string]bool) bool {
@@ -410,7 +449,8 @@ func survived(t *testing.T, ctx context.Context, db *database.DB, before map[str
 	}
 }
 
-// moved checks what the upgrade wrote where the release's rows changed shape.
+// moved checks what the upgrade wrote where the release's rows changed shape,
+// or took a value a column v0.1.0 did not have.
 func moved(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
 	one := func(query string, args ...any) string {
@@ -421,16 +461,27 @@ func moved(t *testing.T, ctx context.Context, db *database.DB) {
 		}
 		return text(v)
 	}
+	every := func(table, where string, args ...any) {
+		t.Helper()
+		all := one(`SELECT COUNT(*) FROM "` + table + `"`)
+		if got := one(`SELECT COUNT(*) FROM "`+table+`" WHERE `+where, args...); got != all || all == "0" {
+			t.Errorf("%s of %s rows of %s hold %s", got, all, table, where)
+		}
+	}
 
-	if got := one(`SELECT "act" FROM "disclosure_movement" WHERE "id" = 1`); got != "extension" {
-		t.Errorf("an embargo extension moved across as %q", got)
+	if got := one(`SELECT "act" FROM "disclosure_movement" WHERE "id" = 7`); got != "extension" {
+		t.Errorf("the embargo extension moved across as %q", got)
 	}
 	if got := one(`SELECT "cwe" FROM "vulnerability_weakness" WHERE "is_primary" = ?`, true); got != "CWE-79" {
 		t.Errorf("the weakness named first is not the primary one; %s is", got)
 	}
 	if got := one(`SELECT COUNT(*) FROM "vulnerability_weakness" WHERE "is_primary" = ?`, true); got != "1" {
-		t.Errorf("%s weaknesses are primary", got)
+		t.Errorf("%s weaknesses are primary, and only the flaw recorded here names one", got)
 	}
+	every("finding", `"urgency_exploited_here" = ?`, false)
+	every("notification", `"together" = ''`)
+	every("flaw_report", `"evaluated_at" = "recorded_at" AND "evaluated_by" = "recorded_by"`)
+
 	reference := one(`SELECT "reference" FROM "flaw_report"`)
 	if !regexp.MustCompile(`^WIDGET-R-2025-\d{6}$`).MatchString(reference) {
 		t.Errorf("a report was named %q", reference)
@@ -440,16 +491,21 @@ func moved(t *testing.T, ctx context.Context, db *database.DB) {
 		abouts[0]["source"] != "vex" || abouts[0]["document_id"] != "" {
 		t.Errorf("the statements moved across as %v", abouts)
 	}
+
+	opened := read(t, ctx, db, "finding", []string{"opened_at"})
 	advisories := read(t, ctx, db, "advisory", []string{"id", "identifier", "identifier_folded",
 		"minted_year", "mint_number", "edition_id", "released_from"})
 	if len(advisories) != 1 || advisories[0]["identifier"] != "WIDGET-2025-123456" ||
 		advisories[0]["identifier_folded"] != "widget-2025-123456" || advisories[0]["minted_year"] != "0" ||
-		advisories[0]["released_from"] == "NULL" || advisories[0]["edition_id"] == "NULL" {
-		t.Errorf("the advisory moved across as %v", advisories)
+		advisories[0]["released_from"] != opened[0]["opened_at"] || advisories[0]["edition_id"] == "NULL" {
+		t.Errorf("the advisory moved across as %v, from a flaw first recorded %s", advisories, opened[0]["opened_at"])
 	}
-	issued := read(t, ctx, db, "advisory_issuance", []string{"ordinal", "document", "digest", "edition_id"})
-	if len(issued) != 2 || issued[0]["ordinal"] != "1" || issued[1]["ordinal"] != "2" ||
-		issued[1]["digest"] != "second" || issued[0]["document"] != "{}" ||
+	issued := read(t, ctx, db, "advisory_issuance", []string{"id", "ordinal", "document", "digest",
+		"summary", "edition_id"})
+	if len(issued) != 2 || issued[0]["id"] != "7" || issued[1]["id"] != "8" ||
+		issued[0]["ordinal"] != "1" || issued[1]["ordinal"] != "2" ||
+		issued[0]["summary"] == "NULL" || issued[1]["summary"] != "NULL" || issued[1]["digest"] != "second" ||
+		issued[0]["document"] != "NULL" || issued[1]["document"] != "NULL" ||
 		issued[0]["edition_id"] != advisories[0]["edition_id"] {
 		t.Errorf("the issuances moved across as %v", issued)
 	}
@@ -457,14 +513,107 @@ func moved(t *testing.T, ctx context.Context, db *database.DB) {
 		t.Errorf("the advisory names its issue %s times", got)
 	}
 
-	// A table whose rows kept their identifiers still generates new ones past
-	// them.
+	// A table whose rows kept their identifiers generates new ones past them.
 	exec(t, ctx, db, `INSERT INTO "disclosure_movement" ("vulnerability_id", "product_id", "act", "was",
 		"until", "reason", "asked_by", "asked_at", "needs_approval") VALUES (1, 1, 'shortening', ?, ?, 'r', 1, ?, ?)`,
 		time.Now(), time.Now(), time.Now(), false)
 	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("advisory_id", "ordinal", "edition_id", "document",
 		"digest", "issued_by", "issued_at") VALUES (?, 3, ?, '{}', 'third', 1, ?)`,
 		advisories[0]["id"], advisories[0]["edition_id"], time.Now())
+	for table, carried := range map[string]int{"disclosure_movement": 7, "advisory_issuance": 8} {
+		if got := one(`SELECT COUNT(*) FROM "`+table+`" WHERE "id" > ?`, carried); got != "1" {
+			t.Errorf("%s generated no identifier past the ones carried across", table)
+		}
+	}
+
+	// A second advisory about the same issue in the same product, which v0.1.0
+	// has one sequence of issuances for.
+	exec(t, ctx, db, `INSERT INTO "advisory" ("identifier", "identifier_folded", "minted_year", "mint_number",
+		"minted_at", "minted_by") VALUES ('PSIRT-2026-0001', 'psirt-2026-0001', 2026, 1, ?, 1)`, time.Now())
+	second := one(`SELECT "id" FROM "advisory" WHERE "identifier_folded" = 'psirt-2026-0001'`)
+	exec(t, ctx, db, `INSERT INTO "advisory_edition" ("advisory_id", "ordinal", "written_by", "written_at")
+		VALUES (?, 1, 1, ?)`, second, time.Now())
+	edition := one(`SELECT "id" FROM "advisory_edition" WHERE "advisory_id" = ?`, second)
+	exec(t, ctx, db, `INSERT INTO "advisory_issue" ("advisory_id", "product_id", "vulnerability_id",
+		"added_at", "added_by") VALUES (?, 1, 1, ?, 1)`, second, time.Now())
+	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("advisory_id", "ordinal", "edition_id", "document",
+		"digest", "issued_by", "issued_at") VALUES (?, 1, ?, '{}', 'other', 1, ?)`, second, edition, time.Now())
+}
+
+// returned checks what the rollback put back in the tables it recreated: every
+// row the release held, as it held it, and identifiers generated past them.
+func returned(t *testing.T, ctx context.Context, db *database.DB, before map[string][]map[string]string) {
+	t.Helper()
+	for _, table := range []string{"disclosure_extension", "advisory_issuance"} {
+		was := before[table]
+		if len(was) == 0 {
+			t.Fatalf("%s held nothing before the upgrade, so nothing is checked", table)
+		}
+		now := read(t, ctx, db, table, sortedKeys(was[0]))
+		byID := map[string]map[string]string{}
+		for _, row := range now {
+			byID[row["id"]] = row
+		}
+		for _, row := range was {
+			back, ok := byID[row["id"]]
+			if !ok {
+				t.Errorf("%s %s did not come back", table, row["id"])
+				continue
+			}
+			for column, value := range row {
+				if back[column] != value {
+					t.Errorf("%s %s.%s was %q and came back %q", table, row["id"], column, value, back[column])
+				}
+			}
+		}
+	}
+	// The shortening has no place in v0.1.0, and the second advisory about
+	// the same issue gives way to the first; the first's third issuance comes
+	// back with it.
+	for table, want := range map[string]int{"disclosure_extension": 1, "advisory_issuance": 3} {
+		if got := len(read(t, ctx, db, table, []string{"id"})); got != want {
+			t.Errorf("%s holds %d rows after the rollback, not %d", table, got, want)
+		}
+	}
+	highest := map[string]string{}
+	for _, table := range []string{"disclosure_extension", "advisory_issuance"} {
+		var id any
+		if err := db.QueryRowContext(ctx, `SELECT MAX("id") FROM "`+table+`"`).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		highest[table] = text(id)
+	}
+	exec(t, ctx, db, `INSERT INTO "disclosure_extension" ("vulnerability_id", "product_id", "was", "until",
+		"reason", "asked_by", "asked_at", "needs_approval") VALUES (1, 1, ?, ?, 'r', 1, ?, ?)`,
+		time.Now(), time.Now(), time.Now(), false)
+	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("product_id", "vulnerability_id", "ordinal", "digest",
+		"issued_by", "issued_at") VALUES (1, 1, 9, 'again', 1, ?)`, time.Now())
+	for table, top := range highest {
+		var past any
+		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+table+`" WHERE "id" > ?`, top).Scan(&past); err != nil {
+			t.Fatal(err)
+		}
+		if text(past) != "1" {
+			t.Errorf("%s generated no identifier past the ones returned to it", table)
+		}
+	}
+}
+
+// shippedSchema holds what migrations 1 to 36 build to what they built when
+// v0.1.0 was tagged, which the files alone do not: the column spellings and
+// widths they use are read from helpers a later change is free to edit.
+//
+// The expected schema was captured from the tag's migrations on each engine.
+func shippedSchema(t *testing.T, engine database.Engine, got []string) {
+	t.Helper()
+	want, err := os.ReadFile(filepath.Join("testdata", "v010-schema-"+string(engine)+".txt"))
+	if err != nil {
+		t.Fatalf("read what v0.1.0 built on %s: %v", engine, err)
+	}
+	lines := strings.Split(strings.TrimRight(string(want), "\n"), "\n")
+	if diff := setDiff(lines, got); diff != "" {
+		t.Errorf("migrations 1 to 36 no longer build what v0.1.0 built on %s:\n%s", engine, diff)
+	}
 }
 
 func setDiff(want, got []string) string {

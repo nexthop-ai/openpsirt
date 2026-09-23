@@ -365,8 +365,8 @@ declarations sit beside the migration that upgrades from them
 (`DESIGN-database.md` § Migrations). The version in the API path is the shape it will have, not a
 promise anybody may hold us to.
 
-The migrations that exist are kept only because walking the chain up and down
-catches an ordering mistake between them. They collapse into one before 1.0
+Migrations 1 to 36 are kept because a database v0.1.0 built has applied them,
+and migration 37 because it upgrades one. They collapse into one before 1.0
 (REQ-72), which `TODO.md` records so it happens rather than being remembered.
 
 ## Evidence beside a decision

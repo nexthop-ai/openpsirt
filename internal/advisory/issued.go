@@ -163,6 +163,9 @@ type Sent struct {
 // public. What publishes walks each advisory until it reaches one it may
 // serve.
 //
+// An issuance v0.1.0 recorded kept no document, so there is nothing of it to
+// serve and it is not among them.
+//
 // Narrowed the way every other read of an issuance is, which for the
 // deployment looking at itself narrows to everything.
 func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error) {
@@ -178,6 +181,7 @@ func (s *Store) Sent(ctx context.Context, subject access.Subject) ([]Sent, error
 		ColumnExpr(`ad.identifier AS "advisory"`).
 		ColumnExpr(`ai.ordinal AS "ordinal"`).
 		ColumnExpr(`ai.document AS "document"`).
+		Where("ai.document IS NOT NULL").
 		// By name and then newest first, so that what is written is decided
 		// by the record rather than by the order an engine chose.
 		OrderExpr("ad.identifier ASC, ai.ordinal DESC")

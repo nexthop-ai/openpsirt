@@ -16,8 +16,8 @@ import (
 // describe is a database's schema as lines of text, one per column, index and
 // constraint, sorted so two can be compared as sets.
 //
-// A column's position is left out. An upgrade adds a column at the end of a
-// table where a fresh install declares it in the middle, and no query here
+// A column's position is left out. Migration 37 adds a column at the end of a
+// table where v0.2.0's declaration puts it in the middle, and no query here
 // reads a column by position. Everything else the engine reports about a
 // column is in: its type as the engine spells it, whether it takes a null, its
 // default, and on MySQL and MariaDB its collation and the table's options.

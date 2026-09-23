@@ -23,8 +23,9 @@ const v010GroupIndex = `CREATE INDEX "finding_group_idx" ON "finding" ("target_i
 // downgradeV020 changes v0.2.0's schema back into v0.1.0's.
 //
 // Rows v0.1.0 has no place for go with the tables and columns that held them:
-// an embargo shortened, a report not yet judged, a file attached to a report,
-// the second and later issues an advisory covers.
+// an embargo shortened, a report that did not become an issue, judged or not,
+// a file attached to a report, the second and later issues an advisory covers,
+// and every later advisory about the same issue in the same product.
 func downgradeV020(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
@@ -305,10 +306,14 @@ func mentionsAny(text string, columns map[string]bool) bool {
 
 // returnAdvisories puts each issuance back under the product and issue it was
 // issued for, which in v0.1.0 is what an issuance is keyed on. An advisory
-// covering several issues is returned under the first of them.
+// covering several issues is returned under the first of them, and where two
+// advisories have the same first issue in the same product, the one issued
+// first keeps it: v0.1.0 holds one sequence of issuances per product and
+// issue.
 func (u *upgrader) returnAdvisories() error {
 	type issuance struct {
 		ID              int64
+		AdvisoryID      int64
 		ProductID       int64
 		VulnerabilityID int64
 		Ordinal         int64
@@ -319,7 +324,7 @@ func (u *upgrader) returnAdvisories() error {
 	}
 	var rows []issuance
 	if err := u.tx.NewRaw(`
-		SELECT "ai"."id", "first"."product_id", "first"."vulnerability_id", "ai"."ordinal",
+		SELECT "ai"."id", "ai"."advisory_id", "first"."product_id", "first"."vulnerability_id", "ai"."ordinal",
 			"ai"."digest", "ai"."summary", "ai"."issued_by", "ai"."issued_at"
 		FROM "advisory_issuance" AS "ai"
 		JOIN "advisory_issue" AS "first" ON "first"."advisory_id" = "ai"."advisory_id"
@@ -335,7 +340,13 @@ func (u *upgrader) returnAdvisories() error {
 	if err := upIssuance(u.ctx, u.raw); err != nil {
 		return err
 	}
+	owner := map[[2]int64]int64{}
 	for _, r := range rows {
+		key := [2]int64{r.ProductID, r.VulnerabilityID}
+		if first, taken := owner[key]; taken && first != r.AdvisoryID {
+			continue
+		}
+		owner[key] = r.AdvisoryID
 		if _, err := u.tx.ExecContext(u.ctx, `
 			INSERT INTO "advisory_issuance" ("id", "product_id", "vulnerability_id", "ordinal",
 				"digest", "summary", "issued_by", "issued_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,

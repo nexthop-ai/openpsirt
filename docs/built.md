@@ -1,8 +1,8 @@
 # Current state
 
 OpenPSIRT is in early development. Nothing is compatible with anything yet: a
-schema change edits the migration that created the thing, and a development
-database is recreated rather than migrated. A database v0.1.0 built is upgraded
+schema change edits what declares the thing rather than adding a migration
+beside it, and a development database is recreated rather than migrated. A database v0.1.0 built is upgraded
 in place.
 
 | Area | State |

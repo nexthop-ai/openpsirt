@@ -208,7 +208,7 @@ components:
           readOnly: true
           type: string
         advisory:
-          description: The identifier this deployment minted, which is what the document is tracked by
+          description: The identifier the advisory is tracked by
           type: string
         agreed:
           description: How many people agree to what it says now. None means it cannot go out
@@ -10639,12 +10639,12 @@ paths:
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-advisory
       parameters:
-        - description: The identifier this deployment minted
+        - description: The identifier the advisory is tracked by
           in: path
           name: advisory
           required: true
           schema:
-            description: The identifier this deployment minted
+            description: The identifier the advisory is tracked by
             type: string
       responses:
         "200":

@@ -178,7 +178,7 @@ worked.
 |---|---|
 | Behind what the binary carries | Refused at startup, naming both versions and what to run. The previous replica stays up, which is what a startup refusal buys over a readiness failure |
 | Equal | Served, and the two versions are logged |
-| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back |
+| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migration 37 is the exception: it reshapes what v0.1.0 reads, so going back to v0.1.0 is rolling it back with the newer binary first |
 
 What the binary carries is the highest version among the embedded migration
 sources, read from their file names, which is the same rule the migration
@@ -218,7 +218,7 @@ The chain has two parts.
 
 | Migrations | What they are |
 |---|---|
-| 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again; a test holds each file to the digest of the tagged one |
+| 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again. A test holds each file to the digest of the tagged one, and what they build to the schema the tag built on each engine, which also catches a change to the column spellings and widths they read from elsewhere |
 | 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. § Release upgrades says how |
 
 Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
@@ -279,11 +279,11 @@ from one release to the next.
 |---|---|
 | Every table and index is made by v0.2.0's own statement | v0.2.0's declaration of each table it creates or changes sits beside it, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
 | One transaction of its own | Registered without the migration library's transaction, because SQLite's foreign keys have to be switched off before a transaction begins, and because the rows it moves are read back by name |
-| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as v0.2.0 declares it and costs no row rewrite on either server |
+| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as v0.2.0 declares it and costs no row rewrite on any of the three |
 | SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by v0.2.0's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
 | SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
 | Rows written with their own identifiers keep them | References into a moved table still land. PostgreSQL's identity does not move past a value it did not generate, so it is moved past them; the other three move on the insert |
-| A column added is last in its table | v0.2.0 declares it in place. No query reads a column by position |
+| A column added is last in its table on the three servers | A table SQLite rebuilds has it where v0.2.0 declares it. No query reads a column by position |
 | On MySQL and MariaDB a failure part way is recovered from a backup | Both commit every data-definition statement as it runs, so the transaction does not hold the migration together there, and the version is not recorded. The operator page says to take one first |
 
 What v0.1.0's rows become:
@@ -292,10 +292,10 @@ What v0.1.0's rows become:
 |---|---|
 | An embargo extension | A disclosure movement whose act is an extension, under the same identifier. v0.1.0 refused a move that was not later |
 | An issuance, keyed on a product and an issue | An advisory per product and issue, with one edition, the one issue it covers, and its issuances beneath it keeping their identifiers, ordinals, digests and summaries |
-| The name an advisory was issued under | The advisory's identifier. v0.1.0 used the issue's own identifier as the tracking identifier, and a revision that changed it would read as a second document. These names were not minted here, so they are numbered in year zero, where no advisory minted from the configured prefix lands |
+| The name an advisory was issued under | The advisory's identifier. v0.1.0 used the issue's own identifier as the tracking identifier, and a revision that changed it would read as a second document. For an issue filed under a CVE since, it is the name minted for the flaw, kept among its aliases; that is wrong only for an issue refiled before its first issuance, and nothing v0.1.0 kept says which came first. These names were not minted from the configured prefix, so they are numbered in year zero, where no advisory minted from it lands |
 | The first release date of an issued advisory | Frozen as the earliest recording of the issue in the product, which is what v0.1.0's document said |
-| The document an issuance sent | Not kept by v0.1.0, and nothing can work it out again. Stored as an empty object, which parses and states no distribution, so a published directory passes over it until the advisory is issued again |
-| A reported flaw | A reference minted the way one is today: the product's name, the year it was recorded, and six random digits |
+| The document an issuance sent | Not kept by v0.1.0, and nothing can work it out again. Stored as null, which is what the column says for an issuance that kept only its digest; a published directory reads only issuances that kept their bytes, so it serves the advisory once it is issued again |
+| A reported flaw | A reference minted the way one is today: the product's name, the year it was recorded, and six random digits. Judged when it was recorded, by whoever recorded it: v0.1.0 wrote a report only together with its flaw, which is the act a report is judged by today |
 | A VEX statement | From a statement set, with no document name of its own: v0.1.0 read nothing else. The version it is about is read from its package identifier the way an upload is read today, and is empty where the identifier names none |
 | The weaknesses of a flaw recorded here | The first named is primary. v0.1.0 wrote them in the order named, in one statement. An issue a scanner reported has none marked until a scan reports it again |
 | A finding | Not exploited here. v0.1.0 had no record of that |
@@ -304,8 +304,9 @@ What v0.1.0's rows become:
 
 Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
 place for goes with the tables and columns that held it: an embargo shortened,
-a report not yet judged, a file attached to a report, and every issue an
-advisory covers but its first. On MySQL and MariaDB a foreign key served by an
+a report that did not become an issue, judged or not, a file attached to a
+report, every issue an advisory covers but its first, and every later advisory
+about the same issue in the same product. On MySQL and MariaDB a foreign key served by an
 index v0.2.0 added is dropped and declared again, so that the engine makes the
 key an index of its own as it did in v0.1.0; one made by hand would outlive
 the next upgrade.
@@ -315,8 +316,10 @@ row into every table, every column holding a value, plus the rows each move
 above reads, and applies migration 37. It compares every column, index and
 constraint against a database that walked the chain empty, compares every
 value the release held with what the upgrade left, and checks each move in the
-table above. It then rolls migration 37 back and compares against the schema
-migration 36 built, and applies it again.
+table above. It then rolls migration 37 back, compares against the schema
+migration 36 built and the rows the release held against what came back, checks
+that the tables it recreated generate identifiers past those rows, and applies
+it again.
 
 The upgrade over a v0.1.0 database holding 524,288 findings, which is the
 largest table and one every engine changes:

@@ -164,7 +164,10 @@ func advisoryStatements(t *columnTypes) []string {
 			-- what we generated" while the document answers "what was
 			-- published". Both are written from the one document in the one
 			-- statement.
-			"document"    ` + t.free + ` NOT NULL,
+			--
+			-- Null on an issuance v0.1.0 recorded, which kept the digest and
+			-- not the bytes.
+			"document"    ` + t.free + ` NULL,
 			"digest"      ` + t.hash + ` NOT NULL,
 			-- What somebody wants said about this revision, where they said
 			-- anything. A revision history whose every entry reads the same is

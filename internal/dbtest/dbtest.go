@@ -412,8 +412,8 @@ func sqliteTemplate() ([]byte, error) {
 // MariaDB, once per package per engine, which is 475 s of server work in a run
 // that spends 43 s of processor time — and none of it tests anything the
 // migration tests do not. What makes reuse safe is that the name carries a
-// fingerprint of the migration sources: a schema change edits the migration
-// that created the thing rather than adding one beside it, so the applied
+// fingerprint of the migration sources: a schema change edits what declares
+// the thing rather than adding a migration beside it, so the applied
 // version does not move and only the content tells one schema from another. An
 // edited migration therefore names a different database, and the databases the
 // older fingerprints named are dropped as the new one is created, so a server
