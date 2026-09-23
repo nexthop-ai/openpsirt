@@ -214,6 +214,16 @@ components:
           description: How many people agree to what it says now. None means it cannot go out
           format: int64
           type: integer
+        agreed_by:
+          description: Who agrees to what it says now, oldest first
+          items:
+            $ref: "#/components/schemas/AgreerBody"
+          type:
+            - array
+            - "null"
+        changed:
+          description: Whether the document generated now says something different from the last one that went out
+          type: boolean
         covers:
           items:
             $ref: "#/components/schemas/CoveredBody"
@@ -408,6 +418,18 @@ components:
           type: integer
       required:
         - edition
+        - agreed_at
+      type: object
+    AgreerBody:
+      additionalProperties: false
+      properties:
+        agreed_at:
+          type: string
+        person:
+          description: Who agrees, by sign-in identity
+          type: string
+      required:
+        - person
         - agreed_at
       type: object
     AlsoBuild:
@@ -4915,6 +4937,28 @@ components:
       required:
         - items
       type: object
+    ListBodyNameableBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyNameableBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/NameableBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyNoteBody:
       additionalProperties: false
       properties:
@@ -5377,28 +5421,6 @@ components:
       required:
         - items
       type: object
-    ListBodyVEXIssuanceBody:
-      additionalProperties: false
-      properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/ListBodyVEXIssuanceBody.json
-          format: uri
-          readOnly: true
-          type: string
-        items:
-          items:
-            $ref: "#/components/schemas/VEXIssuanceBody"
-          type:
-            - array
-            - "null"
-        total:
-          format: int64
-          type: integer
-      required:
-        - items
-      type: object
     ListBodyVariantBody:
       additionalProperties: false
       properties:
@@ -5703,6 +5725,22 @@ components:
         - asked_at
         - needs_approval
         - in_force
+      type: object
+    NameableBody:
+      additionalProperties: false
+      properties:
+        open:
+          description: How many of its findings in this product are still open. None means it is fixed wherever it was found
+          format: int64
+          type: integer
+        summary:
+          type: string
+        vulnerability:
+          description: The identifier the issue is filed under
+          type: string
+      required:
+        - vulnerability
+        - open
       type: object
     Named:
       additionalProperties: false
@@ -9719,13 +9757,6 @@ components:
     VEXIssuanceBody:
       additionalProperties: false
       properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/VEXIssuanceBody.json
-          format: uri
-          readOnly: true
-          type: string
         digest:
           description: A digest of what the document said, so that what is published and what we would generate stay answerable against each other
           type: string
@@ -9739,6 +9770,37 @@ components:
           format: int64
           type: integer
       required:
+        - version
+        - digest
+        - issued_by
+        - issued_at
+      type: object
+    VEXRecordedBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/VEXRecordedBody.json
+          format: uri
+          readOnly: true
+          type: string
+        digest:
+          description: A digest of what the document said, so that what is published and what we would generate stay answerable against each other
+          type: string
+        document:
+          description: The OpenVEX document recorded, as its bytes, carrying the version it is recorded under. This is the one to send
+        issued_at:
+          type: string
+        issued_by:
+          description: Who published it. The act leaves this row and nothing else, so the row names them
+          type: string
+        version:
+          description: Which revision went out, counting from one. It is the version that document carries
+          format: int64
+          type: integer
+      required:
+        - document
         - version
         - digest
         - issued_by
@@ -9774,6 +9836,28 @@ components:
           type: boolean
       required:
         - name
+      type: object
+    VexIssuancesBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/VexIssuancesBody.json
+          format: uri
+          readOnly: true
+          type: string
+        changed:
+          description: Whether the public document generated now says something different from the last one that went out. Absent where nothing has gone out or no publisher is configured
+          type: boolean
+        items:
+          items:
+            $ref: "#/components/schemas/VEXIssuanceBody"
+          type:
+            - array
+            - "null"
+      required:
+        - items
       type: object
     Vulnerability:
       additionalProperties: false
@@ -10546,7 +10630,9 @@ paths:
   /v1/advisories/{advisory}:
     get:
       description: |-
-        The advisory and the issues it covers, in the order they were added.
+        The advisory and the issues it covers, in the order they were added, who agrees to what it says now, and whether what it would generate now differs from what last went out.
+
+        `changed` is absent where nothing has gone out, where it covers nothing, and where no publisher is configured, since then there is no document to compare.
 
         An advisory covering a product you hold nothing on answers as one that does not exist. Told apart, the pair of answers says what exists.
 
@@ -15263,11 +15349,13 @@ paths:
 
         Only claims naming a component this product ships are recorded.
 
-        Reading starts from the moment the supplier is added. To take an advisory published before that, upload it.
+        A new supplier is read from the number of days before it was added that scanning.supplier-history names. To take an advisory published before that, upload it.
+
+        Each document is checked against the digest file its publisher serves beside it, ending .sha256 or .sha512, and one that does not match is not read. A publisher serving neither is read unchecked.
 
         A VEX document listed beside the advisories is not read here. Upload it to the VEX endpoint to take it.
 
-        A supplier withdrawn and added again under the same name starts from today, the way a new one does.
+        A supplier withdrawn and added again under the same name resumes where it stopped, no further back than that same window.
 
         The name is matched without regard to capitals. A name already in use for this product is refused with 409; withdraw the supplier first to change its address.
 
@@ -18940,6 +19028,45 @@ paths:
           - private-read
           - private-triage
         note: Asking about undisclosed findings needs private-read or private-triage.
+  /v1/products/{product}/nameable-flaws:
+    get:
+      description: |-
+        Every flaw recorded here in this product, open or fixed, by identifier. These are the issues adding one to an advisory accepts in this product.
+
+        `open` is how many of its findings are still open; none means it is fixed wherever it was found. At most 500, in identifier order; `total` says how many there are.
+
+        A product you do not triage answers 404.
+
+        Requires: public-triage or private-triage on the product. Answers only what you may see.
+      operationId: list-nameable-flaws
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyNameableBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List the flaws an advisory may name
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+        note: Answers only what you may see.
   /v1/products/{product}/overview:
     get:
       description: |-
@@ -22234,11 +22361,11 @@ paths:
       description: |-
         What has been published for this build, oldest first: which revision, when, and what the document hashed to at the time.
 
-        Readable without generating a document. Somebody deciding whether to publish a revision is asking before they generate anything, and the digest beside each entry is what answers whether the last one still describes what this would produce.
+        The record itself is read without generating a document. `changed` generates the public one to compare, so it is absent where that cannot be done.
 
-        The published document itself belongs to whoever published it. The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same.
+        The digest is over what the document says, with the moment it was generated, the version and the build of OpenPSIRT that wrote it left out, so a document regenerated unchanged hashes the same. `changed` says whether the public document generated now differs from the last one that went out.
 
-        Answered whether or not a publisher is configured for this deployment. Nothing here is assembled and no author is named.
+        `changed` is absent where nothing has gone out, where no publisher is configured, and where the build now holds more statements than one document carries.
 
         Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document.
       operationId: list-vex-issuances
@@ -22263,7 +22390,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyVEXIssuanceBody"
+                $ref: "#/components/schemas/VexIssuancesBody"
           description: OK
         default:
           content:
@@ -22284,7 +22411,7 @@ paths:
         note: "Answers only what you may see. A grant on one case does not reach it: a row saying a document about this build went out is as much a disclosure as the document."
     post:
       description: |-
-        Records that the document for this build was published: when, by whom, and a digest of the document as it stands now.
+        Records that the document for this build was published: when, by whom, and a digest of the document as it stands now. Answers with the document that was recorded, which is the one to send: it carries the version it is recorded under, and a document generated before recording may not.
 
         A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once a claim is withdrawn, a decision is revised or a scan closes a finding.
 
@@ -22315,7 +22442,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/VEXIssuanceBody"
+                $ref: "#/components/schemas/VEXRecordedBody"
           description: Created
         default:
           content:
@@ -22332,6 +22459,63 @@ paths:
           - public-triage
           - private-triage
         note: The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the claim was approved.
+  /v1/products/{product}/streams/{stream}/variants/{variant}/vex/issuance/{version}:
+    get:
+      description: |-
+        The OpenVEX document recorded as one revision, byte for byte as it went out. It carries the version it was recorded under and the moment it was recorded.
+
+        A revision nobody recorded answers 404.
+
+        Requires: public-read or public-triage or private-read or private-triage on the product. Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue.
+      operationId: get-vex-issued
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: stream
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: variant
+          required: true
+          schema:
+            type: string
+        - description: Which revision, counting from one
+          in: path
+          name: version
+          required: true
+          schema:
+            description: Which revision, counting from one
+            format: int64
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Read a VEX document that went out
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
+          - private-triage
+        note: "Answers only what you may see. A grant on one case does not reach it: the document is about the whole build rather than about one issue."
   /v1/products/{product}/supplier-advisories:
     post:
       description: |-
