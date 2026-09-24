@@ -498,6 +498,71 @@ func TestWhatACountSaysIsIssuesWhicheverWayTheComponentIsReached(t *testing.T) {
 	})
 }
 
+func TestASearchRanksByOpenIssuesTheReaderMaySeeThenByName(t *testing.T) {
+	// Every component whose name holds the term, most open issues first and
+	// then by name, counting only the issues the reader may read — an
+	// undisclosed issue neither adds to a count nor lifts a component up the
+	// list for somebody who reads disclosed work alone. A component at two
+	// places is one answer with one count.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		libssl := at("libssl", "3.0.11")
+		snap := tree()
+		snap.Components = append(snap.Components, zlib, libssl)
+		snap.Dependencies = append(snap.Dependencies,
+			graph.Dependency{Parent: root, Child: zlib},
+			graph.Dependency{Parent: openssl, Child: libssl})
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+
+		zlibID := f.componentNamed(t, zlib.Name)
+		for _, name := range []string{"CVE-2026-Z1", "CVE-2026-Z2"} {
+			issue := f.anIssue(t, name)
+			f.opens(t, issue, zlibID, "zlib-a")
+			f.opens(t, issue, zlibID, "zlib-b")
+		}
+		curlID := f.componentNamed(t, curl.Name)
+		f.opens(t, f.anIssue(t, "CVE-2026-C1"), curlID, "curl-a")
+		f.opensAs(t, f.anIssue(t, "CVE-2026-C2"), curlID, "curl-a", access.Private)
+		f.opens(t, f.anIssue(t, "CVE-2026-O1"), f.componentNamed(t, openssl.Name), "openssl-a")
+
+		said := func(found []graph.Neighbor) string {
+			out := make([]string, 0, len(found))
+			for _, each := range found {
+				out = append(out, fmt.Sprintf("%s:%d", each.Name, each.Findings))
+			}
+			return strings.Join(out, " ")
+		}
+
+		found, err := f.store.Search(ctx, everyone(f), f.targetID, "L", 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := said(found), "curl:2 zlib:2 openssl:1 libssl:0"; got != want {
+			t.Errorf("searching as somebody reading both answered %q, want %q", got, want)
+		}
+
+		disclosed := access.NewPerson(2, "disclosed", false,
+			map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead}}, 0)
+		found, err = f.store.Search(ctx, disclosed, f.targetID, "l", 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := said(found), "zlib:2 curl:1 openssl:1 libssl:0"; got != want {
+			t.Errorf("searching as somebody reading disclosed work answered %q, want %q", got, want)
+		}
+
+		found, err = f.store.Search(ctx, everyone(f), f.targetID, "l", 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := said(found), "curl:2 zlib:2"; got != want {
+			t.Errorf("a search bounded at two answered %q, want %q", got, want)
+		}
+	})
+}
+
 // anIssue records a vulnerability to open findings against.
 func (f *fixture) anIssue(t *testing.T, identifier string) int64 {
 	t.Helper()
@@ -521,12 +586,20 @@ func (f *fixture) componentNamed(t *testing.T, name string) int64 {
 	return id
 }
 
-// opens puts one finding of an issue at one place of a component.
+// opens puts one disclosed finding of an issue at one place of a component.
 func (f *fixture) opens(t *testing.T, issue, componentID int64, place string) {
+	t.Helper()
+	f.opensAs(t, issue, componentID, place, access.Public)
+}
+
+// opensAs puts one finding of an issue at one place of a component, at a
+// visibility.
+func (f *fixture) opensAs(t *testing.T, issue, componentID int64, place string,
+	visibility access.Visibility) {
 	t.Helper()
 	row := &finding.Finding{
 		TargetID: f.targetID, Kind: finding.Vulnerable, VulnerabilityID: issue,
-		Visibility: access.Public, ComponentID: componentID, PlaceIdentity: place,
+		Visibility: visibility, ComponentID: componentID, PlaceIdentity: place,
 		LastChangedAt: time.Now().UTC().Truncate(time.Microsecond),
 		OpenedAt:      time.Now().UTC().Truncate(time.Microsecond),
 	}

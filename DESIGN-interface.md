@@ -872,11 +872,27 @@ distinct issues and the list is one row per issue and component. A name the
 build does not hold is refused rather than answered with an empty list, since an
 empty list is also what a clean subtree looks like.
 
-Searching the tree counts what the tree counts. Counted as finding rows rather
-than distinct issues, a library reachable under three parents reported three
-times its real number — and the results are **ordered** by that number, so
-deeply-vendored components with few real issues outranked shallow ones with
-many, which is the opposite of what a search of a build is for.
+Searching the tree counts what the tree counts: distinct open issues the reader
+may read, per component, ordered by that count and then by name. A component at
+several places is one answer with one count.
+
+| Rule | |
+|---|---|
+| Issues, not finding rows | A library reachable under three parents is one issue. Counted as rows it reads three times its number, and the order follows the count |
+| Counted in one pass over the build, grouped by component | Counted per matched component, SQLite reads the build's open findings once for each, and a term matching many names takes most of a minute |
+
+Measured on the demo's switch image, 6,867 components and 297,881 open
+findings, before and after counting in one pass:
+
+| Term | SQLite | PostgreSQL | MySQL | MariaDB |
+|---|---|---|---|---|
+| `li`, 698 matches | 17.1 s → 0.24 s | 1.38 s → 0.09 s | 0.33 s → 0.37 s | 33.5 s → 0.13 s |
+| `open` | 12.7 s → 0.24 s | 0.30 s → 0.08 s | 16 ms → 0.35 s | 13 ms → 0.13 s |
+| `ssl`, 6 matches | 0.15 s → 0.22 s | 6 ms → 75 ms | 14 ms → 0.36 s | 12 ms → 0.13 s |
+
+A narrow term is slower than it was on three engines, because the pass reads the
+whole build however few names match. Every term is under half a second on every
+engine, where a broad term was over half a minute on two.
 
 ## The review queue
 
