@@ -11,110 +11,136 @@ Nothing else may reference this file. Anything durable belongs in
 - [Deferred by the owner](#deferred-by-the-owner)
 - [Decided, not built](#decided-not-built)
 - [Known gaps](#known-gaps)
+- [Weak tests](#weak-tests)
 - [Owner decisions outstanding](#owner-decisions-outstanding)
-- [Measured, recorded, not fixed](#measured-recorded-not-fixed)
+- [Measured and left alone](#measured-and-left-alone)
 - [Not planned](#not-planned)
 
 ## Before 1.0
 
-Mandatory, and wrong to do earlier.
+Required for 1.0, and wrong to do earlier.
 
-| | |
+| Work | Why it waits |
 |---|---|
-| Collapse the schema into one initial migration | Migrations 1 to 36 are kept because a database v0.1.0 built has applied them, and migration 37 because it upgrades one (REQ-72) |
-| Start keeping schema and API compatibility | Until 1.0 a schema change edits what declares the thing rather than adding a migration beside it, and a development database is recreated (REQ-61, REQ-72 and REQ-76) |
+| Collapse the migrations into one | 1 to 36 stay because v0.1.0 applied them, 37 because it upgrades v0.1.0 to v0.2.0, and 38 onward because each changes a tagged release (REQ-72) |
+| Start keeping schema and API compatibility | Below 1.0 an upgrade may change the API, and only a database from a tagged release is upgraded in place (REQ-76) |
 
 ## Deferred by the owner
 
-| | |
+The owner has chosen to wait on each of these.
+
+| Work | Where it stands |
 |---|---|
-| Adapters that deliver an advisory to somebody's platform | Where a document goes next differs completely by product (REQ-39). The one destination that is built is the static provider directory, which is files an operator's own web server serves |
-| Signing a published advisory, and the public key beside it | What the standard's trusted provider role adds on top of the directory. Key material is a class of configuration this deployment does not take, and it is the same class a CVE Numbering Authority record needs |
-| Being a CVE Numbering Authority | A direction rather than a commitment, and recorded as one: this is likely after 1.0, because filing by hand through a web page does not scale past a handful of flaws of our own. It sequences after the advisory becomes an entity with its own identity, where a CVE record is another serializer over what is stored rather than a second assembly path — and the credentials it needs are the same new class of configuration that signing a published advisory needs. It was in `REQUIREMENTS.md` § 4 with no reason beside it, which read as a decision never to |
-| Exploitation sources beyond the known-exploited catalog | A larger commercial catalog, or a feed of exploits that exist, is triage prioritization rather than evidence that this product was attacked. Not before 1.0. A deployment wanting a commercial source holds its own license and key for it, so what is built is somewhere to configure one rather than a source shipped |
-| Deadline windows set per product | One set of remediation windows applies to every product. The mechanism a product already uses to state its own triage line is the shape an override would take; a remediation deadline has no counterparty behind it, so this is a knob on an advisory signal |
-| The VEX profile of the CSAF document | Needs the mapping from a decision to the releases it covers. The dismissal vocabulary was aligned to VEX from the start, so no new words are needed |
-| Server-side PDF rendering for reports | Printing is the browser's and the stylesheet is the record's, which covers what a report is taken away as today |
-| A release note with nothing in it | `get-release-notes` answers 200 with a zero-byte body where nothing was fixed, and a caller cannot tell that from a truncated response or a wrong pair of builds. `finding.Notes` returns the empty string deliberately — a heading over nothing is a question in the reader's mind — and a test pins it, so changing what a published operation returns is a decision rather than a fix |
-| Nothing *watches* how deep the queue is | How deep it is, per kind and against the bound, is on the System screen, so it is no longer a backlog nobody sees. What is left is the watching: the threshold it would be measured against and the alert kind it would raise, both of which are decisions |
-| Where the ceiling on a sign-in belongs | Thirty days is in force and is a judgment rather than a commitment: it bounds how long a role a group withdrew can still be held, and ninety would be defensible. `DESIGN-access.md` records what is built; the number itself is the owner's to settle, and a decision row is theirs to add |
-| Test doubles at three boundaries that have none | The mail sender, the scanner subprocess and process startup. Each is at 0.0% while the pure code in the same file is not, and each is silent when it fails: a newline in an SMTP header, the argv a subprocess is handed, and a process that serves the API against a stale schema while reporting ready |
-| Six assertions that cannot be false | In the attachment name check, the SQLite migration lock, the sort conformance sweep, the connection-pool timeout, the upstream-currency retry and the empty-document reader. Each holds for every possible implementation of what it names, or compares a value against the only source that could have produced it |
-| Asking a code host's API which branches hold a commit | GitLab answers it in one request, and GitHub one branch at a time with a token for the rate. Git answers every host and is the one route built; an API would spare a copy for a repository with a few linked commits |
-| Fetching a repository from a substitute address | An administrator naming a mirror for a repository — the kernel's stable tree from a host that sends commits alone is 1.1 GB against 5.1 GB — and one copy standing for both the stable and mainline trees, since the first holds the second |
-| Marking the patch for the branch a component ships | Matching `linux-6.12.y` to a component at 6.12.41 is per project, and no convention covers `release-1.4` or `stable/2024.1` |
-| Fetching repositories through an outbound proxy | The guard git reaches out through dials directly. Chaining it through the proxy a deployment names, while still checking the resolved address, is what a network with no direct route needs |
+| Sending an advisory to somebody's platform | OpenPSIRT writes a provider directory that a web server serves. Every other destination needs its own adapter (REQ-39) |
+| Signing published advisories, and publishing the key | Needs key material, which is configuration the deployment does not take |
+| Becoming a CVE Numbering Authority | Likely after 1.0. Filing CVEs by hand does not scale, and it needs the same kind of credentials as signing |
+| Exploitation sources beyond the known-exploited catalog | A commercial catalog or an exploit feed. Each needs somewhere to configure a license and a key, and none exists |
+| Deadline windows per product | There are two sets of windows for the whole deployment: one for scanned findings, one for flaws in our own product |
+| The VEX profile of the CSAF advisory | Needs a mapping from each decision to the releases it covers |
+| PDF reports rendered on the server | Reports are printed from the browser |
+| Asking GitHub or GitLab which branches hold a commit | Patch branches clone each repository. An API call would skip the clone for a repository with few linked commits |
+| Fetching a repository from a mirror | The kernel stable tree is 5.1 GB from kernel.org and 1.1 GB from a mirror that sends commits only |
+| Marking the patch for the branch a component ships | Matching a branch such as `linux-6.12.y` to a version works differently in every project |
+| Cloning through an outbound HTTP proxy | The patch-branch fetcher connects directly, so a network with no direct route cannot use it |
 
 ## Decided, not built
 
-A decision that exists and is not implemented, so it is scheduled rather than a
-gap somebody rediscovers by auditing.
+A decision in `REQUIREMENTS.md` is in force and nothing implements it.
 
-| Decision | Waits for |
+| Decision | Missing |
 |---|---|
-| REQ-14 | Ingesting static analysis and fuzzing findings. The finding model already carries a kind, so a second kind needs no rewrite |
-| REQ-46 | A channel per chat service, behind the interface mail uses, and a screen to configure one. The signed outbound request is not that: it is a general destination somebody points at whatever accepts it, and a channel translates a notification into what one service renders well. Sending a chat service a payload shaped for everything is the shape this is meant to replace |
+| REQ-05 | A producer's own vulnerability report uploaded beside an inventory. The upload takes the inventory and its suppressions only |
+| REQ-14 | Findings from static analyzers and fuzzers |
+| REQ-36 | Opening or updating an item in an external tracker. A finding stores a link somebody typed, and nothing follows it |
+| REQ-40 | Disclosing a finding. Reaching a disclosure date escalates, and nothing makes a finding public |
+| REQ-46 | Chat channels such as Slack and Teams. Mail and a generic signed webhook are the only channels |
+| REQ-73 | Purging old data by exporting rows to a file and then dropping them. Nothing is purged or partitioned, and the column to partition on is undecided |
 
 ## Known gaps
 
-| Gap | |
+Missing or wrong, with no decision needed to fix it.
+
+| Gap | Effect |
 |---|---|
-| An outsized inventory delta is measured against the build rather than against its own history | A receipt says how many component names an upload added, removed and moved, and an upload that moves more of a build than this deployment allows is raised. What decides that is the size of the inventory the upload changed. Whether this build usually moves two names a night or two hundred is not asked, so a build that rolls its base image weekly is reported weekly. A per-build baseline is a stored derived value, and nothing has measured a deployment where the threshold alone is wrong |
-| A supplier whose directory is on a second host cannot be read | Every request is pinned to the host the configured address names, so a listing elsewhere is refused. SUSE describes itself on `www.suse.com` and serves its directory from `ftp.suse.com`, and nothing is served at the second host's own description address. Admitting a second host means deciding what an administrator names beside the address, since trusting whatever host a description points at is the request-forgery primitive the pin exists to refuse |
-| The published image is `amd64` only | The binaries are cross-compiled for `arm64` as well; the image cannot follow while the stage that catalogs what it ships runs the cataloger at the target architecture, which puts `node`, `go` and `syft` under emulation. `DESIGN-packaging.md` names the fix |
-| A producer's own SPDX 3.x output as a fixture | Yocto and one vendor tool emit it, so this is gettable rather than hypothetical. What it would settle is which shapes a real producer actually uses; `DESIGN-ingest.md` records the limitation until it arrives |
-| The license a scan states is dropped at parse | Measured on the 6,866-component switch image: 4,483 of them carry one, which is 65%. It is read out of the inventory and thrown away, so nothing can answer which licenses a build ships even though a permissive license is already something the project cares about (REQ-01) |
-| A component screen keyed on a name rather than on the source package | The unit of work is one source package at one version, and the schema keys a commitment that way: `curl` at one version ships three binary packages, and nobody upgrades a binary. The screen is keyed on the component name instead, so sibling binaries of one source read as separate work and a name one build holds at two versions needs the reader to pick between them. Moving it moves the route, the endpoint and the store |
-| No index is asked what a distribution package is | Every language index asked but the module proxy serves a one-line summary and all of them name an address, so a package from one of them can say what it is. A distribution's own description lives in its package index, which is one file for a whole release rather than one request per package — around 13 MB compressed for one Debian suite — and that is a different shape from the per-package asks. `DESIGN-findings.md` records it as unbuilt |
-| Two read routes still publish a display name where a sign-in identity is documented | The administration trail fills `by`, documented as "who made the change, by sign-in identity", through the store's presentation helper, and the record-a-finding routes do the same for `asked_by` and `approved_by`. `Handles` is the batch lookup to use. The routes that round-trip a name — the collaborator list, the team members, the routing rules, and the role, credential and token listings — are fixed, each pinned by a person whose two names differ |
-| A destination's address comes back whole from `list-outbound` | For Slack and for Teams the path **is** the credential: the token is in it and there is no other authentication, which is why the trail row beside the create records the host alone. The listing and the create response both return `row.URL`. Redacting it means deciding what a caller needs the address for, since somebody has to be able to tell two destinations apart |
-| Every person in the `internal/httpapi` fixtures is seeded with no display name | So the identity and the label coincide, and a field publishing the wrong one of the two cannot be told from a field publishing the right one. Giving those people names is what would make the two rows above checkable, and it is deliberately not done until each field is settled one at a time |
-| A prepared claim is one person's, so several triagers on one backlog drift | Saved filters and the claims they prepare are personal by design — no ownership, no permissions, and no arguing about whose filter is authoritative. What that costs is a shared vocabulary: "when you see this shape, here is the argument we have agreed on" is per person, so three triagers means three hand-copies drifting apart with no way to see that they have. It needs several people working one backlog to appear, which is the trigger for revisiting it. The line it is not about stays where it is: a rule prepares a claim and a person proposes it, and a rule proposing its own pending claim stays refused |
-| An outside claim ruled a duplicate of a flaw found here starts no disclosure date | Its reporter may be counting down to a publication, and the flaw carries no date because it was found here. Whether the duplicate gives it one, from when the claim arrived, is REQ-37's to say |
-| The twelve-week history cannot mark where a version moved | The chart draws what opened and closed; what it cannot draw is the release the build was shipping at the time, which is the thing that says whether the last upgrade worked. Counts are what the trend answers, and a version for each week is a new read over the scan history. The build comparison gives one pairwise `from` and `to`, never a series |
+| Approvers are not told when an edit withdraws their approval | Their approval stops counting silently. The API description of notifications says they are told |
+| Some routes return a display name where a sign-in identity is documented | Affects the administration trail's `by`, its CSV export, and the disclosure-date movement routes. A caller matching on identity gets a name |
+| The webhook listing returns each destination's full address | For Slack and Teams the address is the secret. Hiding it means deciding how somebody tells two destinations apart |
+| The upload alert compares against the size of the build | A build that rolls its base image every week raises the alert every week. Comparing against the build's usual churn needs a stored baseline |
+| A supplier whose directory is on a second host cannot be read | SUSE is one. Every request is pinned to the configured host, and allowing a second one means deciding how an administrator names it |
+| The container image is `amd64` only | The binaries are built for `arm64` too. `DESIGN-packaging.md` names the fix |
+| The license an inventory declares is skipped when it is read | 4,483 of 6,866 components on the switch image declare one, so nothing can say which licenses a build ships |
+| The component screen is keyed on the binary package name | Upgrades happen per source package, so three binaries from one source read as three pieces of work |
+| No distribution package index is asked what a package is | A language package gets a summary and an address from its index. A distribution package gets neither |
+| The component screen's twelve-week chart does not mark version changes | It shows findings opened and closed, and not which version the build shipped each week, so it cannot show whether an upgrade worked |
+| A version 4 CVSS score is left out of published advisories | CSAF 2.0 has no field for one. A flaw rated only under 4.0 publishes no score until the document moves to CSAF 2.1 |
+| Advisories carry no text of our own beyond the title | Everything else in the document is assembled from the flaws it covers |
+| The review queue filters by product only | No filter for what is waiting, who proposed it, its age or its severity |
+| A judgment always covers every place a finding sits | Choosing a subset of the places is not offered |
+| No single view of an upgrade promise across the builds it names | Each build answers for itself |
+| Mail is plain text only | The server-side markdown renderer is kept for an HTML part that is not built |
+| The interface has no spacing scale | Spacing is written by hand at many sizes. Choosing a scale is a design judgment made in a browser |
+| Nothing checks that every API operation is reached by some screen | An operation no screen calls is found only by reading |
+| Other multi-step flows lack a visible next step | Reporting a flaw was reworked so each step offers the next. Finding to decision to approval, and fix to release to VEX, were not |
+| A flaw found here and upgraded from v0.1.0 has no report | v0.1.0 kept nothing saying who recorded it. A later claim about it is accepted as the flaw where it should be ruled a duplicate |
+| `cgit.freedesktop.org` patch links fail | That project moved to GitLab. The System screen shows the failure |
+| One demo component has no walkable route to the build root | `golang.org/x/net` under `sonic-mgmt-common-codegen`. The screen names the consumer. The inventory may hold a disconnected fragment |
+| No real producer's SPDX 3.x output is a fixture | The SPDX 3.x fixtures are the specification's own examples. Yocto and one vendor tool emit it |
+| The recorded scanner output is from grype 0.112.0 | The image ships 0.119.0. Re-recording changes what several tests assert |
+| The scanner's memory use is not measured | The pod's limits are a judgment. A measurement of peak memory on the full-size fixture, cold and warm, would settle them |
+| The interface is designed from mockups | Some of it will be wrong in ways that show only in use. The first release is evidence |
+
+## Weak tests
+
+| Test | Problem |
+|---|---|
+| Mail sending | No test double. The header sanitizer has no test |
+| The scanner subprocess | The double does not check the arguments the scanner is given |
+| Process startup | The stale-schema check is tested, and nothing tests that serving calls it |
+| Attachment names | Feeds a path with no newline to a check for a newline |
+| The SQLite migration lock | Compares the message against the only string that produces it |
+| The sort sweep | Checks for a 200 only, which an unknown sort key also returns |
+| The connection-pool timeout | Dials a port that refuses at once, so the timeout is never reached. The pool bound is compared against the function that sets it |
+| The upstream-currency retry | Runs one pass, so nothing is asked again |
+| The empty-document reader | Its comment says an empty part is refused, and it asserts that the part is stored |
+| Scanned builds in the API tests | Several tests build a scanned build by hand. The shared fixture has helpers for the catalog and people only |
+| People in the API tests | Most are seeded with no display name, so a test cannot tell a name from an identity. This hides the display-name gap above |
 
 ## Owner decisions outstanding
 
-Each is a proposal rather than a change, except where it says otherwise.
-**One of them is a wrong answer on screen rather than a question** — the team
-queue below — and is marked as such, because a list that mixes those two reads
-as though none of it is urgent.
+Each needs the owner to choose before anything is built.
 
-| | |
+| Question | Background |
 |---|---|
-| **An unknown query parameter is dropped rather than refused** | A mistyped filter in a link, a script or a generated query silently returns the unnarrowed list. It is not a visibility problem — the subject filter is a separate layer the store always applies, so a dropped narrowing widens the answer strictly inside what that caller may already see — but it is how `make demo-flaw` came to report "already recorded" on every deployment that had ever been scanned, having never filed anything. The caller was corrected; the behaviour underneath was not, because refusing an unknown parameter is a decision for every endpoint at once rather than for this one. `A parameter that changes nothing is worse than one that is missing` is the principle it would rest on, already written beside the paging struct |
-| **An issue carries no published or modified date** | Neither is in what the scanner reports: its vulnerability record has a description, an advisory link, the scores, the estimate and the weaknesses. Recording them means a second source — the issue's own record, fetched from a vulnerability database — which is a capability rather than a field. What is fetched today is a supplier's own advisories, from an address an administrator named; an issue's record is a different source, keyed on the issue rather than on a publisher |
-| **The date an issue became known-exploited is reported and not read** | The catalog entry states it as `dateAdded`, in the document the scanner already produces. The exploited clock counts from the scan that learned the fact instead, which `DESIGN-findings.md` settles; whether the catalog's own date is the better base is the open half |
-| **A finding does not name the other builds carrying it** | It says how many. Naming them inline is a request per finding against the reach or the issue route, and the issue screen names every one of them a click away from the identifier in the heading — so what is left is whether that click is one too many, which is worth answering with somebody looking at the screen |
-| **The screen names about fifty weaknesses and the catalog names them all** | Two lists now: the interface has a short one in a few words somebody scans — "Buffer overflow" — and a published advisory states the catalog's own name for the same identifier, which is what a validator compares against. The catalog half is answered: it is fetched by a make target, committed, and attributed in `NOTICE`. What is left is whether the screen's list is worth keeping beside it, or whether the screen should read the catalog and show a shortened form |
-| **Handing a selection over is a request per row** | The findings list assigns by looping the selection, one write each at about 400 ms, so two thousand rows — the deployment's own cap — is a quarter of an hour of round trips, and there is no "select all matching" as the bulk-claim screen has. Both halves want one endpoint that takes a narrowing and assigns what it resolves to, bounded the way a bulk judgment is. That is a capability rather than a fix |
-| **A bulk claim refuses a selection covering something already decided** | It names which decision now, which is what somebody holding five hundred rows can act on. Skipping the decided rows instead is a different question: a bulk write that silently covers less than what was selected is one nobody can check afterwards, so if it is offered it is asked for rather than assumed |
-| **Saved filters cannot be opened on the list that spans products** | They are stored per product, so the cross-product list — which is where the default landing view is — offers none. Making one span products is a change to what a saved filter is, and the position that they stay personal is about ownership rather than about scope |
-| **The package-kind picker enumerates a set the API calls open** | The kind is read out of the identifier a producer wrote, so an image carrying `nuget`, `composer` or `swift` components can be narrowed to them through the address and not from the screen — and the next kind goes short the way `apk` and `rpm` did. The durable shape is the kinds actually present travelling with the read, with the labels a display map falling back to the raw word; that is a question the server does not answer yet, so it is a capability rather than a fix |
-| **A tracker reference in a durable comment is not gated** | One was found by reading. `internal/tools/readable` walks every file type and is the gate positioned to carry it, but its whole subject is bytes a text tool skips — a second, unrelated rule there would make its name a lie. It is a gate of its own or nothing |
-| **Eight other `internal/httpapi` tests hand-roll the scanned-build seed** | The one this touched now builds it once, in the file. The wider move is a helper in `internal/dbtest/fixture`, which seeds a catalog and has nothing for a scan, a graph or a finding |
+| Refuse unknown query parameters? | A mistyped filter is ignored and the unfiltered list comes back. Refusing applies to every endpoint at once |
+| Fetch each issue's own record from a vulnerability database? | The scanner reports no date an issue was published or modified. A second source per issue would supply them. Storing the date as a field alone is rejected in `REQUIREMENTS.md` |
+| Count the exploitation clock from the catalog's date? | The clock starts when a scan learns an issue is exploited. The catalog states the date it added the issue, and nothing reads it |
+| Name the other builds a finding sits in? | The finding says how many. The issue screen lists them one click away |
+| Keep the screen's short list of weakness names? | The screen shows a short list in plain words. Published advisories use the full CWE catalog |
+| Add an endpoint that assigns a whole selection? | Assigning loops one request per row at about 400 ms each, so 2,000 rows take about a quarter of an hour. There is no "select all matching" |
+| Let a bulk claim skip rows already decided? | A bulk claim covering a decided row is refused, naming the decision. Skipping silently covers less than was selected |
+| Offer saved filters on the all-products findings list? | Saved filters belong to one product, so the list the home screen's tiles open has none |
+| Have the server list the package kinds present? | The package-kind filter is a fixed list. A kind missing from it is reachable only by editing the address |
+| Add a gate for tracker references in comments? | The rule is enforced by reading. No existing gate fits it |
+| Alert on the depth of the job queue? | The System screen shows the depth against the bound. An alert needs a threshold and an alert kind |
+| Keep 30 days as the longest a sign-in lasts? | It bounds how long a role a group withdrew can still be held. 90 days is defensible |
+| Share prepared claims between triagers? | Saved filters and the claims they prepare are personal, so several triagers on one backlog drift apart. Worth revisiting when a team works one backlog |
+| Start a disclosure date for an outside report ruled a duplicate? | The flaw was found here and has no date, and the outside reporter may be counting down to publication |
 
-## Measured, recorded, not fixed
-
-| | |
-|---|---|
-| **A re-scan of unchanged data rewrites every fixable finding on two engines** | Measured at the scale `TestMeasureTheFirstNightAfterTheDeadlineRuleChanged` uses — 8,840 findings, 5,882 of them carrying a fix — a night where nothing moved writes nothing on SQLite and 5,882 rows on PostgreSQL (1.3 s) and MySQL (840 ms). The same measurement taken before the deadline rule changed says the same, so it is not that rule's doing. The applier skips a row where what it holds and what was reported are the same, and the comparison includes the date a fix arrived, so what this points at is how that timestamp survives a round trip on each engine. It costs a write per fixable finding per night and nothing else: no answer is wrong |
+## Measured and left alone
 
 Nothing is made faster until it is measured slow. These were measured and left.
 
-| | |
+| Measurement | Result |
 |---|---|
-| MySQL costs 14× MariaDB per statement | A night issues 1,699 statements on every engine: 203 µs each on MariaDB, 404 µs on PostgreSQL, 2,835 µs on MySQL. There is nothing to find in what the apply does; the lever is issuing fewer statements |
-| One component on the demo has no walkable route to the build root | `golang.org/x/net` under `sonic-mgmt-common-codegen`. The consumer has edges upward, the depth bound of 64 is nowhere near reached, and the root exists. The row names the consumer instead of claiming nothing pulls it in, which is true whichever the cause. It may be a disconnected fragment in that inventory |
-| The scan measurement covers one build and an assumed churn rate | A deployment tracks several. `make measure` re-runs it against a different model by changing the constants |
-| Folding sibling components on the dependency tree buys 3.86% of the worst level | Measured on a real image: 159 of 345 parent-levels hold a foldable group, and folding every one removes 281 child rows of 36,991. The level somebody actually struggles with — a kernel module pulling in 4,867 components — becomes 4,679. It does not make a level browsable, which is what the search and the level cap are for, and aggregating `beneath` over folded siblings would double count whatever two of them both reach |
+| A rescan of unchanged data | Rewrites every finding with a fix on PostgreSQL (1.3 s), MySQL (782 ms) and MariaDB (711 ms): 5,882 rows at the scale measured. SQLite writes none. The likely cause is how the date a fix arrived survives a round trip. No answer is wrong |
+| Cost per statement | 2,835 µs on MySQL, 404 µs on PostgreSQL, 203 µs on MariaDB. The number of statements a night issues has moved since, so the ratio wants a fresh `make measure` |
+| Folding sibling components on the dependency tree | Removes 281 of 36,991 child rows on a real image, and shrinks its worst level from 4,867 rows to 4,679. That level stays too large to browse |
+| The scan measurement's model | One build and an assumed churn rate. A deployment tracks several. `make measure` takes different constants |
 
 ## Not planned
 
-| | |
+| Item | Reason |
 |---|---|
-| Component library | The interface was built without one, from the mockup's own tokens and hand-written components — so the choice was made by building rather than by deciding |
-| Client-side syntax highlighter | Loaded only by a view containing a code block. Grammar coverage against bundle cost, better weighed against a real screen (REQ-67) |
-| Partition column and granularity | Which column, what granularity, and how to retire a whole product, which partitioning by time does not solve |
-| External tracker hand-off | Optional. The seams are built rather than the integration (REQ-36) |
-| Whether the interface decisions survive contact with use | Everything in the interface was decided from mockups. Some of it will be wrong in ways nobody can see from a picture. The first release is read as evidence rather than as confirmation |
+| A component library | The interface is built from the mockup's tokens and components written here |
+| A syntax highlighter for code blocks | Grammar coverage costs bundle size. Worth weighing against a real screen |
+| Coordinating an embargo with other organizations | Shared embargoes, a coordinator's record and a peer vendor's schedule are organizational practice |
