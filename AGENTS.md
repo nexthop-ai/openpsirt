@@ -632,9 +632,10 @@ and a push, and a long stretch is committed in purposeful pieces along the
 way — a decision recorded, a behavior built with its design document, a
 screen rebuilt — each with a body that says why.
 
-Never force-push. As long as history is only ever added to, everything is
-recoverable, and a mistake is fixed by a commit on top rather than by
-rewriting what somebody else may already have pulled.
+`main` is protected: nothing is pushed to it directly and its history is
+never rewritten. A pull request branch belongs to its author, who rebases it
+onto `main` and force-pushes it as the work needs, with `--force-with-lease` so
+a push nobody has seen is never overwritten.
 
 Work goes on a branch, with a pull request from it. The work is pushed as
 it lands and the pull request is where it is reviewed; the queue is what puts
