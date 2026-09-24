@@ -303,3 +303,33 @@ func TestAClaimWithARowTheReaderMayNotAgreeToIsNotWaitingOnThem(t *testing.T) {
 		}
 	})
 }
+
+func TestADecisionOnAnIssueDisclosedSinceThePlaceWasReadIsPublic(t *testing.T) {
+	// The visibility a proposal carries is read before the proposing
+	// transaction opens. An issue disclosed in between has no undisclosed
+	// finding left in the product, and a row written private then would
+	// stay private with nothing left to disclose it.
+	each(t, func(t *testing.T, f *fixture) {
+		libfoo := f.component(t, "libfoo-disclosed", "1.2.3")
+		f.finds(t, f.build(t, f.product, "2026.03"), libfoo, "place-of-libfoo", access.Public)
+
+		written := f.proposes(t, f.privately(t),
+			f.placeIn(f.product, "place-of-libfoo", access.Private))
+		if written.Visibility != access.Public {
+			t.Errorf("a decision on a disclosed issue was written %s", written.Visibility)
+		}
+
+		// One on an issue still undisclosed somewhere in its product keeps
+		// what it was given.
+		other := f.secondProduct(t)
+		f.finds(t, f.build(t, other, "2026.03"), libfoo, "under-e", access.Public)
+		f.finds(t, f.build(t, other, "2026.06"), libfoo, "under-e", access.Private)
+		insider := f.holding(t, "switchd-insider", map[int64][]access.Role{
+			other: {access.PublicTriage, access.PrivateTriage},
+		})
+		kept := f.proposes(t, insider, f.placeIn(other, "under-e", access.Private))
+		if kept.Visibility != access.Private {
+			t.Errorf("a decision on an undisclosed issue was written %s", kept.Visibility)
+		}
+	})
+}
