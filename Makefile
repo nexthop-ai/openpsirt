@@ -154,7 +154,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
+.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
 
 all: check build
 
@@ -280,24 +280,14 @@ full:
 docs-check:
 	$(GO) test ./internal/docs/
 
-vet:
-	$(GO) vet $(PACKAGES)
-	$(MAKE) measure-builds
-
-# The measurement file, type-checked without being run.
+# The linter is also the vet. Its govet runs every analyzer go vet does, over
+# test files and over the file behind the "measure" tag, so a separate go vet
+# ran the same analysis twice: 50 s of a two-core runner. A test in
+# internal/build holds the linter's configuration to that.
 #
-# It sits behind a build tag, and "make measure" is the only thing that passes
-# that tag — a target which refuses outright unless three server engines are
-# configured, so nobody discovers that the file has stopped compiling. A rename
-# anywhere it reaches left it silently broken while the build, the vet, the
-# linter and CI all passed.
-#
-# Vetting rather than running: go vet type-checks, it needs no database, and it
-# costs a second.
-.PHONY: measure-builds
-measure-builds:
-	$(GO) vet -tags measure $(MEASURED)
-
+# The tag matters because "make measure" is the only other thing that passes
+# it — a target which refuses outright unless three server engines are
+# configured, so nothing else would notice the file had stopped compiling.
 lint:
 # Verified before it is run. The loader drops a key it does not recognize
 # without a word, so a setting spelled at the wrong level reads as configured
@@ -603,7 +593,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+check: build lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"

@@ -107,7 +107,6 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
 | `make lint` | Static analysis, pinned version |
-| `make vet` | The compiler's own checks |
 | `make govulncheck` | Known vulnerabilities in dependencies |
 | `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
 | `make web-audit` | Known vulnerabilities in what the interface installs |
@@ -137,7 +136,6 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
 | `make measure` | Measurements rather than gates. Behind a build tag |
-| `make measure-builds` | The measurement file, type-checked without being run. Inside `vet` |
 | `make sbom-shape` | The reader over a full-size inventory, decompressed from a committed fixture. Inside `check` |
 
 ## Gate tiers
@@ -155,7 +153,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check`, `spdx` |
-| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
+| Go reaching no SQL | `build`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
@@ -175,11 +173,11 @@ an uncommitted tree they report the file as stale.
 
 Test code a tag or an environment variable guards is compiled by the gate.
 A file behind a build tag is loaded by nothing an ordinary run compiles, so a
-rename anywhere it reaches leaves it silently broken while the build, the vet,
-the linter and CI all pass — and the one target that does pass the tag refuses
+rename anywhere it reaches leaves it silently broken while the build, the
+linter and CI all pass — and the one target that does pass the tag refuses
 outright unless three server engines are configured, so nobody finds out. It is
-vetted rather than run: `go vet` type-checks, needs no database and costs a
-second, and the linter is given the tag too. A test guarded by an environment
+linted rather than run: the linter is given the tag, type-checks what it
+compiles, and needs no database. A test guarded by an environment
 variable nothing sets is the same gap with a different lock, and the answer is
 the same: a target that sets it, inside `check`.
 
@@ -582,6 +580,17 @@ backlog (REQ-75).
 
 The linter set is tuned rather than enabled wholesale. Documentation rules are
 off; error checking excludes the cleanup-path functions conventionally ignored.
+
+The linter is also the vet. Its `govet` runs every analyzer `go vet` does and one
+more, over test files and the file behind the `measure` tag, so the gate runs no
+separate `go vet`: the same analysis twice was 50 s of a two-core runner. A
+mistake planted in a test file and in the tagged file was reported by the
+linter in both. What keeps that true is the configuration, so a test holds it:
+`govet` enabled, no `govet` settings narrowing its analyzers, test files not
+excluded, and the `measure` tag passed.
+
+The linter reports one issue per line. Two problems on one line appear one at a
+time, where `go vet` alone would name both.
 
 The linter must be built with a Go release at least as new as the code, or it
 cannot read the compiler's export data and fails on every file with a message
