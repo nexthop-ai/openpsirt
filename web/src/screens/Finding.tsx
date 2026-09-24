@@ -610,8 +610,7 @@ export function Finding() {
                   ; this issue is fixed in <b>{it.fixed_in}</b>
                 </>
               )}
-              , so the upgrade could not have resolved it. The old reasoning probably still stands,
-              and somebody's remediation did not land.
+              , so this upgrade didn't fix it.
             </p>
             <div className="ladder">
               <span className="v was">{it.arrived_from}</span>
@@ -815,9 +814,8 @@ export function Finding() {
           {it.nothing_since && (
             <p className="alert" style={{ margin: 0 }}>
               <span>
-                Nothing has been released upstream since {it.latest_released_at ?? "well before"},
-                over a year before this issue was named, and there is no fix. Replacing or patching
-                the component is the response available.
+                No upstream release since {it.latest_released_at ?? "well before"} and no fix.
+                Replace or patch it.
               </span>
             </p>
           )}
@@ -1031,8 +1029,7 @@ export function Finding() {
                     one — what is shipped around the component differs — so
                     this offers words to start from and decides nothing. */}
                 <p className="reading" style={{ marginBottom: 8 }}>
-                  The same issue at the same place in another product. Somebody else&apos;s judgment
-                  about their build, to read rather than to take.
+                  Same issue, same place, another product. Their judgment, for reference.
                 </p>
                 {elsewhere.map((e) => (
                   <div key={`${e.product} ${e.decision_id}`} className="prior">

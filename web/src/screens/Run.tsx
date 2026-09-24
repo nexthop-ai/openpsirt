@@ -194,9 +194,6 @@ function Shape({
           {(exploited ?? 0) > 0 && (
             <p className="alert" style={{ marginTop: 10 }}>
               <strong>{exploited?.toLocaleString()} known to be exploited</strong>
-              <span>
-                Which is what decides whether this is an evening&rsquo;s work or a night&rsquo;s.
-              </span>
             </p>
           )}
         </>

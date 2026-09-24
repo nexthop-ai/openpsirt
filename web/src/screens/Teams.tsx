@@ -171,14 +171,11 @@ export function Teams() {
       )}
 
       <p className="hint" style={{ marginTop: 12 }}>
-        Being on a team says where work arrives and never what anybody may read, so one team can
-        carry mixed clearance — a member who may not read undisclosed work does not see the
-        undisclosed work in its queue. Retiring a team takes it out of use rather than deleting it,
-        because work already routed to it has to keep resolving to something a screen can name.{" "}
+        A team routes work; it grants no reading.{" "}
         <Link to="/auto-assignment" className="linkish">
           Auto-assignment →
         </Link>{" "}
-        is where a standing rule hands work to one.
+        hands work to a team by rule.
       </p>
 
       <Declare

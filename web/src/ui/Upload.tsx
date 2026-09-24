@@ -95,9 +95,8 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       }
     >
       <p className="reading" style={{ margin: "0 0 14px" }}>
-        The same endpoint a pipeline uses: two parts, <span className="mono">inventory</span> and{" "}
-        <span className="mono">suppressions</span> — for a build with no automation, or to try any
-        SBOM.
+        Same as a pipeline upload: <span className="mono">inventory</span> and{" "}
+        <span className="mono">suppressions</span>.
       </p>
 
       {upload.error != null && <Failed error={upload.error} what="That could not be uploaded." />}

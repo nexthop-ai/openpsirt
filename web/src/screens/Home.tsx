@@ -112,10 +112,7 @@ export function Home({ who }: { who: Who }) {
           ) : byRelease ? (
             <>
               <Releases points={releases.data?.items ?? []} />
-              <p className="hint">
-                Each release against today&rsquo;s vulnerability data, not the day it was cut. No
-                rates: they depend on how far apart releases were cut.
-              </p>
+              <p className="hint">Each release against today&rsquo;s vulnerability data.</p>
             </>
           ) : (
             <>

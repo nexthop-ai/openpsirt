@@ -110,9 +110,7 @@ export function AdvisorySources() {
         {product !== "" && <AddButton label="Add supplier" onClick={() => setAdding(true)} />}
       </div>
       <p className="hint" style={{ marginTop: 0 }}>
-        Suppliers whose published advisories are read on the scan schedule. What arrives is evidence
-        and a prefill, never a decision. Reading reaches back a set number of days before a supplier
-        is added — upload anything older below.
+        Read on the scan schedule, as evidence. Upload anything older below.
       </p>
 
       <div className="field">

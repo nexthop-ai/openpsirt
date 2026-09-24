@@ -307,8 +307,7 @@ function Reaffirm({
         <h3>Re-affirm</h3>
       </header>
       <p className="reading" style={{ marginTop: 0 }}>
-        The code moved under this. Saying it still holds re-makes every place it covered, at the
-        versions they have now.
+        The code moved. Reaffirming re-makes every place at today's versions.
       </p>
       <textarea
         rows={3}
@@ -328,7 +327,7 @@ function Reaffirm({
         {waiting !== null && (
           <span className="hint" style={{ marginLeft: 10 }}>
             {waiting
-              ? "Waiting for a second person: it is rated worse than when it was agreed to, or nothing had agreed to it."
+              ? "Waiting for a second person: it is rated worse now, or was never agreed."
               : "Standing, with the earlier agreement carried onto it."}
           </span>
         )}

@@ -629,8 +629,8 @@ export function Decide({
           />
           <span className="hint">
             {needsMitigation
-              ? "Nothing watches configuration, so this will not lapse if the mitigation is removed. Say what to check."
-              : "Optional. Where you say one, customers are told this is present and staying and what they can do about it. Where you do not, they are told nothing."}
+              ? "Won't lapse if the mitigation is removed. Say what to check."
+              : "Optional. If given, customers are told what they can do about it."}
           </span>
         </div>
       )}
@@ -646,8 +646,7 @@ export function Decide({
             onChange={(event) => setFixedVersion(event.target.value)}
           />
           <span className="hint">
-            Backported fixes do not move the upstream version, so nothing here sees them. Recorded
-            and never compared against the version shipping.
+            For backports. Recorded, not compared against the shipped version.
           </span>
         </div>
       )}

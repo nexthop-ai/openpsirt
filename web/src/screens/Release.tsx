@@ -212,8 +212,7 @@ export function Release({ product, stream }: { product: string; stream: string }
         {previous ? (
           <>
             <p className="hint" style={{ marginTop: 0 }}>
-              Against <b>{previous.name}</b>, the release before this one. What is newly present and
-              what is still there are in the VEX below.
+              Against <b>{previous.name}</b>, the previous release.
             </p>
             <Link
               to={

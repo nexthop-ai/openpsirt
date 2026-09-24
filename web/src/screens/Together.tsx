@@ -250,13 +250,7 @@ export function Together() {
               <b>{writing.toLocaleString()}</b> {writing === 1 ? "finding" : "findings"} would be
               written
               {cap > 0 && <> · the limit here is {cap.toLocaleString()}</>}
-              {over && (
-                <>
-                  {" "}
-                  — narrow the selection, or raise the limit deliberately. An issue sits at more
-                  than one place, so a short list can still be a long write.
-                </>
-              )}
+              {over && <> — narrow the selection or raise the limit.</>}
             </p>
           )}
 

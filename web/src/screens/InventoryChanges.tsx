@@ -122,7 +122,7 @@ export function InventoryChanges() {
         ) : (
           <Empty
             title="Nothing changed here."
-            detail="The first upload read for a build is a picture of it rather than a change to one. A rebuild that moved nothing says the same."
+            detail="A build's first upload, or a rebuild that moved nothing."
           />
         )
       ) : (

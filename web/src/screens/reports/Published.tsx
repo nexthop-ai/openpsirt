@@ -86,8 +86,7 @@ export function Published() {
             {revisions > 0 && `, ${revisions.toLocaleString()} of them a revision`}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Newest first. A revision is an advisory published again. The digest lets a later draft
-            be compared against what went out.
+            Newest first.
           </p>
           <Wide>
             <table>

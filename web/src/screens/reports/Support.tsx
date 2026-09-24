@@ -86,19 +86,18 @@ export function Support() {
             {(ended.data?.open ?? 0).toLocaleString()} open
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Issues at components, not once per place. Past end-of-life nothing carries a deadline,
-            so none of this is overdue.
+            Issues at components. Nothing past end of life has a deadline.
           </p>
           {rows.length === 0 ? (
             <Empty
               title="Nothing is out of support."
-              detail="Appears once the release end-of-life date has passed, or the product's has and it states none of its own."
+              detail="Appears once a release passes its end-of-life date, or its product's."
             />
           ) : (
             <>
               <p className="hint">
-                The whole of it as a file — <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
-                <a href={fileAt("json", asked)}>JSON</a>, with the day it was taken stated in it.
+                Download <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
+                <a href={fileAt("json", asked)}>JSON</a>
               </p>
               <Wide>
                 <table>
@@ -165,8 +164,7 @@ export function Support() {
             {(ended.data?.ending_open ?? 0).toLocaleString()} open
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            On the day each one crosses, what is open on it loses its deadline and leaves every
-            overdue count. That is the last moment anything can be planned for it.
+            When one crosses, what is open on it loses its deadline.
           </p>
           <Wide>
             <table>

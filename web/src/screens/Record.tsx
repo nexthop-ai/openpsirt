@@ -311,7 +311,7 @@ export function Record() {
         <p>
           {fromReport
             ? "Record this report as a flaw in what we ship."
-            : "A flaw in what we ship, sent in or found here. File it for judging, or record it as a flaw now."}
+            : "A flaw in what we ship, sent in or found here."}
         </p>
         {/* What was recorded here before. The screen that files one is where
             somebody asks whether it is already filed. */}
@@ -670,7 +670,7 @@ export function Record() {
                 ? "Already disclosed, so no disclosure date."
                 : origin === "here" || report.data?.found_here
                   ? "Starts undisclosed, with no disclosure date: nobody outside is counting down."
-                  : "Starts undisclosed, with a disclosure date ninety days from the day it arrived unless this deployment says otherwise. Reaching it escalates rather than publishes."}
+                  : "Starts undisclosed. Disclosure date: 90 days from arrival, unless set otherwise."}
             </span>
           </div>
         </div>
@@ -721,7 +721,7 @@ export function Record() {
                   : whole
                     ? `Against ${streams.length * variants.length} ${
                         streams.length * variants.length === 1 ? "build" : "builds"
-                      }: one issue, and a finding for each place the component sits in each of them. A build that does not hold the component is refused rather than skipped.`
+                      }: one issue, a finding per place. A build without the component is refused.`
                     : "Pick at least one branch or tag and one variant."}
           </span>
         </div>

@@ -177,8 +177,7 @@ function Judge({ product, reference }: { product: string; reference: string }) {
           </button>
         </div>
         <span className="hint">
-          One a scan reported in {product}. A flaw recorded here already has its report, so a second
-          claim about one is a duplicate: rule it so below.
+          One a scan reported in {product}. For a flaw recorded here, rule it a duplicate below.
         </span>
         {accept.error != null && <Failed error={accept.error} what="It was not accepted." />}
       </div>

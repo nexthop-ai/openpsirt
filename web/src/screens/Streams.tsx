@@ -319,7 +319,7 @@ export function Streams() {
         error={amend.error}
         busy={amend.isPending || renameTo.trim() === ""}
         ok="Save"
-        hint="Cannot be corrected once a document naming this release has gone out: readers hold it by that name. Whether it is a branch or a tag, and what a tag was cut from, are not changed here."
+        hint="Locked once a published document names it."
       >
         <Field
           label="Name"

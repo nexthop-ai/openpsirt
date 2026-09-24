@@ -126,10 +126,7 @@ export function Effort() {
       ) : (
         <section className="panel">
           <p className="hint" style={{ marginTop: 0 }}>
-            Most argued first. <b>Claims</b> is arguments made — one act, however many places it
-            covered — and <b>places</b> is how far they reached. What came out of them is beside it,
-            because a component that took forty arguments and dismissed forty is a different quarter
-            from one that promised forty upgrades.
+            Most argued first. <b>Claims</b> counts acts; <b>places</b> counts what they covered.
           </p>
           <Wide>
             <table>

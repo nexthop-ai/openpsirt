@@ -102,8 +102,8 @@ export function Webhooks() {
         <AddButton label="Add webhook" onClick={() => setAdding(true)} />
       </div>
       <p className="hint" style={{ marginTop: 0 }}>
-        Every request is signed: a timestamp, and an HMAC over it and the body. Whether they are
-        arriving is on the system screen.
+        Each request carries a timestamp and an HMAC signature. Delivery status is on the System
+        screen.
       </p>
       {retire.error != null && (
         <Failed error={retire.error} what="That webhook could not be retired." />

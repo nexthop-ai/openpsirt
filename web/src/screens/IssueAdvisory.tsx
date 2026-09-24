@@ -130,10 +130,7 @@ export function IssueAdvisory({
           </button>
         </h3>
       </header>
-      <p className="reading">
-        A CSAF 2.0 document: what the flaw is, and which releases hold it. Generated, never
-        published. Flaws in third-party components are refused.
-      </p>
+      <p className="reading">A CSAF 2.0 document for a flaw in our own code.</p>
       {/* On the screen whose purpose is publishing, "never published" and
           "could not be asked" are the two answers that must not look alike:
           the first is a reason to publish and the second is a reason not to
@@ -226,10 +223,7 @@ export function IssueAdvisory({
                   Open {advisory}
                 </Link>
               </div>
-              <p className="hint">
-                A second person agrees to what it says before it goes out, and it is not you: you
-                started this one.
-              </p>
+              <p className="hint">Needs a second person's agreement before it goes out.</p>
             </>
           )}
         </>

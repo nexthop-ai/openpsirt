@@ -109,16 +109,14 @@ function UpstreamUnanswered() {
       {rows.length === 0 ? (
         <Empty
           title="Nothing here has gone unanswered."
-          detail="Only components in products you may read are counted, and only after the pass has reached them — a deployment that has not turned asking on has reached none of them yet."
+          detail="Counts components you may read, once the pass reaches them. Off until turned on in Settings."
         />
       ) : (
         <>
           <p className="hint">
             {total.toLocaleString()} without an answer
-            {rows.length < total && `, ${rows.length.toLocaleString()} shown`}. Only components in
-            products you may read.{" "}
-            {asked.data?.whole === false &&
-              "This estate is past what one read examines, so the count is a floor."}
+            {rows.length < total && `, ${rows.length.toLocaleString()} shown`}. Products you may
+            read. {asked.data?.whole === false && "The count is a floor."}
           </p>
           <Wide>
             <table>
@@ -180,8 +178,7 @@ function VulnerabilityData() {
     <section className="panel">
       <h3>Vulnerability data</h3>
       <p className="hint" style={{ marginTop: 0 }}>
-        What every scan is answering against. The version is the scanner&rsquo;s own spelling and
-        nothing orders it — what matters is that it moves, not which is newer.
+        What every scan answers against.
       </p>
       {version === "" ? (
         <Empty
@@ -363,8 +360,7 @@ function TheQueue() {
       <section className="panel">
         <h3>Queue</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Per kind, against the limit that refuses more. Work held by a worker that has stopped
-          reporting counts as waiting.
+          Per kind, against its limit.
         </p>
         {waiting.length === 0 ? (
           <Empty title="Nothing is queued." detail="This process runs no background work." />
@@ -401,8 +397,7 @@ function TheQueue() {
       <section className="panel">
         <h3>Failed jobs</h3>
         <p className="hint" style={{ marginTop: 0 }}>
-          Tried as many times as it is allowed to be. Nothing picks it up again until somebody puts
-          it back.
+          Out of retries. Stays here until put back.
         </p>
         {retry.error != null && (
           <Failed error={retry.error} what="That job could not be put back." />

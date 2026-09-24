@@ -178,8 +178,7 @@ export function Review({
                     <span className="id">{m}</span>
                   </span>
                 ))}
-                . Same upstream versions, same chain. A decision reaches these by lookup; nothing is
-                copied and there is nothing to agree to.
+                . Same versions and chain, so the decision applies there too.
               </>
             )}
           </p>
@@ -191,9 +190,8 @@ export function Review({
           ) : (
             <>
               <p>
-                Different code — <b>a different version</b>, not a different variant. Your reasoning
-                is about <span className="id">{plan.versionHere || "the version here"}</span>; tick
-                the ones it also holds for. Each lapses on its own.
+                Other versions. Tick the ones your reasoning about{" "}
+                <span className="id">{plan.versionHere || "the version here"}</span> also covers.
               </p>
               <ul className="revlist">
                 {plan.offered.map((o) => (

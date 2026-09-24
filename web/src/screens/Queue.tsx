@@ -448,9 +448,8 @@ export function Queue() {
       <div className="screen-head" id="lapsed" style={{ marginTop: 22 }}>
         <h2>Lapsed decisions</h2>
         <p>
-          {stopped.isError ? "—" : (stopped.data?.total ?? 0).toLocaleString()} · nobody has to
-          agree to these again — two people already did — but each needs a fresh reason, because
-          what it was a claim about has moved.
+          {stopped.isError ? "—" : (stopped.data?.total ?? 0).toLocaleString()} · the code moved;
+          each needs a fresh reason, not a new approval.
         </p>
       </div>
       {/* A read that did not happen is not a list of nothing. Without this the
@@ -897,8 +896,7 @@ function Card({
             </Wide>
           )}
           <p className="hint" style={{ margin: "8px 0 0" }}>
-            Selected rows are excluded from the approval and rejected back to {claim.proposedBy} as
-            a separate item, with this table as the reason.
+            Selected rows go back to {claim.proposedBy} as a separate item.
           </p>
         </div>
       )}
