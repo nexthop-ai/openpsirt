@@ -312,6 +312,7 @@ What v0.1.0's rows become under migration 37:
 | A finding | Not exploited here. v0.1.0 had no record of that |
 | A notification | Carried alone. Only a kind of message v0.1.0 did not have is carried together |
 | A column v0.1.0 did not have and that takes a null | Null |
+| A grant of undisclosed reading or triage | Carried unchanged, per product, across the estate and in a group binding. It reaches undisclosed work alone, where in v0.1.0 it reached disclosed work too. Nothing grants the disclosed role on upgrade; the operator does, as the upgrade note in `docs/configuration.md` says |
 
 Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
 place for goes with the tables and columns that held it: an embargo shortened,
@@ -422,6 +423,7 @@ in the gate.
 | The upgrade | This tree's image applies the migrations on their own. The version reached is this tree's last migration |
 | The rows | Each table's count against what the upgrade tables above say: a table both sides hold keeps its count, a table only the upgrade holds starts empty, and a table the upgrade fills or removes holds what that table says |
 | Rolled back and applied again | Down to the release's last migration, where every table holds what the release left, and up again, where every table holds what the first upgrade left |
+| What the upgrade note asks | From a release whose note asks an operator to act, the rehearsal acts as it says before serving. From v0.1.0, that is the disclosed role granted beside every undisclosed one |
 | Served | This tree's server on the upgraded database reports the same open findings per build, and no GET its API document lists answers 5xx. A GET with a path parameter the seed has no name for is skipped |
 
 | Rule | |

@@ -279,6 +279,15 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	}
 	faults = append(faults, prefix("reapplied", Compare(upgraded, again, nil))...)
 
+	if _, ok := notes[r.from]; ok {
+		r.step("what the upgrade note asks of an operator")
+		n, err := r.grantImplied(ctx)
+		if err != nil {
+			return nil, err
+		}
+		r.note("%d disclosed roles granted beside undisclosed ones", n)
+	}
+
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
 		return nil, err
@@ -296,6 +305,12 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	r.saveLogs(ctx, "current")
 	return faults, nil
 }
+
+// notes names the releases whose upgrade note asks an operator to act before
+// the upgraded deployment serves what it served. Before v0.2.0 an undisclosed
+// role reached disclosed work too, and nothing grants the disclosed role on
+// upgrade (docs/configuration.md, Upgrading).
+var notes = map[string]bool{"v0.1.0": true}
 
 // database makes an empty database for the release to build, and works out
 // how a container and this process each reach it.
