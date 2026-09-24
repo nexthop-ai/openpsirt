@@ -64,6 +64,8 @@ export function label(kind?: string): string {
       return "agreement taken back";
     case "claim-lapsed":
       return "stopped applying";
+    case "disclosed":
+      return "disclosed";
     default:
       return kind ?? "";
   }

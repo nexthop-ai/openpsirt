@@ -1135,8 +1135,8 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 
 ## Disclosure and advisories
 
-Partly built. A finding says whether it is disclosed, and there is a screen for
-what is running out with both ways of moving a date on it.
+A finding says whether it is disclosed, and there is a screen for what is
+running out with every movement of an embargo on it, disclosure included.
 
 | Rule | |
 |---|---|
@@ -1144,6 +1144,7 @@ what is running out with both ways of moving a date on it.
 | A group is undisclosed when *any* of its places is | One embargoed place among fifty makes the whole of it embargoed for anybody deciding what may be said about it, and the earliest date is the one that matters. Both read as aggregates rather than off whichever row sorted first — counted, because a maximum of the visibility word answers "public" for exactly the mixed group the question is about, and the list then drew no marker on a row holding an undisclosed place |
 | The standing notice is unmissable on the finding page (REQ-40) | A notice somebody has to look for is one that has not been given. It sits above everything, on the screen where a person is about to write something down, and it names the places a disclosure actually happens: a ticket, a commit message, a chat. The row's chip is the secondary signal |
 | A screen lists what is approaching disclosure (REQ-38) | Soonest first with what is past due at the top, and a date moved from it. That list is itself a disclosure and is narrowed the way `DESIGN-access.md` describes — a product somebody may not read undisclosed work in contributes nothing to it, not even a count |
+| Disclosing is offered in the standing notice and on the disclosing screen | The notice is where somebody is thinking about who may know, and the screen is where every other movement of the embargo is made. Offered to whoever may triage undisclosed work in the product. It says it cannot be undone, and after it is asked for it says whether it took effect or waits for a second person |
 | The act is chosen before the date, not derived from it | Extending and bringing forward are different events, so the form asks which and labels the reason for that one. Derived from whichever way the typed date pointed, a date typed the wrong way round would be recorded as a decision somebody made |
 | **The window it opens on is this deployment's own embargo length** | It opened on thirty days against the ninety-day policy that ships, so a deployment with five embargoes running drew an empty screen — which reads as "nothing is coming". The server answers over its own window where the caller names none, and the picker's first option says that is what it is doing |
 | The screen says what a date arriving means | The answer is counter-intuitive: nothing has been published, and the row is waiting for somebody to say what happens. It also says what moving the date will do before it is asked for |

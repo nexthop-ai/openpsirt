@@ -1066,18 +1066,47 @@ The date arriving tells administrators, and whoever holds the finding where they
 may still read undisclosed work in that product. A condition rather than an
 event: it stands while the date is past and nothing has been decided.
 
+### Issue disclosure
+
+A person holding undisclosed triage in the product discloses an issue there,
+with a reason (REQ-40). It is the last movement of the embargo, recorded beside
+the extensions and shortenings with the act `disclosure`.
+
+| Where the embargo stands | Second person |
+|---|---|
+| Its date has arrived | Never |
+| Its date is ahead | Past the movement threshold, measured as a shortening to today is |
+| It has no date | Always |
+
+| Rule | Reason |
+|---|---|
+| The unit is one issue in one product | The unit an embargo date is kept and moved in |
+| Every place turns public, open and closed | A closed place still carries comments and decisions, and REQ-40 opens the whole record |
+| Every decision about the issue in the product turns public | A decision carries its finding's visibility so that the row answers who may reach it |
+| Nothing else is rewritten | Comments, notes, attachments, assignments and an advisory's distribution label read the finding's visibility when asked |
+| A flaw with no date always needs a second person | A flaw found here has no end anybody agreed to, so the disclosure is the whole decision |
+| One way | Nothing turns a disclosed issue undisclosed again, and a later extension or shortening finds nothing to move |
+| One disclosure waits at a time | A second request for the same issue is refused while the first waits |
+| A disclosure waiting for agreement changes nothing | The same rule as every other movement |
+| Whoever holds a place is told, apart from the person whose act made it public | What they write about it is public from then on. People only: a place in a team's queue has nobody to tell |
+| A movement left waiting when the issue is disclosed leaves the queue | It can no longer be agreed to |
+
+The disclosure date stays on the findings after disclosure. Nothing reads it
+there, because every list of embargoes asks for undisclosed findings.
+
 ## Disclosure-date movements
 
 Needs a reason, and past a threshold that is a setting — thirty days by default —
 a second person (REQ-38). The same shape as a deferral, because moving a date
 is the same act: changing how long something stays hidden.
 
-Two acts, recorded apart.
+Three acts, recorded apart.
 
 | Act | What it says |
 |---|---|
 | **Extension** | The embargo ends later. The unilateral case: the fix slipped |
 | **Shortening** | The embargo ends sooner. The coordinated case: a coordinator or a peer vendor is publishing on a date of their own, or the detail leaked |
+| **Disclosure** | The embargo ends today and the issue is public. § Issue disclosure holds its rules |
 
 | Rule | Reason |
 |---|---|

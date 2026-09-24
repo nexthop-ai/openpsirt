@@ -52,7 +52,6 @@ A decision in `REQUIREMENTS.md` is in force and nothing implements it.
 | REQ-05 | A producer's own vulnerability report uploaded beside an inventory. The upload takes the inventory and its suppressions only |
 | REQ-14 | Findings from static analyzers and fuzzers |
 | REQ-36 | Opening or updating an item in an external tracker. A finding stores a link somebody typed, and nothing follows it |
-| REQ-40 | Disclosing a finding. Reaching a disclosure date escalates, and nothing makes a finding public |
 | REQ-46 | Chat channels such as Slack and Teams. Mail and a generic signed webhook are the only channels |
 | REQ-73 | Purging old data by exporting rows to a file and then dropping them. Nothing is purged or partitioned, and the column to partition on is undecided |
 

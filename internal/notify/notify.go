@@ -59,7 +59,7 @@ func Kinds() []Kind {
 		Assigned, Mentioned, SentBack, BuildQuiet, HoldingAbsent,
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
-		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
+		ApprovalUndone, ClaimLapsed, BroughtIn, Disclosed, Unanswered,
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		InventoryMoved,
 		ObligationOpen, ObligationNear, ObligationPassed,
@@ -202,6 +202,12 @@ const (
 	// without saying to what is unactionable. What leaves this deployment
 	// about it still carries a link and nothing else.
 	BroughtIn Kind = "brought-in"
+
+	// Disclosed is an issue somebody holds becoming public in its product.
+	//
+	// An event, told to whoever holds a place of it: what they write about it
+	// from here on is public, and what they wrote before now is too.
+	Disclosed Kind = "disclosed"
 
 	// Unanswered is a report somebody sent us and nobody has replied to.
 	//

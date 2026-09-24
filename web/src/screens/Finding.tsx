@@ -11,6 +11,7 @@ import {
   type Previous,
 } from "./FindingClaim";
 import { Assess } from "./FindingAssess";
+import { Disclose } from "./FindingDisclose";
 import { ExploitedHere } from "./FindingExploited";
 import { Notes } from "./FindingNotes";
 import { Duplicates, MatchMethod, LookItUp, Places, References, Reporter } from "./FindingEvidence";
@@ -561,6 +562,7 @@ export function Finding() {
               <> No end date has been set.</>
             )}
           </span>
+          {mayTriage && <Disclose product={product} vulnerability={vulnerability} />}
         </div>
       )}
 

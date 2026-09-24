@@ -2458,6 +2458,24 @@ components:
         - created
         - item
       type: object
+    Disclose-issueRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Disclose-issueRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        reason:
+          description: The reason the issue is being disclosed
+          maxLength: 65536
+          minLength: 1
+          type: string
+      required:
+        - reason
+      type: object
     DisposedBody:
       additionalProperties: false
       properties:
@@ -5707,10 +5725,11 @@ components:
           readOnly: true
           type: string
         act:
-          description: Which act this was. An extension ends the embargo later, a shortening ends it sooner
+          description: Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public
           enum:
             - extension
             - shortening
+            - disclosure
           type: string
         approved_at:
           type: string
@@ -6548,6 +6567,7 @@ components:
           enum:
             - extension
             - shortening
+            - disclosure
           type: string
         asked_at:
           type: string
@@ -12812,7 +12832,7 @@ paths:
   /v1/disclosure-movements/{id}/approval:
     post:
       description: |-
-        Records a second person agreeing, and moves the date. Either act.
+        Records a second person agreeing, and moves the date. A disclosure agreed to makes the issue public in its product.
 
         The person who asked may not be the one who agrees. That is the control the threshold exists to reach, and a movement somebody approved for themselves is the same as one nobody approved.
 
@@ -18615,6 +18635,56 @@ paths:
           - private-read
           - private-triage
         note: Only where you may read undisclosed work.
+    post:
+      description: |-
+        Makes this issue public in this product: every finding of it, open and closed, and every decision, comment and note about it. It cannot be undone.
+
+        A reason is required. Recorded as a movement whose act is `disclosure`.
+
+        On or after the disclosure date it takes effect at once. Before the date it brings the embargo's end to today, and the threshold that applies to a shortening applies to it. A flaw with no disclosure date always needs a second person. `in_force` says whether it took effect; one that needs agreement discloses nothing until it has it, and appears in `GET /v1/disclosure-movements`.
+
+        Refused with 409 where the issue is already public here, or a disclosure of it is already waiting for agreement.
+
+        Requires: private-triage on the product. A second person agrees past the threshold.
+      operationId: disclose-issue
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: vulnerability
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Disclose-issueRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MovementBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Disclose an issue
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - private-triage
+        note: A second person agrees past the threshold.
   /v1/products/{product}/issues/{vulnerability}/disclosure/extension:
     post:
       description: |-
