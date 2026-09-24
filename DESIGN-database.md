@@ -306,7 +306,8 @@ What v0.1.0's rows become:
 
 Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
 place for goes with the tables and columns that held it: an embargo shortened,
-a report that did not become an issue, judged or not, a file attached to a
+an issue disclosed, whose findings stay public with nothing recording who
+disclosed it or why, a report that did not become an issue, judged or not, a file attached to a
 report, every issue an advisory covers but its first, and every later advisory
 about the same issue in the same product. On MySQL and MariaDB a foreign key served by an
 index v0.2.0 added is dropped and declared again, so that the engine makes the
