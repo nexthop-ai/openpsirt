@@ -49,7 +49,8 @@ jobs:
           # it: nothing here can prove a check run that has not appeared yet
           # is still coming.
           delay: 60
-          # An hour. The longest jobs are the two passes of the suite; a
-          # ceiling far above them costs nothing on a green run and stops a
-          # wedged check from holding a queue entry open all day.
+          # An hour. The longest job is the four-engine suite with the race
+          # detector, plus the image and chart build beside it; a ceiling far
+          # above that costs nothing on a green run and stops a wedged check
+          # from holding a queue entry open all day.
           timeout: 3600

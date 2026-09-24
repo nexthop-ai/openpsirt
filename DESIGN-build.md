@@ -127,8 +127,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make vendored` | Every file somebody else wrote is accounted for, under a license this tree may carry, and named in `NOTICE` where its license asks. See below |
 | `make spdx` | Every source file opens with this project's copyright and an SPDX license identifier. `make spdx-fix` writes it where missing. See below |
 | `make pins-check` | Every version pinned in two files still agrees |
-| `make check-static` | Everything above except the suite. Needs npm, because the interface tier refuses rather than skipping |
-| `make check` | `check-static` and `test-all`: everything above |
+| `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
 | `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
 | `make weakness-names` | Rewrites the weakness names from the catalog that publishes them. In no gate, unlike the word list: the engines that one asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes |
@@ -186,28 +185,21 @@ the same: a target that sets it, inside `check`.
 
 ## CI jobs
 
-Five. The first three are `make check`, divided where it divides; the other two
-are separate for a reason of their own.
+Three, and each of the two beside the first is separate for a reason of its own
+rather than for tidiness.
 
-| Job | Holds | Why it is a job of its own |
+| Job | Holds | Why it is not a step of the first |
 |---|---|---|
-| Build and check | `engines-check`, `make check-static`, and the bill of materials as an artifact | The half of `check` that is not the suite |
-| Race detector | `make test-race` | The race pass of `test-all`. In-process work, and the most processor time of any job |
-| Database engines | The four servers, `make test-engines`, `check-engines` | The server pass of `test-all`, and the only job with services |
+| Build, test and check | `engines-check`, `make check`, `check-engines`, and the bill of materials as an artifact | — |
 | Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
 | Documentation builds | The documentation site built | Python, and nothing else needs it |
-
-A runner for a private repository has two cores. On one runner the two passes
-ran one package at a time each, and the job took 20 minutes, 16 of them in
-`make check`; the suite was 13 of those, 696 s of it the server pass run package
-after package.
 
 ### CI caches
 
 | Cache | Holds | Keyed on | Saved |
 |---|---|---|---|
 | Go modules | Every module the tree and the pinned tools need, extracted and as downloaded | `go.sum` | When the key is new |
-| Go build | One per Go job: the binary and the tools built from source, the tree race-instrumented, and the test binaries plain | The job and the run, restored by prefix so a run starts from the newest | On `main` |
+| Go build | The tree compiled plain and race-instrumented, its test binaries' objects, and the five tools built from source | The run, restored by prefix so a run starts from the newest | On `main` |
 | Image layers | Every stage's layers | The buildkit scope | On `main` |
 
 A pull request's run restores all three and writes none of them: what its
@@ -245,24 +237,22 @@ Both declare `merge_group:` as this one does — a workflow that does not
 contributes no check to a queue entry, and the aggregator cannot tell that
 from one that has not started.
 
-The three jobs of `make check` run the three targets it is made of, and no
-list of targets beneath them. `make check` is `check-static` and `test-all`, and
-`test-all` is `test-race` and `test-engines`; a target added to `check-static`
-is run by CI without anybody remembering to add a step.
+The first job runs one target, not a list of them. `make check` is the
+definition of what CI checks, so a target added to it is run by CI without
+anybody remembering to add a step.
 
 Naming targets individually is what makes the two drift. Jobs listing their
 targets by hand leave targets `make check` runs in no job, so the rule that
 local and CI run the identical command is written down, believed and false —
 including for the check that no invented name collides with a word an engine
-reserves, which is a non-negotiable. A target added to `check` directly rather
-than to `check-static` is in no job, and the makefile says so where `check` is
-defined.
+reserves, which is a non-negotiable.
 
-The static checks are one job. The interface, static analysis, vulnerabilities
-and licenses, the API document and the bill of materials share a runner image,
-a toolchain and a module cache, and declare no services and no conditions:
-separate, they are that many clones and toolchain restores doing one machine's
-worth of work.
+Jobs that declare nothing but a checkout and a Go setup are one job. The
+interface, static analysis, vulnerabilities and licenses, the API document and
+the bill of materials share a runner image, a toolchain and a module cache, and
+declare no services and no conditions: separate, they are that many clones and
+toolchain restores doing one machine's worth of work, and parallelism is all
+that folding them costs.
 
 A composite action is not needed. One Go setup is left in the workflow, so an
 action abstracting it would have a single caller, and a reusable workflow runs
@@ -427,10 +417,15 @@ on purpose.
 The two run at once. They share no engine, so neither can see the other's rows,
 and they are bottlenecked on different things — the detector is in-process work
 and the server pass spends its time waiting on a socket — so each fills what the
-other leaves idle. Each takes half the cores, so the number of test binaries
-alive at once is what a single pass has, and the peak memory falls rather than
-rises: 119 s and 3.4 GB run one after another, 100 s and 1.5 GB run together,
-on twelve cores with everything warm.
+other leaves idle. The race pass takes half the cores, so the number of test
+binaries it has alive is what a single pass has, and the peak memory falls
+rather than rises: 119 s and 3.4 GB run one after another, 100 s and 1.5 GB run
+together, on twelve cores with everything warm.
+
+The server pass takes half the cores or eight packages, whichever is more. Its
+packages are round trips rather than processor work, and half of a two-core
+runner is one package at a time: CI's server pass was 696 s of package time,
+run end to end.
 
 Each pass labels its own lines. Held and printed at the end, a run says nothing
 for the whole of it — on a slow machine a quarter of an hour of a log that looks
