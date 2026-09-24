@@ -385,8 +385,8 @@ A server database is kept between runs and reused. Applying the migrations is
 nearly the whole cost of a server engine on a disk — 20.9 s on MySQL and 18.9 s
 on MariaDB, once per package per engine — and none of it tests anything the
 migration tests do not. A server CI starts is new every run, so there it keeps
-nothing, and the data directory in memory is what makes building the schema
-cheap: 0.79 s and 0.17 s.
+nothing and builds every schema; the runner's disk makes that cheaper than a
+workstation's, and the migrations package takes 25 s there against 109 s.
 
 What makes reuse safe is the name. Below 1.0 a schema change edits what
 declares the thing rather than adding a migration beside it, so the applied
@@ -496,9 +496,10 @@ accepts only there, and a workflow declaring a service container has no command
 line to pass. Asking from the connection reaches both.
 
 The settings govern commits, and a schema change syncs the files it creates
-whatever they say. So every test server keeps its data directory in memory —
-`make engines-up` and the CI services alike — which removes the disk from
-building a schema as well as from committing to it.
+whatever they say. So a server `make engines-up` starts keeps its data
+directory in memory, which removes the disk from building a schema as well as
+from committing to it. The CI services keep theirs on disk: a runner's memory
+is what the suite runs in, and its disk pays little for a schema change.
 
 | Building the schema, one database, a workstation | On disk | In memory |
 |---|---|---|

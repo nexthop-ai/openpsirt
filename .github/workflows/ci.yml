@@ -150,9 +150,10 @@ jobs:
     # none of the portability traps the design is written around, so a green
     # run here is the only thing that makes "runs on four engines" a fact.
     #
-    # Each data directory is in memory. A schema change syncs the files it
-    # creates whatever the commit settings say, and every package builds the
-    # schema once on each server.
+    # The data directories stay on the runner's disk. The runner's memory is
+    # what the suite runs in, and the disk a runner has pays little for a
+    # schema change: the migrations package takes 25 s here against 109 s on a
+    # workstation's disk.
     services:
       postgres:
         image: postgres:16-alpine
@@ -161,7 +162,6 @@ jobs:
           POSTGRES_DB: openpsirt
         ports: ["5432:5432"]
         options: >-
-          --tmpfs /var/lib/postgresql/data
           --health-cmd pg_isready --health-interval 5s
           --health-timeout 5s --health-retries 10
       mysql:
@@ -171,7 +171,6 @@ jobs:
           MYSQL_DATABASE: openpsirt
         ports: ["3306:3306"]
         options: >-
-          --tmpfs /var/lib/mysql
           --health-cmd "mysqladmin ping -ptest --silent" --health-interval 5s
           --health-timeout 5s --health-retries 20
       # Deliberately below the floor, so the refusal is exercised. Without it
@@ -183,7 +182,6 @@ jobs:
           POSTGRES_DB: openpsirt
         ports: ["5433:5432"]
         options: >-
-          --tmpfs /var/lib/postgresql/data
           --health-cmd pg_isready --health-interval 5s
           --health-timeout 5s --health-retries 10
       mariadb:
@@ -193,7 +191,6 @@ jobs:
           MARIADB_DATABASE: openpsirt
         ports: ["3307:3306"]
         options: >-
-          --tmpfs /var/lib/mysql
           --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 5s --health-timeout 5s --health-retries 20
 

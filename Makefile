@@ -924,11 +924,12 @@ PG_AS_A_TEST_SERVER := -c fsync=off -c synchronous_commit=off -c full_page_write
 MY_AS_A_TEST_SERVER := --innodb-flush-log-at-trx-commit=0 --innodb-doublewrite=0 \
 	--sync-binlog=0 --skip-log-bin
 
-# The data directories are in memory. The settings above govern commits, and
-# a schema change syncs the files it creates whatever they say: building the
+# The data directories are in memory. The settings above govern commits, and a
+# schema change syncs the files it creates whatever they say: building the
 # schema took MySQL 20.9 s and MariaDB 18.9 s on a workstation's disk and
 # 0.79 s and 0.17 s in memory. A stopped container loses its databases, which
-# the harness answers by migrating again.
+# the harness answers by migrating again. CI keeps its servers on disk: the
+# runner's memory is what the suite runs in, and its disk pays little for DDL.
 PG_TEST_DATA := --tmpfs /var/lib/postgresql/data
 MY_TEST_DATA := --tmpfs /var/lib/mysql
 
