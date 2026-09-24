@@ -154,7 +154,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
+.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
 
 all: check build
 
@@ -280,24 +280,14 @@ full:
 docs-check:
 	$(GO) test ./internal/docs/
 
-vet:
-	$(GO) vet $(PACKAGES)
-	$(MAKE) measure-builds
-
-# The measurement file, type-checked without being run.
+# The linter is also the vet. Its govet runs every analyzer go vet does, over
+# test files and over the file behind the "measure" tag, so a separate go vet
+# ran the same analysis twice: 50 s of a two-core runner. A test in
+# internal/build holds the linter's configuration to that.
 #
-# It sits behind a build tag, and "make measure" is the only thing that passes
-# that tag — a target which refuses outright unless three server engines are
-# configured, so nobody discovers that the file has stopped compiling. A rename
-# anywhere it reaches left it silently broken while the build, the vet, the
-# linter and CI all passed.
-#
-# Vetting rather than running: go vet type-checks, it needs no database, and it
-# costs a second.
-.PHONY: measure-builds
-measure-builds:
-	$(GO) vet -tags measure $(MEASURED)
-
+# The tag matters because "make measure" is the only other thing that passes
+# it — a target which refuses outright unless three server engines are
+# configured, so nothing else would notice the file had stopped compiling.
 lint:
 # Verified before it is run. The loader drops a key it does not recognize
 # without a word, so a setting spelled at the wrong level reads as configured
@@ -603,7 +593,7 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+check: build lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
@@ -909,6 +899,15 @@ PG_AS_A_TEST_SERVER := -c fsync=off -c synchronous_commit=off -c full_page_write
 MY_AS_A_TEST_SERVER := --innodb-flush-log-at-trx-commit=0 --innodb-doublewrite=0 \
 	--sync-binlog=0 --skip-log-bin
 
+# The data directories are in memory. The settings above govern commits, and a
+# schema change syncs the files it creates whatever they say: building the
+# schema took MySQL 20.9 s and MariaDB 18.9 s on a workstation's disk and
+# 0.79 s and 0.17 s in memory. A stopped container loses its databases, which
+# the harness answers by migrating again. CI keeps its servers on disk: the
+# runner's memory is what the suite runs in, and its disk pays little for DDL.
+PG_TEST_DATA := --tmpfs /var/lib/postgresql/data
+MY_TEST_DATA := --tmpfs /var/lib/mysql
+
 engines-up: engines-check
 	@# Everything up to "--" belongs to docker and everything after it to the
 	@# server: the tuning below is the server's own command line, and passed as
@@ -929,13 +928,13 @@ engines-up: engines-check
 	  echo "  $$name: created from $$image"; \
 	}; \
 	up $(ENGINE_PREFIX)-pg16 $(ENGINE_PG_IMAGE) $(ENGINE_PG_PORT):5432 \
-	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER); \
+	   $(PG_TEST_DATA) -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER); \
 	up $(ENGINE_PREFIX)-mysql $(ENGINE_MYSQL_IMAGE) $(ENGINE_MYSQL_PORT):3306 \
-	   -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
+	   $(MY_TEST_DATA) -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
 	up $(ENGINE_PREFIX)-mariadb $(ENGINE_MARIADB_IMAGE) $(ENGINE_MARIADB_PORT):3306 \
-	   -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
+	   $(MY_TEST_DATA) -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
 	up $(ENGINE_PREFIX)-floor $(ENGINE_FLOOR_IMAGE) $(ENGINE_FLOOR_PORT):5432 \
-	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER)
+	   $(PG_TEST_DATA) -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER)
 	@# A container reported "Up" is not one that answers. Each server is asked
 	@# with its own client, inside its own container, so nothing here depends on
 	@# a client being installed on this machine. MariaDB renamed mysqladmin to

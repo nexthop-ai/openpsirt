@@ -107,7 +107,6 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
 | `make lint` | Static analysis, pinned version |
-| `make vet` | The compiler's own checks |
 | `make govulncheck` | Known vulnerabilities in dependencies |
 | `make licenses` | Shipped dependency licenses against the allowlist, Go and npm |
 | `make web-audit` | Known vulnerabilities in what the interface installs |
@@ -137,7 +136,6 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
 | `make measure` | Measurements rather than gates. Behind a build tag |
-| `make measure-builds` | The measurement file, type-checked without being run. Inside `vet` |
 | `make sbom-shape` | The reader over a full-size inventory, decompressed from a committed fixture. Inside `check` |
 
 ## Gate tiers
@@ -155,7 +153,7 @@ query runs both.
 |---|---|
 | `*.md` alone | the document tests, and `unclaimed` |
 | `web/**` alone | `web-check`, `spdx` |
-| Go reaching no SQL | `build`, `vet`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
+| Go reaching no SQL | `build`, `lint`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `attached`, `vendored`, `spdx`, `test` |
 | a query, the schema, a migration, or the harness the tests share | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from | `openapi-current`, `web-api` |
 | anything else, or nothing | the whole gate |
@@ -175,11 +173,11 @@ an uncommitted tree they report the file as stale.
 
 Test code a tag or an environment variable guards is compiled by the gate.
 A file behind a build tag is loaded by nothing an ordinary run compiles, so a
-rename anywhere it reaches leaves it silently broken while the build, the vet,
-the linter and CI all pass — and the one target that does pass the tag refuses
+rename anywhere it reaches leaves it silently broken while the build, the
+linter and CI all pass — and the one target that does pass the tag refuses
 outright unless three server engines are configured, so nobody finds out. It is
-vetted rather than run: `go vet` type-checks, needs no database and costs a
-second, and the linter is given the tag too. A test guarded by an environment
+linted rather than run: the linter is given the tag, type-checks what it
+compiles, and needs no database. A test guarded by an environment
 variable nothing sets is the same gap with a different lock, and the answer is
 the same: a target that sets it, inside `check`.
 
@@ -344,8 +342,29 @@ on each engine, so packages share nothing and run in parallel.
 
 | Engine | What a test gets | Emptied between tests |
 |---|---|---|
-| SQLite | A copy of a template migrated once per binary | Not needed — each test holds its own file |
-| The three servers | The package's own database on the server | By deleting from the tables that hold rows |
+| SQLite | A copy of a template migrated once per run and kept in the temporary directory, and a connection of its own | Not needed — each test holds its own file |
+| The three servers | The package's own database on the server, through one pool every test in the binary shares | By deleting from the tables that hold rows |
+
+The pool on a server is shared because a PostgreSQL connection is a process on
+the server that starts knowing nothing of the schema. Its first statement over
+the fifty-odd tables costs 43 ms, and the same statement on a warm connection
+3.4 ms. With a pool per test, every test paid the first: the API package spent
+90 s on PostgreSQL that way and spends 48 s with one pool. Tests in a package
+run one after another on a server, so the pool carries nothing from one test to
+the next that the emptying does not remove.
+
+The SQLite template is migrated by the first binary that asks and kept in the
+temporary directory for the rest. Each package is a binary, and migrating once
+in each was 6% of the race pass's processor time: 24 s of 383 s sampled. The
+file is named for everything its content follows from — the migrations'
+fingerprint, the name widths the migrations read, the SQLite library and the
+migration library — so any of those changing names a different file, and one
+that does not open like a database is migrated again.
+
+Each test gets a query builder of its own over the shared pool. A test may add a
+query hook to count its statements, and a hook on a shared builder goes on
+firing in every later test — alongside that test's own writers, which the race
+detector reports.
 
 A package whose tests start from the same rows declares them once, as a seeded
 template: a function that fills a migrated, empty database and returns what a
@@ -364,10 +383,11 @@ with their claims and grants, about sixty transactions; run per test that was
 as a seeded template it is a file write.
 
 A server database is kept between runs and reused. Applying the migrations is
-nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
-MariaDB, once per package per engine, which is 475 s of server work in a run
-spending 43 s of processor time — and none of it tests anything the migration
-tests do not.
+nearly the whole cost of a server engine on a disk — 20.9 s on MySQL and 18.9 s
+on MariaDB, once per package per engine — and none of it tests anything the
+migration tests do not. A server CI starts is new every run, so there it keeps
+nothing and builds every schema; the runner's disk makes that cheaper than a
+workstation's, and the migrations package takes 25 s there against 109 s.
 
 What makes reuse safe is the name. Below 1.0 a schema change edits what
 declares the thing rather than adding a migration beside it, so the applied
@@ -476,6 +496,24 @@ passes the same intent at startup, which also reaches the settings an engine
 accepts only there, and a workflow declaring a service container has no command
 line to pass. Asking from the connection reaches both.
 
+The settings govern commits, and a schema change syncs the files it creates
+whatever they say. So a server `make engines-up` starts keeps its data
+directory in memory, which removes the disk from building a schema as well as
+from committing to it. The CI services keep theirs on disk: a runner's memory
+is what the suite runs in, and its disk pays little for a schema change.
+
+| Building the schema, one database, a workstation | On disk | In memory |
+|---|---|---|
+| PostgreSQL | 0.49 s | 0.45 s |
+| MySQL | 20.9 s | 0.79 s |
+| MariaDB | 18.9 s | 0.17 s |
+
+The server pass over every package, six at once, went from 516 s to 246 s of
+package time with the pool above and the data in memory, where the 516 s reused
+databases migrated by an earlier run and the 246 s migrated every one. A
+container stopped and started again has lost its databases, and the harness
+migrates new ones.
+
 A connection that may not set a global leaves the server as it is and the suite
 runs slower. A test reads the setting back from the session it was handed and
 fails where it is durable on a connection that could have changed it, which
@@ -543,6 +581,20 @@ backlog (REQ-75).
 
 The linter set is tuned rather than enabled wholesale. Documentation rules are
 off; error checking excludes the cleanup-path functions conventionally ignored.
+
+The linter is also the vet. Its `govet` runs every analyzer `go vet` does and one
+more, over test files and the file behind the `measure` tag, so the gate runs no
+separate `go vet`: the same analysis twice was 50 s of a two-core runner. A
+mistake planted in a test file and in the tagged file was reported by the
+linter in both. What keeps that true is the configuration, so a test holds it:
+`govet` enabled, no `govet` settings narrowing its analyzers, test files not
+excluded, generated files not excluded, no exclusion naming `govet` or a test
+file, and the `measure` tag passed. The linter's own default skips any file
+marked generated, which `go vet` reads, so the configuration turns that off for
+every linter.
+
+The linter reports one issue per line. Two problems on one line appear one at a
+time, where `go vet` alone would name both.
 
 The linter must be built with a Go release at least as new as the code, or it
 cannot read the compiler's export data and fails on every file with a message

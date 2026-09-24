@@ -158,10 +158,11 @@ jobs:
         # here without anybody remembering to add a step, which is the half
         # that had already gone wrong three times over.
         #
-        # It covers: the build, vet, the linter, unreachable exported code,
-        # decisions no design document names, invented names an engine
-        # reserves, source files a text tool cannot read, the pinned versions
-        # agreeing with each other, the four-engine race-detected suite,
+        # It covers: the build, the linter (which is also the vet),
+        # unreachable exported code, decisions no design document names,
+        # invented names an engine reserves, source files a text tool cannot
+        # read, the pinned versions agreeing with each other, the four-engine
+        # race-detected suite,
         # known vulnerabilities, dependency licenses, the OpenAPI document
         # being current, the bill of materials, and the interface.
         run: make check

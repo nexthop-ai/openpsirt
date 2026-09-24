@@ -8,13 +8,15 @@
 // loudly otherwise — a skipped engine is reported rather than silently absent,
 // because a portability suite that quietly tests one engine is worse than none.
 //
-// The schema is built once per test binary, not once per test. A test binary
-// is one package, so on SQLite one file is migrated on first use and copied
-// for each test — a copy is milliseconds where eighteen migrations were about
-// a second — and on the three servers each binary gets a database of its own,
-// named for the package, dropped and created on first use and migrated once.
+// The schema is built once, not once per test. On SQLite the first test
+// binary in a run migrates one file and keeps it in the temporary directory,
+// every other binary reads it, and each test copies it — a copy is
+// milliseconds where a migration is most of a second. On the three servers
+// each binary gets a database of its own, named for the package, dropped and
+// created on first use and migrated once.
 // Packages therefore share nothing and can run in parallel; tests within a
-// package share the database and empty it between them with Reset, as before.
+// package share the database, and one pool of connections to it, and empty it
+// between them with Reset.
 //
 // A package whose tests start from the same rows declares them once as a
 // Seeded template. On SQLite the seed is applied to the template before the
@@ -96,14 +98,15 @@ func candidates() []candidate {
 //
 // The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per binary, and each server database is either migrated on
+// was migrated once per run, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
 // This is for a test that pins what a query does: every portability defect
 // found so far was a query behaving differently on one engine, so a store
-// test earns all four. Each subtest gets its own connection, and it is
-// closed afterwards.
+// test earns all four. On SQLite each subtest gets a connection of its own,
+// closed afterwards; on a server every test in the binary shares one pool,
+// described at serverConnection.
 func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 	t.Helper()
 	run(t, plain(fn), nil, beside, nil)
@@ -113,7 +116,7 @@ func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 //
 // The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per binary, and each server database is either migrated on
+// was migrated once per run, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
@@ -131,7 +134,7 @@ func Alone(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 //
 // The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per binary, and each server database is either migrated on
+// was migrated once per run, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
@@ -174,7 +177,7 @@ func Servers(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 //
 // The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per binary, and each server database is either migrated on
+// was migrated once per run, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
@@ -273,7 +276,10 @@ func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, see
 			if err != nil {
 				t.Fatalf("prepare a %s database for this package: %v", c.name, err)
 			}
-			db := Open(t, own)
+			db, err := serverConnection(c.name, own)
+			if err != nil {
+				t.Fatalf("connect to the %s database for this package: %v", c.name, err)
+			}
 			var made any
 			if seed != nil {
 				// The package's one database on this server holds whatever
@@ -362,6 +368,7 @@ var (
 
 	serverMu   sync.Mutex
 	serverURLs = map[database.Engine]string{}
+	serverDBs  = map[database.Engine]*database.DB{}
 )
 
 // sqliteTestPragmas is what a test database adds to the pragmas every SQLite
@@ -381,25 +388,88 @@ func sqliteDir(t *testing.T) string {
 	return t.TempDir()
 }
 
-// sqliteTemplate migrates one file per binary, the first time it is asked,
-// and keeps its bytes rather than the file: a test binary has no hook after
-// its last test, so a file would outlive it, and a migrated empty database
-// is a few hundred kilobytes.
+// sqliteTemplate is the migrated, empty SQLite database every test in this
+// binary copies, read the first time it is asked and kept as bytes: a test
+// binary has no hook after its last test, and a migrated empty database is a
+// few hundred kilobytes.
+//
+// One migration serves every binary. Each package is a binary of its own, and
+// migrating once in each was 6% of the race pass's processor time — 24 s of
+// 383 s sampled, a fresh install walking every migration under the detector.
+// So the first binary to ask migrates and leaves the file in the temporary
+// directory, named for what built it, and the others read it.
 func sqliteTemplate() ([]byte, error) {
 	sqliteOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "openpsirt-dbtest-")
-		if err != nil {
-			sqliteErr = err
-			return
-		}
-		defer func() { _ = os.RemoveAll(dir) }()
-		path := filepath.Join(dir, "template.db")
-		if sqliteErr = migrateFresh("sqlite://" + path + sqliteTestPragmas); sqliteErr != nil {
-			return
-		}
-		sqliteBytes, sqliteErr = os.ReadFile(path) //nolint:gosec // G304: the path is one this function just chose inside its own temporary directory
+		sqliteBytes, sqliteErr = sharedTemplate(os.TempDir())
 	})
 	return sqliteBytes, sqliteErr
+}
+
+// sqliteHeader opens every SQLite database file.
+const sqliteHeader = "SQLite format 3\x00"
+
+// sharedTemplate reads the template kept in dir for the migrations this
+// binary carries, or migrates one and keeps it there.
+//
+// The name carries everything the file's content follows from, so an edited
+// migration, a changed width or a new library names a different file rather
+// than reading a stale one. It is written beside its name and renamed into place, so a
+// binary reading it never sees half a file, and two binaries migrating at once
+// each rename a complete one. A file that does not open like a database is
+// migrated again.
+func sharedTemplate(dir string) ([]byte, error) {
+	name, err := templateName()
+	if err != nil {
+		return nil, err
+	}
+	kept := filepath.Join(dir, name)
+	if held, err := os.ReadFile(kept); err == nil && strings.HasPrefix(string(held), sqliteHeader) { //nolint:gosec // G304: a name this function derives inside the temporary directory
+		return held, nil
+	}
+
+	work, err := os.MkdirTemp(dir, "openpsirt-dbtest-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(work) }()
+	path := filepath.Join(work, "template.db")
+	if err := migrateFresh("sqlite://" + path + sqliteTestPragmas); err != nil {
+		return nil, err
+	}
+	made, err := os.ReadFile(path) //nolint:gosec // G304: the path is one this function just chose inside its own temporary directory
+	if err != nil {
+		return nil, err
+	}
+	// Kept for the next binary where it can be, and the bytes returned either
+	// way: a directory that refuses the file costs speed, not correctness.
+	staged := filepath.Join(work, "staged.db")
+	if err := os.WriteFile(staged, made, 0o600); err == nil { //nolint:gosec // G703: a name inside the directory MkdirTemp just made
+		_ = os.Rename(staged, kept)
+	}
+	return made, nil
+}
+
+// templateName is the file the template is kept under: named for everything
+// its content follows from — the migrations, the widths seven of them read,
+// the SQLite library that writes the file and the migration library that
+// writes its version table.
+func templateName() (string, error) {
+	schema, err := migrations.Fingerprint()
+	if err != nil {
+		return "", fmt.Errorf("fingerprint the migrations: %w", err)
+	}
+	var libraries []string
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, dep := range info.Deps {
+			if dep.Path == "modernc.org/sqlite" || dep.Path == "github.com/pressly/goose/v3" {
+				libraries = append(libraries, dep.Path+"@"+dep.Version)
+			}
+		}
+	}
+	key := fmt.Sprintf("%s\x00%s\x00%d\x00%d", schema, strings.Join(libraries, "\x00"),
+		database.NameWidth, database.ComposedWidth)
+	sum := sha256.Sum256([]byte(key))
+	return "openpsirt-dbtest-" + hex.EncodeToString(sum[:6]) + ".db", nil
 }
 
 // serverDatabase gives this binary its own database on the server the
@@ -476,6 +546,39 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 	}
 	serverURLs[engine] = own
 	return own, nil
+}
+
+// serverConnection is a handle on the one pool every test in this binary uses
+// on engine. The pool is opened the first time it is asked for and never
+// closed: a test binary has no hook after its last test, and the process
+// ending closes it.
+//
+// One pool rather than one per test, because a PostgreSQL connection is a
+// process of its own on the server, and a new one knows nothing of the schema.
+// Its first statement against the fifty-odd tables costs 43 ms and the same
+// statement on a warm connection 3.4 ms, and every test paid the first: the API
+// package spent 90 s on PostgreSQL with a pool per test and 48 s with this.
+// Tests in a package run one after another on a server, so sharing the pool
+// shares nothing a test can see — the rows are emptied between tests as before.
+//
+// Each call wraps the pool in a query builder of its own. A test may add a
+// query hook to the handle it is given, to count statements, and a hook added
+// to a shared builder would go on firing in every later test.
+func serverConnection(engine database.Engine, own string) (*database.DB, error) {
+	serverMu.Lock()
+	defer serverMu.Unlock()
+	pool, ok := serverDBs[engine]
+	if !ok {
+		target, err := database.ParseURL(own)
+		if err != nil {
+			return nil, err
+		}
+		if pool, err = database.Open(context.Background(), target); err != nil {
+			return nil, fmt.Errorf("open %s: %w", target.Redacted, err)
+		}
+		serverDBs[engine] = pool
+	}
+	return &database.DB{DB: bun.NewDB(pool.DB.DB, pool.Dialect()), Server: pool.Server}, nil
 }
 
 // ensureDatabase leaves exactly one database for this package and checkout on
