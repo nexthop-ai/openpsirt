@@ -448,6 +448,7 @@ Everything after the tag is the `Release` workflow.
    ```
    git switch main && git pull
    make gate full
+   make release-check VERSION=v0.3.0
    git tag -a v0.3.0 -m "0.3.0"
    git push origin v0.3.0
    ```
@@ -455,7 +456,7 @@ Everything after the tag is the `Release` workflow.
 | The workflow then | |
 |---|---|
 | Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
-| Refuses a release whose migrations were not frozen | A database the release builds applies exactly what it shipped. Unfrozen, nothing holds those files once the next change lands. A prerelease is held to the record of the release it precedes |
+| Refuses a release whose migrations were not frozen | A database the release builds applies exactly what it shipped. Unfrozen, nothing holds those files once the next change lands. A release candidate, `-rc.N`, is held to the record of the release it precedes, and any other suffix is refused |
 | Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything |
 | Pushes the image and the chart to `ghcr.io` | |
 | Signs the image, the chart and the checksum file, then verifies each | Keyless, against the workflow's own identity, with the command a downloader would run |
@@ -464,7 +465,7 @@ Everything after the tag is the `Release` workflow.
 
 | Rule | Why |
 |---|---|
-| A version with a hyphen is a prerelease | `0.2.0-rc.1` is, `0.2.0` is not. The workflow reads the tag rather than being told twice |
+| A version with a hyphen is a prerelease | `0.2.0-rc.1` is, `0.2.0` is not. The workflow reads the tag rather than being told twice. The only prerelease the migration check accepts is a release candidate, `-rc.N` |
 | A prerelease moves nothing | No `latest` image tag, no `<major>.<minor>` tag, no documentation alias. It exists to be tried, not to be landed on by somebody who asked for the current version |
 | A release is never rebuilt under the same tag | The tag names one set of bytes. Something wrong in a published release is fixed by the next tag, not by moving this one |
 

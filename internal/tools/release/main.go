@@ -15,6 +15,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 )
@@ -31,6 +32,13 @@ func main() {
 	}
 	switch tag := os.Args[2]; os.Args[1] {
 	case "freeze":
+		// A tagged release's record is what it shipped, and freezing it again
+		// would rewrite that record to whatever the tree holds now.
+		if version, err := released.Base(tag); err == nil && tagged(version) {
+			fmt.Fprintf(os.Stderr, "freeze %s: %s is tagged, and its record is what it shipped; "+
+				"a later migration belongs to the next release\n", tag, version)
+			os.Exit(1)
+		}
 		r, err := released.Freeze(root, migrations, tag)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "freeze %s: %v\n", tag, err)
@@ -54,4 +62,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: release freeze|check vX.Y.Z")
 		os.Exit(2)
 	}
+}
+
+// tagged reports whether a release's own tag exists in this checkout.
+func tagged(version string) bool {
+	//nolint:gosec // G204: a version Base has already read as vX.Y.Z
+	return exec.Command("git", "rev-parse", "-q", "--verify", "refs/tags/"+version).Run() == nil
 }

@@ -152,7 +152,7 @@ func TestAFileEditedAfterTheFreezeIsRefused(t *testing.T) {
 	atV010(t, migrations)
 	write(t, filepath.Join(migrations, "00002_second.go"), header+"package migrations\n\n// edited\n")
 	faults := check(t, root, migrations, "v0.1.0")
-	if len(faults) != 1 || !strings.Contains(faults[0], "00002_second.go is not the file v0.1.0 shipped") {
+	if len(faults) != 1 || !strings.Contains(faults[0], "00002_second.go is not the file v0.1.0 froze") {
 		t.Errorf("an edited file answered %v", faults)
 	}
 }
@@ -216,11 +216,53 @@ func TestFreezingRecordsWhatTheReleaseOwns(t *testing.T) {
 	}
 }
 
-// Freezing with no migration past the previous release has nothing to hold.
-func TestFreezingWithNothingNewIsRefused(t *testing.T) {
+// A release that changes no schema is frozen with no files of its own, and
+// may be tagged: a bug-fix release ships the schema of the release before it.
+func TestAReleaseWithNoMigrationOfItsOwnIsFrozenEmpty(t *testing.T) {
 	root, migrations := tree(t)
 	atV010(t, migrations)
-	if _, err := Freeze(root, migrations, "v0.2.0"); err == nil {
-		t.Error("a release with no migration of its own was frozen")
+	if err := os.MkdirAll(filepath.Join(root, "v0.1.1"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for _, engine := range Engines {
+		write(t, filepath.Join(root, "v0.1.1", Schema(engine)), "column t.c int\n")
+	}
+	r, err := Freeze(root, migrations, "v0.1.1")
+	if err != nil {
+		t.Fatalf("a release with no migration of its own was refused: %v", err)
+	}
+	if r.Last != 2 || len(r.Digests) != 0 {
+		t.Errorf("froze through %d with %v", r.Last, r.Digests)
+	}
+	if faults := check(t, root, migrations, "v0.1.1"); len(faults) != 0 {
+		t.Errorf("the release just frozen was refused: %v", faults)
+	}
+}
+
+// A file named for the release after its freeze is one it did not ship: a
+// second migration in its range, or a declaration carrying its code.
+func TestAFileTheReleaseDidNotShipIsRefused(t *testing.T) {
+	for _, name := range []string{"00002_another.go", "v010_extra.go"} {
+		root, migrations := tree(t)
+		atV010(t, migrations)
+		write(t, filepath.Join(migrations, name), header+"package migrations\n\n// later\n")
+		faults := check(t, root, migrations, "v0.1.0")
+		if len(faults) != 1 || !strings.Contains(faults[0], name+" belongs to v0.1.0 and the release did not ship it") {
+			t.Errorf("%s, added after the freeze, answered %v", name, faults)
+		}
+	}
+}
+
+// A file the record lists that the tree no longer has is gone from what the
+// release shipped.
+func TestAFileTheReleaseShippedAndIsGoneIsRefused(t *testing.T) {
+	root, migrations := tree(t)
+	atV010(t, migrations)
+	if err := os.Remove(filepath.Join(migrations, "00001_first.go")); err != nil {
+		t.Fatal(err)
+	}
+	faults := check(t, root, migrations, "v0.1.0")
+	if len(faults) != 1 || !strings.Contains(faults[0], "v0.1.0 shipped 00001_first.go and it is not here") {
+		t.Errorf("a shipped file removed answered %v", faults)
 	}
 }

@@ -253,8 +253,8 @@ func Held(root, migrations string, r *Record) ([]string, error) {
 			continue
 		}
 		if got != want {
-			faults = append(faults, fmt.Sprintf("%s is not the file %s shipped; a change to its schema goes in a later migration",
-				name, r.Version))
+			faults = append(faults, fmt.Sprintf("%s is not the file %s froze: if %s is not tagged yet, freeze it "+
+				"again; once it is, a change to its schema goes in a later migration", name, r.Version, r.Version))
 		}
 	}
 	for name := range r.Digests {

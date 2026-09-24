@@ -24,7 +24,7 @@ func Check(root, migrations, tag string) ([]string, error) {
 	r, err := Read(root, version)
 	if errors.Is(err, os.ErrNotExist) {
 		return []string{fmt.Sprintf("%s has no record of its migrations: run make release-freeze VERSION=%s "+
-			"on the commit to be tagged", version, version)}, nil
+			"on a branch from the head of main, and land it before the tag", version, version)}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -61,7 +61,8 @@ func Check(root, migrations, tag string) ([]string, error) {
 		}
 		if n := Number(name); n > r.Last {
 			faults = append(faults, fmt.Sprintf("%s is past %s's last migration, %d, and nothing holds it: "+
-				"freeze the release again", name, version, r.Last))
+				"if %s is not tagged yet, freeze it again; once it is, the migration belongs to the next release",
+				name, version, r.Last, version))
 		}
 		if m := declaration.FindStringSubmatch(name); m != nil && !codes[m[1]] {
 			faults = append(faults, fmt.Sprintf("%s declares tables for a release nothing froze", name))
@@ -78,6 +79,11 @@ var declaration = regexp.MustCompile(`^(v\d+)_[a-z_]+\.go$`)
 // previous release's last, and every declaration carrying its code. The
 // schema each engine builds is written beside it first, by a test, because
 // only a test has the engines.
+//
+// A release that changes no schema has a record listing no files, with the
+// previous release's last migration as its own. It is still a record: the
+// check refuses a tag with none, and a release that ships nothing new still
+// ships the schema before it.
 func Freeze(root, migrations, tag string) (*Record, error) {
 	version, err := Base(tag)
 	if err != nil {
@@ -102,8 +108,9 @@ func Freeze(root, migrations, tag string) (*Record, error) {
 		}
 	}
 	before := previous(records, version)
-	if last <= before {
-		return nil, fmt.Errorf("no migration is numbered past %d, the last of the release before %s", before, version)
+	if last < before {
+		return nil, fmt.Errorf("the last migration here is %d, behind %d, the last of the release before %s",
+			last, before, version)
 	}
 	r := &Record{Version: version, Last: last, Digests: map[string]string{}}
 	var b strings.Builder
