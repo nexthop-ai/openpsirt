@@ -1,33 +1,47 @@
 # Current state
 
-OpenPSIRT is in early development. Nothing is compatible with anything yet: a
-schema change edits what declares the thing rather than adding a migration
-beside it, and a development database is recreated rather than migrated. A database v0.1.0 built is upgraded
-in place.
+The latest release is 0.2.0. Below 1.0 there is no compatibility promise for
+the API or the schema. A database built by v0.1.0 or v0.2.0 is upgraded in
+place, and a database built by any other earlier build is recreated.
+[Configuration](configuration.md#upgrading) says what an upgrade changes.
+
+## Areas
 
 | Area | State |
 |---|---|
-| Build and validation | The pipeline, and a gate that runs the tier a change lands in |
-| Database | All four engines, with the schema created and migrated at startup |
-| Catalog and graph | Products, streams, variants, and the dependency graph |
-| Ingest | Inventory upload and the reader behind it, with the suppressions a build carries |
-| Scanning | Run here, findings tracked over intervals, everything tracked scanned again on a schedule |
-| Sign-in | OIDC, GitHub or a trusted header, with sessions, API keys and personal tokens |
-| Access | Roles and visibility, enforced in the data layer |
-| Triage | Decisions, approval, revision history, comments, bulk claims and the review queue |
-| Remediation | A fix is declared rather than completed: somebody says which releases it is meant to reach, and the next scan of each answers whether it arrived |
-| Reporting | Release-to-release comparison, trends, deadlines, release readiness, and what a new line would inherit |
-| Notifications | An area inside the application, and mail out of it: the categories worth interrupting somebody for go immediately, a daily digest — off until asked for — carries the rest, and a message about an undisclosed finding says only that there is something |
-| Private findings | A flaw is recorded by hand from the findings list of the build it is in. It starts undisclosed, its embargo has an end, moving that end costs a reason and past a threshold a second person, and the date arriving tells somebody |
-| Advisories | A CSAF document and a per-build VEX document, generated from what is already held. Generated is all: nothing is sent anywhere |
-| Web interface | Sign-in, home, the catalog, findings, finding detail, the dependency tree, decisions with their history, the review queue, assignment, bulk triage, inventory upload, release comparison, people and roles, and settings — embedded into the binary and served from it |
-| Also built | Files hanging off a finding, authorized against what the finding's visibility allows; teams, and work routed to one by standing rule; a record of who changed a setting or a grant; and six lists that leave as CSV or JSON |
+| Build and validation | The pipeline, and a gate that runs the checks a change touches |
+| Database | PostgreSQL, MySQL, MariaDB and SQLite, with the schema created and migrated at startup |
+| Catalog and graph | Products, branches and tags, variants, and the dependency graph. Each is renamed and retired in place |
+| Ingest | CycloneDX, SPDX 2.x and SPDX 3.x, with the suppressions a build carries, and a receipt per upload naming what it moved |
+| Scanning | Run here on a schedule, findings tracked over intervals, CVSS 3 and 4.0 ratings kept side by side |
+| Upstream and supplier data | Upstream currency, patch branches, and supplier advisories read from a CSAF provider directory. Each is off by default |
+| Sign-in | OpenID Connect, GitHub or a trusted header, with sessions, API keys and personal tokens |
+| Access | Roles per product or across every product, public and private as separate grants, enforced in the data layer |
+| Triage | Decisions, approval, revision history, comments, bulk judgments, standing corrections and the review queue |
+| Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
+| Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
+| Advisories | CSAF advisories with editorial states and a second person's agreement, a CSAF provider directory, and per-build OpenVEX documents with a revision chain |
+| Obligations | Records of exploitation, the windows they may oblige, and the notices given |
+| Reporting | Release comparison, trends, deadlines, release readiness, exception reports, and exports as CSV or JSON |
+| Notifications | An in-application area, immediate mail, a daily digest, signed webhooks, and operational alerts |
+| Web interface | Every screen above, embedded into the binary and served from it |
+| Packaging | A container image and a Helm chart for `linux/amd64`, and binary archives for Linux on amd64 and arm64 |
 
-Not built: every adapter that would send an advisory somewhere, the VEX
-profile of the CSAF document, chat, hand-off to an external tracker, findings
-from a static analyzer, reading SPDX, and images for any architecture but
-`amd64`.
+## Not built
+
+| Area | Not built |
+|---|---|
+| Ingest | Findings from a static analyzer or a fuzzer, and a producer's own vulnerability report uploaded beside an inventory |
+| Supplier advisories | A publisher that serves its directory from a second host. Its advisories are uploaded instead |
+| Patch branches | Asking a forge's API in place of cloning, and fetching through an outbound HTTP proxy |
+| Triage | Narrowing a judgment to some of the places it covers |
+| Disclosure | Disclosing a finding. Reaching a disclosure date escalates, and no path makes a finding public. A report from outside ruled a duplicate of a flaw found here starts no disclosure date. Coordinating an embargo with a peer vendor or a coordinator |
+| Advisories | Sending one anywhere, signing the provider directory, the VEX profile of the CSAF document, a CVSS 4.0 score in the document, and prose of the deployment's own beyond the title |
+| Remediation | Opening or updating an item in an external tracker; a link somebody typed is stored. One view of a promise to upgrade across every build it names |
+| Notifications | Chat adapters, an HTML part in mail, and a notice that an edit withdrew an approval |
+| Interface | Narrowing the review queue further than a product |
+| Database | Purging old rows and partitioning tables |
+| Packaging | Images for any architecture but `amd64` |
 
 The reasoning behind each area is in
-[REQUIREMENTS.md](https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md),
-and a `DESIGN-*.md` document describes how each one works.
+[REQUIREMENTS.md](https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md).

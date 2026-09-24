@@ -14,12 +14,12 @@ docker run -p 8080:8080 \
   -e OPENPSIRT_BOOTSTRAP_ADMINS="you" \
   -e OPENPSIRT_TRUSTED_HEADER="X-User" \
   -e OPENPSIRT_TRUSTED_SOURCES="172.16.0.0/12,10.0.0.0/8,fd00::/8" \
-  ghcr.io/nexthop-ai/openpsirt:0.1.0
+  ghcr.io/nexthop-ai/openpsirt:0.2.0
 ```
 
 It creates its own schema on startup and serves the interface and the API on
 one port. The Helm chart is published beside the image, as
-`openpsirt-0.1.0.tgz` on the same release.
+`openpsirt-0.2.0.tgz` on the same release.
 
 !!! warning "Not a small production deployment"
     Plain HTTP, and administration handed to whoever a header says they are.

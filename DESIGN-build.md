@@ -786,4 +786,4 @@ generated address rather than at the organization's.
 | The install and operate guides are not written | Both are about a release — how to get a version, how to move between them, what to back up before an upgrade — and there is no release process, so a guide written now would describe the demo target and the development database |
 | The gate and CI run the same commands | Written twice, neither copy a superset of the other, a reviewer running the gate and a merge being blocked check different things |
 | A check needing a running server refuses rather than skips | A skipped test passes, and "the suite is green" and "the suite ran" are two different facts behind one command |
-| `README.md` and `docs/index.md` are compared | Neither can include the other, and the same list maintained twice drifts |
+| `README.md` and `docs/index.md` are compared, from their scope to the end of their features, with link targets set aside | Neither can include the other, and the same list maintained twice drifts. Each links to the other pages by its own path |

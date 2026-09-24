@@ -1056,7 +1056,8 @@ docs-site:
 .PHONY: pins-check
 pins-check:
 	@fail=0; \
-	block() { sed -n '/^## Scope$$/,/^- Build or deploy fixes$$/p' "$$1"; }; \
+	block() { awk '/^## Scope$$/ { p = 1 } /^## (Evaluation|Next steps)$$/ { p = 0 } p' "$$1" \
+	  | sed -E 's/\]\([^)]*\)/]()/g'; }; \
 	[ -n "$$(block README.md)" ] || { \
 	  echo "the shared block is empty in README.md, so this compared nothing."; fail=1; }; \
 	[ -n "$$(block docs/index.md)" ] || { \

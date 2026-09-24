@@ -1,20 +1,19 @@
 <picture>
- <source media="(prefers-color-scheme: dark)" srcset="assets/openpsirt-logo-dark.svg">
- <img alt="OpenPSIRT" src="assets/openpsirt-logo.svg" width="380">
+ <source media="(prefers-color-scheme: dark)" srcset="assets/openpsirt-logo-wide-dark.svg">
+ <img alt="OpenPSIRT" src="assets/openpsirt-logo-wide.svg" width="520">
 </picture>
 
 Track vulnerabilities in the products you ship.
 
 OpenPSIRT takes in the inventory a build produced, scans it for known
-vulnerabilities, works out what changed release to release, and gives people a
-place to triage what it finds and track it through to a fix.
+vulnerabilities, works out what changed release to release, and gives people
+somewhere to triage what it finds and follow it through to a fix and an
+advisory.
 
-> **Status: alpha.** Every version below 1.0 promises nothing about the API or
-> the schema — a schema change edits what declares the thing rather than
-> adding a migration beside it, and a database is recreated rather than
-> migrated. A database v0.1.0 built is the one exception, and is upgraded in
-> place.
-> [Components](#components) says how far each area has got.
+> Alpha. Below 1.0 the API and the schema carry no compatibility promise. A
+> database built by v0.1.0 or v0.2.0 is upgraded in place; a database built by
+> any other earlier build is recreated.
+> [Current state](docs/built.md) says what is built and what is not.
 
 ## Contents
 
@@ -27,14 +26,15 @@ place to triage what it finds and track it through to a fix.
   - [The tracked unit](#the-tracked-unit)
   - [State and history](#state-and-history)
   - [Triage](#triage)
+  - [Vulnerability reports](#vulnerability-reports)
   - [Ranking and remediation](#ranking-and-remediation)
   - [Disclosure and advisories](#disclosure-and-advisories)
+  - [Attacks and obligations](#attacks-and-obligations)
   - [Access and permissions](#access-and-permissions)
   - [Notifications](#notifications)
   - [Reporting](#reporting)
   - [Interface and API](#interface-and-api)
   - [Operation](#operation)
-- [Components](#components)
 - [Evaluation](#evaluation)
 - [Documentation](#documentation)
 - [License](#license)
@@ -42,24 +42,31 @@ place to triage what it finds and track it through to a fix.
 ## Scope
 
 - Takes in inventories pushed by build pipelines, in CycloneDX or SPDX form,
-  along with the suppressions the build carries patches for
-- Runs the scan here, not in the build, so every product is measured against
-  the same scanner and the same vulnerability data
-- Keeps the dependency graph, so you can see why a vulnerable component is
-  present and which part of the product pulled it in
-- Tracks change over time per release, and works out why a finding disappeared
-  rather than guessing
-- Carries triage decisions forward, so a nightly scan does not reset the work
-- Rescans shipped releases, so a vulnerability published after a release still
-  gets found
-- Reports on what was fixed between releases, what was dismissed and why, what
-  is running out of time, and whether the team is keeping pace
+  with the suppressions the build carries patches for
+- Runs the scan in the deployment, so every product is measured against one
+  scanner and one set of vulnerability data
+- Keeps the dependency graph, so a vulnerable component shows why it is present
+  and which part of the product pulled it in
+- Records why every finding closed, such as an upgrade, a removal, a carried
+  patch, or a scanner that went quiet
+- Carries triage decisions forward, so a nightly scan leaves the work standing
+- Rescans shipped releases, so a vulnerability published after a release is
+  still found in it
+- Takes vulnerability reports from outside, judges them, and records flaws in
+  our own product
+- Generates CSAF advisories and per-build VEX documents, and writes the
+  advisories out as a CSAF provider directory
+- Reports what was fixed between releases, what was dismissed and why, what is
+  running out of time, and whether the team is keeping pace
 
 ## Out of scope
 
-- Generate SBOMs — your build does that
-- Work out what is in a product — the component list always comes from the build
-- Build or deploy fixes
+| | |
+|---|---|
+| Generating SBOMs | The build does that |
+| Discovering what is in a product | The component list always comes from the build |
+| Building or deploying fixes | A fix is declared here and confirmed by the next scan |
+| Sending an advisory anywhere | A published advisory belongs to whoever publishes it. OpenPSIRT writes the files |
 
 ## Builds over time
 
@@ -68,254 +75,308 @@ the findings and to the judgments standing on them.
 
 | When a build changes | What is recorded |
 |---|---|
-| An upload arrives | A receipt naming the components it added, removed and moved. An upload that moves more of the build than the deployment allows is raised |
+| An upload arrives | A receipt naming the component names it added, removed and moved. An upload that moves more of the build than the deployment allows raises an alert |
 | A component's version moves | The finding at the old version closes as upgraded, or as superseded where the issue came with it. The new finding records the version it arrived from |
 | The version moves and the fix does not arrive | The finding is marked as an incomplete upgrade |
 | The shipped version changes and the upstream one does not | The finding closes as revised, which is what a carried patch looks like from outside |
 | A component leaves the build | Its findings close as removed |
 | The scanner stops reporting something present and unchanged | The finding closes as unexplained, and that is flagged at any volume |
 | The vulnerability data moves | The scheduled rescan finds it, in shipped releases as well as current ones |
-| A judged component moves version | A judgment about risk lapses and returns to triage. A claim that the scanner matched the wrong thing stands |
+| A judged component, or what pulls it in, moves version | A judgment about risk lapses and returns to triage. A claim that the scanner matched the wrong thing stands |
 | Another release or variant ships the same code | The judgment already made there applies |
 | A fix is declared for a set of releases | The next scan of each release says whether it arrived |
 
 | Cost | |
 |---|---|
-| A finding is a component at one place | One switch image is 335,021 findings, 305,487 of them one kernel across 62 modules. Tracking at that grain is heavier per build than tracking per package, and it is what lets a judgment be true in one place and not another |
+| A finding is a component at one place | One switch image is 335,021 findings, 305,487 of them one kernel across 62 modules. Tracking at that grain is heavier per build than tracking per package, and it is what lets a judgment hold in one place and not another |
 | A finding is stored once | With when it opened and when it closed, never once per scan |
 | Nightly branch scans are transient | Tagged releases are retained |
 
 ## Features
 
-What the tool is specified to do. [Components](#components) says how far
-each area has got, and [REQUIREMENTS.md](REQUIREMENTS.md) carries the reasoning
-behind every line of it.
+[REQUIREMENTS.md](REQUIREMENTS.md) carries the reasoning behind every line
+here, and [Current state](docs/built.md) lists what is not built.
 
 ### Ingest
 
-- Inventories arrive from the build, in CycloneDX, SPDX 2.x or SPDX 3.x form,
-  one adapter per producer. A vulnerability report or a third party's VEX
-  document may be uploaded alongside. The document says which format it is and
-  the reader is chosen from that, so one upload takes any of them
+- Inventories arrive from the build as CycloneDX, SPDX 2.2 and 2.3, or SPDX
+  3.x. The document states its format, and the reader follows the document
 - An upload is accepted, queued and answered later. A scan applies whole or
   changes nothing, and only a scan newer than the state it replaces is taken
-- Releases and variants are declared before a scan may name one, so a
-  misspelled release is rejected rather than quietly created
+- A product, its releases and its variants are declared before a scan may name
+  one, so a misspelled release is refused
+- A product, a release or a variant is renamed or retired. Retiring takes it
+  out of every list and refuses new scans against it, and keeps everything
+  filed. Declaring it again brings it back. A name is fixed once a published
+  document names it
 - Identity is derived from content. Nothing a scan file supplies is trusted to
   be stable between builds or consistent between producers
-- Sized against the largest real input rather than the average: one pipeline
-  spans a thousandfold, and nightly branch scans are transient where tagged
-  releases are retained and can be fetched back
+- Every upload has a receipt listing which component names it added, removed
+  and moved to another version
+- A third party's VEX document, or a supplier's CSAF security advisory, is
+  uploaded by an administrator as evidence
 
 ### Scanning
 
-- The deployment runs the scan, on a schedule, for everything it tracks — so
-  every product is measured against the same scanner and the same vulnerability
-  data
-- The component list always comes from the build. We re-scan; we do not
-  discover
+- The deployment scans everything it tracks, on a schedule, with one scanner
+  and one set of vulnerability data
 - A build's own suppressions are applied and never re-decided
-- The scanner, its vulnerability database and the exploitation feeds all work
-  with no network, so a scan answers the same way twice and no content network
-  sits in the path it is available through. An air-gapped install uses the same
-  path as any other
-- Every finding records what produced it — which scanner, which version, which
+- The scanner, its vulnerability database and the exploitation feeds all run
+  with no network. By default the scanner keeps its own database current; an
+  air-gapped install loads a bundle in its place
+- Every finding records what produced it: which scanner, which version, which
   database, and how the match was made
-- OpenPSIRT publishes an inventory of itself, of the binary and of the image,
-  and scans itself with them
+- An issue keeps a CVSS 3 and a CVSS 4.0 rating side by side where both are
+  published. The newest generation is the one shown, and every number carries
+  its scheme
+- Candidate upgrades are ranked for ecosystems with a written ordering: Debian,
+  RPM, Alpine, PyPI, Maven, NuGet, and Semantic Versioning for Go, npm and
+  Cargo. Everything else stays unranked
+- OpenPSIRT publishes an inventory of its binary and its image, and scans
+  itself with them
+
+| Optional | What it adds |
+|---|---|
+| Upstream currency | The newest release upstream for a component, asked of the Go, npm, PyPI, Cargo, Maven and NuGet indexes. Names the deployment calls its own are never sent |
+| Patch branches | Which branches hold each patch commit a report links to, from a kept copy of the repository. Fetched through a proxy that refuses private address space and any excluded host |
+| Supplier advisories | A supplier's CSAF provider directory, read on the scan schedule. Each document is checked against the digest published beside it, and only claims about components a build ships are kept |
+
+All three are off by default. [Configuration](docs/configuration.md#features)
+says what turns each on.
 
 ### The tracked unit
 
 - The tracked unit is a product, a branch or tag, and a variant. A release
   carries a reversible end-of-life date, past which nothing is deleted or
   hidden
-- The dependency graph is kept as nodes and edges and walked when asked, never
-  flattened: one shared library was 49,170 flattened paths against 48 direct
-  consumers
+- The dependency graph is kept as nodes and edges and walked when asked. One
+  shared library was 49,170 flattened paths against 48 direct consumers
 - A finding is one component at one place in one build. Twelve places is twelve
   findings, and grouping is presentation only
 - An issue is one issue across every name it goes by, and everything each
-  report said about it is kept rather than overwritten
-- A flaw in our own product is recorded by hand, under an identifier this
-  deployment mints, against every build that ships it
+  report said about it is kept
 
 ### State and history
 
-- Change over time is a primary query, not an audit log read backwards
+- Change over time is a primary query
 - Findings open and close themselves as scans change, every closure records
   why, and a disappearance nobody can explain is flagged at any volume
-- Triage history is append-only: records are written and never edited or
-  removed, and each is written in the same transaction as the act it describes.
-  The database is trusted, and nothing defends against somebody editing rows
-  directly
-- Administrative changes record who changed what from what, and what a scan
-  observed is never merged with what a person declared
+- Triage history is append-only. Each record is written in the same
+  transaction as the act it describes. The database is trusted, and nothing
+  defends against somebody editing rows directly
+- Administrative changes record who changed what from what: settings, grants,
+  the catalog, and records of exploitation
+- What a scan observed is kept apart from what a person declared
 
 ### Triage
 
-- One outcome from a fixed set: affected, not applicable, deferred, will not
-  fix, already fixed here, and the two that promise work
-- Dismissing something needs a written explanation and a second person's
-  approval. The proposer and the approver are never the same person, with no
-  override; short deferrals are exempt up to a cumulative threshold the
-  deployment sets
-- A decision survives re-scans, lapses only when the software changes, and
-  carries automatically to other releases, tags and variants whose chains and
-  versions already match
-- One judgment covers every place a finding sits by default; narrowing it is
-  deliberate
-- Bulk triage is one action across many issues at a component, bounded by a
-  configurable cap, recording how the set was chosen
-- An approver works at the unit the proposer acted at, approves, sends back or
-  undoes a batch as one act, and an approval points at one revision of the
-  justification — editing the text withdraws it
-- What is recorded against an issue — a rating that disagrees with the
-  published one, or a note for whoever decides — belongs to one product,
-  applies to every build of it, and does not lapse when a version moves. Two
-  products may record different things about the same issue
-- A third party's judgment is evidence, never a decision. The build's
-  suppressions and a supplier's VEX are shown and offered as a prefill
-- A deployment says what it considers worth triaging and a product may say
+- Every finding takes one outcome: affected, not applicable, deferred, will not
+  fix, already fixed here, a wrong match, or one of the two that promise work
+- A dismissal needs a written reason and a second person's approval. The
+  proposer never approves their own, with no override. Short deferrals are
+  exempt up to a cumulative threshold the deployment sets
+- A judgment about risk survives rescans and lapses when the upstream version
+  of the component, or of anything that pulls it in, moves. It carries to other
+  releases, tags and variants whose chains and versions match
+- A wrong match is a claim about identity. It stands at every version until
+  somebody withdraws it, and always needs a second person
+- One judgment covers every place a finding sits
+- A bulk judgment is one act across many issues at a component, recording how
+  the set was chosen. One that sets findings aside is bounded by a cap the
+  deployment sets; a bulk promise to upgrade takes no cap
+- An approver approves, sends back or undoes a batch as one act. An approval
+  points at one revision of the reason, and editing the text withdraws it
+- A rating that disagrees with the published one, or a note for whoever
+  decides, belongs to one product and applies to every build of it
+- A third party's word is evidence. The build's suppressions, a supplier's VEX
+  and a supplier's advisory are shown beside the finding, and offer a prefill
+  only at the versions they name
+- A deployment sets what it considers worth triaging, and a product may set
   something narrower. Below the line a finding is still recorded, counted and
   reportable, and any list that hides something says how much
 
+### Vulnerability reports
+
+- A report of a flaw is recorded before anybody judges it, under a reference
+  minted per product. Files arrive with it
+- One form takes every report. It asks whether the flaw came from outside or
+  was found here, and whether to file it for judging or record it as a flaw
+  now
+- Each product has an inbox of reports waiting for a judgment
+- A report is judged one of five ways. Every way but acceptance is a ruling,
+  which covers one report or many in one act:
+
+| Judgment | Takes effect |
+|---|---|
+| Accepted, as an existing issue or a new flaw | At once, one report at a time |
+| Duplicate of an issue open here | At once |
+| Not reproducible | At once |
+| Out of scope | When a second person approves |
+| Rejected | When a second person approves |
+
+- A flaw in our own product is recorded under an identifier this deployment
+  mints, against every build that ships it
+- Reading reports takes a private read role. Recording, answering and judging
+  them takes private triage
+
 ### Ranking and remediation
 
-- One urgency orders the queue, worked out from severity, known exploitation,
-  exploitation likelihood, and whether the component reaches customers
-- Deadlines are set by policy from that urgency. Being overdue is reported,
-  never acted on automatically
-- Work is assigned to a person or to a team. A team queue is picked out of
-  rather than held, work nobody holds is routed to a team by standing rule, and
-  a human assignment always wins
-- A fix is declared as the set of releases it targets, and resolution is
-  computed from later scans rather than declared done
-- Hand-off to an external tracker is optional and off by default. This does not
-  replace anybody's issue tracker
+- One urgency orders the queue, worked out from a record that this product was
+  attacked through the issue, severity, known exploitation, exploitation
+  likelihood, and whether the component reaches customers
+- A deadline is set by policy from severity and known exploitation. It counts
+  from the latest of when the finding was first seen, when exploitation was
+  learned, and when a fix became available
+- A flaw in our own product runs on deadline windows of its own, counted from
+  when it was first given a severity
+- A finding with no deadline says why: nobody has rated it, it is below the
+  line, upstream has no fix to take, or its release is a tag or out of
+  support
+- Being overdue is reported, never acted on automatically
+- Work is assigned to a person or a team. A team queue is picked from, work
+  nobody holds is routed to a team by standing rule, and a person's assignment
+  always wins
+- A fix is declared as the set of releases it targets, and each later scan says
+  whether it arrived
 
 ### Disclosure and advisories
 
-- A flaw recorded here starts undisclosed, carrying a disclosure date that
-  defaults to 90 days from when the report was received. Reaching it escalates
-  rather than publishes
-- Extending that date costs a reason and, past a threshold, a second person —
-  and it is raised before the date rather than on it
-- Disclosure makes the whole record public: comments, decisions, actors. People
-  writing in the record know that from the first word
-- An advisory is generated as a CSAF document about flaws in our own product,
-  and a VEX document per build from approved dismissals. Generating is all it
-  does — nothing is sent anywhere, because a published advisory belongs to
-  whoever publishes it
+- A flaw recorded here starts undisclosed. One reported from outside carries a
+  disclosure date, 90 days from when the report arrived by default. One found
+  here carries none. Reaching the date escalates and publishes nothing
+- A disclosure date moves either way, as two separate acts. Each takes a
+  reason, and past a threshold a second person, and is raised before the date
+- A record is written to be disclosed whole: comments, decisions, actors.
+  People writing in it know that from the first word
+- An advisory is a record of its own, under an identifier this deployment
+  mints. It covers one flaw or several, across products, and is generated as a
+  CSAF 2.0 document
+
+| Advisory state | Means |
+|---|---|
+| Final | A second person agrees to what it says now, whether or not it has gone out |
+| Interim | It has gone out, and no agreement stands on what it says now |
+| Draft | Neither |
+
+- A second person agrees to one edition of an advisory. Editing it takes every
+  agreement back. It stays TLP:RED while anything it covers is undisclosed
+- What went out is kept byte for byte, and the advisory says whether it has
+  changed since
+- Every advisory revision that went out marked for anybody to read is written
+  into a CSAF provider directory: provider metadata, an index, a change list, a
+  feed, and a checksum beside each document. Another web server serves it
+- Each build has an OpenVEX document, generated from approved dismissals, with
+  a stable name and a revision chain. Each version that went out is kept
+
+### Attacks and obligations
+
+- A person records that a product was exploited through an issue: when it
+  became known, and what happened. Clearing the record takes a reason, and the
+  cleared record stays readable
+- That record outranks every feed in the queue, refuses a claim that the issue
+  does not apply, and sends a standing claim of that kind back for review
+- An administrator declares the windows an attack may oblige a notice within,
+  in hours from when it became known. A window covers every product or the
+  ones it names
+- Notices given to somebody outside are recorded, append-only, against the
+  window they answer
+- A standing-attacks screen lists every record. An alert is raised as each
+  window opens, at the warning a window declares, and as it passes
+- A bulk judgment that would dismiss or defer an attacked issue is refused.
+  Nothing here decides whether an obligation applies or was met
 
 ### Access and permissions
 
-- Sign-in is federated — OIDC, GitHub or a trusted header — and no account is
-  created for anybody nothing authorized in advance. Where roles are derived
-  from identity-provider groups, that mapping is the advance grant: somebody it
-  covers is recorded on their first arrival, and somebody in no mapped group is
-  refused exactly as a stranger is
-- Roles are granted per product; administration is global. A product somebody
-  holds no role on is invisible to them: not listed, not counted
+- Sign-in is federated: OpenID Connect, GitHub or a trusted header. No account
+  is created for anybody nothing authorized in advance. Where roles come from
+  identity-provider groups, that mapping is the advance grant
+- Roles are granted per product, or once across every product including ones
+  declared later. Administration and reading the deployment's own records are
+  permissions of their own. A product somebody holds no role on is invisible to
+  them: not listed, not counted
+- Public and private findings are separate grants: read public, read private,
+  triage public, triage private. Somebody who works both holds both
 - Visibility is enforced in the data-access layer, with a required subject,
-  covering counts, aggregates, search and exports rather than row reads alone
+  over counts, aggregates, search and exports as well as row reads
 - One person can be brought into one undisclosed case without being granted the
   product it sits in
 - Machine credentials are their own subject type: scoped, ingest-only,
   rotatable, and able to read back only their own uploads
 - Losing a role hands back the work it carried, because an identity provider
-  never tells us an account was disabled
+  never reports an account as disabled
 
 ### Notifications
 
-- Immediate mail only for something a person must act on. Everything else is a
-  digest, off until somebody asks for it
-- Nothing leaving this deployment about an undisclosed finding carries detail —
-  not the identifier, not the component, not the summary. That there is
-  something, and a link
+- Immediate mail goes out only for something a person must act on. Everything
+  else is a digest, off until somebody asks for it
+- Nothing leaving this deployment about an undisclosed finding carries detail:
+  no identifier, no component, no summary. It says there is something, and
+  links to it
 - Every channel sits behind one interface, and delivery is queued and retried.
-  Email is required; chat adapters are not built
-- Operational alerts are their own category: condition-based ones clear
-  themselves, event-based ones are acknowledged
+  The channels are mail and a signed webhook
+- Operational alerts are their own category. A condition clears itself once it
+  stops holding, and an event is acknowledged. They cover a build that stopped
+  being scanned, vulnerability data that stopped moving, an upload that moved
+  too much, a supplier gone silent, and one pair of people agreeing to most of
+  a product's work
 
 ### Reporting
 
-- Any two releases can be compared — fixed, newly present, still present — in a
-  form that goes into release notes
-- Any list that can be read can be exported as CSV or JSON, through the same
-  visibility rules the list was read with, carrying the filters of the screen
-  it came from
-- Scan coverage is reportable: what is being scanned, when each artifact was
-  last seen, and what has gone stale
-- Dismissals, deadlines, approvals and how long triage is taking are reportable
-  in their own right, including the exception report that should come back
-  empty
+- Any two releases can be compared as fixed, newly present and still present,
+  in a form that goes into release notes
+- Any list that can be read leaves as CSV or JSON, through the visibility rules
+  it was read with, carrying the filters of the screen it came from
+- Scan coverage is reportable: what is scanned, when each artifact was last
+  seen, and what has gone stale
+- Dismissals, standing corrections, deadlines, approvals and how long triage
+  takes are reportable in their own right, including the exception report that
+  should come back empty
+- Release readiness sets a branch beside the last release cut from it, with the
+  findings each count is made of
 - Trends are plotted on the axis the subject has: calendar time for a branch,
   release over release for tags
 
 ### Interface and API
 
-- REST and JSON, with the OpenAPI document generated from the code and never
-  hand-maintained. The web interface is a client of it, with no private
-  endpoints
+- REST and JSON, with the OpenAPI document generated from the code. The web
+  interface is a client of it, with no private endpoints
 - Every operation declares what it asks of a caller, and a gate refuses one
   that declares nothing
 - The dependency tree is browsable both ways: from a finding to where it sits,
   and from any node to the findings beneath it
 - The findings list is one row per issue at a component, with the places under
-  it — 335,021 rows for one image is not a list anybody reads — and it is the
-  tool for building a batch
-- One home page assembled from what the person holds, and one scope picker that
+  it, and it is where a batch is built. It narrows to what one variant holds
+  alone or what every variant holds
+- One home page is assembled from what the person holds, and one scope picker
   narrows the whole interface. A screen that cannot answer at the chosen scope
   says so
-- Every screen works on a phone, for reading and responding rather than bulk
-  work
-- Nothing a person typed is lost — not by a failed submission, a navigation, or
-  an expired session
+- Every screen works on a phone, for reading and responding
+- Nothing a person typed is lost to a failed submission, a navigation or an
+  expired session
 
 ### Operation
 
-- A container image and a Helm chart. A configuration that cannot work is
-  refused at install time, naming what is missing
+- A container image, a Helm chart, and binary archives for Linux on amd64 and
+  arm64. A configuration that cannot work is refused at install time, naming
+  what is missing
+- The pod is sized for the server and the scanner together, and the chart can
+  keep the scanner's vulnerability database on a volume
 - Any number of replicas: no leader, no shared filesystem, and no state in one
   process that decides anything
 - Four database engines are supported and tested: PostgreSQL, MySQL, MariaDB,
-  and SQLite for development
+  and SQLite for development and trials
 - The application creates and migrates its own schema at startup, one instance
-  at a time, so there is no migration step to run
+  at a time
 - Untrusted input never becomes SQL, markup or a filesystem path, and text a
   scan file supplied is never rendered
-- Markdown a person writes is policed on the server at submission: no raw HTML,
-  restricted link schemes, and nothing fetched from anywhere when it renders
+- Markdown a person writes is checked at submission: no raw HTML, restricted
+  link schemes, and nothing fetched from anywhere when it renders
 - Attachments are stored outside the database, in no public bucket, and every
-  fetch is authorized against the finding it hangs off before any URL is issued
-- Static analysis, vulnerability scanning, dependency review, secret scanning
-  and a license check gate every change, and every finding reproduces locally
-  with one documented command
-
-## Components
-
-| Area | Where it has got to |
-|---|---|
-| Build and validation | The pipeline, and a gate that runs the tier a change lands in |
-| Database | All four engines, with the schema created and migrated at startup |
-| Catalog and graph | Products, streams, variants, and the dependency graph |
-| Ingest | Inventory upload and the readers behind it — CycloneDX, SPDX 2.x and SPDX 3.x, chosen by what the document says it is — with the suppressions a build carries |
-| Scanning | Run here, findings tracked over intervals, everything tracked scanned again on a schedule |
-| Sign-in | OIDC, GitHub or a trusted header, with sessions, API keys and personal tokens |
-| Access | Roles and visibility, enforced in the data layer |
-| Triage | Decisions, approval, revision history, comments, bulk claims and the review queue |
-| Remediation | A fix is declared rather than completed: somebody says which releases it is meant to reach, and the next scan of each answers whether it arrived |
-| Reporting | Release-to-release comparison, trends, deadlines, release readiness, and what a new line would inherit |
-| Notifications | An area inside the application, and mail out of it: the categories worth interrupting somebody for go immediately, a daily digest — off until asked for — carries the rest, and a message about an undisclosed finding says only that there is something |
-| Private findings | A flaw is recorded by hand from the findings list of the build it is in. It starts undisclosed, its embargo has an end, moving that end costs a reason and past a threshold a second person, and the date arriving tells somebody |
-| Advisories | A CSAF document and a per-build VEX document, generated from what is already held. Generated is all: nothing is sent anywhere |
-| Web interface | Sign-in, home, the catalog, findings, finding detail, the dependency tree, decisions with their history, the review queue, assignment, bulk triage, inventory upload, release comparison, people and roles, and settings — embedded into the binary and served from it |
-| Also built | Files hanging off a finding, authorized against what the finding's visibility allows; teams, and work routed to one by standing rule; a record of who changed a setting or a grant; lists that leave as CSV or JSON; and a signed request out to a destination configured on the System screen |
-| System | What the deployment itself is doing: what is queued against the bound that refuses more of it, the work it has given up on and a way to put that back, and where it sends what it has to say |
-
-Not built: every adapter that would send an advisory somewhere, the VEX
-profile of the CSAF document, chat, hand-off to an external tracker, findings
-from a static analyzer, and images for any architecture but `amd64`.
+  fetch is authorized against what the file hangs off before any address is
+  issued
+- Static analysis, a vulnerability scan, a license check on dependencies and on
+  copied files, a secret scan, and a copyright header on every source file gate
+  every change. Each check runs locally with one command
 
 ## Evaluation
 
@@ -324,18 +385,12 @@ make demo                    # build the image, start it, seed two products, pri
 make demo DEMO_HOST=yourbox  # if you browse by something other than localhost
 ```
 
-Docker is all you need, plus `curl` and `xz` to seed from the compressed
-fixtures. The image builds the interface and the binary inside itself and
-carries the scanner, and it builds from your working tree — so what comes up
-is your change.
+Docker is all it needs, plus `curl` and `xz` to seed from the compressed
+fixtures. The image builds from the working tree, so what comes up is the
+change in front of you. It seeds a real switch image and OpenPSIRT itself.
 
-It seeds two products: a real switch image, and OpenPSIRT itself, from the
-inventory the image carries of what it ships, so the screens that compare
-across products have something to compare.
-
-One person cannot demonstrate this tool. A judgment is proposed by one
-person and agreed to by another, and approving your own is refused. The demo
-therefore opens a door per person, and two browser windows are two people:
+A judgment is proposed by one person and approved by another, so the demo opens
+a door per person. Two browser windows are two people:
 
 | Door | Arrives as | May |
 |---|---|---|
@@ -343,69 +398,16 @@ therefore opens a door per person, and two browser windows are two people:
 | `http://localhost:8081` | Ana | triage, and approve somebody else's |
 | `http://localhost:8082` | Ben | triage, and approve somebody else's |
 
-Change or extend the cast with `DEMO_CAST`, which takes `port:name:roles`
-entries:
-
-```
-make demo DEMO_CAST="8091:ana:public-read,public-triage,approver \
-                     8092:ben:public-read,public-triage,approver"
-```
-
-| Command | |
-|---|---|
-| `make demo-status` | What it found, and every door |
-| `make demo-down` | Stops it |
-| `make demo-reset` | Starts over, keeping the scanner's vulnerability database, which is large and slow to fetch |
-| `make demo-triage` | Adds a few judgments once the scans have landed: a dismissal, a deferral and a backport proposed by one of the cast and agreed to by another, plus an upgrade carried by a team |
-| `make demo-vex` | Adds a VEX document attributed to a distribution, written from what the scans actually found |
-| `make dev` | This machine's binary plus the interface's own dev server, for editing the interface and watching it reload |
-
-- A demo where every figure reads zero demonstrates nothing. Without
-  `demo-triage` the review queue, the record of judgments, how long triage is
-  taking and what is planned are all empty, and the screens answering those
-  questions look broken rather than idle. It records through the cast's own
-  doors, because one person proposing and a second agreeing is the control the
-  whole tool rests on
-- `demo-vex` is separate from the seed because the scans run in the background,
-  and a document written before them would name issues this deployment does not
-  have
-- `make dev` needs Go, node and a scanner installed locally, and it does not
-  exercise the interface the binary embeds. `make demo` does
-- Everything the demo writes stays in a git-ignored directory in the checkout
-- It is a demonstration deployment rather than a small production one — plain
-  HTTP, and administration handed to whoever the proxy in front of it says they
-  are. `DESIGN-interface.md` says what that costs
+[Evaluation](docs/trying.md) covers the published image, changing the cast,
+and the targets that seed judgments, a VEX document and a flaw of our own.
 
 ## Documentation
 
 | | |
 |---|---|
-| [REQUIREMENTS.md](REQUIREMENTS.md) | Every decision, with reasoning, organized by area |
-| [AGENTS.md](AGENTS.md) | Conventions for anyone, human or otherwise, working in this repository |
-| [docs/](docs/) | What is published: configuring it, the API reference, and who may call what |
-
-`DESIGN-*.md` documents describe how each area actually works, and appear as
-each is built:
-
-| | |
-|---|---|
-| [DESIGN-access.md](DESIGN-access.md) | Who is asking, and what they may reach |
-| [DESIGN-api.md](DESIGN-api.md) | The shape of the HTTP surface |
-| [DESIGN-attachments.md](DESIGN-attachments.md) | Files on a finding — where the bytes live, and who may reach them |
-| [DESIGN-build.md](DESIGN-build.md) | Layout, the validation pipeline, how a change is checked |
-| [DESIGN-data-model.md](DESIGN-data-model.md) | What a scan is filed against, and the dependency graph |
-| [DESIGN-database.md](DESIGN-database.md) | Four engines, migrations, locking |
-| [DESIGN-findings.md](DESIGN-findings.md) | What a scan run found, and where |
-| [DESIGN-ingest.md](DESIGN-ingest.md) | What happens to a scan when it arrives, and how one is read |
-| [DESIGN-interface.md](DESIGN-interface.md) | The web interface, how it is built and how it reaches the server |
-| [DESIGN-notifications.md](DESIGN-notifications.md) | What people are told about, and what they are not |
-| [DESIGN-obligations.md](DESIGN-obligations.md) | The facts a regulatory report needs, and why none of them is computed |
-| [DESIGN-packaging.md](DESIGN-packaging.md) | Container image and Helm chart |
-| [DESIGN-queue.md](DESIGN-queue.md) | How work waiting to be done is held and picked up |
-| [DESIGN-remediation.md](DESIGN-remediation.md) | Which releases a fix is meant to reach, and how the scans answer |
-| [DESIGN-reporting.md](DESIGN-reporting.md) | Trends, release comparison, deadlines, settings |
-| [DESIGN-text.md](DESIGN-text.md) | What may be written, and how it is rendered |
-| [DESIGN-triage.md](DESIGN-triage.md) | What people decide about findings, and when a decision stops applying |
+| [docs/](docs/) | What is published: evaluation, build pipelines, configuration, the API reference, and who may call what |
+| [REQUIREMENTS.md](REQUIREMENTS.md) | Every decision, with its reasoning, by area |
+| [AGENTS.md](AGENTS.md) | Conventions for anyone working in this repository |
 
 ## License
 

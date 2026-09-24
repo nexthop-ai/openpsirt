@@ -85,7 +85,7 @@ write and a form not to.
 | Surface | Register |
 |---|---|
 | `DESIGN-*.md` | Spec, including the `Contents` and `Limits` rules below |
-| `docs/`, `README.md`, `SECURITY.md` | Spec. No `Contents` section, because the site generates one; no `Limits` block, because the case for a design is not published |
+| `docs/`, `README.md`, `SECURITY.md` | Spec, with no `Limits` block, because the case for a design is not published. A page under `docs/` has no `Contents` section, because the site generates one; `README.md` has one, because it is read on the repository page, outside the site |
 | Code comments | Spec, and neither of those two rules |
 | The published API document | Spec, with the divergences below |
 | `REQUIREMENTS.md` rows | Spec, plus the one clause of reason a row carries |
