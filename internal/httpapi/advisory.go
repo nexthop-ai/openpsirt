@@ -615,7 +615,7 @@ type AdvisoryListedBody struct {
 // CoveredBody is one issue an advisory covers, in one product.
 type CoveredBody struct {
 	Product       string `json:"product"`
-	ProductName   string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
+	ProductName   string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	Vulnerability string `json:"vulnerability"`
 	Summary       string `json:"summary,omitempty"`
 	AddedAt       string `json:"added_at"`

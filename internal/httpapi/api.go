@@ -284,7 +284,9 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	})
 
 	cfg := huma.DefaultConfig("OpenPSIRT", version.Get().Version)
-	cfg.Info.Description = "Track vulnerabilities in the products you ship."
+	cfg.Info.Description = "Track vulnerabilities in the products you ship.\n\n" +
+		"A request carrying a query parameter the operation does not take is refused " +
+		"with a 400 naming the parameter."
 	// Documentation is published separately, so the server serves no page
 	// for it. The document itself stays on the framework's own route,
 	// authenticated like everything else.
@@ -311,6 +313,7 @@ func New(logger *slog.Logger, ready Ready, in Ingest) (http.Handler, huma.API) {
 	// Before anything registers, so no operation can be added without the
 	// scope on its own declaration being enforced.
 	enforceDeclarations(api)
+	refuseUnknownParameters(api)
 	registerVersion(api)
 	registerScans(api, in)
 	registerFindings(api, in)

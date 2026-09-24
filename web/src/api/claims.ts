@@ -58,11 +58,15 @@ export function claimOf(row: QueueRow): Claim {
     kind: row.claim.kind,
     derivedFrom: row.claim.derived_from ?? null,
     title: row.place.vulnerability ?? "",
-    product: row.place.product ?? "",
+    product: row.place.product_name || row.place.product || "",
     outcome: row.decision.outcome ?? "",
     justification: row.decision.justification ?? "",
     deferredUntil: row.decision.deferred_until ?? "",
-    proposedBy: row.claim.proposed_by || row.proposed_by,
+    proposedBy:
+      row.claim.proposed_by_name ||
+      row.claim.proposed_by ||
+      row.proposed_by_name ||
+      row.proposed_by,
     proposedAt: row.claim.proposed_at,
     selectedBy: row.claim.selected_by ?? row.decision.selected_by ?? "",
     reasoning: row.reasoning,

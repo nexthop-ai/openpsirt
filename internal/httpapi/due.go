@@ -22,13 +22,18 @@ type LateBody struct {
 	Exploited     bool   `json:"exploited,omitempty"`
 	Component     string `json:"component"`
 	Version       string `json:"version,omitempty" doc:"The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved"`
-	Product       string `json:"product"`
-	Stream        string `json:"stream"`
-	Variant       string `json:"variant"`
-	Places        int    `json:"places" doc:"The number of places in that build this sits at"`
-	AssignedTo    string `json:"assigned_to,omitempty" doc:"Empty means nobody, or not everywhere the same person"`
-	Due           string `json:"due" doc:"The date it is due"`
-	DaysLeft      int    `json:"days_left" doc:"Negative once it is overdue"`
+	Product       string `json:"product" doc:"The product, by the name that addresses it"`
+
+	ProductName  string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	Stream       string `json:"stream"`
+	StreamName   string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	Variant      string `json:"variant"`
+	VariantName  string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
+	Places       int    `json:"places" doc:"The number of places in that build this sits at"`
+	AssignedTo   string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`
+	AssignedName string `json:"assigned_to_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	Due          string `json:"due" doc:"The date it is due"`
+	DaysLeft     int    `json:"days_left" doc:"Negative once it is overdue"`
 }
 
 func registerDue(api huma.API, in Ingest) {
@@ -96,16 +101,20 @@ func registerDue(api huma.API, in Ingest) {
 			body := LateBody{
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, Component: row.Component, Version: row.Version,
-				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
-				Places: row.Places,
-				Due:    row.Due.Format(time.DateOnly),
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Stream: row.Stream, Variant: row.Variant,
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				Places:      row.Places,
+				Due:         row.Due.Format(time.DateOnly),
 				// Rounded down, not toward zero. Truncation reports something
 				// twelve hours overdue as having zero days left, which reads
 				// as due today rather than as late.
 				DaysLeft: int(math.Floor(row.Due.Sub(now).Hours() / 24)),
 			}
 			if row.AssignedTo != nil {
-				body.AssignedTo = who[*row.AssignedTo].Name
+				held := who[*row.AssignedTo]
+				body.AssignedTo, body.AssignedName = held.Address, labelBeside(held.Name, held.Address)
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}

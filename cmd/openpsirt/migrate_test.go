@@ -7,6 +7,8 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -71,6 +73,51 @@ func TestServingIsRefusedWhenTheSchemaIsBehindThisBuild(t *testing.T) {
 			}
 		}
 	})
+}
+
+// TestStartingWithoutMigratingChecksTheSchemaFirst pins the call rather than
+// the check: the server started with migration off, against a schema one
+// migration short, stops before anything else and says why. The check above
+// is only a control where serving reaches it.
+func TestStartingWithoutMigratingChecksTheSchemaFirst(t *testing.T) {
+	url := "sqlite://" + filepath.Join(t.TempDir(), "behind.db")
+	target, err := database.ParseURL(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(t.Context(), target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := schema.Up(t.Context(), db, silent()); err != nil {
+		t.Fatalf("migrate up: %v", err)
+	}
+	if err := schema.Down(t.Context(), db, silent()); err != nil {
+		t.Fatalf("roll back one: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("OPENPSIRT_DATABASE_URL", url)
+	t.Setenv("OPENPSIRT_AUTO_MIGRATE", "false")
+	discard, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = discard.Close() }()
+
+	err = run(nil, discard, discard)
+	if err == nil {
+		t.Fatal("the server started against a schema this build is ahead of")
+	}
+	// The refusal the check writes, which nothing later in startup does.
+	for _, want := range []string{"schema", "AUTO_MIGRATE"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("starting did not stop at the schema check: %v", err)
+			break
+		}
+	}
 }
 
 func TestASchemaAheadOfThisBuildStillServes(t *testing.T) {

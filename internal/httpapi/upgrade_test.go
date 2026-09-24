@@ -218,3 +218,64 @@ func TestMovingAPromiseRunsTheMarkdownPolicyOnItsReasoning(t *testing.T) {
 		}
 	})
 }
+
+// Moving a promise somebody agreed to withdraws their agreement, the same as
+// revising the words does, and they are told.
+func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scannedTwoIssues(t)
+
+		year := time.Now().UTC().Add(365 * 24 * time.Hour).Format(time.DateOnly)
+		made := asPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/components/linux-image/upgrade",
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,
+				"builds":[{"stream":"master","variant":"broadcom"}],
+				"reasoning":"Moving the package rather than answering each of these."}`, year))
+		if made.Code != http.StatusCreated {
+			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
+		}
+		var done struct {
+			ClaimID int64 `json:"claim_id"`
+			Waiting bool  `json:"waiting"`
+		}
+		if err := json.Unmarshal(made.Body.Bytes(), &done); err != nil {
+			t.Fatal(err)
+		}
+		if !done.Waiting {
+			t.Fatal("a promise a year out was not gated, so nobody agrees and this tests nothing")
+		}
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", done.ClaimID), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+
+		later := time.Now().UTC().Add(400 * 24 * time.Hour).Format(time.DateOnly)
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"The release slipped a month."}`,
+				later)); got.Code >= 300 {
+			t.Fatalf("moving the promise answered %d: %s", got.Code, got.Body.String())
+		}
+		told := r.told(t, "reviewer", "approval-withdrawn")
+		if len(told) != 1 || !contains(told[0], "promise") {
+			t.Errorf("moving an agreed promise told the approver %v", told)
+		}
+
+		// The same version and date with new words withdraws the agreement
+		// too, and says the reasoning changed rather than the promise.
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", done.ClaimID), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving again answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"The same promise, said better."}`,
+				later)); got.Code >= 300 {
+			t.Fatalf("restating the promise answered %d: %s", got.Code, got.Body.String())
+		}
+		told = r.told(t, "reviewer", "approval-withdrawn")
+		if len(told) != 2 || !contains(told[0]+told[1], "The reasoning") {
+			t.Errorf("restating an agreed promise told the approver %v", told)
+		}
+	})
+}

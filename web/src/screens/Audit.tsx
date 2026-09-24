@@ -495,7 +495,7 @@ function Administered() {
             {rows.map((row, i) => (
               <tr key={`${row.at} ${row.about} ${i}`}>
                 <td className="id">{(row.at ?? "").slice(0, 16).replace("T", " ")}</td>
-                <td>{row.by}</td>
+                <td>{row.by_name || row.by}</td>
                 <td>
                   <span className="hint">{row.kind}</span> {row.about}
                 </td>
@@ -579,7 +579,7 @@ function Judgment({ row }: { row: Judged }) {
               in <span className="id">{row.consumer}</span>
             </>
           )}{" "}
-          · {row.product}
+          · {row.product_name || row.product}
         </dd>
 
         <dt>Proposed</dt>

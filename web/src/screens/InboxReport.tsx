@@ -73,15 +73,15 @@ export function InboxReport() {
             </>
           )}
           {it.credit && <> · credit as {it.credit}</>}
-          {it.received && <> · arrived {it.received}</>} · recorded by {it.recorded_by},{" "}
-          {on(it.recorded_at)}
+          {it.received && <> · arrived {it.received}</>} · recorded by{" "}
+          {it.recorded_by_name || it.recorded_by}, {on(it.recorded_at)}
         </p>
         {/* Nobody outside sent a flaw found here, so nobody is owed an
             answer. */}
         {it.found_here ? null : it.acknowledged ? (
           <p className="hint">
             Answered {on(it.acknowledged)}
-            {it.acknowledged_by && <> by {it.acknowledged_by}</>}
+            {it.acknowledged_by && <> by {it.acknowledged_by_name || it.acknowledged_by}</>}
           </p>
         ) : (
           <div className="alert" style={{ margin: "6px 0 0" }}>
@@ -117,7 +117,7 @@ export function InboxReport() {
             {it.evaluated_by && (
               <span className="hint">
                 {" "}
-                · {it.evaluated_by}, {on(it.evaluated)}
+                · {it.evaluated_by_name || it.evaluated_by}, {on(it.evaluated)}
               </span>
             )}
           </p>

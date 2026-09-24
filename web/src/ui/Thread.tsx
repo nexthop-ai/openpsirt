@@ -26,6 +26,7 @@ export type Said = {
   id?: number;
   body?: string;
   written_by?: string;
+  written_by_name?: string;
   written_at?: string;
   edited_at?: string;
 };
@@ -88,10 +89,12 @@ export function Thread({
         <div className="thread">
           {items.map((each) => (
             <div key={each.id} className="said2">
-              <span className="avatar">{initials(each.written_by ?? "")}</span>
+              <span className="avatar">
+                {initials(each.written_by_name || each.written_by || "")}
+              </span>
               <div>
                 <div className="meta">
-                  <b>{each.written_by}</b>
+                  <b>{each.written_by_name || each.written_by}</b>
                   <span className="when">{said(each.written_at)}</span>
                   {each.edited_at && (
                     <button

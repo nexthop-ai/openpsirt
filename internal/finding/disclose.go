@@ -25,8 +25,11 @@ type Embargoed struct {
 	Summary       string `bun:"summary"`
 	Component     string `bun:"component"`
 	Product       string `bun:"product"`
+	ProductName   string `bun:"product_name"`
 	Stream        string `bun:"stream"`
+	StreamName    string `bun:"stream_name"`
 	Variant       string `bun:"variant"`
+	VariantName   string `bun:"variant_name"`
 	Severity      string `bun:"severity"`
 	// DiscloseAt is when the embargo ends. Reaching it discloses nothing:
 	// it is a date to answer, not a trigger.
@@ -119,9 +122,12 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`v.description AS "summary"`).
 		ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 		ColumnExpr(`c.name AS "component"`).
-		ColumnExpr(`p.display_name AS "product"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
 		// Whoever is dealing with it, and nobody where the places disagree.
 		// A minimum named one of them: a partly assigned embargo read as one
@@ -137,7 +143,7 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		Where("f.disclose_at IS NOT NULL").
 		Where("f.disclose_at <= ?", s.now().UTC().Add(within)).
 		GroupExpr("v.identifier, v.description, " + rating.EffectiveExpr +
-			", c.name, p.display_name, st.display_name, va.display_name").
+			", c.name, p.name, p.display_name, st.name, st.display_name, va.name, va.display_name").
 		OrderExpr("disclose_at, v.identifier")
 	if len(private) > 0 {
 		query = query.Where("st.product_id IN (?)", bun.List(private))
@@ -624,7 +630,6 @@ type Waiting struct {
 	Movement
 	Product       string
 	Vulnerability string
-	AskedByName   string
 }
 
 // Pending lists movements of a disclosure date waiting for a second person,
@@ -677,17 +682,14 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 		Movement      `bun:",extend"`
 		Product       string `bun:"product"`
 		Vulnerability string `bun:"vulnerability"`
-		AskedByName   string `bun:"asked_by_name"`
 	}
 	query := s.db.NewSelect().
 		Model((*Movement)(nil)).
 		ColumnExpr("dx.*").
 		Join(`JOIN "product" AS "p" ON p.id = dx.product_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = dx.vulnerability_id`).
-		Join(`LEFT JOIN "person" AS "ps" ON ps.id = dx.asked_by`).
 		ColumnExpr(`p.name AS "product"`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
-		ColumnExpr(`COALESCE(NULLIF(ps.display_name, ''), ps.identity, '') AS "asked_by_name"`).
 		Where("dx.needs_approval = ?", true).
 		Where("dx.approved_at IS NULL").
 		// Only while something here is still undisclosed. A request left
@@ -715,7 +717,7 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 	for _, row := range rows {
 		out = append(out, Waiting{
 			Movement: row.Movement, Product: row.Product,
-			Vulnerability: row.Vulnerability, AskedByName: row.AskedByName,
+			Vulnerability: row.Vulnerability,
 		})
 	}
 	return out, total, nil

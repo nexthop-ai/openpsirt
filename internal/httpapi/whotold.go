@@ -12,7 +12,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -29,23 +28,26 @@ type ReportBody struct {
 	// Acknowledged is when somebody answered them, and by whom. Absent is the
 	// state an unacknowledged report is in: prompt acknowledgment is the part
 	// of coordinated disclosure a reporter actually judges.
-	Acknowledged   string `json:"acknowledged,omitempty"`
-	AcknowledgedBy string `json:"acknowledged_by,omitempty"`
+	Acknowledged       string `json:"acknowledged,omitempty"`
+	AcknowledgedBy     string `json:"acknowledged_by,omitempty" doc:"The person who answered them, by sign-in identity"`
+	AcknowledgedByName string `json:"acknowledged_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	// Issue is what the claim turned out to be, where somebody has said, with
 	// when they said it and who they were. Absent is a claim nobody has
 	// judged, which is the state every report arrives in.
-	Issue       string `json:"issue,omitempty" doc:"The issue the claim turned out to be"`
-	Evaluated   string `json:"evaluated,omitempty" doc:"When somebody said what it turned out to be"`
-	EvaluatedBy string `json:"evaluated_by,omitempty" doc:"Who said so"`
+	Issue           string `json:"issue,omitempty" doc:"The issue the claim turned out to be"`
+	Evaluated       string `json:"evaluated,omitempty" doc:"When somebody said what it turned out to be"`
+	EvaluatedBy     string `json:"evaluated_by,omitempty" doc:"The person who said so, by sign-in identity"`
+	EvaluatedByName string `json:"evaluated_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	// Disposition is what the claim was judged to be, where that has taken
 	// effect. Absent is a claim nobody has answered, or one whose ruling is
 	// waiting for a second person.
-	Disposition string `json:"disposition,omitempty" enum:"accepted,duplicate,not-reproducible,out-of-scope,rejected" doc:"What the claim was judged to be, once that has taken effect"`
-	DuplicateOf string `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
-	Ruling      int64  `json:"ruling,omitempty" doc:"The ruling that answers it, waiting or in force"`
-	Waiting     string `json:"waiting,omitempty" enum:"out-of-scope,rejected" doc:"A disposition proposed and waiting for a second person"`
-	RecordedBy  string `json:"recorded_by" doc:"Who wrote it down"`
-	RecordedAt  string `json:"recorded_at" doc:"When it was written down, which is not when it arrived"`
+	Disposition    string `json:"disposition,omitempty" enum:"accepted,duplicate,not-reproducible,out-of-scope,rejected" doc:"What the claim was judged to be, once that has taken effect"`
+	DuplicateOf    string `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
+	Ruling         int64  `json:"ruling,omitempty" doc:"The ruling that answers it, waiting or in force"`
+	Waiting        string `json:"waiting,omitempty" enum:"out-of-scope,rejected" doc:"A disposition proposed and waiting for a second person"`
+	RecordedBy     string `json:"recorded_by" doc:"The person who wrote it down, by sign-in identity"`
+	RecordedByName string `json:"recorded_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	RecordedAt     string `json:"recorded_at" doc:"When it was written down, which is not when it arrived"`
 }
 
 // registerWhoTold is the record of who told us, and the act of saying we
@@ -233,7 +235,7 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 			issues = append(issues, *ruling.DuplicateOf)
 		}
 	}
-	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
+	who, err := whoSigned(ctx, in.DB.DB, people)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +250,7 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 			Reference: row.Reference, Summary: row.Summary,
 			ReportedBy: row.ReportedBy, Contact: row.Contact, Credit: row.Credit,
 			FoundHere:  row.FoundHere,
-			RecordedBy: names[row.RecordedBy],
+			RecordedBy: who.identity(row.RecordedBy), RecordedByName: who.label(row.RecordedBy),
 			RecordedAt: row.RecordedAt.Format(time.RFC3339),
 		}
 		if row.ReceivedOn != nil {
@@ -258,7 +260,8 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 			body.Acknowledged = row.AcknowledgedAt.Format(time.RFC3339)
 		}
 		if row.AcknowledgedBy != nil {
-			body.AcknowledgedBy = names[*row.AcknowledgedBy]
+			body.AcknowledgedBy = who.identity(*row.AcknowledgedBy)
+			body.AcknowledgedByName = who.label(*row.AcknowledgedBy)
 		}
 		if row.VulnerabilityID != nil {
 			body.Issue = identifiers[*row.VulnerabilityID]
@@ -280,7 +283,8 @@ func reportBodies(ctx context.Context, in Ingest, rows []finding.FlawReport) (
 			body.Evaluated = row.EvaluatedAt.Format(time.RFC3339)
 		}
 		if row.EvaluatedBy != nil {
-			body.EvaluatedBy = names[*row.EvaluatedBy]
+			body.EvaluatedBy = who.identity(*row.EvaluatedBy)
+			body.EvaluatedByName = who.label(*row.EvaluatedBy)
 		}
 		out = append(out, body)
 	}

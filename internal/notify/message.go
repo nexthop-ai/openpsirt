@@ -52,6 +52,7 @@ var called = map[Kind]string{
 	DeferralEnding:    "A deferral is running out",
 	QueueUntaken:      "Work is sitting in a team's queue",
 	ApprovalUndone:    "An agreement to a claim of yours was taken back",
+	ApprovalWithdrawn: "A claim you agreed to was changed",
 	ClaimLapsed:       "A decision of yours stopped applying",
 	BroughtIn:         "You have been brought into a case",
 	Disclosed:         "An issue you hold was disclosed",

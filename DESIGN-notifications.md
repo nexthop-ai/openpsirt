@@ -56,7 +56,7 @@ true is cleared, and running the same pass twice changes nothing.
 | Somebody named you | event | A name after an `@`, resolved when the text is saved |
 | An agreement taken back | event | Approval is silent because it is what the proposer asked for; an undo reverses something they were relying on. Two things cause it: a reviewer undoing a bulk approval, and a record that the product was exploited through the issue returning a claim that sets it aside to the queue. The second reaches somebody who was not in the exchange at all, so without it the claim simply reappears in their queue with no explanation |
 | A decision the code moved under | event | It hands work back to somebody who did nothing to cause it |
-| An approval an edit withdrew | event | **Not built.** The people who granted it should be told, so it does not quietly stop counting |
+| An approval an edit withdrew | event | To everybody whose standing agreement a revision of the reasoning or a moved promise took back, once each, and never to whoever made the edit. Without it an approver goes on relying on an agreement the record no longer holds (REQ-24, REQ-28) |
 | A build that stopped being scanned | condition | A sweep derives every declared build with when it was last scanned and reconciles |
 | An embargo whose date arrived | condition | Reaching the date discloses nothing (REQ-37). Clears when the date moves or the finding is disclosed |
 | A claim waiting for a second person | condition | To whoever may approve it, never to its proposer. A ruling on reports waiting for its approval is the same condition |
@@ -490,6 +490,7 @@ request-forgery primitive unless governed (REQ-69):
 |---|---|
 | Every request is signed over the timestamp and the body | A receiver can distinguish one of ours from one anybody could make, and cannot be handed yesterday's again. The timestamp is inside the signature |
 | The signing secret is stored recoverably | Every other credential is hashed because it authenticates somebody to this deployment; this one authenticates this deployment to somebody else. No endpoint returns it |
+| No endpoint returns a destination's address, only its host | For Slack and Teams the path is the credential. A destination is told apart by its name and kind, which is also what retires it |
 | What it carries is what the channel rules already allow | Composed by the same code that composes a mail, the address included. A rule enforced in two places is enforced in one and a half, and the address is the part a channel would otherwise build for itself |
 | Tracked per destination and per thing said, not per notification | A condition is opened once for every person who should hear it, and a channel wants it once. An event is tracked by its own identity, unless it names what it is one of |
 | An event that says the same sentence to many people names what it is one of | One upload changing much of a build is one thing to carry however many people read that product. Without it a product with twenty-five readers posts twenty-five identical messages a night, and a night of builds crowds every other kind out of a sweep. What is personal — a decision of yours, you were named — carries none, because those are as many things as there are people |

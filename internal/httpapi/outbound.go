@@ -20,14 +20,16 @@ import (
 
 // OutboundBody is one destination this deployment sends to.
 //
-// The secret is never here. It signs our requests rather than authenticating
-// anybody to us, so it is stored recoverably — and a configuration screen that
-// showed it would put a shared secret on a page anybody with the settings
-// right can read.
+// Neither credential is here. The secret signs our requests rather than
+// authenticating anybody to us, so it is stored recoverably and never shown.
+// The address is the other one: for Slack and for Teams the path carries the
+// token and there is no other authentication, so only the host is returned.
+// A destination is told apart from another by its name and kind, which is what
+// retiring one takes.
 type OutboundBody struct {
 	Name string `json:"name" doc:"The name, so a log line and a screen can use it"`
 	Kind string `json:"kind" doc:"The notifications that go here, or * for all of them"`
-	URL  string `json:"url"`
+	Host string `json:"host" doc:"The host it sends to. The rest of the address is never returned"`
 	// Sent and Failing say whether it is working, which is the question an
 	// operator has about a destination and one nothing else answers.
 	Sent    int    `json:"sent" doc:"The number of things delivered there"`
@@ -45,9 +47,8 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Summary: "List where this deployment sends things",
 		Description: "The destinations configured, which kinds go to each, and whether they " +
 			"are working.\n\n" +
-			"The signing secret is never returned. It signs our requests rather than " +
-			"authenticating anybody to us, so it has to be stored recoverably — and showing " +
-			"it would put a shared secret on a page.",
+			"The signing secret is never returned, and of the address only the host is. A " +
+			"destination is told apart by its name and kind.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[OutboundBody], error) {
 		if _, _, err := administerable(ctx, a, a.handle()); err != nil {
@@ -65,7 +66,7 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		out.Body.Items = make([]OutboundBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, OutboundBody{
-				Name: row.Name, Kind: row.Kind, URL: row.URL,
+				Name: row.Name, Kind: row.Kind, Host: hostOf(row.URL),
 				Sent: row.Sent, Failing: row.Failing, Because: row.Because,
 			})
 		}
@@ -88,6 +89,8 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 			"`X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the " +
 			"body — so a receiver can tell one of ours from one anybody could make, and " +
 			"cannot replay yesterday's.\n\n" +
+			"The response carries the host of the address and never the rest of it, the " +
+			"same as the listing.\n\n" +
 			"https only, and a redirect is refused rather than followed. The body is " +
 			"signed and not encrypted, and a redirect asks us to send a signed request " +
 			"somewhere else, which is what the restriction exists to prevent.",
@@ -145,7 +148,7 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 			Status int
 			Body   OutboundBody
 		}{Status: http.StatusCreated, Body: OutboundBody{
-			Name: row.Name, Kind: row.Kind, URL: row.URL,
+			Name: row.Name, Kind: row.Kind, Host: hostOf(row.URL),
 		}}, nil
 	})
 

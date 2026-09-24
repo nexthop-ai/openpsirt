@@ -214,13 +214,16 @@ type Late struct {
 	// Version is which one, because a build ships a name at more than one
 	// version often enough that a link without it cannot be resolved — and a
 	// screen offering a link that dead-ends is worse than one offering none.
-	Version    string `bun:"version"`
-	Severity   string `bun:"severity"`
-	Exploited  bool   `bun:"exploited"`
-	Product    string `bun:"product"`
-	Stream     string `bun:"stream"`
-	Variant    string `bun:"variant"`
-	AssignedTo *int64 `bun:"assigned_to"`
+	Version     string `bun:"version"`
+	Severity    string `bun:"severity"`
+	Exploited   bool   `bun:"exploited"`
+	Product     string `bun:"product"`
+	ProductName string `bun:"product_name"`
+	Stream      string `bun:"stream"`
+	StreamName  string `bun:"stream_name"`
+	Variant     string `bun:"variant"`
+	VariantName string `bun:"variant_name"`
+	AssignedTo  *int64 `bun:"assigned_to"`
 	// Due is the earliest deadline among the places this row covers — the one
 	// that makes the whole group late.
 	Due time.Time `bun:"due"`
@@ -385,8 +388,8 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	}
 	// The grouping, which decides what one row is: an issue at a component in
 	// one build, however many places it sits at there.
-	const grouping = "v.identifier, c.name, c.version, f.urgency_exploited, p.display_name, " +
-		"st.display_name, va.display_name, f.target_id, f.vulnerability_id, f.component_id"
+	const grouping = "v.identifier, c.name, c.version, f.urgency_exploited, p.name, p.display_name, " +
+		"st.name, st.display_name, va.name, va.display_name, f.target_id, f.vulnerability_id, f.component_id"
 
 	query := narrow(s.db.NewSelect()).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
@@ -394,9 +397,12 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
-		ColumnExpr(`p.display_name AS "product"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		// The earliest of the places this row covers, because that is the one
 		// that makes the whole group late.
 		ColumnExpr(`MIN(f.due_at) AS "due"`).

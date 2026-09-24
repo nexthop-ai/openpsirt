@@ -61,9 +61,6 @@ Missing or wrong, with no decision needed to fix it.
 
 | Gap | Effect |
 |---|---|
-| Approvers are not told when an edit withdraws their approval | Their approval stops counting silently. The API description of notifications says they are told |
-| Some routes return a display name where a sign-in identity is documented | Affects the administration trail's `by`, its CSV export, and the disclosure-date movement routes. A caller matching on identity gets a name |
-| The webhook listing returns each destination's full address | For Slack and Teams the address is the secret. Hiding it means deciding how somebody tells two destinations apart |
 | The upload alert compares against the size of the build | A build that rolls its base image every week raises the alert every week. Comparing against the build's usual churn needs a stored baseline |
 | A supplier whose directory is on a second host cannot be read | SUSE is one. Every request is pinned to the configured host, and allowing a second one means deciding how an administrator names it |
 | The container image is `amd64` only | The binaries are built for `arm64` too. `DESIGN-packaging.md` names the fix |
@@ -94,7 +91,6 @@ Missing or wrong, with no decision needed to fix it.
 |---|---|
 | Mail sending | No test double. The header sanitizer has no test |
 | The scanner subprocess | The double does not check the arguments the scanner is given |
-| Process startup | The stale-schema check is tested, and nothing tests that serving calls it |
 | Attachment names | Feeds a path with no newline to a check for a newline |
 | The SQLite migration lock | Compares the message against the only string that produces it |
 | The sort sweep | Checks for a 200 only, which an unknown sort key also returns |
@@ -102,7 +98,6 @@ Missing or wrong, with no decision needed to fix it.
 | The upstream-currency retry | Runs one pass, so nothing is asked again |
 | The empty-document reader | Its comment says an empty part is refused, and it asserts that the part is stored |
 | Scanned builds in the API tests | Several tests build a scanned build by hand. The shared fixture has helpers for the catalog and people only |
-| People in the API tests | Most are seeded with no display name, so a test cannot tell a name from an identity. This hides the display-name gap above |
 
 ## Owner decisions outstanding
 
@@ -110,7 +105,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Refuse unknown query parameters? | A mistyped filter is ignored and the unfiltered list comes back. Refusing applies to every endpoint at once |
 | Fetch each issue's own record from a vulnerability database? | The scanner reports no date an issue was published or modified. A second source per issue would supply them. Storing the date as a field alone is rejected in `REQUIREMENTS.md` |
 | Count the exploitation clock from the catalog's date? | The clock starts when a scan learns an issue is exploited. The catalog states the date it added the issue, and nothing reads it |
 | Name the other builds a finding sits in? | The finding says how many. The issue screen lists them one click away |

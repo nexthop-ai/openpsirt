@@ -203,25 +203,28 @@ var castSeed = dbtest.Seed(seedCast)
 
 func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	cat := catalog.NewStore(db.DB)
-	mine, err := cat.DeclareProduct(ctx, "mine", "Mine")
+	mine, err := cat.DeclareProduct(ctx, "mine", shownAs("mine"))
 	if err != nil {
 		return cast{}, err
 	}
-	if _, err := cat.DeclareStream(ctx, mine.ID, "master", catalog.Branch, nil); err != nil {
+	// The streams and variants are declared with a capital, so each is spelled
+	// differently from the name a path addresses it by and a test can tell
+	// which of the two a field carries.
+	if _, err := cat.DeclareStream(ctx, mine.ID, "Master", catalog.Branch, nil); err != nil {
 		return cast{}, err
 	}
-	if _, err := cat.DeclareVariant(ctx, mine.ID, "broadcom", true); err != nil {
+	if _, err := cat.DeclareVariant(ctx, mine.ID, "Broadcom", true); err != nil {
 		return cast{}, err
 	}
-	theirs, err := cat.DeclareProduct(ctx, "theirs", "Theirs")
+	theirs, err := cat.DeclareProduct(ctx, "theirs", shownAs("theirs"))
 	if err != nil {
 		return cast{}, err
 	}
-	theirBranch, err := cat.DeclareStream(ctx, theirs.ID, "master", catalog.Branch, nil)
+	theirBranch, err := cat.DeclareStream(ctx, theirs.ID, "Master", catalog.Branch, nil)
 	if err != nil {
 		return cast{}, err
 	}
-	theirVariant, err := cat.DeclareVariant(ctx, theirs.ID, "mellanox", true)
+	theirVariant, err := cat.DeclareVariant(ctx, theirs.ID, "Mellanox", true)
 	if err != nil {
 		return cast{}, err
 	}
@@ -246,18 +249,13 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		return cast{}, err
 	}
 
-	// Everybody here is seeded with no display name, which is a
-	// degeneracy rather than a choice. access.Store.Names answers a
-	// display name where one is known and the identity otherwise, so with
-	// none set every read of a name in this package comes back as the
-	// identity — and a field publishing the wrong one of the two cannot be
-	// told from a field publishing the right one. Four routes in this
-	// package publish the wrong one, which `TODO.md` records under Known
-	// gaps: giving these people names is what makes that visible, and it
-	// belongs with the change that decides, field by field, which of the
-	// two each should carry.
+	// Everybody here is seeded with a display name that is not their
+	// identity. access.Store.Names answers the display name, so a field
+	// publishing the label where the identity belongs reads differently
+	// from one publishing the identity, and a route that resolves the
+	// field it listed fails to find the label.
 	rights := access.NewStore(db.DB)
-	administrator, err := rights.Ensure(ctx, "admin", "", access.Stated(true), nil)
+	administrator, err := rights.Ensure(ctx, "admin", shownAs("admin"), access.Stated(true), nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -269,7 +267,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// reading by administering — and the point of the pair is that
 	// the grant is visible in the same record as everybody else's
 	// rather than implied by the flag.
-	adminReader, err := rights.Ensure(ctx, "admin-reader", "", access.Stated(true), nil)
+	adminReader, err := rights.Ensure(ctx, "admin-reader", shownAs("admin-reader"), access.Stated(true), nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -285,7 +283,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// whole of what it is for is a reader of the deployment's own records
 	// who reaches no product, so the identity that tests it holds nothing
 	// else.
-	auditor, err := rights.Ensure(ctx, "auditor", "", nil, access.Stated(true))
+	auditor, err := rights.Ensure(ctx, "auditor", shownAs("auditor"), nil, access.Stated(true))
 	if err != nil {
 		return cast{}, err
 	}
@@ -331,7 +329,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 		// that holds it bare.
 		"assigner-only": {access.Assigner},
 	} {
-		person, err := rights.Ensure(ctx, who, "", nil, nil)
+		person, err := rights.Ensure(ctx, who, shownAs(who), nil, nil)
 		if err != nil {
 			return cast{}, err
 		}
@@ -352,7 +350,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// approver is actually granted in a deployment. The approver above
 	// holds the capability alone, and reaches nothing — that is the rule
 	// being pinned, not an oversight.
-	reviewer, err := rights.Ensure(ctx, "reviewer", "", nil, nil)
+	reviewer, err := rights.Ensure(ctx, "reviewer", shownAs("reviewer"), nil, nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -370,7 +368,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// deliberately: the hazard is that "every product" is read as "no
 	// narrowing at all", which would hand this identity the undisclosed
 	// findings in both products (REQ-42 and REQ-43).
-	estate, err := rights.Ensure(ctx, "estate-reader", "", nil, nil)
+	estate, err := rights.Ensure(ctx, "estate-reader", shownAs("estate-reader"), nil, nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -385,7 +383,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// the role everywhere" and "may act on this issue here" can be told
 	// apart: an issue a product does not carry is not one anybody rates
 	// through it, however widely they are trusted.
-	estateTriage, err := rights.Ensure(ctx, "wide-triager", "", nil, nil)
+	estateTriage, err := rights.Ensure(ctx, "wide-triager", shownAs("wide-triager"), nil, nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -400,7 +398,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	// one. Not "nothing": a subject granted nothing anywhere is refused at
 	// the door, so a case grant is untestable through them — and a case is
 	// exactly what somebody outside a product is brought into.
-	outsider, err := rights.Ensure(ctx, "outsider", "", nil, nil)
+	outsider, err := rights.Ensure(ctx, "outsider", shownAs("outsider"), nil, nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -412,7 +410,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	}
 
 	// Somebody who exists and was granted nothing at all.
-	ungranted, err := rights.Ensure(ctx, "nothing", "", nil, nil)
+	ungranted, err := rights.Ensure(ctx, "nothing", shownAs("nothing"), nil, nil)
 	if err != nil {
 		return cast{}, err
 	}
@@ -1231,4 +1229,11 @@ func withProvider(t *testing.T, r *reach, groups bool) http.Handler {
 			},
 		})
 	return handler
+}
+
+// shownAs is the display name the cast is seeded with: never a
+// recapitalization of the identity, because folding would then match the
+// label against the identity and hide a field carrying the wrong one.
+func shownAs(identity string) string {
+	return "Shown as " + identity
 }

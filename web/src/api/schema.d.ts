@@ -730,7 +730,7 @@ export interface paths {
          * Change what a release is moving to
          * @description Changes the version a promised upgrade moves to, or the date it is promised by, on the claim and on every commitment it wrote.
          *
-         *     This withdraws any existing approval and returns every row of the claim to the review queue. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
+         *     This withdraws any existing approval and returns every row of the claim to the review queue, and notifies everybody whose approval it withdrew. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
          *
          *     `reasoning` is required and is recorded as a revision — saying why a date moved is what the second person has to read, and the revisions are where what was said before survives being changed.
          *
@@ -788,7 +788,7 @@ export interface paths {
          * Update a claim's justification
          * @description Replaces the justification text with a new revision. Earlier revisions are kept and remain readable.
          *
-         *     A claim is one argument however many places it covers, so this revises all of it. It withdraws any existing approval and returns every row of the claim to the review queue, marked as previously approved. Requires no approval of its own.
+         *     A claim is one argument however many places it covers, so this revises all of it. It withdraws any existing approval and returns every row of the claim to the review queue, marked as previously approved. Everybody whose approval it withdrew is notified. Requires no approval of its own.
          *
          *     The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
          *
@@ -1667,7 +1667,7 @@ export interface paths {
          * List where this deployment sends things
          * @description The destinations configured, which kinds go to each, and whether they are working.
          *
-         *     The signing secret is never returned. It signs our requests rather than authenticating anybody to us, so it has to be stored recoverably — and showing it would put a shared secret on a page.
+         *     The signing secret is never returned, and of the address only the host is. A destination is told apart by its name and kind.
          *
          *     Requires: administrator
          */
@@ -1682,6 +1682,8 @@ export interface paths {
          *     What it carries is what the channel rules already allow. A notification about a finding nobody has announced carries the fact that there is something and a link, and nothing else — the same body a mail would carry, composed by the same code.
          *
          *     Every request is signed. `X-OpenPSIRT-Timestamp` and `X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the body — so a receiver can tell one of ours from one anybody could make, and cannot replay yesterday's.
+         *
+         *     The response carries the host of the address and never the rest of it, the same as the listing.
          *
          *     https only, and a redirect is refused rather than followed. The body is signed and not encrypted, and a redirect asks us to send a signed request somewhere else, which is what the restriction exists to prevent.
          *
@@ -5920,7 +5922,10 @@ export interface components {
         };
         ApprovalBody: {
             approved_at: string;
+            /** @description The person who agreed, by sign-in identity */
             approved_by: string;
+            /** @description Their display name, where it differs from their identity */
+            approved_by_name?: string;
             /** @description The batch it was approved under, if it was a bulk approval */
             batch?: string;
             /**
@@ -6062,8 +6067,10 @@ export interface components {
             uploaded_at: string;
         };
         BecameBody: {
-            /** @description The person who did it, where a person did */
+            /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
+            /** @description Their display name, where it differs from their identity */
+            by_name?: string;
             claim: components["schemas"]["ClaimBody"];
             decision: components["schemas"]["DecisionBody"];
             /**
@@ -6117,8 +6124,8 @@ export interface components {
             group: string;
             /** @description The product the role is held against, by the name that addresses it */
             product?: string;
-            /** @description That product's display name, where it was declared with one */
-            product_display_name?: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /**
              * @description The role membership of this group grants
              * @enum {string}
@@ -6182,9 +6189,13 @@ export interface components {
             /** Format: int64 */
             medium: number;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             /** Format: int64 */
             total: number;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
         };
         BuildName: {
             stream: string;
@@ -6399,6 +6410,8 @@ export interface components {
             became?: string;
             /** @description The person who made the change, by sign-in identity */
             by: string;
+            /** @description Their display name, where it differs from their identity */
+            by_name?: string;
             /** @description This change cleared it */
             cleared?: boolean;
             /**
@@ -6497,7 +6510,10 @@ export interface components {
             kind: "finding" | "together" | "extension" | "returned";
             /** @description The moment the action was taken */
             proposed_at: string;
+            /** @description The person who took it, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where it differs from their identity */
+            proposed_by_name?: string;
             /** @description The narrowing behind a bulk set. Never part of the claim itself */
             selected_by?: string;
             /** @description The narrowing behind a bulk claim, as something you can re-run. Absent on a claim that was not one */
@@ -6519,8 +6535,10 @@ export interface components {
             argument: components["schemas"]["DecisionBody"];
             /** @description Every build the claim currently covers, as stream and variant */
             builds: string[] | null;
-            /** @description The person who did it, where a person did */
+            /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
+            /** @description Their display name, where it differs from their identity */
+            by_name?: string;
             /** @description The actor, the moment, the sort of action, the narrowing behind a bulk set, and where the work is happening */
             claim: components["schemas"]["ClaimBody"];
             /**
@@ -6605,9 +6623,12 @@ export interface components {
         };
         CollaboratorBody: {
             added_at: string;
+            /** @description The person who brought them in, by sign-in identity */
             added_by: string;
+            /** @description Their display name, where it differs from their identity */
+            added_by_name?: string;
             identity: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             name?: string;
         };
         "Comment-on-claimRequest": {
@@ -6639,7 +6660,10 @@ export interface components {
             /** Format: int64 */
             id: number;
             written_at: string;
+            /** @description The author, by sign-in identity */
             written_by: string;
+            /** @description Their display name, where it differs from their identity */
+            written_by_name?: string;
         };
         ComparisonBody: {
             /**
@@ -6781,7 +6805,7 @@ export interface components {
             readonly $schema?: string;
             added_at: string;
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             summary?: string;
             vulnerability: string;
@@ -6978,7 +7002,10 @@ export interface components {
             place: components["schemas"]["PlaceBody"];
             /** @description The moment the claim was made */
             proposed_at: string;
+            /** @description The person who made the claim, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where it differs from their identity */
+            proposed_by_name?: string;
             /** @description The justification as it currently stands, in markdown */
             reasoning: string;
         };
@@ -7132,8 +7159,10 @@ export interface components {
         EarlierBody: {
             /** @description The component upstream version it was a claim about */
             about?: string;
-            /** @description The person who last agreed to it, where anybody did */
+            /** @description The person who last agreed to it, where anybody did, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            approved_by_name?: string;
             /** Format: int64 */
             claim_id: number;
             /** Format: int64 */
@@ -7152,7 +7181,10 @@ export interface components {
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             proposed_at: string;
+            /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where it differs from their identity */
+            proposed_by_name?: string;
             /** @description The reasoning as it last stood, in markdown, offered back rather than thrown away */
             reasoning: string;
         };
@@ -7177,7 +7209,10 @@ export interface components {
         };
         ElsewhereBody: {
             approved_at?: string;
+            /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            approved_by_name?: string;
             /** Format: int64 */
             claim_id: number;
             /** Format: int64 */
@@ -7201,11 +7236,18 @@ export interface components {
              * @description The number of findings this covers
              */
             places: number;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             severity?: string;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             summary?: string;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             vulnerability: string;
         };
         EndOfLifeBody: {
@@ -7592,6 +7634,8 @@ export interface components {
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
             /** @description A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build */
             stream?: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             /** @description The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding */
             summary?: string;
             /** @description Words somebody put on this. Free text, no fixed vocabulary */
@@ -7602,6 +7646,8 @@ export interface components {
             upstream?: string;
             /** @description The variant of that build */
             variant?: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             /** @description The version that ships */
             version: string;
             /** @description The issue, under the name it is most widely known by */
@@ -7670,8 +7716,10 @@ export interface components {
              * @description The number of places the issue sits at in that component in that build
              */
             places: number;
-            /** @description The build to link to, by product, branch or tag, and variant */
+            /** @description The build to link to, by product, branch or tag, and variant. The product by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /** Format: double */
             score?: number;
             /** @description The scoring system the number is on */
@@ -7679,7 +7727,11 @@ export interface components {
             /** @description Our rating where one stands, else as published */
             severity?: string;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             /** @description The version that ships */
             version: string;
             /** @description The issue, under the name it is most widely known by */
@@ -7786,8 +7838,8 @@ export interface components {
             everywhere?: boolean;
             /** @description The product the role is held against, by the name that addresses it. Absent where it is held across every product */
             product?: string;
-            /** @description That product's display name, where it was declared with one */
-            product_display_name?: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /**
              * @description The rights it carries
              * @enum {string}
@@ -7832,8 +7884,10 @@ export interface components {
              * @description The number of those pieces past their deadline
              */
             overdue: number;
-            /** @description The holder, by the name they are shown under. A person or a team */
+            /** @description The holder, by sign-in identity for a person and by name for a team */
             person: string;
+            /** @description Their display name, where it differs from the name above */
+            person_name?: string;
             /**
              * Format: int64
              * @description The number of findings those cover, across every build
@@ -8004,7 +8058,10 @@ export interface components {
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             proposed_at: string;
             proposed_by: string;
             /** @description The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart */
@@ -8032,8 +8089,8 @@ export interface components {
             name: string;
             /** @description The product it may send scans for, by the name that addresses it. Always required */
             product: string;
-            /** @description That product's display name, where it was declared with one */
-            product_display_name?: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
             /** @description Optionally, the one release it may send for */
@@ -8055,8 +8112,10 @@ export interface components {
             rows: number;
         };
         LateBody: {
-            /** @description Empty means nobody, or not everywhere the same person */
+            /** @description The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person */
             assigned_to?: string;
+            /** @description Their display name, where it differs from their identity */
+            assigned_to_name?: string;
             component: string;
             /**
              * Format: int64
@@ -8071,10 +8130,17 @@ export interface components {
              * @description The number of places in that build this sits at
              */
             places: number;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             severity?: string;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             /** @description The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved */
             version?: string;
             vulnerability: string;
@@ -8660,7 +8726,11 @@ export interface components {
              */
             places: number;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             /** @description The version that build ships under this name — pass it as ?version= when applying a decision there */
             version?: string;
         };
@@ -8781,9 +8851,15 @@ export interface components {
              */
             act: "extension" | "shortening" | "disclosure";
             approved_at?: string;
+            /** @description The second person, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            approved_by_name?: string;
             asked_at: string;
+            /** @description The person who asked, by sign-in identity */
             asked_by: string;
+            /** @description Their display name, where it differs from their identity */
+            asked_by_name?: string;
             /** Format: int64 */
             id: number;
             in_force: boolean;
@@ -8858,8 +8934,10 @@ export interface components {
             /** Format: int64 */
             id: number;
             written_at: string;
-            /** @description The author */
+            /** @description The author, by sign-in identity */
             written_by: string;
+            /** @description Their display name, where it differs from their identity */
+            written_by_name?: string;
         };
         NoteWritten: {
             /**
@@ -9037,6 +9115,8 @@ export interface components {
              * @description The number being retried or given up on
              */
             failing: number;
+            /** @description The host it sends to. The rest of the address is never returned */
+            host: string;
             /** @description The notifications that go here, or * for all of them */
             kind: string;
             /** @description The name, so a log line and a screen can use it */
@@ -9046,7 +9126,6 @@ export interface components {
              * @description The number of things delivered there
              */
             sent: number;
-            url: string;
         };
         OutlierBody: {
             /**
@@ -9285,8 +9364,10 @@ export interface components {
              */
             act: "extension" | "shortening" | "disclosure";
             asked_at: string;
-            /** @description The person who asked */
+            /** @description The person who asked, by sign-in identity */
             by: string;
+            /** @description Their display name, where it differs from their identity */
+            by_name?: string;
             /**
              * Format: int64
              * @description How far the date moves, in days, whichever way it moves
@@ -9425,7 +9506,10 @@ export interface components {
         PlaceBody: {
             /** @description The place in the build, as the findings list gives it */
             place: string;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it differs from its name */
+            readonly product_name?: string;
             /** @description The issue, by any name it is known under */
             vulnerability: string;
         };
@@ -10000,6 +10084,8 @@ export interface components {
              */
             open: number;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
         };
         Remediation: {
             category: string;
@@ -10039,7 +10125,10 @@ export interface components {
             last_until?: string;
             /** @description Names the place rather than describing it: what it is called depends on the build, and this is not about one build */
             place: string;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             severity?: string;
             /** @description A deferral is in force now. Something put off three times and since decided is history; the same thing still being put off is the pattern */
             standing?: boolean;
@@ -10063,7 +10152,10 @@ export interface components {
              */
             readonly $schema?: string;
             acknowledged?: string;
+            /** @description The person who answered them, by sign-in identity */
             acknowledged_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            acknowledged_by_name?: string;
             contact?: string;
             /** @description The credit they asked for in an advisory */
             credit?: string;
@@ -10076,8 +10168,10 @@ export interface components {
             duplicate_of?: string;
             /** @description When somebody said what it turned out to be */
             evaluated?: string;
-            /** @description Who said so */
+            /** @description The person who said so, by sign-in identity */
             evaluated_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            evaluated_by_name?: string;
             /** @description Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer */
             found_here: boolean;
             /** @description The issue the claim turned out to be */
@@ -10086,8 +10180,10 @@ export interface components {
             received?: string;
             /** @description When it was written down, which is not when it arrived */
             recorded_at: string;
-            /** @description Who wrote it down */
+            /** @description The person who wrote it down, by sign-in identity */
             recorded_by: string;
+            /** @description Their display name, where it differs from their identity */
+            recorded_by_name?: string;
             /** @description The name this report is reached by */
             reference: string;
             reported_by?: string;
@@ -10251,7 +10347,10 @@ export interface components {
              */
             ordinal: number;
             written_at: string;
+            /** @description The author, by sign-in identity */
             written_by: string;
+            /** @description Their display name, where it differs from their identity */
+            written_by_name?: string;
         };
         RootsBody: {
             /**
@@ -10313,8 +10412,8 @@ export interface components {
             order: number;
             /** @description The team work lands on, by the name that addresses it */
             team: string;
-            /** @description That team's display name, where it was declared with one */
-            team_display_name?: string;
+            /** @description The team's display name, where it differs from its name */
+            team_name?: string;
             /** @description A source package name. Catches every binary package built from it */
             upstream?: string;
         };
@@ -10326,8 +10425,10 @@ export interface components {
              */
             readonly $schema?: string;
             approved_at?: string;
-            /** @description Who agreed, on a disposition that takes a second person */
+            /** @description The person who agreed, on a disposition that takes a second person, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            approved_by_name?: string;
             /** @enum {string} */
             disposition: "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
             /** @description The issue a duplicate points at */
@@ -10337,7 +10438,10 @@ export interface components {
             /** @description The product it was made in */
             product: string;
             proposed_at: string;
+            /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where it differs from their identity */
+            proposed_by_name?: string;
             /** @description Why, as markdown. Never edited */
             reasoning?: string;
             /** @description The references of the reports it covers, including after it was withdrawn */
@@ -10348,7 +10452,10 @@ export interface components {
              */
             state: "waiting" | "in-force" | "withdrawn";
             withdrawn_at?: string;
+            /** @description The person who took it back, by sign-in identity */
             withdrawn_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            withdrawn_by_name?: string;
             /** @description Whether you proposed it. The proposer may not approve it */
             yours?: boolean;
         };
@@ -10691,7 +10798,10 @@ export interface components {
         };
         SimilarBody: {
             approved_at?: string;
+            /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            approved_by_name?: string;
             /**
              * Format: int64
              * @description Pass as extends when deciding to carry it to this issue
@@ -10760,7 +10870,10 @@ export interface components {
              * @description The number of different people who argued about it
              */
             people: number;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /**
              * Format: int64
              * @description Claims that promised work: an upgrade or a backport
@@ -10828,7 +10941,10 @@ export interface components {
         };
         StandingClaimBody: {
             approved_at?: string;
+            /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where it differs from their identity */
+            approved_by_name?: string;
             /** @description Every build the claim currently covers, as stream and variant */
             builds: string[] | null;
             /** Format: int64 */
@@ -10855,7 +10971,10 @@ export interface components {
              */
             places: number;
             proposed_at: string;
+            /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where it differs from their identity */
+            proposed_by_name?: string;
             /** @description The state of the claim's rows here */
             rows: components["schemas"]["RowsStandingBody"];
             /** @description The last time rows were sent back to the author */
@@ -11016,8 +11135,8 @@ export interface components {
             owner?: string;
             /** @description Optionally, the one product it may reach, by the name that addresses it */
             product?: string;
-            /** @description That product's display name, where it was declared with one */
-            product_display_name?: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
             /** @description Whether it has been withdrawn */
@@ -11119,12 +11238,19 @@ export interface components {
              * @description The number of findings a judgment here would be recorded against, across every build it is in
              */
             places: number;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             severity?: string;
             /** @description A branch or tag holding it. Where builds is more than one, any of them */
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             /** @description A build variant holding it. Where builds is more than one, any of them */
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             version: string;
             vulnerability: string;
         };
@@ -11331,7 +11457,10 @@ export interface components {
             places: number;
             /** @description This was agreed to before and came back */
             previously_approved?: boolean;
+            /** @description The person who made the claim, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where it differs from their identity */
+            proposed_by_name?: string;
             reasoning: string;
         };
         WasSaidBody: {

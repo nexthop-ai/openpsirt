@@ -22,7 +22,9 @@ import (
 // release, and it is why this is a snapshot per release rather than a
 // timeline.
 type ReleasePoint struct {
-	Stream string
+	// Stream is the name a path addresses the release by, and StreamName the
+	// spelling shown.
+	Stream, StreamName string
 	// Cut is when the release went out, where somebody said, and when it was
 	// declared here otherwise. It is what orders them and it is not the axis:
 	// the axis is the sequence, and the dates are labels.
@@ -80,10 +82,11 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	limit = database.APlot.Of(limit)
 
 	var rows []struct {
-		Stream    string    `bun:"stream"`
-		CreatedAt time.Time `bun:"created_at"`
-		Band      string    `bun:"band"`
-		Open      int       `bun:"open"`
+		Stream     string    `bun:"stream"`
+		StreamName string    `bun:"stream_name"`
+		CreatedAt  time.Time `bun:"created_at"`
+		Band       string    `bun:"band"`
+		Open       int       `bun:"open"`
 	}
 	// The distinct issues per release and band, counted after. Distinct over
 	// the pair first for the same reason Releases does it: counting distinct
@@ -95,7 +98,8 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = f.vulnerability_id`).
 		Join(rating.For(rating.OnStream)).
-		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
 		// The day it went out, where somebody said, and the day it was declared
 		// here otherwise. Ordering by the declaration alone made this chart an
 		// accident of administration: a release recorded months after it
@@ -111,10 +115,11 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_release"`, inner).
 		ColumnExpr(`per_release.stream AS "stream"`).
+		ColumnExpr(`per_release.stream_name AS "stream_name"`).
 		ColumnExpr(`per_release.created_at AS "created_at"`).
 		ColumnExpr(`per_release.band AS "band"`).
 		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr("per_release.stream, per_release.created_at, per_release.band").
+		GroupExpr("per_release.stream, per_release.stream_name, per_release.created_at, per_release.band").
 		// Newest last, so the chart reads left to right the way time does.
 		OrderExpr("created_at, stream, band").
 		Scan(ctx, &rows); err != nil {
@@ -128,7 +133,8 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		i, held := at[row.Stream]
 		if !held {
 			out = append(out, ReleasePoint{
-				Stream: row.Stream, Cut: row.CreatedAt, BySeverity: map[string]int{},
+				Stream: row.Stream, StreamName: row.StreamName, Cut: row.CreatedAt,
+				BySeverity: map[string]int{},
 			})
 			i = len(out) - 1
 			at[row.Stream] = i

@@ -272,9 +272,11 @@ func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
 
 		var listed struct {
 			Items []struct {
-				Identity string `json:"identity"`
-				Name     string `json:"name"`
-				AddedAt  string `json:"added_at"`
+				Identity    string `json:"identity"`
+				Name        string `json:"name"`
+				AddedBy     string `json:"added_by"`
+				AddedByName string `json:"added_by_name"`
+				AddedAt     string `json:"added_at"`
 			} `json:"items"`
 		}
 		read(t, r, "private-triage", at, &listed)
@@ -289,6 +291,10 @@ func TestACollaboratorIsListedUnderTheNameThatTakesThemOff(t *testing.T) {
 		}
 		if one.Name != "Ana Ruiz" {
 			t.Errorf("the listing does not say what to call them: %q", one.Name)
+		}
+		if one.AddedBy != "private-triage" || one.AddedByName != shownAs("private-triage") {
+			t.Errorf("the listing names who brought them in as %q (%q), want the identity",
+				one.AddedBy, one.AddedByName)
 		}
 		// Not the zero time. A person the grant reports and the rows do not
 		// is left out rather than dated 0001-01-01.

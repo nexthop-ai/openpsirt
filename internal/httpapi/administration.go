@@ -242,7 +242,7 @@ type HeldBody struct {
 	// one the withdraw route resolves, so it carries the address and this
 	// carries the label — a screen rendering the label and sending it back
 	// grants a role it cannot withdraw.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
+	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	// Everywhere says it is held across the estate, covering products
 	// declared afterwards. Reported rather than left to be inferred from an
 	// absent product: an access review asks what somebody holds, and "on
@@ -268,7 +268,7 @@ type KeyBody struct {
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: this field is what create-key resolves, and a display
 	// name resolves to nothing.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
+	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	// Stream and Variant narrow it further. Either, both or neither may be
 	// given: a key covering a whole product cannot imply which release an
 	// upload is for, which is why an upload always states its own target.

@@ -16,8 +16,10 @@ import (
 
 // SpentBody is the work spent on one component in one product.
 type SpentBody struct {
-	Product   string `json:"product"`
-	Component string `json:"component" doc:"The subject of the judgments, by name. Empty where nothing in any build carries the place any more"`
+	Product string `json:"product" doc:"The product, by the name that addresses it"`
+
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
+	Component   string `json:"component" doc:"The subject of the judgments, by name. Empty where nothing in any build carries the place any more"`
 	// Claims is the unit somebody works in — one argument, however many rows
 	// it wrote — and Decisions how many places those reached.
 	Claims    int `json:"claims" doc:"Arguments made about it in the period"`
@@ -76,8 +78,9 @@ func registerEffort(api huma.API, in Ingest) {
 		out.Body.Items = make([]SpentBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, SpentBody{
-				Product: row.Product, Component: row.Component,
-				Claims: row.Claims, Decisions: row.Decisions, People: row.People,
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Component: row.Component,
+				Claims:    row.Claims, Decisions: row.Decisions, People: row.People,
 				Promised: row.Promised, Dismissed: row.Dismissed, Deferred: row.Deferred,
 			})
 		}

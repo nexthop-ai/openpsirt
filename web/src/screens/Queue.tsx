@@ -494,7 +494,7 @@ function Stopped({ row }: { row: Standing }) {
           {row.place?.vulnerability}
         </Link>
         <span style={{ color: "var(--muted)" }}>
-          {row.place?.product} · {labeled(it?.outcome ?? "")}
+          {row.place?.product_name || row.place?.product} · {labeled(it?.outcome ?? "")}
           {it?.justification && (
             <>
               {" "}
@@ -513,7 +513,7 @@ function Stopped({ row }: { row: Standing }) {
       )}
       <div className="qmeta">
         <span>
-          Proposed by <b>{row.proposed_by}</b>
+          Proposed by <b>{row.proposed_by_name || row.proposed_by}</b>
         </span>
         <span>
           Stood <b>{row.age_days} days</b>
@@ -638,7 +638,9 @@ function Card({
               ·{" "}
             </>
           )}
-          {f ? `${f.product} · ${f.stream} · ${f.variant}` : claim.product}
+          {f
+            ? `${f.product_name || f.product} · ${f.stream_name || f.stream} · ${f.variant_name || f.variant}`
+            : claim.product}
           {bulk && claim.issues > 1 && <> · {claim.issues.toLocaleString()} issues</>}
           {extension && claim.derivedFrom && (
             <>

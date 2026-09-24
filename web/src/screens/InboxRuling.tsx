@@ -185,17 +185,18 @@ export function RulingCard({
         )}
       </p>
       <p className="hint" style={{ margin: "4px 0 0" }}>
-        {ruling.proposed_by}, {on(ruling.proposed_at)}
+        {ruling.proposed_by_name || ruling.proposed_by}, {on(ruling.proposed_at)}
         {ruling.approved_by && (
           <>
             {" "}
-            · approved by {ruling.approved_by}, {on(ruling.approved_at)}
+            · approved by {ruling.approved_by_name || ruling.approved_by}, {on(ruling.approved_at)}
           </>
         )}
         {ruling.withdrawn_by && (
           <>
             {" "}
-            · withdrawn by {ruling.withdrawn_by}, {on(ruling.withdrawn_at)}
+            · withdrawn by {ruling.withdrawn_by_name || ruling.withdrawn_by},{" "}
+            {on(ruling.withdrawn_at)}
           </>
         )}
       </p>

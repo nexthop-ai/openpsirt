@@ -215,9 +215,11 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		// The history is kept whether or not anybody agreed.
 		var history struct {
 			Items []struct {
-				Act     string `json:"act"`
-				Reason  string `json:"reason"`
-				InForce bool   `json:"in_force"`
+				Act         string `json:"act"`
+				Reason      string `json:"reason"`
+				InForce     bool   `json:"in_force"`
+				AskedBy     string `json:"asked_by"`
+				AskedByName string `json:"asked_by_name"`
 			} `json:"items"`
 		}
 		read(t, r, "private-triage", at, &history)
@@ -226,6 +228,13 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		}
 		if history.Items[0].InForce {
 			t.Error("an extension nobody agreed to is reported as in force")
+		}
+		// The identity, which is what a caller matches on, with the label
+		// beside it rather than in its place.
+		if history.Items[0].AskedBy != "private-triage" ||
+			history.Items[0].AskedByName != shownAs("private-triage") {
+			t.Errorf("the history names who asked as %q (%q), want the sign-in identity",
+				history.Items[0].AskedBy, history.Items[0].AskedByName)
 		}
 		if history.Items[0].Act != "extension" {
 			t.Errorf("the history does not say which act it was: %+v", history.Items[0])
@@ -249,8 +258,9 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 		if len(pending.Items) != 1 || pending.Items[0].ID != asked.ID {
 			t.Fatalf("what is waiting to be agreed to reads as %+v", pending.Items)
 		}
-		if pending.Items[0].Days <= 0 || pending.Items[0].By == "" {
-			t.Errorf("the row does not say how far, or who asked: %+v", pending.Items[0])
+		if pending.Items[0].Days <= 0 || pending.Items[0].By != "private-triage" {
+			t.Errorf("the row does not say how far, or who asked by identity: %+v",
+				pending.Items[0])
 		}
 		if pending.Items[0].Act != "extension" {
 			t.Errorf("the row does not say which act is waiting: %+v", pending.Items[0])

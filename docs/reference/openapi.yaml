@@ -530,6 +530,10 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The person who agreed, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         batch:
           description: The batch it was approved under, if it was a bulk approval
@@ -749,7 +753,10 @@ components:
       additionalProperties: false
       properties:
         by:
-          description: The person who did it, where a person did
+          description: The person who did it, where a person did, by sign-in identity
+          type: string
+        by_name:
+          description: Their display name, where it differs from their identity
           type: string
         claim:
           $ref: "#/components/schemas/ClaimBody"
@@ -842,8 +849,8 @@ components:
         product:
           description: The product the role is held against, by the name that addresses it
           type: string
-        product_display_name:
-          description: That product's display name, where it was declared with one
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         role:
           description: The role membership of this group grants
@@ -964,10 +971,16 @@ components:
           type: integer
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         total:
           format: int64
           type: integer
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
       required:
         - stream
@@ -1346,6 +1359,9 @@ components:
         by:
           description: The person who made the change, by sign-in identity
           type: string
+        by_name:
+          description: Their display name, where it differs from their identity
+          type: string
         cleared:
           description: This change cleared it
           type: boolean
@@ -1516,6 +1532,10 @@ components:
           description: The moment the action was taken
           type: string
         proposed_by:
+          description: The person who took it, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         selected_by:
           description: The narrowing behind a bulk set. Never part of the claim itself
@@ -1554,7 +1574,10 @@ components:
             - array
             - "null"
         by:
-          description: The person who did it, where a person did
+          description: The person who did it, where a person did, by sign-in identity
+          type: string
+        by_name:
+          description: Their display name, where it differs from their identity
           type: string
         claim:
           $ref: "#/components/schemas/ClaimBody"
@@ -1687,11 +1710,15 @@ components:
         added_at:
           type: string
         added_by:
+          description: The person who brought them in, by sign-in identity
+          type: string
+        added_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         identity:
           type: string
         name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
       required:
         - identity
@@ -1752,6 +1779,10 @@ components:
         written_at:
           type: string
         written_by:
+          description: The author, by sign-in identity
+          type: string
+        written_by_name:
+          description: Their display name, where it differs from their identity
           type: string
       required:
         - id
@@ -1998,7 +2029,7 @@ components:
         product:
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         summary:
           type: string
@@ -2315,6 +2346,10 @@ components:
           description: The moment the claim was made
           type: string
         proposed_by:
+          description: The person who made the claim, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         reasoning:
           description: The justification as it currently stands, in markdown
@@ -2625,7 +2660,10 @@ components:
           description: The component upstream version it was a claim about
           type: string
         approved_by:
-          description: The person who last agreed to it, where anybody did
+          description: The person who last agreed to it, where anybody did, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         claim_id:
           format: int64
@@ -2668,6 +2706,10 @@ components:
         proposed_at:
           type: string
         proposed_by:
+          description: The person who proposed it, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         reasoning:
           description: The reasoning as it last stood, in markdown, offered back rather than thrown away
@@ -2720,6 +2762,10 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The person who agreed, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         claim_id:
           format: int64
@@ -2774,14 +2820,24 @@ components:
           format: int64
           type: integer
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         severity:
           type: string
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         summary:
           type: string
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         vulnerability:
           type: string
@@ -3392,6 +3448,9 @@ components:
         stream:
           description: "A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         summary:
           description: The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding
           type: string
@@ -3410,6 +3469,9 @@ components:
           type: string
         variant:
           description: The variant of that build
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           description: The version that ships
@@ -3539,7 +3601,10 @@ components:
           format: int64
           type: integer
         product:
-          description: The build to link to, by product, branch or tag, and variant
+          description: The build to link to, by product, branch or tag, and variant. The product by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         score:
           format: double
@@ -3552,7 +3617,13 @@ components:
           type: string
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           description: The version that ships
@@ -3758,8 +3829,8 @@ components:
         product:
           description: The product the role is held against, by the name that addresses it. Absent where it is held across every product
           type: string
-        product_display_name:
-          description: That product's display name, where it was declared with one
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         role:
           description: The rights it carries
@@ -3835,7 +3906,10 @@ components:
           format: int64
           type: integer
         person:
-          description: The holder, by the name they are shown under. A person or a team
+          description: The holder, by sign-in identity for a person and by name for a team
+          type: string
+        person_name:
+          description: Their display name, where it differs from the name above
           type: string
         places:
           description: The number of findings those cover, across every build
@@ -4188,6 +4262,10 @@ components:
             - patch-needed
           type: string
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         proposed_at:
           type: string
@@ -4250,8 +4328,8 @@ components:
           description: The product it may send scans for, by the name that addresses it. Always required
           minLength: 1
           type: string
-        product_display_name:
-          description: That product's display name, where it was declared with one
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
@@ -4307,7 +4385,10 @@ components:
       additionalProperties: false
       properties:
         assigned_to:
-          description: Empty means nobody, or not everywhere the same person
+          description: The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person
+          type: string
+        assigned_to_name:
+          description: Their display name, where it differs from their identity
           type: string
         component:
           type: string
@@ -4325,12 +4406,22 @@ components:
           format: int64
           type: integer
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         severity:
           type: string
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           description: The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved
@@ -5516,7 +5607,13 @@ components:
           type: integer
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           description: The version that build ships under this name — pass it as ?version= when applying a decision there
@@ -5734,10 +5831,18 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The second person, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         asked_at:
           type: string
         asked_by:
+          description: The person who asked, by sign-in identity
+          type: string
+        asked_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         id:
           format: int64
@@ -5875,7 +5980,10 @@ components:
         written_at:
           type: string
         written_by:
-          description: The author
+          description: The author, by sign-in identity
+          type: string
+        written_by_name:
+          description: Their display name, where it differs from their identity
           type: string
       required:
         - id
@@ -6172,6 +6280,9 @@ components:
           description: The number being retried or given up on
           format: int64
           type: integer
+        host:
+          description: The host it sends to. The rest of the address is never returned
+          type: string
         kind:
           description: The notifications that go here, or * for all of them
           type: string
@@ -6182,12 +6293,10 @@ components:
           description: The number of things delivered there
           format: int64
           type: integer
-        url:
-          type: string
       required:
         - name
         - kind
-        - url
+        - host
         - sent
         - failing
       type: object
@@ -6572,7 +6681,10 @@ components:
         asked_at:
           type: string
         by:
-          description: The person who asked
+          description: The person who asked, by sign-in identity
+          type: string
+        by_name:
+          description: Their display name, where it differs from their identity
           type: string
         days:
           description: How far the date moves, in days, whichever way it moves
@@ -6788,7 +6900,12 @@ components:
           minLength: 1
           type: string
         product:
+          description: The product, by the name that addresses it
           minLength: 1
+          type: string
+        product_name:
+          description: The product's display name, where it differs from its name
+          readOnly: true
           type: string
         vulnerability:
           description: The issue, by any name it is known under
@@ -7708,6 +7825,9 @@ components:
           type: integer
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
       required:
         - stream
         - cut
@@ -7783,6 +7903,10 @@ components:
           description: "Names the place rather than describing it: what it is called depends on the build, and this is not about one build"
           type: string
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         severity:
           type: string
@@ -7819,6 +7943,10 @@ components:
         acknowledged:
           type: string
         acknowledged_by:
+          description: The person who answered them, by sign-in identity
+          type: string
+        acknowledged_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         contact:
           type: string
@@ -7841,7 +7969,10 @@ components:
           description: When somebody said what it turned out to be
           type: string
         evaluated_by:
-          description: Who said so
+          description: The person who said so, by sign-in identity
+          type: string
+        evaluated_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         found_here:
           description: Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer
@@ -7856,7 +7987,10 @@ components:
           description: When it was written down, which is not when it arrived
           type: string
         recorded_by:
-          description: Who wrote it down
+          description: The person who wrote it down, by sign-in identity
+          type: string
+        recorded_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         reference:
           description: The name this report is reached by
@@ -8115,6 +8249,10 @@ components:
         written_at:
           type: string
         written_by:
+          description: The author, by sign-in identity
+          type: string
+        written_by_name:
+          description: Their display name, where it differs from their identity
           type: string
       required:
         - id
@@ -8204,8 +8342,8 @@ components:
         team:
           description: The team work lands on, by the name that addresses it
           type: string
-        team_display_name:
-          description: That team's display name, where it was declared with one
+        team_name:
+          description: The team's display name, where it differs from its name
           type: string
         upstream:
           description: A source package name. Catches every binary package built from it
@@ -8229,7 +8367,10 @@ components:
         approved_at:
           type: string
         approved_by:
-          description: Who agreed, on a disposition that takes a second person
+          description: The person who agreed, on a disposition that takes a second person, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         disposition:
           enum:
@@ -8250,6 +8391,10 @@ components:
         proposed_at:
           type: string
         proposed_by:
+          description: The person who proposed it, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         reasoning:
           description: Why, as markdown. Never edited
@@ -8271,6 +8416,10 @@ components:
         withdrawn_at:
           type: string
         withdrawn_by:
+          description: The person who took it back, by sign-in identity
+          type: string
+        withdrawn_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         yours:
           description: Whether you proposed it. The proposer may not approve it
@@ -8906,6 +9055,10 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The person who agreed, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         claim_id:
           description: Pass as extends when deciding to carry it to this issue
@@ -8998,6 +9151,10 @@ components:
           format: int64
           type: integer
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         promised:
           description: "Claims that promised work: an upgrade or a backport"
@@ -9113,6 +9270,10 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The person who agreed, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         builds:
           description: Every build the claim currently covers, as stream and variant
@@ -9169,6 +9330,10 @@ components:
         proposed_at:
           type: string
         proposed_by:
+          description: The person who proposed it, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         rows:
           $ref: "#/components/schemas/RowsStandingBody"
@@ -9487,8 +9652,8 @@ components:
         product:
           description: Optionally, the one product it may reach, by the name that addresses it
           type: string
-        product_display_name:
-          description: That product's display name, where it was declared with one
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
@@ -9683,14 +9848,24 @@ components:
           format: int64
           type: integer
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         severity:
           type: string
         stream:
           description: A branch or tag holding it. Where builds is more than one, any of them
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         variant:
           description: A build variant holding it. Where builds is more than one, any of them
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           type: string
@@ -10032,6 +10207,10 @@ components:
           description: This was agreed to before and came back
           type: boolean
         proposed_by:
+          description: The person who made the claim, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where it differs from their identity
           type: string
         reasoning:
           type: string
@@ -10330,7 +10509,10 @@ components:
         - withdrawn
       type: object
 info:
-  description: Track vulnerabilities in the products you ship.
+  description: |-
+    Track vulnerabilities in the products you ship.
+
+    A request carrying a query parameter the operation does not take is refused with a 400 naming the parameter.
   title: OpenPSIRT
   version: dev
 openapi: 3.1.0
@@ -12016,7 +12198,7 @@ paths:
       description: |-
         Changes the version a promised upgrade moves to, or the date it is promised by, on the claim and on every commitment it wrote.
 
-        This withdraws any existing approval and returns every row of the claim to the review queue. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
+        This withdraws any existing approval and returns every row of the claim to the review queue, and notifies everybody whose approval it withdrew. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
 
         `reasoning` is required and is recorded as a revision — saying why a date moved is what the second person has to read, and the revisions are where what was said before survives being changed.
 
@@ -12108,7 +12290,7 @@ paths:
       description: |-
         Replaces the justification text with a new revision. Earlier revisions are kept and remain readable.
 
-        A claim is one argument however many places it covers, so this revises all of it. It withdraws any existing approval and returns every row of the claim to the review queue, marked as previously approved. Requires no approval of its own.
+        A claim is one argument however many places it covers, so this revises all of it. It withdraws any existing approval and returns every row of the claim to the review queue, marked as previously approved. Everybody whose approval it withdrew is notified. Requires no approval of its own.
 
         The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
 
@@ -14569,7 +14751,7 @@ paths:
       description: |-
         The destinations configured, which kinds go to each, and whether they are working.
 
-        The signing secret is never returned. It signs our requests rather than authenticating anybody to us, so it has to be stored recoverably — and showing it would put a shared secret on a page.
+        The signing secret is never returned, and of the address only the host is. A destination is told apart by its name and kind.
 
         Requires: administrator
       operationId: list-outbound
@@ -14600,6 +14782,8 @@ paths:
         What it carries is what the channel rules already allow. A notification about a finding nobody has announced carries the fact that there is something and a link, and nothing else — the same body a mail would carry, composed by the same code.
 
         Every request is signed. `X-OpenPSIRT-Timestamp` and `X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the body — so a receiver can tell one of ours from one anybody could make, and cannot replay yesterday's.
+
+        The response carries the host of the address and never the rest of it, the same as the listing.
 
         https only, and a redirect is refused rather than followed. The body is signed and not encrypted, and a redirect asks us to send a signed request somewhere else, which is what the restriction exists to prevent.
 
