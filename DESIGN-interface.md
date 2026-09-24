@@ -1278,7 +1278,7 @@ A control somebody can see and cannot reach is a control that is not there.
 | **The cursor is drawn, and goes when the question changes** | A cursor nobody can see is a key that appears to do nothing, and a cursor pointing at row nine of a list that has been re-read points at a different finding |
 | The focus ring is added to, never replaced | An accent border and a wash around it are an addition to the global ring. A checkbox and a radio are painted by the browser, so a border declaration reaches nothing on them and a wash at a tenth of full strength is 1.16:1 against the surface — where 3:1 is the floor. Tabbing into the permission grid, where one press writes a grant per product, nothing on screen said which box had focus |
 | Where a control has no border of its own, the ring goes on the box around it | The two search boxes draw their own frame and the input inside has none, so the ring taken off the input had nowhere to go |
-| Nothing a person operates is hidden with `display: none` | It leaves the tab order. The upload drop zone's file input was hidden that way and nothing else reached it — no focusable label, no drag handler, and the Upload button disabled until a file is chosen — so filing an inventory by hand was pointer-only |
+| Nothing a person operates is hidden with `display: none` | It leaves the tab order. A drop zone's file input is out of sight and still focusable, and the zone draws the focus ring, because a label is not focusable and nothing else reaches the input |
 | Text on a severity color reads the token that flips with the look | Every severity token in the dark look is a light tint, so white on one of them is 2.54:1. One rule hardcoded white over the critical token at nine and a half pixels |
 | One ratio for one meaning | A disabled chip and a disabled button said the same thing at two strengths, and the weaker composited to about 2.2:1 against white |
 
@@ -1664,6 +1664,9 @@ scroll sideways. That is why the tables here are written rather than installed.
 | **Stacking is a named scale, not hand-picked numbers** | They were spread across the stylesheets with nothing to read to decide the next one, and two unrelated overlays claimed the same step: the drawer and the rail's scrim resolve in one context, so the drawer won on document order and the rail's click-to-dismiss stopped working wherever they overlapped |
 | **A closed vocabulary the server owns is rendered from the generated client** | They were hand-kept tables here, and every one had a member it could not label: an outcome drew an empty cell wherever it was the whole of it, register states printed as wire tokens, and a narrowing over the claim kinds could not fail because its comparisons exhausted every value but one |
 | **A word the table does not know is shown as it arrived** | A server that grows a vocabulary before the interface does should leave somebody reading something unfamiliar rather than a blank |
+| **A choice with a consequence is a card per option** | Where it came from, filing or recording, and a ruling's disposition each decide something that follows. The card carries what picking it does, so it is read before the choice. A radio group to the keyboard: one tab stop, arrows move and pick |
+| **A switch between views or values is a segmented control** | Each option is drawn as a button, the picked one filled, and the frame is dashed while nothing is picked. It keeps its own width inside a panel, which otherwise stretches it to the panel's edge |
+| **A file is picked in a drop zone** | Click or drop, a button-look at its end, and what was picked listed under it as chips that come off again. The browser's own file input changes with the browser and takes no drop |
 
 ## The initial load
 

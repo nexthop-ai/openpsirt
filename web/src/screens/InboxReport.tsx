@@ -13,6 +13,7 @@ import {
   useRuling,
 } from "../api/intake";
 import { useQueryClient } from "@tanstack/react-query";
+import { Dropzone } from "../ui/Dropzone";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Markdown } from "../ui/Markdown";
@@ -204,8 +205,8 @@ function Files({
   const [refused, setRefused] = useState<unknown>(null);
   const files = listed.data?.items ?? [];
 
-  const attach = async (chosen: FileList | null) => {
-    if (!chosen || chosen.length === 0) return;
+  const attach = async (chosen: readonly File[]) => {
+    if (chosen.length === 0) return;
     setSending(true);
     setRefused(null);
     try {
@@ -251,16 +252,20 @@ function Files({
           )}
         </ul>
       )}
-      <label className="btn quiet" style={{ marginTop: 8 }} hidden={!works}>
-        {sending ? "Attaching…" : "Attach a file"}
-        <input
-          type="file"
-          multiple
-          hidden
-          disabled={sending}
-          onChange={(event) => void attach(event.target.files)}
-        />
-      </label>
+      {works && (
+        <div style={{ marginTop: 8 }}>
+          <Dropzone
+            files={[]}
+            onChange={(chosen) => void attach(chosen)}
+            multiple
+            small
+            disabled={sending}
+            action={sending ? "Attaching…" : "Attach files"}
+          >
+            Drop evidence here
+          </Dropzone>
+        </div>
+      )}
       {refused != null && <Failed error={refused} what="A file was not attached." />}
     </div>
   );

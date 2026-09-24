@@ -11,6 +11,8 @@ import { api } from "../api/client";
 import { at as choicesAt, unwrap } from "../api/queries";
 import { useScope } from "../app/scope";
 import { mayOf, useWho } from "../app/session";
+import { ChoiceCards } from "../ui/ChoiceCards";
+import { Dropzone } from "../ui/Dropzone";
 import { Editor, mentioning } from "../ui/Editor";
 import { Suggest } from "../ui/Suggest";
 import { Failed } from "../ui/Failed";
@@ -375,27 +377,11 @@ export function Record() {
 
         <div className="field">
           <label htmlFor="rec-files">Evidence</label>
-          <p className="hint" style={{ marginTop: 0 }}>
+          <Dropzone id="rec-files" files={files} onChange={setFiles} multiple small>
             {recordNow
-              ? "Optional. Readable by whoever can read the issue, so an undisclosed flaw’s evidence is undisclosed too."
+              ? "Optional. Readable by whoever can read the issue."
               : "Optional. Readable by whoever can read the report."}
-          </p>
-          <input
-            id="rec-files"
-            type="file"
-            multiple
-            onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
-          />
-          {files.length > 0 && (
-            <ul className="refs" style={{ marginTop: 8 }}>
-              {files.map((each) => (
-                <li key={each.name}>
-                  <span className="chip">{each.name}</span>
-                  <span className="hint">{Math.max(1, Math.round(each.size / 1024))} KB</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          </Dropzone>
         </div>
       </div>
 
@@ -418,29 +404,23 @@ export function Record() {
           </p>
         ) : (
           <>
-            <div className="seg" role="group" aria-label="Where it came from">
-              <button
-                type="button"
-                aria-pressed={origin === "outside"}
-                onClick={() => setOrigin("outside")}
-              >
-                Sent in from outside
-              </button>
-              <button
-                type="button"
-                aria-pressed={origin === "here"}
-                onClick={() => setOrigin("here")}
-              >
-                Found here
-              </button>
-            </div>
-            {origin !== "" && (
-              <p className="hint">
-                {origin === "outside"
-                  ? "Gets a disclosure date, counted from the day it arrived, and waits for somebody to answer the reporter."
-                  : "No disclosure date, and nobody outside to answer."}
-              </p>
-            )}
+            <ChoiceCards
+              label="Where it came from"
+              value={origin}
+              onChange={setOrigin}
+              options={[
+                {
+                  value: "outside",
+                  label: "Sent in from outside",
+                  note: "Gets a disclosure date from the day it arrived",
+                },
+                {
+                  value: "here",
+                  label: "Found here",
+                  note: "No disclosure date, nobody to answer",
+                },
+              ]}
+            />
             {origin !== "" && (
               <div className="filters">
                 <label className="field" style={{ margin: 0 }}>
@@ -499,19 +479,19 @@ export function Record() {
       {choosing && (
         <div className="panel" style={{ maxWidth: "80ch", marginTop: 14 }}>
           <h3>Next</h3>
-          <div className="seg" role="group" aria-label="What to do with it">
-            <button type="button" aria-pressed={!recordNow} onClick={() => setNow(false)}>
-              File for judging
-            </button>
-            <button type="button" aria-pressed={recordNow} onClick={() => setNow(true)}>
-              Record as a flaw now
-            </button>
-          </div>
-          <p className="hint">
-            {recordNow
-              ? "Gets an identifier and opens findings in the builds you pick."
-              : "Waits in the Inbox, where it is recorded as a flaw, matched to one, or ruled out."}
-          </p>
+          <ChoiceCards
+            label="What to do with it"
+            value={recordNow ? "record" : "file"}
+            onChange={(next) => setNow(next === "record")}
+            options={[
+              { value: "file", label: "File for judging", note: "Waits in the Inbox" },
+              {
+                value: "record",
+                label: "Record as a flaw now",
+                note: "Gets an identifier, opens findings",
+              },
+            ]}
+          />
         </div>
       )}
 

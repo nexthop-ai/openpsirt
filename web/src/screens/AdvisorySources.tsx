@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
+import { Dropzone } from "../ui/Dropzone";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -281,17 +282,20 @@ function Upload({ product }: { product: string }) {
             ))}
           </select>
         </label>
-        <label className="field">
+        <div className="field" style={{ flex: "1 1 18rem" }}>
           <span>File</span>
-          <input
-            type="file"
+          <Dropzone
+            files={file ? [file] : []}
             accept=".json,application/json"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
+            small
+            onChange={(chosen) => {
+              setFile(chosen[0] ?? null);
               upload.reset();
             }}
-          />
-        </label>
+          >
+            A JSON document
+          </Dropzone>
+        </div>
         <button
           type="button"
           className="btn"

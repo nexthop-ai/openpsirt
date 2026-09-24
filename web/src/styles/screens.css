@@ -1286,9 +1286,55 @@
   font-size: var(--step--1);
   color: var(--muted);
 }
-.dropzone:hover {
+.dropzone:hover,
+.dropzone.over {
   border-color: var(--accent-line);
   background: var(--accent-soft);
+}
+.dropzone[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+/* Drawn as a button so the zone reads as something to press. */
+.dropzone .pick {
+  margin-left: auto;
+  flex: none;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 4px 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.picked {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.picked .chip {
+  cursor: default;
+  padding: 2px 4px 2px 10px;
+}
+.picked .chip small {
+  color: var(--faint);
+}
+.picked .chip button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 5px;
+  border-radius: 50%;
+}
+.picked .chip button:hover {
+  color: var(--ink);
+  background: var(--line);
 }
 .dropzone.has {
   border-style: solid;
@@ -1296,12 +1342,8 @@
   background: color-mix(in oklab, var(--ok) 8%, var(--surface));
   color: var(--ink);
 }
-/* Out of sight and still in the tab order.
-   `display: none` takes an element out of it, and nothing else here reached
-   the input: the label wrapping it is not focusable, there is no drag handler,
-   and the Upload button stays disabled until a file has been chosen — so
-   filing an inventory by hand was pointer-only, on a screen this stylesheet
-   argues the opposite about three times over. */
+/* Out of sight and still in the tab order. `display: none` takes an element
+   out of it, and the label wrapping it is not focusable. */
 .dropzone input {
   position: absolute;
   width: 1px;
