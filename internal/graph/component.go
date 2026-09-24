@@ -301,6 +301,8 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		if err := d.Valid(); err != nil {
 			return nil, err
 		}
+		d.Supplier = bound.HeadRunes(strings.TrimSpace(d.Supplier), statedWidth)
+		d.License = bound.HeadRunes(strings.TrimSpace(d.License), statedWidth)
 		byIdentity[d.Identity()] = d
 	}
 	if len(byIdentity) == 0 {
@@ -617,6 +619,14 @@ func Folded(name string) string {
 	// hash, so two components differing only past that third folded together.
 	return bound.HeadRunes(folded, foldedWidth)
 }
+
+// statedWidth bounds what a producer states about a component in words: who
+// supplied it and what it is licensed under. The columns hold text of any
+// length, and a document is bounded only in bytes, so without it one
+// component listing every license in a large archive fails the whole scan
+// apply on an engine whose text column is smaller than the document (REQ-69).
+// Cut on a character, never inside one.
+const statedWidth = 4096
 
 // foldedWidth is the column's width, which is what every indexed name column
 // in this schema is bounded to: the widest a unique index stays inside on
