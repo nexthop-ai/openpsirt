@@ -420,19 +420,43 @@ that check a download:
 
 ## The release procedure
 
-A release is a tag. Everything after it is the `Release` workflow, and there
-is no step anybody performs by hand:
+A release is a tag, on a commit that froze the release's migrations.
+Everything after the tag is the `Release` workflow.
 
-```
-git switch main && git pull
-make gate full
-git tag -a v0.2.0 -m "0.2.0"
-git push origin v0.2.0
-```
+1. Rehearse the upgrade from every earlier release on each engine.
+   `DESIGN-database.md` § Upgrade rehearsal says what it checks.
+
+   ```
+   make engines-up
+   for from in v0.1.0 v0.2.0; do for engine in sqlite postgres mysql mariadb; do
+     make upgrade-rehearsal FROM=$from ENGINE=$engine || break 2
+   done; done
+   ```
+
+2. Freeze the migrations, on a branch from the head of `main`, and land the
+   record through a pull request. `DESIGN-database.md` § Release records says
+   what it holds.
+
+   ```
+   git switch main && git pull && git switch -c freeze-v0.3.0
+   make engines-up
+   make release-freeze VERSION=v0.3.0
+   ```
+
+3. Tag the commit the merge queue put on `main`.
+
+   ```
+   git switch main && git pull
+   make gate full
+   make release-check VERSION=v0.3.0
+   git tag -a v0.3.0 -m "0.3.0"
+   git push origin v0.3.0
+   ```
 
 | The workflow then | |
 |---|---|
 | Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
+| Refuses a release whose migrations were not frozen | A database the release builds applies exactly what it shipped. Unfrozen, nothing holds those files once the next change lands. A release candidate, `-rc.N`, is held to the record of the release it precedes, and any other suffix is refused |
 | Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything |
 | Pushes the image and the chart to `ghcr.io` | |
 | Signs the image, the chart and the checksum file, then verifies each | Keyless, against the workflow's own identity, with the command a downloader would run |
@@ -441,7 +465,7 @@ git push origin v0.2.0
 
 | Rule | Why |
 |---|---|
-| A version with a hyphen is a prerelease | `0.2.0-rc.1` is, `0.2.0` is not. The workflow reads the tag rather than being told twice |
+| A version with a hyphen is a prerelease | `0.2.0-rc.1` is, `0.2.0` is not. The workflow reads the tag rather than being told twice. The only prerelease the migration check accepts is a release candidate, `-rc.N` |
 | A prerelease moves nothing | No `latest` image tag, no `<major>.<minor>` tag, no documentation alias. It exists to be tried, not to be landed on by somebody who asked for the current version |
 | A release is never rebuilt under the same tag | The tag names one set of bytes. Something wrong in a published release is fixed by the next tag, not by moving this one |
 

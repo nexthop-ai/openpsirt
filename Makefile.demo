@@ -22,7 +22,7 @@
 # Included by the makefile beside it, so every target here is reached the same
 # way it was: `make demo`, `make dev`, `make scanner-db`, and the rest.
 
-.PHONY: scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status dev dev-up dev-down dev-seed dev-reset dev-status
+.PHONY: scanner-db scanner-db-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-reset demo-status upgrade-rehearsal dev dev-up dev-down dev-seed dev-reset dev-status
 
 # A throwaway deployment to click around in. Everything about it is
 # overridable, because the two settings people get wrong are the host they
@@ -629,6 +629,28 @@ demo-status:
 demo-reset: demo-down
 	@rm -rf $(DEMO_DIR)/data $(DEMO_DIR)/image.cdx.json
 	@echo "  removed the demo database. The scanner cache in $(DEMO_DIR)/grype and the repository copies in $(DEMO_DIR)/repositories were kept."
+
+# A database a tagged release built and seeded, carried through an upgrade to
+# this tree and checked. DESIGN-database.md § Upgrade rehearsal says what it
+# checks; it is a step of the release checklist there.
+#
+#   make upgrade-rehearsal FROM=v0.2.0 ENGINE=postgres
+#
+# The engine's URL is the one make engines-up wrote, and the rehearsal makes a
+# database of its own beside it. Local only: it builds the release's image and
+# this tree's, and scans every inventory the release's demo seeds, so it takes
+# minutes per run rather than seconds. The scanner's database is copied from
+# the demo's once and shared by every run after.
+REHEARSAL_DIR ?= $(DEMO_DIR)/rehearsal
+upgrade-rehearsal:
+	@test -n "$(FROM)" && test -n "$(ENGINE)" \
+	  || { echo "usage: make upgrade-rehearsal FROM=v0.2.0 ENGINE=sqlite|postgres|mysql|mariadb"; exit 2; }
+	@mkdir -p $(REHEARSAL_DIR)
+	@[ -d $(REHEARSAL_DIR)/grype ] || [ ! -d $(DEMO_DIR)/grype ] || cp -a $(DEMO_DIR)/grype $(REHEARSAL_DIR)/grype
+	@$(MAKE) --no-print-directory demo-image DEMO_IMAGE=openpsirt-rehearsal:current
+	@$(GO) run ./internal/tools/rehearsal -from $(FROM) -engine $(ENGINE) -dir $(REHEARSAL_DIR) \
+	  -image openpsirt-rehearsal:current \
+	  -url "$(OPENPSIRT_TEST_$(shell echo '$(ENGINE)' | tr a-z A-Z)_URL)"
 
 # The developer loop: this machine's binary and the interface's dev server, for
 # editing the interface and seeing it reload. Needs Go, node and a scanner

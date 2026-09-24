@@ -62,6 +62,12 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      # A database a release builds applies exactly the migrations it shipped,
+      # so a release is frozen before it is tagged: its record holds each file
+      # and the schema it builds on every engine. A tag nobody froze, or one
+      # whose tree has moved past what was frozen, publishes nothing.
+      - name: Confirm the release's migrations are frozen
+        run: make release-check VERSION="$GITHUB_REF_NAME"
       # "make dist" builds the interface before it builds the binaries, because
       # the binary embeds it. The version is the one the image builds with, and
       # "make pins-check" is what holds every copy of that number together.

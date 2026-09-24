@@ -214,24 +214,33 @@ engine. A timestamp column has no portable spelling: PostgreSQL has no
 `DATETIME`, and MySQL's `TIMESTAMP` is a 32-bit value that can acquire an
 implicit default and an on-update clause depending on server configuration.
 
-The chain has two parts.
+The chain is one part per release.
 
 | Migrations | What they are |
 |---|---|
-| 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again. A test holds each file to the digest of the tagged one, and what they build to the schema the tag built on each engine, which also catches a change to the column spellings and widths they read from elsewhere |
-| 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. § Release upgrades says how. A database v0.2.0 built has applied it as the release tagged it, so it and every declaration it reads never change again, and a test holds each file to the tagged one |
-| 38 onward | What changed after v0.2.0 was tagged, each a migration of its own. § Changes after v0.2.0 says what each does |
+| 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again |
+| 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. A database v0.2.0 built has applied it as the release tagged it, so it and every declaration it reads never change again |
+| 38 | v0.3.0: v0.2.0's schema changed into v0.3.0's, and the rows moved with it. § The v0.3.0 upgrade says what it does. Untagged, so a schema change edits it and its declarations |
+
+Each tagged release keeps a record of its migrations: the files it shipped for
+them, the digest of each below its license header, its last migration, and the
+schema they build on each of the four engines, captured from the tag.
+
+| Held by the record | Why |
+|---|---|
+| Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | A database the release built has applied exactly those. An edit changes a schema deployments already hold without changing the version they recorded |
+| The migrations up to a release's last build, on every engine, the schema the tag built | The files alone do not fix it: the column spellings and widths they use are read from helpers a later change is free to edit |
 
 Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
-declares the table rather than adding a migration beside it — within an
-unreleased migration. Once a release has tagged a migration, a change is a
-migration after it.
+declares the table rather than adding a migration beside it — within the
+untagged release's migration. Once a release has tagged a migration, a change is
+a migration after it.
 The chain collapses into a single initial migration before 1.0 (REQ-72), and a
 database any 0.x release built is recreated then.
 
 Migrations 1 to 36 each create something, which is why rolling one back is
-dropping what it made. Migration 37 is the one that changes an existing table,
-and rolling it back changes the table back.
+dropping what it made. Migrations 37 and 38 change existing tables, and rolling
+one back changes the tables back.
 
 A migration is its statements and nothing else. What every one of them does
 around those statements — asking which engine this is, refusing an engine there
@@ -271,24 +280,24 @@ when one stops half way.
 
 ### Release upgrades
 
-Migration 37 carries a database from v0.1.0 to v0.2.0. A database v0.1.0
-built applies it and nothing else; a fresh install walks the whole chain and
-applies it last. It is the one migration here shaped the way every migration
-after 1.0 will be, and it exists to show the project can carry a deployment
-from one release to the next.
+Each release after v0.1.0 carries one migration that changes the schema the
+release before it built into its own, and moves the rows with it: 37 carries a
+database from v0.1.0 to v0.2.0, and 38 from v0.2.0 to v0.3.0. A database a
+release built applies the ones after its own; a fresh install walks the whole
+chain. They are shaped the way every migration after 1.0 will be.
 
 | Rule | |
 |---|---|
-| Every table and index is made by v0.2.0's own statement | v0.2.0's declaration of each table it creates or changes sits beside it, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
+| Every table and index is made by the release's own statement | The release's declaration of each table it creates or changes sits beside its migration, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
 | One transaction of its own | Registered without the migration library's transaction, because SQLite's foreign keys have to be switched off before a transaction begins, and because the rows it moves are read back by name |
-| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as v0.2.0 declares it and costs no row rewrite on any of the three |
-| SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by v0.2.0's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
+| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as the release declares it and costs no row rewrite on any of the three |
+| SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by the release's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
 | SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
 | Rows written with their own identifiers keep them | References into a moved table still land. PostgreSQL's identity does not move past a value it did not generate, so it is moved past them; the other three move on the insert |
-| A column added is last in its table on the three servers | A table SQLite rebuilds has it where v0.2.0 declares it. No query reads a column by position |
+| A column added is last in its table on the three servers | A table SQLite rebuilds has it where the release declares it. No query reads a column by position |
 | On MySQL and MariaDB a failure part way is recovered from a backup | Both commit every data-definition statement as it runs, so the transaction does not hold the migration together there, and the version is not recorded. The operator page says to take one first |
 
-What v0.1.0's rows become:
+What v0.1.0's rows become under migration 37:
 
 | In v0.1.0 | After the upgrade |
 |---|---|
@@ -303,6 +312,7 @@ What v0.1.0's rows become:
 | A finding | Not exploited here. v0.1.0 had no record of that |
 | A notification | Carried alone. Only a kind of message v0.1.0 did not have is carried together |
 | A column v0.1.0 did not have and that takes a null | Null |
+| A grant of undisclosed reading or triage | Carried unchanged, per product, across the estate, in a group binding and in a personal token's holds. It reaches undisclosed work alone, where in v0.1.0 it reached disclosed work too. Nothing grants the disclosed role on upgrade; the operator does, as the upgrade note in `docs/configuration.md` says |
 
 Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
 place for goes with the tables and columns that held it: an embargo shortened,
@@ -334,31 +344,102 @@ largest table and one every engine changes:
 | MySQL 8.4 | 12.1 s |
 | MariaDB 11.4 | 19.3 s |
 
-### Changes after v0.2.0
+### The v0.3.0 upgrade
 
-| Migration | What it does |
+Migration 38. Every change is a column added, which all four engines make where
+the table stands, so no table is rebuilt.
+
+| Column | What it holds |
 |---|---|
-| 38 | Adds when a recorded flaw was first rated, and whether a report was found here (REQ-33, REQ-37) |
-| 39 | Adds the license an inventory declares for a component, empty on every row it finds. `DESIGN-findings.md` § Component licenses says what fills it |
+| When a recorded flaw was first rated in its product | What its deadline counts from (REQ-33) |
+| Whether a report was found here | Only a report sent in carries a disclosure date (REQ-37). A report is from outside unless somebody says otherwise |
+| The license an inventory declares for a component | Empty on every row it finds. `DESIGN-findings.md` § Component licenses says what fills it |
 
-Migration 38 moves v0.2.0's rows onto those rules:
+What v0.2.0's rows become:
 
-| In v0.2.0 | After it |
+| In v0.2.0 | After the upgrade |
 |---|---|
 | A report | Sent in from outside. v0.2.0 wrote a report only where somebody said who told us |
 | A recorded flaw with a severity in force in its product, published or rated there | Rated at the earliest recording of it in that product, which is when v0.2.0 started its clock. Its deadline, where it holds one, is counted from there on the windows for our own products as this release ships them. The settings that change those windows arrive with this release, so none is set yet. A deadline another rule took away stays away |
 | A recorded flaw with no severity in force | Not rated, and without a deadline |
 | A recorded flaw no report is the record of | Found here, which is what v0.2.0 meant by recording one with nobody named. It gives up its disclosure date. It gains no report, because v0.2.0 kept nothing saying who recorded it, so a later claim about it may be accepted as it rather than ruled a duplicate |
 | A scanned finding | Unchanged |
+| A component | No license |
 
-Rolled back, it drops the two columns. The deadlines and disclosure dates it
-moved stay where it moved them, because what they held before is not kept.
+Rolled back, it drops the three columns. The deadlines and disclosure dates it
+moved stay where it moved them, because what they held before is not kept. A
+binary of v0.2.0 run against a database migration 38 left in place is served:
+the columns are additive.
 
-A test on each of the four engines builds a database to migration 37, writes a
-recorded flaw rated as published and recorded in two builds days apart, one
-rated only by its product, one rated by nobody, one with no report, and a
-scanned finding, applies migration 38, checks each row against the table above,
-rolls it back and applies it again.
+Tests on each of the four engines:
+
+| Test | What it holds |
+|---|---|
+| A v0.2.0 database, a row in every table | Upgraded, every column, index and constraint matches a database that walked the chain empty, and every value it held is still there. Rolled back, it is the schema the v0.2.0 tag built, still holding them. Upgraded again, it matches the empty one |
+| A v0.1.0 database, a row in every table | Carried through migrations 37 and 38, it matches a database that walked the chain empty, and holds what it held |
+| Recorded flaws of each kind | A recorded flaw rated as published and recorded in two builds days apart, one rated only by its product, one rated by nobody, one with no report, and a scanned finding, each against the table above |
+| v0.3.0's declarations | Each table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it: every column with its type, nullability and default, every constraint and every index. An index another migration adds is named as such |
+
+### Release records
+
+A release's migrations are frozen by `make release-freeze`, on a branch from
+the head of `main` that lands before the tag, and the release workflow refuses
+a tag whose release is not frozen, by `make release-check`, before it builds
+anything.
+`DESIGN-packaging.md` § The release procedure says where the two sit.
+
+| Step | What happens |
+|---|---|
+| 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0. Every schema change before the tag edits that migration and those declarations |
+| 2. Rehearse, from every earlier release, on each engine | A database the earlier release's own image built and seeded is upgraded by this tree and checked, as § Upgrade rehearsal says |
+| 3. Freeze, on a branch from the head of `main` | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration |
+| 4. Land the record through a pull request | The digest test and the schema test hold the tree to it from then on |
+| 5. Check, then tag | `make release-check` on the commit to be tagged, then the tag. The release workflow checks the record again before anything is built |
+| 6. The next schema change | A new migration, numbered after the tagged release's last, for the next release |
+
+| The check refuses | Why |
+|---|---|
+| A release with no record | Nothing would hold what it shipped once the next change lands |
+| A file the release owns that its record does not list, or lists with another digest | The record is stale: the tree moved after the freeze |
+| A migration numbered past the release's last | It would ship with nothing holding it |
+| Declarations named for a release nothing froze | The same, for the tables a migration reads |
+| A record missing one engine's schema | The schema test cannot hold that engine |
+| A tag that is not a release | A release is `vX.Y.Z`, and a release candidate `vX.Y.Z-rc.N`, held to the record of the release it precedes. Any other suffix is refused, so the output of `git describe` is never read as a release |
+
+A file a release owns is a migration numbered after the previous release's
+last up to its own, or a declaration named for it. A release that changes no
+schema owns no file: its record lists none and carries the previous release's
+last migration as its own.
+
+| Situation | What to do |
+|---|---|
+| The release's migration needs a fix after the freeze, before the tag or between release candidates | Edit the release's migration and declarations, freeze it again in the same pull request, and recreate a database a release candidate built |
+| A release is tagged | Its record is what it shipped. `make release-freeze` refuses a version whose tag exists, and a schema change is a migration numbered after its last, for the next release |
+
+### Upgrade rehearsal
+
+`make upgrade-rehearsal FROM=<release> ENGINE=<engine>` upgrades a database an
+earlier release built and filled itself. It is a step of the release
+checklist above, run from every earlier release on each of the four engines.
+It builds images and scans the demo's inventories, so it runs locally and not
+in the gate.
+
+| Stage | What it does |
+|---|---|
+| The release's database | The release's image is built from its tag, and its own demo targets run unedited against an empty database of the rehearsal's own: products, inventories, the scans, a VEX document, judgments and an approval, an assignment, and a recorded flaw |
+| What it held | Its status report's open findings per build, and every table's row count with it stopped |
+| The upgrade | This tree's image applies the migrations on their own. The version reached is this tree's last migration |
+| The rows | Each table's count against what the upgrade tables above say: a table both sides hold keeps its count, a table only the upgrade holds starts empty, and a table the upgrade fills or removes holds what that table says |
+| Rolled back and applied again | Down to the release's last migration, where every table holds what the release left, and up again, where every table holds what the first upgrade left |
+| What the upgrade note asks | From a release whose note asks an operator to act, the rehearsal acts as it says before serving. From v0.1.0, that is the disclosed role granted beside every undisclosed one |
+| Served | This tree's server on the upgraded database reports the same open findings per build, and no GET its API document lists answers 5xx. A GET with a path parameter the seed has no name for is skipped |
+
+| Rule | |
+|---|---|
+| The release seeds itself | A fixture written today records what this tree thinks the release wrote. The release's own targets write what a deployment of it holds |
+| Only the docker command is wrapped | The containers, network and ports are renamed so a demo already running is untouched, and the application is pointed at the rehearsal's database. Nothing in the release's targets is edited |
+| Counted with nothing running | A server runs passes that write rows. Counted between the migrations alone, a changed count is the migration's |
+| Everything it made is removed | Pass or fail: its containers, network and database. The release's worktree, both images, the run's directory with its logs, and the scanner's database are kept. `-keep` leaves everything in place |
 
 ## Migration locks
 

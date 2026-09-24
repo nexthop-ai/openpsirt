@@ -359,15 +359,16 @@ document that cites one.
 
 Below 1.0 there is no schema compatibility and no API compatibility (REQ-76).
 A schema change edits what declares the thing rather than adding a migration
-beside it, and anybody holding a development database recreates it. The
-migrations v0.1.0 shipped are the exception and never change; v0.2.0's
-declarations sit beside the migration that upgrades from them
-(`DESIGN-database.md` § Migrations). The version in the API path is the shape it will have, not a
-promise anybody may hold us to.
+beside it, and anybody holding a development database recreates it — within
+the untagged release's own migration. What a tagged release shipped is the
+exception and never changes; each release's declarations sit beside the
+migration that upgrades to it (`DESIGN-database.md` § Migrations). The version
+in the API path is the shape it will have, not a promise anybody may hold us to.
 
 Migrations 1 to 36 are kept because a database v0.1.0 built has applied them,
-and migration 37 because it upgrades one. They collapse into one before 1.0
-(REQ-72), which `TODO.md` records so it happens rather than being remembered.
+migration 37 because it upgrades one, and migration 38 because it upgrades a
+database v0.2.0 built. They collapse into one before 1.0 (REQ-72), which
+`TODO.md` records so it happens rather than being remembered.
 
 ## Evidence beside a decision
 
@@ -631,9 +632,10 @@ and a push, and a long stretch is committed in purposeful pieces along the
 way — a decision recorded, a behavior built with its design document, a
 screen rebuilt — each with a body that says why.
 
-Never force-push. As long as history is only ever added to, everything is
-recoverable, and a mistake is fixed by a commit on top rather than by
-rewriting what somebody else may already have pulled.
+`main` is protected: nothing is pushed to it directly and its history is
+never rewritten. A pull request branch belongs to its author, who rebases it
+onto `main` and force-pushes it as the work needs, with `--force-with-lease` so
+a push nobody has seen is never overwritten.
 
 Work goes on a branch, with a pull request from it. The work is pushed as
 it lands and the pull request is where it is reviewed; the queue is what puts

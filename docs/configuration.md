@@ -35,24 +35,34 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 
 ## Upgrading
 
-Stop every v0.1.0 process before upgrading. The upgrade drops and reshapes
-tables v0.1.0 reads and writes, so a v0.1.0 replica left serving during a
-rolling update fails on them. With the Helm chart, scale the deployment to zero
-first.
+A database built by v0.1.0 or v0.2.0 is upgraded in place, at startup or by
+`openpsirt migrate up`. One built by v0.1.0 passes through v0.2.0's upgrade on
+the way. A database built by any build between releases is recreated.
 
-Going back to v0.1.0 is `openpsirt migrate down`, run with this build before
-the v0.1.0 one is deployed. v0.1.0 started against the upgraded schema reports
-it current and cannot read it.
+Back the database up first. On MySQL and MariaDB an upgrade that fails part way
+leaves the schema half changed, and the backup is what recovers it.
 
-A database built by v0.1.0 is upgraded in place, at startup or by `openpsirt
-migrate up`. Back it up first: on MySQL and MariaDB an upgrade that fails part
-way leaves the schema half changed, and the backup is what recovers it. A
-database built by any other earlier build is recreated.
+Stop every process of the earlier release before upgrading. The upgrade from
+v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a v0.1.0 replica
+left serving during a rolling update fails on them. With the Helm chart, scale
+the deployment to zero first.
 
-| After the upgrade | |
+Going back is `openpsirt migrate down`, once for each release stepped back,
+run with this build before the earlier one is deployed. v0.1.0 started against
+an upgraded schema reports it current and cannot read it.
+
+| After the upgrade from v0.1.0 | |
 |---|---|
 | An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
 | A reported flaw | Has a reference, minted as one recorded today would be |
+
+| After the upgrade from v0.2.0 | |
+|---|---|
+| A report | Sent in from outside |
+| A flaw recorded here with a severity in force in its product | Rated at its first recording in that product. Its deadline counts from there, on the windows for flaws in our own product |
+| A flaw recorded here with no severity in force | Not rated, and with no deadline |
+| A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
+| A component | Has no license until a scan reads one from its inventory |
 
 `OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is now
 refused where it used to be accepted. `psirt.example.com` has to become
