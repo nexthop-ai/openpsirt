@@ -387,25 +387,85 @@ func sqliteDir(t *testing.T) string {
 	return t.TempDir()
 }
 
-// sqliteTemplate migrates one file per binary, the first time it is asked,
-// and keeps its bytes rather than the file: a test binary has no hook after
-// its last test, so a file would outlive it, and a migrated empty database
-// is a few hundred kilobytes.
+// sqliteTemplate is the migrated, empty SQLite database every test in this
+// binary copies, read the first time it is asked and kept as bytes: a test
+// binary has no hook after its last test, and a migrated empty database is a
+// few hundred kilobytes.
+//
+// One migration serves every binary. Each package is a binary of its own, and
+// migrating once in each was 6% of the race pass's processor time — 24 s of
+// 383 s sampled, a fresh install walking every migration under the detector.
+// So the first binary to ask migrates and leaves the file in the temporary
+// directory, named for what built it, and the others read it.
 func sqliteTemplate() ([]byte, error) {
 	sqliteOnce.Do(func() {
-		dir, err := os.MkdirTemp("", "openpsirt-dbtest-")
-		if err != nil {
-			sqliteErr = err
-			return
-		}
-		defer func() { _ = os.RemoveAll(dir) }()
-		path := filepath.Join(dir, "template.db")
-		if sqliteErr = migrateFresh("sqlite://" + path + sqliteTestPragmas); sqliteErr != nil {
-			return
-		}
-		sqliteBytes, sqliteErr = os.ReadFile(path) //nolint:gosec // G304: the path is one this function just chose inside its own temporary directory
+		sqliteBytes, sqliteErr = sharedTemplate(os.TempDir())
 	})
 	return sqliteBytes, sqliteErr
+}
+
+// sqliteHeader opens every SQLite database file.
+const sqliteHeader = "SQLite format 3\x00"
+
+// sharedTemplate reads the template kept in dir for the migrations this
+// binary carries, or migrates one and keeps it there.
+//
+// The name carries the migrations' fingerprint and the SQLite library's
+// version, the two things the file's content follows from, so an edited
+// migration or a new library names a different file rather than reading a
+// stale one. It is written beside its name and renamed into place, so a
+// binary reading it never sees half a file, and two binaries migrating at once
+// each rename a complete one. A file that does not open like a database is
+// migrated again.
+func sharedTemplate(dir string) ([]byte, error) {
+	name, err := templateName()
+	if err != nil {
+		return nil, err
+	}
+	kept := filepath.Join(dir, name)
+	if held, err := os.ReadFile(kept); err == nil && strings.HasPrefix(string(held), sqliteHeader) { //nolint:gosec // G304: a name this function derives inside the temporary directory
+		return held, nil
+	}
+
+	work, err := os.MkdirTemp(dir, "openpsirt-dbtest-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(work) }()
+	path := filepath.Join(work, "template.db")
+	if err := migrateFresh("sqlite://" + path + sqliteTestPragmas); err != nil {
+		return nil, err
+	}
+	made, err := os.ReadFile(path) //nolint:gosec // G304: the path is one this function just chose inside its own temporary directory
+	if err != nil {
+		return nil, err
+	}
+	// Kept for the next binary where it can be, and the bytes returned either
+	// way: a directory that refuses the file costs speed, not correctness.
+	staged := filepath.Join(work, "staged.db")
+	if err := os.WriteFile(staged, made, 0o600); err == nil { //nolint:gosec // G703: a name inside the directory MkdirTemp just made
+		_ = os.Rename(staged, kept)
+	}
+	return made, nil
+}
+
+// templateName is the file the template for these migrations and this SQLite
+// library is kept under.
+func templateName() (string, error) {
+	schema, err := migrations.Fingerprint()
+	if err != nil {
+		return "", fmt.Errorf("fingerprint the migrations: %w", err)
+	}
+	library := ""
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, dep := range info.Deps {
+			if dep.Path == "modernc.org/sqlite" {
+				library = dep.Version
+			}
+		}
+	}
+	sum := sha256.Sum256([]byte(schema + "\x00" + library))
+	return "openpsirt-dbtest-" + hex.EncodeToString(sum[:6]) + ".db", nil
 }
 
 // serverDatabase gives this binary its own database on the server the

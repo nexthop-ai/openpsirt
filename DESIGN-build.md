@@ -344,7 +344,7 @@ on each engine, so packages share nothing and run in parallel.
 
 | Engine | What a test gets | Emptied between tests |
 |---|---|---|
-| SQLite | A copy of a template migrated once per binary, and a connection of its own | Not needed — each test holds its own file |
+| SQLite | A copy of a template migrated once per run and kept in the temporary directory, and a connection of its own | Not needed — each test holds its own file |
 | The three servers | The package's own database on the server, through one pool every test in the binary shares | By deleting from the tables that hold rows |
 
 The pool on a server is shared because a PostgreSQL connection is a process on
@@ -354,6 +354,13 @@ the fifty-odd tables costs 43 ms, and the same statement on a warm connection
 90 s on PostgreSQL that way and spends 48 s with one pool. Tests in a package
 run one after another on a server, so the pool carries nothing from one test to
 the next that the emptying does not remove.
+
+The SQLite template is migrated by the first binary that asks and kept in the
+temporary directory for the rest. Each package is a binary, and migrating once
+in each was 6% of the race pass's processor time: 24 s of 383 s sampled. The
+file is named for the migrations' fingerprint and the SQLite library's version,
+so an edited migration or a new library names a different file, and one that
+does not open like a database is migrated again.
 
 Each test gets a query builder of its own over the shared pool. A test may add a
 query hook to count its statements, and a hook on a shared builder goes on
