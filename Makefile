@@ -178,19 +178,14 @@ test:
 # first run did not — the argument already accepted for the two-engine form of
 # a test. It runs on SQLite, which needs no server and where each test holds a
 # database of its own, so those tests also run beside each other.
-# Half the cores, rounded down, and never below one. The race pass takes that,
-# so the number of test binaries alive at once stays near what a single pass
-# has and the memory falls rather than rises: 1.5 GB against the 3.4 GB the two
-# reach running one after another with the whole machine each.
+# Half the cores, rounded down, and never below one. Each of the two passes
+# takes that, so the number of test binaries alive at once is what a single
+# pass has and the memory falls rather than rises: 1.5 GB against the 3.4 GB
+# the two reach running one after another with the whole machine each.
 # Two ways of asking, because a machine with neither would assert two cores and
 # give each pass one package at a time — fewer than either pass had alone, and
 # nothing printed to say why.
 TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2); h=$$((n / 2)); if [ $$h -lt 1 ]; then h=1; fi; echo $$h)
-
-# The server pass takes half the cores or eight packages, whichever is more. A package on a server is a sequence of round trips, so half of a
-# two-core runner is one package at a time, and the pass waits on a socket for
-# nearly all of it: 696 s of package time end to end on CI.
-TEST_SERVERS := $(shell h=$(TEST_HALF); if [ $$h -lt 8 ]; then h=8; fi; echo $$h)
 
 # One spelling of each pass. test-all adds a package count and a label; the
 # standalone targets run the same command with the whole machine. Written twice,
@@ -234,7 +229,7 @@ SERVERS_PASS = OPENPSIRT_TEST_ENGINES=postgres,mysql,mariadb $(GO) test -count=1
 test-all:
 	@( $(RACE_PASS) -p $(TEST_HALF) \
 	    $(PACKAGES) 2>&1 | awk '{ print "[sqlite -race] " $$0; fflush() }' ) & detector=$$!; \
-	( $(SERVERS_PASS) -p $(TEST_SERVERS) \
+	( $(SERVERS_PASS) -p $(TEST_HALF) \
 	    $(PACKAGES) 2>&1 | awk '{ print "[servers]      " $$0; fflush() }' ) & portability=$$!; \
 	failed=0; \
 	wait $$detector || failed=1; \
@@ -250,7 +245,7 @@ test-race:
 # socket, which is not where a race is found: 16.9 s against 12.0 s for the API
 # package on MariaDB, where the same package on SQLite is 73.6 s against 10.1 s.
 test-engines:
-	$(SERVERS_PASS) -p $(TEST_SERVERS) $(PACKAGES)
+	$(SERVERS_PASS) $(PACKAGES)
 
 # The checks this change has to pass, chosen from what it touches.
 #

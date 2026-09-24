@@ -104,7 +104,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make test` | SQLite only, packages in parallel, cached. Seconds |
 | `make test-all` | Every configured engine, nothing cached: the two runs below, at once |
 | `make test-race` | SQLite with the race detector, tests within a package beside each other |
-| `make test-engines` | The three server engines, without the detector, at least eight packages at once |
+| `make test-engines` | The three server engines, without the detector |
 | `make docs-check` | What a change to documents alone can break |
 | `make lint` | Static analysis, pinned version |
 | `make vet` | The compiler's own checks |
@@ -417,15 +417,10 @@ on purpose.
 The two run at once. They share no engine, so neither can see the other's rows,
 and they are bottlenecked on different things — the detector is in-process work
 and the server pass spends its time waiting on a socket — so each fills what the
-other leaves idle. The race pass takes half the cores, so the number of test
-binaries it has alive is what a single pass has, and the peak memory falls
-rather than rises: 119 s and 3.4 GB run one after another, 100 s and 1.5 GB run
-together, on twelve cores with everything warm.
-
-The server pass takes half the cores or eight packages, whichever is more. Its
-packages are round trips rather than processor work, and half of a two-core
-runner is one package at a time: CI's server pass was 696 s of package time,
-run end to end.
+other leaves idle. Each takes half the cores, so the number of test binaries
+alive at once is what a single pass has, and the peak memory falls rather than
+rises: 119 s and 3.4 GB run one after another, 100 s and 1.5 GB run together,
+on twelve cores with everything warm.
 
 Each pass labels its own lines. Held and printed at the end, a run says nothing
 for the whole of it — on a slow machine a quarter of an hour of a log that looks
