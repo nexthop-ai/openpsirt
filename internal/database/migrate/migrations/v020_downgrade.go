@@ -52,7 +52,7 @@ func downgradeV020(ctx context.Context, tx bun.Tx) error {
 				// v0.2.0's product index took its place.
 				rekey:   []string{"flaw_report_product_fk"},
 				keys:    []string{"flaw_report_answered_by_fk", "flaw_report_judged_by_fk", "flaw_report_ruling_fk"},
-				columns: []string{"reference", "summary", "evaluated_at", "evaluated_by", "ruling_id", "found_here"},
+				columns: []string{"reference", "summary", "evaluated_at", "evaluated_by", "ruling_id"},
 				require: []string{"vulnerability_id"}})
 		},
 		func() error {
@@ -62,7 +62,7 @@ func downgradeV020(ctx context.Context, tx bun.Tx) error {
 		func() error { return u.narrow(narrowing{table: "notification", columns: []string{"together"}}) },
 		func() error {
 			return u.narrow(narrowing{table: "finding", indexes: []string{"finding_group_idx"},
-				columns: []string{"urgency_exploited_here", "rated_at"}, restore: []string{v010GroupIndex}})
+				columns: []string{"urgency_exploited_here"}, restore: []string{v010GroupIndex}})
 		},
 		func() error {
 			return u.narrow(narrowing{table: "vulnerability_weakness", columns: []string{"is_primary"}})

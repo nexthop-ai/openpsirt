@@ -614,7 +614,7 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 			// start put it back. Asked only then, because this runs for
 			// every issue whose likelihood a feed moved.
 			if recorded {
-				if err := recountOwn(ctx, tx, productID, []int64{id}, learnedAt); err != nil {
+				if _, err := recountOwn(ctx, tx, productID, []int64{id}, learnedAt); err != nil {
 					return err
 				}
 			}
@@ -740,7 +740,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64) er
 			return fmt.Errorf("move this issue's deadline: %w", err)
 		}
 	}
-	return recountOwn(ctx, tx, productID, []int64{vulnerabilityID}, recountedAt)
+	_, err = recountOwn(ctx, tx, productID, []int64{vulnerabilityID}, recountedAt)
+	return err
 }
 
 // Assessments lists what has been said about issues, newest first.

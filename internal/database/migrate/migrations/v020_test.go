@@ -23,8 +23,12 @@ import (
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
-// v010 is the last migration the v0.1.0 release shipped.
-const v010 = 36
+// v010 is the last migration the v0.1.0 release shipped, and v020 the one
+// the v0.2.0 release carried it across with.
+const (
+	v010 = 36
+	v020 = 37
+)
 
 // A database the v0.1.0 release built, holding a row in every table, is
 // upgraded into exactly the schema a fresh install makes, and every value it
@@ -33,6 +37,10 @@ const v010 = 36
 func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
+		// Held to v0.2.0 as it was tagged. What a later migration changes is
+		// that migration's test.
+		rollBack(t, ctx, db)
+		dbtest.MigrateTo(t, db, v020)
 		fresh := describe(t, ctx, db)
 		if len(fresh) == 0 {
 			t.Fatal("the fresh schema described as nothing, so nothing is compared")
@@ -46,9 +54,7 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		before := snapshot(t, ctx, db)
 
 		start := time.Now()
-		if err := schema.Up(ctx, db, quiet()); err != nil {
-			t.Fatalf("upgrade: %v", err)
-		}
+		dbtest.MigrateTo(t, db, v020)
 		t.Logf("%s: upgraded in %v", db.Server.Engine, time.Since(start))
 
 		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
@@ -61,17 +67,11 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read the version: %v", err)
 		}
-		wanted, err := schema.Expected()
-		if err != nil {
-			t.Fatalf("read the expected version: %v", err)
+		if version != v020 {
+			t.Errorf("the upgrade left version %d, want %d", version, v020)
 		}
-		if version != wanted {
-			t.Errorf("the upgrade left version %d and this build expects %d", version, wanted)
-		}
-		// A second start finds nothing to do.
-		if err := schema.Up(ctx, db, quiet()); err != nil {
-			t.Fatalf("a start after the upgrade: %v", err)
-		}
+		// A second run finds nothing to do.
+		dbtest.MigrateTo(t, db, v020)
 
 		if err := schema.Down(ctx, db, quiet()); err != nil {
 			t.Fatalf("roll the upgrade back: %v", err)
@@ -80,11 +80,14 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 			t.Errorf("rolled back, the schema differs from v0.1.0's:\n%s", diff)
 		}
 		returned(t, ctx, db, before)
-		if err := schema.Up(ctx, db, quiet()); err != nil {
-			t.Fatalf("upgrade again: %v", err)
-		}
+		dbtest.MigrateTo(t, db, v020)
 		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
 			t.Errorf("upgraded a second time, the schema differs from a fresh install's:\n%s", diff)
+		}
+		dbtest.Reset(t, db)
+		// Left where every other test in the package expects it.
+		if err := schema.Up(ctx, db, quiet()); err != nil {
+			t.Fatalf("migrate to the latest: %v", err)
 		}
 		dbtest.Reset(t, db)
 	})
@@ -481,18 +484,6 @@ func moved(t *testing.T, ctx context.Context, db *database.DB) {
 	every("finding", `"urgency_exploited_here" = ?`, false)
 	every("notification", `"together" = ''`)
 	every("flaw_report", `"evaluated_at" = "recorded_at" AND "evaluated_by" = "recorded_by"`)
-	// Every report v0.1.0 wrote named somebody who told us.
-	every("flaw_report", `"found_here" = ?`, false)
-	// A flaw recorded with a severity was clocked from its recording; a
-	// scanned finding's clock runs from its opening and carries no start.
-	if got := one(`SELECT COUNT(*) FROM "finding" WHERE "kind" = ? AND "rated_at" = "opened_at"`,
-		"entered"); got != "1" {
-		t.Errorf("%s recorded flaws were rated when they were recorded, want 1", got)
-	}
-	if got := one(`SELECT COUNT(*) FROM "finding" WHERE "kind" <> ? AND "rated_at" IS NOT NULL`,
-		"entered"); got != "0" {
-		t.Errorf("%s scanned findings carry a rating start", got)
-	}
 
 	reference := one(`SELECT "reference" FROM "flaw_report"`)
 	if !regexp.MustCompile(`^WIDGET-R-2025-\d{6}$`).MatchString(reference) {

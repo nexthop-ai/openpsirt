@@ -2935,7 +2935,7 @@ export interface paths {
          *
          *     The received date is what the embargo runs from: a report arriving on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the one the reporter has a publication scheduled against, and they are the party who will publish regardless.
          *
-         *     Answers 404 to somebody who may not read the product's vulnerability reports.
+         *     Answers 404 where no report is the record of this issue — every issue a scan reported that nobody wrote in about — and to somebody who may not read the product's vulnerability reports.
          *
          *     Requires: private-read or private-triage on the product
          */

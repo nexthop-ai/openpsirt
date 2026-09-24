@@ -273,3 +273,46 @@ func TestAnIssueSaysWhereItIsAFlawRecordedHere(t *testing.T) {
 		}
 	})
 }
+
+func TestABuildAddedToAFlawKeepsTheClockItAlreadyHas(t *testing.T) {
+	// A build added after the flaw was rated is on the clock the flaw already
+	// runs. Stamped as rated on its own, the next recount gave it a whole new
+	// window, which is the fresh start a re-rating is refused.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		f.shippedTo(t, other, through(libnl))
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+			Told:    finding.Told{FoundHere: true},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		rated := time.Now().UTC().AddDate(0, 0, -40).Truncate(time.Microsecond)
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set("rated_at = ?", rated).
+			Where("vulnerability_id = ?", rows[0].VulnerabilityID).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID,
+			[]int64{f.target, other}, ""); err != nil {
+			t.Fatal(err)
+		}
+		// Any policy save recounts every recorded flaw.
+		if _, err := f.store.Recompute(ctx, finding.DefaultWindows()); err != nil {
+			t.Fatal(err)
+		}
+		want := rated.Add(finding.DefaultOwnWindows().High)
+		for _, row := range f.rowsOf(t, identifier) {
+			if row.RatedAt == nil || !row.RatedAt.Equal(rated) || row.DueAt == nil || !row.DueAt.Equal(want) {
+				t.Errorf("the build at %d is rated %v and due %v, want %v and %v",
+					row.TargetID, row.RatedAt, row.DueAt, rated, want)
+			}
+		}
+	})
+}

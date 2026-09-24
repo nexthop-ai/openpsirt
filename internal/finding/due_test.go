@@ -717,7 +717,9 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 		// products.
 		shorter := testWindows
 		shorter.High = 15 * 24 * time.Hour
-		if err := f.setting(t, setting.OwnDueHigh, "360h"); err != nil {
+		// Different from the scanned window, so a recount that clocked the
+		// recorded flaw as a scanned one would land it somewhere else.
+		if err := f.setting(t, setting.OwnDueHigh, "480h"); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := f.store.Recompute(t.Context(), shorter); err != nil {
@@ -729,9 +731,9 @@ func TestAFindingWithNoRunIsStillOnTheClockAndOnTheChart(t *testing.T) {
 			Scan(t.Context(), &now); err != nil {
 			t.Fatal(err)
 		}
-		if now.Sub(opened.Add(shorter.High)).Abs() > time.Second {
+		if now.Sub(opened.Add(480*time.Hour)).Abs() > time.Second {
 			t.Errorf("a recorded finding's deadline is %s after the policy changed, want %s",
-				now, opened.Add(shorter.High))
+				now, opened.Add(480*time.Hour))
 		}
 
 		// And it is on the chart. Counted as issues, so this is one more than

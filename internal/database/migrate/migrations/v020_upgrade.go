@@ -73,8 +73,7 @@ func upgradeV020(ctx context.Context, tx bun.Tx) error {
 		},
 		func() error {
 			return u.change(findingStatements(t), change{table: "finding",
-				add:     []added{{column: "urgency_exploited_here", fill: "FALSE"}, {column: "rated_at"}},
-				then:    u.ratedWhenRecorded,
+				add:     []added{{column: "urgency_exploited_here", fill: "FALSE"}},
 				indexes: []string{"finding_group_idx"}})
 		},
 		func() error {
@@ -99,7 +98,6 @@ func upgradeV020(ctx context.Context, tx bun.Tx) error {
 					{column: "evaluated_at"},
 					{column: "evaluated_by"},
 					{column: "ruling_id"},
-					{column: "found_here", fill: "FALSE"},
 				},
 				relax: []string{"vulnerability_id"},
 				then:  u.referencesAndJudgments,
@@ -425,21 +423,6 @@ func (u *upgrader) primaryWeakness() error {
 		)`, true, "entered")
 	if err != nil {
 		return fmt.Errorf("mark the weakness a recorded flaw names first: %w", err)
-	}
-	return nil
-}
-
-// ratedWhenRecorded starts the clock of a flaw recorded with a severity at
-// the moment it was recorded, which is when v0.1.0 started it. One recorded
-// without a severity has not been rated, and starts when somebody rates it.
-func (u *upgrader) ratedWhenRecorded() error {
-	_, err := u.tx.ExecContext(u.ctx, `
-		UPDATE "finding" SET "rated_at" = "opened_at"
-		WHERE "kind" = ? AND "vulnerability_id" IN (
-			SELECT "v"."id" FROM "vulnerability" AS "v"
-			WHERE COALESCE("v"."severity", '') <> '')`, "entered")
-	if err != nil {
-		return fmt.Errorf("start the clock of a flaw recorded with a severity: %w", err)
 	}
 	return nil
 }

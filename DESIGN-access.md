@@ -1044,7 +1044,8 @@ one somebody intends to disclose eventually. All of this is built.
 A private finding reported from outside carries a disclosure date, defaulting to
 ninety days after the report was received (REQ-37). A flaw found here carries
 none, because nobody outside is counting down to a publication, and neither does
-a public finding. The point of having one
+a public finding. A claim from outside ruled a duplicate of a flaw found here
+does not give it one; that half is not built. The point of having one
 is that it gives the embargo an end somebody outside could hold this deployment
 to.
 

@@ -89,3 +89,64 @@ func TestTheMigrationsV010ShippedAreTheFilesItTagged(t *testing.T) {
 		t.Errorf("%d of the %d migrations v0.1.0 shipped are here", seen, len(shipped))
 	}
 }
+
+// shippedV020 is migration 37 and every declaration it reads, as the v0.2.0
+// release tagged them. A database the release built has applied migration 37
+// as these files wrote it, so a change after the tag goes in a later
+// migration.
+var shippedV020 = map[string]string{
+	"00037_v020.go":           "f0f92960d7af25c888f9699cca48b7cba64baa88486800c18893d95d172fd651",
+	"v020_advisory.go":        "ed0e2e0f2de03e6de3faa41b1e129be5586fe172684c7dc9a8a20d65e11fc6ab",
+	"v020_advisory_source.go": "3ea9523f7050c68383077ccbfdea3d308428d5310bd87e6fc536a94bc69c4e0c",
+	"v020_attachment.go":      "bd01b62779f62591dcc200197372cf24a9867690d9ddfcbc1a039d7b1e7f109c",
+	"v020_catalog.go":         "c0f5ada8653e132862cde0e33babb282ffce2912988f298a06dbf3b912189ac5",
+	"v020_disclosure.go":      "99b930f20c8afa77c83d69fb5c8e9dd2b9eff5d230a7a0a8e566e59b3aa24fb1",
+	"v020_downgrade.go":       "8233e57d5a7c735486a286fe7960a9a65660828a7c0048faca4cd1c17046cdb8",
+	"v020_exploited_here.go":  "b4acf0dae10298a69ed6e28fe6ecfc3860263575fd73c471522904ea3d161969",
+	"v020_finding.go":         "61bd8aa3bb193324be50c2e8db5aa5fb44b50eb2f03dd1fac3cea746068ee49a",
+	"v020_notification.go":    "d774c545254c78f03afbc41b185edf25d6ebd2e6549e64f86a2baa3ec2341c5c",
+	"v020_patch_branch.go":    "bdd69d8939f0fd7d2120380bc0dda3800a04797703caefefa7c22deba24f1560",
+	"v020_report.go":          "19e1ce04f6d8425498ec62ee519164f9d63aa96f5a780e8e4104e9df0a00b580",
+	"v020_scan.go":            "786465128d186a3e3daa5e87410f3eaed9705f3a61130ff1bc6a2204822dba35",
+	"v020_upgrade.go":         "94e9737a93a2c771b83bfac34334d5b2e5eda4674874ced49bac640395a2023e",
+	"v020_vex.go":             "6cd2b765f2cb0b17554889a914a6c6fb8cb577f956d7e046e98d6fc078474247",
+	"v020_vex_issuance.go":    "6c5c6f19ab4e715f6719d9a977293c2752399447e6f19fd6a9d68ae0580f9db5",
+}
+
+// Migration 37 and every declaration it reads are the files v0.2.0 tagged,
+// and every one of those files is here.
+func TestTheMigrationV020ShippedIsTheFilesItTagged(t *testing.T) {
+	names, err := fs.Glob(sources, "*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := 0
+	for _, name := range names {
+		if strings.HasSuffix(name, "_test.go") ||
+			(!strings.HasPrefix(name, "00037_") && !strings.HasPrefix(name, "v020_")) {
+			continue
+		}
+		seen++
+		want, listed := shippedV020[name]
+		if !listed {
+			t.Errorf("%s belongs to migration 37 and the v0.2.0 release did not ship it", name)
+			continue
+		}
+		content, err := sources.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, body, found := strings.Cut(string(content), "\n\n")
+		if !found || !strings.HasPrefix(string(content), "// Copyright") {
+			t.Errorf("%s does not open with the license header", name)
+			continue
+		}
+		sum := sha256.Sum256([]byte(body))
+		if got := hex.EncodeToString(sum[:]); got != want {
+			t.Errorf("%s is not the file v0.2.0 shipped; a change to its schema goes in a later migration", name)
+		}
+	}
+	if seen != len(shippedV020) {
+		t.Errorf("%d of the %d files v0.2.0 shipped for migration 37 are here", seen, len(shippedV020))
+	}
+}

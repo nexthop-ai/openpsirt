@@ -55,17 +55,19 @@ func ownDeadline(own Windows, severity string, ratedAt *time.Time, state FixStat
 // Recorded flaws are counted in single or low double digits a year, one row per
 // place in each build, so the whole population is small enough that a
 // statement per distinct deadline is the simpler shape.
+//
+// It answers how many places it gave a deadline or took one away.
 func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64,
-	now time.Time) error {
+	now time.Time) (int, error) {
 
 	now = now.UTC().Truncate(time.Microsecond)
 	own, err := LoadOwnWindows(ctx, db)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	floor, err := FloorFor(ctx, db, productID)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	var rows []struct {
@@ -99,7 +101,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 		q = q.Where("f.vulnerability_id IN (?)", bun.List(issues))
 	}
 	if err := q.Scan(ctx, &rows); err != nil {
-		return fmt.Errorf("read the flaws recorded here: %w", err)
+		return 0, fmt.Errorf("read the flaws recorded here: %w", err)
 	}
 
 	var firstRated []int64
@@ -128,7 +130,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 			Exec(ctx)
 		return err
 	}); err != nil {
-		return fmt.Errorf("record when these were first rated: %w", err)
+		return 0, fmt.Errorf("record when these were first rated: %w", err)
 	}
 	for at, ids := range due {
 		if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
@@ -138,7 +140,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 				Exec(ctx)
 			return err
 		}); err != nil {
-			return fmt.Errorf("rewrite the deadline on a recorded flaw: %w", err)
+			return 0, fmt.Errorf("rewrite the deadline on a recorded flaw: %w", err)
 		}
 	}
 	// A second statement rather than a CASE choosing between NULL and a
@@ -151,7 +153,7 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 			Exec(ctx)
 		return err
 	}); err != nil {
-		return fmt.Errorf("take the deadline off a recorded flaw: %w", err)
+		return 0, fmt.Errorf("take the deadline off a recorded flaw: %w", err)
 	}
-	return nil
+	return len(rows), nil
 }

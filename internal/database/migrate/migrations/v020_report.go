@@ -127,11 +127,6 @@ func reportStatements(t *columnTypes) []string {
 			-- A date rather than a moment: the reporter is counting
 			-- in days and so are we.
 			"received_on"      ` + t.date + ` NULL,
-			-- Whether it was found here rather than sent by somebody
-			-- outside. A flaw nobody outside knows about has nobody
-			-- counting down to a publication, so it carries no disclosure
-			-- date and nobody is owed an answer.
-			"found_here"       ` + t.boolean + ` NOT NULL,
 			-- When somebody answered them, and who. Null is the condition
 			-- an unacknowledged report reports: prompt acknowledgment is the part of
 			-- coordinated disclosure a reporter actually judges, and it is

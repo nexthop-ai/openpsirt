@@ -610,6 +610,10 @@ A flaw recorded here already has its report, so a second claim about it is a
 duplicate. Accepting a report as an existing issue reaches the issues a scan
 reported.
 
+Half of that is not built. A claim from outside ruled a duplicate of a flaw
+found here starts no disclosure date, although its reporter may be counting
+down to a publication.
+
 | Refusal | Reason |
 |---|---|
 | The report has already been judged | Two people judging at once would both succeed, and the second would overwrite who decided and when. Asked in the write as well as before it |
@@ -717,7 +721,7 @@ is never raised: there is nobody outside to answer.
 | Version 3.0, 3.1 and 4.0; anything else refused by name | Version 2 is a different scheme, and a vector scored with the wrong formula produces a number nothing downstream can tell from a real one |
 | Each scheme rounds its own way | Version 3 rounds up to a tenth, in integer arithmetic, because floating point gets a different answer for some inputs: a value that should be exactly 8.6 is not representable, and a naive ceiling returns 8.7. Version 4 rounds to the nearest tenth |
 | An unstated vector is not a score of zero | Zero says "harmless", a judgment nobody made during early triage |
-| A severity may be left unstated (REQ-18) | Making somebody choose a word to get the record written is how a guess ends up stored as a judgment. It is not given *no* deadline: the windows answer for a severity they do not recognize |
+| A severity may be left unstated (REQ-18) | Making somebody choose a word to get the record written is how a guess ends up stored as a judgment. On a flaw recorded here it carries no deadline until somebody rates it, and says so as `not-rated` (REQ-33) |
 | A person's severity is checked against the words rather than folded | A report's is folded, because a scanner that rated nothing is silent and silence is not a claim that something is mild. A person typing "urgent" is not silent; they are wrong, and folding would replace their judgment with one nobody made |
 | The scheme a score is on travels with it | A number alone is not readable across schemes. It is recorded from the vector on a flaw assessed here, and from what the report states on one a scan brought in |
 | The screen shows the newest generation's rating and names the others beside it | A report commonly rates one issue under version 3 and version 4. The number beside the issue is the newest generation's rating, whole, so a list and the finding screen show the same number on the same scheme. `DESIGN-ingest.md` holds which rating in a generation is kept |

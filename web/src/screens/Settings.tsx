@@ -49,6 +49,7 @@ export function Settings({ who }: { who: Who }) {
       return true;
     });
   const deadlines = group((name) => name.startsWith("remediation.due."));
+  const ownDeadlines = group((name) => name.startsWith("remediation.own.due."));
   const floor = group((name) => name === "triage.floor");
   const threshold = group(
     (name) => name === "triage.deferral-threshold" || name === "triage.together-cap",
@@ -93,6 +94,19 @@ export function Settings({ who }: { who: Who }) {
           </div>
           <p className="reading" style={{ marginTop: 10 }}>
             Counted from when a finding was first seen. Exploited findings use their own window.
+          </p>
+        </div>
+      )}
+
+      {ownDeadlines.length > 0 && (
+        <div className="card" style={{ marginBottom: 14 }}>
+          <h3>Deadlines for our own products</h3>
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end" }}>
+            {ownDeadlines.map(field)}
+          </div>
+          <p className="reading" style={{ marginTop: 10 }}>
+            For flaws recorded here. Counted from when one is first rated; unrated, it has no
+            deadline.
           </p>
         </div>
       )}

@@ -321,12 +321,6 @@ func findingStatements(t *columnTypes) []string {
 			-- marked before this was recorded, which reads as "count from
 			-- the opening" because there is nothing better to count from.
 			"exploited_learned_at" ` + t.timestamp + ` NULL,
-			-- When the issue was first given a severity in this product,
-			-- which is what a recorded flaw's deadline is counted from.
-			-- Null on a scanned row, whose severity arrives with it and
-			-- whose clock runs from the opening, and on a recorded flaw
-			-- nobody has rated yet, which carries no deadline at all.
-			"rated_at" ` + t.timestamp + ` NULL,
 			"urgency_shipped"   ` + t.boolean + ` NOT NULL,
 			-- What this place held before, where the version moved and the
 			-- issue came with it. Present means somebody bumped this and the

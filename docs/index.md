@@ -172,9 +172,9 @@ behind every line of it.
 
 ### Disclosure and advisories
 
-- A flaw recorded here starts undisclosed, carrying a disclosure date that
-  defaults to 90 days from when the report was received. Reaching it escalates
-  rather than publishes
+- A flaw recorded here starts undisclosed. One reported from outside carries a
+  disclosure date that defaults to 90 days from when the report was received;
+  one found here carries none. Reaching it escalates rather than publishes
 - Extending that date costs a reason and, past a threshold, a second person —
   and it is raised before the date rather than on it
 - Disclosure makes the whole record public: comments, decisions, actors. People

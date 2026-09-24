@@ -78,11 +78,9 @@ export function Record() {
   // on a right that is not known until the session is.
   const [chose, setChose] = useState<boolean | null>(null);
   const [vector, setVector] = useState("");
-  // Files that prove it — a test case, a capture, a screenshot. Held until the
-  // finding exists, because an attachment hangs off an issue and there is no
-  // issue until this is recorded. Who told us, where somebody did. All
-  // optional: a flaw found by whoever is typing has no reporter, and a form
-  // demanding one asks them to invent an answer.
+  // Who told us, or who found it here. All optional: a claim arriving
+  // anonymously has no reporter, and a form demanding one asks them to invent
+  // an answer.
   const [reportedBy, setReportedBy] = useState("");
   const [contact, setContact] = useState("");
   const [credit, setCredit] = useState("");
@@ -94,6 +92,8 @@ export function Record() {
   // Whether to record it as a flaw now rather than file it for judging. The
   // button somebody pressed, and nothing until they press one.
   const [now, setNow] = useState<boolean | null>(null);
+  // Files that prove it — a test case, a capture, a screenshot. Held until the
+  // report or the issue exists, because an attachment hangs off one of them.
   const [files, setFiles] = useState<File[]>([]);
   const [refused, setRefused] = useState<string[]>([]);
   // The address of the finding just recorded, held while somebody reads
@@ -291,7 +291,11 @@ export function Record() {
   // A summary and a build. Not a severity: a flaw may be recorded before
   // anybody has worked out how bad it is, and making somebody pick a word to
   // get the record written is how a guess ends up stored as a judgment.
+  // Nothing more once something is saved. A file that did not attach keeps
+  // the form up to say so, and a second press would file a second report or
+  // record a second flaw.
   const ready =
+    onward === "" &&
     said &&
     summary.trim() !== "" &&
     !record.isPending &&
@@ -372,7 +376,9 @@ export function Record() {
         <div className="field">
           <label htmlFor="rec-files">Evidence</label>
           <p className="hint" style={{ marginTop: 0 }}>
-            Optional. Readable by whoever can read the report.
+            {recordNow
+              ? "Optional. Readable by whoever can read the issue, so an undisclosed flaw’s evidence is undisclosed too."
+              : "Optional. Readable by whoever can read the report."}
           </p>
           <input
             id="rec-files"

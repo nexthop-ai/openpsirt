@@ -521,6 +521,14 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 
 	changed := 0
 	for _, productID := range products {
+		// The flaws recorded here, on their own windows and counted from
+		// their first rating.
+		own, err := recountOwn(ctx, s.db, productID, nil, s.now())
+		changed += own
+		if err != nil {
+			return changed, err
+		}
+
 		// The distinct moments something opened in this product, off the
 		// findings themselves. This walked the runs and joined back for the
 		// timestamp, which asked the question in terms of the thing that
@@ -531,14 +539,8 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		// The same cardinality either way — every finding a run opened
 		// carries that run's start — so this is one table fewer rather than
 		// more rows.
-		// The flaws recorded here, on their own windows and counted from
-		// their first rating.
-		if err := recountOwn(ctx, s.db, productID, nil, s.now()); err != nil {
-			return changed, err
-		}
-
 		var opened []time.Time
-		err := s.db.NewSelect().
+		err = s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
