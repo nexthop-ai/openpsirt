@@ -93,7 +93,6 @@ Missing or wrong, with no decision needed to fix it.
 |---|---|
 | Mail sending | No test double. The header sanitizer has no test |
 | The scanner subprocess | The double does not check the arguments the scanner is given |
-| Process startup | The stale-schema check is tested, and nothing tests that serving calls it |
 | Attachment names | Feeds a path with no newline to a check for a newline |
 | The SQLite migration lock | Compares the message against the only string that produces it |
 | The sort sweep | Checks for a 200 only, which an unknown sort key also returns |
