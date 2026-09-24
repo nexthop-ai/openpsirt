@@ -17,18 +17,25 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 func quiet() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
-// v010 is the last migration the v0.1.0 release shipped, and v020 the one
-// the v0.2.0 release carried it across with.
+// v010 is the last migration the v0.1.0 release shipped, v020 the one the
+// v0.2.0 release carried it across with, and v030 the one v0.3.0 carries
+// v0.2.0's across with.
 const (
 	v010 = 36
 	v020 = 37
+	v030 = 38
 )
+
+// records is where each tagged release's record of its migrations is kept,
+// from this package's directory.
+const records = "../released"
 
 // A database the v0.1.0 release built, holding a row in every table, is
 // upgraded into exactly the schema a fresh install makes, and every value it
@@ -49,7 +56,7 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		rollBack(t, ctx, db)
 		dbtest.MigrateTo(t, db, v010)
 		released := describe(t, ctx, db)
-		shippedSchema(t, db.Server.Engine, released)
+		taggedSchema(t, "v0.1.0", db.Server.Engine, released)
 		seed(t, ctx, db)
 		before := snapshot(t, ctx, db)
 
@@ -60,7 +67,7 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
 			t.Errorf("the upgraded schema differs from a fresh install's:\n%s", diff)
 		}
-		survived(t, ctx, db, before)
+		survived(t, ctx, db, before, replacedByV020, nil)
 		moved(t, ctx, db)
 
 		version, err := schema.Version(ctx, db)
@@ -226,10 +233,44 @@ var overrides = map[string]any{
 	"advisory_issuance.ordinal":  int64(1),
 }
 
-// seed writes a row into every table of the v0.1.0 schema, each after the
+// seed writes a row into every table of the v0.1.0 schema, and the rows
+// migration 37 reads a meaning into.
+func seed(t *testing.T, ctx context.Context, db *database.DB) {
+	t.Helper()
+	tables := seedEvery(t, ctx, db)
+	when := time.Date(2025, 11, 3, 9, 30, 0, 0, time.UTC)
+
+	// Identifiers a fresh table would not generate, so that keeping them is
+	// something the upgrade does rather than something it happens into.
+	exec(t, ctx, db, `UPDATE "disclosure_extension" SET "id" = 7`)
+	exec(t, ctx, db, `UPDATE "advisory_issuance" SET "id" = 7`)
+
+	// The flaw recorded here, refiled under a CVE after it was issued: the
+	// name it was minted and issued under is kept among its aliases.
+	exec(t, ctx, db, `INSERT INTO "vulnerability_alias" ("vulnerability_id", "identifier", "identifier_folded")
+		VALUES (1, 'WIDGET-2025-123456', 'widget-2025-123456')`)
+
+	// An issue a scanner reported, classified, and recorded here by nobody.
+	copyRow(t, ctx, db, tables["vulnerability"], "vulnerability", map[string]any{
+		"identifier": "CVE-2025-2222", "identifier_folded": "cve-2025-2222"})
+	exec(t, ctx, db, `INSERT INTO "vulnerability_weakness" ("vulnerability_id", "cwe") VALUES (2, 'CWE-89')`)
+	copyRow(t, ctx, db, tables["finding"], "finding", map[string]any{"vulnerability_id": 2, "kind": "vulnerability"})
+
+	// A second weakness named after the first, a second issuance of the same
+	// advisory, and a statement naming no version.
+	exec(t, ctx, db, `INSERT INTO "vulnerability_weakness" ("vulnerability_id", "cwe") VALUES (1, 'CWE-20')`)
+	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("id", "product_id", "vulnerability_id", "ordinal", "digest",
+		"summary", "issued_by", "issued_at") VALUES (8, 1, 1, 2, 'second', NULL, 1, ?)`, when.Add(time.Hour))
+	exec(t, ctx, db, `INSERT INTO "vex_statement" ("product_id", "publisher", "vulnerability", "purl",
+		"component", "status", "statement", "document", "digest", "uploaded_by", "uploaded_at", "superseded_at")
+		SELECT "product_id", "publisher", 'CVE-2', 'pkg:generic/zlib', "component", "status", "statement",
+		"document", "digest", "uploaded_by", "uploaded_at", "superseded_at" FROM "vex_statement"`)
+}
+
+// seedEvery writes a row into every table of the schema, each after the
 // tables it points at, every column holding a value. A foreign key points at
 // the first row of the table it names, which is the one this wrote.
-func seed(t *testing.T, ctx context.Context, db *database.DB) {
+func seedEvery(t *testing.T, ctx context.Context, db *database.DB) map[string][]column {
 	t.Helper()
 	tables := columns(t, ctx, db)
 	done := map[string]bool{}
@@ -261,32 +302,7 @@ func seed(t *testing.T, ctx context.Context, db *database.DB) {
 			t.Fatalf("the tables left point at each other: %v", missing(tables, done))
 		}
 	}
-
-	// Identifiers a fresh table would not generate, so that keeping them is
-	// something the upgrade does rather than something it happens into.
-	exec(t, ctx, db, `UPDATE "disclosure_extension" SET "id" = 7`)
-	exec(t, ctx, db, `UPDATE "advisory_issuance" SET "id" = 7`)
-
-	// The flaw recorded here, refiled under a CVE after it was issued: the
-	// name it was minted and issued under is kept among its aliases.
-	exec(t, ctx, db, `INSERT INTO "vulnerability_alias" ("vulnerability_id", "identifier", "identifier_folded")
-		VALUES (1, 'WIDGET-2025-123456', 'widget-2025-123456')`)
-
-	// An issue a scanner reported, classified, and recorded here by nobody.
-	copyRow(t, ctx, db, tables["vulnerability"], "vulnerability", map[string]any{
-		"identifier": "CVE-2025-2222", "identifier_folded": "cve-2025-2222"})
-	exec(t, ctx, db, `INSERT INTO "vulnerability_weakness" ("vulnerability_id", "cwe") VALUES (2, 'CWE-89')`)
-	copyRow(t, ctx, db, tables["finding"], "finding", map[string]any{"vulnerability_id": 2, "kind": "vulnerability"})
-
-	// A second weakness named after the first, a second issuance of the same
-	// advisory, and a statement naming no version.
-	exec(t, ctx, db, `INSERT INTO "vulnerability_weakness" ("vulnerability_id", "cwe") VALUES (1, 'CWE-20')`)
-	exec(t, ctx, db, `INSERT INTO "advisory_issuance" ("id", "product_id", "vulnerability_id", "ordinal", "digest",
-		"summary", "issued_by", "issued_at") VALUES (8, 1, 1, 2, 'second', NULL, 1, ?)`, when.Add(time.Hour))
-	exec(t, ctx, db, `INSERT INTO "vex_statement" ("product_id", "publisher", "vulnerability", "purl",
-		"component", "status", "statement", "document", "digest", "uploaded_by", "uploaded_at", "superseded_at")
-		SELECT "product_id", "publisher", 'CVE-2', 'pkg:generic/zlib', "component", "status", "statement",
-		"document", "digest", "uploaded_by", "uploaded_at", "superseded_at" FROM "vex_statement"`)
+	return tables
 }
 
 // copyRow writes a second row into a table, copied from its first with some
@@ -419,11 +435,16 @@ func text(v any) string {
 	return fmt.Sprint(v)
 }
 
+// replacedByV020 is the tables migration 37 replaces with tables of another
+// shape, whose rows moved rather than stayed.
+var replacedByV020 = map[string]bool{"disclosure_extension": true, "advisory_issuance": true}
+
 // survived checks every value the release held is still where it was, in
-// every table the upgrade keeps.
-func survived(t *testing.T, ctx context.Context, db *database.DB, before map[string][]map[string]string) {
+// every table the upgrade keeps, other than the columns it moves onto a rule
+// of its own, named as table.column.
+func survived(t *testing.T, ctx context.Context, db *database.DB, before map[string][]map[string]string,
+	replaced, rewritten map[string]bool) {
 	t.Helper()
-	replaced := map[string]bool{"disclosure_extension": true, "advisory_issuance": true}
 	checked := 0
 	for table, rows := range before {
 		if replaced[table] {
@@ -440,6 +461,9 @@ func survived(t *testing.T, ctx context.Context, db *database.DB, before map[str
 		}
 		for i := range rows {
 			for column, was := range rows[i] {
+				if rewritten[table+"."+column] {
+					continue
+				}
 				if now := after[i][column]; now != was {
 					t.Errorf("%s.%s was %q and is %q", table, column, was, now)
 				}
@@ -602,20 +626,20 @@ func returned(t *testing.T, ctx context.Context, db *database.DB, before map[str
 	}
 }
 
-// shippedSchema holds what migrations 1 to 36 build to what they built when
-// v0.1.0 was tagged, which the files alone do not: the column spellings and
+// taggedSchema holds what a release's migrations build to what they built
+// when it was tagged, which the files alone do not: the column spellings and
 // widths they use are read from helpers a later change is free to edit.
 //
 // The expected schema was captured from the tag's migrations on each engine.
-func shippedSchema(t *testing.T, engine database.Engine, got []string) {
+func taggedSchema(t *testing.T, version string, engine database.Engine, got []string) {
 	t.Helper()
-	want, err := os.ReadFile(filepath.Join("testdata", "v010-schema-"+string(engine)+".txt"))
+	want, err := os.ReadFile(filepath.Join(records, version, released.Schema(string(engine)))) //nolint:gosec // G304: a record in this repository, named by a release and an engine
 	if err != nil {
-		t.Fatalf("read what v0.1.0 built on %s: %v", engine, err)
+		t.Fatalf("read what %s built on %s: %v", version, engine, err)
 	}
 	lines := strings.Split(strings.TrimRight(string(want), "\n"), "\n")
 	if diff := setDiff(lines, got); diff != "" {
-		t.Errorf("migrations 1 to 36 no longer build what v0.1.0 built on %s:\n%s", engine, diff)
+		t.Errorf("the migrations no longer build what %s built on %s:\n%s", version, engine, diff)
 	}
 }
 

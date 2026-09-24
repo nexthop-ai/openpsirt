@@ -15,8 +15,8 @@ import (
 )
 
 // ownClock is the migration that clocks a recorded flaw from its first
-// severity and marks a report found here.
-const ownClock = 38
+// severity and marks a report found here, which is v0.3.0's upgrade.
+const ownClock = v030
 
 // A v0.2.0 database's recorded flaws come across clocked from when they were
 // first rated, in whatever way they were, on the windows for our own products;

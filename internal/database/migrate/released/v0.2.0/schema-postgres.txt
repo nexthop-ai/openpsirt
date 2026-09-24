@@ -1,0 +1,1135 @@
+column admin_change.about varchar(593) null=NO identity=NO default=-
+column admin_change.at timestamptz null=NO identity=NO default=-
+column admin_change.became text null=YES identity=NO default=-
+column admin_change.by int8 null=NO identity=NO default=-
+column admin_change.id int8 null=NO identity=YES default=-
+column admin_change.kind varchar(16) null=NO identity=NO default=-
+column admin_change.was text null=YES identity=NO default=-
+column advisory.edition_id int8 null=YES identity=NO default=-
+column advisory.id int8 null=NO identity=YES default=-
+column advisory.identifier varchar(191) null=NO identity=NO default=-
+column advisory.identifier_folded varchar(191) null=NO identity=NO default=-
+column advisory.mint_number int8 null=NO identity=NO default=-
+column advisory.minted_at timestamptz null=NO identity=NO default=-
+column advisory.minted_by int8 null=NO identity=NO default=-
+column advisory.minted_year int8 null=NO identity=NO default=-
+column advisory.released_from timestamptz null=YES identity=NO default=-
+column advisory_approval.advisory_id int8 null=NO identity=NO default=-
+column advisory_approval.approved_at timestamptz null=NO identity=NO default=-
+column advisory_approval.approved_by int8 null=NO identity=NO default=-
+column advisory_approval.edition_id int8 null=NO identity=NO default=-
+column advisory_approval.id int8 null=NO identity=YES default=-
+column advisory_approval.withdrawn_at timestamptz null=YES identity=NO default=-
+column advisory_approval.withdrawn_by int8 null=YES identity=NO default=-
+column advisory_edition.advisory_id int8 null=NO identity=NO default=-
+column advisory_edition.id int8 null=NO identity=YES default=-
+column advisory_edition.ordinal int8 null=NO identity=NO default=-
+column advisory_edition.title text null=YES identity=NO default=-
+column advisory_edition.written_at timestamptz null=NO identity=NO default=-
+column advisory_edition.written_by int8 null=NO identity=NO default=-
+column advisory_issuance.advisory_id int8 null=NO identity=NO default=-
+column advisory_issuance.digest varchar(64) null=NO identity=NO default=-
+column advisory_issuance.document text null=YES identity=NO default=-
+column advisory_issuance.edition_id int8 null=NO identity=NO default=-
+column advisory_issuance.id int8 null=NO identity=YES default=-
+column advisory_issuance.issued_at timestamptz null=NO identity=NO default=-
+column advisory_issuance.issued_by int8 null=NO identity=NO default=-
+column advisory_issuance.ordinal int8 null=NO identity=NO default=-
+column advisory_issuance.summary text null=YES identity=NO default=-
+column advisory_issue.added_at timestamptz null=NO identity=NO default=-
+column advisory_issue.added_by int8 null=NO identity=NO default=-
+column advisory_issue.advisory_id int8 null=NO identity=NO default=-
+column advisory_issue.id int8 null=NO identity=YES default=-
+column advisory_issue.product_id int8 null=NO identity=NO default=-
+column advisory_issue.removed_at timestamptz null=YES identity=NO default=-
+column advisory_issue.removed_by int8 null=YES identity=NO default=-
+column advisory_issue.vulnerability_id int8 null=NO identity=NO default=-
+column advisory_source.caught_up_mark varchar(64) null=YES identity=NO default=-
+column advisory_source.caught_up_to timestamptz null=YES identity=NO default=-
+column advisory_source.created_at timestamptz null=NO identity=NO default=-
+column advisory_source.created_by int8 null=NO identity=NO default=-
+column advisory_source.display_name varchar(191) null=NO identity=NO default=-
+column advisory_source.failed text null=YES identity=NO default=-
+column advisory_source.fetched_at timestamptz null=YES identity=NO default=-
+column advisory_source.id int8 null=NO identity=YES default=-
+column advisory_source.name varchar(191) null=NO identity=NO default=-
+column advisory_source.product_id int8 null=NO identity=NO default=-
+column advisory_source.reached_at timestamptz null=YES identity=NO default=-
+column advisory_source.retired_at timestamptz null=YES identity=NO default=-
+column advisory_source.url text null=NO identity=NO default=-
+column api_key.created_at timestamptz null=NO identity=NO default=-
+column api_key.id int8 null=NO identity=YES default=-
+column api_key.last_used_at timestamptz null=YES identity=NO default=-
+column api_key.name varchar(191) null=NO identity=NO default=-
+column api_key.product_id int8 null=NO identity=NO default=-
+column api_key.revoked_at timestamptz null=YES identity=NO default=-
+column api_key.secret_hash varchar(64) null=NO identity=NO default=-
+column api_key.stream_id int8 null=YES identity=NO default=-
+column api_key.variant_id int8 null=YES identity=NO default=-
+column application_setting.name varchar(191) null=NO identity=NO default=-
+column application_setting.updated_at timestamptz null=NO identity=NO default=-
+column application_setting.value text null=NO identity=NO default=-
+column assessment.decided_at timestamptz null=YES identity=NO default=-
+column assessment.decided_by int8 null=YES identity=NO default=-
+column assessment.id int8 null=NO identity=YES default=-
+column assessment.live_vulnerability_id int8 null=YES identity=NO default=-
+column assessment.needs_approval bool null=NO identity=NO default=-
+column assessment.product_id int8 null=NO identity=NO default=-
+column assessment.proposed_at timestamptz null=NO identity=NO default=-
+column assessment.proposed_by int8 null=NO identity=NO default=-
+column assessment.published varchar(16) null=YES identity=NO default=-
+column assessment.reasoning text null=NO identity=NO default=-
+column assessment.severity varchar(16) null=NO identity=NO default=-
+column assessment.state varchar(16) null=NO identity=NO default=-
+column assessment.vulnerability_id int8 null=NO identity=NO default=-
+column attachment.attached_at timestamptz null=YES identity=NO default=-
+column attachment.content_type varchar(191) null=NO identity=NO default=-
+column attachment.digest varchar(64) null=NO identity=NO default=-
+column attachment.filename text null=NO identity=NO default=-
+column attachment.flaw_report_id int8 null=YES identity=NO default=-
+column attachment.id int8 null=NO identity=YES default=-
+column attachment.object_key varchar(191) null=NO identity=NO default=-
+column attachment.product_id int8 null=NO identity=NO default=-
+column attachment.redacted_at timestamptz null=YES identity=NO default=-
+column attachment.redacted_by int8 null=YES identity=NO default=-
+column attachment.redacted_reason text null=YES identity=NO default=-
+column attachment.size_bytes int8 null=NO identity=NO default=-
+column attachment.token varchar(191) null=NO identity=NO default=-
+column attachment.uploaded_at timestamptz null=NO identity=NO default=-
+column attachment.uploaded_by int8 null=NO identity=NO default=-
+column attachment.vulnerability_id int8 null=YES identity=NO default=-
+column case_collaborator.added_at timestamptz null=NO identity=NO default=-
+column case_collaborator.added_by int8 null=NO identity=NO default=-
+column case_collaborator.id int8 null=NO identity=YES default=-
+column case_collaborator.live_person_id int8 null=YES identity=NO default=-
+column case_collaborator.person_id int8 null=NO identity=NO default=-
+column case_collaborator.product_id int8 null=NO identity=NO default=-
+column case_collaborator.removed_at timestamptz null=YES identity=NO default=-
+column case_collaborator.removed_by int8 null=YES identity=NO default=-
+column case_collaborator.vulnerability_id int8 null=NO identity=NO default=-
+column claim.committed_to date null=YES identity=NO default=-
+column claim.deferred_until date null=YES identity=NO default=-
+column claim.derived_from int8 null=YES identity=NO default=-
+column claim.elsewhere text null=YES identity=NO default=-
+column claim.fixed_version text null=YES identity=NO default=-
+column claim.id int8 null=NO identity=YES default=-
+column claim.justification text null=YES identity=NO default=-
+column claim.kind varchar(16) null=NO identity=NO default=-
+column claim.mitigation text null=YES identity=NO default=-
+column claim.outcome varchar(16) null=NO identity=NO default=-
+column claim.proposed_at timestamptz null=NO identity=NO default=-
+column claim.proposed_by int8 null=NO identity=NO default=-
+column claim.revision_id int8 null=YES identity=NO default=-
+column claim.selected_by text null=YES identity=NO default=-
+column claim.selected_matched int4 null=YES identity=NO default=-
+column claim.selected_named int4 null=YES identity=NO default=-
+column claim.selected_where text null=YES identity=NO default=-
+column claim.upgrade_to text null=YES identity=NO default=-
+column claim_approval.approved_at timestamptz null=NO identity=NO default=-
+column claim_approval.approved_by int8 null=NO identity=NO default=-
+column claim_approval.batch varchar(64) null=YES identity=NO default=-
+column claim_approval.carried_from int8 null=YES identity=NO default=-
+column claim_approval.claim_id int8 null=NO identity=NO default=-
+column claim_approval.covered int8 null=YES identity=NO default=-
+column claim_approval.id int8 null=NO identity=YES default=-
+column claim_approval.revision_id int8 null=NO identity=NO default=-
+column claim_approval.withdrawn_at timestamptz null=YES identity=NO default=-
+column claim_approval.withdrawn_by int8 null=YES identity=NO default=-
+column claim_comment.body text null=NO identity=NO default=-
+column claim_comment.claim_id int8 null=NO identity=NO default=-
+column claim_comment.edited_at timestamptz null=YES identity=NO default=-
+column claim_comment.id int8 null=NO identity=YES default=-
+column claim_comment.written_at timestamptz null=NO identity=NO default=-
+column claim_comment.written_by int8 null=NO identity=NO default=-
+column claim_comment_revision.body text null=NO identity=NO default=-
+column claim_comment_revision.comment_id int8 null=NO identity=NO default=-
+column claim_comment_revision.id int8 null=NO identity=YES default=-
+column claim_comment_revision.ordinal int8 null=NO identity=NO default=-
+column claim_comment_revision.replaced_at timestamptz null=NO identity=NO default=-
+column claim_revision.body text null=NO identity=NO default=-
+column claim_revision.claim_id int8 null=NO identity=NO default=-
+column claim_revision.id int8 null=NO identity=YES default=-
+column claim_revision.ordinal int8 null=NO identity=NO default=-
+column claim_revision.written_at timestamptz null=NO identity=NO default=-
+column claim_revision.written_by int8 null=NO identity=NO default=-
+column component.cpe text null=YES identity=NO default=-
+column component.first_seen_at timestamptz null=NO identity=NO default=-
+column component.fold_key varchar(64) null=NO identity=NO default=-
+column component.id int8 null=NO identity=YES default=-
+column component.identity varchar(64) null=NO identity=NO default=-
+column component.latest_checked_at timestamptz null=YES identity=NO default=-
+column component.latest_released_at timestamptz null=YES identity=NO default=-
+column component.latest_version text null=YES identity=NO default=-
+column component.name text null=NO identity=NO default=-
+column component.name_folded varchar(191) null=YES identity=NO default=-
+column component.project_url text null=YES identity=NO default=-
+column component.purl text null=YES identity=NO default=-
+column component.summary text null=YES identity=NO default=-
+column component.supplier text null=YES identity=NO default=-
+column component.upstream_folded varchar(191) null=YES identity=NO default=-
+column component.upstream_name text null=YES identity=NO default=-
+column component.upstream_version text null=YES identity=NO default=-
+column component.version text null=NO identity=NO default=-
+column decision.claim_id int8 null=NO identity=NO default=-
+column decision.component_upstream_version varchar(191) null=YES identity=NO default=-
+column decision.consumer_upstream_version varchar(191) null=YES identity=NO default=-
+column decision.ended_at timestamptz null=YES identity=NO default=-
+column decision.from_statement_id int8 null=YES identity=NO default=-
+column decision.id int8 null=NO identity=YES default=-
+column decision.live_key varchar(64) null=YES identity=NO default=-
+column decision.needs_approval bool null=NO identity=NO default=-
+column decision.place_identity varchar(64) null=NO identity=NO default=-
+column decision.product_id int8 null=NO identity=NO default=-
+column decision.proposed_at timestamptz null=NO identity=NO default=-
+column decision.proposed_by int8 null=NO identity=NO default=-
+column decision.selected_by text null=YES identity=NO default=-
+column decision.sent_back_at timestamptz null=YES identity=NO default=-
+column decision.severity_centi int8 null=YES identity=NO default=-
+column decision.state varchar(16) null=NO identity=NO default=-
+column decision.visibility varchar(16) null=NO identity=NO default=-
+column decision.vulnerability_id int8 null=NO identity=NO default=-
+column disclosure_movement.act varchar(16) null=NO identity=NO default=-
+column disclosure_movement.approved_at timestamptz null=YES identity=NO default=-
+column disclosure_movement.approved_by int8 null=YES identity=NO default=-
+column disclosure_movement.asked_at timestamptz null=NO identity=NO default=-
+column disclosure_movement.asked_by int8 null=NO identity=NO default=-
+column disclosure_movement.id int8 null=NO identity=YES default=-
+column disclosure_movement.needs_approval bool null=NO identity=NO default=-
+column disclosure_movement.product_id int8 null=NO identity=NO default=-
+column disclosure_movement.reason text null=NO identity=NO default=-
+column disclosure_movement.until timestamptz null=NO identity=NO default=-
+column disclosure_movement.vulnerability_id int8 null=NO identity=NO default=-
+column disclosure_movement.was timestamptz null=NO identity=NO default=-
+column exploited_here.cleared_at timestamptz null=YES identity=NO default=-
+column exploited_here.cleared_because text null=YES identity=NO default=-
+column exploited_here.cleared_by int8 null=YES identity=NO default=-
+column exploited_here.grounds text null=NO identity=NO default=-
+column exploited_here.id int8 null=NO identity=YES default=-
+column exploited_here.known_at timestamptz null=NO identity=NO default=-
+column exploited_here.live_vulnerability_id int8 null=YES identity=NO default=-
+column exploited_here.product_id int8 null=NO identity=NO default=-
+column exploited_here.recorded_at timestamptz null=NO identity=NO default=-
+column exploited_here.recorded_by int8 null=NO identity=NO default=-
+column exploited_here.vulnerability_id int8 null=NO identity=NO default=-
+column finding.arrived_from text null=YES identity=NO default=-
+column finding.assigned_at timestamptz null=YES identity=NO default=-
+column finding.assigned_to int8 null=YES identity=NO default=-
+column finding.closed_at timestamptz null=YES identity=NO default=-
+column finding.closed_because varchar(16) null=YES identity=NO default=-
+column finding.closed_by int8 null=YES identity=NO default=-
+column finding.closed_note text null=YES identity=NO default=-
+column finding.closed_run_id int8 null=YES identity=NO default=-
+column finding.component_id int8 null=NO identity=NO default=-
+column finding.consumer_id int8 null=YES identity=NO default=-
+column finding.disclose_at timestamptz null=YES identity=NO default=-
+column finding.due_at timestamptz null=YES identity=NO default=-
+column finding.exploited_learned_at timestamptz null=YES identity=NO default=-
+column finding.fix_state varchar(16) null=YES identity=NO default=-
+column finding.fixed_at date null=YES identity=NO default=-
+column finding.fixed_in text null=YES identity=NO default=-
+column finding.id int8 null=NO identity=YES default=-
+column finding.kind varchar(16) null=NO identity=NO default=-
+column finding.last_changed_at timestamptz null=NO identity=NO default=-
+column finding.matched varchar(16) null=YES identity=NO default=-
+column finding.matched_from text null=YES identity=NO default=-
+column finding.matched_in text null=YES identity=NO default=-
+column finding.matched_range text null=YES identity=NO default=-
+column finding.moved_to text null=YES identity=NO default=-
+column finding.opened_at timestamptz null=NO identity=NO default=-
+column finding.opened_run_id int8 null=YES identity=NO default=-
+column finding.place_identity varchar(64) null=NO identity=NO default=-
+column finding.routed_by int8 null=YES identity=NO default=-
+column finding.suppressed_by int8 null=YES identity=NO default=-
+column finding.target_id int8 null=NO identity=NO default=-
+column finding.urgency int8 null=NO identity=NO default=-
+column finding.urgency_exploited bool null=NO identity=NO default=-
+column finding.urgency_exploited_here bool null=NO identity=NO default=-
+column finding.urgency_shipped bool null=NO identity=NO default=-
+column finding.visibility varchar(16) null=NO identity=NO default=-
+column finding.vulnerability_id int8 null=NO identity=NO default=-
+column finding_tag.added_at timestamptz null=NO identity=NO default=-
+column finding_tag.added_by int8 null=NO identity=NO default=-
+column finding_tag.component_id int8 null=NO identity=NO default=-
+column finding_tag.id int8 null=NO identity=YES default=-
+column finding_tag.product_id int8 null=NO identity=NO default=-
+column finding_tag.tag varchar(191) null=NO identity=NO default=-
+column finding_tag.typed text null=NO identity=NO default=-
+column finding_tag.vulnerability_id int8 null=NO identity=NO default=-
+column flaw_report.acknowledged_at timestamptz null=YES identity=NO default=-
+column flaw_report.acknowledged_by int8 null=YES identity=NO default=-
+column flaw_report.contact text null=YES identity=NO default=-
+column flaw_report.credit text null=YES identity=NO default=-
+column flaw_report.evaluated_at timestamptz null=YES identity=NO default=-
+column flaw_report.evaluated_by int8 null=YES identity=NO default=-
+column flaw_report.id int8 null=NO identity=YES default=-
+column flaw_report.product_id int8 null=NO identity=NO default=-
+column flaw_report.received_on date null=YES identity=NO default=-
+column flaw_report.recorded_at timestamptz null=NO identity=NO default=-
+column flaw_report.recorded_by int8 null=NO identity=NO default=-
+column flaw_report.reference varchar(593) null=NO identity=NO default=-
+column flaw_report.reported_by text null=YES identity=NO default=-
+column flaw_report.ruling_id int8 null=YES identity=NO default=-
+column flaw_report.summary text null=YES identity=NO default=-
+column flaw_report.vulnerability_id int8 null=YES identity=NO default=-
+column goose_db_version.id int4 null=NO identity=YES default=-
+column goose_db_version.is_applied bool null=NO identity=NO default=-
+column goose_db_version.tstamp timestamp null=NO identity=NO default=now()
+column goose_db_version.version_id int8 null=NO identity=NO default=-
+column graph_edge.child_id int8 null=NO identity=NO default=-
+column graph_edge.closed_scan_id int8 null=YES identity=NO default=-
+column graph_edge.id int8 null=NO identity=YES default=-
+column graph_edge.kind varchar(16) null=NO identity=NO default=-
+column graph_edge.opened_scan_id int8 null=NO identity=NO default=-
+column graph_edge.parent_id int8 null=NO identity=NO default=-
+column graph_edge.target_id int8 null=NO identity=NO default=-
+column graph_node.closed_scan_id int8 null=YES identity=NO default=-
+column graph_node.component_id int8 null=NO identity=NO default=-
+column graph_node.id int8 null=NO identity=YES default=-
+column graph_node.is_root bool null=NO identity=NO default=-
+column graph_node.opened_scan_id int8 null=NO identity=NO default=-
+column graph_node.target_id int8 null=NO identity=NO default=-
+column group_admin.created_at timestamptz null=NO identity=NO default=-
+column group_admin.grants varchar(16) null=NO identity=NO default=-
+column group_admin.group_name varchar(191) null=NO identity=NO default=-
+column group_admin.id int8 null=NO identity=YES default=-
+column group_role.created_at timestamptz null=NO identity=NO default=-
+column group_role.group_name varchar(191) null=NO identity=NO default=-
+column group_role.id int8 null=NO identity=YES default=-
+column group_role.product_id int8 null=NO identity=NO default=-
+column group_role.role varchar(16) null=NO identity=NO default=-
+column issue_note.body text null=NO identity=NO default=-
+column issue_note.edited_at timestamptz null=YES identity=NO default=-
+column issue_note.id int8 null=NO identity=YES default=-
+column issue_note.product_id int8 null=NO identity=NO default=-
+column issue_note.vulnerability_id int8 null=NO identity=NO default=-
+column issue_note.written_at timestamptz null=NO identity=NO default=-
+column issue_note.written_by int8 null=NO identity=NO default=-
+column issue_note_revision.body text null=NO identity=NO default=-
+column issue_note_revision.id int8 null=NO identity=YES default=-
+column issue_note_revision.note_id int8 null=NO identity=NO default=-
+column issue_note_revision.ordinal int8 null=NO identity=NO default=-
+column issue_note_revision.replaced_at timestamptz null=NO identity=NO default=-
+column issue_rating.id int8 null=NO identity=YES default=-
+column issue_rating.product_id int8 null=NO identity=NO default=-
+column issue_rating.severity varchar(16) null=NO identity=NO default=-
+column issue_rating.vulnerability_id int8 null=NO identity=NO default=-
+column job.attempts int4 null=NO identity=NO default=-
+column job.claimed_at timestamptz null=YES identity=NO default=-
+column job.claimed_by varchar(191) null=YES identity=NO default=-
+column job.created_at timestamptz null=NO identity=NO default=-
+column job.id int8 null=NO identity=YES default=-
+column job.kind varchar(191) null=NO identity=NO default=-
+column job.last_error text null=YES identity=NO default=-
+column job.max_attempts int4 null=NO identity=NO default=-
+column job.reference varchar(191) null=NO identity=NO default=-
+column job.run_after timestamptz null=NO identity=NO default=-
+column job.state varchar(16) null=NO identity=NO default=-
+column job.updated_at timestamptz null=NO identity=NO default=-
+column lease.held_by varchar(191) null=YES identity=NO default=-
+column lease.held_until timestamptz null=YES identity=NO default=-
+column lease.name varchar(191) null=NO identity=NO default=-
+column notification.about varchar(191) null=NO identity=NO default=-
+column notification.about_open varchar(191) null=YES identity=NO default=-
+column notification.attempts int8 null=NO identity=NO default=-
+column notification.body text null=NO identity=NO default=-
+column notification.cleared_at timestamptz null=YES identity=NO default=-
+column notification.concerns varchar(191) null=YES identity=NO default=-
+column notification.created_at timestamptz null=NO identity=NO default=-
+column notification.id int8 null=NO identity=YES default=-
+column notification.kind varchar(191) null=NO identity=NO default=-
+column notification.lifetime varchar(16) null=NO identity=NO default=-
+column notification.link text null=NO identity=NO default=-
+column notification.person_id int8 null=NO identity=NO default=-
+column notification.private bool null=NO identity=NO default=-
+column notification.product_id int8 null=YES identity=NO default=-
+column notification.read_at timestamptz null=YES identity=NO default=-
+column notification.sent_at timestamptz null=YES identity=NO default=-
+column notification.together varchar(191) null=NO identity=NO default=-
+column notification.vulnerability_id int8 null=YES identity=NO default=-
+column obligation_window.declared_at timestamptz null=NO identity=NO default=-
+column obligation_window.declared_by int8 null=NO identity=NO default=-
+column obligation_window.id int8 null=NO identity=YES default=-
+column obligation_window.lead_hours int4 null=YES identity=NO default=-
+column obligation_window.length_hours int4 null=NO identity=NO default=-
+column obligation_window.live_name varchar(191) null=YES identity=NO default=-
+column obligation_window.name varchar(191) null=NO identity=NO default=-
+column obligation_window.retired_at timestamptz null=YES identity=NO default=-
+column obligation_window_product.product_id int8 null=NO identity=NO default=-
+column obligation_window_product.window_id int8 null=NO identity=NO default=-
+column outbound.created_at timestamptz null=NO identity=NO default=-
+column outbound.created_by int8 null=NO identity=NO default=-
+column outbound.id int8 null=NO identity=YES default=-
+column outbound.kind varchar(191) null=NO identity=NO default=-
+column outbound.name varchar(191) null=NO identity=NO default=-
+column outbound.retired_at timestamptz null=YES identity=NO default=-
+column outbound.secret text null=NO identity=NO default=-
+column outbound.url text null=NO identity=NO default=-
+column outbound_delivery.about varchar(64) null=NO identity=NO default=-
+column outbound_delivery.attempts int8 null=NO identity=NO default=-
+column outbound_delivery.failed text null=YES identity=NO default=-
+column outbound_delivery.first_seen timestamptz null=NO identity=NO default=-
+column outbound_delivery.id int8 null=NO identity=YES default=-
+column outbound_delivery.notification_id int8 null=NO identity=NO default=-
+column outbound_delivery.outbound_id int8 null=NO identity=NO default=-
+column outbound_delivery.sent_at timestamptz null=YES identity=NO default=-
+column party.id int8 null=NO identity=YES default=-
+column party.kind varchar(16) null=NO identity=NO default=-
+column patch_commit.branch_count int8 null=NO identity=NO default=-
+column patch_commit.commit_hash varchar(64) null=NO identity=NO default=-
+column patch_commit.created_at timestamptz null=NO identity=NO default=-
+column patch_commit.found bool null=NO identity=NO default=-
+column patch_commit.id int8 null=NO identity=YES default=-
+column patch_commit.looked_at timestamptz null=YES identity=NO default=-
+column patch_commit.repository_id int8 null=NO identity=NO default=-
+column patch_commit_branch.branch varchar(191) null=NO identity=NO default=-
+column patch_commit_branch.commit_id int8 null=NO identity=NO default=-
+column patch_commit_branch.id int8 null=NO identity=YES default=-
+column patch_repository.created_at timestamptz null=NO identity=NO default=-
+column patch_repository.failed text null=YES identity=NO default=-
+column patch_repository.fetched_at timestamptz null=YES identity=NO default=-
+column patch_repository.held_bytes int8 null=YES identity=NO default=-
+column patch_repository.host varchar(191) null=NO identity=NO default=-
+column patch_repository.id int8 null=NO identity=YES default=-
+column patch_repository.reached_at timestamptz null=YES identity=NO default=-
+column patch_repository.url text null=NO identity=NO default=-
+column patch_repository.url_identity varchar(64) null=NO identity=NO default=-
+column person.admin_derived bool null=NO identity=NO default=-
+column person.admin_derived_at timestamptz null=YES identity=NO default=-
+column person.audits bool null=NO identity=NO default=-
+column person.audits_derived bool null=NO identity=NO default=-
+column person.audits_derived_at timestamptz null=YES identity=NO default=-
+column person.created_at timestamptz null=NO identity=NO default=-
+column person.deactivated_at timestamptz null=YES identity=NO default=-
+column person.digest bool null=NO identity=NO default=-
+column person.digest_sent_at timestamptz null=YES identity=NO default=-
+column person.digest_unassigned bool null=NO identity=NO default=-
+column person.display_name text null=YES identity=NO default=-
+column person.email text null=YES identity=NO default=-
+column person.email_source varchar(16) null=NO identity=NO default=-
+column person.id int8 null=NO identity=YES default=-
+column person.identity varchar(191) null=NO identity=NO default=-
+column person.is_admin bool null=NO identity=NO default=-
+column person.is_bootstrap bool null=NO identity=NO default=-
+column person.last_seen_at timestamptz null=YES identity=NO default=-
+column person.party_id int8 null=NO identity=NO default=-
+column person_identity.bound_at timestamptz null=YES identity=NO default=-
+column person_identity.claimable_until timestamptz null=YES identity=NO default=-
+column person_identity.created_at timestamptz null=NO identity=NO default=-
+column person_identity.id int8 null=NO identity=YES default=-
+column person_identity.person_id int8 null=NO identity=NO default=-
+column person_identity.provider varchar(191) null=YES identity=NO default=-
+column person_identity.subject varchar(191) null=YES identity=NO default=-
+column person_identity.username varchar(191) null=NO identity=NO default=-
+column personal_token.created_at timestamptz null=NO identity=NO default=-
+column personal_token.expires_at timestamptz null=NO identity=NO default=-
+column personal_token.holds varchar(191) null=YES identity=NO default=-
+column personal_token.id int8 null=NO identity=YES default=-
+column personal_token.last_used_at timestamptz null=YES identity=NO default=-
+column personal_token.name varchar(191) null=NO identity=NO default=-
+column personal_token.person_id int8 null=NO identity=NO default=-
+column personal_token.product_id int8 null=YES identity=NO default=-
+column personal_token.revoked_at timestamptz null=YES identity=NO default=-
+column personal_token.secret_hash varchar(64) null=NO identity=NO default=-
+column product.created_at timestamptz null=NO identity=NO default=-
+column product.display_name text null=NO identity=NO default=-
+column product.eol_on date null=YES identity=NO default=-
+column product.id int8 null=NO identity=YES default=-
+column product.name varchar(191) null=NO identity=NO default=-
+column product.pair_approvers int4 null=YES identity=NO default=-
+column product.pair_share int4 null=YES identity=NO default=-
+column product.retired_at timestamptz null=YES identity=NO default=-
+column product.triage_floor varchar(16) null=YES identity=NO default=-
+column report_ruled.flaw_report_id int8 null=NO identity=NO default=-
+column report_ruled.ruling_id int8 null=NO identity=NO default=-
+column report_ruling.approved_at timestamptz null=YES identity=NO default=-
+column report_ruling.approved_by int8 null=YES identity=NO default=-
+column report_ruling.disposition varchar(16) null=NO identity=NO default=-
+column report_ruling.duplicate_of int8 null=YES identity=NO default=-
+column report_ruling.id int8 null=NO identity=YES default=-
+column report_ruling.product_id int8 null=NO identity=NO default=-
+column report_ruling.proposed_at timestamptz null=NO identity=NO default=-
+column report_ruling.proposed_by int8 null=NO identity=NO default=-
+column report_ruling.reasoning text null=YES identity=NO default=-
+column report_ruling.settled_at timestamptz null=YES identity=NO default=-
+column report_ruling.withdrawn_at timestamptz null=YES identity=NO default=-
+column report_ruling.withdrawn_by int8 null=YES identity=NO default=-
+column role_grant.active bool null=NO identity=NO default=-
+column role_grant.created_at timestamptz null=NO identity=NO default=-
+column role_grant.id int8 null=NO identity=YES default=-
+column role_grant.person_id int8 null=NO identity=NO default=-
+column role_grant.product_id int8 null=NO identity=NO default=-
+column role_grant.role varchar(16) null=NO identity=NO default=-
+column role_grant.source varchar(16) null=NO identity=NO default=-
+column role_grant_all.active bool null=NO identity=NO default=-
+column role_grant_all.created_at timestamptz null=NO identity=NO default=-
+column role_grant_all.id int8 null=NO identity=YES default=-
+column role_grant_all.person_id int8 null=NO identity=NO default=-
+column role_grant_all.role varchar(16) null=NO identity=NO default=-
+column role_grant_all.source varchar(16) null=NO identity=NO default=-
+column routing_rule.beneath varchar(191) null=YES identity=NO default=-
+column routing_rule.created_at timestamptz null=NO identity=NO default=-
+column routing_rule.created_by int8 null=NO identity=NO default=-
+column routing_rule.id int8 null=NO identity=YES default=-
+column routing_rule.name text null=NO identity=NO default=-
+column routing_rule.ordinal int8 null=NO identity=NO default=-
+column routing_rule.product_id int8 null=NO identity=NO default=-
+column routing_rule.retired_at timestamptz null=YES identity=NO default=-
+column routing_rule.team_id int8 null=NO identity=NO default=-
+column routing_rule.upstream varchar(191) null=YES identity=NO default=-
+column saved_filter.created_at timestamptz null=NO identity=NO default=-
+column saved_filter.defer_days int4 null=YES identity=NO default=-
+column saved_filter.display_name text null=YES identity=NO default=-
+column saved_filter.id int8 null=NO identity=YES default=-
+column saved_filter.justification text null=YES identity=NO default=-
+column saved_filter.name varchar(191) null=NO identity=NO default=-
+column saved_filter.outcome varchar(16) null=YES identity=NO default=-
+column saved_filter.person_id int8 null=NO identity=NO default=-
+column saved_filter.product_id int8 null=NO identity=NO default=-
+column saved_filter.query text null=NO identity=NO default=-
+column saved_filter.reasoning text null=YES identity=NO default=-
+column scan.built_at timestamptz null=NO identity=NO default=-
+column scan.components int4 null=YES identity=NO default=-
+column scan.content_hash varchar(64) null=NO identity=NO default=-
+column scan.credential varchar(191) null=YES identity=NO default=-
+column scan.failure text null=YES identity=NO default=-
+column scan.id int8 null=NO identity=YES default=-
+column scan.parser_version varchar(191) null=NO identity=NO default=-
+column scan.placed int4 null=YES identity=NO default=-
+column scan.received_at timestamptz null=NO identity=NO default=-
+column scan.root_identifier text null=YES identity=NO default=-
+column scan.serial text null=YES identity=NO default=-
+column scan.status varchar(16) null=NO identity=NO default=-
+column scan.target_id int8 null=NO identity=NO default=-
+column scan_document.content_hash varchar(64) null=NO identity=NO default=-
+column scan_document.created_at timestamptz null=NO identity=NO default=-
+column scan_document.discarded_at timestamptz null=YES identity=NO default=-
+column scan_document.id int8 null=NO identity=YES default=-
+column scan_document.kind varchar(16) null=NO identity=NO default=-
+column scan_document.ordinal int4 null=NO identity=NO default=-
+column scan_document.scan_id int8 null=NO identity=NO default=-
+column scan_document.size_bytes int8 null=NO identity=NO default=-
+column scan_document_chunk.body bytea null=NO identity=NO default=-
+column scan_document_chunk.document_id int8 null=NO identity=NO default=-
+column scan_document_chunk.id int8 null=NO identity=YES default=-
+column scan_document_chunk.seq int4 null=NO identity=NO default=-
+column scan_refusal.at timestamptz null=NO identity=NO default=-
+column scan_refusal.built_at timestamptz null=YES identity=NO default=-
+column scan_refusal.content_hash varchar(64) null=YES identity=NO default=-
+column scan_refusal.credential varchar(191) null=YES identity=NO default=-
+column scan_refusal.id int8 null=NO identity=YES default=-
+column scan_refusal.reason text null=NO identity=NO default=-
+column scan_refusal.target_id int8 null=NO identity=NO default=-
+column scan_run.caution text null=YES identity=NO default=-
+column scan_run.database_version text null=YES identity=NO default=-
+column scan_run.failure text null=YES identity=NO default=-
+column scan_run.finished_at timestamptz null=YES identity=NO default=-
+column scan_run.id int8 null=NO identity=YES default=-
+column scan_run.ran_here bool null=NO identity=NO default=-
+column scan_run.scanner text null=NO identity=NO default=-
+column scan_run.scanner_version text null=YES identity=NO default=-
+column scan_run.started_at timestamptz null=NO identity=NO default=-
+column scan_run.target_id int8 null=NO identity=NO default=-
+column session.created_at timestamptz null=NO identity=NO default=-
+column session.csrf_token varchar(64) null=NO identity=NO default=-
+column session.expires_at timestamptz null=NO identity=NO default=-
+column session.id int8 null=NO identity=YES default=-
+column session.last_used_at timestamptz null=YES identity=NO default=-
+column session.person_id int8 null=NO identity=NO default=-
+column session.token_hash varchar(64) null=NO identity=NO default=-
+column stream.created_at timestamptz null=NO identity=NO default=-
+column stream.display_name text null=NO identity=NO default=-
+column stream.eol_on date null=YES identity=NO default=-
+column stream.id int8 null=NO identity=YES default=-
+column stream.kind varchar(16) null=NO identity=NO default=-
+column stream.name varchar(191) null=NO identity=NO default=-
+column stream.parent_id int8 null=YES identity=NO default=-
+column stream.product_id int8 null=NO identity=NO default=-
+column stream.released_on date null=YES identity=NO default=-
+column stream.retired_at timestamptz null=YES identity=NO default=-
+column suppression.closed_scan_id int8 null=YES identity=NO default=-
+column suppression.id int8 null=NO identity=YES default=-
+column suppression.identity varchar(64) null=NO identity=NO default=-
+column suppression.justification text null=YES identity=NO default=-
+column suppression.opened_scan_id int8 null=NO identity=NO default=-
+column suppression.origin varchar(16) null=NO identity=NO default=-
+column suppression.statement text null=YES identity=NO default=-
+column suppression.status varchar(191) null=NO identity=NO default=-
+column suppression.subject_name text null=YES identity=NO default=-
+column suppression.subject_purl text null=YES identity=NO default=-
+column suppression.target_id int8 null=NO identity=NO default=-
+column suppression.vulnerability text null=NO identity=NO default=-
+column target.created_at timestamptz null=NO identity=NO default=-
+column target.id int8 null=NO identity=YES default=-
+column target.last_run_id int8 null=YES identity=NO default=-
+column target.last_scan_id int8 null=YES identity=NO default=-
+column target.stream_id int8 null=NO identity=NO default=-
+column target.variant_id int8 null=NO identity=NO default=-
+column team.created_at timestamptz null=NO identity=NO default=-
+column team.display_name text null=YES identity=NO default=-
+column team.id int8 null=NO identity=YES default=-
+column team.name varchar(191) null=NO identity=NO default=-
+column team.party_id int8 null=NO identity=NO default=-
+column team.retired_at timestamptz null=YES identity=NO default=-
+column team_member.added_at timestamptz null=NO identity=NO default=-
+column team_member.added_by int8 null=NO identity=NO default=-
+column team_member.person_id int8 null=NO identity=NO default=-
+column team_member.team_id int8 null=NO identity=NO default=-
+column told_outside.exploited_here_id int8 null=NO identity=NO default=-
+column told_outside.id int8 null=NO identity=YES default=-
+column told_outside.recipient text null=NO identity=NO default=-
+column told_outside.recorded_at timestamptz null=NO identity=NO default=-
+column told_outside.recorded_by int8 null=NO identity=NO default=-
+column told_outside.said text null=NO identity=NO default=-
+column told_outside.told_at timestamptz null=NO identity=NO default=-
+column told_outside.window_id int8 null=YES identity=NO default=-
+column upgrade.claim_id int8 null=YES identity=NO default=-
+column upgrade.committed_to date null=YES identity=NO default=-
+column upgrade.declared_at timestamptz null=NO identity=NO default=-
+column upgrade.declared_by int8 null=NO identity=NO default=-
+column upgrade.fold_key varchar(64) null=NO identity=NO default=-
+column upgrade.from_version text null=NO identity=NO default=-
+column upgrade.id int8 null=NO identity=YES default=-
+column upgrade.target_id int8 null=NO identity=NO default=-
+column upgrade.to_version text null=NO identity=NO default=-
+column variant.created_at timestamptz null=NO identity=NO default=-
+column variant.customer_facing bool null=NO identity=NO default=-
+column variant.display_name text null=NO identity=NO default=-
+column variant.id int8 null=NO identity=YES default=-
+column variant.name varchar(191) null=NO identity=NO default=-
+column variant.product_id int8 null=NO identity=NO default=-
+column variant.retired_at timestamptz null=YES identity=NO default=-
+column vex_issuance.digest varchar(64) null=NO identity=NO default=-
+column vex_issuance.document text null=NO identity=NO default=-
+column vex_issuance.id int8 null=NO identity=YES default=-
+column vex_issuance.issued_at timestamptz null=NO identity=NO default=-
+column vex_issuance.issued_by int8 null=NO identity=NO default=-
+column vex_issuance.ordinal int8 null=NO identity=NO default=-
+column vex_issuance.target_id int8 null=NO identity=NO default=-
+column vex_statement.about varchar(191) null=NO identity=NO default=-
+column vex_statement.component varchar(191) null=NO identity=NO default=-
+column vex_statement.digest varchar(64) null=NO identity=NO default=-
+column vex_statement.document text null=NO identity=NO default=-
+column vex_statement.document_id varchar(191) null=NO identity=NO default=-
+column vex_statement.id int8 null=NO identity=YES default=-
+column vex_statement.justification varchar(191) null=YES identity=NO default=-
+column vex_statement.product_id int8 null=NO identity=NO default=-
+column vex_statement.publisher varchar(191) null=NO identity=NO default=-
+column vex_statement.purl text null=YES identity=NO default=-
+column vex_statement.source varchar(16) null=NO identity=NO default=-
+column vex_statement.statement text null=YES identity=NO default=-
+column vex_statement.status varchar(191) null=NO identity=NO default=-
+column vex_statement.superseded_at timestamptz null=YES identity=NO default=-
+column vex_statement.uploaded_at timestamptz null=NO identity=NO default=-
+column vex_statement.uploaded_by int8 null=NO identity=NO default=-
+column vex_statement.vulnerability varchar(191) null=NO identity=NO default=-
+column vulnerability.advisory text null=YES identity=NO default=-
+column vulnerability.description text null=YES identity=NO default=-
+column vulnerability.exploited bool null=NO identity=NO default=-
+column vulnerability.first_seen_at timestamptz null=NO identity=NO default=-
+column vulnerability.id int8 null=NO identity=YES default=-
+column vulnerability.identifier text null=NO identity=NO default=-
+column vulnerability.identifier_folded varchar(191) null=NO identity=NO default=-
+column vulnerability.likelihood_on date null=YES identity=NO default=-
+column vulnerability.likelihood_percentile_ppm int8 null=YES identity=NO default=-
+column vulnerability.likelihood_ppm int8 null=YES identity=NO default=-
+column vulnerability.score_centi int8 null=YES identity=NO default=-
+column vulnerability.score_kind text null=YES identity=NO default=-
+column vulnerability.score_source text null=YES identity=NO default=-
+column vulnerability.score_version text null=YES identity=NO default=-
+column vulnerability.severity varchar(16) null=YES identity=NO default=-
+column vulnerability.vector text null=YES identity=NO default=-
+column vulnerability_alias.id int8 null=NO identity=YES default=-
+column vulnerability_alias.identifier varchar(191) null=NO identity=NO default=-
+column vulnerability_alias.identifier_folded varchar(191) null=NO identity=NO default=-
+column vulnerability_alias.vulnerability_id int8 null=NO identity=NO default=-
+column vulnerability_rating.generation int8 null=NO identity=NO default=-
+column vulnerability_rating.id int8 null=NO identity=YES default=-
+column vulnerability_rating.score_centi int8 null=NO identity=NO default=-
+column vulnerability_rating.score_kind text null=YES identity=NO default=-
+column vulnerability_rating.score_source text null=YES identity=NO default=-
+column vulnerability_rating.score_version text null=YES identity=NO default=-
+column vulnerability_rating.vector text null=NO identity=NO default=-
+column vulnerability_rating.vulnerability_id int8 null=NO identity=NO default=-
+column vulnerability_reference.id int8 null=NO identity=YES default=-
+column vulnerability_reference.kind varchar(16) null=NO identity=NO default=-
+column vulnerability_reference.url text null=NO identity=NO default=-
+column vulnerability_reference.url_identity varchar(64) null=NO identity=NO default=-
+column vulnerability_reference.vulnerability_id int8 null=NO identity=NO default=-
+column vulnerability_weakness.cwe varchar(191) null=NO identity=NO default=-
+column vulnerability_weakness.id int8 null=NO identity=YES default=-
+column vulnerability_weakness.is_primary bool null=NO identity=NO default=-
+column vulnerability_weakness.vulnerability_id int8 null=NO identity=NO default=-
+constraint admin_change admin_change_by_fk FOREIGN KEY (by) REFERENCES person(id)
+constraint admin_change admin_change_pkey PRIMARY KEY (id)
+constraint advisory advisory_by_fk FOREIGN KEY (minted_by) REFERENCES person(id)
+constraint advisory advisory_identifier_once UNIQUE (identifier_folded)
+constraint advisory advisory_number_once UNIQUE (minted_year, mint_number)
+constraint advisory advisory_pkey PRIMARY KEY (id)
+constraint advisory_approval advisory_approval_advisory_fk FOREIGN KEY (advisory_id) REFERENCES advisory(id)
+constraint advisory_approval advisory_approval_back_fk FOREIGN KEY (withdrawn_by) REFERENCES person(id)
+constraint advisory_approval advisory_approval_by_fk FOREIGN KEY (approved_by) REFERENCES person(id)
+constraint advisory_approval advisory_approval_edition_fk FOREIGN KEY (edition_id) REFERENCES advisory_edition(id)
+constraint advisory_approval advisory_approval_pkey PRIMARY KEY (id)
+constraint advisory_edition advisory_edition_advisory_fk FOREIGN KEY (advisory_id) REFERENCES advisory(id)
+constraint advisory_edition advisory_edition_by_fk FOREIGN KEY (written_by) REFERENCES person(id)
+constraint advisory_edition advisory_edition_once UNIQUE (advisory_id, ordinal)
+constraint advisory_edition advisory_edition_pkey PRIMARY KEY (id)
+constraint advisory_issuance advisory_issuance_advisory_fk FOREIGN KEY (advisory_id) REFERENCES advisory(id)
+constraint advisory_issuance advisory_issuance_by_fk FOREIGN KEY (issued_by) REFERENCES person(id)
+constraint advisory_issuance advisory_issuance_edition_fk FOREIGN KEY (edition_id) REFERENCES advisory_edition(id)
+constraint advisory_issuance advisory_issuance_once UNIQUE (advisory_id, ordinal)
+constraint advisory_issuance advisory_issuance_pkey PRIMARY KEY (id)
+constraint advisory_issue advisory_issue_advisory_fk FOREIGN KEY (advisory_id) REFERENCES advisory(id)
+constraint advisory_issue advisory_issue_by_fk FOREIGN KEY (added_by) REFERENCES person(id)
+constraint advisory_issue advisory_issue_issue_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint advisory_issue advisory_issue_off_fk FOREIGN KEY (removed_by) REFERENCES person(id)
+constraint advisory_issue advisory_issue_once UNIQUE (advisory_id, product_id, vulnerability_id)
+constraint advisory_issue advisory_issue_pkey PRIMARY KEY (id)
+constraint advisory_issue advisory_issue_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint advisory_source advisory_source_by_fk FOREIGN KEY (created_by) REFERENCES person(id)
+constraint advisory_source advisory_source_named_once UNIQUE (product_id, name)
+constraint advisory_source advisory_source_pkey PRIMARY KEY (id)
+constraint advisory_source advisory_source_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint api_key api_key_name_unique UNIQUE (name)
+constraint api_key api_key_pkey PRIMARY KEY (id)
+constraint api_key api_key_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint api_key api_key_secret_unique UNIQUE (secret_hash)
+constraint api_key api_key_stream_fk FOREIGN KEY (stream_id) REFERENCES stream(id)
+constraint api_key api_key_variant_fk FOREIGN KEY (variant_id) REFERENCES variant(id)
+constraint application_setting application_setting_pkey PRIMARY KEY (name)
+constraint assessment assessment_decider_fk FOREIGN KEY (decided_by) REFERENCES person(id)
+constraint assessment assessment_live_unique UNIQUE (live_vulnerability_id, product_id)
+constraint assessment assessment_pkey PRIMARY KEY (id)
+constraint assessment assessment_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint assessment assessment_proposer_fk FOREIGN KEY (proposed_by) REFERENCES person(id)
+constraint assessment assessment_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint attachment attachment_pkey PRIMARY KEY (id)
+constraint attachment attachment_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint attachment attachment_redacted_by_fk FOREIGN KEY (redacted_by) REFERENCES person(id)
+constraint attachment attachment_report_fk FOREIGN KEY (flaw_report_id) REFERENCES flaw_report(id)
+constraint attachment attachment_token_unique UNIQUE (token)
+constraint attachment attachment_uploaded_by_fk FOREIGN KEY (uploaded_by) REFERENCES person(id)
+constraint attachment attachment_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint case_collaborator case_collaborator_by_fk FOREIGN KEY (added_by) REFERENCES person(id)
+constraint case_collaborator case_collaborator_issue_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint case_collaborator case_collaborator_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint case_collaborator case_collaborator_pkey PRIMARY KEY (id)
+constraint case_collaborator case_collaborator_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint claim claim_derived_fk FOREIGN KEY (derived_from) REFERENCES claim(id)
+constraint claim claim_pkey PRIMARY KEY (id)
+constraint claim claim_proposer_fk FOREIGN KEY (proposed_by) REFERENCES person(id)
+constraint claim_approval claim_approval_approver_fk FOREIGN KEY (approved_by) REFERENCES person(id)
+constraint claim_approval claim_approval_carried_fk FOREIGN KEY (carried_from) REFERENCES claim_approval(id) ON DELETE SET NULL
+constraint claim_approval claim_approval_claim_fk FOREIGN KEY (claim_id) REFERENCES claim(id)
+constraint claim_approval claim_approval_pkey PRIMARY KEY (id)
+constraint claim_approval claim_approval_revision_fk FOREIGN KEY (revision_id) REFERENCES claim_revision(id)
+constraint claim_approval claim_approval_withdrawer_fk FOREIGN KEY (withdrawn_by) REFERENCES person(id)
+constraint claim_comment claim_comment_author_fk FOREIGN KEY (written_by) REFERENCES person(id)
+constraint claim_comment claim_comment_claim_fk FOREIGN KEY (claim_id) REFERENCES claim(id)
+constraint claim_comment claim_comment_pkey PRIMARY KEY (id)
+constraint claim_comment_revision claim_comment_revision_fk FOREIGN KEY (comment_id) REFERENCES claim_comment(id)
+constraint claim_comment_revision claim_comment_revision_once UNIQUE (comment_id, ordinal)
+constraint claim_comment_revision claim_comment_revision_pkey PRIMARY KEY (id)
+constraint claim_revision claim_revision_author_fk FOREIGN KEY (written_by) REFERENCES person(id)
+constraint claim_revision claim_revision_claim_fk FOREIGN KEY (claim_id) REFERENCES claim(id)
+constraint claim_revision claim_revision_pkey PRIMARY KEY (id)
+constraint claim_revision claim_revision_unique UNIQUE (claim_id, ordinal)
+constraint component component_identity_unique UNIQUE (identity)
+constraint component component_pkey PRIMARY KEY (id)
+constraint decision decision_claim_fk FOREIGN KEY (claim_id) REFERENCES claim(id)
+constraint decision decision_live_unique UNIQUE (live_key)
+constraint decision decision_pkey PRIMARY KEY (id)
+constraint decision decision_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint decision decision_proposer_fk FOREIGN KEY (proposed_by) REFERENCES person(id)
+constraint decision decision_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint disclosure_movement disclosure_movement_approved_by_fk FOREIGN KEY (approved_by) REFERENCES person(id)
+constraint disclosure_movement disclosure_movement_asked_by_fk FOREIGN KEY (asked_by) REFERENCES person(id)
+constraint disclosure_movement disclosure_movement_pkey PRIMARY KEY (id)
+constraint disclosure_movement disclosure_movement_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint disclosure_movement disclosure_movement_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint exploited_here exploited_here_clearer_fk FOREIGN KEY (cleared_by) REFERENCES person(id)
+constraint exploited_here exploited_here_live_unique UNIQUE (live_vulnerability_id, product_id)
+constraint exploited_here exploited_here_pkey PRIMARY KEY (id)
+constraint exploited_here exploited_here_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint exploited_here exploited_here_recorder_fk FOREIGN KEY (recorded_by) REFERENCES person(id)
+constraint exploited_here exploited_here_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint finding finding_closed_run_id_fk FOREIGN KEY (closed_run_id) REFERENCES scan_run(id)
+constraint finding finding_component_id_fk FOREIGN KEY (component_id) REFERENCES component(id)
+constraint finding finding_consumer_id_fk FOREIGN KEY (consumer_id) REFERENCES component(id)
+constraint finding finding_opened_run_id_fk FOREIGN KEY (opened_run_id) REFERENCES scan_run(id)
+constraint finding finding_pkey PRIMARY KEY (id)
+constraint finding finding_suppressed_by_fk FOREIGN KEY (suppressed_by) REFERENCES suppression(id)
+constraint finding finding_target_id_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint finding finding_vulnerability_id_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint finding_tag finding_tag_by_fk FOREIGN KEY (added_by) REFERENCES person(id)
+constraint finding_tag finding_tag_component_fk FOREIGN KEY (component_id) REFERENCES component(id)
+constraint finding_tag finding_tag_issue_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint finding_tag finding_tag_once UNIQUE (product_id, vulnerability_id, component_id, tag)
+constraint finding_tag finding_tag_pkey PRIMARY KEY (id)
+constraint finding_tag finding_tag_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint flaw_report flaw_report_answered_by_fk FOREIGN KEY (acknowledged_by) REFERENCES person(id)
+constraint flaw_report flaw_report_by_fk FOREIGN KEY (recorded_by) REFERENCES person(id)
+constraint flaw_report flaw_report_issue_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint flaw_report flaw_report_issue_unique UNIQUE (vulnerability_id)
+constraint flaw_report flaw_report_judged_by_fk FOREIGN KEY (evaluated_by) REFERENCES person(id)
+constraint flaw_report flaw_report_pkey PRIMARY KEY (id)
+constraint flaw_report flaw_report_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint flaw_report flaw_report_reference_unique UNIQUE (reference)
+constraint flaw_report flaw_report_ruling_fk FOREIGN KEY (ruling_id) REFERENCES report_ruling(id)
+constraint goose_db_version goose_db_version_pkey PRIMARY KEY (id)
+constraint graph_edge graph_edge_child_fk FOREIGN KEY (child_id) REFERENCES graph_node(id)
+constraint graph_edge graph_edge_closed_fk FOREIGN KEY (closed_scan_id) REFERENCES scan(id)
+constraint graph_edge graph_edge_opened_fk FOREIGN KEY (opened_scan_id) REFERENCES scan(id)
+constraint graph_edge graph_edge_parent_fk FOREIGN KEY (parent_id) REFERENCES graph_node(id)
+constraint graph_edge graph_edge_pkey PRIMARY KEY (id)
+constraint graph_edge graph_edge_target_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint graph_node graph_node_closed_fk FOREIGN KEY (closed_scan_id) REFERENCES scan(id)
+constraint graph_node graph_node_component_fk FOREIGN KEY (component_id) REFERENCES component(id)
+constraint graph_node graph_node_opened_fk FOREIGN KEY (opened_scan_id) REFERENCES scan(id)
+constraint graph_node graph_node_pkey PRIMARY KEY (id)
+constraint graph_node graph_node_target_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint group_admin group_admin_pkey PRIMARY KEY (id)
+constraint group_admin group_admin_unique UNIQUE (group_name, grants)
+constraint group_role group_role_pkey PRIMARY KEY (id)
+constraint group_role group_role_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint group_role group_role_unique UNIQUE (group_name, product_id, role)
+constraint issue_note issue_note_author_fk FOREIGN KEY (written_by) REFERENCES person(id)
+constraint issue_note issue_note_issue_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint issue_note issue_note_pkey PRIMARY KEY (id)
+constraint issue_note issue_note_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint issue_note_revision issue_note_revision_fk FOREIGN KEY (note_id) REFERENCES issue_note(id)
+constraint issue_note_revision issue_note_revision_once UNIQUE (note_id, ordinal)
+constraint issue_note_revision issue_note_revision_pkey PRIMARY KEY (id)
+constraint issue_rating issue_rating_pkey PRIMARY KEY (id)
+constraint issue_rating issue_rating_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint issue_rating issue_rating_unique UNIQUE (vulnerability_id, product_id)
+constraint issue_rating issue_rating_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint job job_pkey PRIMARY KEY (id)
+constraint lease lease_pk PRIMARY KEY (name)
+constraint notification notification_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint notification notification_pkey PRIMARY KEY (id)
+constraint notification notification_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint notification notification_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint obligation_window obligation_window_declarer_fk FOREIGN KEY (declared_by) REFERENCES person(id)
+constraint obligation_window obligation_window_live_unique UNIQUE (live_name)
+constraint obligation_window obligation_window_pkey PRIMARY KEY (id)
+constraint obligation_window_product obligation_window_product_pk PRIMARY KEY (window_id, product_id)
+constraint obligation_window_product obligation_window_product_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint obligation_window_product obligation_window_product_window_fk FOREIGN KEY (window_id) REFERENCES obligation_window(id)
+constraint outbound outbound_by_fk FOREIGN KEY (created_by) REFERENCES person(id)
+constraint outbound outbound_named_once UNIQUE (name, kind)
+constraint outbound outbound_pkey PRIMARY KEY (id)
+constraint outbound_delivery outbound_delivery_fk FOREIGN KEY (outbound_id) REFERENCES outbound(id)
+constraint outbound_delivery outbound_delivery_nt FOREIGN KEY (notification_id) REFERENCES notification(id) ON DELETE CASCADE
+constraint outbound_delivery outbound_delivery_once UNIQUE (outbound_id, about)
+constraint outbound_delivery outbound_delivery_pkey PRIMARY KEY (id)
+constraint party party_pkey PRIMARY KEY (id)
+constraint patch_commit patch_commit_pkey PRIMARY KEY (id)
+constraint patch_commit patch_commit_repository_fk FOREIGN KEY (repository_id) REFERENCES patch_repository(id)
+constraint patch_commit patch_commit_unique UNIQUE (repository_id, commit_hash)
+constraint patch_commit_branch patch_commit_branch_commit_fk FOREIGN KEY (commit_id) REFERENCES patch_commit(id)
+constraint patch_commit_branch patch_commit_branch_pkey PRIMARY KEY (id)
+constraint patch_commit_branch patch_commit_branch_unique UNIQUE (commit_id, branch)
+constraint patch_repository patch_repository_pkey PRIMARY KEY (id)
+constraint patch_repository patch_repository_url_unique UNIQUE (url_identity)
+constraint person person_identity_unique UNIQUE (identity)
+constraint person person_party_fk FOREIGN KEY (party_id) REFERENCES party(id)
+constraint person person_party_unique UNIQUE (party_id)
+constraint person person_pkey PRIMARY KEY (id)
+constraint person_identity person_identity_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint person_identity person_identity_pkey PRIMARY KEY (id)
+constraint person_identity person_identity_subject_unique UNIQUE (subject)
+constraint person_identity person_identity_username_unique UNIQUE (username)
+constraint personal_token personal_token_name_unique UNIQUE (person_id, name)
+constraint personal_token personal_token_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint personal_token personal_token_pkey PRIMARY KEY (id)
+constraint personal_token personal_token_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint personal_token personal_token_secret_unique UNIQUE (secret_hash)
+constraint product product_name_unique UNIQUE (name)
+constraint product product_pkey PRIMARY KEY (id)
+constraint report_ruled report_ruled_pk PRIMARY KEY (ruling_id, flaw_report_id)
+constraint report_ruled report_ruled_report_fk FOREIGN KEY (flaw_report_id) REFERENCES flaw_report(id)
+constraint report_ruled report_ruled_ruling_fk FOREIGN KEY (ruling_id) REFERENCES report_ruling(id)
+constraint report_ruling report_ruling_approved_by_fk FOREIGN KEY (approved_by) REFERENCES person(id)
+constraint report_ruling report_ruling_duplicate_fk FOREIGN KEY (duplicate_of) REFERENCES vulnerability(id)
+constraint report_ruling report_ruling_pkey PRIMARY KEY (id)
+constraint report_ruling report_ruling_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint report_ruling report_ruling_proposed_by_fk FOREIGN KEY (proposed_by) REFERENCES person(id)
+constraint report_ruling report_ruling_withdrawn_by_fk FOREIGN KEY (withdrawn_by) REFERENCES person(id)
+constraint role_grant role_grant_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint role_grant role_grant_pkey PRIMARY KEY (id)
+constraint role_grant role_grant_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint role_grant role_grant_unique UNIQUE (person_id, product_id, role, source)
+constraint role_grant_all role_grant_all_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint role_grant_all role_grant_all_pkey PRIMARY KEY (id)
+constraint role_grant_all role_grant_all_unique UNIQUE (person_id, role, source)
+constraint routing_rule routing_rule_by_fk FOREIGN KEY (created_by) REFERENCES person(id)
+constraint routing_rule routing_rule_pkey PRIMARY KEY (id)
+constraint routing_rule routing_rule_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint routing_rule routing_rule_team_fk FOREIGN KEY (team_id) REFERENCES team(id)
+constraint saved_filter saved_filter_name_unique UNIQUE (person_id, product_id, name)
+constraint saved_filter saved_filter_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint saved_filter saved_filter_pkey PRIMARY KEY (id)
+constraint saved_filter saved_filter_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint scan scan_content_unique UNIQUE (target_id, content_hash)
+constraint scan scan_pkey PRIMARY KEY (id)
+constraint scan scan_target_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint scan_document scan_document_pkey PRIMARY KEY (id)
+constraint scan_document scan_document_place_unique UNIQUE (scan_id, kind, ordinal)
+constraint scan_document scan_document_scan_id_fk FOREIGN KEY (scan_id) REFERENCES scan(id)
+constraint scan_document_chunk scan_document_chunk_document_id_fk FOREIGN KEY (document_id) REFERENCES scan_document(id)
+constraint scan_document_chunk scan_document_chunk_pkey PRIMARY KEY (id)
+constraint scan_document_chunk scan_document_chunk_seq_unique UNIQUE (document_id, seq)
+constraint scan_refusal scan_refusal_pkey PRIMARY KEY (id)
+constraint scan_refusal scan_refusal_target_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint scan_refusal scan_refusal_target_unique UNIQUE (target_id)
+constraint scan_run scan_run_pkey PRIMARY KEY (id)
+constraint scan_run scan_run_target_id_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint session session_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint session session_pkey PRIMARY KEY (id)
+constraint session session_token_unique UNIQUE (token_hash)
+constraint stream stream_name_unique UNIQUE (product_id, name)
+constraint stream stream_parent_fk FOREIGN KEY (parent_id) REFERENCES stream(id)
+constraint stream stream_pkey PRIMARY KEY (id)
+constraint stream stream_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint suppression suppression_closed_scan_id_fk FOREIGN KEY (closed_scan_id) REFERENCES scan(id)
+constraint suppression suppression_opened_scan_id_fk FOREIGN KEY (opened_scan_id) REFERENCES scan(id)
+constraint suppression suppression_pkey PRIMARY KEY (id)
+constraint suppression suppression_target_id_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint target target_pkey PRIMARY KEY (id)
+constraint target target_stream_fk FOREIGN KEY (stream_id) REFERENCES stream(id)
+constraint target target_unique UNIQUE (stream_id, variant_id)
+constraint target target_variant_fk FOREIGN KEY (variant_id) REFERENCES variant(id)
+constraint team team_name_unique UNIQUE (name)
+constraint team team_party_fk FOREIGN KEY (party_id) REFERENCES party(id)
+constraint team team_party_unique UNIQUE (party_id)
+constraint team team_pkey PRIMARY KEY (id)
+constraint team_member team_member_added_by_fk FOREIGN KEY (added_by) REFERENCES person(id)
+constraint team_member team_member_person_fk FOREIGN KEY (person_id) REFERENCES person(id)
+constraint team_member team_member_pk PRIMARY KEY (team_id, person_id)
+constraint team_member team_member_team_fk FOREIGN KEY (team_id) REFERENCES team(id)
+constraint told_outside told_outside_pkey PRIMARY KEY (id)
+constraint told_outside told_outside_record_fk FOREIGN KEY (exploited_here_id) REFERENCES exploited_here(id)
+constraint told_outside told_outside_recorder_fk FOREIGN KEY (recorded_by) REFERENCES person(id)
+constraint told_outside told_outside_window_fk FOREIGN KEY (window_id) REFERENCES obligation_window(id)
+constraint upgrade upgrade_declared_by_fk FOREIGN KEY (declared_by) REFERENCES person(id)
+constraint upgrade upgrade_pkey PRIMARY KEY (id)
+constraint upgrade upgrade_target_id_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint upgrade upgrade_unique UNIQUE (target_id, fold_key)
+constraint variant variant_name_unique UNIQUE (product_id, name)
+constraint variant variant_pkey PRIMARY KEY (id)
+constraint variant variant_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint vex_issuance vex_issuance_by_fk FOREIGN KEY (issued_by) REFERENCES person(id)
+constraint vex_issuance vex_issuance_once UNIQUE (target_id, ordinal)
+constraint vex_issuance vex_issuance_pkey PRIMARY KEY (id)
+constraint vex_issuance vex_issuance_target_fk FOREIGN KEY (target_id) REFERENCES target(id)
+constraint vex_statement vex_statement_by_fk FOREIGN KEY (uploaded_by) REFERENCES person(id)
+constraint vex_statement vex_statement_pkey PRIMARY KEY (id)
+constraint vex_statement vex_statement_product_fk FOREIGN KEY (product_id) REFERENCES product(id)
+constraint vulnerability vulnerability_folded_unique UNIQUE (identifier_folded)
+constraint vulnerability vulnerability_pkey PRIMARY KEY (id)
+constraint vulnerability_alias vulnerability_alias_pkey PRIMARY KEY (id)
+constraint vulnerability_alias vulnerability_alias_unique UNIQUE (identifier)
+constraint vulnerability_alias vulnerability_alias_vulnerability_id_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint vulnerability_rating vulnerability_rating_pkey PRIMARY KEY (id)
+constraint vulnerability_rating vulnerability_rating_unique UNIQUE (vulnerability_id, generation)
+constraint vulnerability_rating vulnerability_rating_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint vulnerability_reference vulnerability_reference_pkey PRIMARY KEY (id)
+constraint vulnerability_reference vulnerability_reference_unique UNIQUE (vulnerability_id, url_identity)
+constraint vulnerability_reference vulnerability_reference_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+constraint vulnerability_weakness vulnerability_weakness_pkey PRIMARY KEY (id)
+constraint vulnerability_weakness vulnerability_weakness_unique UNIQUE (vulnerability_id, cwe)
+constraint vulnerability_weakness vulnerability_weakness_vulnerability_fk FOREIGN KEY (vulnerability_id) REFERENCES vulnerability(id)
+index admin_change CREATE INDEX admin_change_about_idx ON public.admin_change USING btree (about, at)
+index admin_change CREATE INDEX admin_change_kind_idx ON public.admin_change USING btree (kind, at)
+index admin_change CREATE INDEX admin_change_recent_idx ON public.admin_change USING btree (at)
+index admin_change CREATE UNIQUE INDEX admin_change_pkey ON public.admin_change USING btree (id)
+index advisory CREATE UNIQUE INDEX advisory_identifier_once ON public.advisory USING btree (identifier_folded)
+index advisory CREATE UNIQUE INDEX advisory_number_once ON public.advisory USING btree (minted_year, mint_number)
+index advisory CREATE UNIQUE INDEX advisory_pkey ON public.advisory USING btree (id)
+index advisory_approval CREATE INDEX advisory_approval_edition_idx ON public.advisory_approval USING btree (edition_id)
+index advisory_approval CREATE UNIQUE INDEX advisory_approval_pkey ON public.advisory_approval USING btree (id)
+index advisory_edition CREATE UNIQUE INDEX advisory_edition_once ON public.advisory_edition USING btree (advisory_id, ordinal)
+index advisory_edition CREATE UNIQUE INDEX advisory_edition_pkey ON public.advisory_edition USING btree (id)
+index advisory_issuance CREATE UNIQUE INDEX advisory_issuance_once ON public.advisory_issuance USING btree (advisory_id, ordinal)
+index advisory_issuance CREATE UNIQUE INDEX advisory_issuance_pkey ON public.advisory_issuance USING btree (id)
+index advisory_issue CREATE UNIQUE INDEX advisory_issue_once ON public.advisory_issue USING btree (advisory_id, product_id, vulnerability_id)
+index advisory_issue CREATE UNIQUE INDEX advisory_issue_pkey ON public.advisory_issue USING btree (id)
+index advisory_source CREATE INDEX advisory_source_due_idx ON public.advisory_source USING btree (retired_at, fetched_at)
+index advisory_source CREATE UNIQUE INDEX advisory_source_named_once ON public.advisory_source USING btree (product_id, name)
+index advisory_source CREATE UNIQUE INDEX advisory_source_pkey ON public.advisory_source USING btree (id)
+index api_key CREATE INDEX api_key_product_idx ON public.api_key USING btree (product_id)
+index api_key CREATE UNIQUE INDEX api_key_name_unique ON public.api_key USING btree (name)
+index api_key CREATE UNIQUE INDEX api_key_pkey ON public.api_key USING btree (id)
+index api_key CREATE UNIQUE INDEX api_key_secret_unique ON public.api_key USING btree (secret_hash)
+index application_setting CREATE UNIQUE INDEX application_setting_pkey ON public.application_setting USING btree (name)
+index assessment CREATE INDEX assessment_issue_idx ON public.assessment USING btree (vulnerability_id, product_id, state)
+index assessment CREATE INDEX assessment_waiting_idx ON public.assessment USING btree (state, needs_approval)
+index assessment CREATE UNIQUE INDEX assessment_live_unique ON public.assessment USING btree (live_vulnerability_id, product_id)
+index assessment CREATE UNIQUE INDEX assessment_pkey ON public.assessment USING btree (id)
+index attachment CREATE INDEX attachment_issue_idx ON public.attachment USING btree (product_id, vulnerability_id)
+index attachment CREATE INDEX attachment_report_idx ON public.attachment USING btree (flaw_report_id)
+index attachment CREATE INDEX attachment_unattached_idx ON public.attachment USING btree (attached_at, uploaded_at)
+index attachment CREATE UNIQUE INDEX attachment_pkey ON public.attachment USING btree (id)
+index attachment CREATE UNIQUE INDEX attachment_token_unique ON public.attachment USING btree (token)
+index case_collaborator CREATE INDEX case_collaborator_person_idx ON public.case_collaborator USING btree (person_id, live_person_id)
+index case_collaborator CREATE UNIQUE INDEX case_collaborator_live_idx ON public.case_collaborator USING btree (product_id, vulnerability_id, live_person_id)
+index case_collaborator CREATE UNIQUE INDEX case_collaborator_pkey ON public.case_collaborator USING btree (id)
+index claim CREATE INDEX claim_derived_idx ON public.claim USING btree (derived_from)
+index claim CREATE UNIQUE INDEX claim_pkey ON public.claim USING btree (id)
+index claim_approval CREATE INDEX claim_approval_batch_idx ON public.claim_approval USING btree (batch)
+index claim_approval CREATE INDEX claim_approval_claim_idx ON public.claim_approval USING btree (claim_id)
+index claim_approval CREATE UNIQUE INDEX claim_approval_pkey ON public.claim_approval USING btree (id)
+index claim_comment CREATE INDEX claim_comment_claim_idx ON public.claim_comment USING btree (claim_id)
+index claim_comment CREATE UNIQUE INDEX claim_comment_pkey ON public.claim_comment USING btree (id)
+index claim_comment_revision CREATE UNIQUE INDEX claim_comment_revision_once ON public.claim_comment_revision USING btree (comment_id, ordinal)
+index claim_comment_revision CREATE UNIQUE INDEX claim_comment_revision_pkey ON public.claim_comment_revision USING btree (id)
+index claim_revision CREATE UNIQUE INDEX claim_revision_pkey ON public.claim_revision USING btree (id)
+index claim_revision CREATE UNIQUE INDEX claim_revision_unique ON public.claim_revision USING btree (claim_id, ordinal)
+index component CREATE INDEX component_fold_idx ON public.component USING btree (fold_key)
+index component CREATE INDEX component_folded_idx ON public.component USING btree (name_folded)
+index component CREATE INDEX component_upstream_folded_idx ON public.component USING btree (upstream_folded)
+index component CREATE UNIQUE INDEX component_identity_unique ON public.component USING btree (identity)
+index component CREATE UNIQUE INDEX component_pkey ON public.component USING btree (id)
+index decision CREATE INDEX decision_applies_idx ON public.decision USING btree (product_id, vulnerability_id, place_identity, component_upstream_version, consumer_upstream_version)
+index decision CREATE INDEX decision_claim_idx ON public.decision USING btree (claim_id)
+index decision CREATE UNIQUE INDEX decision_live_unique ON public.decision USING btree (live_key)
+index decision CREATE UNIQUE INDEX decision_pkey ON public.decision USING btree (id)
+index disclosure_movement CREATE INDEX disclosure_movement_place_idx ON public.disclosure_movement USING btree (vulnerability_id, product_id)
+index disclosure_movement CREATE UNIQUE INDEX disclosure_movement_pkey ON public.disclosure_movement USING btree (id)
+index exploited_here CREATE INDEX exploited_here_issue_idx ON public.exploited_here USING btree (vulnerability_id, product_id)
+index exploited_here CREATE INDEX exploited_here_product_idx ON public.exploited_here USING btree (product_id, recorded_at)
+index exploited_here CREATE UNIQUE INDEX exploited_here_live_unique ON public.exploited_here USING btree (live_vulnerability_id, product_id)
+index exploited_here CREATE UNIQUE INDEX exploited_here_pkey ON public.exploited_here USING btree (id)
+index finding CREATE INDEX finding_assigned_idx ON public.finding USING btree (assigned_to, closed_at)
+index finding CREATE INDEX finding_component_idx ON public.finding USING btree (target_id, component_id, closed_at)
+index finding CREATE INDEX finding_due_idx ON public.finding USING btree (closed_at, suppressed_by, due_at)
+index finding CREATE INDEX finding_group_idx ON public.finding USING btree (target_id, closed_at, visibility, vulnerability_id, component_id, urgency, urgency_exploited, urgency_exploited_here)
+index finding CREATE INDEX finding_open_idx ON public.finding USING btree (target_id, closed_at)
+index finding CREATE INDEX finding_place_idx ON public.finding USING btree (place_identity, vulnerability_id)
+index finding CREATE INDEX finding_vulnerability_idx ON public.finding USING btree (vulnerability_id, closed_at)
+index finding CREATE UNIQUE INDEX finding_pkey ON public.finding USING btree (id)
+index finding_tag CREATE INDEX finding_tag_named_idx ON public.finding_tag USING btree (product_id, tag)
+index finding_tag CREATE UNIQUE INDEX finding_tag_once ON public.finding_tag USING btree (product_id, vulnerability_id, component_id, tag)
+index finding_tag CREATE UNIQUE INDEX finding_tag_pkey ON public.finding_tag USING btree (id)
+index flaw_report CREATE INDEX flaw_report_product_idx ON public.flaw_report USING btree (product_id, recorded_at)
+index flaw_report CREATE INDEX flaw_report_ruling_idx ON public.flaw_report USING btree (ruling_id)
+index flaw_report CREATE INDEX flaw_report_unanswered_idx ON public.flaw_report USING btree (acknowledged_at, received_on)
+index flaw_report CREATE UNIQUE INDEX flaw_report_issue_unique ON public.flaw_report USING btree (vulnerability_id)
+index flaw_report CREATE UNIQUE INDEX flaw_report_pkey ON public.flaw_report USING btree (id)
+index flaw_report CREATE UNIQUE INDEX flaw_report_reference_unique ON public.flaw_report USING btree (reference)
+index goose_db_version CREATE UNIQUE INDEX goose_db_version_pkey ON public.goose_db_version USING btree (id)
+index graph_edge CREATE INDEX graph_edge_child_idx ON public.graph_edge USING btree (child_id, closed_scan_id)
+index graph_edge CREATE INDEX graph_edge_current_idx ON public.graph_edge USING btree (target_id, closed_scan_id, parent_id, child_id)
+index graph_edge CREATE UNIQUE INDEX graph_edge_pkey ON public.graph_edge USING btree (id)
+index graph_node CREATE INDEX graph_node_current_idx ON public.graph_node USING btree (target_id, closed_scan_id, component_id)
+index graph_node CREATE UNIQUE INDEX graph_node_pkey ON public.graph_node USING btree (id)
+index group_admin CREATE UNIQUE INDEX group_admin_pkey ON public.group_admin USING btree (id)
+index group_admin CREATE UNIQUE INDEX group_admin_unique ON public.group_admin USING btree (group_name, grants)
+index group_role CREATE UNIQUE INDEX group_role_pkey ON public.group_role USING btree (id)
+index group_role CREATE UNIQUE INDEX group_role_unique ON public.group_role USING btree (group_name, product_id, role)
+index issue_note CREATE INDEX issue_note_thread_idx ON public.issue_note USING btree (vulnerability_id, product_id, id)
+index issue_note CREATE UNIQUE INDEX issue_note_pkey ON public.issue_note USING btree (id)
+index issue_note_revision CREATE UNIQUE INDEX issue_note_revision_once ON public.issue_note_revision USING btree (note_id, ordinal)
+index issue_note_revision CREATE UNIQUE INDEX issue_note_revision_pkey ON public.issue_note_revision USING btree (id)
+index issue_rating CREATE UNIQUE INDEX issue_rating_pkey ON public.issue_rating USING btree (id)
+index issue_rating CREATE UNIQUE INDEX issue_rating_unique ON public.issue_rating USING btree (vulnerability_id, product_id)
+index job CREATE INDEX job_runnable_idx ON public.job USING btree (kind, state, run_after, id)
+index job CREATE INDEX job_set_aside_idx ON public.job USING btree (state, updated_at, id)
+index job CREATE UNIQUE INDEX job_pkey ON public.job USING btree (id)
+index lease CREATE UNIQUE INDEX lease_pk ON public.lease USING btree (name)
+index notification CREATE INDEX notification_unread_idx ON public.notification USING btree (person_id, read_at, cleared_at)
+index notification CREATE UNIQUE INDEX notification_condition_idx ON public.notification USING btree (person_id, kind, about_open)
+index notification CREATE UNIQUE INDEX notification_pkey ON public.notification USING btree (id)
+index obligation_window CREATE UNIQUE INDEX obligation_window_live_unique ON public.obligation_window USING btree (live_name)
+index obligation_window CREATE UNIQUE INDEX obligation_window_pkey ON public.obligation_window USING btree (id)
+index obligation_window_product CREATE UNIQUE INDEX obligation_window_product_pk ON public.obligation_window_product USING btree (window_id, product_id)
+index outbound CREATE INDEX outbound_kind_idx ON public.outbound USING btree (kind, retired_at)
+index outbound CREATE UNIQUE INDEX outbound_named_once ON public.outbound USING btree (name, kind)
+index outbound CREATE UNIQUE INDEX outbound_pkey ON public.outbound USING btree (id)
+index outbound_delivery CREATE INDEX outbound_delivery_settled_idx ON public.outbound_delivery USING btree (outbound_id, notification_id)
+index outbound_delivery CREATE UNIQUE INDEX outbound_delivery_once ON public.outbound_delivery USING btree (outbound_id, about)
+index outbound_delivery CREATE UNIQUE INDEX outbound_delivery_pkey ON public.outbound_delivery USING btree (id)
+index party CREATE UNIQUE INDEX party_pkey ON public.party USING btree (id)
+index patch_commit CREATE INDEX patch_commit_due_idx ON public.patch_commit USING btree (repository_id, looked_at)
+index patch_commit CREATE UNIQUE INDEX patch_commit_pkey ON public.patch_commit USING btree (id)
+index patch_commit CREATE UNIQUE INDEX patch_commit_unique ON public.patch_commit USING btree (repository_id, commit_hash)
+index patch_commit_branch CREATE UNIQUE INDEX patch_commit_branch_pkey ON public.patch_commit_branch USING btree (id)
+index patch_commit_branch CREATE UNIQUE INDEX patch_commit_branch_unique ON public.patch_commit_branch USING btree (commit_id, branch)
+index patch_repository CREATE UNIQUE INDEX patch_repository_pkey ON public.patch_repository USING btree (id)
+index patch_repository CREATE UNIQUE INDEX patch_repository_url_unique ON public.patch_repository USING btree (url_identity)
+index person CREATE UNIQUE INDEX person_identity_unique ON public.person USING btree (identity)
+index person CREATE UNIQUE INDEX person_party_unique ON public.person USING btree (party_id)
+index person CREATE UNIQUE INDEX person_pkey ON public.person USING btree (id)
+index person_identity CREATE INDEX person_identity_person_idx ON public.person_identity USING btree (person_id)
+index person_identity CREATE UNIQUE INDEX person_identity_pkey ON public.person_identity USING btree (id)
+index person_identity CREATE UNIQUE INDEX person_identity_subject_unique ON public.person_identity USING btree (subject)
+index person_identity CREATE UNIQUE INDEX person_identity_username_unique ON public.person_identity USING btree (username)
+index personal_token CREATE UNIQUE INDEX personal_token_name_unique ON public.personal_token USING btree (person_id, name)
+index personal_token CREATE UNIQUE INDEX personal_token_pkey ON public.personal_token USING btree (id)
+index personal_token CREATE UNIQUE INDEX personal_token_secret_unique ON public.personal_token USING btree (secret_hash)
+index product CREATE UNIQUE INDEX product_name_unique ON public.product USING btree (name)
+index product CREATE UNIQUE INDEX product_pkey ON public.product USING btree (id)
+index report_ruled CREATE INDEX report_ruled_report_idx ON public.report_ruled USING btree (flaw_report_id)
+index report_ruled CREATE UNIQUE INDEX report_ruled_pk ON public.report_ruled USING btree (ruling_id, flaw_report_id)
+index report_ruling CREATE INDEX report_ruling_duplicate_idx ON public.report_ruling USING btree (duplicate_of)
+index report_ruling CREATE INDEX report_ruling_waiting_idx ON public.report_ruling USING btree (product_id, settled_at, withdrawn_at)
+index report_ruling CREATE UNIQUE INDEX report_ruling_pkey ON public.report_ruling USING btree (id)
+index role_grant CREATE UNIQUE INDEX role_grant_pkey ON public.role_grant USING btree (id)
+index role_grant CREATE UNIQUE INDEX role_grant_unique ON public.role_grant USING btree (person_id, product_id, role, source)
+index role_grant_all CREATE UNIQUE INDEX role_grant_all_pkey ON public.role_grant_all USING btree (id)
+index role_grant_all CREATE UNIQUE INDEX role_grant_all_unique ON public.role_grant_all USING btree (person_id, role, source)
+index routing_rule CREATE INDEX routing_rule_order_idx ON public.routing_rule USING btree (product_id, retired_at, ordinal)
+index routing_rule CREATE UNIQUE INDEX routing_rule_pkey ON public.routing_rule USING btree (id)
+index saved_filter CREATE UNIQUE INDEX saved_filter_name_unique ON public.saved_filter USING btree (person_id, product_id, name)
+index saved_filter CREATE UNIQUE INDEX saved_filter_pkey ON public.saved_filter USING btree (id)
+index scan CREATE INDEX scan_newest_idx ON public.scan USING btree (target_id, status, built_at)
+index scan CREATE INDEX scan_recency_idx ON public.scan USING btree (target_id, received_at)
+index scan CREATE UNIQUE INDEX scan_content_unique ON public.scan USING btree (target_id, content_hash)
+index scan CREATE UNIQUE INDEX scan_pkey ON public.scan USING btree (id)
+index scan_document CREATE UNIQUE INDEX scan_document_pkey ON public.scan_document USING btree (id)
+index scan_document CREATE UNIQUE INDEX scan_document_place_unique ON public.scan_document USING btree (scan_id, kind, ordinal)
+index scan_document_chunk CREATE UNIQUE INDEX scan_document_chunk_pkey ON public.scan_document_chunk USING btree (id)
+index scan_document_chunk CREATE UNIQUE INDEX scan_document_chunk_seq_unique ON public.scan_document_chunk USING btree (document_id, seq)
+index scan_refusal CREATE UNIQUE INDEX scan_refusal_pkey ON public.scan_refusal USING btree (id)
+index scan_refusal CREATE UNIQUE INDEX scan_refusal_target_unique ON public.scan_refusal USING btree (target_id)
+index scan_run CREATE UNIQUE INDEX scan_run_pkey ON public.scan_run USING btree (id)
+index session CREATE INDEX session_expires_idx ON public.session USING btree (expires_at)
+index session CREATE INDEX session_person_idx ON public.session USING btree (person_id)
+index session CREATE UNIQUE INDEX session_pkey ON public.session USING btree (id)
+index session CREATE UNIQUE INDEX session_token_unique ON public.session USING btree (token_hash)
+index stream CREATE UNIQUE INDEX stream_name_unique ON public.stream USING btree (product_id, name)
+index stream CREATE UNIQUE INDEX stream_pkey ON public.stream USING btree (id)
+index suppression CREATE INDEX suppression_open_idx ON public.suppression USING btree (target_id, closed_scan_id)
+index suppression CREATE UNIQUE INDEX suppression_pkey ON public.suppression USING btree (id)
+index target CREATE INDEX target_variant_idx ON public.target USING btree (variant_id)
+index target CREATE UNIQUE INDEX target_pkey ON public.target USING btree (id)
+index target CREATE UNIQUE INDEX target_unique ON public.target USING btree (stream_id, variant_id)
+index team CREATE UNIQUE INDEX team_name_unique ON public.team USING btree (name)
+index team CREATE UNIQUE INDEX team_party_unique ON public.team USING btree (party_id)
+index team CREATE UNIQUE INDEX team_pkey ON public.team USING btree (id)
+index team_member CREATE INDEX team_member_person_idx ON public.team_member USING btree (person_id)
+index team_member CREATE UNIQUE INDEX team_member_pk ON public.team_member USING btree (team_id, person_id)
+index told_outside CREATE INDEX told_outside_record_idx ON public.told_outside USING btree (exploited_here_id, told_at)
+index told_outside CREATE UNIQUE INDEX told_outside_pkey ON public.told_outside USING btree (id)
+index upgrade CREATE UNIQUE INDEX upgrade_pkey ON public.upgrade USING btree (id)
+index upgrade CREATE UNIQUE INDEX upgrade_unique ON public.upgrade USING btree (target_id, fold_key)
+index variant CREATE UNIQUE INDEX variant_name_unique ON public.variant USING btree (product_id, name)
+index variant CREATE UNIQUE INDEX variant_pkey ON public.variant USING btree (id)
+index vex_issuance CREATE UNIQUE INDEX vex_issuance_once ON public.vex_issuance USING btree (target_id, ordinal)
+index vex_issuance CREATE UNIQUE INDEX vex_issuance_pkey ON public.vex_issuance USING btree (id)
+index vex_statement CREATE INDEX vex_statement_about_idx ON public.vex_statement USING btree (product_id, vulnerability, component, superseded_at)
+index vex_statement CREATE INDEX vex_statement_from_idx ON public.vex_statement USING btree (product_id, publisher, source, document_id, superseded_at)
+index vex_statement CREATE UNIQUE INDEX vex_statement_pkey ON public.vex_statement USING btree (id)
+index vulnerability CREATE UNIQUE INDEX vulnerability_folded_unique ON public.vulnerability USING btree (identifier_folded)
+index vulnerability CREATE UNIQUE INDEX vulnerability_pkey ON public.vulnerability USING btree (id)
+index vulnerability_alias CREATE INDEX vulnerability_alias_folded_idx ON public.vulnerability_alias USING btree (identifier_folded, vulnerability_id)
+index vulnerability_alias CREATE UNIQUE INDEX vulnerability_alias_pkey ON public.vulnerability_alias USING btree (id)
+index vulnerability_alias CREATE UNIQUE INDEX vulnerability_alias_unique ON public.vulnerability_alias USING btree (identifier)
+index vulnerability_rating CREATE UNIQUE INDEX vulnerability_rating_pkey ON public.vulnerability_rating USING btree (id)
+index vulnerability_rating CREATE UNIQUE INDEX vulnerability_rating_unique ON public.vulnerability_rating USING btree (vulnerability_id, generation)
+index vulnerability_reference CREATE UNIQUE INDEX vulnerability_reference_pkey ON public.vulnerability_reference USING btree (id)
+index vulnerability_reference CREATE UNIQUE INDEX vulnerability_reference_unique ON public.vulnerability_reference USING btree (vulnerability_id, url_identity)
+index vulnerability_weakness CREATE INDEX vulnerability_weakness_cwe_idx ON public.vulnerability_weakness USING btree (cwe)
+index vulnerability_weakness CREATE UNIQUE INDEX vulnerability_weakness_pkey ON public.vulnerability_weakness USING btree (id)
+index vulnerability_weakness CREATE UNIQUE INDEX vulnerability_weakness_unique ON public.vulnerability_weakness USING btree (vulnerability_id, cwe)

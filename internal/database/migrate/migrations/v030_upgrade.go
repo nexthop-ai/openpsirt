@@ -5,26 +5,26 @@ package migrations
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
-	"github.com/pressly/goose/v3"
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
-func init() {
-	goose.AddMigrationNoTxContext(upOwnClock, downOwnClock)
-}
-
-// A flaw recorded here is clocked from its first severity on windows of its
-// own (REQ-33), and only one reported from outside carries a disclosure date
-// (REQ-37).
+// upgradeV030 changes the schema the v0.2.0 release built into v0.3.0's, and
+// moves the rows it holds.
 //
-// Two columns, and the rows v0.2.0 left moved onto the rules they carry:
+// The v030 files beside this one hold v0.3.0's declaration of every table this
+// changes. A column added is declared as that statement declares it, and what
+// is written here is only the order and the rows. Every change is a column
+// added, which all four engines make where the table stands, so no table is
+// rebuilt.
+//
+// Three columns, and the rows v0.2.0 left moved onto the rules two of them
+// carry:
 //
 //   - When a recorded flaw was first given a severity in its product. Every
 //     recorded flaw rated in force is stamped with the earliest moment one of
@@ -35,64 +35,44 @@ func init() {
 //     somebody said who told us. A recorded flaw with no report at all is one
 //     v0.2.0 recorded as found here, so it gives up its disclosure date. It
 //     gains no report, because v0.2.0 kept nothing saying who recorded it.
+//   - The license an inventory declares for a component. Empty on every row:
+//     it is read from an inventory, and the next scan of a build that ships
+//     the component writes it, as a supplier is written.
 //
 // A deadline a recorded flaw holds is rewritten onto the windows for our own
 // products as this release ships them, counted from the stamp. Nothing has set
 // those windows yet: the settings that hold them arrive with this release. A
 // deadline another rule took away stays away.
-//
-// Registered without the library's transaction and run in one of its own, so
-// that the rows are read and written through the query builder, which binds a
-// value the same way on every engine.
-func upOwnClock(ctx context.Context, sqldb *sql.DB) error {
+func upgradeV030(ctx context.Context, tx bun.Tx) error {
 	t, err := types(ctx)
 	if err != nil {
 		return err
 	}
-	db, err := database.Query(sqldb, migrate.EngineFrom(ctx))
-	if err != nil {
-		return err
+	u := &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}
+
+	steps := []func() error{
+		// Columns that take a null, which every existing row holds.
+		func() error {
+			return u.change(findingV030(t), change{table: "finding", add: []added{{column: "rated_at"}}})
+		},
+		func() error {
+			return u.change(componentV030(t), change{table: "component", add: []added{{column: "license"}}})
+		},
+		// A column whose declared default every existing row takes.
+		func() error {
+			return u.change(reportV030(t), change{table: "flaw_report", add: []added{{column: "found_here"}}})
+		},
+
+		// Rows that move onto the rules the new columns carry.
+		func() error { return foundHereLosesItsDate(ctx, tx) },
+		func() error { return ratedAndReclocked(ctx, tx) },
 	}
-	return db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		for _, statement := range []string{
-			// Null on a scanned row, whose clock runs from its opening, and
-			// on a recorded flaw nobody has rated, which has no clock.
-			`ALTER TABLE "finding" ADD COLUMN "rated_at" ` + t.timestamp + ` NULL`,
-			// A default rather than a fill, because a report is from outside
-			// unless somebody says otherwise, which is also what a row
-			// written before this column is.
-			`ALTER TABLE "flaw_report" ADD COLUMN "found_here" ` + t.boolean + ` DEFAULT FALSE NOT NULL`,
-		} {
-			if _, err := tx.ExecContext(ctx, statement); err != nil {
-				return fmt.Errorf("%s: %w", firstLine(statement), err)
-			}
-		}
-		if err := foundHereLosesItsDate(ctx, tx); err != nil {
+	for _, step := range steps {
+		if err := step(); err != nil {
 			return err
 		}
-		return ratedAndReclocked(ctx, tx)
-	})
-}
-
-// downOwnClock takes the two columns away. A deadline and a disclosure date
-// the upgrade moved stay where it moved them: v0.2.0 reads both columns as it
-// always did, and what they held before is not kept.
-func downOwnClock(ctx context.Context, sqldb *sql.DB) error {
-	db, err := database.Query(sqldb, migrate.EngineFrom(ctx))
-	if err != nil {
-		return err
 	}
-	return db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		for _, statement := range []string{
-			`ALTER TABLE "flaw_report" DROP COLUMN "found_here"`,
-			`ALTER TABLE "finding" DROP COLUMN "rated_at"`,
-		} {
-			if _, err := tx.ExecContext(ctx, statement); err != nil {
-				return fmt.Errorf("%s: %w", firstLine(statement), err)
-			}
-		}
-		return nil
-	})
+	return nil
 }
 
 // foundHereLosesItsDate takes the disclosure date off every recorded flaw no
