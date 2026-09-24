@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -15,6 +16,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -378,7 +381,7 @@ func registerDisclosure(api huma.API, in Ingest) {
 // MovementBody is one time somebody moved the end of an embargo.
 type MovementBody struct {
 	ID             int64  `json:"id"`
-	Act            string `json:"act" enum:"extension,shortening" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner"`
+	Act            string `json:"act" enum:"extension,shortening,disclosure" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public"`
 	Was            string `json:"was" doc:"The embargo's previous end"`
 	Until          string `json:"until" doc:"The end that was asked for"`
 	Reason         string `json:"reason"`
@@ -400,7 +403,7 @@ type PendingMovementBody struct {
 	ID            int64  `json:"id"`
 	Product       string `json:"product"`
 	Vulnerability string `json:"vulnerability"`
-	Act           string `json:"act" enum:"extension,shortening" doc:"Which act is being asked for"`
+	Act           string `json:"act" enum:"extension,shortening,disclosure" doc:"Which act is being asked for"`
 	Was           string `json:"was" doc:"The embargo's end now"`
 	Until         string `json:"until" doc:"The end being asked for"`
 	Days          int    `json:"days" doc:"How far the date moves, in days, whichever way it moves"`
@@ -455,7 +458,7 @@ func registerMovements(api huma.API, in Ingest) {
 				if errors.Is(err, finding.ErrNotEmbargoed) {
 					return nil, noSuchFinding()
 				}
-				return nil, refusedFinding(in, err)
+				return nil, refusedMovement(in, err)
 			}
 			body, err := movementBody(ctx, in, []finding.Movement{*asked})
 			if err != nil {
@@ -505,6 +508,50 @@ func registerMovements(api huma.API, in Ingest) {
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}), moving(finding.Shortening))
 
+	huma.Register(api, gated(huma.Operation{
+		OperationID: "disclose-issue", Method: http.MethodPost, Path: path,
+		Summary: "Disclose an issue",
+		Description: "Makes this issue public in this product: every finding of it, open and " +
+			"closed, and every decision, comment and note about it. It cannot be undone.\n\n" +
+			"A reason is required. Recorded as a movement whose act is `disclosure`.\n\n" +
+			"On or after the disclosure date it takes effect at once. Before the date it " +
+			"brings the embargo's end to today, and the threshold that applies to a shortening " +
+			"applies to it. A flaw with no disclosure date always needs a second person. " +
+			"`in_force` says whether it took effect; one that needs agreement discloses nothing " +
+			"until it has it, and appears in `GET /v1/disclosure-movements`.\n\n" +
+			"Refused with 409 where the issue is already public here, or a disclosure of it is " +
+			"already waiting for agreement.",
+		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
+	}), func(ctx context.Context, input *struct {
+		Product       string `path:"product"`
+		Vulnerability string `path:"vulnerability"`
+		Body          struct {
+			Reason string `json:"reason" minLength:"1" maxLength:"65536" doc:"The reason the issue is being disclosed"`
+		}
+	}) (*movingOutput, error) {
+		subject, store, product, issue, err := embargoAt(ctx, in, input.Product, input.Vulnerability)
+		if err != nil {
+			return nil, err
+		}
+		asked, err := store.Disclose(ctx, subject, product, issue, input.Body.Reason)
+		switch {
+		case errors.Is(err, finding.ErrNotEmbargoed):
+			return nil, noSuchFinding()
+		case errors.Is(err, finding.ErrDisclosed), errors.Is(err, finding.ErrDisclosureWaiting):
+			return nil, huma.Error409Conflict(err.Error())
+		case err != nil:
+			return nil, refusedMovement(in, err)
+		}
+		if asked.InForce() {
+			toldDisclosed(ctx, in, store, subject, product, issue)
+		}
+		body, err := movementBody(ctx, in, []finding.Movement{*asked})
+		if err != nil {
+			return nil, wentWrong(in.Logger, "the disclosure could not be read back", err)
+		}
+		return &movingOutput{Status: http.StatusCreated, Body: body[0]}, nil
+	})
+
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "list-disclosure-movements", Method: http.MethodGet, Path: path,
 		Summary: "List how an embargo has been moved",
@@ -513,9 +560,11 @@ func registerMovements(api huma.API, in Ingest) {
 			"Kept in full and never overwritten. One movement is a judgment and six is a " +
 			"policy nobody wrote down, and the difference is invisible if each replaces the " +
 			"last. A request still waiting for agreement is here too: what was asked for is " +
-			"part of how long this stayed hidden, whether or not it was granted.",
+			"part of how long this stayed hidden, whether or not it was granted.\n\n" +
+			"Readable to anybody who may read the issue once it is disclosed in the product.",
 		Tags: []string{"Findings"},
-	}, perProduct, "Only where you may read undisclosed work.", privateRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "Where you may read undisclosed work, or once the issue is disclosed in the product.",
+		readRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*listOutput[MovementBody], error) {
@@ -541,8 +590,8 @@ func registerMovements(api huma.API, in Ingest) {
 		Path:    "/v1/disclosure-movements",
 		Summary: "List disclosure-date movements waiting for a second person",
 		Description: "Every request to move a disclosure date that nobody has agreed to yet, " +
-			"across the products you may read undisclosed work in, newest first. Both acts " +
-			"are here, and `act` says which each one is.\n\n" +
+			"across the products you may read undisclosed work in, newest first. Every act " +
+			"is here, and `act` says which each one is.\n\n" +
 			"Without this there is nowhere to be that second person. A request could be " +
 			"read on the finding it belongs to and nowhere else, so the only way to find one " +
 			"was to already know it existed — which is the failure the review queue exists to " +
@@ -607,7 +656,8 @@ func registerMovements(api huma.API, in Ingest) {
 		OperationID: "agree-to-disclosure-movement", Method: http.MethodPost,
 		Path:    "/v1/disclosure-movements/{id}/approval",
 		Summary: "Approve a disclosure-date movement",
-		Description: "Records a second person agreeing, and moves the date. Either act.\n\n" +
+		Description: "Records a second person agreeing, and moves the date. A disclosure " +
+			"agreed to makes the issue public in its product.\n\n" +
 			"The person who asked may not be the one who agrees. That is the control the " +
 			"threshold exists to reach, and a movement somebody approved for themselves is " +
 			"the same as one nobody approved.",
@@ -622,10 +672,13 @@ func registerMovements(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return nil, noDatabase(in.Logger)
 		}
-		err = finding.NewStore(in.DB.DB).AgreeToMovement(ctx, subject, input.ID)
+		store := finding.NewStore(in.DB.DB)
+		agreed, err := store.AgreeToMovement(ctx, subject, input.ID)
 		switch {
 		case errors.Is(err, finding.ErrNotEmbargoed):
 			return nil, noSuchFinding()
+		case errors.Is(err, finding.ErrDisclosed):
+			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrSamePerson):
 			return nil, huma.Error409Conflict(
 				"the person who asked to move a date may not be the one who agrees to it")
@@ -636,8 +689,55 @@ func registerMovements(api huma.API, in Ingest) {
 		case err != nil:
 			return nil, refusedFinding(in, err)
 		}
+		if agreed.Act == finding.Disclosure {
+			toldDisclosed(ctx, in, store, subject, agreed.ProductID, agreed.VulnerabilityID)
+		}
 		return &struct{}{}, nil
 	})
+}
+
+// toldDisclosed tells whoever holds a place of an issue that it is public
+// now, apart from the person who made it so.
+//
+// After the write rather than inside it. A notice that could not be written
+// leaves the disclosure standing, and a disclosure rolled back for want of a
+// notice is the embargo held on a mail queue.
+func toldDisclosed(ctx context.Context, in Ingest, store *finding.Store,
+	by access.Subject, product, issue int64) {
+
+	told, err := store.ToTell(ctx, by, product, issue)
+	if err != nil {
+		in.logger().Error("could not read who holds a disclosed issue", "error", err)
+		return
+	}
+	for _, person := range told.People {
+		if person == by.ID {
+			continue
+		}
+		tell(ctx, in, "could not say that an issue was disclosed", notify.Telling{
+			PersonID: person, Kind: notify.Disclosed,
+			Body: told.Vulnerability + " is disclosed in " + told.Product +
+				". Its findings, decisions and comments are public.",
+			Link: "/products/" + url.PathEscape(told.Product) +
+				"/findings?q=" + url.QueryEscape(told.Vulnerability),
+			ProductID:       &product,
+			VulnerabilityID: &issue,
+		}, "issue", told.Vulnerability)
+	}
+}
+
+// refusedMovement is the answer to a movement of an embargo the store turned
+// away. A reason missing or refused by the text policy is the caller's to fix.
+func refusedMovement(in Ingest, err error) error {
+	var faults markdown.Faults
+	if errors.As(err, &faults) {
+		return refusedText(faults)
+	}
+	var unreasoned finding.Unreasoned
+	if errors.As(err, &unreasoned) {
+		return huma.Error422UnprocessableEntity(unreasoned.Error())
+	}
+	return refusedFinding(in, err)
 }
 
 // embargoAt resolves a product and an issue for the disclosure endpoints.

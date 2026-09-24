@@ -497,6 +497,7 @@ var outsideTheTrail = map[string]string{
 	"decide":                       "the decision record",
 	"decide-finding":               "the decision record",
 	"decide-together":              "the decision record",
+	"disclose-issue":               "the decision record",
 	"edit-comment":                 "the decision record",
 	"edit-issue-note":              "the decision record",
 	"extend-disclosure":            "the decision record",

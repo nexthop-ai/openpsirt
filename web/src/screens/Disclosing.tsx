@@ -7,6 +7,7 @@ import { on } from "../ui/when";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { mayOf, useWho } from "../app/session";
 import { unwrap } from "../api/queries";
 import { Editor } from "../ui/Editor";
 import { Empty } from "../ui/Empty";
@@ -31,6 +32,7 @@ const PAGE = 100;
 
 export function Disclosing() {
   const queries = useQueryClient();
+  const who = useWho().data;
   // The distance ahead to look. Empty is this deployment's own embargo length,
   // which the server supplies: a fixed thirty days against the ninety-day
   // policy that ships drew an empty screen while embargoes were running, and
@@ -40,7 +42,7 @@ export function Disclosing() {
   // Which act is being recorded. Chosen rather than read off the date typed:
   // extending because a fix slipped and shortening because it leaked are
   // different events, and the record says which without anybody inferring it.
-  const [act, setAct] = useState<"extension" | "shortening">("extension");
+  const [act, setAct] = useState<"extension" | "shortening" | "disclosure">("extension");
   const [until, setUntil] = useState("");
   const [because, setBecause] = useState("");
   const [said, setSaid] = useState<string | null>(null);
@@ -59,22 +61,31 @@ export function Disclosing() {
   const move = useMutation({
     mutationFn: async (at: { product: string; vulnerability: string }) =>
       unwrap(
-        act === "shortening"
-          ? await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure/shortening", {
+        act === "disclosure"
+          ? await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure", {
               params: { path: at },
-              body: { until, reason: because },
+              body: { reason: because },
             })
-          : await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure/extension", {
-              params: { path: at },
-              body: { until, reason: because },
-            }),
+          : act === "shortening"
+            ? await api.POST(
+                "/v1/products/{product}/issues/{vulnerability}/disclosure/shortening",
+                {
+                  params: { path: at },
+                  body: { until, reason: because },
+                },
+              )
+            : await api.POST("/v1/products/{product}/issues/{vulnerability}/disclosure/extension", {
+                params: { path: at },
+                body: { until, reason: because },
+              }),
       ),
     onSuccess: (asked) => {
       setSaid(
         asked.in_force
-          ? `The date moved to ${until}.`
-          : `Recorded. Nothing moves until a second person agrees, because of how far` +
-              ` this embargo has already been moved.`,
+          ? act === "disclosure"
+            ? "Disclosed. The findings and everything on them are public."
+            : `The date moved to ${until}.`
+          : "Recorded. Nothing changes until a second person agrees.",
       );
       setAsking(null);
       setUntil("");
@@ -181,19 +192,24 @@ export function Disclosing() {
                     </td>
                     <td className="num">{row.places}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="linkish"
-                        onClick={() => {
-                          setSaid(null);
-                          setAsking(asking === key ? null : key);
-                          setAct("extension");
-                          setUntil("");
-                          setBecause("");
-                        }}
-                      >
-                        Move the date
-                      </button>
+                      {/* Moving a date and disclosing both need undisclosed
+                          triage in the row's product, which reading this list
+                          does not. */}
+                      {mayOf(who, row.product ?? "")?.may_hide && (
+                        <button
+                          type="button"
+                          className="linkish"
+                          onClick={() => {
+                            setSaid(null);
+                            setAsking(asking === key ? null : key);
+                            setAct("extension");
+                            setUntil("");
+                            setBecause("");
+                          }}
+                        >
+                          Move or disclose
+                        </button>
+                      )}
                       {asking === key && (
                         <div style={{ marginTop: 8 }}>
                           <label className="field">
@@ -201,45 +217,59 @@ export function Disclosing() {
                             <select
                               value={act}
                               onChange={(event) =>
-                                setAct(event.target.value as "extension" | "shortening")
+                                setAct(
+                                  event.target.value as "extension" | "shortening" | "disclosure",
+                                )
                               }
                             >
                               <option value="extension">Extend — it ends later</option>
                               <option value="shortening">Bring forward — it ends sooner</option>
+                              <option value="disclosure">Disclose — public now</option>
                             </select>
                           </label>
                           <p className="hint">
-                            Past a threshold this needs a second person, measured against how far
-                            this embargo&rsquo;s end has already been carried either way.
+                            {act === "disclosure"
+                              ? "Can't be undone. Before the date, past a threshold, a second person agrees."
+                              : "Past a threshold a second person agrees."}
                           </p>
-                          <label className="field">
-                            <span>Until</span>
-                            <input
-                              type="date"
-                              value={until}
-                              onChange={(event) => setUntil(event.target.value)}
-                            />
-                          </label>
+                          {act !== "disclosure" && (
+                            <label className="field">
+                              <span>Until</span>
+                              <input
+                                type="date"
+                                value={until}
+                                onChange={(event) => setUntil(event.target.value)}
+                              />
+                            </label>
+                          )}
                           <Editor
                             value={because}
                             onChange={setBecause}
                             rows={3}
                             label={
-                              act === "shortening"
-                                ? "The reason it is being brought forward"
-                                : "The reason for the extension"
+                              act === "disclosure"
+                                ? "The reason it is being disclosed"
+                                : act === "shortening"
+                                  ? "The reason it is being brought forward"
+                                  : "The reason for the extension"
                             }
                             placeholder={
-                              act === "shortening"
-                                ? "Why the embargo ends sooner — who is publishing, or what got out."
-                                : "The reason the date is moving, and what has to happen before the new one."
+                              act === "disclosure"
+                                ? "What is public now, or where it was published."
+                                : act === "shortening"
+                                  ? "Why the embargo ends sooner — who is publishing, or what got out."
+                                  : "The reason the date is moving, and what has to happen before the new one."
                             }
                           />
                           <div className="actions" style={{ marginTop: 8 }}>
                             <button
                               type="button"
                               className="btn"
-                              disabled={!until || !because.trim() || move.isPending}
+                              disabled={
+                                (act !== "disclosure" && !until) ||
+                                !because.trim() ||
+                                move.isPending
+                              }
                               onClick={() =>
                                 move.mutate({
                                   product: row.product ?? "",
@@ -251,7 +281,14 @@ export function Disclosing() {
                             </button>
                           </div>
                           {move.isError && (
-                            <Failed error={move.error} what="That date was not moved." />
+                            <Failed
+                              error={move.error}
+                              what={
+                                act === "disclosure"
+                                  ? "That issue was not disclosed."
+                                  : "That date was not moved."
+                              }
+                            />
                           )}
                         </div>
                       )}

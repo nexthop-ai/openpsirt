@@ -180,10 +180,13 @@ const (
 	// Shortening is the embargo ending sooner, which is what a coordinator or
 	// a peer vendor pulling a date in asks for.
 	Shortening Act = "shortening"
+	// Disclosure is the embargo ending today, and the issue becoming public
+	// in the product. The last movement an embargo has.
+	Disclosure Act = "disclosure"
 )
 
-// Acts are both of them, in the order a person meets them.
-func Acts() []Act { return []Act{Extension, Shortening} }
+// Acts are all of them, in the order a person meets them.
+func Acts() []Act { return []Act{Extension, Shortening, Disclosure} }
 
 // Valid reports whether a is one we recognize.
 func (a Act) Valid() bool {
@@ -203,6 +206,10 @@ func (a Act) moves(was, until time.Time) bool {
 		return until.After(was)
 	case Shortening:
 		return until.Before(was)
+	case Disclosure:
+		// Disclosing moves no date a person typed. It ends the embargo
+		// whichever side of its date today is.
+		return true
 	}
 	return false
 }
@@ -261,6 +268,11 @@ var ErrAlreadyAgreed = errors.New("that movement has already been agreed to")
 
 // ErrNotLater says an extension would not move the date later.
 var ErrNotLater = errors.New("an extension moves a date later")
+
+// Unreasoned is a movement asked for with no reason. The caller's to fix.
+type Unreasoned struct{ Said string }
+
+func (u Unreasoned) Error() string { return u.Said }
 
 // ErrNotEarlier says bringing a date forward would not move it earlier.
 var ErrNotEarlier = errors.New("bringing a disclosure date forward moves it earlier")
@@ -330,7 +342,7 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 		return nil, access.Denied("move a disclosure date without being anybody")
 	}
 	if strings.TrimSpace(reason) == "" {
-		return nil, fmt.Errorf("say why the embargo is being moved")
+		return nil, Unreasoned{Said: "say why the embargo is being moved"}
 	}
 	// The submission policy, run before the text is stored. This row is
 	// append-only and is read back into a disclosure record.
@@ -422,14 +434,18 @@ func endsAt(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (
 // The person who asked may not be the one who agrees. That is the control the
 // threshold exists to reach, and a movement somebody approved for themselves
 // is the same as one nobody approved.
-func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id int64) error {
+//
+// It answers the movement agreed to, which says which act took effect.
+func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id int64) (*Movement, error) {
 	if subject.ID == 0 {
-		return access.Denied("agree to a disclosure movement without being anybody")
+		return nil, access.Denied("agree to a disclosure movement without being anybody")
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 
-	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+	var agreed *Movement
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		asked := new(Movement)
+		agreed = asked
 		if err := tx.NewSelect().Model(asked).Where("id = ?", id).Scan(ctx); err != nil {
 			// A movement somebody may not reach and one that is
 			// not there answer alike, so guessing identifiers says
@@ -453,6 +469,19 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 			return ErrAlreadyAgreed
 		}
 
+		if asked.Act == Disclosure {
+			// Nothing to re-measure: disclosing ends the embargo wherever
+			// its date has moved to since. What has to still hold is that
+			// something here is undisclosed.
+			if _, err := undisclosedHere(ctx, tx, asked.ProductID, asked.VulnerabilityID); err != nil {
+				return err
+			}
+			if err := agree(ctx, tx, id, subject.ID, now); err != nil {
+				return err
+			}
+			return makePublic(ctx, tx, asked.ProductID, asked.VulnerabilityID, now)
+		}
+
 		// Where the embargo ends now, rather than where it ended when this
 		// was asked for. A request waits in the queue while other movements
 		// take effect, so the date it was measured against is not the date it
@@ -467,30 +496,43 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 			return wrongWay(asked.Act)
 		}
 
-		// The count is read, because the WHERE below is what decides the
-		// outcome. Discarded, a second person agreeing at the same moment as
-		// the first matched nothing and was told they had agreed — the
-		// clause was there, the guard it carries was not reported, and the
-		// two-person rule reported two agreements where the record holds one.
-		res, err := tx.NewUpdate().Model((*Movement)(nil)).
-			Set("approved_by = ?", subject.ID).
-			Set("approved_at = ?", now).
-			Where("id = ?", id).
-			Where("approved_at IS NULL").Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("record the agreement: %w", err)
-		}
-		switch agreed, err := database.Affected(res); {
-		case err != nil:
-			return fmt.Errorf("read whether the agreement was recorded: %w", err)
-		case agreed == 0:
-			// Somebody agreed between the read above and this write. Reported
-			// as what it is rather than as a second agreement: the record
-			// holds one, and the date moved once.
-			return ErrAlreadyAgreed
+		if err := agree(ctx, tx, id, subject.ID, now); err != nil {
+			return err
 		}
 		return moveTo(ctx, tx, asked.ProductID, asked.VulnerabilityID, asked.Until, now)
 	})
+	if err != nil {
+		return nil, err
+	}
+	return agreed, nil
+}
+
+// agree records one person agreeing to one movement.
+//
+// The count is read, because the WHERE below is what decides the outcome.
+// Discarded, a second person agreeing at the same moment as the first matched
+// nothing and was told they had agreed — the clause was there, the guard it
+// carries was not reported, and the two-person rule reported two agreements
+// where the record holds one.
+func agree(ctx context.Context, tx bun.IDB, id, personID int64, now time.Time) error {
+	res, err := tx.NewUpdate().Model((*Movement)(nil)).
+		Set("approved_by = ?", personID).
+		Set("approved_at = ?", now).
+		Where("id = ?", id).
+		Where("approved_at IS NULL").Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("record the agreement: %w", err)
+	}
+	switch agreed, err := database.Affected(res); {
+	case err != nil:
+		return fmt.Errorf("read whether the agreement was recorded: %w", err)
+	case agreed == 0:
+		// Somebody agreed between the read and this write. Reported as what
+		// it is rather than as a second agreement: the record holds one, and
+		// the date moved once.
+		return ErrAlreadyAgreed
+	}
+	return nil
 }
 
 // Movements lists every time this embargo was moved, oldest first.
@@ -498,11 +540,25 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 // Kept in full and never overwritten. One movement is a judgment and six is a
 // policy nobody wrote down, and the difference is invisible if each replaces
 // the last.
+//
+// Public once the issue is disclosed in the product: the history of the
+// embargo is part of the record that disclosing opens (REQ-40). Until then
+// only somebody reading undisclosed work there may read it.
 func (s *Store) Movements(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64) ([]Movement, error) {
 
 	if !subject.Reads(access.Private, productID) {
-		return nil, access.Denied(fmt.Sprintf("read undisclosed work in product %d", productID))
+		denied := access.Denied(fmt.Sprintf("read undisclosed work in product %d", productID))
+		if !subject.Reads(access.Public, productID) {
+			return nil, denied
+		}
+		switch _, err := undisclosedHere(ctx, s.db, productID, vulnerabilityID); {
+		case errors.Is(err, ErrDisclosed):
+		case err == nil, errors.Is(err, ErrNotEmbargoed):
+			return nil, denied
+		default:
+			return nil, err
+		}
 	}
 	var rows []Movement
 	if err := s.db.NewSelect().Model(&rows).
@@ -636,6 +692,16 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 		ColumnExpr(`v.identifier AS "vulnerability"`).
 		Where("dx.needs_approval = ?", true).
 		Where("dx.approved_at IS NULL").
+		// Only while something here is still undisclosed. A request left
+		// waiting when the issue was disclosed can no longer be agreed to,
+		// and a queue entry nobody can act on is noise on the one list whose
+		// point is that everything on it is a question.
+		Where(`EXISTS (SELECT 1 FROM "finding" AS "fu"
+			JOIN "target" AS "tu" ON tu.id = fu.target_id
+			JOIN "stream" AS "su" ON su.id = tu.stream_id
+			WHERE fu.vulnerability_id = dx.vulnerability_id
+			AND su.product_id = dx.product_id
+			AND fu.visibility = ?)`, access.Private).
 		OrderExpr("dx.asked_at DESC")
 	if !all {
 		query = query.Where("dx.product_id IN (?)", bun.List(readable))

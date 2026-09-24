@@ -66,6 +66,7 @@ true is cleared, and running the same pass twice changes nothing.
 | Somebody away still holding work | condition | Below |
 | A VEX publisher revising a cited statement | condition | Below |
 | A report received and not acknowledged | condition | Prompt acknowledgment is the part of coordinated disclosure a reporter judges |
+| An issue somebody holds disclosed | event | To every person holding a place of it, apart from the person whose act made it public. It carries the issue's detail, because the issue is public. Described under disclosure in `DESIGN-access.md` |
 | Somebody brought onto one case | event | The grant is the whole of what they may reach, so the notice is how they learn it exists. Described where the grant is, under case collaborators |
 | An embargo date approaching | condition | Before the date rather than on it, so somebody can act. Described under embargo notices below |
 | An upload that changed much of a build | event | The one thing an inventory arriving is worth interrupting anybody for. Below |

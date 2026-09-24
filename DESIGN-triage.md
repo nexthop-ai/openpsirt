@@ -226,12 +226,13 @@ a comment or a decision would read as a tightening and would defeat it
 silently, which is why it is written here rather than left to be inferred from
 the read rule above.
 
-The step itself is not built. What is enforced today is the rule above,
-which is a statement about what a disclosure would carry rather than an act
-somebody can perform: reaching a disclosure date escalates and publishes
-nothing (REQ-37), and no path anywhere makes a finding public. So the record is
-written to be disclosable as a whole, and the act that would disclose it is the
-half that is missing.
+A decision row carries a copy of its finding's visibility, so that who may
+reach it is answered by the row in a report or an export. Issue disclosure
+rewrites that copy in the same act that turns the findings public, and nothing
+else under a finding holds one. A decision is written public where its issue
+has no undisclosed finding left in the product when the row is written, because
+the visibility a proposal carries is read before the write and a disclosure may
+land between the two. `DESIGN-access.md` § Issue disclosure holds the act.
 
 ## Readback
 

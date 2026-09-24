@@ -432,6 +432,9 @@ func (s *Store) proposeAll(ctx context.Context, claim *Claim, proposals []Propos
 	for _, p := range proposals {
 		rows = append(rows, s.row(claim, p, now))
 	}
+	if err := s.disclosedSince(ctx, rows); err != nil {
+		return nil, err
+	}
 	if err := database.InBatches(ctx, s.db, rows); err != nil {
 		if database.IsDuplicate(err) {
 			// The unique index over the live key refused it, which is the only
@@ -881,6 +884,60 @@ func visibilityOf(at Place) access.Visibility {
 		return access.Public
 	}
 	return access.Private
+}
+
+// disclosedSince turns public every row whose issue was disclosed in its
+// product after the caller read the place.
+//
+// The visibility a proposal carries is read before this transaction opens,
+// and disclosing an issue changes it. A row written private on an issue that
+// is public by then stays private for good, because disclosing reads the
+// findings to decide whether anything is left to disclose. Asked here, inside
+// the transaction, an issue with no undisclosed finding left in the product
+// is disclosed.
+func (s *Store) disclosedSince(ctx context.Context, rows []Decision) error {
+	products := map[int64]bool{}
+	issues := map[int64]bool{}
+	for _, row := range rows {
+		if row.Visibility == access.Private {
+			products[row.ProductID] = true
+			issues[row.VulnerabilityID] = true
+		}
+	}
+	if len(issues) == 0 {
+		return nil
+	}
+	var held []struct {
+		ProductID       int64 `bun:"product_id"`
+		VulnerabilityID int64 `bun:"vulnerability_id"`
+		Private         int   `bun:"private"`
+	}
+	err := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
+		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
+		ColumnExpr(`st.product_id AS "product_id"`).
+		ColumnExpr(`f.vulnerability_id AS "vulnerability_id"`).
+		ColumnExpr(`COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS "private"`, access.Private).
+		Where("st.product_id IN (?)", bun.List(keysOf(products))).
+		Where("f.vulnerability_id IN (?)", bun.List(keysOf(issues))).
+		GroupExpr("st.product_id, f.vulnerability_id").
+		Scan(ctx, &held)
+	if err != nil {
+		return fmt.Errorf("read whether the issue is still undisclosed: %w", err)
+	}
+	disclosed := map[[2]int64]bool{}
+	for _, one := range held {
+		if one.Private == 0 {
+			disclosed[[2]int64{one.ProductID, one.VulnerabilityID}] = true
+		}
+	}
+	for i := range rows {
+		if disclosed[[2]int64{rows[i].ProductID, rows[i].VulnerabilityID}] {
+			rows[i].Visibility = access.Public
+		}
+	}
+	return nil
 }
 
 // Undecided keeps the places nothing currently stands at.

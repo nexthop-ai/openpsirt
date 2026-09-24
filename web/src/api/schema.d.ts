@@ -1103,7 +1103,7 @@ export interface paths {
         };
         /**
          * List disclosure-date movements waiting for a second person
-         * @description Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first. Both acts are here, and `act` says which each one is.
+         * @description Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first. Every act is here, and `act` says which each one is.
          *
          *     Without this there is nowhere to be that second person. A request could be read on the finding it belongs to and nowhere else, so the only way to find one was to already know it existed — which is the failure the review queue exists to prevent, in the one place where what is being agreed to is how long something stays hidden.
          *
@@ -1133,7 +1133,7 @@ export interface paths {
         put?: never;
         /**
          * Approve a disclosure-date movement
-         * @description Records a second person agreeing, and moves the date. Either act.
+         * @description Records a second person agreeing, and moves the date. A disclosure agreed to makes the issue public in its product.
          *
          *     The person who asked may not be the one who agrees. That is the control the threshold exists to reach, and a movement somebody approved for themselves is the same as one nobody approved.
          *
@@ -2763,11 +2763,25 @@ export interface paths {
          *
          *     Kept in full and never overwritten. One movement is a judgment and six is a policy nobody wrote down, and the difference is invisible if each replaces the last. A request still waiting for agreement is here too: what was asked for is part of how long this stayed hidden, whether or not it was granted.
          *
-         *     Requires: private-read or private-triage on the product. Only where you may read undisclosed work.
+         *     Readable to anybody who may read the issue once it is disclosed in the product.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage on the product. Where you may read undisclosed work, or once the issue is disclosed in the product.
          */
         get: operations["list-disclosure-movements"];
         put?: never;
-        post?: never;
+        /**
+         * Disclose an issue
+         * @description Makes this issue public in this product: every finding of it, open and closed, and every decision, comment and note about it. It cannot be undone.
+         *
+         *     A reason is required. Recorded as a movement whose act is `disclosure`.
+         *
+         *     On or after the disclosure date it takes effect at once. Before the date it brings the embargo's end to today, and the threshold that applies to a shortening applies to it. A flaw with no disclosure date always needs a second person. `in_force` says whether it took effect; one that needs agreement discloses nothing until it has it, and appears in `GET /v1/disclosure-movements`.
+         *
+         *     Refused with 409 where the issue is already public here, or a disclosure of it is already waiting for agreement.
+         *
+         *     Requires: private-triage on the product. A second person agrees past the threshold.
+         */
+        post: operations["disclose-issue"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7068,6 +7082,16 @@ export interface components {
             created: boolean;
             item: components["schemas"]["VariantBody"];
         };
+        "Disclose-issueRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Disclose-issueRequest.json
+             */
+            readonly $schema?: string;
+            /** @description The reason the issue is being disclosed */
+            reason: string;
+        };
         DisposedBody: {
             /** @description Whether the agreement was carried forward from an earlier claim rather than given for this one */
             agreement_carried?: boolean;
@@ -8866,10 +8890,10 @@ export interface components {
              */
             readonly $schema?: string;
             /**
-             * @description Which act this was. An extension ends the embargo later, a shortening ends it sooner
+             * @description Which act this was. An extension ends the embargo later, a shortening ends it sooner, a disclosure ends it today and makes the issue public
              * @enum {string}
              */
-            act: "extension" | "shortening";
+            act: "extension" | "shortening" | "disclosure";
             approved_at?: string;
             /** @description The second person, by sign-in identity */
             approved_by?: string;
@@ -9382,7 +9406,7 @@ export interface components {
              * @description Which act is being asked for
              * @enum {string}
              */
-            act: "extension" | "shortening";
+            act: "extension" | "shortening" | "disclosure";
             asked_at: string;
             /** @description The person who asked, by sign-in identity */
             by: string;
@@ -16072,6 +16096,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListBodyMovementBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "disclose-issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                vulnerability: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Disclose-issueRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovementBody"];
                 };
             };
             /** @description Error */

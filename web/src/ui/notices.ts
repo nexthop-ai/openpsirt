@@ -68,6 +68,8 @@ export function label(kind?: string): string {
       return "agreed claim changed";
     case "claim-lapsed":
       return "stopped applying";
+    case "disclosed":
+      return "disclosed";
     default:
       return kind ?? "";
   }

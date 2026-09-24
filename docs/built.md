@@ -18,6 +18,7 @@ place, and a database built by any other earlier build is recreated.
 | Sign-in | OpenID Connect, GitHub or a trusted header, with sessions, API keys and personal tokens |
 | Access | Roles per product or across every product, public and private as separate grants, enforced in the data layer |
 | Triage | Decisions, approval, revision history, comments, bulk judgments, standing corrections and the review queue |
+| Disclosure | Disclosure dates, their movements, and disclosing an issue in a product, which makes its whole record public |
 | Vulnerability reports | One form for every report, an inbox per product, and rulings that judge many reports in one act |
 | Remediation | Deadlines from severity and exploitation, assignment to people and teams, and fixes declared for releases and confirmed by scans |
 | Advisories | CSAF advisories with editorial states and a second person's agreement, a CSAF provider directory, and per-build OpenVEX documents with a revision chain |
@@ -35,7 +36,7 @@ place, and a database built by any other earlier build is recreated.
 | Supplier advisories | A publisher that serves its directory from a second host. Its advisories are uploaded instead |
 | Patch branches | Asking a forge's API in place of cloning, and fetching through an outbound HTTP proxy |
 | Triage | Narrowing a judgment to some of the places it covers |
-| Disclosure | Disclosing a finding. Reaching a disclosure date escalates, and no path makes a finding public. A report from outside ruled a duplicate of a flaw found here starts no disclosure date. Coordinating an embargo with a peer vendor or a coordinator |
+| Disclosure | A report from outside ruled a duplicate of a flaw found here starts no disclosure date. Coordinating an embargo with a peer vendor or a coordinator |
 | Advisories | Sending one anywhere, signing the provider directory, the VEX profile of the CSAF document, a CVSS 4.0 score in the document, and prose of the deployment's own beyond the title |
 | Remediation | Opening or updating an item in an external tracker; a link somebody typed is stored. One view of a promise to upgrade across every build it names |
 | Notifications | Chat adapters, an HTML part in mail, and a notice that an edit withdrew an approval |
