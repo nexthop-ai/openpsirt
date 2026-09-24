@@ -85,7 +85,7 @@ func registerDueExport(api huma.API, in Ingest) {
 			Header: []string{
 				"issue", "severity", "exploited", "component", "version",
 				"product", "product name", "stream", "stream name", "variant", "variant name",
-				"places", "held by", "due", "days left",
+				"places", "held by", "held by name", "due", "days left",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				late, _, err := store.RunningOutPage(ctx, subject, scope,
@@ -107,9 +107,12 @@ func registerDueExport(api huma.API, in Ingest) {
 				}
 				rows := make([][]string, 0, len(late))
 				for _, row := range late {
-					held := ""
+					// The holder by identity or team name, the way the list
+					// carries it, with the label beside it.
+					held, heldName := "", ""
 					if row.AssignedTo != nil {
-						held = who[*row.AssignedTo].Name
+						h := who[*row.AssignedTo]
+						held, heldName = h.Address, labelBeside(h.Name, h.Address)
 					}
 					rows = append(rows, []string{
 						row.Vulnerability, row.Severity,
@@ -118,7 +121,7 @@ func registerDueExport(api huma.API, in Ingest) {
 						row.Product, labelBeside(row.ProductName, row.Product),
 						row.Stream, labelBeside(row.StreamName, row.Stream),
 						row.Variant, labelBeside(row.VariantName, row.Variant),
-						strconv.Itoa(row.Places), held,
+						strconv.Itoa(row.Places), held, heldName,
 						row.Due.Format(time.DateOnly),
 						// Rounded down rather than toward zero, the way the
 						// screen rounds it: truncation reports something twelve
@@ -408,8 +411,9 @@ func registerQueueExport(api huma.API, in Ingest) {
 		out := Exporting{
 			What: "the review queue",
 			Header: []string{
-				"claim", "proposed", "proposed by", "age days", "outcome", "issue",
-				"product", "component", "decisions", "issues", "places", "builds",
+				"claim", "proposed", "proposed by", "proposed by name", "age days", "outcome",
+				"issue", "product", "product name", "component", "decisions", "issues",
+				"places", "builds",
 				"previously approved", "deferred days", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -434,19 +438,19 @@ func registerQueueExport(api huma.API, in Ingest) {
 				rows := make([][]string, 0, len(waiting))
 				for i, row := range waiting {
 					where := named[i].Finding
-					product, component, version := "", "", ""
+					product, productName, component, version := "", "", "", ""
 					if where != nil {
-						product, component = where.Product, where.Component
-						version = where.Version
+						product, productName = where.Product, where.ProductName
+						component, version = where.Component, where.Version
 					}
 					rows = append(rows, []string{
 						strconv.FormatInt(row.Claim.ID, 10),
 						stamp(row.Decision.ProposedAt),
-						named[i].ProposedBy,
+						named[i].ProposedBy, named[i].ProposedByName,
 						strconv.Itoa(int(store.Age(&row.Decision).Hours() / 24)),
 						string(row.Claim.Outcome),
 						named[i].Place.Vulnerability,
-						product, component + " " + version,
+						product, productName, component + " " + version,
 						strconv.Itoa(row.Decisions), strconv.Itoa(row.Issues),
 						strconv.Itoa(row.Places),
 						strings.Join(row.Builds, "; "),
