@@ -153,10 +153,15 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 			}
 		}
 
-		if got := asPerson(t, r, "admin", http.MethodPost, at,
+		created := asPerson(t, r, "admin", http.MethodPost, at,
 			`{"name":"ops","kind":"*","url":"https://hooks.example.test/t/s3cr3t-path",`+
-				`"secret":"`+secret+`"}`); got.Code != http.StatusCreated {
-			t.Fatalf("recording a destination answered %d: %s", got.Code, got.Body.String())
+				`"secret":"`+secret+`"}`)
+		if created.Code != http.StatusCreated {
+			t.Fatalf("recording a destination answered %d: %s", created.Code, created.Body.String())
+		}
+		if body := created.Body.String(); strings.Contains(body, "s3cr3t-path") ||
+			strings.Contains(body, secret) {
+			t.Errorf("recording a destination hands back a credential: %s", body)
 		}
 
 		// Never what it is signed with. For Slack and for Teams the
@@ -169,13 +174,24 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 		if body := listed.Body.String(); strings.Contains(body, secret) {
 			t.Errorf("the listing hands back the signing secret: %s", body)
 		}
-		// The secret, and not the address. For Slack and for Teams the
-		// path carries the token and there is no other authentication, which
-		// is why the trail row beside the create records the host alone — and
-		// the listing hands the whole URL back regardless. That is not
-		// asserted here because it is not true: `outbound.go` predates this
-		// branch, and a test claiming a redaction nothing does would be worse
-		// than none. `TODO.md` carries it.
+		// Nor the path of the address. For Slack and for Teams the path
+		// carries the token and there is no other authentication, so the
+		// listing carries the host and nothing more.
+		if body := listed.Body.String(); strings.Contains(body, "s3cr3t-path") {
+			t.Errorf("the listing hands back the path of the address: %s", body)
+		}
+		var destinations struct {
+			Items []struct {
+				Name string `json:"name"`
+				Host string `json:"host"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(listed.Body.Bytes(), &destinations); err != nil {
+			t.Fatal(err)
+		}
+		if len(destinations.Items) != 1 || destinations.Items[0].Host != "hooks.example.test" {
+			t.Errorf("the listing does not say which host it sends to: %+v", destinations.Items)
+		}
 
 		// And the rules on a destination are enforced here and nowhere else.
 		for _, c := range []struct {

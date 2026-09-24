@@ -1667,7 +1667,7 @@ export interface paths {
          * List where this deployment sends things
          * @description The destinations configured, which kinds go to each, and whether they are working.
          *
-         *     The signing secret is never returned. It signs our requests rather than authenticating anybody to us, so it has to be stored recoverably — and showing it would put a shared secret on a page.
+         *     The signing secret is never returned, and of the address only the host is. For Slack and Teams the path of the address is the credential. A destination is told apart by its name and kind.
          *
          *     Requires: administrator
          */
@@ -1682,6 +1682,8 @@ export interface paths {
          *     What it carries is what the channel rules already allow. A notification about a finding nobody has announced carries the fact that there is something and a link, and nothing else — the same body a mail would carry, composed by the same code.
          *
          *     Every request is signed. `X-OpenPSIRT-Timestamp` and `X-OpenPSIRT-Signature: sha256=…`, an HMAC over the timestamp, a dot, and the body — so a receiver can tell one of ours from one anybody could make, and cannot replay yesterday's.
+         *
+         *     The response carries the host of the address and never the rest of it, the same as the listing.
          *
          *     https only, and a redirect is refused rather than followed. The body is signed and not encrypted, and a redirect asks us to send a signed request somewhere else, which is what the restriction exists to prevent.
          *
@@ -9054,6 +9056,8 @@ export interface components {
              * @description The number being retried or given up on
              */
             failing: number;
+            /** @description The host it sends to. The rest of the address is never returned */
+            host: string;
             /** @description The notifications that go here, or * for all of them */
             kind: string;
             /** @description The name, so a log line and a screen can use it */
@@ -9063,7 +9067,6 @@ export interface components {
              * @description The number of things delivered there
              */
             sent: number;
-            url: string;
         };
         OutlierBody: {
             /**
