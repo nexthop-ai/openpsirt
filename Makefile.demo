@@ -433,7 +433,7 @@ DEMO_CSV = { gsub(/"/, "") } \
 # distribution saying "affected, not fixing it here" is not a distribution
 # saying "not affected", and only the second offers a dismissal.
 demo-vex:
-	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); 	rows=$$(curl -sS --noproxy '*' 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=none&limit=6" 	  | awk -F',' '$(DEMO_CSV) { if ($$1 ~ /^CVE-/ && $$at["component"] != "") print $$1 "|" $$at["component"] }');	if [ -z "$$rows" ]; then 	  echo "  no findings to speak about yet — run make demo-status and try again"; exit 0; 	fi; 	{ printf '{"@context":"https://openvex.dev/ns/v0.2.0",'; 	  printf '"@id":"https://demo.openpsirt.invalid/vex/debian-1",'; 	  printf '"author":"Debian Security Team","version":1,'; 	  printf '"timestamp":"%s","statements":[' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)"; 	  n=0; 	  while IFS='|' read -r cve name; do 	    [ -n "$$cve" ] || continue; 	    [ $$n -gt 0 ] && printf ','; 	    if [ $$((n % 2)) -eq 0 ]; then 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"affected","action_statement":"Minor issue in %s; no update planned for this release. Will be fixed in a later point release."}' "$$name"; 	    else 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"not_affected","justification":"vulnerable_code_not_in_execute_path",'; 	      printf '"impact_statement":"The affected code path is not built in the Debian package of %s."}' "$$name"; 	    fi; 	    n=$$((n + 1)); 	  done <<< "$$rows"; 	  printf ']}'; } > $(DEMO_DIR)/debian.vex.json; 	curl -sS --noproxy '*' -o /dev/null -w "  VEX from debian %{http_code}\n" 	  -X POST -H "Origin: $(DEMO_URL)" 	  -F "statements=@$(DEMO_DIR)/debian.vex.json" 	  "$(DEMO_URL)/v1/products/$$product/vex-statements?publisher=debian"
+	@product=$$(for b in $(DEMO_BUILDS); do IFS=',' read -r _ p _ <<< "$$b"; echo "$$p"; done | head -1); 	rows=$$(curl -sS --noproxy '*' 	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=none" 	  | awk -F',' '$(DEMO_CSV) { if ($$1 ~ /^CVE-/ && $$at["component"] != "") print $$1 "|" $$at["component"] }');	if [ -z "$$rows" ]; then 	  echo "  no findings to speak about yet — run make demo-status and try again"; exit 0; 	fi; 	{ printf '{"@context":"https://openvex.dev/ns/v0.2.0",'; 	  printf '"@id":"https://demo.openpsirt.invalid/vex/debian-1",'; 	  printf '"author":"Debian Security Team","version":1,'; 	  printf '"timestamp":"%s","statements":[' "$$(date -u +%Y-%m-%dT%H:%M:%SZ)"; 	  n=0; 	  while IFS='|' read -r cve name; do 	    [ -n "$$cve" ] || continue; 	    [ $$n -gt 0 ] && printf ','; 	    if [ $$((n % 2)) -eq 0 ]; then 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"affected","action_statement":"Minor issue in %s; no update planned for this release. Will be fixed in a later point release."}' "$$name"; 	    else 	      printf '{"vulnerability":{"name":"%s"},"products":[{"@id":"pkg:generic/%s"}],' "$$cve" "$$name"; 	      printf '"status":"not_affected","justification":"vulnerable_code_not_in_execute_path",'; 	      printf '"impact_statement":"The affected code path is not built in the Debian package of %s."}' "$$name"; 	    fi; 	    n=$$((n + 1)); 	  done <<< "$$rows"; 	  printf ']}'; } > $(DEMO_DIR)/debian.vex.json; 	curl -sS --noproxy '*' -o /dev/null -w "  VEX from debian %{http_code}\n" 	  -X POST -H "Origin: $(DEMO_URL)" 	  -F "statements=@$(DEMO_DIR)/debian.vex.json" 	  "$(DEMO_URL)/v1/products/$$product/vex-statements?publisher=debian"
 
 # A few judgments, so the screens that report on triage have something to
 # report.
@@ -470,7 +470,7 @@ demo-triage:
 	at="http://$(DEMO_HOST):$$proposer"; \
 	agrees="http://$(DEMO_HOST):$$approver"; \
 	rows=$$(curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=fixed&limit=60&stream=$$stream&variant=$$variant" \
+	    "$(DEMO_URL)/v1/products/$$product/findings.csv?fix_state=fixed&stream=$$stream&variant=$$variant" \
 	  | awk -F',' '$(DEMO_CSV) \
 	    { part = $$at["component"]; \
 	      if ($$1 !~ /^CVE-/ || part == "" || part ~ /\//) next; \
@@ -534,7 +534,7 @@ demo-triage:
 	  -d '{"identity":"holly","display_name":"Holly","holds":[{"product":"'"$$product"'","role":"approver"}]}' \
 	  "$(DEMO_URL)/v1/people"; \
 	rows=$$(curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/$$product/findings.csv?limit=40&stream=$$stream&variant=$$variant" \
+	    "$(DEMO_URL)/v1/products/$$product/findings.csv?stream=$$stream&variant=$$variant" \
 	  | awk -F',' '$(DEMO_CSV) \
 	    { part = $$at["component"]; \
 	      if ($$1 ~ /^CVE-/ && part != "" && part !~ /\//) print $$1 "|" part }'); \
