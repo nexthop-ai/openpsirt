@@ -638,7 +638,7 @@ function Card({
               ·{" "}
             </>
           )}
-          {f ? `${f.product} · ${f.stream} · ${f.variant}` : claim.product}
+          {f ? `${f.product_name || f.product} · ${f.stream} · ${f.variant}` : claim.product}
           {bulk && claim.issues > 1 && <> · {claim.issues.toLocaleString()} issues</>}
           {extension && claim.derivedFrom && (
             <>

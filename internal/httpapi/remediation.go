@@ -50,7 +50,9 @@ type RemediationOutput struct {
 
 // RepeatBody is one place that keeps being put off.
 type RepeatBody struct {
-	Product       string `json:"product"`
+	Product string `json:"product" doc:"The product, by the name that addresses it"`
+
+	ProductName   string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
 	Vulnerability string `json:"vulnerability"`
 	Severity      string `json:"severity,omitempty"`
 	Place         string `json:"place" doc:"Names the place rather than describing it: what it is called depends on the build, and this is not about one build"`
@@ -239,7 +241,8 @@ func repeatBodies(rows []triage.Repeated) []RepeatBody {
 	out := make([]RepeatBody, 0, len(rows))
 	for _, row := range rows {
 		item := RepeatBody{
-			Product: row.Product, Vulnerability: row.Vulnerability, Severity: row.Severity,
+			Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+			Vulnerability: row.Vulnerability, Severity: row.Severity,
 			Place: row.PlaceIdentity, Times: row.Times,
 			TotalDays: int(math.Round(row.TotalDays)),
 			Standing:  row.Standing,

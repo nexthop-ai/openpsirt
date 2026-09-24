@@ -23,8 +23,9 @@ import (
 // the record is where the acts are: a claim argued is a piece of work
 // somebody did, whatever it concluded.
 type Spent struct {
-	Product   string `bun:"product"`
-	Component string `bun:"component"`
+	Product     string `bun:"product"`
+	ProductName string `bun:"product_name"`
+	Component   string `bun:"component"`
 	// Claims is how many arguments were made — the unit a person works in,
 	// one act however many rows it wrote — and Decisions how many places
 	// those reached. The pair is the point: ten claims over ten places and
@@ -92,7 +93,8 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 		Join(`LEFT JOIN "finding" AS "pf" ON pf.vulnerability_id = de.vulnerability_id
 			AND pf.place_identity = de.place_identity`).
 		Join(`LEFT JOIN "component" AS "pc" ON pc.id = pf.component_id`).
-		ColumnExpr(`MIN(p.display_name) AS "product"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(COALESCE(NULLIF(p.display_name, ''), p.name)) AS "product_name"`).
 		ColumnExpr(`COALESCE(pc.name, '') AS "component"`).
 		ColumnExpr(`COUNT(DISTINCT de.claim_id) AS "claims"`).
 		ColumnExpr(`COUNT(DISTINCT de.id) AS "decisions"`).

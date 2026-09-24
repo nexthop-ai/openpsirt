@@ -22,14 +22,16 @@ type LateBody struct {
 	Exploited     bool   `json:"exploited,omitempty"`
 	Component     string `json:"component"`
 	Version       string `json:"version,omitempty" doc:"The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved"`
-	Product       string `json:"product"`
-	Stream        string `json:"stream"`
-	Variant       string `json:"variant"`
-	Places        int    `json:"places" doc:"The number of places in that build this sits at"`
-	AssignedTo    string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`
-	AssignedName  string `json:"assigned_to_name,omitempty" doc:"Their display name, where they have one"`
-	Due           string `json:"due" doc:"The date it is due"`
-	DaysLeft      int    `json:"days_left" doc:"Negative once it is overdue"`
+	Product       string `json:"product" doc:"The product, by the name that addresses it"`
+
+	ProductName  string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
+	Stream       string `json:"stream"`
+	Variant      string `json:"variant"`
+	Places       int    `json:"places" doc:"The number of places in that build this sits at"`
+	AssignedTo   string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`
+	AssignedName string `json:"assigned_to_name,omitempty" doc:"Their display name, where they have one"`
+	Due          string `json:"due" doc:"The date it is due"`
+	DaysLeft     int    `json:"days_left" doc:"Negative once it is overdue"`
 }
 
 func registerDue(api huma.API, in Ingest) {
@@ -97,7 +99,8 @@ func registerDue(api huma.API, in Ingest) {
 			body := LateBody{
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, Component: row.Component, Version: row.Version,
-				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Stream: row.Stream, Variant: row.Variant,
 				Places: row.Places,
 				Due:    row.Due.Format(time.DateOnly),
 				// Rounded down, not toward zero. Truncation reports something

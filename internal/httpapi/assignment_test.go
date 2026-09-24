@@ -41,7 +41,7 @@ func TestWorkNobodyOwnsCanBeFoundAndGivenToSomebody(t *testing.T) {
 		if waiting.Total != 1 || len(waiting.Items) != 1 {
 			t.Fatalf("%d findings are waiting for an owner, want 1", waiting.Total)
 		}
-		if waiting.Items[0].Component != "libnl-3-200" || waiting.Items[0].Product != "Mine" {
+		if waiting.Items[0].Component != "libnl-3-200" || waiting.Items[0].Product != "mine" {
 			t.Errorf("the unassigned row does not say what it is: %+v", waiting.Items[0])
 		}
 

@@ -203,7 +203,7 @@ var castSeed = dbtest.Seed(seedCast)
 
 func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	cat := catalog.NewStore(db.DB)
-	mine, err := cat.DeclareProduct(ctx, "mine", "Mine")
+	mine, err := cat.DeclareProduct(ctx, "mine", shownAs("mine"))
 	if err != nil {
 		return cast{}, err
 	}
@@ -213,7 +213,7 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if _, err := cat.DeclareVariant(ctx, mine.ID, "broadcom", true); err != nil {
 		return cast{}, err
 	}
-	theirs, err := cat.DeclareProduct(ctx, "theirs", "Theirs")
+	theirs, err := cat.DeclareProduct(ctx, "theirs", shownAs("theirs"))
 	if err != nil {
 		return cast{}, err
 	}

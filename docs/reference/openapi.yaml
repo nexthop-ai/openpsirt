@@ -2796,6 +2796,10 @@ components:
           format: int64
           type: integer
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it has one
           type: string
         severity:
           type: string
@@ -3561,7 +3565,10 @@ components:
           format: int64
           type: integer
         product:
-          description: The build to link to, by product, branch or tag, and variant
+          description: The build to link to, by product, branch or tag, and variant. The product by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it has one
           type: string
         score:
           format: double
@@ -4213,6 +4220,10 @@ components:
             - patch-needed
           type: string
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it has one
           type: string
         proposed_at:
           type: string
@@ -4353,6 +4364,10 @@ components:
           format: int64
           type: integer
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it has one
           type: string
         severity:
           type: string
@@ -6829,7 +6844,12 @@ components:
           minLength: 1
           type: string
         product:
+          description: The product, by the name that addresses it
           minLength: 1
+          type: string
+        product_name:
+          description: The product's display name, where it has one
+          readOnly: true
           type: string
         vulnerability:
           description: The issue, by any name it is known under
@@ -7824,6 +7844,10 @@ components:
           description: "Names the place rather than describing it: what it is called depends on the build, and this is not about one build"
           type: string
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it has one
           type: string
         severity:
           type: string
@@ -9068,6 +9092,10 @@ components:
           format: int64
           type: integer
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it has one
           type: string
         promised:
           description: "Claims that promised work: an upgrade or a backport"
@@ -9761,6 +9789,10 @@ components:
           format: int64
           type: integer
         product:
+          description: The product, by the name that addresses it
+          type: string
+        product_name:
+          description: The product's display name, where it has one
           type: string
         severity:
           type: string

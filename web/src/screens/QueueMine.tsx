@@ -110,7 +110,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
         </td>
         <td className="id">{row.finding?.component ?? "—"}</td>
         <td className="hint">
-          {row.place?.product}
+          {row.place?.product_name || row.place?.product}
           {row.finding?.stream && (
             <>
               {" "}

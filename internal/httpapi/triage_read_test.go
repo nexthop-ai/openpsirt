@@ -192,6 +192,7 @@ func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
 			} `json:"decision"`
 			Place struct {
 				Product       string `json:"product"`
+				ProductName   string `json:"product_name"`
 				Vulnerability string `json:"vulnerability"`
 				Place         string `json:"place"`
 			} `json:"place"`
@@ -202,9 +203,9 @@ func TestEverythingWrittenAboutADecisionCanBeReadBack(t *testing.T) {
 		if detail.Decision.State != "approved" {
 			t.Errorf("the decision reads as %q after being approved", detail.Decision.State)
 		}
-		// "Mine" rather than "mine": what comes back is the spelling somebody
-		// declared, not the normalized form we match on.
-		if detail.Place.Product != "Mine" || detail.Place.Vulnerability != "CVE-2026-9999" {
+		// The name that addresses the product, with the label beside it.
+		if detail.Place.Product != "mine" || detail.Place.ProductName != shownAs("mine") ||
+			detail.Place.Vulnerability != "CVE-2026-9999" {
 			t.Errorf("the decision does not say what it is about: %+v", detail.Place)
 		}
 		if detail.Reasoning == "" {
@@ -353,7 +354,7 @@ func TestAClaimReadsWholeRatherThanThroughARow(t *testing.T) {
 		if whole.Argument.ClaimID != claim {
 			t.Errorf("the argument belongs to claim %d, want %d", whole.Argument.ClaimID, claim)
 		}
-		if whole.Place.Vulnerability != "CVE-2026-9999" || whole.Place.Product != "Mine" {
+		if whole.Place.Vulnerability != "CVE-2026-9999" || whole.Place.Product != "mine" {
 			t.Errorf("the claim does not say what it is about: %+v", whole.Place)
 		}
 		if whole.Argument.Reasoning == "" {

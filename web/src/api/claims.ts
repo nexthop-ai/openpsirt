@@ -58,7 +58,7 @@ export function claimOf(row: QueueRow): Claim {
     kind: row.claim.kind,
     derivedFrom: row.claim.derived_from ?? null,
     title: row.place.vulnerability ?? "",
-    product: row.place.product ?? "",
+    product: row.place.product_name || row.place.product || "",
     outcome: row.decision.outcome ?? "",
     justification: row.decision.justification ?? "",
     deferredUntil: row.decision.deferred_until ?? "",

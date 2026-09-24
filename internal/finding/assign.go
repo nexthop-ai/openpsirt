@@ -615,7 +615,9 @@ type Owned struct {
 	Severity      string `bun:"severity"`
 	Exploited     bool   `bun:"exploited"`
 	ExploitedHere bool   `bun:"exploited_here"`
-	Product       string `bun:"product"`
+	// Product is the name that addresses it, and ProductName the one shown.
+	Product     string `bun:"product"`
+	ProductName string `bun:"-"`
 	// Stream and Variant name a build holding this, not the only one. A
 	// screen needs somewhere to link to and an action needs a finding to name,
 	// and where several builds hold the same code any of them will do. What
@@ -887,6 +889,7 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		}
 		if build, held := builds[head.TargetID]; held {
 			row.Product, row.Stream, row.Variant = build.Product, build.Stream, build.Variant
+			row.ProductName = build.ProductName
 		}
 		rows = append(rows, row)
 	}
@@ -896,10 +899,11 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 // buildName is what a build is called on a screen: its product, stream and
 // variant, as people know them.
 type buildName struct {
-	TargetID int64  `bun:"target_id"`
-	Product  string `bun:"product"`
-	Stream   string `bun:"stream"`
-	Variant  string `bun:"variant"`
+	TargetID    int64  `bun:"target_id"`
+	Product     string `bun:"product"`
+	ProductName string `bun:"product_name"`
+	Stream      string `bun:"stream"`
+	Variant     string `bun:"variant"`
 }
 
 // targetsNamed reads the names of the builds these targets are, by target.
@@ -915,7 +919,8 @@ func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 		ColumnExpr(`tg.id AS "target_id"`).
-		ColumnExpr(`p.display_name AS "product"`).
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
 		ColumnExpr(`st.display_name AS "stream"`).
 		ColumnExpr(`va.display_name AS "variant"`).
 		Where("tg.id IN (?)", bun.List(ids)).

@@ -449,7 +449,7 @@ export function Overview() {
                       <Severity word={row.severity} />{" "}
                       <span className="id">{row.vulnerability}</span>
                     </td>
-                    <td>{row.product}</td>
+                    <td>{row.product_name || row.product}</td>
                     <td className="num">{row.times}</td>
                     <td className="num">{row.total_days}</td>
                     <td>

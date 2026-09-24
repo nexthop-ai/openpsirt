@@ -171,7 +171,7 @@ export function Disclosing() {
                       {row.summary && <div className="hint">{row.summary}</div>}
                     </td>
                     <td className="hint">
-                      {row.product} · {row.component}
+                      {row.product_name || row.product} · {row.component}
                     </td>
                     <td>
                       <span className={row.passed ? "due over" : "due soon"}>

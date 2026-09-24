@@ -23,11 +23,13 @@ type EmbargoedBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Summary       string `json:"summary,omitempty"`
 	Component     string `json:"component"`
-	Product       string `json:"product"`
-	Stream        string `json:"stream"`
-	Variant       string `json:"variant"`
-	Severity      string `json:"severity,omitempty"`
-	DiscloseAt    string `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
+	Product       string `json:"product" doc:"The product, by the name that addresses it"`
+
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
+	Stream      string `json:"stream"`
+	Variant     string `json:"variant"`
+	Severity    string `json:"severity,omitempty"`
+	DiscloseAt  string `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
 	// Passed says the date has arrived. It is a date to answer rather than a
 	// trigger, so this is a row somebody has to act on rather than a record of
 	// something that happened.
@@ -359,7 +361,8 @@ func registerDisclosure(api huma.API, in Ingest) {
 			out.Body.Items = append(out.Body.Items, EmbargoedBody{
 				Vulnerability: row.Vulnerability, Summary: row.Summary,
 				Component: row.Component, Product: row.Product,
-				Stream: row.Stream, Variant: row.Variant, Severity: row.Severity,
+				ProductName: labelBeside(row.ProductName, row.Product),
+				Stream:      row.Stream, Variant: row.Variant, Severity: row.Severity,
 				DiscloseAt: stamp(row.DiscloseAt), Passed: row.Passed(now),
 				Places: row.Places,
 			})

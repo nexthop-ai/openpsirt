@@ -24,7 +24,9 @@ type UnassignedBody struct {
 	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"This product is recorded as having been exploited through this issue"`
 	Component     string `json:"component"`
 	Version       string `json:"version"`
-	Product       string `json:"product"`
+	Product       string `json:"product" doc:"The product, by the name that addresses it"`
+
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
 	// Stream and Variant name a build holding this, not the only one: a screen
 	// needs somewhere to link to and an action needs a finding to name. The
 	// field that says there are several is `builds`.
@@ -376,7 +378,8 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
-				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Stream: row.Stream, Variant: row.Variant,
 				Places: row.Places, Builds: row.Builds,
 			})
 		}
@@ -480,7 +483,8 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
-				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Stream: row.Stream, Variant: row.Variant,
 				Places: row.Places, Builds: row.Builds,
 			})
 		}
@@ -563,7 +567,8 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
-				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Stream: row.Stream, Variant: row.Variant,
 				Places: row.Places, Builds: row.Builds,
 			})
 		}

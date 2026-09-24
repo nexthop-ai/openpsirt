@@ -23,6 +23,7 @@ import (
 // is a policy nobody wrote down and nobody agreed to.
 type Repeated struct {
 	Product       string `bun:"product"`
+	ProductName   string `bun:"product_name"`
 	Vulnerability string `bun:"vulnerability"`
 	Severity      string `bun:"severity"`
 	// PlaceIdentity names the place rather than describing it. What it is
@@ -107,7 +108,8 @@ func (s *Store) RepeatsPage(ctx context.Context, subject access.Subject, product
 		// both, and a genuine per-product pattern was reported against
 		// whichever name the group collapsed onto. Only the product's name is
 		// unique, and it is not the one anybody reads.
-		ColumnExpr(`MIN(p.display_name) AS "product"`).
+		ColumnExpr(`MIN(p.name) AS "product"`).
+		ColumnExpr(`MIN(COALESCE(NULLIF(p.display_name, ''), p.name)) AS "product_name"`).
 		ColumnExpr(`MIN(v.identifier) AS "vulnerability"`).
 		ColumnExpr("MIN("+rating.EffectiveExpr+`) AS "severity"`).
 		ColumnExpr(`de.place_identity AS "place_identity"`).

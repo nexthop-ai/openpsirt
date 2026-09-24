@@ -35,7 +35,8 @@ type Judged struct {
 	Component string
 	Version   string
 	Consumer  string
-	Product   string
+	// Product is the name that addresses it, and ProductName the one shown.
+	Product, ProductName string
 	// ProposedByName and Approvals are the separation-of-duties record: who
 	// made the claim, and who agreed to it. Two different people is the whole
 	// control, so both names are carried rather than a count.
@@ -269,7 +270,7 @@ func (s *Store) Audit(ctx context.Context, subject access.Subject, f Filter,
 		}
 		if what, held := about[decision.ID]; held {
 			row.Issue, row.Component, row.Version = what.Issue, what.Component, what.Version
-			row.Consumer, row.Product = what.Consumer, what.Product
+			row.Consumer, row.Product, row.ProductName = what.Consumer, what.Product, what.ProductName
 		}
 		out = append(out, row)
 	}
@@ -319,6 +320,9 @@ type what struct {
 	Version   string
 	Consumer  string
 	Product   string
+	// ProductName is the product's display name, or its name where it has
+	// none.
+	ProductName string
 }
 
 // aboutEach names what each decision was about, for the whole page at once.
@@ -341,12 +345,13 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		keys = append(keys, decision.ID)
 	}
 	var rows []struct {
-		DecisionID int64  `bun:"decision_id"`
-		Issue      string `bun:"issue"`
-		Component  string `bun:"component"`
-		Version    string `bun:"version"`
-		Consumer   string `bun:"consumer"`
-		Product    string `bun:"product"`
+		DecisionID  int64  `bun:"decision_id"`
+		Issue       string `bun:"issue"`
+		Component   string `bun:"component"`
+		Version     string `bun:"version"`
+		Consumer    string `bun:"consumer"`
+		Product     string `bun:"product"`
+		ProductName string `bun:"product_name"`
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"decision" AS "de"`).
@@ -368,7 +373,8 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`COALESCE(uc.name, ?) AS "consumer"`, "").
-		ColumnExpr(`p.display_name AS "product"`).
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
 		Where("de.id IN (?)", bun.List(keys)).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -378,7 +384,7 @@ func (s *Store) aboutEach(ctx context.Context, decisions []Decision) (map[int64]
 	for _, row := range rows {
 		about[row.DecisionID] = what{
 			Issue: row.Issue, Component: row.Component, Version: row.Version,
-			Consumer: row.Consumer, Product: row.Product,
+			Consumer: row.Consumer, Product: row.Product, ProductName: row.ProductName,
 		}
 	}
 	return about, nil

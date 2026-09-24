@@ -78,7 +78,8 @@ type DecisionBody struct {
 // FindingRefBody is the subject of a decision, as the findings list shows it:
 // the build to link to, the issue, the component and where it sits.
 type FindingRefBody struct {
-	Product       string  `json:"product" doc:"The build to link to, by product, branch or tag, and variant"`
+	Product       string  `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
+	ProductName   string  `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
 	Stream        string  `json:"stream"`
 	Variant       string  `json:"variant"`
 	Vulnerability string  `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
@@ -103,7 +104,8 @@ type FindingRefBody struct {
 // on trust: it is assembled from a finding, and a caller that could name a
 // place freely would be choosing which decisions apply where.
 type PlaceBody struct {
-	Product       string `json:"product" minLength:"1"`
+	Product       string `json:"product" minLength:"1" doc:"The product, by the name that addresses it"`
+	ProductName   string `json:"product_name,omitempty" readOnly:"true" doc:"The product's display name, where it has one"`
 	Vulnerability string `json:"vulnerability" minLength:"1" doc:"The issue, by any name it is known under"`
 	Place         string `json:"place" minLength:"1" doc:"The place in the build, as the findings list gives it"`
 }

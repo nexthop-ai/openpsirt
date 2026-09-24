@@ -49,7 +49,7 @@ func TestAPersonalTokenIsNarrowedWhenItIsMade(t *testing.T) {
 				listed.Body.String())
 		}
 		// And what a person reads, beside it.
-		if out.Items[0].ProductDisplayName != "Mine" {
+		if out.Items[0].ProductDisplayName != shownAs("mine") {
 			t.Errorf("the listing does not say what to call the product: %s",
 				listed.Body.String())
 		}

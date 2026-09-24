@@ -7208,7 +7208,10 @@ export interface components {
              * @description The number of findings this covers
              */
             places: number;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it has one */
+            product_name?: string;
             severity?: string;
             stream: string;
             summary?: string;
@@ -7677,8 +7680,10 @@ export interface components {
              * @description The number of places the issue sits at in that component in that build
              */
             places: number;
-            /** @description The build to link to, by product, branch or tag, and variant */
+            /** @description The build to link to, by product, branch or tag, and variant. The product by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it has one */
+            product_name?: string;
             /** Format: double */
             score?: number;
             /** @description The scoring system the number is on */
@@ -8013,7 +8018,10 @@ export interface components {
             mitigation?: string;
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it has one */
+            product_name?: string;
             proposed_at: string;
             proposed_by: string;
             /** @description The words the standing agreement was given for. Editing them withdraws the agreement, so this and what was agreed to cannot drift apart */
@@ -8082,7 +8090,10 @@ export interface components {
              * @description The number of places in that build this sits at
              */
             places: number;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it has one */
+            product_name?: string;
             severity?: string;
             stream: string;
             variant: string;
@@ -9447,7 +9458,10 @@ export interface components {
         PlaceBody: {
             /** @description The place in the build, as the findings list gives it */
             place: string;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it has one */
+            readonly product_name?: string;
             /** @description The issue, by any name it is known under */
             vulnerability: string;
         };
@@ -10061,7 +10075,10 @@ export interface components {
             last_until?: string;
             /** @description Names the place rather than describing it: what it is called depends on the build, and this is not about one build */
             place: string;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it has one */
+            product_name?: string;
             severity?: string;
             /** @description A deferral is in force now. Something put off three times and since decided is history; the same thing still being put off is the pattern */
             standing?: boolean;
@@ -10803,7 +10820,10 @@ export interface components {
              * @description The number of different people who argued about it
              */
             people: number;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it has one */
+            product_name?: string;
             /**
              * Format: int64
              * @description Claims that promised work: an upgrade or a backport
@@ -11168,7 +11188,10 @@ export interface components {
              * @description The number of findings a judgment here would be recorded against, across every build it is in
              */
             places: number;
+            /** @description The product, by the name that addresses it */
             product: string;
+            /** @description The product's display name, where it has one */
+            product_name?: string;
             severity?: string;
             /** @description A branch or tag holding it. Where builds is more than one, any of them */
             stream: string;

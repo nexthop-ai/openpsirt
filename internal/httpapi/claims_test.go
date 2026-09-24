@@ -526,6 +526,7 @@ func TestAQueueEntryAndADecisionSayWhatTheyAreAbout(t *testing.T) {
 
 		type ref struct {
 			Product       string  `json:"product"`
+			ProductName   string  `json:"product_name"`
 			Stream        string  `json:"stream"`
 			Variant       string  `json:"variant"`
 			Vulnerability string  `json:"vulnerability"`
@@ -547,7 +548,8 @@ func TestAQueueEntryAndADecisionSayWhatTheyAreAbout(t *testing.T) {
 			if f == nil {
 				t.Fatalf("%s carries no finding", what)
 			}
-			if f.Product != "Mine" || f.Stream != "master" || f.Variant != "broadcom" {
+			if f.Product != "mine" || f.ProductName != shownAs("mine") ||
+				f.Stream != "master" || f.Variant != "broadcom" {
 				t.Errorf("%s names build %s · %s · %s", what, f.Product, f.Stream, f.Variant)
 			}
 			if f.Vulnerability != "CVE-2026-9999" || f.Component != "linux-image" || f.Version != "5.10" {

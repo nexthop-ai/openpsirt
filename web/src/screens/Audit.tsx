@@ -579,7 +579,7 @@ function Judgment({ row }: { row: Judged }) {
               in <span className="id">{row.consumer}</span>
             </>
           )}{" "}
-          · {row.product}
+          · {row.product_name || row.product}
         </dd>
 
         <dt>Proposed</dt>

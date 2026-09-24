@@ -445,7 +445,11 @@ func describeDecisions(ctx context.Context, in Ingest, store *triage.Store,
 	if err != nil {
 		return nil, err
 	}
-	productNames, err := catalog.NewStore(in.DB.DB).ProductNames(ctx, products)
+	productNames, err := catalog.NewStore(in.DB.DB).ProductsCalled(ctx, products)
+	if err != nil {
+		return nil, err
+	}
+	productLabels, err := catalog.NewStore(in.DB.DB).ProductNames(ctx, products)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +472,9 @@ func describeDecisions(ctx context.Context, in Ingest, store *triage.Store,
 			Finding:  findingRef(described, decision.ID),
 			Decision: decisionBody(decision),
 			Place: PlaceBody{
-				Product:       productNames[decision.ProductID],
+				Product: productNames[decision.ProductID],
+				ProductName: labelBeside(productLabels[decision.ProductID],
+					productNames[decision.ProductID]),
 				Vulnerability: issueNames[decision.VulnerabilityID],
 				Place:         decision.PlaceIdentity,
 			},
@@ -490,7 +496,8 @@ func findingRef(described map[int64]triage.Described, decisionID int64) *Finding
 		return nil
 	}
 	body := &FindingRefBody{
-		Product: d.Product, Stream: d.Stream, Variant: d.Variant,
+		Product: d.Product, ProductName: labelBeside(d.ProductName, d.Product),
+		Stream: d.Stream, Variant: d.Variant,
 		Vulnerability: d.Issue.Identifier, Component: d.Component, Version: d.Version,
 		Severity: d.Issue.InForce(), Exploited: d.Issue.Exploited,
 		FixState: d.FixState, FixedIn: d.FixedIn,

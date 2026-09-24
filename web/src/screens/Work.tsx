@@ -399,7 +399,7 @@ function Held({
                   </span>
                 </td>
                 <td className="hint">
-                  {row.product}
+                  {row.product_name || row.product}
                   {(row.builds ?? 1) > 1 ? (
                     <> · {row.builds} builds</>
                   ) : (
