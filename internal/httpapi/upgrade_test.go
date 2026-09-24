@@ -260,5 +260,22 @@ func TestMovingAnAgreedPromiseIsSaidToWhoeverAgreed(t *testing.T) {
 		if len(told) != 1 || !contains(told[0], "promise") {
 			t.Errorf("moving an agreed promise told the approver %v", told)
 		}
+
+		// The same version and date with new words withdraws the agreement
+		// too, and says the reasoning changed rather than the promise.
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", done.ClaimID), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving again answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "private-triage", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/promise", done.ClaimID),
+			fmt.Sprintf(`{"to":"9.9.9","by":%q,"reasoning":"The same promise, said better."}`,
+				later)); got.Code >= 300 {
+			t.Fatalf("restating the promise answered %d: %s", got.Code, got.Body.String())
+		}
+		told = r.told(t, "reviewer", "approval-withdrawn")
+		if len(told) != 2 || !contains(told[0]+told[1], "The reasoning") {
+			t.Errorf("restating an agreed promise told the approver %v", told)
+		}
 	})
 }

@@ -383,12 +383,16 @@ func registerTriage(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, huma.Error422UnprocessableEntity("by must be a date, as YYYY-MM-DD")
 		}
-		withdrawn, err := store.Repromise(ctx, subject, input.ID, input.Body.To, by,
+		withdrawn, moved, err := store.Repromise(ctx, subject, input.ID, input.Body.To, by,
 			input.Body.Reasoning)
 		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}
-		tellTheApprovers(ctx, in, input.ID, withdrawn, "The promise")
+		changed := "The reasoning"
+		if moved {
+			changed = "The promise"
+		}
+		tellTheApprovers(ctx, in, input.ID, withdrawn, changed)
 		return &struct{}{}, nil
 	})
 

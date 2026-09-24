@@ -96,13 +96,6 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	if latest == 0 {
 		return Revised{}, ErrNotTheirs
 	}
-	// Who agreed, read before the agreements are withdrawn and inside the
-	// same transaction, because what is reported is whose agreement this
-	// revision took back.
-	withdrawn, err := s.agreeingTo(ctx, subject, claimID, rows)
-	if err != nil {
-		return Revised{}, err
-	}
 
 	now := s.now().Truncate(time.Microsecond)
 	revision := &Revision{
@@ -131,6 +124,13 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 		Where("claim_id = ?", claimID).
 		Where("withdrawn_at IS NULL").Exec(ctx); err != nil {
 		return Revised{}, fmt.Errorf("withdraw the approvals on what was revised: %w", err)
+	}
+	// Who agreed, read from the rows this revision withdrew rather than
+	// before it. An agreement committed between a read and the write would be
+	// withdrawn by the write and missing from the read.
+	withdrawn, err := s.agreementsWithdrawn(ctx, subject, claimID, now, rows)
+	if err != nil {
+		return Revised{}, err
 	}
 	if _, err := s.db.NewUpdate().Model((*Claim)(nil)).
 		Set("revision_id = ?", revision.ID).
@@ -390,12 +390,12 @@ func (s *Store) wholeClaims(ctx context.Context, reached []int64) ([]int64, []in
 	return claims, kept, nil
 }
 
-// agreeingTo gathers who has a standing agreement on a claim, one entry each,
-// leaving out the subject. Each entry carries the claim's earliest row as the
+// agreementsWithdrawn gathers whose agreement on a claim the subject withdrew
+// at a moment, one entry each, leaving out the subject. Each entry carries the claim's earliest row as the
 // representative, and whether any of its rows is undisclosed, read off the rows
 // rather than off the representative.
-func (s *Store) agreeingTo(ctx context.Context, subject access.Subject, claimID int64,
-	rows []Decision) ([]ForPerson, error) {
+func (s *Store) agreementsWithdrawn(ctx context.Context, subject access.Subject, claimID int64,
+	at time.Time, rows []Decision) ([]ForPerson, error) {
 
 	if len(rows) == 0 {
 		return nil, nil
@@ -404,7 +404,8 @@ func (s *Store) agreeingTo(ctx context.Context, subject access.Subject, claimID 
 	if err := s.db.NewSelect().Model((*Approval)(nil)).
 		ColumnExpr("DISTINCT da.approved_by").
 		Where("da.claim_id = ?", claimID).
-		Where("da.withdrawn_at IS NULL").
+		Where("da.withdrawn_at = ?", at).
+		Where("da.withdrawn_by = ?", subject.ID).
 		Where("da.approved_by <> ?", subject.ID).
 		OrderExpr("da.approved_by ASC").
 		Scan(ctx, &approvers); err != nil {

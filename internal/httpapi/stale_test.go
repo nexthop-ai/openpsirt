@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 )
 
 // Each of these is wrong because nothing has happened, which is the
@@ -356,6 +359,41 @@ func TestAnEditThatWithdrawsAnAgreementIsSaidToWhoeverAgreed(t *testing.T) {
 		}
 		if told := r.told(t, "reviewer", "approval-withdrawn"); len(told) != 1 {
 			t.Errorf("a revision with no agreement standing told the approver again: %v", told)
+		}
+	})
+}
+
+// TestAnApproverWhoEditsWhatTheyAgreedToIsNotToldTheirOwnEdit pins the
+// exclusion: the person who made the edit knows already. It needs somebody who
+// may both agree and revise, which the proposer never is.
+func TestAnApproverWhoEditsWhatTheyAgreedToIsNotToldTheirOwnEdit(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		ctx := t.Context()
+		mine, err := catalog.NewStore(r.db.DB).ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		reviewer, err := r.rights.ByIdentity(ctx, "reviewer")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.rights.GrantRole(ctx, reviewer.ID, mine.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "reviewer", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			`{"reasoning":"The parser is unreachable: the only caller is the encoder."}`); got.Code != http.StatusOK {
+			t.Fatalf("revising answered %d: %s", got.Code, got.Body.String())
+		}
+		if told := r.told(t, "reviewer", "approval-withdrawn"); len(told) != 0 {
+			t.Errorf("the approver who revised it was told their own edit: %v", told)
 		}
 	})
 }
