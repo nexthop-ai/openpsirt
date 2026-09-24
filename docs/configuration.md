@@ -36,25 +36,45 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 ## Upgrading
 
 A database built by v0.1.0 or v0.2.0 is upgraded in place, at startup or by
-`openpsirt migrate up`. One built by v0.1.0 passes through v0.2.0's upgrade on
+`openpsirt migrate up`. One built by v0.1.0 passes through the v0.2.0 upgrade on
 the way. A database built by any build between releases is recreated.
 
-Back the database up first. On MySQL and MariaDB an upgrade that fails part way
-leaves the schema half changed, and the backup is what recovers it.
+Read the sections for the release you are coming from, and every section after
+it: from v0.1.0, read all three.
 
-Stop every process of the earlier release before upgrading. The upgrade from
-v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a v0.1.0 replica
-left serving during a rolling update fails on them. With the Helm chart, scale
-the deployment to zero first.
+### Every upgrade
 
-Going back is `openpsirt migrate down`, once for each release stepped back,
-run with this build before the earlier one is deployed. v0.1.0 started against
-an upgraded schema reports it current and cannot read it.
+| Step | |
+|---|---|
+| Back the database up | On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it |
+| Stop every process of the earlier release | With the Helm chart, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them |
+| Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
+
+Going back is `openpsirt migrate down`, once for each release stepped back, run
+with this build before the earlier one is deployed. v0.1.0 started against an
+upgraded schema reports it current and cannot read it.
+
+### From v0.1.0
+
+| Change | What to do |
+|---|---|
+| `private-read` and `private-triage` reach undisclosed findings only. In v0.1.0 they reached disclosed findings too | Grant `public-read` or `public-triage` beside them, directly, in a group binding or in a token's holds, wherever somebody should keep the disclosed findings. Nothing is granted on upgrade |
+| The setting `disclosure.extension-threshold` is `disclosure.movement-threshold` | Nothing. The value is carried across by the upgrade |
 
 | After the upgrade from v0.1.0 | |
 |---|---|
 | An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
 | A reported flaw | Has a reference, minted as one recorded today would be |
+
+### From v0.2.0
+
+Also read after an upgrade from v0.1.0.
+
+| Change | What to do |
+|---|---|
+| `OPENPSIRT_PATCH_EXCLUDED` is `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's `patchBranches.excluded` is `outbound.excluded` | Move the list. The old name is refused at startup, and the chart refuses to render with the old key set |
+| The excluded list also keeps supplier directories out, and a supplier is read from every host its description names | Set `outbound.excluded` wherever suppliers are configured |
+| Patch branch lookups are turned on in the deployment's configuration. The `patch.branches` setting is gone | Set `patchBranches.enabled: true` in the chart, or `OPENPSIRT_PATCH_BRANCHES=true`. A deployment that had the setting on has the lookups off until then. [What to set first](#enabling) |
 
 | After the upgrade from v0.2.0 | |
 |---|---|
@@ -63,35 +83,6 @@ an upgraded schema reports it current and cannot read it.
 | A flaw recorded here with no severity in force | Not rated, and with no deadline |
 | A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
 | A component | Has no license until a scan reads one from its inventory |
-
-`OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is now
-refused where it used to be accepted. `psirt.example.com` has to become
-`https://psirt.example.com`.
-
-Accepting it bought nothing: with no scheme there is no host to read, so the
-same-origin check on every state-changing browser request falls back to the
-address the request itself claimed — the guard runs and guards nothing — and
-the address a sign-in provider is sent back to is not absolute, which the
-provider refuses. A deployment reaching this has not been protected by that
-check for as long as the value has been wrong.
-
-A path below the address is refused for the same reason:
-`https://psirt.example.com/psirt` makes every link this deployment writes point
-somewhere it does not answer. If this deployment is served under a path, that
-is a thing to raise rather than to configure here.
-
-`private-read` and `private-triage` used to include disclosed findings. Each
-now reaches only findings nobody has announced. Grant `public-read` or
-`public-triage` beside them — directly, in a group binding, or in a token's
-holds — wherever somebody should keep the disclosed findings. Nothing is
-granted on upgrade, so until then a holder of a private role alone sees no
-disclosed finding they are not assigned.
-
-`OPENPSIRT_PATCH_EXCLUDED` is now `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's
-`patchBranches.excluded` is now `outbound.excluded`. The list keeps supplier
-directories out as well as repositories. A deployment still setting the old
-name is refused at startup, naming the new one, and the chart refuses to render
-with the old key set.
 
 ## Serving
 
