@@ -423,7 +423,17 @@ that check a download:
 A release is a tag, on a commit that froze the release's migrations.
 Everything after the tag is the `Release` workflow.
 
-1. Freeze the migrations, on a branch from the head of `main`, and land the
+1. Rehearse the upgrade from every earlier release on each engine.
+   `DESIGN-database.md` § Upgrade rehearsal says what it checks.
+
+   ```
+   make engines-up
+   for from in v0.1.0 v0.2.0; do for engine in sqlite postgres mysql mariadb; do
+     make upgrade-rehearsal FROM=$from ENGINE=$engine || break 2
+   done; done
+   ```
+
+2. Freeze the migrations, on a branch from the head of `main`, and land the
    record through a pull request. `DESIGN-database.md` § Release records says
    what it holds.
 
@@ -433,7 +443,7 @@ Everything after the tag is the `Release` workflow.
    make release-freeze VERSION=v0.3.0
    ```
 
-2. Tag the commit the merge queue put on `main`.
+3. Tag the commit the merge queue put on `main`.
 
    ```
    git switch main && git pull

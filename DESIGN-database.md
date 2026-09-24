@@ -389,10 +389,11 @@ not frozen, by `make release-check`, before it builds anything.
 | Step | What happens |
 |---|---|
 | 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0. Every schema change before the tag edits that migration and those declarations |
-| 2. Freeze, on the commit to be tagged | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration |
-| 3. Land the record through a pull request | The digest test and the schema test hold the tree to it from then on |
-| 4. Tag | The release workflow checks the record before anything is built |
-| 5. The next schema change | A new migration, numbered after the tagged release's last, for the next release |
+| 2. Rehearse, from every earlier release, on each engine | A database the earlier release's own image built and seeded is upgraded by this tree and checked, as § Upgrade rehearsal says |
+| 3. Freeze, on the commit to be tagged | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration |
+| 4. Land the record through a pull request | The digest test and the schema test hold the tree to it from then on |
+| 5. Tag | The release workflow checks the record before anything is built |
+| 6. The next schema change | A new migration, numbered after the tagged release's last, for the next release |
 
 | The check refuses | Why |
 |---|---|
@@ -405,6 +406,30 @@ not frozen, by `make release-check`, before it builds anything.
 
 A file a release owns is a migration numbered after the previous release's
 last up to its own, or a declaration named for it.
+
+### Upgrade rehearsal
+
+`make upgrade-rehearsal FROM=<release> ENGINE=<engine>` upgrades a database an
+earlier release built and filled itself. It is a step of the release
+checklist above, run from every earlier release on each of the four engines.
+It builds images and scans the demo's inventories, so it runs locally and not
+in the gate.
+
+| Stage | What it does |
+|---|---|
+| The release's database | The release's image is built from its tag, and its own demo targets run unedited against an empty database of the rehearsal's own: products, inventories, the scans, a VEX document, judgments and an approval, an assignment, and a recorded flaw |
+| What it held | Its status report's open findings per build, and every table's row count with it stopped |
+| The upgrade | This tree's image applies the migrations on their own. The version reached is this tree's last migration |
+| The rows | Each table's count against what the upgrade tables above say: a table both sides hold keeps its count, a table only the upgrade holds starts empty, and a table the upgrade fills or removes holds what that table says |
+| Rolled back and applied again | Down to the release's last migration, where every table holds what the release left, and up again, where every table holds what the first upgrade left |
+| Served | This tree's server on the upgraded database reports the same open findings per build, and no GET its API document lists answers 5xx. A GET with a path parameter the seed has no name for is skipped |
+
+| Rule | |
+|---|---|
+| The release seeds itself | A fixture written today records what this tree thinks the release wrote. The release's own targets write what a deployment of it holds |
+| Only the docker command is wrapped | The containers, network and ports are renamed so a demo already running is untouched, and the application is pointed at the rehearsal's database. Nothing in the release's targets is edited |
+| Counted with nothing running | A server runs passes that write rows. Counted between the migrations alone, a changed count is the migration's |
+| Everything it made is removed | Pass or fail: its containers, network and database. The release's worktree and the scanner's database are kept for the next run |
 
 ## Migration locks
 
