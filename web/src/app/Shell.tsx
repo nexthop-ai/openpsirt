@@ -283,7 +283,7 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               being recorded is precisely what is *not* in that list, and it asks
               more than a control beside a table has room for. It needs no
               product picked, because the screen asks for one. */}
-            <Rail to="/record" icon="record" label="Record a flaw" />
+            <Rail to="/record" icon="record" label="Report a flaw" />
             {/* What is running out of embargo. The list is itself a disclosure,
               so a product somebody may not read undisclosed work in contributes
               nothing to it — the server narrows it. */}

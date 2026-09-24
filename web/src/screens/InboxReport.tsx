@@ -63,7 +63,9 @@ export function InboxReport() {
           <p className="hint">Recorded with the issue. Its description carries the claim.</p>
         )}
         <p className="hint" style={{ marginTop: 8 }}>
-          {it.reported_by || "Anonymous"}
+          {it.found_here
+            ? `Found here${it.reported_by ? ` by ${it.reported_by}` : ""}`
+            : it.reported_by || "Anonymous"}
           {it.contact && (
             <>
               {" "}
@@ -74,7 +76,9 @@ export function InboxReport() {
           {it.received && <> · arrived {it.received}</>} · recorded by {it.recorded_by},{" "}
           {on(it.recorded_at)}
         </p>
-        {it.acknowledged ? (
+        {/* Nobody outside sent a flaw found here, so nobody is owed an
+            answer. */}
+        {it.found_here ? null : it.acknowledged ? (
           <p className="hint">
             Answered {on(it.acknowledged)}
             {it.acknowledged_by && <> by {it.acknowledged_by}</>}
@@ -135,22 +139,31 @@ export function InboxReport() {
   );
 }
 
-// The two ways to answer a claim: it is an issue here, or it is one of the
-// four a ruling says.
+// The three ways to answer a claim: it is a new flaw, it is an issue already
+// here, or it is one of the things a ruling says. The first is the one a real
+// claim usually is, so it is the first control rather than a link in a hint.
 function Judge({ product, reference }: { product: string; reference: string }) {
   const [issue, setIssue] = useState("");
   const accept = useAcceptReport(product, reference);
   return (
     <>
+      <div className="actions" style={{ marginBottom: 12 }}>
+        <Link
+          className="btn"
+          to={`/record?product=${encodeURIComponent(product)}&from=${encodeURIComponent(reference)}`}
+        >
+          Record as a new flaw
+        </Link>
+      </div>
       <div className="field">
-        <label htmlFor="accept-as">Accept as an issue</label>
+        <label htmlFor="accept-as">Or accept as an issue already here</label>
         <div style={{ display: "flex", gap: 6 }}>
           <input
             {...notACredential}
             id="accept-as"
             type="text"
             value={issue}
-            placeholder="SONIC-2026-000123"
+            placeholder="CVE-2026-12345"
             onChange={(event) => setIssue(event.target.value)}
           />
           <button
@@ -163,13 +176,8 @@ function Judge({ product, reference }: { product: string; reference: string }) {
           </button>
         </div>
         <span className="hint">
-          An issue already recorded in {product}, or{" "}
-          <Link
-            to={`/record?product=${encodeURIComponent(product)}&from=${encodeURIComponent(reference)}`}
-          >
-            record it as a new flaw
-          </Link>
-          .
+          One a scan reported in {product}. A flaw recorded here already has its report, so a second
+          claim about one is a duplicate: rule it so below.
         </span>
         {accept.error != null && <Failed error={accept.error} what="It was not accepted." />}
       </div>

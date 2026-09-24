@@ -43,8 +43,11 @@ type Sighting struct {
 	// any is, undecided when none has a claim.
 	State       string
 	Undisclosed bool
-	DueAt       *time.Time
-	FixedIn     string
+	// Recorded is a flaw recorded here in our own product rather than an
+	// issue a scanner reported.
+	Recorded bool
+	DueAt    *time.Time
+	FixedIn  string
 }
 
 // Everywhere is every build that carries one issue, across every product the
@@ -105,6 +108,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		Approved    int        `bun:"approved_here"`
 		Lapsed      int        `bun:"lapsed_here"`
 		Private     int        `bun:"private"`
+		Recorded    int        `bun:"recorded"`
 		DueAt       *time.Time `bun:"due_at"`
 		FixedIn     string     `bun:"fixed_in"`
 	}
@@ -117,6 +121,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(`MIN(c.version) AS "version"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS "private"`, access.Private).
+		ColumnExpr(`SUM(CASE WHEN f.kind = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MIN(f.due_at) AS "due_at"`).
 		// The version a fix arrived in, where any place knows one. Folded to
 		// the empty string first, a minimum answered "" whenever any place
@@ -153,6 +158,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			Places:      row.Places,
 			State:       stateWord(row.Places, row.Waiting, row.Approved, row.Lapsed),
 			Undisclosed: row.Private > 0,
+			Recorded:    row.Recorded > 0,
 			DueAt:       row.DueAt,
 			FixedIn:     row.FixedIn,
 		})

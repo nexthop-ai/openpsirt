@@ -10641,6 +10641,8 @@ export interface components {
             product: string;
             /** @description Its spelling on screen */
             product_name: string;
+            /** @description Whether this is a flaw recorded in our own product rather than an issue a scanner reported */
+            recorded?: boolean;
             /**
              * @description The decision state here, by the definition the findings list uses
              * @enum {string}

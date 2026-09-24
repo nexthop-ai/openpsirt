@@ -25,6 +25,7 @@ type SightingBody struct {
 	Places      int    `json:"places" doc:"The number of times that component sits in that build carrying this issue"`
 	State       string `json:"state,omitempty" enum:"undecided,waiting,agreed,lapsed" doc:"The decision state here, by the definition the findings list uses"`
 	Undisclosed bool   `json:"undisclosed,omitempty"`
+	Recorded    bool   `json:"recorded,omitempty" doc:"Whether this is a flaw recorded in our own product rather than an issue a scanner reported"`
 	Due         string `json:"due,omitempty" doc:"The earliest deadline among its places"`
 	FixedIn     string `json:"fixed_in,omitempty"`
 }
@@ -141,7 +142,7 @@ func registerIssue(api huma.API, in Ingest) {
 				Stream: row.Stream, Variant: row.Variant,
 				Component: row.Component, Version: row.Version,
 				Places: row.Places, State: row.State,
-				Undisclosed: row.Undisclosed, FixedIn: row.FixedIn,
+				Undisclosed: row.Undisclosed, Recorded: row.Recorded, FixedIn: row.FixedIn,
 			}
 			if row.DueAt != nil {
 				body.Due = row.DueAt.Format(time.DateOnly)

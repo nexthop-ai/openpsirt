@@ -173,7 +173,7 @@ to upload, what is waiting on you, and who you are.
 | Rail group | Holds |
 |---|---|
 | **Across products** | Home, the review queue, what nobody holds, the assignments and the record. The record is here because that is how it is asked for: an auditor asks about a period, not about a build |
-| **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Recording a flaw, what is disclosing, the advisories and the standing attacks sit at its foot, each a date or a document somebody outside is waiting on |
+| **The named build** | The findings, the dependency tree, the inventories and what the build is waiting on. The comparison of two releases is not here: it is a named report, listed in the report catalog with the selection already made, and linked from the front page. Three doors to one screen is two too many. Reporting a flaw, what is disclosing, the advisories and the standing attacks sit at its foot, each a date or a document somebody outside is waiting on |
 | **Manage** | The catalog, the access, the teams, the standing assignment rules, the settings and the deployment itself. The catalog is whole and in order here — a product, then the branches and tags under it, then what those are built as — because the two lower levels need a product picked, and a catalog split across two groups makes managing one a visit to both |
 
 A build-only entry declines rather than opening on a scope that means nothing.
@@ -1053,11 +1053,21 @@ where nothing happened.
 
 ## Flaw entry
 
-A screen of its own, reached from the rail rather than from the findings list.
-What is being recorded is precisely what is **not** in that list, so opening it
-from there asks somebody to start where the answer is absent.
+One screen for every flaw reported in what we ship, whether somebody outside
+sent it or somebody here found it. It is reached from the rail as "Report a
+flaw", from a product's Inbox with that product picked, and from a report being
+recorded as a flaw. Not from the findings list: what is being reported is
+precisely what is **not** in that list.
 
-It asks for the product and then for **sets** of lines and variants, because the
+| Rule | |
+|---|---|
+| Where it came from is asked, with no default | It decides the disclosure date and whether anybody is owed an answer (REQ-37). A preselected answer is a choice nobody made. Found here asks for the finder and the credit; sent in from outside asks for the reporter, how to reach them, the credit and the day it arrived |
+| Filing and recording are one choice on the same form | Filed, it waits in the Inbox to be recorded as a flaw, matched to one, or ruled out. Recorded now, it asks for the builds, the component and the severity, and its report is written in the same act. Offered to whoever may work reports; somebody who may not is offered recording alone, because filing is working reports |
+| Opened from a report, it records that report | Where it came from is read from the report rather than asked again, and recording accepts it |
+| A recorded flaw opens on its issue page | Every build it landed in, and the advisory panel, which is where a flaw in our own product is headed |
+| A filed report opens on its own page in the Inbox | Where it is judged |
+
+Recording asks for the product and then for **sets** of lines and variants, because the
 same code goes out on several lines and as several variants at once and a flaw in
 it is one issue in every build that ships it. The builds are the product of the
 two, and the scope prefills it without constraining it. Ticked rather than chosen
@@ -1069,14 +1079,14 @@ are about to file against — which the screen also says as a count.
 |---|---|
 | The control appears only for somebody who may record one | A button leading to a refusal is worse than no button. Undisclosed needs private triage, already-public needs the ordinary right, and somebody holding only the ordinary one is offered the second with the first saying why it is not theirs |
 | It is undisclosed unless somebody says otherwise | A choice of two stated options rather than a checkbox: the dangerous mistake should not be the quiet one |
-| The severity has no default, and may be left unset | A judgment sitting in the field as though somebody had made it is this screen making it for them. An unrated finding comes due as a medium, which is what every unrated finding already does |
+| The severity has no default, and may be left unset | A judgment sitting in the field as though somebody had made it is this screen making it for them. An unrated flaw has no deadline until somebody rates it (REQ-33), and the hint says so |
 | The component is searched against what that build actually holds | A name typed from memory is a name the server refuses, and a name the build holds at two versions is a question the refusal asks properly rather than something to guess at |
 | The score is composed as a vector and worked out on the server | The metrics are offered in words rather than letters, because somebody rating a flaw is choosing between "over the network" and "physical access". The formula lives in one place, so a second copy in the browser cannot disagree with the number in the database. A vector settles the severity, so it is not asked twice |
 | The scheme is picked, and the metrics follow it | Version 4 asks eleven metrics, version 3 asks eight, and the two they share are asked in different words. Changing the scheme keeps the answers the new one also asks for |
 | A new assessment is composed under 3.1 | A published advisory has a field for a version 3 score and none for a version 4 one, so a flaw assessed under version 4 publishes without a score. The picker says so where version 4 is chosen, because it is a consequence somebody has to weigh before they answer eleven metrics |
 | A score is shown with the scheme it is on | Two schemes are scorable and their numbers are not comparable. Where the number leads, the scheme is beside it; where the band leads and the number is a hint, the scheme is on the number |
 | Weaknesses are suggested and never restricted | A picker that refused an identifier it had not heard of would refuse next year's |
-| Files that prove it are attached on the same screen | Stored after the finding exists, because an attachment hangs off an issue and there is no issue until it is recorded. A file that will not store does not undo the record — the words are the finding and the file is evidence for them — and what is reported is which file failed |
+| Files that prove it are attached on the same screen | Stored against the report when it is filed, and against the issue when it is recorded, after either exists. A file that will not store does not undo the record — the words are the finding and the file is evidence for them — and what is reported is which file failed |
 
 The description is written and read as markdown. It is our own prose, so it goes
 through the same editor and the same submission policy as a justification. What
@@ -1116,7 +1126,9 @@ that name a report. `DESIGN-findings.md` § Reports holds what a report is and
 | The button names the act | "Propose" where somebody else has to agree, "Submit" where nobody does. The count is on it where more than one report is covered |
 | A duplicate asks for the issue, and says a closed one is rejected instead | The server refuses a duplicate of an issue not open here; the hint says what to do before the refusal does |
 | Approve is not offered to the ruling's own proposer | The server tells them apart and says so on the ruling. Withdrawing is offered to whoever works reports, and reads "Withdraw" to the proposer, "Send back" to anybody else while it waits, and "Undo" once it is in force — one act under three names, each the word for that moment |
-| A report's page holds the claim, the answer to the reporter, the files and the judgment | In that order, which is the order they happen in. The judgment offers accepting as an issue and a ruling side by side while nothing answers the report, and the ruling itself once one does |
+| A report's page holds the claim, the answer to the reporter, the files and the judgment | In that order, which is the order they happen in. While nothing answers the report, the judgment offers recording it as a new flaw first, as a button, then accepting it as an issue a scan reported, then a ruling; the ruling itself once one does. A new flaw is what a real claim usually is |
+| A report found here says so, and is never shown as unanswered | Its From column reads "found here". Nobody outside sent it, so nobody is owed an answer and no control offers to record one |
+| The Inbox's control for a new report opens the flaw entry form | With the product picked. One form for every report, so a flaw found here and one sent in are filed the same way |
 | Files are attached from the report's page and held at once | A report carries no text a reference could be written into |
 | Duplicates are listed on the issue: in the reporter card where the flaw was recorded here, and in a card of their own on an issue a scanner found | A scanner-found issue has no reporter card and is the usual thing a claim duplicates. Read under the report rule, so the list is absent for somebody who may not read reports rather than drawn empty |
 | Rulings sit beside the record, over its products and period | A ruling is a judgment somebody could be asked to account for, and an auditor asks about a period. Beside the judgments rather than among them: a ruling is about a claim rather than a finding and takes none of their filters. Printed with them, without the controls |
@@ -1154,7 +1166,8 @@ advisory is and § Editorial state holds who may agree.
 | Who agrees is named, with when | Somebody about to publish checks who vouched for the words, and a count does not say |
 | Whether it changed since it went out is said above what went out | The server's answer, compared on the settled digest. Drawn as an alert where it changed and a line where it did not, and absent where the server has no answer |
 | The refusal a control reaches is the server's sentence | Agreeing as the person who started it, and naming a flaw a scanner reported. Each says what the store said rather than a sentence invented on the screen |
-| A flaw is typed as well as picked | The list offered is every flaw recorded in the chosen product, open or fixed, without what the advisory already names there, and a fixed one says so. A read that failed says so and leaves the typing, because an empty picker reads as "this product has none", which is the one thing a failed read did not say |
+| Starting one names its first flaw | The list's control asks for a product and a flaw, then mints the name and names the flaw on it. An advisory covering nothing generates no document, so one started empty is a name with nothing behind it. A name minted before the naming was refused is kept for the next attempt, so a mistyped identifier spends no second number |
+| A flaw is typed as well as picked | One picker serves starting an advisory and naming a further flaw on one. The list offered is every flaw recorded in the chosen product, open or fixed, without what the advisory already names there, and a fixed one says so. A read that failed says so and leaves the typing, because an empty picker reads as "this product has none", which is the one thing a failed read did not say |
 | The picker says when it is holding less than what is there | It stops at the endpoint's own maximum, and a truncated list otherwise reads as the whole of what a product holds |
 | Retitling and taking a flaw off are on the compose panel | They are the other two acts that open an edition, so each takes back every agreement standing, which is said beside the control. `DESIGN-remediation.md` § Editions and agreement holds the rule |
 | The document is asked for only where a flaw is named | One covering nothing is refused, and a refusal on every visit draws a failure on a screen where nothing failed |
@@ -1183,6 +1196,7 @@ this product on it, read what it generates, and open it.
 
 | Rule | |
 |---|---|
+| Open on a flaw recorded here, folded on anything else | An advisory is about a flaw in our own product, which is where somebody arriving from recording one goes next. Most issues the screen shows are a scanner's report about somebody else's component, which the naming refuses, and asking about those on every visit is a refusal per page load |
 | What already covers this flaw is said before another is started | The question before starting a second is whether one already says it, and each is a link to the advisory that says it |
 | Where each advisory covering this flaw stands is shown beside its name | Whether one is agreed to and whether it has gone out is what somebody asks before starting a second |
 | A flaw in somebody else's component is refused when it is named | The refusal names the issue somebody chose, and is shown rather than swallowed |

@@ -240,3 +240,36 @@ func TestOnlyAFlawReportedFromOutsideCarriesADisclosureDate(t *testing.T) {
 		}
 	})
 }
+
+func TestAnIssueSaysWhereItIsAFlawRecordedHere(t *testing.T) {
+	// The issue screen opens the advisory panel on a flaw recorded here and
+	// leaves it folded on a scanner's issue, which the naming refuses.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PrivateTriage)
+		scanned := f.anIssueHere(t, who, "A known issue in a component somebody else wrote.")
+		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
+			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
+			Summary: "The management socket accepts a request nobody authenticated.",
+			Told:    finding.Told{FoundHere: true},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for issue, want := range map[int64]bool{scanned: false, f.issueID(t, identifier): true} {
+			rows, _, err := f.store.Everywhere(ctx, who, issue, 50)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rows) == 0 {
+				t.Fatalf("issue %d sits nowhere", issue)
+			}
+			for _, row := range rows {
+				if row.Recorded != want {
+					t.Errorf("issue %d reads as recorded here: %v, want %v", issue, row.Recorded, want)
+				}
+			}
+		}
+	})
+}

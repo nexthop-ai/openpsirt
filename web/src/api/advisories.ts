@@ -90,14 +90,6 @@ export function useIssuances(advisory: string): UseQueryResult<{ items: Issuance
 
 // Minting a name. No title: what an advisory is called is a decision somebody
 // makes about a document, and it is made on the screen the new name opens.
-export function useStartAdvisory() {
-  const done = useAfterAdvisory();
-  return useMutation({
-    mutationFn: async () => unwrap(await api.POST("/v1/advisories", { body: {} })),
-    onSuccess: done,
-  });
-}
-
 export function useRetitle() {
   const done = useAfterAdvisory();
   return useMutation({

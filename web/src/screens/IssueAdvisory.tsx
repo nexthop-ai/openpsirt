@@ -29,8 +29,12 @@ import { standing, statusLabel } from "./advisory";
 export function IssueAdvisory({
   vulnerability,
   products,
+  recorded,
 }: {
   vulnerability: string;
+  // Whether this is a flaw recorded in one of our own products, which is
+  // what an advisory is about.
+  recorded: boolean;
   // The products carrying this issue, as the rows give them: the name to ask
   // with, and what to call it on screen.
   products: { name: string; called: string }[];
@@ -39,12 +43,12 @@ export function IssueAdvisory({
   // The advisory being worked on. Held here because an advisory is started
   // and then filled in, and the two are separate acts against separate names.
   const [advisory, setAdvisory] = useState("");
-  // Folded until somebody asks. An advisory is about a flaw in something this
-  // deployment ships, and most issues on this screen are a scanner's report
-  // about somebody else's component — so asking about every one of them on
-  // every visit is a refused request per page load, which is noise in a
-  // console and work nobody wanted done.
-  const [open, setOpen] = useState(false);
+  // Open on a flaw recorded here, which is where somebody arriving from
+  // recording one goes next. Folded on anything else until somebody asks: most
+  // issues on this screen are a scanner's report about somebody else's
+  // component, and asking about every one of them on every visit is a refused
+  // request per page load.
+  const [open, setOpen] = useState(recorded);
 
   // The advisories that already cover this flaw here, without generating
   // anything. The question before starting another is whether one already

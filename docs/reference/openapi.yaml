@@ -8825,6 +8825,9 @@ components:
         product_name:
           description: Its spelling on screen
           type: string
+        recorded:
+          description: Whether this is a flaw recorded in our own product rather than an issue a scanner reported
+          type: boolean
         state:
           description: The decision state here, by the definition the findings list uses
           enum:

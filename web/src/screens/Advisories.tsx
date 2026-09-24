@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
-import { PAGE, useAdvisories, useStartAdvisory } from "../api/advisories";
+import { PAGE, useAdvisories, useAfterAdvisory } from "../api/advisories";
+import { api } from "../api/client";
+import { unwrap } from "../api/queries";
 import { useWho } from "../app/session";
 import { AddButton } from "../ui/Declare";
 import { Empty } from "../ui/Empty";
@@ -13,6 +16,7 @@ import { Paged } from "../ui/Paged";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { standing, statusLabel } from "./advisory";
+import { FlawPicker } from "./FlawPicker";
 
 // Every advisory this deployment has minted, newest first.
 //
@@ -28,7 +32,7 @@ export function Advisories() {
   const navigate = useNavigate();
   const [offset, setOffset] = useState(0);
   const rows = useAdvisories(offset);
-  const start = useStartAdvisory();
+  const [starting, setStarting] = useState(false);
   const who = useWho();
   // Whoever may record a flaw in a product may write an advisory about one,
   // which is the server's own gate. Drawn to somebody holding no triage
@@ -49,28 +53,18 @@ export function Advisories() {
         </h2>
         <p>What this deployment has said about its own flaws, newest first.</p>
         {mayStart && (
-          <AddButton
-            label="Start an advisory"
-            onClick={() =>
-              start.mutate(undefined, {
-                // Straight to it. A name is all the act produces, and what to
-                // call the document and which flaws it covers are decided on
-                // the screen the name opens.
-                onSuccess: (made) => navigate(`/advisories/${encodeURIComponent(made.advisory)}`),
-              })
-            }
-          />
+          <AddButton label="Start an advisory" onClick={() => setStarting((was) => !was)} />
         )}
       </div>
 
-      {start.isError && (
-        <Failed error={start.error} what="No advisory could be started. Nothing was minted." />
+      {starting && (
+        <Start onStarted={(made) => navigate(`/advisories/${encodeURIComponent(made)}`)} />
       )}
 
       {items.length === 0 ? (
         <Empty
           title="No advisories."
-          detail="One you start, or one started from a flaw, appears here."
+          detail="An advisory is about flaws recorded here. Start one from a flaw, here or on the flaw's own page."
         />
       ) : (
         <Wide>
@@ -114,5 +108,74 @@ export function Advisories() {
       )}
       <Paged shown={items.length} total={total} offset={offset} limit={PAGE} onGo={setOffset} />
     </>
+  );
+}
+
+// Starting an advisory names its first flaw in the same act. An advisory
+// covering nothing generates no document, so one started empty is a name with
+// nothing behind it and an extra step before anything can be read.
+//
+// Two requests, because they are two acts on the server: a name is minted,
+// then the flaw is named on it. A name already minted is kept for the next
+// attempt when the naming is refused, so a mistyped identifier does not spend
+// another number from the year's sequence.
+function Start({ onStarted }: { onStarted: (advisory: string) => void }) {
+  const [product, setProduct] = useState("");
+  const [flaw, setFlaw] = useState("");
+  const [minted, setMinted] = useState("");
+  const after = useAfterAdvisory();
+  const start = useMutation({
+    mutationFn: async () => {
+      let name = minted;
+      if (name === "") {
+        name = unwrap(await api.POST("/v1/advisories", { body: {} })).advisory;
+        setMinted(name);
+      }
+      unwrap(
+        await api.POST("/v1/advisories/{advisory}/issues", {
+          params: { path: { advisory: name } },
+          body: { product, vulnerability: flaw.trim() },
+        }),
+      );
+      return name;
+    },
+    onSettled: after,
+    onSuccess: onStarted,
+  });
+
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <h3>Start an advisory</h3>
+      <FlawPicker
+        product={product}
+        onProduct={(next) => {
+          setProduct(next);
+          setFlaw("");
+          start.reset();
+        }}
+        flaw={flaw}
+        onFlaw={setFlaw}
+        action={
+          <button
+            type="button"
+            className="btn"
+            disabled={!product || !flaw.trim() || start.isPending}
+            onClick={() => start.mutate()}
+          >
+            {start.isPending ? "Starting…" : "Start"}
+          </button>
+        }
+      />
+      {start.isError && (
+        <Failed
+          error={start.error}
+          what={
+            minted
+              ? `${minted} was started and that flaw was not named on it.`
+              : "No advisory could be started. Nothing was minted."
+          }
+        />
+      )}
+    </div>
   );
 }
