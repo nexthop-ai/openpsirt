@@ -42,7 +42,7 @@ func TestAV020DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
 			t.Errorf("the upgraded schema differs from a fresh install's:\n%s", diff)
 		}
-		survived(t, ctx, db, before, nil, nil)
+		survived(t, ctx, db, before, nil)
 		addedByV030(t, ctx, db)
 		if version, err := schema.Version(ctx, db); err != nil || version != v030 {
 			t.Errorf("the upgrade left version %d (%v), want %d", version, err, v030)
@@ -56,7 +56,7 @@ func TestAV020DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		if diff := setDiff(built, describe(t, ctx, db)); diff != "" {
 			t.Errorf("rolled back, the schema differs from v0.2.0's:\n%s", diff)
 		}
-		survived(t, ctx, db, before, nil, nil)
+		survived(t, ctx, db, before, nil)
 		dbtest.MigrateTo(t, db, v030)
 		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
 			t.Errorf("upgraded a second time, the schema differs from a fresh install's:\n%s", diff)
@@ -84,42 +84,113 @@ func TestAV010DatabaseUpgradesThroughEveryReleaseKeepingItsRows(t *testing.T) {
 		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
 			t.Errorf("upgraded from v0.1.0, the schema differs from a fresh install's:\n%s", diff)
 		}
-		survived(t, ctx, db, before, replacedByV020, nil)
+		survived(t, ctx, db, before, replacedByV020)
 		moved(t, ctx, db)
 		addedByV030(t, ctx, db)
 		leaveAtLatest(t, ctx, db)
 	})
 }
 
-// v0.3.0's declaration of each table it changes names the columns the chain
-// of migrations gives that table.
+// v0.3.0's declaration of each table it changes is the table the chain of
+// migrations builds: every column with its type, nullability and default,
+// every constraint and every index, on every engine. Migration 38 runs none of
+// these statements — it adds three columns — so nothing else holds a
+// declaration to the table it describes, and a freeze would record one that
+// is wrong for good. Each is built beside the real table under a scratch name
+// and the two are described alike.
 func TestTheV030DeclarationsAreTheTablesTheMigrationsBuild(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		rollBack(t, ctx, db)
 		dbtest.MigrateTo(t, db, v030)
-		declared, err := migrations.DeclaredV030(db.Server.Engine)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(declared) == 0 {
-			t.Fatal("v0.3.0 declares no table, so nothing was compared")
-		}
-		built := columns(t, ctx, db)
-		for table, names := range declared {
-			var have []string
-			for _, c := range built[table] {
-				have = append(have, c.name)
+		declared := migrations.StatementsV030(db.Server.Engine)
+		var made []string
+		for table, statements := range declared {
+			for _, stmt := range statements {
+				if _, err := db.ExecContext(ctx, scratch(table, stmt)); err != nil {
+					t.Fatalf("build %s's declaration under a scratch name: %v\n%s", table, err, stmt)
+				}
 			}
-			want := slices.Clone(names)
-			slices.Sort(want)
-			slices.Sort(have)
-			if !slices.Equal(want, have) {
-				t.Errorf("%s is declared with %v and the migrations build %v", table, want, have)
+			made = append(made, scratchPrefix+table)
+		}
+		described := describe(t, ctx, db)
+		compared := 0
+		for table := range declared {
+			built := linesOf(described, table, "")
+			fromDeclaration := linesOf(described, scratchPrefix+table, scratchPrefix)
+			if len(built) == 0 || len(fromDeclaration) == 0 {
+				t.Errorf("%s described as %d lines built and %d declared, so nothing was compared",
+					table, len(built), len(fromDeclaration))
+				continue
+			}
+			compared++
+			for _, line := range fromDeclaration {
+				if !slices.Contains(built, line) {
+					t.Errorf("%s is declared with %q and the migrations do not build it", table, line)
+				}
+			}
+			for _, line := range built {
+				if !slices.Contains(fromDeclaration, line) && !madeElsewhere(table, line) {
+					t.Errorf("the migrations build %q on %s and v0.3.0 does not declare it", line, table)
+				}
+			}
+		}
+		if compared != len(declared) || compared != 3 {
+			t.Errorf("compared %d of the tables v0.3.0 declares, want 3", compared)
+		}
+		for _, table := range made {
+			if _, err := db.ExecContext(ctx, `DROP TABLE "`+table+`"`); err != nil {
+				t.Fatalf("drop %s: %v", table, err)
 			}
 		}
 		leaveAtLatest(t, ctx, db)
 	})
+}
+
+// scratchPrefix names a declared table built beside the real one. Every name
+// a declaration makes starts with its table's name, so prefixing those names
+// keeps the index and constraint names of the two apart on engines where
+// those are unique across a database.
+const scratchPrefix = "zz_"
+
+func scratch(table, stmt string) string {
+	return strings.ReplaceAll(stmt, `"`+table, `"`+scratchPrefix+table)
+}
+
+// linesOf is the lines of a description about one table, with the scratch
+// prefix taken out of each so the two read alike.
+func linesOf(described []string, table, strip string) []string {
+	var out []string
+	for _, line := range described {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		about := fields[1]
+		if fields[0] == "foreign" && len(fields) > 2 {
+			about = fields[2]
+		}
+		about, _, _ = strings.Cut(about, ".")
+		if about != table {
+			continue
+		}
+		if strip != "" {
+			line = strings.ReplaceAll(line, strip, "")
+		}
+		out = append(out, line)
+	}
+	return out
+}
+
+// madeElsewhere is what a table carries that another migration makes rather
+// than the table's own declaration: an index added after the table was.
+func madeElsewhere(table, line string) bool {
+	for _, name := range map[string][]string{"finding": {"finding_component_idx"}}[table] {
+		if strings.Contains(line, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // addedByV030 checks what the upgrade wrote into the columns v0.2.0 did not

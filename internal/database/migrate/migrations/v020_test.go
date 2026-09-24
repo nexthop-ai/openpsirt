@@ -67,7 +67,7 @@ func TestAV010DatabaseUpgradesToTheFreshSchemaKeepingItsRows(t *testing.T) {
 		if diff := setDiff(fresh, describe(t, ctx, db)); diff != "" {
 			t.Errorf("the upgraded schema differs from a fresh install's:\n%s", diff)
 		}
-		survived(t, ctx, db, before, replacedByV020, nil)
+		survived(t, ctx, db, before, replacedByV020)
 		moved(t, ctx, db)
 
 		version, err := schema.Version(ctx, db)
@@ -440,10 +440,9 @@ func text(v any) string {
 var replacedByV020 = map[string]bool{"disclosure_extension": true, "advisory_issuance": true}
 
 // survived checks every value the release held is still where it was, in
-// every table the upgrade keeps, other than the columns it moves onto a rule
-// of its own, named as table.column.
+// every table the upgrade keeps.
 func survived(t *testing.T, ctx context.Context, db *database.DB, before map[string][]map[string]string,
-	replaced, rewritten map[string]bool) {
+	replaced map[string]bool) {
 	t.Helper()
 	checked := 0
 	for table, rows := range before {
@@ -461,9 +460,6 @@ func survived(t *testing.T, ctx context.Context, db *database.DB, before map[str
 		}
 		for i := range rows {
 			for column, was := range rows[i] {
-				if rewritten[table+"."+column] {
-					continue
-				}
 				if now := after[i][column]; now != was {
 					t.Errorf("%s.%s was %q and is %q", table, column, was, now)
 				}

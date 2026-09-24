@@ -3,7 +3,8 @@
 
 package migrations
 
-// v0.3.0's declaration of the finding table, and its indexes.
+// v0.3.0's declaration of the finding table, and the indexes it makes.
+// finding_component_idx is migration 12's.
 //
 // v0.2.0's, with when a recorded flaw was first rated. A flaw found or
 // reported here is clocked from that moment on windows of its own, where

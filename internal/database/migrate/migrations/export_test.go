@@ -5,23 +5,13 @@ package migrations
 
 import "github.com/nexthop-ai/openpsirt/internal/database"
 
-// DeclaredV030 is each table v0.3.0 declares, and the columns its statement
-// names, as the statements read on one engine.
-func DeclaredV030(engine database.Engine) (map[string][]string, error) {
+// StatementsV030 is v0.3.0's declaration of each table it changes, every
+// statement of it, as it reads on one engine.
+func StatementsV030(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
-	out := map[string][]string{}
-	for _, statements := range [][]string{findingV030(t), reportV030(t), componentV030(t)} {
-		for _, stmt := range statements {
-			m := createsTable.FindStringSubmatch(stmt)
-			if m == nil {
-				continue
-			}
-			d, err := declared(stmt)
-			if err != nil {
-				return nil, err
-			}
-			out[m[1]] = d.columns
-		}
+	return map[string][]string{
+		"finding":     findingV030(t),
+		"flaw_report": reportV030(t),
+		"component":   componentV030(t),
 	}
-	return out, nil
 }

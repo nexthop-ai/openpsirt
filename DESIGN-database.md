@@ -290,8 +290,8 @@ chain. They are shaped the way every migration after 1.0 will be.
 |---|---|
 | Every table and index is made by the release's own statement | The release's declaration of each table it creates or changes sits beside its migration, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
 | One transaction of its own | Registered without the migration library's transaction, because SQLite's foreign keys have to be switched off before a transaction begins, and because the rows it moves are read back by name |
-| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as v0.2.0 declares it and costs no row rewrite on any of the three |
-| SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by v0.2.0's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
+| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as the release declares it and costs no row rewrite on any of the three |
+| SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by the release's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
 | SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
 | Rows written with their own identifiers keep them | References into a moved table still land. PostgreSQL's identity does not move past a value it did not generate, so it is moved past them; the other three move on the insert |
 | A column added is last in its table on the three servers | A table SQLite rebuilds has it where the release declares it. No query reads a column by position |
@@ -312,7 +312,7 @@ What v0.1.0's rows become under migration 37:
 | A finding | Not exploited here. v0.1.0 had no record of that |
 | A notification | Carried alone. Only a kind of message v0.1.0 did not have is carried together |
 | A column v0.1.0 did not have and that takes a null | Null |
-| A grant of undisclosed reading or triage | Carried unchanged, per product, across the estate and in a group binding. It reaches undisclosed work alone, where in v0.1.0 it reached disclosed work too. Nothing grants the disclosed role on upgrade; the operator does, as the upgrade note in `docs/configuration.md` says |
+| A grant of undisclosed reading or triage | Carried unchanged, per product, across the estate, in a group binding and in a personal token's holds. It reaches undisclosed work alone, where in v0.1.0 it reached disclosed work too. Nothing grants the disclosed role on upgrade; the operator does, as the upgrade note in `docs/configuration.md` says |
 
 Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
 place for goes with the tables and columns that held it: an embargo shortened,
@@ -378,22 +378,23 @@ Tests on each of the four engines:
 | A v0.2.0 database, a row in every table | Upgraded, every column, index and constraint matches a database that walked the chain empty, and every value it held is still there. Rolled back, it is the schema the v0.2.0 tag built, still holding them. Upgraded again, it matches the empty one |
 | A v0.1.0 database, a row in every table | Carried through migrations 37 and 38, it matches a database that walked the chain empty, and holds what it held |
 | Recorded flaws of each kind | A recorded flaw rated as published and recorded in two builds days apart, one rated only by its product, one rated by nobody, one with no report, and a scanned finding, each against the table above |
-| v0.3.0's declarations | Each table the release declares has the columns the chain builds |
+| v0.3.0's declarations | Each table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it: every column with its type, nullability and default, every constraint and every index. An index another migration adds is named as such |
 
 ### Release records
 
-A release's migrations are frozen on the commit that is tagged, by
-`make release-freeze`, and the release workflow refuses a tag whose release is
-not frozen, by `make release-check`, before it builds anything.
+A release's migrations are frozen by `make release-freeze`, on a branch from
+the head of `main` that lands before the tag, and the release workflow refuses
+a tag whose release is not frozen, by `make release-check`, before it builds
+anything.
 `DESIGN-packaging.md` § The release procedure says where the two sit.
 
 | Step | What happens |
 |---|---|
 | 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0. Every schema change before the tag edits that migration and those declarations |
 | 2. Rehearse, from every earlier release, on each engine | A database the earlier release's own image built and seeded is upgraded by this tree and checked, as § Upgrade rehearsal says |
-| 3. Freeze, on the commit to be tagged | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration |
+| 3. Freeze, on a branch from the head of `main` | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration |
 | 4. Land the record through a pull request | The digest test and the schema test hold the tree to it from then on |
-| 5. Tag | The release workflow checks the record before anything is built |
+| 5. Check, then tag | `make release-check` on the commit to be tagged, then the tag. The release workflow checks the record again before anything is built |
 | 6. The next schema change | A new migration, numbered after the tagged release's last, for the next release |
 
 | The check refuses | Why |
@@ -403,10 +404,17 @@ not frozen, by `make release-check`, before it builds anything.
 | A migration numbered past the release's last | It would ship with nothing holding it |
 | Declarations named for a release nothing froze | The same, for the tables a migration reads |
 | A record missing one engine's schema | The schema test cannot hold that engine |
-| A tag that is not a release | A prerelease is held to the record of the release it precedes |
+| A tag that is not a release | A release is `vX.Y.Z`, and a release candidate `vX.Y.Z-rc.N`, held to the record of the release it precedes. Any other suffix is refused, so the output of `git describe` is never read as a release |
 
 A file a release owns is a migration numbered after the previous release's
-last up to its own, or a declaration named for it.
+last up to its own, or a declaration named for it. A release that changes no
+schema owns no file: its record lists none and carries the previous release's
+last migration as its own.
+
+| Situation | What to do |
+|---|---|
+| The release's migration needs a fix after the freeze, before the tag or between release candidates | Edit the release's migration and declarations, freeze it again in the same pull request, and recreate a database a release candidate built |
+| A release is tagged | Its record is what it shipped. `make release-freeze` refuses a version whose tag exists, and a schema change is a migration numbered after its last, for the next release |
 
 ### Upgrade rehearsal
 
@@ -431,7 +439,7 @@ in the gate.
 | The release seeds itself | A fixture written today records what this tree thinks the release wrote. The release's own targets write what a deployment of it holds |
 | Only the docker command is wrapped | The containers, network and ports are renamed so a demo already running is untouched, and the application is pointed at the rehearsal's database. Nothing in the release's targets is edited |
 | Counted with nothing running | A server runs passes that write rows. Counted between the migrations alone, a changed count is the migration's |
-| Everything it made is removed | Pass or fail: its containers, network and database. The release's worktree and the scanner's database are kept for the next run |
+| Everything it made is removed | Pass or fail: its containers, network and database. The release's worktree, both images, the run's directory with its logs, and the scanner's database are kept. `-keep` leaves everything in place |
 
 ## Migration locks
 
