@@ -30,29 +30,129 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Everything that needs the Go toolchain, in one job.
+  # What "make check" runs, as three jobs rather than one. The command a
+  # developer runs is "make check", which is check-static and test-all; test-all
+  # is the race pass and the server pass; so the three jobs are the three
+  # halves, named here and in the makefile's definition of check, and nowhere
+  # a target can be added without reaching one of them.
   #
-  # This was six jobs — build and test, the interface, static analysis,
-  # vulnerabilities and licenses, the OpenAPI document, and the bill of
-  # materials. Five of them declared nothing but a checkout and a Go setup
-  # before running a make target: same runner image, same toolchain, same
-  # module cache, no services and no conditions. So they were six clones and
-  # six toolchain restores to run one machine's worth of work.
-  #
-  # **What it runs is the command a developer runs.** `make check` is defined
-  # as everything CI checks, and `make gate full` is `make check &&
-  # make check-engines`. Naming the targets separately here is how the two
-  # drifted: CI was running neither `reserved`, nor `readable`, nor
-  # `pins-check`, all three of which `make check` has run for as long as it has
-  # existed. A gate nobody notices is missing is the failure `check-engines`
-  # was written to prevent, one level up.
-  checks:
-    name: Build, test and check
+  # Three runners rather than one, because a runner for a private repository
+  # has two cores. On one runner the two passes of the suite ran one package at
+  # a time each, and the job took twenty minutes, sixteen of them in make check.
+  static:
+    name: Build and check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          # Off in every job: setup-go keeps the modules and the build cache
+          # in one entry under one key, and the two answer different
+          # questions. Each is restored below under a key of its own.
+          cache: false
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-mod-${{ runner.os }}-
+      # The build cache, one per job, because each compiles something
+      # different: this one the binary and the tools, the race job the tree
+      # instrumented, the engine job the test binaries plain.
+      #
+      # Written on main and read everywhere. A branch restores what the last
+      # merge left, which is at most one merge stale, and writing from every
+      # branch would churn a shared ten gigabytes for entries nothing reads
+      # twice. Go's build cache is content-addressed, so a stale entry is
+      # ignored rather than used: the failure mode is a slow run, never a
+      # wrong one.
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        with:
+          path: ~/.cache/go-build
+          key: go-build-static-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: go-build-static-${{ runner.os }}-
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          # The version the image builds the interface with. check-static
+          # runs the interface checks, so the toolchain for them belongs here.
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Confirm a developer's engines are the engines run here
+        # The servers the engine job declares are started locally by "make
+        # engines-up", which pins the same versions. Two pinned lists drift,
+        # and the drift is invisible exactly when it matters: a suite green
+        # locally against an engine this workflow no longer runs proves
+        # nothing about the one it does. The target compares the two lists in
+        # both directions, so an engine added here and nowhere else is caught.
+        run: make engines-check
+
+      - name: Everything make check runs except the suite
+        # One target rather than a list of them, so that a target added to it
+        # is run here without anybody remembering to add a step.
+        run: make check-static
+
+      # Written here rather than beside the restore, so what is stored is the
+      # compilation this job did rather than what it started with.
+      - uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ~/.cache/go-build
+          key: go-build-static-${{ runner.os }}-${{ github.run_id }}
+
+      # Written by check-static, by way of the sbom target. Published because
+      # we ingest these for other people's software and publishing one for our
+      # own is the same promise kept.
+      #
+      # It describes a binary built from this tree, and is not the inventory a
+      # release publishes — that one is read out of the image, is attached to
+      # the release, and does not expire. Two documents of one name invites
+      # somebody to treat this one as the release's.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: openpsirt-sbom
+          path: bin/openpsirt.cdx.json
+          if-no-files-found: error
+
+  race:
+    name: Race detector
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        with:
+          path: ~/go/pkg/mod
+          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-mod-${{ runner.os }}-
+      - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        with:
+          path: ~/.cache/go-build
+          key: go-build-race-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: go-build-race-${{ runner.os }}-
+      - name: The suite on SQLite, with the race detector
+        run: make test-race
+      - uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ~/.cache/go-build
+          key: go-build-race-${{ runner.os }}-${{ github.run_id }}
+
+  engines:
+    name: Database engines
     runs-on: ubuntu-latest
 
     # All four supported engines run the same suite. SQLite alone would catch
     # none of the portability traps the design is written around, so a green
     # run here is the only thing that makes "runs on four engines" a fact.
+    #
+    # Each data directory is in memory. A schema change syncs the files it
+    # creates whatever the commit settings say, and every package builds the
+    # schema once on each server.
     services:
       postgres:
         image: postgres:16-alpine
@@ -61,6 +161,7 @@ jobs:
           POSTGRES_DB: openpsirt
         ports: ["5432:5432"]
         options: >-
+          --tmpfs /var/lib/postgresql/data
           --health-cmd pg_isready --health-interval 5s
           --health-timeout 5s --health-retries 10
       mysql:
@@ -70,6 +171,7 @@ jobs:
           MYSQL_DATABASE: openpsirt
         ports: ["3306:3306"]
         options: >-
+          --tmpfs /var/lib/mysql
           --health-cmd "mysqladmin ping -ptest --silent" --health-interval 5s
           --health-timeout 5s --health-retries 20
       # Deliberately below the floor, so the refusal is exercised. Without it
@@ -81,6 +183,7 @@ jobs:
           POSTGRES_DB: openpsirt
         ports: ["5433:5432"]
         options: >-
+          --tmpfs /var/lib/postgresql/data
           --health-cmd pg_isready --health-interval 5s
           --health-timeout 5s --health-retries 10
       mariadb:
@@ -90,6 +193,7 @@ jobs:
           MARIADB_DATABASE: openpsirt
         ports: ["3307:3306"]
         options: >-
+          --tmpfs /var/lib/mysql
           --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 5s --health-timeout 5s --health-retries 20
 
@@ -104,75 +208,24 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
-          # Off, because setup-go keeps the modules and the build cache in one
-          # entry under one key, and the two answer different questions. Left
-          # on, the entry holding both is downloaded and extracted over the top
-          # of the two below, and grows to hold the merged copy.
           cache: false
-      # The modules, keyed on what decides their content.
       - uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
         with:
           path: ~/go/pkg/mod
           key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
           restore-keys: go-mod-${{ runner.os }}-
-      # The build cache, kept current.
-      #
-      # setup-go's key is a hash of go.mod, and a cache is written only when
-      # its key is new. So what a run restores is the compilation of whatever
-      # the tree looked like the last time a dependency was added or the Go
-      # version moved — go.mod moves less often than the checksum file — and
-      # everything changed since is compiled again. It is the largest block in
-      # this job that is not a test.
-      #
-      # Written on main and read everywhere. A branch restores what the last
-      # merge left, which is at most one merge stale, and writing from every
-      # branch would churn a shared ten gigabytes for entries nothing reads
-      # twice. Go's build cache is content-addressed, so a stale entry is
-      # ignored rather than used: the failure mode is a slow run, never a
-      # wrong one.
       - uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
         with:
           path: ~/.cache/go-build
-          key: go-build-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: go-build-${{ runner.os }}-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
-        with:
-          # The version the image builds the interface with. "make check" runs
-          # the interface checks, so the toolchain for them belongs here.
-          node-version: 26
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Confirm a developer's engines are the engines run here
-        # The servers above are declared in this file and started locally by
-        # "make engines-up", which pins the same versions. Two pinned lists
-        # drift, and the drift is invisible exactly when it matters: a suite
-        # green locally against an engine this job no longer runs proves
-        # nothing about the one it does. The target compares the two lists in
-        # both directions, so an engine added here and nowhere else is caught.
-        run: make engines-check
-
-      - name: Everything the local gate checks
-        # Deliberately one target rather than a list of them. "make check" is
-        # the definition of what CI checks, so a target added to it is run
-        # here without anybody remembering to add a step, which is the half
-        # that had already gone wrong three times over.
-        #
-        # It covers: the build, vet, the linter, unreachable exported code,
-        # decisions no design document names, invented names an engine
-        # reserves, source files a text tool cannot read, the pinned versions
-        # agreeing with each other, the four-engine race-detected suite,
-        # known vulnerabilities, dependency licenses, the OpenAPI document
-        # being current, the bill of materials, and the interface.
-        run: make check
-
-      # Written here rather than beside the restore, so what is stored is the
-      # compilation this job did rather than what it started with.
+          key: go-build-engines-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: go-build-engines-${{ runner.os }}-
+      - name: The suite on PostgreSQL, MySQL and MariaDB
+        run: make test-engines
       - uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684  # v4.2.3
         if: github.ref == 'refs/heads/main'
         with:
           path: ~/.cache/go-build
-          key: go-build-${{ runner.os }}-${{ github.run_id }}
+          key: go-build-engines-${{ runner.os }}-${{ github.run_id }}
 
       - name: Confirm every engine ran, and that each was the engine it claimed
         # A skipped engine passes silently, which would make the matrix
@@ -185,29 +238,15 @@ jobs:
         # the three servers.
         run: make check-engines
 
-      # Written by "make check" above, by way of the sbom target. Published
-      # because we ingest these for other people's software and publishing one
-      # for our own is the same promise kept.
-      #
-      # It describes a binary built from this tree, and is not the inventory a
-      # release publishes — that one is read out of the image, is attached to
-      # the release, and does not expire. Two documents of one name invites
-      # somebody to treat this one as the release's.
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
-        with:
-          name: openpsirt-sbom
-          path: bin/openpsirt.cdx.json
-          if-no-files-found: error
-
-  # The two below are not steps of the job above, and each for a reason of
-  # its own rather than for tidiness.
+  # The two below are not parts of make check, and each is a job for a reason
+  # of its own rather than for tidiness.
   #
   # A third was here: dependency review, the action applying the license
   # policy to what a pull request adds. It needs GitHub Advanced Security on
   # a private repository, which is a paid add-on nothing else in this
   # organization buys, and it could never be run locally — so what it checked
-  # is now checked by "make licenses" and "make web-audit", which the job
-  # above runs along with everything else. REQ-75 asks for a finding that
+  # is now checked by "make licenses" and "make web-audit", which the static
+  # job runs along with everything else. REQ-75 asks for a finding that
   # reproduces locally with one documented command, and the action was the
   # one gate that could not.
 

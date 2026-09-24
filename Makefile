@@ -154,7 +154,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
+.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines check-static vet lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
 
 all: check build
 
@@ -244,8 +244,14 @@ test-race:
 # The three server engines, without it. Their time is spent waiting on a
 # socket, which is not where a race is found: 16.9 s against 12.0 s for the API
 # package on MariaDB, where the same package on SQLite is 73.6 s against 10.1 s.
+#
+# At least eight packages at once, whatever the core count. A package on a
+# server is a sequence of round trips, so the default of one package per core
+# leaves a two-core runner waiting on a socket for most of the pass.
+TEST_SERVERS := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2); if [ $$n -lt 8 ]; then n=8; fi; echo $$n)
+
 test-engines:
-	$(SERVERS_PASS) $(PACKAGES)
+	$(SERVERS_PASS) -p $(TEST_SERVERS) $(PACKAGES)
 
 # The checks this change has to pass, chosen from what it touches.
 #
@@ -603,12 +609,21 @@ openapi:
 # Everything CI runs, reachable from one command. Container and chart checks
 # are included because CI runs them; omitting them meant four of nine jobs
 # could not be reproduced locally.
-check: build vet lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check test-all sbom-shape govulncheck licenses secrets openapi-current sbom web-check
+#
+# Two halves, so that CI can run them on separate runners: check-static, and
+# the suite through test-all. CI runs check-static and the two passes of
+# test-all as three jobs, and a target belongs in check-static rather than here,
+# or no job runs it.
+check: check-static test-all
 ifneq ($(ENGINES_MISSING),)
 	@echo
 	@echo "NOT TESTED ON: $(ENGINES_MISSING). Those engines were not configured,"
 	@echo "so nothing here exercised them. Run 'make check-engines' before committing."
 endif
+
+# Everything check runs except the suite: the build, the static analysis, the
+# generated files, the dependency checks and the interface.
+check-static: build vet lint unreachable unclaimed vendored spdx reserved confined granted narrowed attached readable negatives pins-check sbom-shape govulncheck licenses secrets openapi-current sbom web-check
 
 # The interface, built into the directory the binary embeds. Kept out of
 # "build" so a checkout with no node toolchain still produces a working
@@ -909,6 +924,14 @@ PG_AS_A_TEST_SERVER := -c fsync=off -c synchronous_commit=off -c full_page_write
 MY_AS_A_TEST_SERVER := --innodb-flush-log-at-trx-commit=0 --innodb-doublewrite=0 \
 	--sync-binlog=0 --skip-log-bin
 
+# The data directories are in memory. The settings above govern commits, and
+# a schema change syncs the files it creates whatever they say: building the
+# schema took MySQL 20.9 s and MariaDB 18.9 s on a workstation's disk and
+# 0.79 s and 0.17 s in memory. A stopped container loses its databases, which
+# the harness answers by migrating again.
+PG_TEST_DATA := --tmpfs /var/lib/postgresql/data
+MY_TEST_DATA := --tmpfs /var/lib/mysql
+
 engines-up: engines-check
 	@# Everything up to "--" belongs to docker and everything after it to the
 	@# server: the tuning below is the server's own command line, and passed as
@@ -929,13 +952,13 @@ engines-up: engines-check
 	  echo "  $$name: created from $$image"; \
 	}; \
 	up $(ENGINE_PREFIX)-pg16 $(ENGINE_PG_IMAGE) $(ENGINE_PG_PORT):5432 \
-	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER); \
+	   $(PG_TEST_DATA) -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER); \
 	up $(ENGINE_PREFIX)-mysql $(ENGINE_MYSQL_IMAGE) $(ENGINE_MYSQL_PORT):3306 \
-	   -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
+	   $(MY_TEST_DATA) -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
 	up $(ENGINE_PREFIX)-mariadb $(ENGINE_MARIADB_IMAGE) $(ENGINE_MARIADB_PORT):3306 \
-	   -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
+	   $(MY_TEST_DATA) -e MARIADB_ROOT_PASSWORD=test -e MARIADB_DATABASE=openpsirt -- $(MY_AS_A_TEST_SERVER); \
 	up $(ENGINE_PREFIX)-floor $(ENGINE_FLOOR_IMAGE) $(ENGINE_FLOOR_PORT):5432 \
-	   -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER)
+	   $(PG_TEST_DATA) -e POSTGRES_PASSWORD=test -e POSTGRES_DB=openpsirt -- $(PG_AS_A_TEST_SERVER)
 	@# A container reported "Up" is not one that answers. Each server is asked
 	@# with its own client, inside its own container, so nothing here depends on
 	@# a client being installed on this machine. MariaDB renamed mysqladmin to

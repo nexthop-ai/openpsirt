@@ -14,7 +14,8 @@
 // a second — and on the three servers each binary gets a database of its own,
 // named for the package, dropped and created on first use and migrated once.
 // Packages therefore share nothing and can run in parallel; tests within a
-// package share the database and empty it between them with Reset, as before.
+// package share the database, and one pool of connections to it, and empty it
+// between them with Reset.
 //
 // A package whose tests start from the same rows declares them once as a
 // Seeded template. On SQLite the seed is applied to the template before the
@@ -102,8 +103,9 @@ func candidates() []candidate {
 //
 // This is for a test that pins what a query does: every portability defect
 // found so far was a query behaving differently on one engine, so a store
-// test earns all four. Each subtest gets its own connection, and it is
-// closed afterwards.
+// test earns all four. On SQLite each subtest gets a connection of its own,
+// closed afterwards; on a server every test in the binary shares one pool,
+// described at serverConnection.
 func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 	t.Helper()
 	run(t, plain(fn), nil, beside, nil)
@@ -273,7 +275,10 @@ func run(t *testing.T, fn body, only map[database.Engine]bool, keep company, see
 			if err != nil {
 				t.Fatalf("prepare a %s database for this package: %v", c.name, err)
 			}
-			db := Open(t, own)
+			db, err := serverConnection(c.name, own)
+			if err != nil {
+				t.Fatalf("connect to the %s database for this package: %v", c.name, err)
+			}
 			var made any
 			if seed != nil {
 				// The package's one database on this server holds whatever
@@ -362,6 +367,7 @@ var (
 
 	serverMu   sync.Mutex
 	serverURLs = map[database.Engine]string{}
+	serverDBs  = map[database.Engine]*database.DB{}
 )
 
 // sqliteTestPragmas is what a test database adds to the pragmas every SQLite
@@ -476,6 +482,35 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 	}
 	serverURLs[engine] = own
 	return own, nil
+}
+
+// serverConnection is the one pool every test in this binary uses on engine,
+// opened the first time it is asked for and never closed: a test binary has no
+// hook after its last test, and the process ending closes it.
+//
+// One pool rather than one per test, because a PostgreSQL connection is a
+// process of its own on the server, and a new one knows nothing of the schema.
+// Its first statement against the fifty-odd tables costs 43 ms and the same
+// statement on a warm connection 3.4 ms, and every test paid the first: the API
+// package spent 90 s on PostgreSQL with a pool per test and 48 s with this.
+// Tests in a package run one after another on a server, so sharing the pool
+// shares nothing a test can see — the rows are emptied between tests as before.
+func serverConnection(engine database.Engine, own string) (*database.DB, error) {
+	serverMu.Lock()
+	defer serverMu.Unlock()
+	if db, ok := serverDBs[engine]; ok {
+		return db, nil
+	}
+	target, err := database.ParseURL(own)
+	if err != nil {
+		return nil, err
+	}
+	db, err := database.Open(context.Background(), target)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", target.Redacted, err)
+	}
+	serverDBs[engine] = db
+	return db, nil
 }
 
 // ensureDatabase leaves exactly one database for this package and checkout on

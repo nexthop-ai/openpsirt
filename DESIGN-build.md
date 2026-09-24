@@ -104,7 +104,7 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make test` | SQLite only, packages in parallel, cached. Seconds |
 | `make test-all` | Every configured engine, nothing cached: the two runs below, at once |
 | `make test-race` | SQLite with the race detector, tests within a package beside each other |
-| `make test-engines` | The three server engines, without the detector |
+| `make test-engines` | The three server engines, without the detector, at least eight packages at once |
 | `make docs-check` | What a change to documents alone can break |
 | `make lint` | Static analysis, pinned version |
 | `make vet` | The compiler's own checks |
@@ -127,7 +127,8 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make vendored` | Every file somebody else wrote is accounted for, under a license this tree may carry, and named in `NOTICE` where its license asks. See below |
 | `make spdx` | Every source file opens with this project's copyright and an SPDX license identifier. `make spdx-fix` writes it where missing. See below |
 | `make pins-check` | Every version pinned in two files still agrees |
-| `make check` | Everything above. Needs npm, because the interface tier refuses rather than skipping |
+| `make check-static` | Everything above except the suite. Needs npm, because the interface tier refuses rather than skipping |
+| `make check` | `check-static` and `test-all`: everything above |
 | `make check-engines` | That all four engines ran, that each was the engine it claimed, and that the reserved-word list still matches what they reserve |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the running engines |
 | `make weakness-names` | Rewrites the weakness names from the catalog that publishes them. In no gate, unlike the word list: the engines that one asks are pinned in CI and this authority is not, so a drift check would fail a build on the day it publishes |
@@ -185,21 +186,28 @@ the same: a target that sets it, inside `check`.
 
 ## CI jobs
 
-Three, and each of the two beside the first is separate for a reason of its own
-rather than for tidiness.
+Five. The first three are `make check`, divided where it divides; the other two
+are separate for a reason of their own.
 
-| Job | Holds | Why it is not a step of the first |
+| Job | Holds | Why it is a job of its own |
 |---|---|---|
-| Build, test and check | `engines-check`, `make check`, `check-engines`, and the bill of materials as an artifact | — |
+| Build and check | `engines-check`, `make check-static`, and the bill of materials as an artifact | The half of `check` that is not the suite |
+| Race detector | `make test-race` | The race pass of `test-all`. In-process work, and the most processor time of any job |
+| Database engines | The four servers, `make test-engines`, `check-engines` | The server pass of `test-all`, and the only job with services |
 | Container image and chart | The image built, then `check-packaging` against it | buildx and helm rather than Go, and it carries a build cache of its own |
 | Documentation builds | The documentation site built | Python, and nothing else needs it |
+
+A runner for a private repository has two cores. On one runner the two passes
+ran one package at a time each, and the job took 20 minutes, 16 of them in
+`make check`; the suite was 13 of those, 696 s of it the server pass run package
+after package.
 
 ### CI caches
 
 | Cache | Holds | Keyed on | Saved |
 |---|---|---|---|
 | Go modules | Every module the tree and the pinned tools need, extracted and as downloaded | `go.sum` | When the key is new |
-| Go build | The tree compiled plain and race-instrumented, its test binaries' objects, and the five tools built from source | The run, restored by prefix so a run starts from the newest | On `main` |
+| Go build | One per Go job: the binary and the tools built from source, the tree race-instrumented, and the test binaries plain | The job and the run, restored by prefix so a run starts from the newest | On `main` |
 | Image layers | Every stage's layers | The buildkit scope | On `main` |
 
 A pull request's run restores all three and writes none of them: what its
@@ -237,22 +245,24 @@ Both declare `merge_group:` as this one does — a workflow that does not
 contributes no check to a queue entry, and the aggregator cannot tell that
 from one that has not started.
 
-The first job runs one target, not a list of them. `make check` is the
-definition of what CI checks, so a target added to it is run by CI without
-anybody remembering to add a step.
+The three jobs of `make check` run the three targets it is made of, and no
+list of targets beneath them. `make check` is `check-static` and `test-all`, and
+`test-all` is `test-race` and `test-engines`; a target added to `check-static`
+is run by CI without anybody remembering to add a step.
 
 Naming targets individually is what makes the two drift. Jobs listing their
 targets by hand leave targets `make check` runs in no job, so the rule that
 local and CI run the identical command is written down, believed and false —
 including for the check that no invented name collides with a word an engine
-reserves, which is a non-negotiable.
+reserves, which is a non-negotiable. A target added to `check` directly rather
+than to `check-static` is in no job, and the makefile says so where `check` is
+defined.
 
-Jobs that declare nothing but a checkout and a Go setup are one job. The
-interface, static analysis, vulnerabilities and licenses, the API document and
-the bill of materials share a runner image, a toolchain and a module cache, and
-declare no services and no conditions: separate, they are that many clones and
-toolchain restores doing one machine's worth of work, and parallelism is all
-that folding them costs.
+The static checks are one job. The interface, static analysis, vulnerabilities
+and licenses, the API document and the bill of materials share a runner image,
+a toolchain and a module cache, and declare no services and no conditions:
+separate, they are that many clones and toolchain restores doing one machine's
+worth of work.
 
 A composite action is not needed. One Go setup is left in the workflow, so an
 action abstracting it would have a single caller, and a reusable workflow runs
@@ -344,8 +354,16 @@ on each engine, so packages share nothing and run in parallel.
 
 | Engine | What a test gets | Emptied between tests |
 |---|---|---|
-| SQLite | A copy of a template migrated once per binary | Not needed — each test holds its own file |
-| The three servers | The package's own database on the server | By deleting from the tables that hold rows |
+| SQLite | A copy of a template migrated once per binary, and a connection of its own | Not needed — each test holds its own file |
+| The three servers | The package's own database on the server, through one pool every test in the binary shares | By deleting from the tables that hold rows |
+
+The pool on a server is shared because a PostgreSQL connection is a process on
+the server that starts knowing nothing of the schema. Its first statement over
+the fifty-odd tables costs 43 ms, and the same statement on a warm connection
+3.4 ms. With a pool per test, every test paid the first: the API package spent
+90 s on PostgreSQL that way and spends 48 s with one pool. Tests in a package
+run one after another on a server, so the pool carries nothing from one test to
+the next that the emptying does not remove.
 
 A package whose tests start from the same rows declares them once, as a seeded
 template: a function that fills a migrated, empty database and returns what a
@@ -364,10 +382,11 @@ with their claims and grants, about sixty transactions; run per test that was
 as a seeded template it is a file write.
 
 A server database is kept between runs and reused. Applying the migrations is
-nearly the whole cost of a server engine — 11.2 s on MySQL and 6.2 s on
-MariaDB, once per package per engine, which is 475 s of server work in a run
-spending 43 s of processor time — and none of it tests anything the migration
-tests do not.
+nearly the whole cost of a server engine on a disk — 20.9 s on MySQL and 18.9 s
+on MariaDB, once per package per engine — and none of it tests anything the
+migration tests do not. A server CI starts is new every run, so there it keeps
+nothing, and the data directory in memory is what makes building the schema
+cheap: 0.79 s and 0.17 s.
 
 What makes reuse safe is the name. Below 1.0 a schema change edits what
 declares the thing rather than adding a migration beside it, so the applied
@@ -475,6 +494,23 @@ server a run meets is not always one this repository started: `make engines-up`
 passes the same intent at startup, which also reaches the settings an engine
 accepts only there, and a workflow declaring a service container has no command
 line to pass. Asking from the connection reaches both.
+
+The settings govern commits, and a schema change syncs the files it creates
+whatever they say. So every test server keeps its data directory in memory —
+`make engines-up` and the CI services alike — which removes the disk from
+building a schema as well as from committing to it.
+
+| Building the schema, one database, a workstation | On disk | In memory |
+|---|---|---|
+| PostgreSQL | 0.49 s | 0.45 s |
+| MySQL | 20.9 s | 0.79 s |
+| MariaDB | 18.9 s | 0.17 s |
+
+The server pass over every package, six at once, went from 516 s to 246 s of
+package time with the pool above and the data in memory, where the 516 s reused
+databases migrated by an earlier run and the 246 s migrated every one. A
+container stopped and started again has lost its databases, and the harness
+migrates new ones.
 
 A connection that may not set a global leaves the server as it is and the suite
 runs slower. A test reads the setting back from the session it was handed and
