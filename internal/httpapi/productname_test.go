@@ -96,6 +96,30 @@ func TestAFileCarriesTheLabelBesideTheName(t *testing.T) {
 	})
 }
 
+// TestABuildsCountsNameItByTheNamesThatAddressIt is the rule on the
+// readiness counts, which read the build's names in a query of their own.
+func TestABuildsCountsNameItByTheNamesThatAddressIt(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		var readiness struct {
+			Now struct {
+				Stream      string `json:"stream"`
+				StreamName  string `json:"stream_name"`
+				Variant     string `json:"variant"`
+				VariantName string `json:"variant_name"`
+			} `json:"now"`
+		}
+		read(t, r, "triager",
+			"/v1/products/mine/streams/master/variants/broadcom/readiness", &readiness)
+		now := readiness.Now
+		if now.Stream != "master" || now.StreamName != "Master" ||
+			now.Variant != "broadcom" || now.VariantName != "Broadcom" {
+			t.Errorf("the counts name the build as %+v, want the names with the spellings beside them",
+				now)
+		}
+	})
+}
+
 // TestAListNamesABuildByTheNamesThatAddressIt is the same rule for the branch
 // or tag and the variant. The cast declares them with a capital, so the
 // spelling shown differs from the name a path folds to.
