@@ -679,11 +679,11 @@ this thing do"; the checkout answers "what does my change do".</p>
   -e OPENPSIRT_BOOTSTRAP_ADMINS=&quot;you&quot; \
   -e OPENPSIRT_TRUSTED_HEADER=&quot;X-User&quot; \
   -e OPENPSIRT_TRUSTED_SOURCES=&quot;172.16.0.0/12,10.0.0.0/8,fd00::/8&quot; \
-  ghcr.io/nexthop-ai/openpsirt:0.1.0
+  ghcr.io/nexthop-ai/openpsirt:0.2.0
 </code></pre>
 <p>It creates its own schema on startup and serves the interface and the API on
 one port. The Helm chart is published beside the image, as
-<code>openpsirt-0.1.0.tgz</code> on the same release.</p>
+<code>openpsirt-0.2.0.tgz</code> on the same release.</p>
 <div class="admonition warning">
 <p class="admonition-title">Not a small production deployment</p>
 <p>Plain HTTP, and administration handed to whoever a header says they are.
