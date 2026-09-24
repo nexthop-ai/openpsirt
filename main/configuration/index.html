@@ -1287,21 +1287,22 @@ Everything marked off does nothing until the thing in the last column is set.</p
 <p>A sign-in method is not in this list because one is required: the process
 refuses to start without one. <a href="#sign-in">Sign-in</a> says which.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
-<p>Stop every v0.1.0 process before upgrading. The upgrade drops and reshapes
-tables v0.1.0 reads and writes, so a v0.1.0 replica left serving during a
-rolling update fails on them. With the Helm chart, scale the deployment to zero
-first.</p>
-<p>Going back to v0.1.0 is <code>openpsirt migrate down</code>, run with this build before
-the v0.1.0 one is deployed. v0.1.0 started against the upgraded schema reports
-it current and cannot read it.</p>
-<p>A database built by v0.1.0 is upgraded in place, at startup or by <code>openpsirt
-migrate up</code>. Back it up first: on MySQL and MariaDB an upgrade that fails part
-way leaves the schema half changed, and the backup is what recovers it. A
-database built by any other earlier build is recreated.</p>
+<p>A database built by v0.1.0 or v0.2.0 is upgraded in place, at startup or by
+<code>openpsirt migrate up</code>. One built by v0.1.0 passes through v0.2.0's upgrade on
+the way. A database built by any build between releases is recreated.</p>
+<p>Back the database up first. On MySQL and MariaDB an upgrade that fails part way
+leaves the schema half changed, and the backup is what recovers it.</p>
+<p>Stop every process of the earlier release before upgrading. The upgrade from
+v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a v0.1.0 replica
+left serving during a rolling update fails on them. With the Helm chart, scale
+the deployment to zero first.</p>
+<p>Going back is <code>openpsirt migrate down</code>, once for each release stepped back,
+run with this build before the earlier one is deployed. v0.1.0 started against
+an upgraded schema reports it current and cannot read it.</p>
 <table>
 <thead>
 <tr>
-<th>After the upgrade</th>
+<th>After the upgrade from v0.1.0</th>
 <th></th>
 </tr>
 </thead>
@@ -1313,6 +1314,36 @@ database built by any other earlier build is recreated.</p>
 <tr>
 <td>A reported flaw</td>
 <td>Has a reference, minted as one recorded today would be</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>After the upgrade from v0.2.0</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A report</td>
+<td>Sent in from outside</td>
+</tr>
+<tr>
+<td>A flaw recorded here with a severity in force in its product</td>
+<td>Rated at its first recording in that product. Its deadline counts from there, on the windows for flaws in our own product</td>
+</tr>
+<tr>
+<td>A flaw recorded here with no severity in force</td>
+<td>Not rated, and with no deadline</td>
+</tr>
+<tr>
+<td>A flaw recorded with nobody named as reporting it</td>
+<td>Found here. It has no disclosure date</td>
+</tr>
+<tr>
+<td>A component</td>
+<td>Has no license until a scan reads one from its inventory</td>
 </tr>
 </tbody>
 </table>
