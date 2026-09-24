@@ -33,11 +33,10 @@ local.mk
 # Build output
 #
 # Every package here is run with "go run", so a binary in the tree came from
-# somebody typing "go build" instead — and two of them were committed, three
-# and a half megabytes each, because nothing here said not to. Named one by
-# one rather than by a pattern: these are the names "go build" gives a package
-# at the root of the checkout, and a pattern matching them would also match a
-# directory somebody means to keep.
+# somebody typing "go build" instead. Named one by one rather than by a
+# pattern: these are the names "go build" gives each command at the root of the
+# checkout, and a pattern matching them would also match a directory somebody
+# means to keep. A command added under internal/tools is added here too.
 /openpsirt
 /attached
 /compose
@@ -45,9 +44,14 @@ local.mk
 /engines
 /gate
 /granted
+/narrowed
 /negatives
+/provenance
 /readable
 /reserved
+/spdx
 /unclaimed
 /unreachable
+/vendored
 /walk
+/weakness
