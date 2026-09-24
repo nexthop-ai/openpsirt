@@ -39,7 +39,7 @@ place, and a database built by any other earlier build is recreated.
 | Advisories | Sending one anywhere, signing the provider directory, the VEX profile of the CSAF document, a CVSS 4.0 score in the document, and prose of the deployment's own beyond the title |
 | Remediation | Opening or updating an item in an external tracker; a link somebody typed is stored. One view of a promise to upgrade across every build it names |
 | Notifications | Chat adapters, an HTML part in mail, and a notice that an edit withdrew an approval |
-| Interface | Narrowing the review queue further than a product, and a deadline and an owner in a finding's header |
+| Interface | Narrowing the review queue further than a product |
 | Database | Purging old rows and partitioning tables |
 | Packaging | Images for any architecture but `amd64` |
 

@@ -1751,7 +1751,6 @@ Coverage of the interface is measured and reported by the gate.
 |---|---|
 | **A claim scoped to a consumer subtree** | Proposed in the workflow review and rejected on the owner's judgment: the rules would have held, and one sentence answering a thousand findings is the shape that makes a dismissal unreadable afterwards |
 | **Narrowing the review queue further than a product** | By what kind of thing is waiting, by who proposed it, by age or by severity. Narrowing by product is built, because a figure that counts one product has to open a list about that product |
-| **A deadline and an owner in the finding's header** | The row carries both; the header does not |
 | **A spacing scale** | Six values are named at exactly the numbers already in use, so naming them moved nothing — but there were nine hundred values written by hand running 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 16, 18, which is continuous rather than a scale. Inventing one is a judgment about how the interface looks, made against a running browser rather than as a mechanical substitution |
 
 ## Gaps the checks left
