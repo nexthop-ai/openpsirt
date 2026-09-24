@@ -570,6 +570,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#outbound-exclusions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outbound exclusions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#patch-branches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -985,6 +996,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#outbound-exclusions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outbound exclusions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#patch-branches" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1228,7 +1250,7 @@ Everything marked off does nothing until the thing in the last column is set.</p
 <tr>
 <td><a href="#patch-branches">Patch branches</a></td>
 <td>Off</td>
-<td><code>patch.branches</code> under Settings. Set <code>OPENPSIRT_PATCH_EXCLUDED</code> first</td>
+<td><code>patch.branches</code> under Settings. Set <a href="#outbound-exclusions"><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></a> first</td>
 </tr>
 <tr>
 <td><a href="#supplier-advisories">Supplier advisories</a></td>
@@ -1313,6 +1335,11 @@ now reaches only findings nobody has announced. Grant <code>public-read</code> o
 holds — wherever somebody should keep the disclosed findings. Nothing is
 granted on upgrade, so until then a holder of a private role alone sees no
 disclosed finding they are not assigned.</p>
+<p><code>OPENPSIRT_PATCH_EXCLUDED</code> is now <code>OPENPSIRT_OUTBOUND_EXCLUDED</code>, and the chart's
+<code>patchBranches.excluded</code> is now <code>outbound.excluded</code>. The list keeps supplier
+directories out as well as repositories. A deployment still setting the old
+name is refused at startup, naming the new one, and the chart refuses to render
+with the old key set.</p>
 <h2 id="serving">Serving<a class="headerlink" href="#serving" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1749,10 +1776,13 @@ entry that answers for it.</p>
 <p>Off unless an administrator names a supplier, under Settings. Each is named
 against one product, and what is read lands as evidence beside a finding — a
 publisher's own judgment, never a decision taken here.</p>
-<p>Requests go to the host the configured address names and nowhere else: https
-only, a redirect refused rather than followed, and an address that resolves
-inside this network refused. So an egress rule for this is one host per
-supplier configured, on 443.</p>
+<p>Requests go to the host the configured address names, and to every host the
+publisher's description, its feeds and their entries name for listings,
+documents and digests: https on port 443 only, a redirect refused rather than
+followed, and an address inside this network or in
+<a href="#outbound-exclusions"><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></a> refused. So an egress rule
+for this is every host a supplier publishes from, on 443.
+SUSE's description is on <code>www.suse.com</code> and its directory on <code>ftp.suse.com</code>.</p>
 <p>What leaves is the request itself. No component name, no build, no product,
 nothing about what this deployment holds — the narrowing to what a product
 ships happens here, after the document has arrived.</p>
@@ -1769,9 +1799,6 @@ stopped, no further back than the same window.</p>
 <p>Each document is checked against the SHA-256 or SHA-512 file its publisher
 serves beside it, and one that does not match is not read. A publisher serving
 neither is read unchecked.</p>
-<p>The directory has to be served from the host the configured address names.
-SUSE serves its description from <code>www.suse.com</code> and its directory from
-<code>ftp.suse.com</code>, so it cannot be read this way; upload its advisories instead.</p>
 <h2 id="upstream-currency">Upstream currency<a class="headerlink" href="#upstream-currency" title="Permanent link">&para;</a></h2>
 <p>Off unless an administrator turns it on, under Settings. Everything a scan
 needs arrives as a file somebody imported, so a deployment that cannot reach out
@@ -1917,6 +1944,31 @@ affected and no upgrade step is needed.</p>
 the default is costing; names no public index has heard of are private modules
 and vendored forks, and they are the candidates to promote into
 <code>OPENPSIRT_UPSTREAM_INTERNAL</code> so they stop being asked about at all.</p>
+<h2 id="outbound-exclusions">Outbound exclusions<a class="headerlink" href="#outbound-exclusions" title="Permanent link">&para;</a></h2>
+<p>Two fetches go to hosts somebody else chose: the repository a patch link names,
+and the directory and documents a supplier's description names. Both refuse
+loopback, private, link-local and shared address space regardless. An internal
+service on a public address or behind a public name is kept out by this list
+alone.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></td>
+<td>Hosts and networks nothing is fetched from, separated by commas. A name covers itself and every host under it; a network is written as <code>10.0.0.0/8</code> and covers every address a name resolves to inside it</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<pre><code>OPENPSIRT_OUTBOUND_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
+</code></pre>
+<p>The chart sets it from <code>outbound.excluded</code>.</p>
 <h2 id="patch-branches">Patch branches<a class="headerlink" href="#patch-branches" title="Permanent link">&para;</a></h2>
 <p>A patch link to a commit is labeled with the branches of its repository that
 contain the commit, on the finding it belongs to. A fix backported to five
@@ -1936,11 +1988,6 @@ copy are on the System screen and at <code>/v1/patch-branches</code>.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>OPENPSIRT_PATCH_EXCLUDED</code></td>
-<td>Hosts and networks no repository is fetched from, separated by commas. A name covers itself and every host under it; a network is written as <code>10.0.0.0/8</code> and covers every address a name resolves to inside it</td>
-<td>unset</td>
-</tr>
-<tr>
 <td><code>OPENPSIRT_PATCH_DIR</code></td>
 <td>Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume</td>
 <td><code>/var/cache/openpsirt/repositories</code></td>
@@ -1952,12 +1999,8 @@ copy are on the System screen and at <code>/v1/patch-branches</code>.</p>
 </tr>
 </tbody>
 </table>
-<p>List your internal networks and domains in <code>OPENPSIRT_PATCH_EXCLUDED</code>. A report
-chooses the host, and loopback, private, link-local and shared address space
-are refused regardless, but an internal service on a public address or behind a
-public name is only kept out by this list:</p>
-<pre><code>OPENPSIRT_PATCH_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
-</code></pre>
+<p>A report chooses the host, so set <a href="#outbound-exclusions"><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></a>
+before turning this on.</p>
 <p>Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.</p>
 <h3 id="sizing">Sizing<a class="headerlink" href="#sizing" title="Permanent link">&para;</a></h3>
