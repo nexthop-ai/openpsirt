@@ -52,6 +52,8 @@ func TestSeveralCycloneDXLicensesAreOneConjunction(t *testing.T) {
 		{"name":"several","version":"1","licenses":[
 			{"license":{"name":"GPL-2+"}},{"license":{"id":"MIT"}},
 			{"expression":"BSD-3-Clause OR Apache-2.0"},{"license":{"id":"MIT"}}]},
+		{"name":"groups","version":"1","licenses":[
+			{"expression":"(MIT) OR (Zlib)"},{"expression":"(ISC OR 0BSD)"}]},
 		{"name":"both","version":"1","licenses":[{"license":{"name":"Expat","id":"MIT"}}]},
 		{"name":"concluded","version":"1","licenses":[
 			{"license":{"id":"Apache-2.0","acknowledgement":"concluded"}}]},
@@ -62,6 +64,7 @@ func TestSeveralCycloneDXLicensesAreOneConjunction(t *testing.T) {
 	got := licenses(doc)
 	for name, want := range map[string]string{
 		"several":   "GPL-2+ AND MIT AND (BSD-3-Clause OR Apache-2.0)",
+		"groups":    "((MIT) OR (Zlib)) AND (ISC OR 0BSD)",
 		"both":      "MIT",
 		"concluded": "Apache-2.0",
 		"declared":  "MIT",

@@ -37,9 +37,31 @@ func conjunction(said []string) string {
 		return parts[0]
 	}
 	for i, one := range parts {
-		if strings.ContainsAny(one, " ") && !(strings.HasPrefix(one, "(") && strings.HasSuffix(one, ")")) {
+		if strings.Contains(one, " ") && !wrapped(one) {
 			parts[i] = "(" + one + ")"
 		}
 	}
 	return strings.Join(parts, " AND ")
+}
+
+// wrapped reports whether an expression is one parenthesized group: its first
+// parenthesis closes at its last character. "(MIT) OR (BSD-2-Clause)" starts and
+// ends with one and is two groups.
+func wrapped(expression string) bool {
+	if !strings.HasPrefix(expression, "(") {
+		return false
+	}
+	depth := 0
+	for i, r := range expression {
+		switch r {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i == len(expression)-1
+			}
+		}
+	}
+	return false
 }
