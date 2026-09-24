@@ -313,6 +313,7 @@ What v0.1.0's rows become under migration 37:
 | A notification | Carried alone. Only a kind of message v0.1.0 did not have is carried together |
 | A column v0.1.0 did not have and that takes a null | Null |
 | A grant of undisclosed reading or triage | Carried unchanged, per product, across the estate, in a group binding and in a personal token's holds. It reaches undisclosed work alone, where in v0.1.0 it reached disclosed work too. Nothing grants the disclosed role on upgrade; the operator does, as the upgrade note in `docs/configuration.md` says |
+| The disclosure extension threshold, under the name v0.1.0 gave it | Left under that name by migration 37, which nothing reads since. Migration 38 carries it to the disclosure movement threshold where that is unset, and removes it |
 
 Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
 place for goes with the tables and columns that held it: an embargo shortened,
@@ -365,9 +366,14 @@ What v0.2.0's rows become:
 | A recorded flaw no report is the record of | Found here, which is what v0.2.0 meant by recording one with nobody named. It gives up its disclosure date. It gains no report, because v0.2.0 kept nothing saying who recorded it, so a later claim about it may be accepted as it rather than ruled a duplicate |
 | A scanned finding | Unchanged |
 | A component | No license |
+| The disclosure extension threshold, under the name v0.1.0 gave it | Carried to the disclosure movement threshold where that is unset, and removed. Where both are set, the movement threshold is what v0.2.0 read, and it stands |
+| The patch branch switch | Removed. The deployment's configuration turns the lookups on in v0.3.0 |
 
 Rolled back, it drops the three columns. The deadlines and disclosure dates it
-moved stay where it moved them, because what they held before is not kept. A
+moved stay where it moved them, because what they held before is not kept. The
+movement threshold stays under the name v0.2.0 reads. The patch branch switch
+is not put back, because nothing kept what it was, so v0.2.0 has the lookups
+off until somebody turns them on. A
 binary of v0.2.0 run against a database migration 38 left in place is served:
 the columns are additive.
 
@@ -379,6 +385,7 @@ Tests on each of the four engines:
 | A v0.1.0 database, a row in every table | Carried through migrations 37 and 38, it matches a database that walked the chain empty, and holds what it held |
 | Recorded flaws of each kind | A recorded flaw rated as published and recorded in two builds days apart, one rated only by its product, one rated by nobody, one with no report, and a scanned finding, each against the table above |
 | v0.3.0's declarations | Each table the release declares, built beside the real one under a scratch name, is described exactly as the chain builds it: every column with its type, nullability and default, every constraint and every index. An index another migration adds is named as such |
+| Renamed and unread settings | The threshold under v0.1.0's name, from a v0.1.0 and a v0.2.0 database, reads under the new name afterwards and the old row is gone; set under both names, the new one stands; the patch branch switch is gone; rolled back, the threshold is still under the name v0.2.0 reads |
 
 ### Release records
 
