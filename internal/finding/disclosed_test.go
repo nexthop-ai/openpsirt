@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -346,7 +347,9 @@ func TestTheEndOfAnEmbargoIsReadFromTheOpenPlaces(t *testing.T) {
 		}
 		closed := places[0]
 		closed.ID = 0
-		closed.PlaceIdentity = "closed-" + closed.PlaceIdentity
+		// A place identity is a digest at the column's full width, so a
+		// second place is a different digest of that width.
+		closed.PlaceIdentity = strings.Repeat("f", len(closed.PlaceIdentity))
 		now := time.Now().UTC()
 		later := now.Add(60 * 24 * time.Hour)
 		closed.DiscloseAt = &later
