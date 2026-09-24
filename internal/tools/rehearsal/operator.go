@@ -6,8 +6,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -22,9 +24,9 @@ var Implied = map[string]string{
 
 // grantImplied does what the upgrade note asks of an operator coming from a
 // release whose undisclosed roles reached disclosed work: every grant of an
-// undisclosed role, per product, across the estate and in a group binding,
-// gains the disclosed role beside it where it is not already held. It returns
-// how many rows it wrote.
+// undisclosed role, per product, across the estate, in a group binding and in
+// a personal token's holds, gains the disclosed role beside it where it is not
+// already held. It returns how many rows it wrote.
 func (r *run) grantImplied(ctx context.Context) (int, error) {
 	target, err := database.ParseURL(r.hostURL)
 	if err != nil {
@@ -51,6 +53,61 @@ func (r *run) grantImplied(ctx context.Context) (int, error) {
 			return written, fmt.Errorf("%s: %w", table.name, err)
 		}
 		written += n
+	}
+	n, err := implyInTokens(ctx, db)
+	if err != nil {
+		return written, fmt.Errorf("personal_token: %w", err)
+	}
+	return written + n, nil
+}
+
+// impliedHolds is a token's holds with the disclosed role added beside every
+// undisclosed one, in the order a token writes its roles. A token that names
+// no undisclosed role comes back as it was.
+func impliedHolds(holds string) string {
+	named := map[string]bool{}
+	for _, word := range strings.Split(holds, ",") {
+		if word = strings.TrimSpace(word); word != "" {
+			named[word] = true
+		}
+	}
+	for held, implied := range Implied {
+		if named[held] {
+			named[implied] = true
+		}
+	}
+	var kept []string
+	for _, role := range access.Roles() {
+		if named[string(role)] {
+			kept = append(kept, string(role))
+		}
+	}
+	return strings.Join(kept, ",")
+}
+
+// implyInTokens rewrites the holds of every personal token narrowed to an
+// undisclosed role. A token that names no role reaches what its owner holds,
+// so the owner's grants above already carry it.
+func implyInTokens(ctx context.Context, db *database.DB) (int, error) {
+	var tokens []struct {
+		ID    int64  `bun:"id"`
+		Holds string `bun:"holds"`
+	}
+	if err := db.NewSelect().TableExpr(`"personal_token"`).Column("id", "holds").
+		Where(`"holds" IS NOT NULL`).Scan(ctx, &tokens); err != nil {
+		return 0, err
+	}
+	written := 0
+	for _, token := range tokens {
+		after := impliedHolds(token.Holds)
+		if after == token.Holds {
+			continue
+		}
+		if _, err := db.ExecContext(ctx, `UPDATE "personal_token" SET "holds" = ? WHERE "id" = ?`,
+			after, token.ID); err != nil {
+			return written, err
+		}
+		written++
 	}
 	return written, nil
 }
