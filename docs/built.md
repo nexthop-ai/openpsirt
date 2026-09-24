@@ -44,5 +44,4 @@ place, and a database built by any other earlier build is recreated.
 | Packaging | Images for any architecture but `amd64` |
 
 The reasoning behind each area is in
-[REQUIREMENTS.md](https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md),
-and a `DESIGN-*.md` document describes how each one works.
+[REQUIREMENTS.md](https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md).

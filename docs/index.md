@@ -369,5 +369,4 @@ says what turns each on.
 | [Privileges](reference/privileges.md) | Which role reaches which endpoint |
 
 The reasoning behind every decision is in
-[REQUIREMENTS.md](https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md),
-and the `DESIGN-*.md` documents beside it describe how each area works.
+[REQUIREMENTS.md](https://github.com/nexthop-ai/openpsirt/blob/main/REQUIREMENTS.md).

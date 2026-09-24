@@ -409,28 +409,6 @@ and the targets that seed judgments, a VEX document and a flaw of our own.
 | [REQUIREMENTS.md](REQUIREMENTS.md) | Every decision, with its reasoning, by area |
 | [AGENTS.md](AGENTS.md) | Conventions for anyone working in this repository |
 
-Each `DESIGN-*.md` document describes how one area works:
-
-| | |
-|---|---|
-| [DESIGN-access.md](DESIGN-access.md) | Who is asking, and what they may reach |
-| [DESIGN-api.md](DESIGN-api.md) | The shape of the HTTP surface |
-| [DESIGN-attachments.md](DESIGN-attachments.md) | Files on a finding or a report: where the bytes live, and who may reach them |
-| [DESIGN-build.md](DESIGN-build.md) | Layout, the validation pipeline, and how a change is checked |
-| [DESIGN-data-model.md](DESIGN-data-model.md) | What a scan is filed against, and the dependency graph |
-| [DESIGN-database.md](DESIGN-database.md) | Four engines, migrations, locking |
-| [DESIGN-findings.md](DESIGN-findings.md) | What a scan found, and where |
-| [DESIGN-ingest.md](DESIGN-ingest.md) | What happens to a scan as it arrives, how each format is read, and supplier documents |
-| [DESIGN-interface.md](DESIGN-interface.md) | The web interface, how it is built and how it reaches the server |
-| [DESIGN-notifications.md](DESIGN-notifications.md) | What people are told about, and what they are not |
-| [DESIGN-obligations.md](DESIGN-obligations.md) | Records of exploitation, the windows they may oblige, and the notices given |
-| [DESIGN-packaging.md](DESIGN-packaging.md) | Container image and Helm chart |
-| [DESIGN-queue.md](DESIGN-queue.md) | How work waiting to be done is held and picked up |
-| [DESIGN-remediation.md](DESIGN-remediation.md) | Fixes, version ordering, upstream currency, advisories and VEX |
-| [DESIGN-reporting.md](DESIGN-reporting.md) | Trends, release comparison, deadlines, settings |
-| [DESIGN-text.md](DESIGN-text.md) | What may be written, and how it is rendered |
-| [DESIGN-triage.md](DESIGN-triage.md) | What people decide about findings, and when a decision stops applying |
-
 ## License
 
 Apache 2.0, copyright Nexthop Systems Inc. See [LICENSE](LICENSE) and
