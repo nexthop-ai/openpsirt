@@ -187,7 +187,7 @@ type PlanUpgradeBody struct {
 	To string `json:"to" minLength:"1" maxLength:"191" doc:"The version this moves to, as whoever packages it writes it"`
 	// Version picks one source version where a release ships two.
 	Version string `json:"version,omitempty" maxLength:"191" doc:"The source version this is about, as the component's entries name it. Required where a release named ships the source package at more than one version, which is refused with the versions listed; otherwise optional"`
-	By string `json:"by" doc:"The date the work lands, as 2026-03-31. A missed target is measured against it"`
+	By      string `json:"by" doc:"The date the work lands, as 2026-03-31. A missed target is measured against it"`
 	// Builds is which releases this is promised for. The same component
 	// can be promised a different version in another release, which is the
 	// ordinary case.
