@@ -87,6 +87,7 @@ inferred from a rule, so adding a route never adds an exception.
 | 201 | Something now exists, and its identifier is in the answer |
 | 202 | Accepted, not yet done. Only an upload, which answers before it has been read |
 | 204 | Done, with nothing worth saying |
+| 400 | A query parameter the operation does not take. The refusal names it |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
 | 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a retirement of something already retired, a name another row already holds |
 | 422 | Understood, and cannot be stored as written |
@@ -241,6 +242,8 @@ part of the statement.
 | A narrowing that cannot be applied answers nothing, never everything | "Assigned to me" from a credential that holds no party names nobody. Dropping the condition hands the caller every finding there is while the screen goes on showing the filter as on, so a filter asking for a set nothing is in answers with nothing |
 | A filter with three answers is a word, not a flag | Origin is one: a screen offering "Scanner" as a flag can only send the absence of "entered by hand", so choosing it filters nothing |
 | A repeated value is one value | A set of one word sent twice otherwise reads as both kinds and no narrowing, which silently puts tags back into a list somebody asked to see branches of |
+| A query parameter the operation does not declare is refused with a 400 naming it | Ignored, a mistyped filter returns the unfiltered list, which reads as a correct answer. The list is read from the operation's own declaration, so what is accepted is what the document publishes |
+| That refusal comes after the operation's declared privileges are checked | A caller who may not reach the operation learns nothing about what it takes |
 
 This also prevents a sort exposing a column the caller was never meant to order
 by.

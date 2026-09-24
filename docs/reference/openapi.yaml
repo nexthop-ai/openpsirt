@@ -10412,7 +10412,10 @@ components:
         - withdrawn
       type: object
 info:
-  description: Track vulnerabilities in the products you ship.
+  description: |-
+    Track vulnerabilities in the products you ship.
+
+    A request carrying a query parameter the operation does not take is refused with a 400 naming the parameter.
   title: OpenPSIRT
   version: dev
 openapi: 3.1.0

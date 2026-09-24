@@ -591,20 +591,10 @@ func TestTheAPIReturnsMarkdownAndNeverMarkup(t *testing.T) {
 			}
 		}
 
-		// And there is no longer any way to ask for markup. An old client
-		// still sending html=true is answered rather than refused — unknown
-		// query parameters are ignored — and what it gets is the source,
-		// never a rendered field it might display without sanitizing.
-		var asked map[string]any
-		read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d?html=true", id), &asked)
-		for key := range asked {
-			if strings.HasSuffix(key, "_html") {
-				t.Errorf("html=true still produced a rendered field %q", key)
-			}
-		}
-		if asked["reasoning"] != body["reasoning"] {
-			t.Error("html=true changed the answer")
-		}
+		// And there is no way to ask for markup: a request for it names a
+		// parameter no operation takes, and is refused as that.
+		refusedWith(t, asPerson(t, r, "triager", http.MethodGet,
+			fmt.Sprintf("/v1/decisions/%d?html=true", id), ""), http.StatusBadRequest)
 	})
 }
 

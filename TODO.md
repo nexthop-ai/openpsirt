@@ -106,7 +106,6 @@ Each needs the owner to choose before anything is built.
 
 | Question | Background |
 |---|---|
-| Refuse unknown query parameters? | A mistyped filter is ignored and the unfiltered list comes back. Refusing applies to every endpoint at once |
 | Fetch each issue's own record from a vulnerability database? | The scanner reports no date an issue was published or modified. A second source per issue would supply them. Storing the date as a field alone is rejected in `REQUIREMENTS.md` |
 | Count the exploitation clock from the catalog's date? | The clock starts when a scan learns an issue is exploited. The catalog states the date it added the issue, and nothing reads it |
 | Name the other builds a finding sits in? | The finding says how many. The issue screen lists them one click away |
