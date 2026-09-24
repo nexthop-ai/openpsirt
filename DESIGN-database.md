@@ -379,6 +379,33 @@ Tests on each of the four engines:
 | Recorded flaws of each kind | A recorded flaw rated as published and recorded in two builds days apart, one rated only by its product, one rated by nobody, one with no report, and a scanned finding, each against the table above |
 | v0.3.0's declarations | Each table the release declares has the columns the chain builds |
 
+### Release records
+
+A release's migrations are frozen on the commit that is tagged, by
+`make release-freeze`, and the release workflow refuses a tag whose release is
+not frozen, by `make release-check`, before it builds anything.
+`DESIGN-packaging.md` § The release procedure says where the two sit.
+
+| Step | What happens |
+|---|---|
+| 1. The untagged release carries one migration | Numbered after the previous release's last. Its table declarations are named for it, `v030` for v0.3.0. Every schema change before the tag edits that migration and those declarations |
+| 2. Freeze, on the commit to be tagged | With the four engines running: the schema the chain builds is described on each, then every file the release owns is listed with its digest and the release's last migration |
+| 3. Land the record through a pull request | The digest test and the schema test hold the tree to it from then on |
+| 4. Tag | The release workflow checks the record before anything is built |
+| 5. The next schema change | A new migration, numbered after the tagged release's last, for the next release |
+
+| The check refuses | Why |
+|---|---|
+| A release with no record | Nothing would hold what it shipped once the next change lands |
+| A file the release owns that its record does not list, or lists with another digest | The record is stale: the tree moved after the freeze |
+| A migration numbered past the release's last | It would ship with nothing holding it |
+| Declarations named for a release nothing froze | The same, for the tables a migration reads |
+| A record missing one engine's schema | The schema test cannot hold that engine |
+| A tag that is not a release | A prerelease is held to the record of the release it precedes |
+
+A file a release owns is a migration numbered after the previous release's
+last up to its own, or a declaration named for it.
+
 ## Migration locks
 
 | Lock | Excludes | Mechanism |

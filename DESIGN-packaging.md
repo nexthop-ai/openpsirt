@@ -420,19 +420,32 @@ that check a download:
 
 ## The release procedure
 
-A release is a tag. Everything after it is the `Release` workflow, and there
-is no step anybody performs by hand:
+A release is a tag, on a commit that froze the release's migrations.
+Everything after the tag is the `Release` workflow.
 
-```
-git switch main && git pull
-make gate full
-git tag -a v0.2.0 -m "0.2.0"
-git push origin v0.2.0
-```
+1. Freeze the migrations, on a branch from the head of `main`, and land the
+   record through a pull request. `DESIGN-database.md` § Release records says
+   what it holds.
+
+   ```
+   git switch main && git pull && git switch -c freeze-v0.3.0
+   make engines-up
+   make release-freeze VERSION=v0.3.0
+   ```
+
+2. Tag the commit the merge queue put on `main`.
+
+   ```
+   git switch main && git pull
+   make gate full
+   git tag -a v0.3.0 -m "0.3.0"
+   git push origin v0.3.0
+   ```
 
 | The workflow then | |
 |---|---|
 | Refuses a tag that is not on `main` | Everything on `main` arrived through the merge queue with the gate green. A tag on a side branch did not, and the assets are indistinguishable afterwards |
+| Refuses a release whose migrations were not frozen | A database the release builds applies exactly what it shipped. Unfrozen, nothing holds those files once the next change lands. A prerelease is held to the record of the release it precedes |
 | Runs `make dist` | The same command a developer runs, so a failure reproduces locally rather than only in a log. It builds the interface first, and gates the image and the chart before checksumming anything |
 | Pushes the image and the chart to `ghcr.io` | |
 | Signs the image, the chart and the checksum file, then verifies each | Keyless, against the workflow's own identity, with the command a downloader would run |

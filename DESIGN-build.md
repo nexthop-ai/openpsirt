@@ -133,6 +133,8 @@ computed rather than written out so a new directory of ours needs no edit.
 | `make reserved-current` | The committed reserved-word list against what the engines answer. Inside `check-engines`, because it needs them running |
 | `make check-packaging` | The container image and the Helm chart. Needs docker and helm |
 | `make dist` | Every release asset, into `bin/dist`, each checked against the tag it names. Needs docker, helm and npm, because it builds the interface and gates the image. See `DESIGN-packaging.md` |
+| `make release-freeze VERSION=vX.Y.Z` | The record of a release's migrations: the schema they build on every engine, then each file and its digest, then the check below. Run on the commit to be tagged, with the four engines up. See `DESIGN-database.md` § Release records |
+| `make release-check VERSION=vX.Y.Z` | That the release a tag names was frozen and the tree still ships what it froze. The release workflow runs it before it builds anything |
 | `make docs-site` | The documentation site, built strictly. Needs mkdocs |
 | `make engines-up` / `-down` / `-status` | The four database servers |
 | `make measure` | Measurements rather than gates. Behind a build tag |

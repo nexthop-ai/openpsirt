@@ -154,7 +154,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 
 NPM ?= npm
 
-.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined
+.PHONY: vendored spdx spdx-fix attached secrets web-audit dist dist-clean dist-version dist-binaries dist-chart dist-inventories dist-sums dist-verify gate full docs-check unreachable unclaimed reserved reserved-words reserved-current weakness-names readable negatives granted narrowed all build test test-all test-race test-engines lint fmt openapi openapi-current run clean check check-packaging check-engines measure engines-up engines-down engines-status engines-check govulncheck licenses sbom web web-deps web-api web-check clean-web dist-serves confined release-freeze release-check
 
 all: check build
 
@@ -787,6 +787,23 @@ reserved-current: reserved-words
 	@git diff --exit-code -- internal/tools/reserved/words_asked.go \
 	  || { echo "the reserved-word list is stale: the engines reserve words this"; \
 	       echo "list does not carry. Commit the regenerated file."; exit 1; }
+
+# A release's record of its migrations: the schema they build on every engine,
+# and each file with its digest. Run on the commit to be tagged, with the four
+# engines up (make engines-up), and commit what it writes. A release a database
+# may be built from is one nothing may edit afterwards, and the record is what
+# holds it there.
+release-freeze:
+	OPENPSIRT_TEST_ENGINES=sqlite,postgres,mysql,mariadb OPENPSIRT_RELEASE_FREEZE=$(VERSION) \
+	  $(GO) test -count=1 -run '^TestWriteTheSchemaAReleaseTags$$' ./internal/database/migrate/migrations/
+	$(GO) run ./internal/tools/release freeze $(VERSION)
+	$(GO) run ./internal/tools/release check $(VERSION)
+
+# That the release a tag names was frozen, and that the tree still ships what
+# it froze. The release workflow runs it before anything is built, so a tag
+# nobody froze publishes nothing.
+release-check:
+	$(GO) run ./internal/tools/release check $(VERSION)
 
 # Decisions no design document names. The chain that makes this auditable runs
 # code to design document to decision, and nothing checked that it was whole:

@@ -161,7 +161,7 @@ func Read(root, version string) (*Record, error) {
 	return r, nil
 }
 
-// All is every release recorded under root, oldest first.
+// All is every release frozen under root, oldest first.
 func All(root string) ([]*Record, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -172,7 +172,12 @@ func All(root string) ([]*Record, error) {
 		if !entry.IsDir() || !release.MatchString(entry.Name()) {
 			continue
 		}
+		// A release whose schema is written and whose files are not yet is
+		// being frozen, and holds nothing until it is.
 		r, err := Read(root, entry.Name())
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
