@@ -22,8 +22,16 @@ func NewLocalPass(db bun.IDB, dir string, quota int64, excluded outward.Excluded
 		git:      git{excluded: excluded, transport: "file", locate: locate},
 		copies:   copies{root: dir, quota: quota, now: time.Now, poll: 10 * time.Millisecond},
 		excluded: excluded,
+		on:       true,
 		Now:      time.Now,
 	}
+}
+
+// TurnOff is the pass with the lookups off, as a deployment that never turned
+// them on has it.
+func (p *Pass) TurnOff() *Pass {
+	p.on = false
+	return p
 }
 
 // Held reports whether the pass keeps a copy of a repository.
@@ -49,6 +57,7 @@ func NewRemotePass(dir string, excluded outward.Excluded) *Pass {
 		git:      git{excluded: excluded, transport: "https"},
 		copies:   copies{root: dir, quota: DefaultQuota, now: time.Now, poll: time.Second},
 		excluded: excluded,
+		on:       true,
 		Now:      time.Now,
 	}
 }

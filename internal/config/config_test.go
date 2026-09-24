@@ -137,6 +137,18 @@ func TestATrustedHeaderHonoredFromAnywhereIsRefused(t *testing.T) {
 	}
 }
 
+// The patch branch lookups reach out to hosts a report chooses, so a
+// deployment that says nothing about them has them off.
+func TestPatchBranchesAreOffUnlessTheDeploymentTurnsThemOn(t *testing.T) {
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.PatchBranches {
+		t.Error("patch branch lookups are on in a deployment that never turned them on")
+	}
+}
+
 func TestTheExcludedListUnderItsOldNameIsRefusedRatherThanIgnored(t *testing.T) {
 	// Ignored, a deployment that set the old name fetches from everything it
 	// meant to keep out.
@@ -206,6 +218,8 @@ func TestASwitchMeansWhatItSays(t *testing.T) {
 		{"AUTO_MIGRATE", "0", false, func(c Config) bool { return c.AutoMigrate }},
 		{"AUTO_MIGRATE", "False", false, func(c Config) bool { return c.AutoMigrate }},
 		{"AUTO_MIGRATE", "1", true, func(c Config) bool { return c.AutoMigrate }},
+		{"PATCH_BRANCHES", "true", true, func(c Config) bool { return c.PatchBranches }},
+		{"PATCH_BRANCHES", "false", false, func(c Config) bool { return c.PatchBranches }},
 	} {
 		t.Run(tc.key+"="+tc.value, func(t *testing.T) {
 			t.Setenv(envPrefix+tc.key, tc.value)

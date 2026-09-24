@@ -9355,7 +9355,7 @@ export interface components {
              * @description How many of those commits have been looked up
              */
             looked: number;
-            /** @description Whether the lookups are turned on */
+            /** @description Whether the deployment turned the lookups on. Set in its configuration, not under Settings */
             on: boolean;
             /** @description The repositories those commits are in, most commits still to look up first */
             repositories: components["schemas"]["PatchRepositoryBody"][] | null;

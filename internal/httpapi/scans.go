@@ -85,6 +85,9 @@ type Ingest struct {
 	// same value the fetching pass holds, so the report of what is fetched
 	// from where says what the pass does.
 	Excluded outward.Excluded
+	// PatchBranches is whether the deployment turned the patch branch
+	// lookups on. The same value the fetching pass holds.
+	PatchBranches bool
 	// Mode says where roles come from. Read per request rather than held, so
 	// an administrator turning group binding off takes effect at once.
 	Mode func(context.Context) access.Mode

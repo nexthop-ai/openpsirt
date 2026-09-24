@@ -276,8 +276,11 @@ kernel issue carries five, for 6.1, 6.6, 6.12, 6.16 and the mainline, and
 nothing in the report says which is which. The repository's history does, so
 a copy of it is kept and asked.
 
-Off unless an administrator turns it on. It reaches out, and a scan needs
-none of it (REQ-12).
+Off unless the deployment turns it on, in its configuration rather than under
+Settings (REQ-78). It reaches out, and a scan needs none of it (REQ-12).
+Turning it on needs memory for git, a volume for the copies and a list of hosts
+no fetch may reach, and only whoever deployed it can provide those. Read at
+startup, so turning it off is a restart.
 
 ### Link shapes
 
@@ -353,11 +356,11 @@ and looks up every due commit in it, most urgent first.
 |---|---|
 | Every due commit looked up | The moment it finished and the size of the copy |
 | The repository could not be fetched or read | What stopped it, in the repository's own words. Retried a day after the visit began |
-| The switch was turned off, the lease was lost, or the process is shutting down | Nothing. The repository is left as it was before the visit began, a failure from an earlier visit included |
-| This deployment failed: the database, the setting, the lease | Nothing, and the failure is logged. A dropped connection is not the repository's fault, and recorded as one it would put the repository out of reach for a day |
+| The lease was lost, or the process is shutting down | Nothing. The repository is left as it was before the visit began, a failure from an earlier visit included |
+| This deployment failed: the database or the lease | Nothing, and the failure is logged. A dropped connection is not the repository's fault, and recorded as one it would put the repository out of reach for a day |
 
-The switch and the lease are read every minute for the whole of a visit, the
-fetch and the index write included. A first fetch of the kernel from
+The lease is taken again every minute for the whole of a visit, the fetch and
+the index write included. A first fetch of the kernel from
 kernel.org takes a quarter of an hour, and the lease is half an hour. A
 process shutting down in the middle of a visit hands the lease back, so the
 next one carries on at once.

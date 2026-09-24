@@ -248,9 +248,9 @@ function PatchBranches() {
     <section className="panel">
       <h3>Patch branches</h3>
       <p className="hint" style={{ marginTop: 0 }}>
-        {it?.on ? "On" : "Off, under Settings"} · {(it?.looked ?? 0).toLocaleString()} of{" "}
-        {(it?.commits ?? 0).toLocaleString()} commits looked up · from{" "}
-        {(it?.links ?? 0).toLocaleString()} patch links
+        {it?.on ? "On" : "Off, in the deployment's configuration"} ·{" "}
+        {(it?.looked ?? 0).toLocaleString()} of {(it?.commits ?? 0).toLocaleString()} commits looked
+        up · from {(it?.links ?? 0).toLocaleString()} patch links
         {held > 0 && ` · copies ${humaneBytes(String(held))}`}
       </p>
       {rows.length === 0 ? (

@@ -11,7 +11,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // PatchRepositoryBody is how far one repository's commits have been looked up.
@@ -31,7 +30,7 @@ type PatchRepositoryBody struct {
 // PatchBranchesOutput is the whole of the lookup work.
 type PatchBranchesOutput struct {
 	Body struct {
-		On           bool                  `json:"on" doc:"Whether the lookups are turned on"`
+		On           bool                  `json:"on" doc:"Whether the deployment turned the lookups on. Set in its configuration, not under Settings"`
 		Links        int                   `json:"links" doc:"How many patch links reports carry"`
 		Commits      int                   `json:"commits" doc:"How many distinct commits in a recognized repository those links name"`
 		Looked       int                   `json:"looked" doc:"How many of those commits have been looked up"`
@@ -67,11 +66,7 @@ func registerPatchBranches(api huma.API, in Ingest) {
 		if in.DB == nil {
 			return out, nil
 		}
-		value, set, err := setting.NewStore(in.DB.DB).Get(ctx, setting.PatchBranches)
-		if err != nil {
-			return nil, wentWrong(in.Logger, "whether patch branches are looked up could not be read", err)
-		}
-		out.Body.On = set && value == setting.On
+		out.Body.On = in.PatchBranches
 		repositories, totals, err := patchbranch.Progress(ctx, in.DB.DB, in.Excluded)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "how far the lookups have got could not be read", err)

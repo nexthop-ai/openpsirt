@@ -176,6 +176,10 @@ spec:
             - name: OPENPSIRT_OUTBOUND_EXCLUDED
               value: {{ join "," . | quote }}
             {{- end }}
+            {{- if .Values.patchBranches.enabled }}
+            - name: OPENPSIRT_PATCH_BRANCHES
+              value: "true"
+            {{- end }}
             {{- with .Values.patchBranches.quota }}
             # Through int64: a whole number in a values file is read as a
             # float and would render as 5.36870912e+10, which the server

@@ -22,7 +22,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Scheduled rescanning](#scanning) | On, daily | `scanning.every` under Settings sets how often |
 | [Vulnerability data updates](#an-air-gapped-install) | On | `GRYPE_DB_AUTO_UPDATE`; set it to `false` where the deployment cannot reach the network |
 | [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
-| [Patch branches](#patch-branches) | Off | `patch.branches` under Settings. Set [`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions) first |
+| [Patch branches](#patch-branches) | Off | `OPENPSIRT_PATCH_BRANCHES`, or `patchBranches.enabled` in the chart. [What to set first](#enabling) |
 | [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
 | [Mail](#mail) | Off | `OPENPSIRT_MAIL_FROM` and `OPENPSIRT_MAIL_SERVER`, both |
 | Webhooks | Off | Adding a destination under Settings |
@@ -461,18 +461,35 @@ contain the commit, on the finding it belongs to. A fix backported to five
 branches arrives as five bare commit links, and the label is what says which
 one applies to the branch you ship.
 
-Off unless an administrator turns it on, under Settings. It fetches a copy of
-each repository a patch link names, from the host the link names, and asks the
-copy which branches hold each commit. Progress, failures and the size of each
-copy are on the System screen and at `/v1/patch-branches`.
+Off unless the deployment turns it on. It fetches a copy of each repository a
+patch link names, from the host the link names, and asks the copy which
+branches hold each commit. Progress, failures and the size of each copy are on
+the System screen and at `/v1/patch-branches`.
 
 | Variable | Meaning | Default |
 |---|---|---|
+| `OPENPSIRT_PATCH_BRANCHES` | Whether the lookups run. Read at startup, so changing it takes a restart | `false` |
 | `OPENPSIRT_PATCH_DIR` | Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume | `/var/cache/openpsirt/repositories` |
 | `OPENPSIRT_PATCH_QUOTA` | How many bytes the copies may hold together. The least recently used is removed to make room | `21474836480` (20 GB) |
 
-A report chooses the host, so set [`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions)
-before turning this on.
+### Enabling
+
+| Step | Chart value | Why |
+|---|---|---|
+| Raise the memory limit to 4 GiB | `resources.limits.memory` | git runs inside the pod's limit beside the server and the scanner |
+| List your internal domains and networks | `outbound.excluded` | A report chooses the host. See [Outbound exclusions](#outbound-exclusions) |
+| Keep the copies on a volume | `patchBranches.existingClaim` | Scratch space loses them on every restart |
+| Turn it on | `patchBranches.enabled: true` | Sets `OPENPSIRT_PATCH_BRANCHES` |
+
+### Replicas
+
+| | |
+|---|---|
+| One replica fetches at a time | A lease decides which |
+| Every replica serves the labels | They are kept in the database |
+| The copies are one replica's disk | A ReadWriteMany claim shared by every replica keeps one set. Only the replica holding the lease writes to it |
+| A ReadWriteOnce claim with several replicas | The replicas on other nodes stay Pending. The chart cannot refuse this, because it cannot see the access mode of a claim it did not make |
+| No claim | Each pod keeps its own scratch copy and fetches again when the lease moves to it |
 
 Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.
@@ -768,7 +785,7 @@ resources:
 | The server reading one scanner report | Bounded by `OPENPSIRT_SCANNER_MAX_OUTPUT`. A read and a scan run in separate loops, so a pod can be doing both |
 | The scanner itself | Not bounded by anything here. It is a separate program, and its report is bounded only once written |
 | The scanner importing its vulnerability database | The largest single draw, and it happens on every start where the data is not kept |
-| Fetching a repository for [patch branches](#patch-branches) | Off unless turned on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org |
+| Fetching a repository for [patch branches](#patch-branches) | Off unless the deployment turns it on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org |
 
 Raise the limit for a bigger inventory, for raised scan-file bounds, or where
 the database is imported on every start.

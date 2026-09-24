@@ -91,9 +91,41 @@ export function Settings({ who }: { who: Who }) {
               onSet={(value) => set.mutate({ name: each.name ?? "", value })}
             />
           ))}
+          {tab === "outbound" && canSet && <PatchBranches />}
         </section>
       )}
     </>
+  );
+}
+
+// Patch branch lookups, which the deployment turns on in its configuration
+// rather than here: turning them on needs memory, a volume and excluded hosts
+// that only whoever deployed it can provide. Shown with the settings so this
+// screen answers what leaves the deployment. Administrators only, because the
+// endpoint behind it refuses anybody else.
+function PatchBranches() {
+  const progress = useQuery({
+    queryKey: ["patch-branches", "on"],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/patch-branches", { params: { query: { limit: 1 } } })),
+  });
+  return (
+    <div className="settingrow">
+      <div className="settingname">
+        <span className="settinglabel">Patch branches</span>
+        <span className="hint">Label patch links with the branches that hold their commit</span>
+      </div>
+      <div className="settingcontrol">
+        {progress.isPending ? (
+          <span className="hint">…</span>
+        ) : (
+          <span>
+            {progress.data?.on ? "On" : "Off"}
+            <span className="hint">, set by the deployment</span>
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
