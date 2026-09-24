@@ -15,9 +15,9 @@ type Counts map[string]int64
 type kind int
 
 const (
-	// same is the default for a table both sides hold: an upgrade moves no
-	// row in or out of it.
-	same kind = iota
+	// The zero value is the default for a table both sides hold: an upgrade
+	// moves no row in or out of it. No rule names it.
+	_ kind = iota
 	// equal is a table the upgrade fills from another: it holds as many rows
 	// as the other held before.
 	equal

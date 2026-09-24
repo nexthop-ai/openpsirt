@@ -143,7 +143,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	for _, d := range []string{r.work, filepath.Join(r.demo, "data"), filepath.Join(r.demo, "repositories"), r.grype} {
-		if err := os.MkdirAll(d, 0o755); err != nil {
+		if err := os.MkdirAll(d, 0o750); err != nil {
 			return nil, err
 		}
 	}
@@ -190,7 +190,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	// A tag names one set of bytes, so an image built from it once is the
 	// image. The build stamps the date, which would otherwise rebuild it on
 	// every run.
-	if exec.CommandContext(ctx, "docker", "image", "inspect", release).Run() != nil {
+	if exec.CommandContext(ctx, "docker", "image", "inspect", release).Run() != nil { //nolint:gosec // G204: the image name is built from a release tag this tool was given
 		if err := r.cmd(ctx, r.tag, nil, "make", "demo-image", "DEMO_IMAGE="+release); err != nil {
 			return nil, err
 		}
@@ -370,7 +370,7 @@ if [ "${args[0]}" = run ] && printf '%s\n' "${args[@]}" | grep -qx ` + app + `; 
 fi
 exec docker "${args[@]}"
 `
-	return path, os.WriteFile(path, []byte(script), 0o755)
+	return path, os.WriteFile(path, []byte(script), 0o700) //nolint:gosec // G306: the wrapper is a script the release's targets execute
 }
 
 // overrides are the variables the release's targets are run with: its own
@@ -414,12 +414,12 @@ func (r *run) settle(ctx context.Context, overrides, env []string) (Totals, erro
 	deadline := time.Now().Add(90 * time.Minute)
 	for {
 		var out bytes.Buffer
-		c := exec.CommandContext(ctx, "make", append([]string{"-s", "--no-print-directory", "demo-status"}, overrides...)...)
+		c := exec.CommandContext(ctx, "make", append([]string{"-s", "--no-print-directory", "demo-status"}, overrides...)...) //nolint:gosec // G204: overrides this tool built itself
 		c.Dir, c.Stdout, c.Stderr, c.Env = r.tag, &out, r.log, append(os.Environ(), env...)
 		if err := c.Run(); err != nil {
 			return nil, fmt.Errorf("%s's status: %w", r.from, err)
 		}
-		fmt.Fprint(r.log, out.String())
+		_, _ = fmt.Fprint(r.log, out.String())
 		totals := Totals{}
 		busy := false
 		var failed []string
@@ -448,7 +448,7 @@ func (r *run) settle(ctx context.Context, overrides, env []string) (Totals, erro
 				r.from, strings.Join(failed, ", "))
 		}
 		if !busy && len(totals) > 0 {
-			fmt.Fprintf(r.log, "settled: %v\n", totals)
+			_, _ = fmt.Fprintf(r.log, "settled: %v\n", totals)
 			return totals, nil
 		}
 		if time.Now().After(deadline) {
@@ -476,7 +476,7 @@ func (r *run) count(ctx context.Context, tables []string) (Counts, error) {
 		if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+table+`"`).Scan(&n); err != nil {
 			// A table the side being counted does not hold is absent from
 			// the answer, which Compare reads as gone or not made.
-			fmt.Fprintf(r.log, "count %s: %v\n", table, err)
+			_, _ = fmt.Fprintf(r.log, "count %s: %v\n", table, err)
 			continue
 		}
 		counts[table] = n
@@ -515,7 +515,7 @@ func (r *run) migrate(ctx context.Context, action string) error {
 // version asks this tree's binary where the schema stands.
 func (r *run) version(ctx context.Context) (int64, error) {
 	var out bytes.Buffer
-	c := exec.CommandContext(ctx, "docker", r.container("--rm", r.image, "migrate", "status")...)
+	c := exec.CommandContext(ctx, "docker", r.container("--rm", r.image, "migrate", "status")...) //nolint:gosec // G204: arguments this tool built itself
 	c.Stdout, c.Stderr = &out, r.log
 	if err := c.Run(); err != nil {
 		return 0, fmt.Errorf("migrate status: %w", err)
@@ -561,7 +561,7 @@ func (r *run) open(ctx context.Context, builds Totals) (Totals, error) {
 			return nil, err
 		}
 		if status != http.StatusOK {
-			fmt.Fprintf(r.log, "open %s: %d %s\n", build, status, body)
+			_, _ = fmt.Fprintf(r.log, "open %s: %d %s\n", build, status, body)
 			continue
 		}
 		var page struct {
@@ -631,7 +631,7 @@ func (r *run) sweep(ctx context.Context, builds Totals) ([]string, error) {
 		case status < 300:
 			answered++
 		default:
-			fmt.Fprintf(r.log, "GET %s: %d %s\n", filled, status, head(body))
+			_, _ = fmt.Fprintf(r.log, "GET %s: %d %s\n", filled, status, head(body))
 		}
 	}
 	r.note("asked %d GET operations, %d answered 2xx; skipped %d whose parameters the seed has no name for",
@@ -677,7 +677,7 @@ func (r *run) clean(ctx context.Context) {
 }
 
 func (r *run) saveLogs(ctx context.Context, name string) {
-	f, err := os.Create(filepath.Join(r.work, name+".log"))
+	f, err := os.Create(filepath.Join(r.work, name+".log")) //nolint:gosec // G304: a name this tool chose, under its own directory
 	if err != nil {
 		return
 	}
@@ -688,8 +688,8 @@ func (r *run) saveLogs(ctx context.Context, name string) {
 }
 
 func (r *run) cmd(ctx context.Context, dir string, env []string, name string, args ...string) error {
-	fmt.Fprintf(r.log, "$ %s %s\n", name, strings.Join(args, " "))
-	c := exec.CommandContext(ctx, name, args...)
+	_, _ = fmt.Fprintf(r.log, "$ %s %s\n", name, strings.Join(args, " "))
+	c := exec.CommandContext(ctx, name, args...) //nolint:gosec // G204: every caller names a fixed program
 	c.Dir, c.Stdout, c.Stderr = dir, r.log, r.log
 	c.Env = append(os.Environ(), env...)
 	if err := c.Run(); err != nil {
@@ -701,18 +701,18 @@ func (r *run) cmd(ctx context.Context, dir string, env []string, name string, ar
 func (r *run) step(format string, args ...any) {
 	line := fmt.Sprintf("%s %s: ", r.from, r.engine) + fmt.Sprintf(format, args...)
 	fmt.Println(line)
-	fmt.Fprintln(r.log, "== "+line)
+	_, _ = fmt.Fprintln(r.log, "== "+line)
 }
 
 func (r *run) note(format string, args ...any) {
 	line := "  " + fmt.Sprintf(format, args...)
 	fmt.Println(line)
-	fmt.Fprintln(r.log, line)
+	_, _ = fmt.Fprintln(r.log, line)
 }
 
 // tablesOf reads the tables a release's schema record names.
 func tablesOf(path string) ([]string, error) {
-	content, err := os.ReadFile(path)
+	content, err := os.ReadFile(path) //nolint:gosec // G304: a schema snapshot in this checkout
 	if err != nil {
 		return nil, err
 	}
