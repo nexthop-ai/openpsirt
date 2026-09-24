@@ -44,7 +44,7 @@ read @graph[].scope:string
 skipped @graph[].simplelicensing_customIdToUri[].key:string
 skipped @graph[].simplelicensing_customIdToUri[].type:string
 skipped @graph[].simplelicensing_customIdToUri[].value:string
-skipped @graph[].simplelicensing_licenseExpression:string
+read @graph[].simplelicensing_licenseExpression:string
 skipped @graph[].software_attributionText[]:string
 skipped @graph[].software_copyrightText:string
 skipped @graph[].software_downloadLocation:string
@@ -82,9 +82,9 @@ skipped components[].externalReferences[].type:string
 skipped components[].externalReferences[].url:string
 skipped components[].hashes[].alg:string
 skipped components[].hashes[].content:string
-skipped components[].licenses[].expression:string
-skipped components[].licenses[].license.id:string
-skipped components[].licenses[].license.name:string
+read components[].licenses[].expression:string
+read components[].licenses[].license.id:string
+read components[].licenses[].license.name:string
 read components[].name:string
 skipped components[].pedigree.ancestors[].externalReferences[].comment:string
 skipped components[].pedigree.ancestors[].externalReferences[].hashes[].alg:string
@@ -215,8 +215,8 @@ read packages[].externalRefs[].referenceLocator:string
 read packages[].externalRefs[].referenceType:string
 skipped packages[].filesAnalyzed:boolean
 skipped packages[].homepage:string
-skipped packages[].licenseConcluded:string
-skipped packages[].licenseDeclared:string
+read packages[].licenseConcluded:string
+read packages[].licenseDeclared:string
 skipped packages[].licenseInfoFromFiles[]:string
 read packages[].name:string
 read packages[].originator:string

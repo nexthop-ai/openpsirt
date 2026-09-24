@@ -19,8 +19,8 @@ func licenseExpression(said string) string {
 // A producer listing several licenses for one package means the package is
 // under all of them — a distribution's copyright file names each license a
 // part of the source is under — and the SPDX expression for that is a
-// conjunction. An expression that is itself compound is parenthesized so the
-// result still reads one way. Repeats are dropped and the order is the
+// conjunction. An expression that is itself compound, joining licenses with
+// AND, OR or WITH, is parenthesized so the result still reads one way. Repeats are dropped and the order is the
 // producer's.
 func conjunction(said []string) string {
 	var parts []string
@@ -37,11 +37,24 @@ func conjunction(said []string) string {
 		return parts[0]
 	}
 	for i, one := range parts {
-		if strings.Contains(one, " ") && !wrapped(one) {
+		if compound(one) && !wrapped(one) {
 			parts[i] = "(" + one + ")"
 		}
 	}
 	return strings.Join(parts, " AND ")
+}
+
+// compound reports whether an expression joins licenses with an operator. A
+// name a producer wrote with spaces in it — "Apache License 2.0" — is one
+// license and is left as written.
+func compound(expression string) bool {
+	upper := " " + strings.ToUpper(expression) + " "
+	for _, operator := range []string{" AND ", " OR ", " WITH "} {
+		if strings.Contains(upper, operator) {
+			return true
+		}
+	}
+	return false
 }
 
 // wrapped reports whether an expression is one parenthesized group: its first

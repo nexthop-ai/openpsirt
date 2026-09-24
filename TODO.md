@@ -68,6 +68,7 @@ Missing or wrong, with no decision needed to fix it.
 | The upload alert compares against the size of the build | A build that rolls its base image every week raises the alert every week. Comparing against the build's usual churn needs a stored baseline |
 | The container image is `amd64` only | The binaries are built for `arm64` too. `DESIGN-packaging.md` names the fix |
 | No distribution package index is asked what a package is | A language package gets a summary and an address from its index. A distribution package gets neither |
+| A build cannot be asked which licenses it ships | Each component's license is read and shown on its page. No listing, filter or export gathers them across a build |
 | The component screen's twelve-week chart does not mark version changes | It shows findings opened and closed, and not which version the build shipped each week, so it cannot show whether an upgrade worked |
 | A version 4 CVSS score is left out of published advisories | CSAF 2.0 has no field for one. A flaw rated only under 4.0 publishes no score until the document moves to CSAF 2.1 |
 | Advisories carry no text of our own beyond the title | Everything else in the document is assembled from the flaws it covers |

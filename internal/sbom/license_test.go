@@ -60,6 +60,8 @@ func TestSeveralCycloneDXLicensesAreOneConjunction(t *testing.T) {
 		{"name":"declared","version":"1","licenses":[
 			{"license":{"id":"Apache-2.0","acknowledgement":"concluded"}},
 			{"license":{"id":"MIT","acknowledgement":"declared"}}]},
+		{"name":"named","version":"1","licenses":[
+			{"license":{"name":"Apache License 2.0"}},{"license":{"id":"MIT"}}]},
 		{"name":"none","version":"1"}]}`)
 	got := licenses(doc)
 	for name, want := range map[string]string{
@@ -68,6 +70,7 @@ func TestSeveralCycloneDXLicensesAreOneConjunction(t *testing.T) {
 		"both":      "MIT",
 		"concluded": "Apache-2.0",
 		"declared":  "MIT",
+		"named":     "Apache License 2.0 AND MIT",
 		"none":      "",
 	} {
 		if got[name] != want {
@@ -87,5 +90,24 @@ func TestAnSPDX3LicenseNamedOnlyByTheListIsRead(t *testing.T) {
 	got := licenses(doc)
 	if got["listed"] != "BSD-2-Clause" || got["custom"] != "LicenseRef-Vendor" {
 		t.Errorf("licenses %v", got)
+	}
+}
+
+func TestADeclaredLicenseStandsOverAConcludedOne(t *testing.T) {
+	// Every fixture package either declares nothing or declares what it
+	// concludes, so these are the only inputs where the order shows.
+	spdx2 := read(t, `{"spdxVersion":"SPDX-2.3","SPDXID":"SPDXRef-DOCUMENT","packages":[
+		{"SPDXID":"SPDXRef-a","name":"both","versionInfo":"1",
+		 "licenseConcluded":"Apache-2.0","licenseDeclared":"MIT"}]}`)
+	spdx3 := read(t, `{"@context":"https://spdx.org/rdf/3.0.1/spdx-context.jsonld","@graph":[
+		{"type":"software_Package","spdxId":"p1","name":"both","software_packageVersion":"1"},
+		{"type":"simplelicensing_LicenseExpression","spdxId":"l1","simplelicensing_licenseExpression":"Apache-2.0"},
+		{"type":"simplelicensing_LicenseExpression","spdxId":"l2","simplelicensing_licenseExpression":"MIT"},
+		{"type":"Relationship","spdxId":"r1","from":"p1","relationshipType":"hasConcludedLicense","to":["l1"]},
+		{"type":"Relationship","spdxId":"r2","from":"p1","relationshipType":"hasDeclaredLicense","to":["l2"]}]}`)
+	for format, doc := range map[string]*sbom.Document{"SPDX 2": spdx2, "SPDX 3": spdx3} {
+		if got := licenses(doc)["both"]; got != "MIT" {
+			t.Errorf("%s: license %q, want the declared MIT", format, got)
+		}
 	}
 }
