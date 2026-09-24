@@ -363,20 +363,26 @@ export function Decide({
     staleTime: 60_000,
   });
 
+  // One spelling for both halves of the map, because a build differing is taken
+  // off the automatic half by the same string.
+  const shown = (m: {
+    stream?: string;
+    stream_name?: string;
+    variant?: string;
+    variant_name?: string;
+  }) => `${m.stream_name || m.stream} · ${m.variant_name || m.variant}`;
   const { matching, offered } = useMemo(() => {
     const auto = new Map<string, true>();
     const diff = new Map<string, Other>();
     const differing = new Set<string>();
     {
-      for (const m of reach.data?.automatic ?? []) auto.set(`${m.stream} · ${m.variant}`, true);
+      for (const m of reach.data?.automatic ?? []) auto.set(shown(m), true);
       for (const m of reach.data?.differing ?? []) {
         // Its place, said as an aside. The subject of the question is the
         // version — a build at matching versions never reaches this list — so
         // "this build" is the honest label for another version sitting beside
         // the one in hand, rather than the build's own name repeated back.
-        const build = m.here
-          ? "this build"
-          : `${m.stream_name || m.stream} · ${m.variant_name || m.variant}`;
+        const build = m.here ? "this build" : shown(m);
         // One question per version, not one per build: a build carrying the
         // component at four versions is four claims about different code, and
         // each is posted with its own version.

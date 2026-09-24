@@ -494,7 +494,7 @@ function Stopped({ row }: { row: Standing }) {
           {row.place?.vulnerability}
         </Link>
         <span style={{ color: "var(--muted)" }}>
-          {row.place?.product} · {labeled(it?.outcome ?? "")}
+          {row.place?.product_name || row.place?.product} · {labeled(it?.outcome ?? "")}
           {it?.justification && (
             <>
               {" "}

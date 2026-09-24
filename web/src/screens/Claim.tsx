@@ -448,15 +448,12 @@ function Answer({
   const [asking, setAsking] = useState(false);
   const [because, setBecause] = useState("");
 
-  // The claim names its product the way a person reads it, and what somebody
-  // reaches is keyed on the identifier — so the two are compared the way the
-  // server compares a name somebody typed: on either spelling, ignoring
-  // capitals. Comparing the identifier against the displayed name drew this
-  // panel for nobody.
+  // The claim names its product by the name that addresses it, which is what
+  // somebody's reach is keyed on.
   const named = same(claim.place.product);
   const mayAgree = (who.data?.reach ?? []).some(
     (each) =>
-      (same(each.product) === named || same(each.name) === named) &&
+      same(each.product) === named &&
       (claim.undisclosed ? each.agrees_private : each.agrees_public),
   );
   if (mine || !mayAgree || !live(claim.happened)) return null;

@@ -103,8 +103,12 @@ export function Work() {
   // own screen and its own question — mixed in here it makes "assignments" a
   // list of things that are not assigned, which is the one thing it must not
   // be.
-  const others = peopleRows.filter((row) => row.person !== who.data?.identity);
-  const myCount = peopleRows.find((row) => row.person === who.data?.identity)?.open ?? 0;
+  // A team's name is not reserved against identities, so a team row is never
+  // the viewer's own.
+  const own = (row: { person?: string; team?: boolean }) =>
+    !row.team && row.person === who.data?.identity;
+  const others = peopleRows.filter((row) => !own(row));
+  const myCount = peopleRows.find(own)?.open ?? 0;
 
   return (
     <>
@@ -262,7 +266,7 @@ function ByPerson({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.person} className="row">
+              <tr key={`${row.team ? "t" : "p"}:${row.person}`} className="row">
                 <td>
                   <button
                     type="button"
