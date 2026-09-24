@@ -378,7 +378,10 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
           {report.found_here ? null : report.acknowledged ? (
             <p className="hint">
               Answered {report.acknowledged.replace("T", " ").slice(0, 16)}
-              {report.acknowledged_by && <> by {report.acknowledged_by}</>}.
+              {report.acknowledged_by && (
+                <> by {report.acknowledged_by_name || report.acknowledged_by}</>
+              )}
+              .
             </p>
           ) : (
             <div className="alert" style={{ margin: "6px 0 0" }}>

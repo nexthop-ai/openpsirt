@@ -302,15 +302,18 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, claim
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		ColumnExpr(`de.claim_id AS "claim_id"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		// Grouped on the names and shown in the spelling somebody declared:
+		// the list is text a person reads, and one build is one entry
+		// however it was spelled.
+		ColumnExpr(`MIN(st.display_name) AS "stream"`).
+		ColumnExpr(`MIN(va.display_name) AS "variant"`).
 		Where("de.claim_id IN (?)", bun.List(claims)).
 		Where("f.closed_at IS NULL").
 		Where("st.product_id = de.product_id").
 		Where(finding.KeyMatches)
 	err := readableFindings(query, subject, "f", "st.product_id").
-		GroupExpr("de.claim_id, st.display_name, va.display_name").
-		OrderExpr("de.claim_id, st.display_name, va.display_name").
+		GroupExpr("de.claim_id, st.name, va.name").
+		OrderExpr("de.claim_id, st.name, va.name").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which builds these cover: %w", err)

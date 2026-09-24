@@ -24,19 +24,26 @@ type UnassignedBody struct {
 	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"This product is recorded as having been exploited through this issue"`
 	Component     string `json:"component"`
 	Version       string `json:"version"`
-	Product       string `json:"product"`
+	Product       string `json:"product" doc:"The product, by the name that addresses it"`
+
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	// Stream and Variant name a build holding this, not the only one: a screen
 	// needs somewhere to link to and an action needs a finding to name. The
 	// field that says there are several is `builds`.
-	Stream  string `json:"stream" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
-	Variant string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
-	Places  int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
-	Builds  int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
+	Stream      string `json:"stream" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	Variant     string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
+	Places      int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
+	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
 }
 
 // HoldingBody is how much work one person has.
 type HoldingBody struct {
-	Person string `json:"person" doc:"The holder, by the name they are shown under. A person or a team"`
+	Person string `json:"person" doc:"The holder, by sign-in identity for a person and by name for a team"`
+	// Name is the label beside the address rather than in its place: the
+	// address is what the holder's own list resolves.
+	Name string `json:"person_name,omitempty" doc:"Their display name, where it differs from the name above"`
 	// Team says this is a queue rather than a holding: work routed to a
 	// team is unheld until somebody takes it.
 	Team bool `json:"team,omitempty" doc:"This is a team's queue rather than one person's work"`
@@ -373,8 +380,11 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
-				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
-				Places: row.Places, Builds: row.Builds,
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Stream: row.Stream, Variant: row.Variant,
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				Places:      row.Places, Builds: row.Builds,
 			})
 		}
 		out.Body.Total = total
@@ -477,8 +487,11 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
-				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
-				Places: row.Places, Builds: row.Builds,
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Stream: row.Stream, Variant: row.Variant,
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				Places:      row.Places, Builds: row.Builds,
 			})
 		}
 		out.Body.Total = total
@@ -560,8 +573,11 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Vulnerability: row.Vulnerability, Severity: row.Severity,
 				Exploited: row.Exploited, ExploitedHere: row.ExploitedHere,
 				Component: row.Component, Version: row.Version,
-				Product: row.Product, Stream: row.Stream, Variant: row.Variant,
-				Places: row.Places, Builds: row.Builds,
+				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+				Stream: row.Stream, Variant: row.Variant,
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				Places:      row.Places, Builds: row.Builds,
 			})
 		}
 		out.Body.Total = total
@@ -609,8 +625,10 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		out.Body.Items = make([]HoldingBody, 0, len(held))
 		for _, h := range held {
 			out.Body.Items = append(out.Body.Items, HoldingBody{
-				Person: who[h.PartyID].Name, Team: who[h.PartyID].Team,
-				Open: h.Open, Places: h.Places, Overdue: h.Overdue,
+				Person: who[h.PartyID].Address,
+				Name:   labelBeside(who[h.PartyID].Name, who[h.PartyID].Address),
+				Team:   who[h.PartyID].Team,
+				Open:   h.Open, Places: h.Places, Overdue: h.Overdue,
 			})
 		}
 		return out, nil

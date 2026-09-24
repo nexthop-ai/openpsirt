@@ -87,6 +87,7 @@ inferred from a rule, so adding a route never adds an exception.
 | 201 | Something now exists, and its identifier is in the answer |
 | 202 | Accepted, not yet done. Only an upload, which answers before it has been read |
 | 204 | Done, with nothing worth saying |
+| 400 | A query parameter the operation does not take. The refusal names it |
 | 404 | The thing is not there, **or** is not yours. Deliberately the same answer |
 | 409 | The request conflicts with the state of what it names: a scan older than the one held, a role granted the wrong way for this deployment's mode, an approval by the person who made the claim, a scan filed against a retired product, release or variant, a name corrected after a document naming it went out, a retirement of something already retired, a name another row already holds |
 | 422 | Understood, and cannot be stored as written |
@@ -241,6 +242,8 @@ part of the statement.
 | A narrowing that cannot be applied answers nothing, never everything | "Assigned to me" from a credential that holds no party names nobody. Dropping the condition hands the caller every finding there is while the screen goes on showing the filter as on, so a filter asking for a set nothing is in answers with nothing |
 | A filter with three answers is a word, not a flag | Origin is one: a screen offering "Scanner" as a flag can only send the absence of "entered by hand", so choosing it filters nothing |
 | A repeated value is one value | A set of one word sent twice otherwise reads as both kinds and no narrowing, which silently puts tags back into a list somebody asked to see branches of |
+| A query parameter the operation does not declare is refused with a 400 naming it | Ignored, a mistyped filter returns the unfiltered list, which reads as a correct answer. The list is read from the operation's own declaration, so what is accepted is what the document publishes |
+| That refusal comes after the scope on the operation's declaration is checked | A caller outside the scope learns nothing about what it takes. A role on the product is checked by the handler, after it; the parameters are published, so the order discloses nothing there |
 
 This also prevents a sort exposing a column the caller was never meant to order
 by.
@@ -366,6 +369,19 @@ label, is sent back by the withdraw beside it and matches nothing.
 
 Every listing carries both fields: the collaborators, the roles, the
 credentials, the bindings, the tokens and the routing rules.
+
+A person named as the actor on a record, and a product, branch or tag, variant
+or team a row is about, are named the same way.
+
+| Rule | Reason |
+|---|---|
+| A field naming a person carries the sign-in identity | A caller matches the record against a person, and a screen matches it against the viewer's own identity to decide what is theirs |
+| A field naming a product, a branch or tag, a variant or a team carries its name | A caller filters a list and builds a path from what it was handed, and a label resolves to nothing |
+| A label, where a response carries one, is the field's name suffixed `_name` | `proposed_by` and `proposed_by_name`, `product` and `product_name`, `stream` and `stream_name`, `team` and `team_name`. One suffix, so a caller finds the label without reading each field's description |
+| A label is absent where it would repeat the name | So that absent reads as "the same", and a caller shows the name |
+| Not every field carries a label | The lists a person reads by name carry one. Adding a label beside a name is additive, so the rest gain one as a screen needs it |
+| The holder of work is a person's identity or a team's name, beside `person_name` | The holder's own list resolves it, and a team's label matches no team |
+| A file carries a label as a column beside the name | The administration trail names the person, the running-out file the product, the build and the holder, the repeated-deferral and audit files the product, and the review-queue file the product and the proposer, the way their lists do |
 
 ## File organization
 

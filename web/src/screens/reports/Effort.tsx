@@ -155,7 +155,7 @@ export function Effort() {
                         <span className="hint">no longer in any build</span>
                       )}
                     </td>
-                    <td>{row.product}</td>
+                    <td>{row.product_name || row.product}</td>
                     <td className="num">{row.claims.toLocaleString()}</td>
                     <td className="num hint">{row.decisions.toLocaleString()}</td>
                     <td className="num hint">{row.people.toLocaleString()}</td>

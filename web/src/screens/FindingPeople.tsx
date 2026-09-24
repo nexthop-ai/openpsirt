@@ -121,7 +121,11 @@ export function Collaborators({
       {rows.length > 0 && (
         <span className="variants" style={{ marginBottom: 8 }}>
           {rows.map((row) => (
-            <span key={row.identity} className="vchip" title={`Brought in by ${row.added_by}`}>
+            <span
+              key={row.identity}
+              className="vchip"
+              title={`Brought in by ${row.added_by_name || row.added_by}`}
+            >
               {row.name || row.identity}{" "}
               <button
                 type="button"

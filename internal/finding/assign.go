@@ -615,15 +615,19 @@ type Owned struct {
 	Severity      string `bun:"severity"`
 	Exploited     bool   `bun:"exploited"`
 	ExploitedHere bool   `bun:"exploited_here"`
-	Product       string `bun:"product"`
+	// Product is the name that addresses it, and ProductName the one shown.
+	Product     string `bun:"product"`
+	ProductName string `bun:"-"`
 	// Stream and Variant name a build holding this, not the only one. A
 	// screen needs somewhere to link to and an action needs a finding to name,
 	// and where several builds hold the same code any of them will do. What
 	// says there are several is Builds, so a screen can show that instead of
 	// naming one of them as though it were the answer.
-	Stream  string `bun:"stream"`
-	Variant string `bun:"variant"`
-	Urgency int64  `bun:"urgency"`
+	Stream      string `bun:"stream"`
+	StreamName  string `bun:"-"`
+	Variant     string `bun:"variant"`
+	VariantName string `bun:"-"`
+	Urgency     int64  `bun:"urgency"`
 	// Undisclosed says at least one of the findings behind this row is one
 	// nobody has announced. Any is enough: what may be said about a group
 	// outside this deployment is decided by the most careful row in it .
@@ -887,6 +891,8 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 		}
 		if build, held := builds[head.TargetID]; held {
 			row.Product, row.Stream, row.Variant = build.Product, build.Stream, build.Variant
+			row.ProductName = build.ProductName
+			row.StreamName, row.VariantName = build.StreamName, build.VariantName
 		}
 		rows = append(rows, row)
 	}
@@ -896,10 +902,13 @@ func (s *Store) workSince(ctx context.Context, subject access.Subject, scope Sco
 // buildName is what a build is called on a screen: its product, stream and
 // variant, as people know them.
 type buildName struct {
-	TargetID int64  `bun:"target_id"`
-	Product  string `bun:"product"`
-	Stream   string `bun:"stream"`
-	Variant  string `bun:"variant"`
+	TargetID    int64  `bun:"target_id"`
+	Product     string `bun:"product"`
+	ProductName string `bun:"product_name"`
+	Stream      string `bun:"stream"`
+	StreamName  string `bun:"stream_name"`
+	Variant     string `bun:"variant"`
+	VariantName string `bun:"variant_name"`
 }
 
 // targetsNamed reads the names of the builds these targets are, by target.
@@ -915,9 +924,12 @@ func targetsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		Join(`JOIN "product" AS "p" ON p.id = st.product_id`).
 		ColumnExpr(`tg.id AS "target_id"`).
-		ColumnExpr(`p.display_name AS "product"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`p.name AS "product"`).
+		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		Where("tg.id IN (?)", bun.List(ids)).
 		Scan(ctx, &builds)
 	if err != nil {

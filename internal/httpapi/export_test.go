@@ -305,7 +305,11 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 			t.Fatalf("agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 		agreed := rowsUnder(lines(t, "private-triage", "/v1/audit.csv"))
-		if len(agreed) != 2 || agreed[1][14] == "" || agreed[1][15] != "true" {
+		approvedBy, twoPeople := indexOf(agreed[0], "approved by"), indexOf(agreed[0], "two people")
+		if approvedBy < 0 || twoPeople < 0 {
+			t.Fatalf("the record has no approved by or two people column: %v", agreed[0])
+		}
+		if len(agreed) != 2 || agreed[1][approvedBy] == "" || agreed[1][twoPeople] != "true" {
 			t.Fatalf("with an agreement, the record exported %v", agreed)
 		}
 		if got := asPerson(t, r, "reviewer", http.MethodDelete,
@@ -316,13 +320,13 @@ func TestTheOtherThreeListsExportWithTheSameVisibility(t *testing.T) {
 		if len(back) != 2 {
 			t.Fatalf("after the agreement was taken back, the record exported %v", back)
 		}
-		if back[1][14] != "" {
+		if back[1][approvedBy] != "" {
 			t.Errorf("an agreement that was taken back is still listed as agreeing: %q",
-				back[1][14])
+				back[1][approvedBy])
 		}
-		if back[1][15] != "false" {
+		if back[1][twoPeople] != "false" {
 			t.Errorf("with the agreement taken back the record still says two people: %q",
-				back[1][15])
+				back[1][twoPeople])
 		}
 
 		// And all three answer as JSON.

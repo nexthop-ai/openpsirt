@@ -365,7 +365,7 @@ export function People({ who: me }: { who: Who }) {
                             >
                               {held.everywhere
                                 ? "every product"
-                                : (held.product_display_name ?? held.product)}{" "}
+                                : (held.product_name ?? held.product)}{" "}
                               · {called(held.role)}
                               {held.source === "assigned" && (
                                 <>

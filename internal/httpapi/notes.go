@@ -184,11 +184,12 @@ func registerIssueNotes(api huma.API, in Ingest) {
 
 // NoteBody is one note on an issue in a product.
 type NoteBody struct {
-	ID        int64  `json:"id"`
-	Body      string `json:"body" doc:"The text, in markdown"`
-	WrittenBy string `json:"written_by" doc:"The author"`
-	WrittenAt string `json:"written_at"`
-	EditedAt  string `json:"edited_at,omitempty" doc:"The moment the author last changed it, where they have"`
+	ID            int64  `json:"id"`
+	Body          string `json:"body" doc:"The text, in markdown"`
+	WrittenBy     string `json:"written_by" doc:"The author, by sign-in identity"`
+	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	WrittenAt     string `json:"written_at"`
+	EditedAt      string `json:"edited_at,omitempty" doc:"The moment the author last changed it, where they have"`
 }
 
 // NoteWritten is the answer to writing or changing a note.
@@ -240,7 +241,7 @@ func notesOut(ctx context.Context, in Ingest, notes []triage.IssueNote) (*listOu
 	for _, note := range notes {
 		authors = append(authors, note.WrittenBy)
 	}
-	names, err := access.NewStore(in.DB.DB).Names(ctx, authors)
+	who, err := whoSigned(ctx, in.DB.DB, authors)
 	if err != nil {
 		return nil, wentWrong(in.Logger, "the notes could not be read", err)
 	}
@@ -249,8 +250,9 @@ func notesOut(ctx context.Context, in Ingest, notes []triage.IssueNote) (*listOu
 	for _, note := range notes {
 		body := NoteBody{
 			ID: note.ID, Body: note.Body,
-			WrittenBy: names[note.WrittenBy],
-			WrittenAt: note.WrittenAt.Format(time.RFC3339),
+			WrittenBy:     who.identity(note.WrittenBy),
+			WrittenByName: who.label(note.WrittenBy),
+			WrittenAt:     note.WrittenAt.Format(time.RFC3339),
 		}
 		if note.EditedAt != nil {
 			body.EditedAt = note.EditedAt.Format(time.RFC3339)

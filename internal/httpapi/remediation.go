@@ -50,7 +50,9 @@ type RemediationOutput struct {
 
 // RepeatBody is one place that keeps being put off.
 type RepeatBody struct {
-	Product       string `json:"product"`
+	Product string `json:"product" doc:"The product, by the name that addresses it"`
+
+	ProductName   string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	Vulnerability string `json:"vulnerability"`
 	Severity      string `json:"severity,omitempty"`
 	Place         string `json:"place" doc:"Names the place rather than describing it: what it is called depends on the build, and this is not about one build"`
@@ -208,7 +210,7 @@ func registerRemediation(api huma.API, in Ingest) {
 			What:  "repeated deferrals",
 			About: []Stated{{"deferred at least", strconv.Itoa(input.AtLeast) + " times"}},
 			Header: []string{
-				"product", "issue", "severity", "place", "times",
+				"product", "product_name", "issue", "severity", "place", "times",
 				"total_days", "standing", "last_until",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -220,7 +222,7 @@ func registerRemediation(api huma.API, in Ingest) {
 				written := make([][]string, 0, len(rows))
 				for _, row := range repeatBodies(rows) {
 					written = append(written, []string{
-						row.Product, row.Vulnerability, row.Severity, row.Place,
+						row.Product, row.ProductName, row.Vulnerability, row.Severity, row.Place,
 						strconv.Itoa(row.Times), strconv.Itoa(row.TotalDays),
 						strconv.FormatBool(row.Standing), row.LastUntil,
 					})
@@ -239,7 +241,8 @@ func repeatBodies(rows []triage.Repeated) []RepeatBody {
 	out := make([]RepeatBody, 0, len(rows))
 	for _, row := range rows {
 		item := RepeatBody{
-			Product: row.Product, Vulnerability: row.Vulnerability, Severity: row.Severity,
+			Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
+			Vulnerability: row.Vulnerability, Severity: row.Severity,
 			Place: row.PlaceIdentity, Times: row.Times,
 			TotalDays: int(math.Round(row.TotalDays)),
 			Standing:  row.Standing,

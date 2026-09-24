@@ -102,7 +102,7 @@ func TestARetiredVariantTakesNoScan(t *testing.T) {
 			} `json:"items"`
 		}
 		read(t, r, "triager",
-			"/v1/findings?product=mine&stream=master&variant=broadcom", &open)
+			"/v1/products/mine/findings?stream=master&variant=broadcom", &open)
 		if len(open.Items) == 0 {
 			t.Error("retiring a variant took its findings with it")
 		}

@@ -152,7 +152,7 @@ func TestTheQueueListsOneEntryPerClaimWithItsSize(t *testing.T) {
 		if one.Decisions != len(ids) || one.Issues != 1 || one.Places != len(ids) {
 			t.Errorf("the entry's size reads as %d/%d/%d, want %d/1/%d", one.Decisions, one.Issues, one.Places, len(ids), len(ids))
 		}
-		if len(one.Builds) != 1 || one.Builds[0] != "master · broadcom" {
+		if len(one.Builds) != 1 || one.Builds[0] != "Master · Broadcom" {
 			t.Errorf("the entry names builds %v, want the one it sits in", one.Builds)
 		}
 	})
@@ -526,6 +526,7 @@ func TestAQueueEntryAndADecisionSayWhatTheyAreAbout(t *testing.T) {
 
 		type ref struct {
 			Product       string  `json:"product"`
+			ProductName   string  `json:"product_name"`
 			Stream        string  `json:"stream"`
 			Variant       string  `json:"variant"`
 			Vulnerability string  `json:"vulnerability"`
@@ -547,7 +548,8 @@ func TestAQueueEntryAndADecisionSayWhatTheyAreAbout(t *testing.T) {
 			if f == nil {
 				t.Fatalf("%s carries no finding", what)
 			}
-			if f.Product != "Mine" || f.Stream != "master" || f.Variant != "broadcom" {
+			if f.Product != "mine" || f.ProductName != shownAs("mine") ||
+				f.Stream != "master" || f.Variant != "broadcom" {
 				t.Errorf("%s names build %s · %s · %s", what, f.Product, f.Stream, f.Variant)
 			}
 			if f.Vulnerability != "CVE-2026-9999" || f.Component != "linux-image" || f.Version != "5.10" {

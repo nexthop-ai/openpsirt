@@ -383,12 +383,12 @@ export function Finding() {
     outcome: p.outcome,
     justification: p.justification ?? "",
     deferredUntil: p.deferred_until ?? "",
-    proposedBy: p.proposed_by,
+    proposedBy: p.proposed_by_name || p.proposed_by,
     proposedAt: p.proposed_at,
     state: p.ended,
     endedAt: p.ended_at ?? "",
     about: p.about ?? "",
-    approvedBy: p.approved_by ?? "",
+    approvedBy: p.approved_by_name || p.approved_by || "",
     reasoning: p.reasoning,
     place: placeOf.get(p.decision_id) ?? "",
   }));
@@ -429,8 +429,7 @@ export function Finding() {
     `/products/${encodeURIComponent(product)}` +
     `/streams/${encodeURIComponent(stream)}` +
     `/variants/${encodeURIComponent(variant)}`;
-  const mine = (proposedBy: string) =>
-    !!who.data && (proposedBy === who.data.identity || proposedBy === who.data.name);
+  const mine = (proposedBy: string) => !!who.data && proposedBy === who.data.identity;
 
   return (
     <>
@@ -994,7 +993,7 @@ export function Finding() {
                       <span className="id">#{s.decision_id}</span>{" "}
                       <Because code={s.justification} />
                       <span className="hint">
-                        approved by {s.approved_by}
+                        approved by {s.approved_by_name || s.approved_by}
                         {s.approved_at && <> on {on(s.approved_at)}</>}
                         {s.issues ? <> · {s.issues} issues rest on it</> : null}
                       </span>
@@ -1040,7 +1039,7 @@ export function Finding() {
                       {e.justification && <Because code={e.justification} />}
                       <span className="hint">
                         {e.outcome}
-                        {e.approved_by && <> · approved by {e.approved_by}</>}
+                        {e.approved_by && <> · approved by {e.approved_by_name || e.approved_by}</>}
                         {e.approved_at && <> on {on(e.approved_at)}</>}
                       </span>
                     </header>

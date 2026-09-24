@@ -28,17 +28,10 @@ import { Wide } from "../ui/Wide";
 // destination nothing has been sent to, which is the failure the system screen
 // exists to make visible.
 //
-// Only the address is a credential. For two of the services this names, the
-// path authenticates, which is why the summary below draws every column but
-// that one and why a failure is recorded with the address replaced by its host.
-// The configuration panel shows it and is administrator-only for that reason.
-//
-// The address is on the wire either way: one read serves both panels and
-// `OutboundBody` carries `url` unconditionally, so what keeps it from a reader
-// who should not have it is the endpoint's own administrator gate, not the
-// column this file declines to draw. Widening the delivery panel to the
-// operator the system screen is described as being for means giving it a body
-// that carries the host in place of the address — not deleting a `<td>`.
+// For two of the services this names, the path of the address authenticates,
+// so the server returns the host alone and a failure is recorded with the
+// address replaced by its host. A destination is told apart by its name and
+// kind.
 
 // One row as both panels read it, from the document the server publishes
 // rather than restated here: a hand-copied shape compiles perfectly while
@@ -70,10 +63,9 @@ function Failing({ row }: { row: Destination }) {
 }
 
 // The configuration. Administrator-only, and gated as a whole rather than
-// per control: the address is a credential, so a reader who may not hold one
-// is not shown the table either — and the endpoint behind it refuses anybody
-// who is not an administrator, so a panel drawn for an auditor would be a
-// panel that could only fail.
+// per control: the endpoint behind it refuses anybody who is not an
+// administrator, so a panel drawn for an auditor would be a panel that could
+// only fail.
 export function Webhooks() {
   const queries = useQueryClient();
   const [adding, setAdding] = useState(false);
@@ -132,7 +124,7 @@ export function Webhooks() {
               <tr>
                 <th>Name</th>
                 <th>Kind</th>
-                <th>URL</th>
+                <th>Host</th>
                 <th />
               </tr>
             </thead>
@@ -141,11 +133,9 @@ export function Webhooks() {
                 <tr key={`${row.name} ${row.kind}`} className="row">
                   <td className="id">{row.name}</td>
                   <td>{kindOf(row.kind)}</td>
-                  {/* The address as recorded. It is not a link: it is somewhere
-                      this deployment posts to, not somewhere a person goes, and
-                      for two of the services it names the path is the
-                      credential. */}
-                  <td className="id">{row.url}</td>
+                  {/* Not a link: it is somewhere this deployment posts to,
+                      not somewhere a person goes. */}
+                  <td className="id">{row.host}</td>
                   <td>
                     <button
                       type="button"

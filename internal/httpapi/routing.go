@@ -29,7 +29,7 @@ type RuleBody struct {
 	// name column — so a team declared "platform-security" and displayed
 	// "Platform Security" lists as the label, and sending that back finds no
 	// team at all.
-	TeamDisplayName string `json:"team_display_name,omitempty" doc:"That team's display name, where it was declared with one"`
+	TeamDisplayName string `json:"team_name,omitempty" doc:"The team's display name, where it differs from its name"`
 	// Order is the whole of the precedence: first match wins.
 	Order int `json:"order" doc:"Its position among the others. The first rule that matches places the work"`
 	// Upstream is the key that matters: one rule naming a source package

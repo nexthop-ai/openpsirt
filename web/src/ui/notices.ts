@@ -62,6 +62,10 @@ export function label(kind?: string): string {
     // it is what they asked for.
     case "approval-undone":
       return "agreement taken back";
+    // Told to an approver: what they agreed to was changed, so their
+    // agreement stopped counting.
+    case "approval-withdrawn":
+      return "agreed claim changed";
     case "claim-lapsed":
       return "stopped applying";
     default:

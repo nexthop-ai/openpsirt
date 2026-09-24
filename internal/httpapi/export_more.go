@@ -84,7 +84,8 @@ func registerDueExport(api huma.API, in Ingest) {
 			About: []Stated{{"looking ahead days", strconv.Itoa(input.Days)}},
 			Header: []string{
 				"issue", "severity", "exploited", "component", "version",
-				"product", "stream", "variant", "places", "held by", "due", "days left",
+				"product", "product name", "stream", "stream name", "variant", "variant name",
+				"places", "held by", "held by name", "due", "days left",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				late, _, err := store.RunningOutPage(ctx, subject, scope,
@@ -106,16 +107,21 @@ func registerDueExport(api huma.API, in Ingest) {
 				}
 				rows := make([][]string, 0, len(late))
 				for _, row := range late {
-					held := ""
+					// The holder by identity or team name, the way the list
+					// carries it, with the label beside it.
+					held, heldName := "", ""
 					if row.AssignedTo != nil {
-						held = who[*row.AssignedTo].Name
+						h := who[*row.AssignedTo]
+						held, heldName = h.Address, labelBeside(h.Name, h.Address)
 					}
 					rows = append(rows, []string{
 						row.Vulnerability, row.Severity,
 						strconv.FormatBool(row.Exploited),
 						row.Component, row.Version,
-						row.Product, row.Stream, row.Variant,
-						strconv.Itoa(row.Places), held,
+						row.Product, labelBeside(row.ProductName, row.Product),
+						row.Stream, labelBeside(row.StreamName, row.Stream),
+						row.Variant, labelBeside(row.VariantName, row.Variant),
+						strconv.Itoa(row.Places), held, heldName,
 						row.Due.Format(time.DateOnly),
 						// Rounded down rather than toward zero, the way the
 						// screen rounds it: truncation reports something twelve
@@ -310,7 +316,8 @@ func registerAuditExport(api huma.API, in Ingest) {
 			What:  "the record of judgments",
 			About: about,
 			Header: []string{
-				"id", "proposed", "product", "issue", "component", "version", "consumer",
+				"id", "proposed", "product", "product name", "issue", "component", "version",
+				"consumer",
 				"outcome", "justification", "deferred until", "fixed version",
 				"state", "standing", "proposed by", "approved by", "two people", "ended",
 				"agreements", "reasoning",
@@ -351,7 +358,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 					}
 					rows = append(rows, []string{
 						strconv.FormatInt(body.ID, 10), body.ProposedAt, body.Product,
-						body.Issue, body.Component, body.Version, body.Consumer,
+						body.ProductName, body.Issue, body.Component, body.Version, body.Consumer,
 						string(body.Outcome), string(body.Justification), body.DeferredUntil,
 						body.FixedVersion, body.State,
 						strconv.FormatBool(body.Standing),
@@ -404,8 +411,9 @@ func registerQueueExport(api huma.API, in Ingest) {
 		out := Exporting{
 			What: "the review queue",
 			Header: []string{
-				"claim", "proposed", "proposed by", "age days", "outcome", "issue",
-				"product", "component", "decisions", "issues", "places", "builds",
+				"claim", "proposed", "proposed by", "proposed by name", "age days", "outcome",
+				"issue", "product", "product name", "component", "decisions", "issues",
+				"places", "builds",
 				"previously approved", "deferred days", "reasoning",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -430,19 +438,19 @@ func registerQueueExport(api huma.API, in Ingest) {
 				rows := make([][]string, 0, len(waiting))
 				for i, row := range waiting {
 					where := named[i].Finding
-					product, component, version := "", "", ""
+					product, productName, component, version := "", "", "", ""
 					if where != nil {
-						product, component = where.Product, where.Component
-						version = where.Version
+						product, productName = where.Product, where.ProductName
+						component, version = where.Component, where.Version
 					}
 					rows = append(rows, []string{
 						strconv.FormatInt(row.Claim.ID, 10),
 						stamp(row.Decision.ProposedAt),
-						named[i].ProposedBy,
+						named[i].ProposedBy, named[i].ProposedByName,
 						strconv.Itoa(int(store.Age(&row.Decision).Hours() / 24)),
 						string(row.Claim.Outcome),
 						named[i].Place.Vulnerability,
-						product, component + " " + version,
+						product, productName, component + " " + version,
 						strconv.Itoa(row.Decisions), strconv.Itoa(row.Issues),
 						strconv.Itoa(row.Places),
 						strings.Join(row.Builds, "; "),
@@ -557,33 +565,34 @@ func registerChangeExport(api huma.API, in Ingest) {
 			return nil, err
 		}
 		store := trail.NewStore(in.DB.DB)
-		rights := access.NewStore(in.DB.DB)
 		out := Exporting{
 			What: "what has been changed administratively",
 			About: []Stated{
 				{"from", asDay(since)}, {"to", asDay(until)}, {"kind", input.Kind},
 			},
-			Header: []string{"at", "by", "kind", "about", "was", "became", "unset", "cleared"},
+			Header: []string{"at", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				changes, _, err := store.Changes(ctx, subject, trail.Kind(input.Kind),
 					trail.Over{Since: since, Until: until}, limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				// The person, by the identity they sign in under, read a page
-				// at a time like every other name this file carries.
+				// The person, by the identity they sign in under and their
+				// display name beside it, read a page at a time like every
+				// other name this file carries.
 				who := make([]int64, 0, len(changes))
 				for _, change := range changes {
 					who = append(who, change.By)
 				}
-				names, err := rights.Names(ctx, who)
+				people, err := whoSigned(ctx, in.DB.DB, who)
 				if err != nil {
 					return nil, err
 				}
 				rows := make([][]string, 0, len(changes))
 				for _, change := range changes {
 					rows = append(rows, []string{
-						change.At.UTC().Format(time.RFC3339), names[change.By],
+						change.At.UTC().Format(time.RFC3339), people.identity(change.By),
+						people.label(change.By),
 						string(change.Kind), change.Name,
 						orBlank(change.Was), orBlank(change.Became),
 						strconv.FormatBool(change.Was == nil),

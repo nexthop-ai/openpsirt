@@ -248,6 +248,7 @@ func registerReports(api huma.API, in Ingest) {
 // ReleasePointBody is the state one release shipped with.
 type ReleasePointBody struct {
 	Stream     string         `json:"stream"`
+	StreamName string         `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
 	Cut        string         `json:"cut" doc:"The date the release was declared. It orders and labels them; the axis is the sequence"`
 	Open       int            `json:"open" doc:"Distinct issues open against it now, against today's vulnerability data rather than the day it was cut"`
 	BySeverity map[string]int `json:"by_severity,omitempty"`
@@ -313,7 +314,8 @@ func registerReleaseTrend(api huma.API, in Ingest) {
 		for _, point := range points {
 			out.Body.Items = append(out.Body.Items, ReleasePointBody{
 				Stream: point.Stream, Cut: point.Cut.Format(time.RFC3339),
-				Open: point.Open, BySeverity: point.BySeverity,
+				StreamName: labelBeside(point.StreamName, point.Stream),
+				Open:       point.Open, BySeverity: point.BySeverity,
 			})
 		}
 		return out, nil

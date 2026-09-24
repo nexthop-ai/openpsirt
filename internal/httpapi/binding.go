@@ -30,7 +30,7 @@ type BindingBody struct {
 	Product string `json:"product,omitempty" doc:"The product the role is held against, by the name that addresses it"`
 	// ProductDisplayName is the label shown beside it, for the reason HeldBody
 	// carries one: unbind resolves the field above.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
+	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	Role               string `json:"role" enum:"approver,assigner,public-read,private-read,public-triage,private-triage,admin,audit" doc:"The role membership of this group grants"`
 }
 

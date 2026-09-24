@@ -24,8 +24,8 @@ import (
 // are the finding's to say.
 type Described struct {
 	TargetID int64
-	// Product, Stream and Variant are the display names, for a card; the
-	// three Name fields are what a path names the same build by.
+	// Product, Stream and Variant are the names a path addresses the build
+	// by, and the three Name fields the ones it is shown under.
 	Product, ProductName string
 	Stream, StreamName   string
 	Variant, VariantName string
@@ -117,12 +117,12 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 			` THEN 1 ELSE 0 END AS "exact"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
 		ColumnExpr(`de.product_id AS "product_id"`).
-		ColumnExpr(`pr.display_name AS "product"`).
-		ColumnExpr(`pr.name AS "product_name"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`st.name AS "stream_name"`).
-		ColumnExpr(`va.display_name AS "variant"`).
-		ColumnExpr(`va.name AS "variant_name"`).
+		ColumnExpr(`pr.name AS "product"`).
+		ColumnExpr(`COALESCE(NULLIF(pr.display_name, ''), pr.name) AS "product_name"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		ColumnExpr(`f.component_id AS "component_id"`).
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`c.version AS "version"`).
@@ -135,7 +135,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, decisions 
 		Where("st.product_id = de.product_id").
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(readable)).
-		OrderExpr("de.id, exact DESC, st.display_name, va.display_name, c.name").
+		OrderExpr("de.id, exact DESC, st.name, va.name, c.name").
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these decisions are about: %w", err)

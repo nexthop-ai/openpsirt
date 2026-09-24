@@ -11,7 +11,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -24,11 +23,12 @@ type DecisionDetail struct {
 	Place    PlaceBody    `json:"place"`
 	// Finding is the decision's subject, where an open finding still sits at
 	// its place. Absent where none does.
-	Finding    *FindingRefBody `json:"finding,omitempty" doc:"The decision's subject — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there"`
-	Reasoning  string          `json:"reasoning" doc:"The justification as it currently stands, in markdown"`
-	ProposedBy string          `json:"proposed_by"`
-	ProposedAt string          `json:"proposed_at" doc:"The moment the claim was made"`
-	AgeDays    int             `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
+	Finding        *FindingRefBody `json:"finding,omitempty" doc:"The decision's subject — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there"`
+	Reasoning      string          `json:"reasoning" doc:"The justification as it currently stands, in markdown"`
+	ProposedBy     string          `json:"proposed_by" doc:"The person who made the claim, by sign-in identity"`
+	ProposedByName string          `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	ProposedAt     string          `json:"proposed_at" doc:"The moment the claim was made"`
+	AgeDays        int             `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
 }
 
 // ClaimDetail is one claim, whole: its argument, its landing place, its
@@ -52,7 +52,8 @@ type ClaimDetail struct {
 	// Happened is the claim's fate, read from its rows.
 	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"The claim's outcome. mixed is a claim whose rows did not all end the same way"`
 	When     string `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
-	By       string `json:"by,omitempty" doc:"The person who did it, where a person did"`
+	By       string `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
+	ByName   string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
@@ -108,21 +109,23 @@ func claimArgument(c triage.Claim, reasoning string) DecisionBody {
 
 // RevisionBody is one statement of a justification.
 type RevisionBody struct {
-	ID        int64  `json:"id" doc:"The identifier an approval names when it says which words were agreed to"`
-	Ordinal   int64  `json:"ordinal" doc:"The revision number, counting from one"`
-	Body      string `json:"body" doc:"The justification text, in markdown"`
-	WrittenBy string `json:"written_by"`
-	WrittenAt string `json:"written_at"`
+	ID            int64  `json:"id" doc:"The identifier an approval names when it says which words were agreed to"`
+	Ordinal       int64  `json:"ordinal" doc:"The revision number, counting from one"`
+	Body          string `json:"body" doc:"The justification text, in markdown"`
+	WrittenBy     string `json:"written_by" doc:"The author, by sign-in identity"`
+	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	WrittenAt     string `json:"written_at"`
 }
 
 // ApprovalBody is one person agreeing to one revision of a justification.
 type ApprovalBody struct {
-	ID          int64  `json:"id"`
-	RevisionID  int64  `json:"revision_id" doc:"The revision of the justification that was agreed to"`
-	ApprovedBy  string `json:"approved_by"`
-	ApprovedAt  string `json:"approved_at"`
-	WithdrawnAt string `json:"withdrawn_at,omitempty" doc:"The moment this approval was taken back, if it was"`
-	Batch       string `json:"batch,omitempty" doc:"The batch it was approved under, if it was a bulk approval"`
+	ID             int64  `json:"id"`
+	RevisionID     int64  `json:"revision_id" doc:"The revision of the justification that was agreed to"`
+	ApprovedBy     string `json:"approved_by" doc:"The person who agreed, by sign-in identity"`
+	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	ApprovedAt     string `json:"approved_at"`
+	WithdrawnAt    string `json:"withdrawn_at,omitempty" doc:"The moment this approval was taken back, if it was"`
+	Batch          string `json:"batch,omitempty" doc:"The batch it was approved under, if it was a bulk approval"`
 	// Covered is how many findings the claim covered when this approval was
 	// given. A decision reaches by matching, so it covers more as builds
 	// appear — and against the present reach it states the growth: agreed
@@ -136,11 +139,12 @@ type ApprovalBody struct {
 
 // CommentBody is one remark on a decision.
 type CommentBody struct {
-	ID        int64  `json:"id"`
-	Body      string `json:"body" doc:"The comment text, in markdown"`
-	WrittenBy string `json:"written_by"`
-	WrittenAt string `json:"written_at"`
-	EditedAt  string `json:"edited_at,omitempty" doc:"The moment the author last changed it, if they did"`
+	ID            int64  `json:"id"`
+	Body          string `json:"body" doc:"The comment text, in markdown"`
+	WrittenBy     string `json:"written_by" doc:"The author, by sign-in identity"`
+	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	WrittenAt     string `json:"written_at"`
+	EditedAt      string `json:"edited_at,omitempty" doc:"The moment the author last changed it, if they did"`
 }
 
 func registerTriageReading(api huma.API, in Ingest) {
@@ -277,7 +281,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 		about := described[0]
 
 		body := ClaimDetail{
-			Claim:              claimBody(whole.Claim, about.ProposedBy),
+			Claim:              claimBody(whole.Claim, about.ProposedBy, about.ProposedByName),
 			Argument:           claimArgument(whole.Claim, whole.Reasoning),
 			Place:              about.Place,
 			Finding:            about.Finding,
@@ -298,11 +302,11 @@ func registerTriageReading(api huma.API, in Ingest) {
 			body.When = whole.When.UTC().Format(time.RFC3339)
 		}
 		if whole.By != 0 {
-			names, err := access.NewStore(in.DB.DB).Names(ctx, []int64{whole.By})
+			who, err := whoSigned(ctx, in.DB.DB, []int64{whole.By})
 			if err != nil {
 				return nil, wentWrong(in.Logger, "that claim could not be read", err)
 			}
-			body.By = names[whole.By]
+			body.By, body.ByName = who.identity(whole.By), who.label(whole.By)
 		}
 		if whole.Outliers != nil {
 			body.Outliers = outliersBody(*whole.Outliers)
@@ -337,7 +341,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 		for _, revision := range revisions {
 			authors = append(authors, revision.WrittenBy)
 		}
-		names, err := access.NewStore(in.DB.DB).Names(ctx, authors)
+		who, err := whoSigned(ctx, in.DB.DB, authors)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the reasoning could not be read", err)
 		}
@@ -347,8 +351,9 @@ func registerTriageReading(api huma.API, in Ingest) {
 		for _, revision := range revisions {
 			out.Body.Items = append(out.Body.Items, RevisionBody{
 				ID: revision.ID, Ordinal: revision.Ordinal, Body: revision.Body,
-				WrittenBy: names[revision.WrittenBy],
-				WrittenAt: revision.WrittenAt.Format(time.RFC3339),
+				WrittenBy:     who.identity(revision.WrittenBy),
+				WrittenByName: who.label(revision.WrittenBy),
+				WrittenAt:     revision.WrittenAt.Format(time.RFC3339),
 			})
 		}
 		return out, nil
@@ -387,7 +392,7 @@ func registerTriageReading(api huma.API, in Ingest) {
 		for _, approval := range approvals {
 			approvers = append(approvers, approval.ApprovedBy)
 		}
-		names, err := access.NewStore(in.DB.DB).Names(ctx, approvers)
+		who, err := whoSigned(ctx, in.DB.DB, approvers)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who agreed could not be read", err)
 		}
@@ -397,8 +402,9 @@ func registerTriageReading(api huma.API, in Ingest) {
 		for _, approval := range approvals {
 			body := ApprovalBody{
 				ID: approval.ID, RevisionID: approval.RevisionID,
-				ApprovedBy: names[approval.ApprovedBy],
-				ApprovedAt: approval.ApprovedAt.Format(time.RFC3339),
+				ApprovedBy:     who.identity(approval.ApprovedBy),
+				ApprovedByName: who.label(approval.ApprovedBy),
+				ApprovedAt:     approval.ApprovedAt.Format(time.RFC3339),
 			}
 			if approval.WithdrawnAt != nil {
 				body.WithdrawnAt = approval.WithdrawnAt.Format(time.RFC3339)
@@ -435,11 +441,15 @@ func describeDecisions(ctx context.Context, in Ingest, store *triage.Store,
 		issues = append(issues, decision.VulnerabilityID)
 	}
 
-	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
+	who, err := whoSigned(ctx, in.DB.DB, people)
 	if err != nil {
 		return nil, err
 	}
-	productNames, err := catalog.NewStore(in.DB.DB).ProductNames(ctx, products)
+	productNames, err := catalog.NewStore(in.DB.DB).ProductsCalled(ctx, products)
+	if err != nil {
+		return nil, err
+	}
+	productLabels, err := catalog.NewStore(in.DB.DB).ProductNames(ctx, products)
 	if err != nil {
 		return nil, err
 	}
@@ -462,14 +472,17 @@ func describeDecisions(ctx context.Context, in Ingest, store *triage.Store,
 			Finding:  findingRef(described, decision.ID),
 			Decision: decisionBody(decision),
 			Place: PlaceBody{
-				Product:       productNames[decision.ProductID],
+				Product: productNames[decision.ProductID],
+				ProductName: labelBeside(productLabels[decision.ProductID],
+					productNames[decision.ProductID]),
 				Vulnerability: issueNames[decision.VulnerabilityID],
 				Place:         decision.PlaceIdentity,
 			},
-			Reasoning:  reasoning[decision.ID],
-			ProposedBy: names[decision.ProposedBy],
-			ProposedAt: decision.ProposedAt.Format(time.RFC3339),
-			AgeDays:    int(store.Age(&decision).Hours() / 24),
+			Reasoning:      reasoning[decision.ID],
+			ProposedBy:     who.identity(decision.ProposedBy),
+			ProposedByName: who.label(decision.ProposedBy),
+			ProposedAt:     decision.ProposedAt.Format(time.RFC3339),
+			AgeDays:        int(store.Age(&decision).Hours() / 24),
 		})
 	}
 	return details, nil
@@ -483,7 +496,10 @@ func findingRef(described map[int64]triage.Described, decisionID int64) *Finding
 		return nil
 	}
 	body := &FindingRefBody{
-		Product: d.Product, Stream: d.Stream, Variant: d.Variant,
+		Product: d.Product, ProductName: labelBeside(d.ProductName, d.Product),
+		Stream: d.Stream, Variant: d.Variant,
+		StreamName:    labelBeside(d.StreamName, d.Stream),
+		VariantName:   labelBeside(d.VariantName, d.Variant),
 		Vulnerability: d.Issue.Identifier, Component: d.Component, Version: d.Version,
 		Severity: d.Issue.InForce(), Exploited: d.Issue.Exploited,
 		FixState: d.FixState, FixedIn: d.FixedIn,

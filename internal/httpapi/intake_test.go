@@ -77,7 +77,7 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 			t.Fatalf("acknowledging answered %d: %s", got.Code, got.Body.String())
 		}
 		read(t, r, "private-triage", at, &one)
-		if one.Acknowledged == "" || one.AcknowledgedBy == "" {
+		if one.Acknowledged == "" || one.AcknowledgedBy != "private-triage" {
 			t.Errorf("acknowledging recorded %q by %q", one.Acknowledged, one.AcknowledgedBy)
 		}
 		if still := r.alerts(t, "private-triage", "unanswered-report"); len(still) != 0 {
@@ -96,7 +96,7 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 		if one.Issue != minted {
 			t.Errorf("the claim points at %q, want %q", one.Issue, minted)
 		}
-		if one.Evaluated == "" || one.EvaluatedBy == "" {
+		if one.Evaluated == "" || one.EvaluatedBy != "private-triage" {
 			t.Errorf("judging recorded %q by %q", one.Evaluated, one.EvaluatedBy)
 		}
 

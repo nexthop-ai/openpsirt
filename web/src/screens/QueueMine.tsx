@@ -87,7 +87,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
     <>
       <tr className="row">
         <td>
-          <Happened word={row.happened} by={row.by} />
+          <Happened word={row.happened} by={row.by_name || row.by} />
         </td>
         <td>
           {row.finding ? (
@@ -110,11 +110,12 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
         </td>
         <td className="id">{row.finding?.component ?? "—"}</td>
         <td className="hint">
-          {row.place?.product}
+          {row.place?.product_name || row.place?.product}
           {row.finding?.stream && (
             <>
               {" "}
-              · {row.finding.stream} · {row.finding.variant}
+              · {row.finding.stream_name || row.finding.stream} ·{" "}
+              {row.finding.variant_name || row.finding.variant}
             </>
           )}
         </td>

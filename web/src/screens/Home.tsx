@@ -239,7 +239,7 @@ function Readiness({ at }: { at: Scoped }) {
                 <tr>
                   <th />
                   <th className="num">Now</th>
-                  <th className="num">{shipped.stream}</th>
+                  <th className="num">{shipped.stream_name || shipped.stream}</th>
                   <th className="num">Change</th>
                 </tr>
               </thead>
@@ -258,7 +258,11 @@ function Readiness({ at }: { at: Scoped }) {
             </table>
           </Wide>
           <p className="reading">
-            {reading(now?.critical ?? 0, shipped.critical ?? 0, shipped.stream ?? "")}
+            {reading(
+              now?.critical ?? 0,
+              shipped.critical ?? 0,
+              shipped.stream_name || shipped.stream || "",
+            )}
             {floor ? ` Counted at ${floor} and above.` : ""}
           </p>
         </>
@@ -762,8 +766,8 @@ function InProgress({ me }: { me: string }) {
   // somebody who works here had to go somewhere else to find out.
   const rows = held.data?.items ?? [];
   const mine = [
-    ...rows.filter((each) => each.person === me),
-    ...rows.filter((each) => each.person !== me),
+    ...rows.filter((each) => !each.team && each.person === me),
+    ...rows.filter((each) => each.team || each.person !== me),
   ];
   const total = mine.reduce((sum, each) => sum + (each.open ?? 0), 0);
   const overdue = mine.reduce((sum, each) => sum + (each.overdue ?? 0), 0);
@@ -793,8 +797,10 @@ function InProgress({ me }: { me: string }) {
       {mine.length === 0 && !held.isError && <p className="reading">Nothing is assigned.</p>}
       <ul>
         {mine.slice(0, 3).map((each) => (
-          <li key={each.person}>
-            <span className="id">{each.person === me ? "you" : each.person}</span>
+          <li key={`${each.team ? "t" : "p"}:${each.person}`}>
+            <span className="id">
+              {!each.team && each.person === me ? "you" : each.person_name || each.person}
+            </span>
             <span className="what">{each.open} open</span>
             {(each.overdue ?? 0) > 0 && <span className="when">{each.overdue} overdue</span>}
           </li>

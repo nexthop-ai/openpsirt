@@ -20,10 +20,11 @@ import (
 
 // CollaboratorBody is one person brought into one case.
 type CollaboratorBody struct {
-	Identity string `json:"identity"`
-	Name     string `json:"name,omitempty" doc:"Their display name, where they have one"`
-	AddedBy  string `json:"added_by"`
-	AddedAt  string `json:"added_at"`
+	Identity    string `json:"identity"`
+	Name        string `json:"name,omitempty" doc:"Their display name, where it differs from their identity"`
+	AddedBy     string `json:"added_by" doc:"The person who brought them in, by sign-in identity"`
+	AddedByName string `json:"added_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	AddedAt     string `json:"added_at"`
 }
 
 // registerCollaborators is the list of people brought into one undisclosed
@@ -229,7 +230,7 @@ func collaboratorBodies(ctx context.Context, in Ingest, productID, issueID int64
 	for _, row := range rows {
 		adders = append(adders, row.AddedBy)
 	}
-	by, err := rights.Names(ctx, adders)
+	by, err := whoSigned(ctx, in.DB.DB, adders)
 	if err != nil {
 		return nil, err
 	}
@@ -242,14 +243,11 @@ func collaboratorBodies(ctx context.Context, in Ingest, productID, issueID int64
 			continue
 		}
 		body := CollaboratorBody{
-			Identity: handles[id], AddedBy: by[row.AddedBy],
-			AddedAt: row.AddedAt.Format(time.RFC3339),
+			Identity: handles[id], AddedBy: by.identity(row.AddedBy),
+			AddedByName: by.label(row.AddedBy),
+			AddedAt:     row.AddedAt.Format(time.RFC3339),
 		}
-		// Empty where it would repeat the identity, so that omitempty keeps
-		// meaning "no display name" rather than "the same again".
-		if names[id] != handles[id] {
-			body.Name = names[id]
-		}
+		body.Name = labelBeside(names[id], handles[id])
 		out = append(out, body)
 	}
 	return out, nil

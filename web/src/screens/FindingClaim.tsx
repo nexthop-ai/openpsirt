@@ -147,7 +147,7 @@ export function Standing({
           Decision <span className="id">#{id}</span>
         </h3>
         <span className="hint">
-          proposed by <b>{claim.proposed_by}</b>
+          proposed by <b>{claim.proposed_by_name || claim.proposed_by}</b>
           {claim.proposed_at && <> · {claim.proposed_at.replace("T", " ").slice(0, 16)}</>}
           {typeof claim.age_days === "number" && claim.age_days > 365 && (
             <>
@@ -245,7 +245,8 @@ export function Standing({
               </>
             ) : state === "approved" && last ? (
               <>
-                <span className="state agreed">Approved</span> by <b>{last.approved_by}</b>
+                <span className="state agreed">Approved</span> by{" "}
+                <b>{last.approved_by_name || last.approved_by}</b>
                 {last.approved_at && <>, {last.approved_at.replace("T", " ").slice(0, 16)}</>}
                 {/* Carried onto this claim from the one it re-affirms: they
                     agreed to those words rather than to the reasoning shown
@@ -347,30 +348,38 @@ export function Activity({
   const now: Event[] = [];
   now.push({
     when: claim.proposed_at ?? "",
-    who: claim.proposed_by ?? "",
+    who: claim.proposed_by_name || claim.proposed_by || "",
     what: `proposed #${claimId} — ${labeled(claim.decision?.outcome ?? "")} · ${places ?? claim.decision?.places ?? 1} ${(places ?? claim.decision?.places ?? 1) === 1 ? "place" : "places"}`,
   });
   for (const r of revisions.data?.items ?? []) {
     if ((r.ordinal ?? 1) > 1)
       now.push({
         when: r.written_at ?? "",
-        who: r.written_by ?? "",
+        who: r.written_by_name || r.written_by || "",
         what: `revised the reasoning (revision ${r.ordinal})`,
       });
   }
   for (const a of approvals.data?.items ?? []) {
     now.push({
       when: a.approved_at ?? "",
-      who: a.approved_by ?? "",
+      who: a.approved_by_name || a.approved_by || "",
       what: a.carried_from
         ? `agreement carried forward onto revision ${a.revision_id}`
         : `approved revision ${a.revision_id}${a.batch ? ` (batch ${a.batch})` : ""}`,
     });
     if (a.withdrawn_at)
-      now.push({ when: a.withdrawn_at, who: a.approved_by ?? "", what: "approval withdrawn" });
+      now.push({
+        when: a.withdrawn_at,
+        who: a.approved_by_name || a.approved_by || "",
+        what: "approval withdrawn",
+      });
   }
   for (const c of comments.data?.items ?? []) {
-    now.push({ when: c.written_at ?? "", who: c.written_by ?? "", what: "commented" });
+    now.push({
+      when: c.written_at ?? "",
+      who: c.written_by_name || c.written_by || "",
+      what: "commented",
+    });
   }
   if (claim.decision?.sent_back_at)
     now.push({
@@ -444,7 +453,7 @@ export function Revisions({ claimId }: { claimId: number }) {
   for (const a of approvals.data?.items ?? []) {
     if (a.revision_id)
       agreed.set(a.revision_id, {
-        by: a.approved_by ?? "",
+        by: a.approved_by_name || a.approved_by || "",
         at: a.approved_at ?? "",
         withdrawn: !!a.withdrawn_at,
       });
@@ -460,7 +469,7 @@ export function Revisions({ claimId }: { claimId: number }) {
             <div key={r.id} className={`version${a && !a.withdrawn ? " agreed" : ""}`}>
               <span className="stamp">
                 <b>Revision {r.ordinal}</b>
-                {r.written_at?.replace("T", " ").slice(0, 16)} · {r.written_by}
+                {r.written_at?.replace("T", " ").slice(0, 16)} · {r.written_by_name || r.written_by}
               </span>
               <div>
                 <div className="tagline">
