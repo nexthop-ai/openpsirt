@@ -3601,6 +3601,7 @@ components:
           description: "The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none"
           type: string
         name:
+          description: The binary package's name
           type: string
         newest_released_at:
           description: The date that version shipped, where the index said
@@ -6851,6 +6852,10 @@ components:
           description: The version this moves to, as whoever packages it writes it
           maxLength: 191
           minLength: 1
+          type: string
+        version:
+          description: The source version this is about, as the component's entries name it. Required where a release named ships the source package at more than one version, which is refused with the versions listed; otherwise optional
+          maxLength: 191
           type: string
       required:
         - to

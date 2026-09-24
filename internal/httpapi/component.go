@@ -5,6 +5,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -56,7 +57,7 @@ type PerBuildBody struct {
 // FoldPackageBody is one binary package of a source package, as one build
 // ships it.
 type FoldPackageBody struct {
-	Name    string `json:"name"`
+	Name    string `json:"name" doc:"The binary package's name"`
 	Version string `json:"version" doc:"The version this build ships the binary at"`
 	// Purl is the identifier an ecosystem and an upstream address are read out
 	// of.
@@ -184,6 +185,8 @@ func registerComponent(api huma.API, in Ingest) {
 // PlanUpgradeBody is a promise to move a component in the builds named.
 type PlanUpgradeBody struct {
 	To string `json:"to" minLength:"1" maxLength:"191" doc:"The version this moves to, as whoever packages it writes it"`
+	// Version picks one source version where a release ships two.
+	Version string `json:"version,omitempty" maxLength:"191" doc:"The source version this is about, as the component's entries name it. Required where a release named ships the source package at more than one version, which is refused with the versions listed; otherwise optional"`
 	By string `json:"by" doc:"The date the work lands, as 2026-03-31. A missed target is measured against it"`
 	// Builds is which releases this is promised for. The same component
 	// can be promised a different version in another release, which is the
@@ -277,7 +280,7 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 			builds = append(builds, target.ID)
 		}
 
-		holder, err := carrying(ctx, in, subject, product.ID, builds, input.Component,
+		holder, err := carrying(ctx, in, subject, product.ID, builds, input.Component, input.Body.Version,
 			input.Body.Person, input.Body.Team)
 		if err != nil {
 			return nil, err
@@ -287,12 +290,12 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 		// a bulk judgment, which nothing re-checks; the next scan re-checks
 		// every row a promise names.
 		done, err := store.PlanUpgrade(ctx, subject, triage.Upgrade{
-			ProductID: product.ID, Component: input.Component,
+			ProductID: product.ID, Component: input.Component, Version: input.Body.Version,
 			To: input.Body.To, By: by, Builds: builds, Reasoning: input.Body.Reasoning,
 			HoldBy: holder,
 		})
 		if err != nil {
-			return nil, refusedDecision(in.Logger, err)
+			return nil, oneVersion(err, func(err error) error { return refusedDecision(in.Logger, err) })
 		}
 		return &struct{ Body PlannedUpgradeBody }{Body: PlannedUpgradeBody{
 			ClaimID: done.ClaimID, Decisions: done.Decisions,
@@ -300,6 +303,16 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 			Waiting: done.Waiting, Held: done.Held,
 		}}, nil
 	})
+}
+
+// oneVersion answers a name a release ships at two source versions with the
+// versions to choose from, and anything else as otherwise.
+func oneVersion(err error, otherwise func(error) error) error {
+	var several *graph.Ambiguous
+	if errors.As(err, &several) {
+		return severalComponents(several, `"version" in the body`)
+	}
+	return otherwise(err)
 }
 
 // carrying is the party an upgrade is handed to, or none where nobody was
@@ -312,7 +325,7 @@ func registerPlanUpgrade(api huma.API, in Ingest) {
 // make the handover the disclosure. And somebody has to be able to read a
 // team's queue, or it sits where none of them can see it.
 func carrying(ctx context.Context, in Ingest, subject access.Subject, productID int64,
-	targets []int64, component, person, team string) (*int64, error) {
+	targets []int64, component, version, person, team string) (*int64, error) {
 
 	if person == "" && team == "" {
 		return nil, nil
@@ -321,9 +334,9 @@ func carrying(ctx context.Context, in Ingest, subject access.Subject, productID 
 		return nil, err
 	}
 	strictest, err := finding.NewStore(in.DB.DB).StrictestOnComponent(ctx, subject,
-		productID, targets, component)
+		productID, targets, component, version)
 	if err != nil {
-		return nil, refusedFinding(in, err)
+		return nil, oneVersion(err, func(err error) error { return refusedFinding(in, err) })
 	}
 	rights := access.NewStore(in.DB.DB)
 	if person != "" {

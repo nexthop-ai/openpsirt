@@ -125,7 +125,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 	if len(targets) == 0 || name == "" {
 		return nil, nil
 	}
-	folds := FoldsNamed(s.db, targets, name)
+	folds := FoldsNamed(s.db, targets, name, "")
 
 	packages, err := s.packagesAcross(ctx, targets, visible, folds)
 	if err != nil {
@@ -215,16 +215,85 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 // or was built from a source carrying it, compared without regard to capitals.
 // Restricted to the builds asked about, so a name shipped at one version here
 // and another elsewhere answers for what these builds ship, and never for a
-// component row nothing here carries.
-func FoldsNamed(db bun.IDB, targets []int64, name string) *bun.SelectQuery {
-	folded := graph.Folded(strings.TrimSpace(name))
-	return db.NewSelect().
+// component row nothing here carries. A version narrows to the folds built at
+// it; empty is every version.
+//
+// A blank name reaches nothing. An empty string is what the source column
+// holds on every component that names no source, so compared, a blank name
+// would reach all of them.
+func FoldsNamed(db bun.IDB, targets []int64, name, version string) *bun.SelectQuery {
+	q := foldsNamed(db, targets, name).ColumnExpr("cn.fold_key")
+	if version = strings.TrimSpace(version); version != "" {
+		q = q.Where(sourceVersionOf+" = ?", version)
+	}
+	return q
+}
+
+// sourceVersionOf is SourceVersion over the component joined as "cn".
+const sourceVersionOf = `CASE WHEN COALESCE(cn.upstream_version, '') <> ''
+	THEN cn.upstream_version ELSE cn.version END`
+
+func foldsNamed(db bun.IDB, targets []int64, name string) *bun.SelectQuery {
+	q := db.NewSelect().
 		TableExpr(`"component" AS "cn"`).
 		Join(`JOIN "graph_node" AS "nn" ON nn.component_id = cn.id`).
-		ColumnExpr("cn.fold_key").
 		Where("nn.target_id IN (?)", bun.List(targets)).
-		Where("nn.closed_scan_id IS NULL").
-		Where("(cn.name_folded = ? OR cn.upstream_folded = ?)", folded, folded)
+		Where("nn.closed_scan_id IS NULL")
+	folded := graph.Folded(strings.TrimSpace(name))
+	if folded == "" {
+		return q.Where("1 = 0")
+	}
+	return q.Where("(cn.name_folded = ? OR cn.upstream_folded = ?)", folded, folded)
+}
+
+// OneFoldNamed is FoldsNamed for an act that writes: where no version was
+// given and one build ships the name at two source versions, it refuses,
+// naming the versions. Two versions in one build are two pieces of code,
+// decided about separately, so a promise made from one is not one about both.
+func OneFoldNamed(ctx context.Context, db bun.IDB, targets []int64,
+	name, version string) (*bun.SelectQuery, error) {
+
+	if strings.TrimSpace(version) != "" {
+		return FoldsNamed(db, targets, name, version), nil
+	}
+	var rows []struct {
+		TargetID int64  `bun:"target_id"`
+		FoldKey  string `bun:"fold_key"`
+		Version  string `bun:"source_version"`
+		Purl     string `bun:"purl"`
+	}
+	err := foldsNamed(db, targets, name).
+		ColumnExpr(`nn.target_id AS "target_id"`).
+		ColumnExpr(`cn.fold_key AS "fold_key"`).
+		ColumnExpr(sourceVersionOf+` AS "source_version"`).
+		ColumnExpr(`COALESCE(cn.purl, '') AS "purl"`).
+		OrderExpr(`"source_version"`).
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("read which versions of %q these builds ship: %w", name, err)
+	}
+	perBuild := map[int64]map[string]bool{}
+	several := false
+	for _, row := range rows {
+		if perBuild[row.TargetID] == nil {
+			perBuild[row.TargetID] = map[string]bool{}
+		}
+		perBuild[row.TargetID][row.FoldKey] = true
+		several = several || len(perBuild[row.TargetID]) > 1
+	}
+	if several {
+		var choices []graph.Choice
+		seen := map[string]bool{}
+		for _, row := range rows {
+			if !seen[row.FoldKey] {
+				seen[row.FoldKey] = true
+				choices = append(choices, graph.Choice{
+					Version: row.Version, Ecosystem: graph.EcosystemOf(row.Purl)})
+			}
+		}
+		return nil, &graph.Ambiguous{Name: strings.TrimSpace(name), Choices: choices}
+	}
+	return FoldsNamed(db, targets, name, ""), nil
 }
 
 // packageRow is one binary package in one build, with the fold it belongs to.

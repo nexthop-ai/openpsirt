@@ -23,6 +23,9 @@ type Upgrade struct {
 	// pair: an upgrade is a claim that moving the package answers what is open
 	// on it, and the next scan says which of that was true.
 	Component string
+	// Version is the source version the promise is about, where one build
+	// ships the component at two. Empty where each build ships one.
+	Version string
 	// To is the version it moves to, and By when the work will be done.
 	To string
 	By time.Time
@@ -106,7 +109,7 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 		// nothing about another, which is the whole reason the target is per
 		// build.
 		reaching, err := findings.PlacesOnComponentWithin(ctx, tx, subject, up.ProductID,
-			wanted, up.Component)
+			wanted, up.Component, up.Version)
 		if err != nil {
 			return err
 		}

@@ -313,7 +313,7 @@ func (s *Store) StrictestOf(ctx context.Context, subject access.Subject, targetI
 // the disclosure — so the level that matters is the strictest in the set
 // rather than that of whichever row somebody happened to be looking at.
 func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject,
-	productID int64, targets []int64, component string) (access.Visibility, error) {
+	productID int64, targets []int64, component, version string) (access.Visibility, error) {
 
 	visible := access.Visible(subject, productID)
 	if len(visible) == 0 {
@@ -322,6 +322,10 @@ func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject
 	}
 	if len(targets) == 0 {
 		return access.Public, nil
+	}
+	folds, err := OneFoldNamed(ctx, s.db, targets, component, version)
+	if err != nil {
+		return access.Public, err
 	}
 	// Matched on the fold, the way the upgrade itself resolves what it covers:
 	// naming any binary of a source package reaches all of them, so asking
@@ -333,7 +337,7 @@ func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject
 		Where("visibility IN (?)", bun.List(visible)).
 		Where("visibility = ?", access.Private).
 		Where(`component_id IN (SELECT c.id FROM "component" AS "c"
-			WHERE `+FoldedOn+` IN (?))`, FoldsNamed(s.db, targets, component)).
+			WHERE `+FoldedOn+` IN (?))`, folds).
 		Exists(ctx)
 	if err != nil {
 		return access.Public, fmt.Errorf("read how far this is disclosed: %w", err)

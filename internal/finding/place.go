@@ -326,7 +326,7 @@ type InBundle struct {
 // retry can propose about a finding somebody closed in between.
 func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 	subject access.Subject, productID int64, targets []int64,
-	component string) ([]InBundle, error) {
+	component, version string) ([]InBundle, error) {
 
 	if !subject.Sees(productID) {
 		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
@@ -336,6 +336,10 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		return nil, access.Denied(fmt.Sprintf("read findings in product %d", productID))
 	}
 
+	folds, err := OneFoldNamed(ctx, db, targets, component, version)
+	if err != nil {
+		return nil, err
+	}
 	var rows []struct {
 		placeRow
 		VulnerabilityID int64  `bun:"vulnerability_id"`
@@ -372,9 +376,9 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// the source package's name alone could not do. A name reaches every
 		// fold it names in the builds asked about, so a source package named
 		// in two builds at two versions moves both.
-		Where(FoldedOn+` IN (?)`, FoldsNamed(db, targets, component)).
+		Where(FoldedOn+` IN (?)`, folds).
 		OrderExpr("f.vulnerability_id, f.component_id, f.target_id, place_identity")
-	err := query.Scan(ctx, &rows)
+	err = query.Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where that bump would reach: %w", err)
 	}

@@ -694,6 +694,9 @@ function Upgrade({
           params: { path: { product, component } },
           body: {
             to: to.trim(),
+            // The source version this entry is, so a release shipping two
+            // versions promises the one on screen.
+            version: here.version,
             by,
             reasoning: because,
             ...(holder?.kind === "team" ? { team: holder.identity } : {}),

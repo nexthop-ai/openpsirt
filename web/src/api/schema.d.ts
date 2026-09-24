@@ -7699,6 +7699,7 @@ export interface components {
             issues: number;
             /** @description The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none */
             license?: string;
+            /** @description The binary package's name */
             name: string;
             /**
              * Format: date-time
@@ -9447,6 +9448,8 @@ export interface components {
             team?: string;
             /** @description The version this moves to, as whoever packages it writes it */
             to: string;
+            /** @description The source version this is about, as the component's entries name it. Required where a release named ships the source package at more than one version, which is refused with the versions listed; otherwise optional */
+            version?: string;
         };
         PlannedBody: {
             /** @description The date the promise named, as a date. Absent where the commitment is intent rather than a promise */
