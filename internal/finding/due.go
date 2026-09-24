@@ -43,6 +43,26 @@ func DefaultWindows() Windows {
 	}
 }
 
+// DefaultOwnWindows are the shipped numbers for a flaw in our own product. Longer
+// at every step than DefaultWindows, because the fix has to be developed rather
+// than taken from upstream.
+func DefaultOwnWindows() Windows {
+	const day = 24 * time.Hour
+	return Windows{
+		Exploited: 7 * day, Critical: 30 * day, High: 90 * day,
+		Medium: 180 * day, Low: 365 * day,
+	}
+}
+
+// LoadOwnWindows reads how long a flaw recorded in our own product may stay
+// open, by how urgent it is.
+func LoadOwnWindows(ctx context.Context, db bun.IDB) (Windows, error) {
+	return loadWindows(ctx, db, DefaultOwnWindows(), [5]string{
+		setting.OwnDueExploited, setting.OwnDueCritical, setting.OwnDueHigh,
+		setting.OwnDueMedium, setting.OwnDueLow,
+	})
+}
+
 // LoadWindows reads how long a finding may stay open, by how urgent it is.
 //
 // Read here rather than by the caller because ingest needs the same answer as
@@ -50,23 +70,27 @@ func DefaultWindows() Windows {
 // so the two have to agree about what the policy says or a finding would be
 // stored with one deadline and read against another.
 func LoadWindows(ctx context.Context, db bun.IDB) (Windows, error) {
-	windows := DefaultWindows()
+	return loadWindows(ctx, db, DefaultWindows(), [5]string{
+		setting.DueExploited, setting.DueCritical, setting.DueHigh,
+		setting.DueMedium, setting.DueLow,
+	})
+}
+
+// loadWindows reads one set of windows, named exploited to low, over its
+// shipped numbers.
+func loadWindows(ctx context.Context, db bun.IDB, windows Windows,
+	names [5]string) (Windows, error) {
+
 	settings := setting.NewStore(db)
-	for _, each := range []struct {
-		name string
-		at   *time.Duration
-	}{
-		{setting.DueExploited, &windows.Exploited},
-		{setting.DueCritical, &windows.Critical},
-		{setting.DueHigh, &windows.High},
-		{setting.DueMedium, &windows.Medium},
-		{setting.DueLow, &windows.Low},
+	for i, at := range []*time.Duration{
+		&windows.Exploited, &windows.Critical, &windows.High,
+		&windows.Medium, &windows.Low,
 	} {
-		held, err := settings.Duration(ctx, each.name, *each.at)
+		held, err := settings.Duration(ctx, names[i], *at)
 		if err != nil {
 			return Windows{}, err
 		}
-		*each.at = held
+		*at = held
 	}
 	return windows, nil
 }
@@ -450,6 +474,9 @@ func whenOpened(column string, moments []time.Time, window time.Duration) (strin
 
 // Recompute rewrites the deadline on every open finding.
 //
+// The windows are the ones a scanned finding is held to. A flaw recorded in our
+// own product is recounted against its own, read from the settings.
+//
 // The one event that makes a stored deadline wrong is somebody changing the
 // policy that sets it. Urgency has the same shape and is left stale until the
 // next scan, which is tolerable because nobody edits the ranking — but people
@@ -494,6 +521,14 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 
 	changed := 0
 	for _, productID := range products {
+		// The flaws recorded here, on their own windows and counted from
+		// their first rating.
+		own, err := recountOwn(ctx, s.db, productID, nil, s.now())
+		changed += own
+		if err != nil {
+			return changed, err
+		}
+
 		// The distinct moments something opened in this product, off the
 		// findings themselves. This walked the runs and joined back for the
 		// timestamp, which asked the question in terms of the thing that
@@ -505,7 +540,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		// carries that run's start — so this is one table fewer rather than
 		// more rows.
 		var opened []time.Time
-		err := s.db.NewSelect().
+		err = s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "target" AS "tg" ON tg.id = f.target_id`).
 			Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
@@ -577,6 +612,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 						Where("id <= ?", from+recomputeSlice).
 						Where("opened_at IN (?)", bun.List(chunk)).
 						Where("closed_at IS NULL").
+						Where("kind <> ?", Entered).
 						Where(inThisProduct, productID)
 					result, err := each.where(query).Exec(ctx)
 					if err != nil {
@@ -629,6 +665,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 					Where("exploited_learned_at IN (?)", bun.List(chunk)).
 					Where("urgency_exploited = ?", true).
 					Where("closed_at IS NULL").
+					Where("kind <> ?", Entered).
 					Where(inThisProduct, productID).Exec(ctx)
 				if err != nil {
 					return changed, fmt.Errorf("rewrite deadlines: %w", err)

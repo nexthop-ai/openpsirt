@@ -1647,6 +1647,9 @@ components:
           description: The credit they asked for in an advisory
           maxLength: 191
           type: string
+        found_here:
+          description: Whether somebody here found it. Unset is a report from outside, which carries a disclosure date once it is recorded as a flaw
+          type: boolean
         received:
           description: The day it arrived, as YYYY-MM-DD, which the embargo is counted from
           type: string
@@ -3015,8 +3018,9 @@ components:
           description: The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix
           type: string
         no_deadline:
-          description: "The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
+          description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
+            - not-rated
             - below-the-line
             - nothing-to-take
             - out-of-support
@@ -3313,8 +3317,9 @@ components:
           format: int64
           type: integer
         no_deadline:
-          description: "The reason there is no deadline: below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
+          description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
+            - not-rated
             - below-the-line
             - nothing-to-take
             - out-of-support
@@ -7492,8 +7497,11 @@ components:
         ecosystem:
           description: The ecosystem, where two share a name and a version
           type: string
+        found_here:
+          description: Whether somebody here found it. Unset is a report from outside, which carries a disclosure date
+          type: boolean
         from_report:
-          description: A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the four fields above are refused beside it
+          description: A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the five fields above are refused beside it
           maxLength: 593
           type: string
         received:
@@ -7815,6 +7823,9 @@ components:
         evaluated_by:
           description: Who said so
           type: string
+        found_here:
+          description: Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer
+          type: boolean
         issue:
           description: The issue the claim turned out to be
           type: string
@@ -7847,6 +7858,7 @@ components:
           type: string
       required:
         - reference
+        - found_here
         - recorded_by
         - recorded_at
       type: object
@@ -8829,6 +8841,9 @@ components:
         product_name:
           description: Its spelling on screen
           type: string
+        recorded:
+          description: Whether this is a flaw recorded in our own product rather than an issue a scanner reported
+          type: boolean
         state:
           description: The decision state here, by the definition the findings list uses
           enum:
@@ -16340,7 +16355,11 @@ paths:
 
         `component` names what in the build carries it, as the build calls it. Leave it out for the build itself, which is where a flaw in how the pieces fit together goes. A name the build holds at more than one version is refused with the choices rather than resolved to one; send `version`, and `ecosystem` where two share a version.
 
-        `from_report` records the flaw from a vulnerability report already in this product and accepts the report as it in the same act; it needs private-triage. A report already judged, or under a ruling, is refused with 409.
+        Every flaw is recorded with a vulnerability report. `from_report` records the flaw from one already in this product and accepts it in the same act; it needs private-triage. A report already judged, or under a ruling, is refused with 409. Without it, a report is written from `reported_by`, `contact`, `credit`, `received` and `found_here`, already accepted as this flaw.
+
+        An undisclosed flaw reported from outside carries a disclosure date, counted from `received`. One with `found_here` carries none.
+
+        The deadline uses the windows for flaws in our own products, counted from when a severity is first given. Recorded without one, it has no deadline until it is rated.
 
         From here it behaves like any other finding: triaged, assigned, decided, on the same clock and in the same reports. No scan will close it, so it is closed by a person through the resolve endpoint or it stays open.
 
@@ -18900,7 +18919,7 @@ paths:
 
         The received date is what the embargo runs from: a report arriving on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the one the reporter has a publication scheduled against, and they are the party who will publish regardless.
 
-        Answers 404 where nobody recorded a reporter, which is every flaw we found ourselves, and to somebody who may not read the product's vulnerability reports.
+        Answers 404 where no report is the record of this issue — every issue a scan reported that nobody wrote in about — and to somebody who may not read the product's vulnerability reports.
 
         Requires: private-read or private-triage on the product
       operationId: get-report
@@ -19471,13 +19490,15 @@ paths:
           - private-triage
     post:
       description: |-
-        Records a claim that arrived, and returns the reference it is reached by.
+        Records a claim that arrived, or a flaw somebody here found, and returns the reference it is reached by.
 
         No issue is minted. What arrived is a claim, and whether it is a flaw is a judgment somebody makes afterwards — so a report nobody believes is answered and filed rather than either minting a flaw nobody believes or going unrecorded.
 
         `summary` is required and everything else is optional: a claim arriving anonymously is an ordinary claim, and a report with nothing in it records only that a mail arrived. The summary is stored as markdown and goes through the same submission policy a justification does, so raw HTML and link schemes outside http, https and mailto are refused naming the line they are on.
 
         `received` is the day it arrived, which is what an embargo would be counted from. A date that cannot be read is treated as one nobody gave.
+
+        `found_here` marks a flaw somebody here found. Recorded as a flaw, it carries no disclosure date, and it is never listed as waiting for an answer.
 
         Requires: private-triage on the product
       operationId: record-report

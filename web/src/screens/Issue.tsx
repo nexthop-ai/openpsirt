@@ -124,7 +124,11 @@ export function Issue() {
           nothing called them. Per product, because that is the grain of the
           document. */}
       {products.length > 0 && (
-        <IssueAdvisory vulnerability={it?.vulnerability ?? ""} products={products} />
+        <IssueAdvisory
+          vulnerability={it?.vulnerability ?? ""}
+          products={products}
+          recorded={(it?.items ?? []).some((row) => row.recorded)}
+        />
       )}
 
       {/* What people have written about this issue, a product at a time. The

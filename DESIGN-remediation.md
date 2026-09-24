@@ -146,12 +146,13 @@ A finding with no deadline states which reason applies:
 
 | Reason | Reported as | Precedence |
 |---|---|---|
-| Below the line its product triages at | `below-the-line` | The narrowest statement about this finding, so it is the one stated |
+| A flaw recorded here that nobody has rated | `not-rated` | The narrowest: it is about what this finding lacks rather than anything around it |
+| Below the line its product triages at | `below-the-line` | The narrowest statement about how this finding is rated |
 | **Upstream has released no fix, or has declined to on an issue nobody is exploiting** | `nothing-to-take` | Above the release, being about this finding rather than about what it sits in. The declining half is the same rule read one step further: a fix that was never going to arrive is as absent as one that has not arrived yet, and unlike a missing fix it will not turn up |
 | **Its release is a tag, so it cannot change** | `out-of-support` | Above end-of-life, being the more fundamental statement: a supported tag is as unfixable as a retired one |
 | Its release is past end-of-life (REQ-15) | `out-of-support` | |
 
-Four reasons share three words. A tag reports as out of support, which is not
+Five reasons share four words. A tag reports as out of support, which is not
 what it is — a supported tag carries no deadline for a more fundamental reason
 than a retired one does. Stated here rather than left as a difference between
 this table and the wire, and a word of its own is worth adding the day somebody
@@ -161,8 +162,8 @@ There is no further reason, because a deadline is worked out at ingest for
 everything else. Left blank, the column reads as missing data on the one screen
 whose purpose is noticing what is running out.
 
-A deadline nobody can meet is not a deadline, which is the one statement all
-four make. Where upstream has released nothing there is no version to take, and
+A deadline nobody can meet is not a deadline, which is the one statement the
+four after `not-rated` make. Where upstream has released nothing there is no version to take, and
 the only act that stops the clock is a person recording a judgment — which is
 the act the deadline exists to ask for and cannot be the answer to. An overdue
 list carrying rows no upgrade would answer is one people stop reading, and what
@@ -220,6 +221,19 @@ deriving it costs a pass over every open finding per urgency band — and it is
 rewritten whenever the answer moves rather than only when the ranking does, so
 a fix appearing upstream starts a clock that was not running and a fix withdrawn
 stops one.
+
+### Recorded flaws
+
+A flaw recorded in our own product is held to a separate set of windows, and
+its clock starts when it is first given a severity (REQ-33).
+
+| Rule | |
+|---|---|
+| The windows are the product's own | The fix has to be written rather than taken from upstream. Shipped at 7 days exploited, 30 critical, 90 high, 180 medium and 365 low, against 3, 7, 30, 90 and 180 for a scanned finding. Both sets are settings, and changing either rewrites every open deadline |
+| The clock starts at the first severity | A flaw recorded with one starts at the recording. One recorded without one carries no deadline, and starts when a rating is first put in force for it in that product |
+| The start is stored on the finding | A rating withdrawn and made again moves the window and keeps the start. Restarted, a flaw near its date is given a fresh window by being re-rated, which is a deferral nobody agreed to |
+| Everything else is the rule above | Exploitation learned later and a fix arriving move it the way they move a scanned finding |
+| A recorded flaw is recounted on its own | Recorded flaws are few, one row per place in each build, so they are rewritten row by row rather than in the bands a scan's findings are |
 
 ## Pending upgrades
 

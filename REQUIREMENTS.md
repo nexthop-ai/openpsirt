@@ -126,7 +126,7 @@ inputs.
 | # | Requirement | Why |
 |---|---|---|
 | REQ-32 | Findings are ordered by one urgency, worked out from exploitation of this product recorded here, severity, known exploitation in the world, exploitation likelihood, and whether the component reaches customers | Severity alone puts every critical in one bucket, and one image produces 335,021 findings (REQ-57) — so "look at the criticals first" names a population too large to order by hand. Somebody recording that this product was attacked through an issue outranks every signal that came from a feed |
-| REQ-33 | Every finding above the line carries a deadline set by policy from its urgency. Being overdue is reported, never acted on automatically | Dates people can edit per item are dates that mean nothing |
+| REQ-33 | Every finding above the line carries a deadline set by policy from its urgency, counted from when it was first seen here — or, for a flaw recorded in our own product, from when it was first given a severity, on windows of its own, because its fix has to be written rather than taken from upstream. Being overdue is reported, never acted on automatically | Dates people can edit per item are dates that mean nothing, a flaw nobody has rated yet has no urgency to set one from, and a window sized for applying a published fix is one a fix that has to be developed misses every time |
 
 ### 3.8 Remediation
 
@@ -140,7 +140,7 @@ inputs.
 
 | # | Requirement | Why |
 |---|---|---|
-| REQ-37 | A flaw recorded here starts undisclosed and carries a disclosure date, defaulting to 90 days from when the report was received. Reaching it escalates rather than publishing | The reporter has a publication scheduled; ours is the clock that has to keep up |
+| REQ-37 | A flaw recorded here starts undisclosed. One an outside party reported carries a disclosure date, defaulting to 90 days from when the report was received; one found here carries none. Reaching it escalates rather than publishing | The reporter has a publication scheduled; ours is the clock that has to keep up, and a flaw nobody outside knows about has no such schedule |
 | REQ-38 | Moving a disclosure date needs a reason and, past a threshold, approval — and it is raised before the date rather than on it. Bringing a date forward is recorded as its own act, never as an extension in reverse | An extension nobody can agree to in time is an approval in name only, and an embargo shortened because it leaked is a different event from one extended because the fix slipped |
 | REQ-39 | An advisory is published about flaws in our own product, as a machine-readable document. A VEX document is generated per build from approved dismissals. **Delivery adapters are not built** | Known issues in shipped third-party components are tracked and fixed, not published about — but VEX is precisely the document for them, and it does not drift from prose nobody regenerates |
 | REQ-40 | When an undisclosed finding is disclosed, the whole record goes public — comments, decisions, actors | People writing in the record have to know that from the first word |

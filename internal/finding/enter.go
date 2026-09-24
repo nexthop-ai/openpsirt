@@ -64,12 +64,9 @@ type Entering struct {
 	// is mild — and making them pick a word to get the record written is how
 	// a guess ends up stored as a judgment.
 	//
-	// An unrated finding is carried, listed, assignable and on the same
-	// clock every other unrated finding is: the deadline windows answer
-	// "medium" for a severity they do not recognize, which is what a scanner
-	// that rated nothing already gets. That is a deliberate default rather
-	// than a gap — a finding with no deadline is one that is never late, and
-	// never being late is how something is forgotten.
+	// An unrated finding is carried, listed and assignable, and carries no
+	// deadline until somebody rates it (REQ-33): the clock is set from an
+	// urgency, and there is none yet to set it from.
 	Severity string
 	// Vector is the CVSS base vector, where somebody has worked one out. The
 	// score is derived from it here and never taken alongside it, so the two
@@ -91,9 +88,9 @@ type Entering struct {
 	// the case this exists for, and defaulting the other way makes the
 	// dangerous mistake the quiet one.
 	Disclosed bool
-	// Told is who reported it, where somebody did. Every field of it is
-	// optional: a flaw found by whoever is typing has no reporter, and a
-	// form demanding one asks them to invent an answer.
+	// Told is where it came from: who reported it and when, or that it was
+	// found here. Every flaw is recorded with a report, so this is written as
+	// one in the same act.
 	//
 	// The day it arrived is what the embargo runs from, which is why it
 	// travels with the record rather than being filled in afterwards.
@@ -271,6 +268,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		// ask again.
 		var reported *FlawReport
 		received := in.Told.When()
+		foundHere := in.Told.FoundHere
 		if in.FromReport != "" {
 			reported = new(FlawReport)
 			err := tx.NewSelect().Model(reported).
@@ -287,6 +285,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				return ErrAlreadyJudged
 			}
 			received = reported.ReceivedOn
+			foundHere = reported.FoundHere
 			// A report that does not say when it arrived was here no
 			// later than when it was recorded.
 			if received == nil {
@@ -391,7 +390,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		}
 		vulnerabilityID := interned[identifier]
 
-		windows, err := LoadWindows(ctx, tx)
+		own, err := LoadOwnWindows(ctx, tx)
 		if err != nil {
 			return err
 		}
@@ -428,9 +427,11 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 				LastChangedAt:   now,
 				OpenedAt:        now,
 			}
-			// An embargo gets an end. A public finding gets none —
-			// it is already disclosed, and a date on it would be a
-			// deadline for something that has already happened.
+			// An embargo gets an end where somebody outside reported
+			// it (REQ-37). A public finding gets none — it is already
+			// disclosed, and a date on it would be a deadline for
+			// something that has already happened — and neither does a
+			// flaw found here, which nobody outside is counting down to.
 			//
 			// Counted from when the report arrived, where somebody
 			// said when that was. A report arriving on 1 June and
@@ -439,9 +440,8 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// scheduled against — and they are the party who will
 			// publish regardless, so ours is the clock that is
 			// wrong. A report that does not say counts from when it
-			// was recorded here. Without a report it falls back to
-			// now, which is every flaw we found ourselves.
-			if visibility == access.Private {
+			// was recorded here.
+			if visibility == access.Private && !foundHere {
 				from := now
 				if received != nil {
 					from = received.UTC()
@@ -454,20 +454,16 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			// because a person typed it would be a second policy nobody chose.
 			ranked := Ranked{Shipped: true, ExploitedHere: attacked[row.VulnerabilityID]}
 			row.RankExploitedHere = ranked.ExploitedHere
-			if row.Urgency = int64(ranked.Rank()); floor.Admits(ranked.ExploitedHere, severity) {
-				// Through the one rule rather than worked out here. The two
-				// agree today only because a flaw somebody recorded carries no
-				// fix state and no fix date, which is exactly the condition
-				// that stops holding the first time the form gains one — and
-				// the comment above promises they cannot differ.
-				row.DueAt = Deadline(row.FixState, ranked.ExploitedHere, now, now, nil, row.FixedAt,
-					// The world's word, which a flaw recorded here does not
-					// carry. Being attacked here admits the finding to the
-					// line above and moves no window: how long a fix may take
-					// is a question about the work rather than about the
-					// attack.
-					windows.For(false, severity))
+			row.Urgency = int64(ranked.Rank())
+			// Rated as it is recorded, where a severity was given, which is
+			// when the clock starts. The own-product windows, and the one rule
+			// a later rating recounts through, so the two cannot differ.
+			if severity != "" {
+				rated := now
+				row.RatedAt = &rated
 			}
+			row.DueAt = ownDeadline(own, severity, row.RatedAt, row.FixState,
+				false, ranked.ExploitedHere, now, nil, row.FixedAt, floor)
 			rows = append(rows, row)
 		}
 		if _, err := tx.NewInsert().Model(&rows).Exec(ctx); err != nil {
@@ -502,30 +498,33 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 			}
 			return nil
 		}
-		if told := in.Told; told.Stated() {
-			reference, err := mintReference(ctx, tx, product, now.Year())
-			if err != nil {
-				return err
-			}
-			row := &FlawReport{
-				Reference:       reference,
-				VulnerabilityID: &vulnerabilityID,
-				// The product it was reported against, which is what decides
-				// who may read the reporter's name and address later.
-				ProductID:  productID,
-				ReportedBy: strings.TrimSpace(told.ReportedBy),
-				Contact:    strings.TrimSpace(told.Contact),
-				Credit:     strings.TrimSpace(told.Credit),
-				ReceivedOn: told.When(),
-				// Judged at the moment it was recorded: whoever typed this in
-				// said what the flaw is in the same act.
-				EvaluatedAt: &now, EvaluatedBy: &subject.ID,
-				RecordedBy: subject.ID,
-				RecordedAt: now,
-			}
-			if _, err := tx.NewInsert().Model(row).Exec(ctx); err != nil {
-				return fmt.Errorf("record who told us: %w", err)
-			}
+		// Every flaw has a report, whether it was sent in or found here, so
+		// the Inbox is the one list of where flaws came from and the same
+		// fields answer it for both.
+		told := in.Told
+		reference, err := mintReference(ctx, tx, product, now.Year())
+		if err != nil {
+			return err
+		}
+		report := &FlawReport{
+			Reference:       reference,
+			VulnerabilityID: &vulnerabilityID,
+			// The product it was reported against, which is what decides
+			// who may read the reporter's name and address later.
+			ProductID:  productID,
+			ReportedBy: strings.TrimSpace(told.ReportedBy),
+			Contact:    strings.TrimSpace(told.Contact),
+			Credit:     strings.TrimSpace(told.Credit),
+			ReceivedOn: told.When(),
+			FoundHere:  told.FoundHere,
+			// Judged at the moment it was recorded: whoever typed this in
+			// said what the flaw is in the same act.
+			EvaluatedAt: &now, EvaluatedBy: &subject.ID,
+			RecordedBy: subject.ID,
+			RecordedAt: now,
+		}
+		if _, err := tx.NewInsert().Model(report).Exec(ctx); err != nil {
+			return fmt.Errorf("record who told us: %w", err)
 		}
 		return nil
 	})

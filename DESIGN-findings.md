@@ -3,7 +3,7 @@
 What a scan run found, where it sits, and how it is ranked and closed.
 
 Satisfies REQ-08, REQ-11, REQ-13, REQ-14, REQ-15, REQ-17, REQ-18, REQ-19,
-REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-32, REQ-37,
+REQ-20, REQ-21, REQ-22, REQ-24, REQ-25, REQ-27, REQ-28, REQ-32, REQ-33, REQ-37,
 REQ-78.
 
 ## Contents
@@ -522,6 +522,9 @@ somebody holds and a name nobody holds identically (REQ-43).
 | A CVE assigned later is another name for the same issue (REQ-18) | Identity is the issue rather than what it is called, so nothing moves: not the finding, not the decisions, not the approvals. The issue is then filed under the better-known name and the minted one stays an alias |
 | A name another issue already answers to is refused, checked before the write | A constraint violation cannot distinguish "already recorded" from "that would merge two issues" |
 | It starts undisclosed, and recording one asks for the private triage right (REQ-37) | Defaulting the other way makes the dangerous mistake the quiet one. Somebody who may argue about known issues in shipped components has not been handed the ones nobody has announced. Already-public is a flag on the request, asking the ordinary right |
+| Every flaw is recorded with a report | One recorded from a report accepts that report. One recorded without names where it came from on the same request, and a report is written from it, already accepted. The Inbox is then the one list of where every flaw came from, whether somebody sent it or somebody here found it |
+| A flaw found here is marked so on its report | It carries no disclosure date (REQ-37) and nobody is owed an answer. Unmarked is a report from outside, because that is the case with somebody counting down to a publication |
+| Its deadline uses the windows for our own products, counted from its first severity (REQ-33) | `DESIGN-remediation.md` § Recorded flaws holds the rule. Recorded without a severity, it is listed and assignable with no deadline, and the reason given is `not-rated` |
 
 One identifier, one finding per place in every build. The same code goes out on
 several lines and as several variants at once, so a flaw in it is not a fact
@@ -556,10 +559,11 @@ contact address is published rather than at some volume of them.
 | A report exists without an issue | Whether a claim is a flaw is a judgment somebody makes afterwards, and the record has to stand before it is made |
 | It carries what was claimed | A report holding only who wrote in records that a mail arrived, which nobody can evaluate, answer or find again. The issue's own description carries the claim once there is one |
 | Everything about the reporter is optional | A claim arriving anonymously is an ordinary claim, and a flaw found by whoever is typing has no reporter at all. A form demanding one asks them to invent an answer |
+| A report says whether it was found here | The one fact that separates a flaw somebody here found from a claim that arrived. It decides the disclosure date and whether an answer is owed, and nothing else: the same fields, the same judgment and the same rulings apply to both |
 | One row per issue, not per finding | A flaw recorded against four builds is one report from one person, and four copies of their address is four places for it to be wrong |
 | **It records the product it was reported against, and that is who may read it** | Read with the right every read of a report asks, reading undisclosed work in that product, on the issue as on the report itself: one reporter has one rule. Answering them is working the report and asks for triage there. An issue's identity spans its aliases, so the moment a CVE is recorded the same issue is open in every product a scan reports it in. Keyed on the issue alone, the reporter's name, address and received date were readable by anybody holding triage rights in any of those — and acknowledging from one of them cleared the unanswered condition out of another product's queue. The unanswered list stops fanning one letter out across every product the name reaches |
 | Credit preference is kept apart from the name reported under | "Anonymous" is a real answer, and so is a handle that is not the name on the mail |
-| The received date is what the embargo runs from (REQ-37) | A report that arrived a fortnight before anybody typed it in no longer puts this clock behind the reporter's. It falls back to when the record was made, and a date nobody can read is treated as one nobody gave |
+| The received date is what the embargo runs from (REQ-37) | A report that arrived a fortnight before anybody typed it in no longer puts this clock behind the reporter's. It falls back to when the record was made, and a date nobody can read is treated as one nobody gave. A report found here starts no embargo |
 | The acknowledged date records that somebody answered, rather than answering | What reaches a researcher is a mail from an address somebody already has. Acknowledging twice keeps the first date, and the condition it raises fires at once rather than after a period |
 | What was claimed goes through the submission policy typed text does | It is rendered as markdown where it is read back and it quotes somebody outside this deployment, which is the case the policy exists for (REQ-67) |
 
@@ -592,15 +596,23 @@ cannot tell them apart evidences none of them.
 | Who answered the reporter, and when | Acknowledging it |
 | Who judged the claim, and when | Accepting it as an issue, or a ruling taking effect. On a ruling, the proposer and the moment they proposed it |
 
-A flaw recorded by hand carries all three at once, because whoever typed it in
-said what the flaw is in the same act.
+A flaw recorded without a report already here is written down and judged in one
+act, because whoever typed it in said what the flaw is as they did.
 
 ### Judgment
 
-A report is pointed at an issue that already exists here. Recording a flaw is
-its own act and carries the builds it ships in, the severity and the embargo,
-so agreeing that a claim is real is not the same keystroke as declaring where
-it lives.
+A report is pointed at an issue that already exists here, or recorded as a new
+flaw. Recording a flaw carries the builds it ships in, the severity and the
+embargo, so it asks for those where accepting a report as an existing issue
+does not.
+
+A flaw recorded here already has its report, so a second claim about it is a
+duplicate. Accepting a report as an existing issue reaches the issues a scan
+reported.
+
+Half of that is not built. A claim from outside ruled a duplicate of a flaw
+found here starts no disclosure date, although its reporter may be counting
+down to a publication.
 
 | Refusal | Reason |
 |---|---|
@@ -696,7 +708,8 @@ readable says nothing about whether what a stranger sent is.
 #### The unanswered condition
 
 A ruling answers what a claim is. It does not answer the reporter. A rejected
-report nobody acknowledged is still raised as unanswered.
+report nobody acknowledged is still raised as unanswered. A report found here
+is never raised: there is nobody outside to answer.
 
 ## Scoring
 
@@ -708,7 +721,7 @@ report nobody acknowledged is still raised as unanswered.
 | Version 3.0, 3.1 and 4.0; anything else refused by name | Version 2 is a different scheme, and a vector scored with the wrong formula produces a number nothing downstream can tell from a real one |
 | Each scheme rounds its own way | Version 3 rounds up to a tenth, in integer arithmetic, because floating point gets a different answer for some inputs: a value that should be exactly 8.6 is not representable, and a naive ceiling returns 8.7. Version 4 rounds to the nearest tenth |
 | An unstated vector is not a score of zero | Zero says "harmless", a judgment nobody made during early triage |
-| A severity may be left unstated (REQ-18) | Making somebody choose a word to get the record written is how a guess ends up stored as a judgment. It is not given *no* deadline: the windows answer for a severity they do not recognize |
+| A severity may be left unstated (REQ-18) | Making somebody choose a word to get the record written is how a guess ends up stored as a judgment. On a flaw recorded here it carries no deadline until somebody rates it, and says so as `not-rated` (REQ-33) |
 | A person's severity is checked against the words rather than folded | A report's is folded, because a scanner that rated nothing is silent and silence is not a claim that something is mild. A person typing "urgent" is not silent; they are wrong, and folding would replace their judgment with one nobody made |
 | The scheme a score is on travels with it | A number alone is not readable across schemes. It is recorded from the vector on a flaw assessed here, and from what the report states on one a scan brought in |
 | The screen shows the newest generation's rating and names the others beside it | A report commonly rates one issue under version 3 and version 4. The number beside the issue is the newest generation's rating, whole, so a list and the finding screen show the same number on the same scheme. `DESIGN-ingest.md` holds which rating in a generation is kept |

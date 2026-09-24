@@ -21,7 +21,7 @@ import (
 )
 
 // lastOfV010 is the last migration the v0.1.0 release shipped. A database at
-// it is one that release built.
+// it or later is one a release built.
 const lastOfV010 = 36
 
 // running serializes migration work within this process.
@@ -97,14 +97,14 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 			return fmt.Errorf("read schema version: %w", err)
 		}
 		if err := goose.UpContext(ctx, db.DB.DB, "."); err != nil {
-			// A database v0.1.0 built is upgraded by the migration after the
-			// ones it shipped. On MySQL and MariaDB one that fails part way
-			// leaves the schema part changed and the version where it was, so
-			// the backup is what recovers it.
-			if before == lastOfV010 {
-				return fmt.Errorf("upgrade the v0.1.0 schema: %w — on MySQL and "+
+			// A database a release built is upgraded by the migrations after
+			// the ones it shipped. On MySQL and MariaDB one that fails part
+			// way leaves the schema part changed and the version where it
+			// was, so the backup is what recovers it.
+			if before >= lastOfV010 {
+				return fmt.Errorf("upgrade the schema from version %d: %w — on MySQL and "+
 					"MariaDB an upgrade that fails part way leaves the schema part "+
-					"changed; restore the backup taken before it and start again", err)
+					"changed; restore the backup taken before it and start again", before, err)
 			}
 			// Named, because the commonest way this fails says a migration is
 			// missing and then prints the path of a file that is sitting right
@@ -125,6 +125,18 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 			logger.Info("schema is current", "version", after)
 		} else {
 			logger.Info("schema migrated", "from", before, "to", after)
+		}
+		return nil
+	})
+}
+
+// UpTo applies the outstanding migrations up to and including a version,
+// holding the lock while it does. A test builds the schema a release shipped
+// with it.
+func UpTo(ctx context.Context, db *database.DB, logger *slog.Logger, version int64) error {
+	return withLock(ctx, db, logger, func(ctx context.Context) error {
+		if err := goose.UpToContext(ctx, db.DB.DB, ".", version); err != nil {
+			return fmt.Errorf("apply migrations up to %d: %w", version, err)
 		}
 		return nil
 	})

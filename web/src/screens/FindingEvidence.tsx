@@ -314,7 +314,8 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
           params: { path: { product, vulnerability } },
         }),
       ),
-    // Nobody recorded a reporter, which is every flaw we found ourselves.
+    // No report is the record of this issue, which is every issue a scan
+    // reported that nobody wrote in about.
     retry: false,
   });
   const answered = useMutation({
@@ -347,18 +348,22 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
         <Loading />
       ) : told.isError && statusOf(told.error) !== 404 ? (
         // 404 alone, not every refusal. This is the one card where the two
-        // statuses mean opposite things: the endpoint answers 404 for "nobody
-        // recorded a reporter", which is every flaw found in-house, and 403
-        // for "you do not hold triage here" — so folding them told a case
-        // collaborator the flaw was found in-house, which is a false claim
-        // about a security record rather than a quiet card.
+        // statuses mean opposite things: the endpoint answers 404 for "no
+        // report is the record of this issue" and 403 for "you do not hold
+        // triage here" — so folding them tells a case collaborator nobody
+        // reported it, which is a false claim about a security record rather
+        // than a quiet card.
         <Failed error={told.error} what="The reporter could not be read." />
       ) : !report ? (
         <p className="reading">No outside reporter recorded.</p>
       ) : (
         <>
           <p className="reading" style={{ marginBottom: 6 }}>
-            <b>{report.reported_by || "Somebody"}</b>
+            <b>
+              {report.found_here
+                ? `Found here${report.reported_by ? ` by ${report.reported_by}` : ""}`
+                : report.reported_by || "Somebody"}
+            </b>
             {report.contact && (
               <>
                 {" "}
@@ -368,7 +373,9 @@ export function Reporter({ product, vulnerability }: { product: string; vulnerab
             {report.received && <> · arrived {report.received}</>}
             {report.credit && <> · credited as {report.credit}</>}
           </p>
-          {report.acknowledged ? (
+          {/* Nobody outside sent a flaw found here, so nobody is owed an
+              answer. */}
+          {report.found_here ? null : report.acknowledged ? (
             <p className="hint">
               Answered {report.acknowledged.replace("T", " ").slice(0, 16)}
               {report.acknowledged_by && <> by {report.acknowledged_by}</>}.

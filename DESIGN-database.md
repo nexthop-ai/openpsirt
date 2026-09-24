@@ -219,11 +219,13 @@ The chain has two parts.
 | Migrations | What they are |
 |---|---|
 | 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again. A test holds each file to the digest of the tagged one, and what they build to the schema the tag built on each engine, which also catches a change to the column spellings and widths they read from elsewhere |
-| 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. § Release upgrades says how |
+| 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. § Release upgrades says how. A database v0.2.0 built has applied it as the release tagged it, so it and every declaration it reads never change again, and a test holds each file to the tagged one |
+| 38 onward | What changed after v0.2.0 was tagged, each a migration of its own. § Changes after v0.2.0 says what each does |
 
 Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
-declares the table rather than adding a migration beside it. Until v0.2.0 is
-tagged, that is v0.2.0's declaration of the table, which migration 37 reads.
+declares the table rather than adding a migration beside it — within an
+unreleased migration. Once a release has tagged a migration, a change is a
+migration after it.
 The chain collapses into a single initial migration before 1.0 (REQ-72), and a
 database any 0.x release built is recreated then.
 
@@ -330,6 +332,31 @@ largest table and one every engine changes:
 | SQLite | 7.5 s |
 | MySQL 8.4 | 12.1 s |
 | MariaDB 11.4 | 19.3 s |
+
+### Changes after v0.2.0
+
+| Migration | What it does |
+|---|---|
+| 38 | Adds when a recorded flaw was first rated, and whether a report was found here (REQ-33, REQ-37) |
+
+Migration 38 moves v0.2.0's rows onto those rules:
+
+| In v0.2.0 | After it |
+|---|---|
+| A report | Sent in from outside. v0.2.0 wrote a report only where somebody said who told us |
+| A recorded flaw with a severity in force in its product, published or rated there | Rated at the earliest recording of it in that product, which is when v0.2.0 started its clock. Its deadline, where it holds one, is counted from there on the windows for our own products as this release ships them. The settings that change those windows arrive with this release, so none is set yet. A deadline another rule took away stays away |
+| A recorded flaw with no severity in force | Not rated, and without a deadline |
+| A recorded flaw no report is the record of | Found here, which is what v0.2.0 meant by recording one with nobody named. It gives up its disclosure date. It gains no report, because v0.2.0 kept nothing saying who recorded it, so a later claim about it may be accepted as it rather than ruled a duplicate |
+| A scanned finding | Unchanged |
+
+Rolled back, it drops the two columns. The deadlines and disclosure dates it
+moved stay where it moved them, because what they held before is not kept.
+
+A test on each of the four engines builds a database to migration 37, writes a
+recorded flaw rated as published and recorded in two builds days apart, one
+rated only by its product, one rated by nobody, one with no report, and a
+scanned finding, applies migration 38, checks each row against the table above,
+rolls it back and applies it again.
 
 ## Migration locks
 

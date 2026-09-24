@@ -84,10 +84,10 @@ func TestAClaimIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 			t.Errorf("an answered claim is still reported as unanswered: %v", still)
 		}
 
-		// And then somebody says what it turned out to be. Recording the flaw
-		// is its own act, because it carries the builds, the severity and the
-		// embargo.
-		minted := r.embargoed(t)
+		// And then somebody says what it turned out to be: an issue a scan
+		// already reported. A flaw recorded here carries its own report, so
+		// a claim about one of those is a duplicate rather than its record.
+		minted := "CVE-2026-9999"
 		if got := asPerson(t, r, "private-triage", http.MethodPut, at+"/issue",
 			`{"vulnerability":"`+minted+`"}`); got.Code != http.StatusOK {
 			t.Fatalf("judging answered %d: %s", got.Code, got.Body.String())

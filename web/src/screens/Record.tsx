@@ -6,7 +6,7 @@ import { RECORDABLE } from "../ui/severities";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useAfterReport, useReport } from "../api/intake";
+import { uploadReportFile, useAfterReport, useRecordReport, useReport } from "../api/intake";
 import { api } from "../api/client";
 import { at as choicesAt, unwrap } from "../api/queries";
 import { useScope } from "../app/scope";
@@ -18,15 +18,18 @@ import { useReseed } from "../ui/reseed";
 import { Scoring } from "../ui/Scoring";
 import { Weaknesses } from "../ui/Weaknesses";
 
-// Recording a flaw in what we ship: a vulnerability no scanner reported,
-// usually because nobody outside knows about it yet.
+// Reporting a flaw in what we ship: one somebody outside sent, or one somebody
+// here found. The one way in for both. What separates them is a single answer
+// about where it came from, which decides the disclosure date and whether
+// anybody is owed a reply.
 //
-// A screen of its own rather than an action on a list. What is being
-// recorded is precisely what is *not* in the findings list, so opening it from
-// there asks somebody to start where the answer is absent. It also needs more
-// asked of it than a control beside a table has room for — which build, which
-// component, how bad, and who knows — and each of those is a question somebody
-// can get wrong quietly.
+// Filed as a report, it waits in the product's Inbox to be judged. Recorded as
+// a flaw at once, it asks for what a flaw carries — the builds, the component,
+// how bad — and is written with its report in the same act. The second is
+// offered to whoever may judge reports, and it is the only path for somebody
+// who may record a public flaw but may not work reports.
+//
+// Opened from a report, it records that report as a flaw.
 //
 // The scope prefills it and does not constrain it: somebody arriving from a
 // build they were reading should not retype it, and somebody arriving from the
@@ -48,9 +51,9 @@ export function Record() {
   // and takes who reported it from the report rather than asking again.
   const [params] = useSearchParams();
   const fromReport = params.get("from") ?? "";
-  const [product, setProduct] = useState(
-    fromReport ? (params.get("product") ?? "") : (scope.product ?? ""),
-  );
+  // The product the link names, where it names one: the Inbox opens this with
+  // its own product picked.
+  const [product, setProduct] = useState(params.get("product") ?? scope.product ?? "");
   const report = useReport(fromReport ? product : "", fromReport);
   const afterReport = useAfterReport();
   // The lines, and the ways they are built. Both are sets: the same code
@@ -75,15 +78,22 @@ export function Record() {
   // on a right that is not known until the session is.
   const [chose, setChose] = useState<boolean | null>(null);
   const [vector, setVector] = useState("");
-  // Files that prove it — a test case, a capture, a screenshot. Held until the
-  // finding exists, because an attachment hangs off an issue and there is no
-  // issue until this is recorded. Who told us, where somebody did. All
-  // optional: a flaw found by whoever is typing has no reporter, and a form
-  // demanding one asks them to invent an answer.
+  // Who told us, or who found it here. All optional: a claim arriving
+  // anonymously has no reporter, and a form demanding one asks them to invent
+  // an answer.
   const [reportedBy, setReportedBy] = useState("");
   const [contact, setContact] = useState("");
   const [credit, setCredit] = useState("");
   const [received, setReceived] = useState("");
+  // Where it came from. No default: a report from outside carries a
+  // disclosure date and one found here does not, and a preselected answer is
+  // a choice nobody made.
+  const [origin, setOrigin] = useState<"" | "here" | "outside">("");
+  // Whether to record it as a flaw now rather than file it for judging. The
+  // button somebody pressed, and nothing until they press one.
+  const [now, setNow] = useState<boolean | null>(null);
+  // Files that prove it — a test case, a capture, a screenshot. Held until the
+  // report or the issue exists, because an attachment hangs off one of them.
   const [files, setFiles] = useState<File[]>([]);
   const [refused, setRefused] = useState<string[]>([]);
   // The address of the finding just recorded, held while somebody reads
@@ -103,6 +113,12 @@ export function Record() {
   const mayPublish = !!may?.triages_public;
   const mayRecord = mayHide || mayPublish;
   const whole = product !== "" && streams.length > 0 && variants.length > 0;
+  // Filing a report is working reports, which asks for the right to triage
+  // undisclosed work. Without it the only path is recording a flaw that is
+  // already public, and from a report there is nothing left to file.
+  const recordNow = fromReport !== "" || (product !== "" && !mayHide) || (now ?? false);
+  const choosing = fromReport === "" && (product === "" || mayHide);
+  const said = fromReport !== "" || origin !== "";
 
   // Defaulting to undisclosed unless the person cannot record one, which is
   // the case this exists for. Defaulting the other way makes the dangerous
@@ -173,14 +189,7 @@ export function Record() {
             // endpoint's list of severities does not contain.
             ...(severity ? { severity: severity as (typeof SEVERITIES)[number] } : {}),
             ...(component.trim() ? { component: component.trim() } : {}),
-            ...(fromReport
-              ? { from_report: fromReport }
-              : {
-                  ...(reportedBy.trim() ? { reported_by: reportedBy.trim() } : {}),
-                  ...(contact.trim() ? { contact: contact.trim() } : {}),
-                  ...(credit.trim() ? { credit: credit.trim() } : {}),
-                  ...(received ? { received } : {}),
-                }),
+            ...(fromReport ? { from_report: fromReport } : told()),
             ...(version ? { version } : {}),
             ...(ecosystem ? { ecosystem } : {}),
             ...(vector ? { vector } : {}),
@@ -221,16 +230,9 @@ export function Record() {
       // fails when somebody tries.
       if (fromReport) afterReport();
       setRefused(failed);
-      // Onto the first build it landed in. From here it behaves like any
-      // other finding, and the next thing somebody does with a flaw they have
-      // just recorded is work on it. They are the same finding whichever build
-      // is opened, and the screen says how many builds hold it.
-      const onward =
-        `/products/${encodeURIComponent(product)}/streams/${encodeURIComponent(streams[0] ?? "")}` +
-        `/variants/${encodeURIComponent(variants[0] ?? "")}/findings/` +
-        `${encodeURIComponent(made.identifier)}/components/` +
-        `${encodeURIComponent(made.component)}` +
-        (version ? `?version=${encodeURIComponent(version)}` : "");
+      // Onto the issue: every build it landed in, and the advisory about it,
+      // which is the next thing a flaw in our own product is headed for.
+      const onward = `/issues/${encodeURIComponent(made.identifier)}`;
       // Unless a file was refused. Navigating in the same commit that writes
       // the warning puts it on a screen that is already unmounting, so the
       // files that did not attach are lost in silence. Staying put is what
@@ -243,6 +245,45 @@ export function Record() {
     },
   });
 
+  // Filed for judging: the claim, where it came from, and what arrived with it.
+  // The files go against the report, which is what exists once this is done.
+  const recordReport = useRecordReport(product);
+  const filing = useMutation({
+    mutationFn: async () => {
+      const made = await recordReport.mutateAsync({ summary: summary.trim(), ...told() });
+      const failed: string[] = [];
+      for (const each of files) {
+        try {
+          await uploadReportFile(product, made.reference, each);
+        } catch {
+          failed.push(each.name);
+        }
+      }
+      return { made, failed };
+    },
+    onSuccess: ({ made, failed }) => {
+      const onward = `/products/${encodeURIComponent(product)}/inbox/${encodeURIComponent(made.reference)}`;
+      setRefused(failed);
+      if (failed.length > 0) {
+        setOnward(onward);
+        return;
+      }
+      navigate(onward);
+    },
+  });
+
+  // What is said about where it came from, as both requests take it. A flaw
+  // found here sends the finder and the credit and nothing about an arrival.
+  function told() {
+    return {
+      ...(reportedBy.trim() ? { reported_by: reportedBy.trim() } : {}),
+      ...(credit.trim() ? { credit: credit.trim() } : {}),
+      ...(origin === "outside" && contact.trim() ? { contact: contact.trim() } : {}),
+      ...(origin === "outside" && received ? { received } : {}),
+      ...(origin === "here" ? { found_here: true } : {}),
+    };
+  }
+
   // A name the build holds at more than one version is a question, not a
   // failure: the server refuses and says which, so this offers them back
   // rather than choosing. Picking one is the whole of the answer.
@@ -250,19 +291,28 @@ export function Record() {
   // A summary and a build. Not a severity: a flaw may be recorded before
   // anybody has worked out how bad it is, and making somebody pick a word to
   // get the record written is how a guess ends up stored as a judgment.
-  const ready = whole && summary.trim() !== "" && !record.isPending;
+  // Nothing more once something is saved. A file that did not attach keeps
+  // the form up to say so, and a second press would file a second report or
+  // record a second flaw.
+  const ready =
+    onward === "" &&
+    said &&
+    summary.trim() !== "" &&
+    !record.isPending &&
+    !filing.isPending &&
+    (recordNow ? whole && mayRecord : product !== "" && mayHide);
 
   return (
     <>
       <div className="screen-head">
-        <h2>Record a flaw</h2>
+        <h2>Report a flaw</h2>
         <p>
-          A vulnerability no scanner reported. Filed under an identifier this deployment mints, then
-          triaged like any other finding.
+          {fromReport
+            ? "Record this report as a flaw in what we ship."
+            : "A flaw in what we ship, sent in or found here. File it for judging, or record it as a flaw now."}
         </p>
         {/* What was recorded here before. The screen that files one is where
-            somebody asks whether it is already filed, and the answer was a
-            findings list with no way to ask for the kind. */}
+            somebody asks whether it is already filed. */}
         {scope.product && (
           <span style={{ marginLeft: "auto" }}>
             <Link
@@ -276,210 +326,59 @@ export function Record() {
       </div>
 
       <div className="panel" style={{ maxWidth: "80ch" }}>
-        <h3>Builds</h3>
-        <p className="hint">A flaw is recorded against one build, so all three are required.</p>
-        <div className="fields">
-          <div className="field">
-            <label htmlFor="rec-product">Product</label>
-            <select
-              id="rec-product"
-              {...notACredential}
-              value={product}
-              // The report names its product, and the reference means nothing
-              // in any other.
-              disabled={!!fromReport}
-              onChange={(event) => {
-                setProduct(event.target.value);
-                setStreams([]);
-                setVariants([]);
-                setComponent("");
-              }}
-            >
-              <option value="">Pick one</option>
-              {(products.data?.items ?? []).map((each) => (
-                <option key={each.name} value={each.name ?? ""}>
-                  {each.display_name || each.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <span className="l">Branches and tags</span>
-            <Picked
-              options={(lines.data?.items ?? []).map((each) => ({
-                value: each.name ?? "",
-                label: each.kind === "tag" ? `${each.name} (tag)` : (each.name ?? ""),
-              }))}
-              chosen={streams}
-              disabled={product === ""}
-              empty={product === "" ? "Pick a product first" : "Nothing is declared here yet"}
-              onChange={(next) => {
-                setStreams(next);
-                setComponent("");
-              }}
-            />
-          </div>
-          <div className="field">
-            <span className="l">Built as</span>
-            <Picked
-              options={(builtAs.data?.items ?? []).map((each) => ({
-                value: each.name ?? "",
-                label: each.name ?? "",
-              }))}
-              chosen={variants}
-              disabled={product === ""}
-              empty={product === "" ? "Pick a product first" : "Nothing is declared here yet"}
-              onChange={(next) => {
-                setVariants(next);
-                setComponent("");
-              }}
-            />
-          </div>
+        <h3>The flaw</h3>
+        <div className="field">
+          <label htmlFor="rec-product">Product</label>
+          <select
+            id="rec-product"
+            {...notACredential}
+            value={product}
+            // The report names its product, and the reference means nothing
+            // in any other.
+            disabled={!!fromReport}
+            onChange={(event) => {
+              setProduct(event.target.value);
+              setStreams([]);
+              setVariants([]);
+              setComponent("");
+            }}
+          >
+            <option value="">Pick one</option>
+            {(products.data?.items ?? []).map((each) => (
+              <option key={each.name} value={each.name ?? ""}>
+                {each.display_name || each.name}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
-
-      {product !== "" && !mayRecord && (
-        <div className="alert" style={{ maxWidth: "80ch", marginTop: 14 }}>
-          <strong>Not yours to record</strong>
-          <span>
-            Recording a flaw is triage work on {product}, and you hold no triage role there.
-          </span>
-        </div>
-      )}
-
-      <div className="panel" style={{ maxWidth: "80ch", marginTop: 14 }}>
-        <h3>Description</h3>
 
         <div className="field">
           <label htmlFor="rec-summary">
-            The flaw{" "}
+            What it is{" "}
             <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
               required
             </span>
           </label>
           {/* The same editor and the same submission policy as a
-              justification. What somebody writes here is our own prose — it is
-              rendered as markdown where it is read back, which is why it is
-              written as markdown here. */}
+              justification. It is rendered as markdown where it is read back,
+              which is why it is written as markdown here. */}
           <Editor
             value={summary}
             onChange={setSummary}
             draftKey={`record:${product}`}
             rows={6}
-            label="The flaw"
+            label="What it is"
             placeholder="The management socket answers a request before anyone has authenticated."
             mentions={mentioning(product, !disclosed)}
           />
-          <span className="hint">The first line a triager reads.</span>
         </div>
-
-        <div className="field">
-          <label htmlFor="rec-severity">Severity</label>
-          <select
-            id="rec-severity"
-            {...notACredential}
-            value={severity}
-            disabled={vector !== ""}
-            onChange={(event) => setSeverity(event.target.value)}
-          >
-            {/* No default. A severity nobody chose, sitting in the field as
-                though somebody had, is a judgment this screen would be making
-                on their behalf. */}
-            <option value="">Not rated</option>
-            {SEVERITIES.map((word) => (
-              <option key={word} value={word}>
-                {word}
-              </option>
-            ))}
-          </select>
-          <span className="hint">
-            The same words a scanner's findings carry, so this ranks and comes due beside them.
-            {vector !== "" ? (
-              <> Set by the vector below.</>
-            ) : (
-              <>
-                {" "}
-                Leave it unset during early triage; it comes due as a medium until somebody rates
-                it, which is what every unrated finding does.
-              </>
-            )}
-          </span>
-        </div>
-
-        <div className="field">
-          <label htmlFor="rec-component">The component carrying it</label>
-          {/* Shown as a list rather than left to the browser's datalist, which
-              has no affordance at all: no arrow, nothing until two characters,
-              and nothing to say whether anything matched. This is the input in
-              the tool most likely to be wrong — a name typed from memory
-              against thousands — and the refusal afterwards was the only place
-              anybody found out.
-
-              Names, not name-and-version rows: a name the build holds three
-              times would otherwise offer the same value three times, and which
-              of the three is meant is the question the refusal asks properly. */}
-          <Suggest
-            id="rec-component"
-            value={component}
-            disabled={!whole}
-            placeholder={whole ? "the build itself" : "pick a build first"}
-            loading={holding.isFetching}
-            options={[...new Set((holding.data?.items ?? []).map((each) => each.component ?? ""))]}
-            onChange={(next) => {
-              setComponent(next);
-              setVersion("");
-              setEcosystem("");
-            }}
-          />
-          <span className="hint">
-            As the build calls it, searched against what that build actually holds. Leave it empty
-            for the build itself, which is the honest answer where the flaw is in how the pieces fit
-            together rather than in one of them.
-            {version && (
-              <>
-                {" "}
-                Recording against <b>{version}</b>
-                {ecosystem && <> ({ecosystem})</>}.
-              </>
-            )}
-          </span>
-        </div>
-
-        {choices.length > 0 && (
-          <div className="alert">
-            <strong>Components named {component}</strong>
-            <span>Shipped as more than one component here. Pick the one that carries it.</span>
-            <ul className="refs" style={{ marginTop: 8 }}>
-              {choices.map((choice) => (
-                <li key={`${choice.version} ${choice.ecosystem ?? ""}`}>
-                  <button
-                    type="button"
-                    className="chip"
-                    aria-pressed={
-                      version === choice.version && ecosystem === (choice.ecosystem ?? "")
-                    }
-                    onClick={() => {
-                      setVersion(choice.version);
-                      setEcosystem(choice.ecosystem ?? "");
-                      record.reset();
-                    }}
-                  >
-                    {choice.version}
-                  </button>
-                  {choice.ecosystem && <span className="hint">{choice.ecosystem}</span>}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <Scoring vector={vector} onChange={setVector} />
 
         <div className="field">
           <label htmlFor="rec-files">Evidence</label>
           <p className="hint" style={{ marginTop: 0 }}>
-            Optional. Readable by whoever can read the issue, so an undisclosed flaw&rsquo;s
-            evidence is undisclosed too.
+            {recordNow
+              ? "Optional. Readable by whoever can read the issue, so an undisclosed flaw’s evidence is undisclosed too."
+              : "Optional. Readable by whoever can read the report."}
           </p>
           <input
             id="rec-files"
@@ -489,193 +388,362 @@ export function Record() {
           />
           {files.length > 0 && (
             <ul className="refs" style={{ marginTop: 8 }}>
-              {files.map((file) => (
-                <li key={file.name}>
-                  <span className="chip">{file.name}</span>
-                  <span className="hint">{Math.max(1, Math.round(file.size / 1024))} KB</span>
+              {files.map((each) => (
+                <li key={each.name}>
+                  <span className="chip">{each.name}</span>
+                  <span className="hint">{Math.max(1, Math.round(each.size / 1024))} KB</span>
                 </li>
               ))}
             </ul>
           )}
         </div>
+      </div>
 
-        <Weaknesses chosen={weaknesses} onChange={setWeaknesses} />
-
-        <div className="field">
-          <span className="l">Disclosure</span>
-          <div className="seg">
-            <button
-              type="button"
-              aria-pressed={!disclosed}
-              disabled={!mayHide}
-              onClick={() => setChose(false)}
-            >
-              Undisclosed
-            </button>
-            <button
-              type="button"
-              aria-pressed={disclosed}
-              disabled={!mayPublish}
-              onClick={() => setChose(true)}
-            >
-              Public
-            </button>
-          </div>
-          {/* Why the first one cannot be picked, in the open. It was a
-              tooltip on a disabled button, which is the shape that reads as a
-              broken control rather than as a right somebody does not hold —
-              nothing about a grayed button says whether it is unavailable
-              here, unavailable now, or unavailable to you. */}
-          {!mayHide && (
-            <span className="hint">
-              Recording an undisclosed flaw needs the private triage role here. Without it, this is
-              public once saved.
-            </span>
-          )}
-          {!mayPublish && mayHide && (
-            <span className="hint">
-              Recording a public flaw needs the public triage role here. Without it, this is
-              undisclosed once saved.
-            </span>
-          )}
-          <span className="hint">
-            {disclosed ? (
-              <>Already disclosed, so no embargo.</>
-            ) : (
-              <>
-                Starts undisclosed with a disclosure date. Reaching it escalates rather than
-                publishes.
-              </>
-            )}
-          </span>
-        </div>
-
-        {/* Who told us. Every field optional: a flaw we found
-            ourselves has no reporter, and the two that do work beyond the
-            record say so where they are typed — the day it arrived is what
-            the embargo runs from, and how they wish to be credited is what an
-            advisory's acknowledgments say. */}
+      <div className="panel" style={{ maxWidth: "80ch", marginTop: 14 }}>
+        <h3>Where it came from</h3>
         {fromReport ? (
-          <div className="field">
-            <span className="l">The reporter</span>
-            <span className="hint">
-              From{" "}
-              <Link
-                className="id"
-                to={`/products/${encodeURIComponent(product)}/inbox/${encodeURIComponent(fromReport)}`}
+          <p className="hint">
+            From{" "}
+            <Link
+              className="id"
+              to={`/products/${encodeURIComponent(product)}/inbox/${encodeURIComponent(fromReport)}`}
+            >
+              {fromReport}
+            </Link>
+            {report.data?.found_here
+              ? " · found here"
+              : report.data?.reported_by && <> · {report.data.reported_by}</>}
+            {report.data?.received && <> · arrived {report.data.received}</>}. Recording it accepts
+            the report.
+          </p>
+        ) : (
+          <>
+            <div className="seg" role="group" aria-label="Where it came from">
+              <button
+                type="button"
+                aria-pressed={origin === "outside"}
+                onClick={() => setOrigin("outside")}
               >
-                {fromReport}
-              </Link>
-              {report.data?.reported_by && <> · {report.data.reported_by}</>}
-              {report.data?.received && <> · arrived {report.data.received}</>}. The report is
-              accepted as this flaw when it is recorded.
+                Sent in from outside
+              </button>
+              <button
+                type="button"
+                aria-pressed={origin === "here"}
+                onClick={() => setOrigin("here")}
+              >
+                Found here
+              </button>
+            </div>
+            {origin !== "" && (
+              <p className="hint">
+                {origin === "outside"
+                  ? "Gets a disclosure date, counted from the day it arrived, and waits for somebody to answer the reporter."
+                  : "No disclosure date, and nobody outside to answer."}
+              </p>
+            )}
+            {origin !== "" && (
+              <div className="filters">
+                <label className="field" style={{ margin: 0 }}>
+                  <span>{origin === "here" ? "Found by" : "Reported by"}</span>
+                  <input
+                    {...notACredential}
+                    type="text"
+                    value={reportedBy}
+                    placeholder={origin === "here" ? "optional" : "as they gave their name"}
+                    onChange={(event) => setReportedBy(event.target.value)}
+                  />
+                </label>
+                {origin === "outside" && (
+                  <label className="field" style={{ margin: 0 }}>
+                    <span>Contact</span>
+                    <input
+                      {...notACredential}
+                      type="text"
+                      value={contact}
+                      placeholder="an address"
+                      onChange={(event) => setContact(event.target.value)}
+                    />
+                  </label>
+                )}
+                <label className="field" style={{ margin: 0 }}>
+                  <span>Credited as</span>
+                  <input
+                    {...notACredential}
+                    type="text"
+                    value={credit}
+                    placeholder="in the advisory; anonymous is an answer"
+                    onChange={(event) => setCredit(event.target.value)}
+                  />
+                </label>
+                {origin === "outside" && (
+                  <label className="field" style={{ margin: 0 }}>
+                    <span>Arrived on</span>
+                    <input
+                      {...notACredential}
+                      type="date"
+                      style={{ width: 180 }}
+                      value={received}
+                      onChange={(event) => setReceived(event.target.value)}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* The choice between filing and recording, for whoever may do both.
+          Somebody who may not work reports only ever records, and a report
+          being recorded has nothing left to file. */}
+      {choosing && (
+        <div className="panel" style={{ maxWidth: "80ch", marginTop: 14 }}>
+          <h3>Next</h3>
+          <div className="seg" role="group" aria-label="What to do with it">
+            <button type="button" aria-pressed={!recordNow} onClick={() => setNow(false)}>
+              File for judging
+            </button>
+            <button type="button" aria-pressed={recordNow} onClick={() => setNow(true)}>
+              Record as a flaw now
+            </button>
+          </div>
+          <p className="hint">
+            {recordNow
+              ? "Gets an identifier and opens findings in the builds you pick."
+              : "Waits in the Inbox, where it is recorded as a flaw, matched to one, or ruled out."}
+          </p>
+        </div>
+      )}
+
+      {product !== "" && !mayRecord && (
+        <div className="alert" style={{ maxWidth: "80ch", marginTop: 14 }}>
+          <strong>Not yours to report</strong>
+          <span>This is triage work on {product}, and you hold no triage role there.</span>
+        </div>
+      )}
+
+      {recordNow && (
+        <div className="panel" style={{ maxWidth: "80ch", marginTop: 14 }}>
+          <h3>Builds</h3>
+          <div className="fields">
+            <div className="field">
+              <span className="l">Branches and tags</span>
+              <Picked
+                options={(lines.data?.items ?? []).map((each) => ({
+                  value: each.name ?? "",
+                  label: each.kind === "tag" ? `${each.name} (tag)` : (each.name ?? ""),
+                }))}
+                chosen={streams}
+                disabled={product === ""}
+                empty={product === "" ? "Pick a product first" : "Nothing is declared here yet"}
+                onChange={(next) => {
+                  setStreams(next);
+                  setComponent("");
+                }}
+              />
+            </div>
+            <div className="field">
+              <span className="l">Built as</span>
+              <Picked
+                options={(builtAs.data?.items ?? []).map((each) => ({
+                  value: each.name ?? "",
+                  label: each.name ?? "",
+                }))}
+                chosen={variants}
+                disabled={product === ""}
+                empty={product === "" ? "Pick a product first" : "Nothing is declared here yet"}
+                onChange={(next) => {
+                  setVariants(next);
+                  setComponent("");
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="rec-component">The component carrying it</label>
+            {/* Shown as a list rather than left to the browser's datalist,
+                which has no affordance at all. Names, not name-and-version
+                rows: which of several versions is meant is the question the
+                refusal asks properly. */}
+            <Suggest
+              id="rec-component"
+              value={component}
+              disabled={!whole}
+              placeholder={whole ? "the build itself" : "pick a build first"}
+              loading={holding.isFetching}
+              options={[
+                ...new Set((holding.data?.items ?? []).map((each) => each.component ?? "")),
+              ]}
+              onChange={(next) => {
+                setComponent(next);
+                setVersion("");
+                setEcosystem("");
+              }}
+            />
+            <span className="hint">
+              As the build calls it. Leave it empty for the build itself.
+              {version && (
+                <>
+                  {" "}
+                  Recording against <b>{version}</b>
+                  {ecosystem && <> ({ecosystem})</>}.
+                </>
+              )}
             </span>
           </div>
-        ) : (
-          <div className="field">
-            <span className="l">The reporter</span>
-            <span className="hint" style={{ marginBottom: 6 }}>
-              Optional. Only where somebody outside reported it.
-            </span>
-            <div className="filters">
-              <label className="field" style={{ margin: 0 }}>
-                <span>Reported by</span>
-                <input
-                  {...notACredential}
-                  type="text"
-                  value={reportedBy}
-                  placeholder="as they gave their name"
-                  onChange={(event) => setReportedBy(event.target.value)}
-                />
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                <span>Contact</span>
-                <input
-                  {...notACredential}
-                  type="text"
-                  value={contact}
-                  placeholder="an address"
-                  onChange={(event) => setContact(event.target.value)}
-                />
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                <span>Credited as</span>
-                <input
-                  {...notACredential}
-                  type="text"
-                  value={credit}
-                  placeholder="where it differs; anonymous is an answer"
-                  onChange={(event) => setCredit(event.target.value)}
-                />
-              </label>
-              <label className="field" style={{ margin: 0 }}>
-                <span>Arrived on</span>
-                <input
-                  {...notACredential}
-                  type="date"
-                  style={{ width: 180 }}
-                  value={received}
-                  onChange={(event) => setReceived(event.target.value)}
-                />
-              </label>
+
+          {choices.length > 0 && (
+            <div className="alert">
+              <strong>Components named {component}</strong>
+              <span>Shipped as more than one component here. Pick the one that carries it.</span>
+              <ul className="refs" style={{ marginTop: 8 }}>
+                {choices.map((choice) => (
+                  <li key={`${choice.version} ${choice.ecosystem ?? ""}`}>
+                    <button
+                      type="button"
+                      className="chip"
+                      aria-pressed={
+                        version === choice.version && ecosystem === (choice.ecosystem ?? "")
+                      }
+                      onClick={() => {
+                        setVersion(choice.version);
+                        setEcosystem(choice.ecosystem ?? "");
+                        record.reset();
+                      }}
+                    >
+                      {choice.version}
+                    </button>
+                    {choice.ecosystem && <span className="hint">{choice.ecosystem}</span>}
+                  </li>
+                ))}
+              </ul>
             </div>
-            {!disclosed && (
+          )}
+
+          <div className="field">
+            <label htmlFor="rec-severity">Severity</label>
+            <select
+              id="rec-severity"
+              {...notACredential}
+              value={severity}
+              disabled={vector !== ""}
+              onChange={(event) => setSeverity(event.target.value)}
+            >
+              {/* No default. A severity nobody chose, sitting in the field as
+                  though somebody had, is a judgment this screen would be making
+                  on their behalf. */}
+              <option value="">Not rated</option>
+              {SEVERITIES.map((word) => (
+                <option key={word} value={word}>
+                  {word}
+                </option>
+              ))}
+            </select>
+            <span className="hint">
+              {vector !== ""
+                ? "Set by the vector below."
+                : "Leave it unset if nobody knows yet. The deadline starts when somebody rates it."}
+            </span>
+          </div>
+
+          <Scoring vector={vector} onChange={setVector} />
+
+          <Weaknesses chosen={weaknesses} onChange={setWeaknesses} />
+
+          <div className="field">
+            <span className="l">Disclosure</span>
+            <div className="seg">
+              <button
+                type="button"
+                aria-pressed={!disclosed}
+                disabled={!mayHide}
+                onClick={() => setChose(false)}
+              >
+                Undisclosed
+              </button>
+              <button
+                type="button"
+                aria-pressed={disclosed}
+                disabled={!mayPublish}
+                onClick={() => setChose(true)}
+              >
+                Public
+              </button>
+            </div>
+            {/* Why one cannot be picked, in the open rather than on a disabled
+                button, which reads as broken. */}
+            {!mayHide && (
               <span className="hint">
-                The embargo is counted from the day it arrived rather than from today: they are
-                counting from the day they sent it, and they are the party who will publish
-                regardless.
-                {received && (
-                  <>
-                    {" "}
-                    Ninety days from <b>{received}</b> unless this deployment says otherwise.
-                  </>
-                )}
+                Recording an undisclosed flaw needs the private triage role here. Without it, this
+                is public once saved.
               </span>
             )}
+            {!mayPublish && mayHide && (
+              <span className="hint">
+                Recording a public flaw needs the public triage role here. Without it, this is
+                undisclosed once saved.
+              </span>
+            )}
+            <span className="hint">
+              {disclosed
+                ? "Already disclosed, so no disclosure date."
+                : origin === "here" || report.data?.found_here
+                  ? "Starts undisclosed, with no disclosure date: nobody outside is counting down."
+                  : "Starts undisclosed, with a disclosure date ninety days from the day it arrived unless this deployment says otherwise. Reaching it escalates rather than publishes."}
+            </span>
           </div>
-        )}
+        </div>
+      )}
 
+      <div className="panel" style={{ maxWidth: "80ch", marginTop: 14 }}>
         {record.error != null && choices.length === 0 && (
           <Failed error={record.error} what="That could not be recorded." />
         )}
+        {filing.error != null && <Failed error={filing.error} what="That report was not filed." />}
 
         {refused.length > 0 && (
           <div className="alert">
-            <strong>The flaw was recorded and some files were not</strong>
+            <strong>Saved, and some files were not</strong>
             <span>
-              {refused.join(", ")} could not be stored. The record stands — attach them again from
-              the finding.
+              {refused.join(", ")} could not be stored. Attach them again from what was saved.
             </span>
             {onward && (
               <Link className="linkish" to={onward}>
-                Open the finding
+                Open it
               </Link>
             )}
           </div>
         )}
 
-        <div className="actions" style={{ marginTop: 8 }}>
+        <div className="actions">
           <button
             type="button"
             className="btn"
-            disabled={!ready || !mayRecord}
-            onClick={() => record.mutate()}
+            disabled={!ready}
+            onClick={() => (recordNow ? record.mutate() : filing.mutate())}
           >
-            {record.isPending ? "Recording…" : disclosed ? "Record" : "Record, undisclosed"}
+            {record.isPending || filing.isPending
+              ? "Saving…"
+              : recordNow
+                ? disclosed
+                  ? "Record flaw"
+                  : "Record flaw, undisclosed"
+                : "File report"}
           </button>
-          {whole ? (
-            <span className="hint">
-              Against {streams.length * variants.length}{" "}
-              {streams.length * variants.length === 1 ? "build" : "builds"} — one issue, and one
-              finding for each place the component sits at in each of them. A build that does not
-              hold the component is refused rather than skipped, so deselect it if research says it
-              is not affected.
-            </span>
-          ) : (
-            <span className="hint">
-              Pick a product, then at least one line and at least one variant.
-            </span>
-          )}
+          <span className="hint">
+            {product === ""
+              ? "Pick a product."
+              : !said
+                ? "Say where it came from."
+                : !recordNow
+                  ? "Goes to the Inbox for judging."
+                  : whole
+                    ? `Against ${streams.length * variants.length} ${
+                        streams.length * variants.length === 1 ? "build" : "builds"
+                      }: one issue, and a finding for each place the component sits in each of them. A build that does not hold the component is refused rather than skipped.`
+                    : "Pick at least one branch or tag and one variant."}
+          </span>
         </div>
       </div>
     </>

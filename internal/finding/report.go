@@ -65,7 +65,11 @@ type FlawReport struct {
 	// ReceivedOn is the day it arrived, which is what the embargo runs
 	// from . A day rather than a moment: the reporter is counting in days
 	// and so are we.
-	ReceivedOn     *time.Time `bun:"received_on"`
+	ReceivedOn *time.Time `bun:"received_on"`
+	// FoundHere is a flaw somebody here found rather than one somebody
+	// outside sent. It carries no disclosure date and nobody is owed an
+	// answer.
+	FoundHere      bool       `bun:"found_here,notnull"`
 	AcknowledgedAt *time.Time `bun:"acknowledged_at"`
 	AcknowledgedBy *int64     `bun:"acknowledged_by"`
 	// EvaluatedAt and EvaluatedBy are when somebody judged the claim, and
@@ -82,24 +86,29 @@ type FlawReport struct {
 	RulingID *int64 `bun:"ruling_id"`
 }
 
-// Told is what somebody types in when they record a flaw somebody sent them.
+// Told is what somebody types in about where a flaw came from.
 //
-// Every field is optional. A flaw found by whoever is typing has no reporter,
-// and a form that demanded one would be asking them to invent an answer —
-// which is the failure mode of every required field that is not always true.
+// Every field is optional. A claim arriving anonymously has no reporter, and a
+// form that demanded one would be asking them to invent an answer — which is
+// the failure mode of every required field that is not always true.
 type Told struct {
 	ReportedBy string
 	Contact    string
 	Credit     string
-	// Received is the day it arrived, as a date. Empty is "we found it", and
-	// the embargo then runs from when the record was made.
+	// Received is the day it arrived, as a date. Empty is the day it was
+	// recorded.
 	Received string
+	// FoundHere is a flaw somebody here found. Unset is a claim from outside,
+	// which is the case with a reporter counting down to a publication, so a
+	// form left alone errs toward the disclosure date rather than away from it.
+	FoundHere bool
 }
 
-// Stated reports whether anything was said about a reporter at all.
+// Stated reports whether anything was said about where it came from at all.
 func (t Told) Stated() bool {
 	return strings.TrimSpace(t.ReportedBy) != "" || strings.TrimSpace(t.Contact) != "" ||
-		strings.TrimSpace(t.Credit) != "" || strings.TrimSpace(t.Received) != ""
+		strings.TrimSpace(t.Credit) != "" || strings.TrimSpace(t.Received) != "" ||
+		t.FoundHere
 }
 
 // The day it arrived, where one was given and could be read.
@@ -213,8 +222,8 @@ type Unanswered struct {
 	Undisclosed     bool
 }
 
-// Unacknowledged is every report nobody has answered yet, across every product
-// .
+// Unacknowledged is every report from outside nobody has answered yet, across
+// every product.
 //
 // Not narrowed here. The pass that reads this decides who hears about each
 // one, and it has to see them all to do that — the same shape as every other
@@ -271,6 +280,8 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ColumnExpr(`SUM(CASE WHEN f.visibility = ? THEN 1 ELSE 0 END) AS "private"`,
 			access.Private).
 		Where("fr.acknowledged_at IS NULL").
+		// A flaw found here has nobody outside to answer.
+		Where("fr.found_here = ?", false).
 		Where("f.closed_at IS NULL").
 		// The product it was reported against, not every product the issue
 		// turns up in. One report is one letter to answer, and fanning it out
@@ -320,6 +331,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 		ColumnExpr(`fr.reported_by AS "reported_by"`).
 		ColumnExpr(`fr.received_on AS "received_on"`).
 		Where("fr.acknowledged_at IS NULL").
+		Where("fr.found_here = ?", false).
 		Where("fr.vulnerability_id IS NULL").
 		Scan(ctx, &rows)
 	if err != nil {

@@ -258,8 +258,8 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 // its set.
 //
 // Everything but the place is copied from a row that already exists, so a build
-// added later is on the same clock and at the same rating as the ones recorded
-// first. Working it out again from today's settings would give the newest build
+// added later is on the same clock, counted from the same first rating, and at
+// the same rating as the ones recorded first. Working it out again from today's settings would give the newest build
 // a later deadline for the same flaw.
 func openIn(targetID, vulnerabilityID, componentID int64, name string,
 	where sits, like *Finding, now time.Time) *Finding {
@@ -275,6 +275,7 @@ func openIn(targetID, vulnerabilityID, componentID int64, name string,
 		Urgency:         like.Urgency,
 		DiscloseAt:      like.DiscloseAt,
 		DueAt:           like.DueAt,
+		RatedAt:         like.RatedAt,
 	}
 }
 

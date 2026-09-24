@@ -3,7 +3,6 @@
 
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import {
   type Covered,
   useAdvisory,
@@ -16,9 +15,6 @@ import {
   useTakeAFlawOff,
   useTakeAgreementBack,
 } from "../api/advisories";
-import { useCatalog } from "../api/catalog";
-import { api } from "../api/client";
-import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Moved } from "../ui/Moved";
@@ -26,7 +22,8 @@ import { notACredential } from "../ui/noautofill";
 import { useReseed } from "../ui/reseed";
 import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
-import { agreeing, missing, nameable, standing, statusLabel } from "./advisory";
+import { agreeing, missing, standing, statusLabel } from "./advisory";
+import { FlawPicker } from "./FlawPicker";
 
 // One advisory, whole: what it is called, what it covers, the document it
 // generates, who agrees to it, and what has gone out.
@@ -145,24 +142,6 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
   const [flaw, setFlaw] = useState("");
   const name = useNameAFlaw();
   const takeOff = useTakeAFlawOff();
-  const catalog = useCatalog(true);
-
-  // Every flaw recorded in the chosen product, open or fixed: an advisory is
-  // usually written after the fix lands.
-  const recorded = useQuery({
-    enabled: product !== "",
-    queryKey: ["advisory-flaws", product],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/products/{product}/nameable-flaws", {
-          params: { path: { product } },
-        }),
-      ),
-  });
-  const offered = useMemo(
-    () => nameable(recorded.data?.items ?? [], covers, product),
-    [recorded.data, covers, product],
-  );
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
@@ -219,89 +198,32 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
       )}
       {takeOff.isError && <Failed error={takeOff.error} what="That flaw was not taken off." />}
 
-      <div className="filters" style={{ marginTop: 10 }}>
-        <label className="field">
-          <span>Product</span>
-          <select
-            value={product}
-            onChange={(event) => {
-              setProduct(event.target.value);
-              setFlaw("");
-              name.reset();
-            }}
+      <FlawPicker
+        product={product}
+        onProduct={(next) => {
+          setProduct(next);
+          setFlaw("");
+          name.reset();
+        }}
+        flaw={flaw}
+        onFlaw={setFlaw}
+        covers={covers}
+        action={
+          <button
+            type="button"
+            className="btn"
+            disabled={!product || !flaw.trim() || name.isPending}
+            onClick={() =>
+              name.mutate(
+                { advisory, product, vulnerability: flaw.trim() },
+                { onSuccess: () => setFlaw("") },
+              )
+            }
           >
-            {/* A read that failed says so in the one place somebody is
-                looking. A select holding nothing but "Pick a product" reads
-                as a deployment with no products in it. */}
-            <option value="">
-              {catalog.products.isError ? "The products could not be read" : "Pick a product"}
-            </option>
-            {(catalog.products.data?.items ?? []).map((each) => (
-              <option key={each.name} value={each.name}>
-                {each.display_name || each.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field" style={{ flex: 1, minWidth: 220 }}>
-          <span>Flaw</span>
-          {/* Typed as well as picked. The list is what this deployment has
-              recorded in that product, and an identifier that is not in it —
-              because the read failed, or because it sits somewhere the list
-              does not reach — is still what the server decides about. */}
-          <input
-            type="text"
-            list="advisory-flaws"
-            value={flaw}
-            placeholder="CVE-2026-0001"
-            onChange={(event) => setFlaw(event.target.value)}
-            {...notACredential}
-          />
-          <datalist id="advisory-flaws">
-            {offered.map((each) => (
-              <option key={each.vulnerability} value={each.vulnerability}>
-                {each.fixed ? `Fixed · ${each.summary}` : each.summary}
-              </option>
-            ))}
-          </datalist>
-        </label>
-        <button
-          type="button"
-          className="btn"
-          disabled={!product || !flaw.trim() || name.isPending}
-          onClick={() =>
-            name.mutate(
-              { advisory, product, vulnerability: flaw.trim() },
-              { onSuccess: () => setFlaw("") },
-            )
-          }
-        >
-          {name.isPending ? "Naming…" : "Name it"}
-        </button>
-      </div>
-      {/* The read stops at the endpoint's own maximum, and a truncated list
-          reads as the whole of what is recorded there. Typing reaches the
-          rest. */}
-      {(recorded.data?.total ?? 0) > (recorded.data?.items ?? []).length && (
-        <p className="hint">
-          More is recorded in that product than this list holds. Type the identifier in full.
-        </p>
-      )}
-      {/* A failed read is not an answer about what is recorded here. Drawn as
-          an empty list it reads as "this product has none", which is the one
-          thing the read did not say. */}
-      {catalog.products.isError && (
-        <Failed
-          error={catalog.products.error}
-          what="The products could not be read, so there is none to pick."
-        />
-      )}
-      {recorded.isError && (
-        <Failed
-          error={recorded.error}
-          what="What is recorded in that product could not be read, so there is nothing to pick from. An identifier typed in full still works."
-        />
-      )}
+            {name.isPending ? "Naming…" : "Name it"}
+          </button>
+        }
+      />
       <p className="hint">
         Only a flaw recorded here. Naming one, and taking one off, each take back every agreement
         standing.

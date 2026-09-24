@@ -148,6 +148,9 @@ type Evidence struct {
 	// answers one question on the way to NoDeadline above and is not part of
 	// what a detail read reports.
 	nothingToTake bool
+	// unrated is a flaw recorded here with no severity in force, which has no
+	// clock until it has one.
+	unrated bool
 	// OpenedAt is when the earliest of these places first appeared here,
 	// and FoundBy what produced it: which scanner, at which version,
 	// against which vulnerability database.
@@ -317,6 +320,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	exploited := evidence.Exploited || evidence.ExploitedHere
 	evidence.nothingToTake = !Clocked(FixState(least), exploited) &&
 		!Clocked(FixState(most), exploited)
+	evidence.unrated = Kind(rows[0].Kind) == Entered && issue.InForce() == ""
 	// Any place answers. They all come from one line of a scanner's report,
 	// which the applier writes to every place of the group.
 	evidence.Matched = Matched(rows[0].Matched)
@@ -680,6 +684,8 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, targetID, vu
 			return nil, err
 		}
 		switch {
+		case evidence.unrated:
+			evidence.NoDeadline = NotRated
 		case !line.Admits(evidence.Exploited || evidence.ExploitedHere, evidence.Severity):
 			evidence.NoDeadline = BelowTheLine
 		case evidence.nothingToTake:
