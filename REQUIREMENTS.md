@@ -126,7 +126,7 @@ inputs.
 | # | Requirement | Why |
 |---|---|---|
 | REQ-32 | Findings are ordered by one urgency, worked out from exploitation of this product recorded here, severity, known exploitation in the world, exploitation likelihood, and whether the component reaches customers | Severity alone puts every critical in one bucket, and one image produces 335,021 findings (REQ-57) — so "look at the criticals first" names a population too large to order by hand. Somebody recording that this product was attacked through an issue outranks every signal that came from a feed |
-| REQ-33 | Every finding above the line carries a deadline set by policy from its urgency, counted from when it was first given a severity. A flaw in our own product is held to windows of its own, because its fix has to be written rather than taken from upstream. Being overdue is reported, never acted on automatically | Dates people can edit per item are dates that mean nothing, a flaw nobody has rated yet has no urgency to set one from, and a window sized for applying a published fix is one a fix that has to be developed misses every time |
+| REQ-33 | Every finding above the line carries a deadline set by policy from its urgency, counted from when it was first seen here — or, for a flaw recorded in our own product, from when it was first given a severity, on windows of its own, because its fix has to be written rather than taken from upstream. Being overdue is reported, never acted on automatically | Dates people can edit per item are dates that mean nothing, a flaw nobody has rated yet has no urgency to set one from, and a window sized for applying a published fix is one a fix that has to be developed misses every time |
 
 ### 3.8 Remediation
 
