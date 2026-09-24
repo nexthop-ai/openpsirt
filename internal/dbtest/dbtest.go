@@ -484,9 +484,10 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 	return own, nil
 }
 
-// serverConnection is the one pool every test in this binary uses on engine,
-// opened the first time it is asked for and never closed: a test binary has no
-// hook after its last test, and the process ending closes it.
+// serverConnection is a handle on the one pool every test in this binary uses
+// on engine. The pool is opened the first time it is asked for and never
+// closed: a test binary has no hook after its last test, and the process
+// ending closes it.
 //
 // One pool rather than one per test, because a PostgreSQL connection is a
 // process of its own on the server, and a new one knows nothing of the schema.
@@ -495,22 +496,25 @@ func serverDatabase(engine database.Engine, base string) (string, error) {
 // package spent 90 s on PostgreSQL with a pool per test and 48 s with this.
 // Tests in a package run one after another on a server, so sharing the pool
 // shares nothing a test can see — the rows are emptied between tests as before.
+//
+// Each call wraps the pool in a query builder of its own. A test may add a
+// query hook to the handle it is given, to count statements, and a hook added
+// to a shared builder would go on firing in every later test.
 func serverConnection(engine database.Engine, own string) (*database.DB, error) {
 	serverMu.Lock()
 	defer serverMu.Unlock()
-	if db, ok := serverDBs[engine]; ok {
-		return db, nil
+	pool, ok := serverDBs[engine]
+	if !ok {
+		target, err := database.ParseURL(own)
+		if err != nil {
+			return nil, err
+		}
+		if pool, err = database.Open(context.Background(), target); err != nil {
+			return nil, fmt.Errorf("open %s: %w", target.Redacted, err)
+		}
+		serverDBs[engine] = pool
 	}
-	target, err := database.ParseURL(own)
-	if err != nil {
-		return nil, err
-	}
-	db, err := database.Open(context.Background(), target)
-	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", target.Redacted, err)
-	}
-	serverDBs[engine] = db
-	return db, nil
+	return &database.DB{DB: bun.NewDB(pool.DB.DB, pool.Dialect()), Server: pool.Server}, nil
 }
 
 // ensureDatabase leaves exactly one database for this package and checkout on

@@ -365,6 +365,11 @@ the fifty-odd tables costs 43 ms, and the same statement on a warm connection
 run one after another on a server, so the pool carries nothing from one test to
 the next that the emptying does not remove.
 
+Each test gets a query builder of its own over the shared pool. A test may add a
+query hook to count its statements, and a hook on a shared builder goes on
+firing in every later test — alongside that test's own writers, which the race
+detector reports.
+
 A package whose tests start from the same rows declares them once, as a seeded
 template: a function that fills a migrated, empty database and returns what a
 test needs to reach the rows, such as an identifier or a secret shown once.

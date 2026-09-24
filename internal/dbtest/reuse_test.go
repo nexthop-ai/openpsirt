@@ -7,12 +7,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
+	"github.com/uptrace/bun"
 )
 
 // The harness has two paths and only one of them had ever run.
@@ -187,4 +189,45 @@ func openAdmin(t *testing.T, base string) *database.DB {
 func suffixFor(t *testing.T, engine database.Engine) string {
 	t.Helper()
 	return string(engine)[:3]
+}
+
+// hookCount is a query hook that counts the statements it sees.
+type hookCount struct{ n atomic.Int64 }
+
+func (h *hookCount) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	h.n.Add(1)
+	return ctx
+}
+func (h *hookCount) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// Every test in a binary shares one pool on a server, and a test may add a
+// query hook to the handle it was given. The hook belongs to that test alone:
+// a later test's statements reaching it would run the earlier test's code in
+// the later test, concurrently with whatever the later test does.
+func TestAQueryHookStaysWithTheTestThatAddedIt(t *testing.T) {
+	Servers(t, func(t *testing.T, db *database.DB) {
+		ctx := context.Background()
+		serverMu.Lock()
+		own := serverURLs[db.Server.Engine]
+		serverMu.Unlock()
+		later, err := serverConnection(db.Server.Engine, own)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		hook := &hookCount{}
+		db.AddQueryHook(hook)
+		if _, err := later.NewSelect().ColumnExpr("1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := hook.n.Load(); n != 0 {
+			t.Errorf("a hook one test added saw %d statements another test made", n)
+		}
+		if _, err := db.NewSelect().ColumnExpr("1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if n := hook.n.Load(); n != 1 {
+			t.Errorf("the hook saw %d of its own test's statements, want 1", n)
+		}
+	})
 }
