@@ -390,12 +390,13 @@ func (c *reader) finish() (*Document, error) {
 			continue
 		}
 		declared = append(declared, graph.Dependency{
-			Parent: parent, Child: child, Kind: c.scopeFor(e.kind, child),
+			Parent: c.merged(parent), Child: c.merged(child), Kind: c.scopeFor(e.kind, child),
 		})
 	}
 	for _, dep := range c.contained {
 		// Nesting states no scope of its own, so what the child was declared
 		// as is what the edge into it carries.
+		dep.Parent, dep.Child = c.merged(dep.Parent), c.merged(dep.Child)
 		dep.Kind = c.scopeFor("", dep.Child)
 		declared = append(declared, dep)
 	}
@@ -436,6 +437,21 @@ func (c *reader) finish() (*Document, error) {
 		}
 	}
 	return &c.doc, nil
+}
+
+// merged is the one description of a component everything read about it was
+// gathered into.
+//
+// An edge names a component through the copy bound when its identifier was
+// read. What arrived later — a second description of the same package, an
+// ancestor a relationship pointed at, a license element — lands on the merged
+// description, and an edge carrying the earlier copy would store the component
+// without it: whichever copy is interned last is the one kept.
+func (c *reader) merged(d graph.Described) graph.Described {
+	if at, ok := c.seen[d.Identity()]; ok {
+		return c.described[at]
+	}
+	return d
 }
 
 // drop records an edge that resolved to nothing, under the reason it did.
