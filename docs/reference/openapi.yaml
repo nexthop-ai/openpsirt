@@ -8966,6 +8966,9 @@ components:
         default:
           description: Nobody has set this; the shipped value is in use
           type: boolean
+        detail:
+          description: What a reader may want beyond the summary
+          type: string
         kind:
           description: "The kind of value: a length of time, a count of things, a count of bytes, a percentage, one of a few words, or on and off"
           enum:
@@ -8976,10 +8979,25 @@ components:
             - word
             - switch
           type: string
-        means:
-          description: The thing it decides
-          type: string
         name:
+          type: string
+        section:
+          description: Which part of the settings it belongs to
+          enum:
+            - deadlines
+            - own
+            - triage
+            - disclosure
+            - scanning
+            - signin
+            - limits
+            - outbound
+          type: string
+        summary:
+          description: What it decides, in one line
+          type: string
+        title:
+          description: The setting's name as a screen shows it
           type: string
         value:
           type: string
@@ -8993,7 +9011,9 @@ components:
       required:
         - name
         - value
-        - means
+        - title
+        - section
+        - summary
         - kind
       type: object
     Shipped:

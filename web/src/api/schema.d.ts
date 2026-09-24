@@ -10764,14 +10764,23 @@ export interface components {
         SettingBody: {
             /** @description Nobody has set this; the shipped value is in use */
             default?: boolean;
+            /** @description What a reader may want beyond the summary */
+            detail?: string;
             /**
              * @description The kind of value: a length of time, a count of things, a count of bytes, a percentage, one of a few words, or on and off
              * @enum {string}
              */
             kind: "duration" | "count" | "size" | "percent" | "word" | "switch";
-            /** @description The thing it decides */
-            means: string;
             name: string;
+            /**
+             * @description Which part of the settings it belongs to
+             * @enum {string}
+             */
+            section: "deadlines" | "own" | "triage" | "disclosure" | "scanning" | "signin" | "limits" | "outbound";
+            /** @description What it decides, in one line */
+            summary: string;
+            /** @description The setting's name as a screen shows it */
+            title: string;
             value: string;
             /** @description For a word setting, the values it takes, in the order to offer them */
             words?: string[] | null;

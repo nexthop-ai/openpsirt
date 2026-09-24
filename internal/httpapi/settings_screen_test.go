@@ -60,36 +60,47 @@ func TestTheScreenTakesWhatAValueIsFromTheServer(t *testing.T) {
 		t.Error("the settings screen does not read the words a word setting takes")
 	}
 
+	// Nor does it name one. The title and the section are served, so a key
+	// appearing here is a lookup coming back.
+	if at := regexp.MustCompile(`"(remediation|triage|scanning|disclosure|attachment|session|token|signin|people|upstream|patch|queue|routing|saved)\.[a-z.-]+"`).FindString(body); at != "" {
+		t.Errorf("the settings screen names the setting %s, which the server describes", at)
+	}
+
 	// The sanity check that this read the right file at all.
 	if !strings.Contains(body, "settings") {
 		t.Fatal("the file read does not look like the settings screen")
 	}
 }
 
-// A setting that calls itself a whole number is checked as one.
+// Every setting offered carries what a screen needs to show it: a title, a
+// section the screen knows, and a summary that fits on one line.
 //
-// The description and the kind are two statements about one setting, written
-// in different places by different people. Disagreeing, a whole number was
-// validated as a length of time with the suite green and every value an
-// operator typed refused.
-//
-// One direction only. A description that says "a whole number" is a promise to
-// an operator and has to hold; a count described without that phrase is prose
-// somebody chose, and requiring the phrase would be a rule about wording.
-func TestASettingThatCallsItselfANumberIsCheckedAsOne(t *testing.T) {
-	said := 0
-	for _, each := range settable {
-		if !strings.Contains(each.means, "A whole number") {
-			continue
-		}
-		said++
-		if each.kind != aCount && each.kind != aSize {
-			t.Errorf("%s is offered as a whole number and checked as %q, so every "+
-				"number an operator types is refused", each.name, each.kind)
-		}
+// Served so the screen names no setting at all. A title or a section kept in
+// the interface is a second list keyed on the name, and a setting added here
+// and not there is drawn under its dotted key in a section of its own.
+func TestEverySettingCarriesATitleASectionAndOneLine(t *testing.T) {
+	sections := []string{"deadlines", "own", "triage", "disclosure", "scanning", "signin",
+		"limits", "outbound"}
+	if len(settable) == 0 {
+		t.Fatal("no settings are offered, so this checked nothing")
 	}
-	if said == 0 {
-		t.Error("no setting describes itself as a whole number, so this checked nothing")
+	for _, each := range settable {
+		if each.title == "" {
+			t.Errorf("%s has no title, so a screen can only show its key", each.name)
+		}
+		if !slices.Contains(sections, each.section) {
+			t.Errorf("%s is filed under %q, which is not a section a screen offers",
+				each.name, each.section)
+		}
+		if strings.Contains(each.summary, ". ") || strings.HasSuffix(each.summary, ".") {
+			t.Errorf("%s has a summary of more than one sentence: %q", each.name, each.summary)
+		}
+		if words := len(strings.Fields(each.summary)); words == 0 || words > 16 {
+			t.Errorf("%s has a summary of %d words, which is not one line", each.name, words)
+		}
+		if each.detail != "" && strings.Contains(each.detail, each.summary) {
+			t.Errorf("%s repeats its summary in its detail", each.name)
+		}
 	}
 }
 

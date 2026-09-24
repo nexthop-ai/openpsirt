@@ -125,6 +125,7 @@ export const ROUTES = {
   advisory: "/advisories/:advisory",
   autoAssignment: "/auto-assignment",
   settings: "/settings",
+  settingsSection: "/settings/:section",
   system: "/system",
 } as const;
 
@@ -252,6 +253,7 @@ export function App() {
               <Route path={ROUTES.advisory} element={<Advisory />} />
               <Route path={ROUTES.autoAssignment} element={<AutoAssignment />} />
               <Route path={ROUTES.settings} element={<Settings who={who.data} />} />
+              <Route path={ROUTES.settingsSection} element={<Settings who={who.data} />} />
               <Route path={ROUTES.system} element={<System />} />
               {/* An address this application does not answer. It says so, and
                 keeps the address in the bar: redirecting home threw away the
