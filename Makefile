@@ -789,21 +789,27 @@ reserved-current: reserved-words
 	       echo "list does not carry. Commit the regenerated file."; exit 1; }
 
 # A release's record of its migrations: the schema they build on every engine,
-# and each file with its digest. Run on the commit to be tagged, with the four
-# engines up (make engines-up), and commit what it writes. A release a database
-# may be built from is one nothing may edit afterwards, and the record is what
-# holds it there.
+# and each file with its digest. Run on a branch from the head of main, with
+# the four engines up (make engines-up), and land what it writes before the tag.
+# A release a database may be built from is one nothing may edit afterwards, and
+# the record is what holds it there.
+#
+# The version reaches the recipe through the environment and is quoted there.
+# In a tag push it is a name somebody chose, and pasted into the recipe it would
+# be shell text.
+release-freeze: export RELEASE_TAG = $(VERSION)
 release-freeze:
-	OPENPSIRT_TEST_ENGINES=sqlite,postgres,mysql,mariadb OPENPSIRT_RELEASE_FREEZE=$(VERSION) \
+	OPENPSIRT_TEST_ENGINES=sqlite,postgres,mysql,mariadb OPENPSIRT_RELEASE_FREEZE="$$RELEASE_TAG" \
 	  $(GO) test -count=1 -run '^TestWriteTheSchemaAReleaseTags$$' ./internal/database/migrate/migrations/
-	$(GO) run ./internal/tools/release freeze $(VERSION)
-	$(GO) run ./internal/tools/release check $(VERSION)
+	$(GO) run ./internal/tools/release freeze "$$RELEASE_TAG"
+	$(GO) run ./internal/tools/release check "$$RELEASE_TAG"
 
 # That the release a tag names was frozen, and that the tree still ships what
 # it froze. The release workflow runs it before anything is built, so a tag
 # nobody froze publishes nothing.
+release-check: export RELEASE_TAG = $(VERSION)
 release-check:
-	$(GO) run ./internal/tools/release check $(VERSION)
+	$(GO) run ./internal/tools/release check "$$RELEASE_TAG"
 
 # Decisions no design document names. The chain that makes this auditable runs
 # code to design document to decision, and nothing checked that it was whole:
