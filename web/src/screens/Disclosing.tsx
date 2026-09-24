@@ -7,6 +7,7 @@ import { on } from "../ui/when";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { mayOf, useWho } from "../app/session";
 import { unwrap } from "../api/queries";
 import { Editor } from "../ui/Editor";
 import { Empty } from "../ui/Empty";
@@ -31,6 +32,7 @@ const PAGE = 100;
 
 export function Disclosing() {
   const queries = useQueryClient();
+  const who = useWho().data;
   // The distance ahead to look. Empty is this deployment's own embargo length,
   // which the server supplies: a fixed thirty days against the ninety-day
   // policy that ships drew an empty screen while embargoes were running, and
@@ -190,19 +192,24 @@ export function Disclosing() {
                     </td>
                     <td className="num">{row.places}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="linkish"
-                        onClick={() => {
-                          setSaid(null);
-                          setAsking(asking === key ? null : key);
-                          setAct("extension");
-                          setUntil("");
-                          setBecause("");
-                        }}
-                      >
-                        Move or disclose
-                      </button>
+                      {/* Moving a date and disclosing both need undisclosed
+                          triage in the row's product, which reading this list
+                          does not. */}
+                      {mayOf(who, row.product ?? "")?.may_hide && (
+                        <button
+                          type="button"
+                          className="linkish"
+                          onClick={() => {
+                            setSaid(null);
+                            setAsking(asking === key ? null : key);
+                            setAct("extension");
+                            setUntil("");
+                            setBecause("");
+                          }}
+                        >
+                          Move or disclose
+                        </button>
+                      )}
                       {asking === key && (
                         <div style={{ marginTop: 8 }}>
                           <label className="field">

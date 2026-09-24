@@ -94,9 +94,8 @@ export function Embargoes({
       <div className="screen-head" id="embargoes" style={{ marginTop: 22 }}>
         <h2>Disclosure dates</h2>
         <p>
-          {said(waiting.length, total)} · somebody has asked to move a date further than this
-          deployment allows on one person&rsquo;s word. Reaching the date discloses nothing by
-          itself; what is being agreed to is how long it stays hidden.
+          {said(waiting.length, total)} · somebody has asked to move a date or disclose an issue,
+          and it needs a second person. Reaching the date discloses nothing by itself.
         </p>
       </div>
       {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
@@ -111,11 +110,17 @@ export function Embargoes({
               </span>
             </div>
             <p className="reading">{row.reason}</p>
-            <p className="hint">
-              {row.act === "shortening" ? "Brought forward" : "Extended"} · ends <b>{row.was}</b> →{" "}
-              <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()} days
-              {row.act === "shortening" ? " sooner" : " longer"}.
-            </p>
+            {row.act === "disclosure" ? (
+              <p className="hint">
+                Disclose · the issue becomes public in {row.product}. This can&rsquo;t be undone.
+              </p>
+            ) : (
+              <p className="hint">
+                {row.act === "shortening" ? "Brought forward" : "Extended"} · ends <b>{row.was}</b>{" "}
+                → <b>{row.until}</b> · {(row.days ?? 0).toLocaleString()} days
+                {row.act === "shortening" ? " sooner" : " longer"}.
+              </p>
+            )}
             <div className="cardfoot">
               <button
                 type="button"
@@ -124,7 +129,9 @@ export function Embargoes({
                 title={
                   row.mine
                     ? "You asked for this one. The person who asks may not be the one who agrees"
-                    : "Agree, and move the date"
+                    : row.act === "disclosure"
+                      ? "Agree, and make it public"
+                      : "Agree, and move the date"
                 }
                 onClick={() => agree.mutate(row.id ?? 0)}
               >
