@@ -939,7 +939,9 @@ SUSE describes itself on `www.suse.com` and serves its directory from
 
 | Rule | |
 |---|---|
-| The hosts a description names are followed | A publisher serving its description from a web site and its directory from a download host is ordinary, and the description is the publisher saying where its directory is |
+| The hosts a description, its feeds and their entries name are followed | A publisher serving its description from a web site and its directory from a download host is ordinary. A feed entry, its self link and its digest links may each name another host again |
+| Only the https port, and no user in an address | The addresses come from a publisher's document, and one naming every port on a host would make the pass a port probe |
+| A host is a plain name or address | A host written in another script is mapped by the lookup to a host the excluded names would have caught |
 | Every request refuses an address inside this network and one an administrator excluded | Checked on the address a name resolved to, at the moment of connecting, so a public name pointing inward gains nothing (REQ-69). The excluded list is the one repository fetches read |
 | https only, and no redirect followed | A redirect is somebody other than the description naming where to go |
 | A budget of its own rather than the interactive one | That one is sized for somebody watching a blank page: at ten seconds a document too large to arrive inside it could not be fetched at all, however many times it was tried |

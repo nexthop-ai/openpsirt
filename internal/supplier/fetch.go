@@ -44,7 +44,7 @@ const MostPerPass = 20
 // MostFeeds bounds how many listings one publisher may point at.
 //
 // Nothing in the format bounds it, and a description within the size bound can
-// name tens of thousands of addresses on the pinned host — which is a pass
+// name tens of thousands of addresses — which is a pass
 // running for hours, holding every entry it has read, and outliving the lease
 // that says it is the one reading (REQ-69). A publisher serves one listing per
 // label they publish under, so this is far above any real directory.

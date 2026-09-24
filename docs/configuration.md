@@ -319,11 +319,12 @@ Off unless an administrator names a supplier, under Settings. Each is named
 against one product, and what is read lands as evidence beside a finding — a
 publisher's own judgment, never a decision taken here.
 
-Requests go to the host the configured address names and to the hosts the
-publisher's description there names for its directory and documents: https
-only, a redirect refused rather than followed, and an address inside this
-network or in [`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions) refused. So
-an egress rule for this is every host a supplier's description names, on 443.
+Requests go to the host the configured address names, and to every host the
+publisher's description, its feeds and their entries name for listings,
+documents and digests: https on port 443 only, a redirect refused rather than
+followed, and an address inside this network or in
+[`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions) refused. So an egress rule
+for this is every host a supplier publishes from, on 443.
 SUSE's description is on `www.suse.com` and its directory on `ftp.suse.com`.
 
 What leaves is the request itself. No component name, no build, no product,
