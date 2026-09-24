@@ -274,7 +274,20 @@ none of it (REQ-12).
 | The repository address is built from the parts recognized, never copied from the link | What reaches git is an address of a known shape. A path segment outside a narrow character set, a port, or credentials in the link name no repository |
 | A hash is seven to sixty-four hexadecimal characters, lowered | Shorter is as likely a pull request number as a commit. An abbreviation is kept as written and resolved by the copy |
 | A pull request, a merge request, a patch tracker and a mailing-list post name no commit | Each describes a fix without saying where it landed. A guessed repository is a request to somewhere the link never pointed |
-| On git.kernel.org, `/cgit/` names the repository under `/pub/scm/` | The site serves its pages and its repositories at different paths |
+| A cgit site that serves its pages and its repositories at different addresses has its links read as the repository address | The address a page is on is not one git can fetch |
+| A repository address is the one git reaches without a redirect | A fetch follows none |
+
+| cgit site | Page | Repository |
+|---|---|---|
+| git.kernel.org | `/cgit/{path}` | `git.kernel.org/pub/scm/{path}` |
+| git.savannah.gnu.org, cgit.git.savannah.gnu.org | `/cgit/{repo}` | `https.git.savannah.gnu.org/git/{repo}` |
+| git.savannah.nongnu.org, cgit.git.savannah.nongnu.org | `/cgit/{repo}` | `https.git.savannah.nongnu.org/git/{repo}` |
+| cgit.freebsd.org | `/{repo}` | `git.freebsd.org/{repo}` |
+
+A cgit site no longer serving a repository at any address, such as
+cgit.freedesktop.org since the project moved to GitLab, is read as the address
+its link names. Fetching it fails, and the failure is shown with the reason
+git gave.
 
 Measured on this deployment's own demonstration data: 36,625 patch links, of
 which 36,000 are `git.kernel.org/stable/c/`.

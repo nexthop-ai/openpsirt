@@ -17,6 +17,7 @@ package patchbranch
 import (
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -71,6 +72,32 @@ var kernelShort = map[string]string{
 	"linus":  "https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git",
 }
 
+// cgitSite is where a cgit site serves the repositories its pages show.
+type cgitSite struct {
+	// Host is where the repositories are fetched from.
+	Host string
+	// Pages is the first path segment of a page, which names no repository.
+	// Empty where every path on the site is a page.
+	Pages string
+	// Under is the path the repositories are served under.
+	Under []string
+}
+
+// cgitSites is the cgit sites whose pages and repositories are at different
+// addresses, keyed on the host the pages are on.
+//
+// Each repository address is the one git reaches without a redirect, because
+// a fetch follows none: Savannah redirects its own clone address to the host
+// named here.
+var cgitSites = map[string]cgitSite{
+	"git.kernel.org":               {Host: "git.kernel.org", Pages: "cgit", Under: []string{"pub", "scm"}},
+	"git.savannah.gnu.org":         {Host: "https.git.savannah.gnu.org", Pages: "cgit", Under: []string{"git"}},
+	"cgit.git.savannah.gnu.org":    {Host: "https.git.savannah.gnu.org", Pages: "cgit", Under: []string{"git"}},
+	"git.savannah.nongnu.org":      {Host: "https.git.savannah.nongnu.org", Pages: "cgit", Under: []string{"git"}},
+	"cgit.git.savannah.nongnu.org": {Host: "https.git.savannah.nongnu.org", Pages: "cgit", Under: []string{"git"}},
+	"cgit.freebsd.org":             {Host: "git.freebsd.org"},
+}
+
 // Parse reads the commit a patch link names.
 //
 // Answers false for anything that does not name exactly one commit in a
@@ -87,8 +114,8 @@ var kernelShort = map[string]string{
 //	/{path…}/commit/?id={hash}               cgit
 //	/stable/c/{hash}, /linus/{hash}          git.kernel.org's short links
 //
-// cgit on git.kernel.org serves its pages under /cgit/ and its repositories
-// under /pub/scm/, so a link to one names the other.
+// A cgit site that serves its pages and its repositories at different
+// addresses has its links read as the repository address, from cgitSites.
 func Parse(link string) (Commit, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(link))
 	if err != nil || parsed.Scheme != "https" && parsed.Scheme != "http" {
@@ -112,8 +139,12 @@ func Parse(link string) (Commit, bool) {
 		if len(parts) == 2 && parts[0] == "linus" {
 			return named(kernelShort["linus"], parts[1])
 		}
-		if len(parts) > 0 && parts[0] == "cgit" {
-			parts = append([]string{"pub", "scm"}, parts[1:]...)
+	}
+	if site, ok := cgitSites[host]; ok {
+		if site.Pages == "" {
+			host, parts = site.Host, slices.Concat(site.Under, parts)
+		} else if len(parts) > 0 && parts[0] == site.Pages {
+			host, parts = site.Host, slices.Concat(site.Under, parts[1:])
 		}
 	}
 
