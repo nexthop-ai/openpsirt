@@ -19,6 +19,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
 // Commit is a commit a patch link names, in the repository that holds it.
@@ -57,10 +59,6 @@ var hexName = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 // Deliberately narrow: what is built from these is an argument to a program,
 // and a path is the one part of an address a report chooses freely.
 var segment = regexp.MustCompile(`^[A-Za-z0-9._~+-]+$`)
-
-// hostName is a host as it may reach git: a name or an address, and no port,
-// credentials or anything else a URL can carry before the path.
-var hostName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$`)
 
 // kernelShort is where the kernel's short links point.
 //
@@ -125,7 +123,7 @@ func Parse(link string) (Commit, bool) {
 		return Commit{}, false
 	}
 	host := strings.ToLower(parsed.Hostname())
-	if !hostName.MatchString(host) {
+	if !outward.HostName(host) {
 		return Commit{}, false
 	}
 	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")

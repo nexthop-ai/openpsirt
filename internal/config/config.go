@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
@@ -259,14 +260,15 @@ type Config struct {
 	// Zero takes the built-in default.
 	PatchDir   string
 	PatchQuota int
-	// PatchExcluded is where no repository is fetched from: host names,
-	// each covering the hosts under it, and networks. On top of this
-	// network, which is refused regardless.
+	// OutboundExcluded is where nothing is fetched from — no repository a
+	// patch link names and no supplier's directory: host names, each
+	// covering the hosts under it, and networks. On top of this network,
+	// which is refused regardless (REQ-69).
 	//
 	// Here rather than among the settings for the reason UpstreamInternal
 	// is: fetching is a switch an administrator throws, and where a fetch
 	// may not go is a boundary the person who deployed it drew.
-	PatchExcluded patchbranch.Excluded
+	OutboundExcluded outward.Excluded
 	// SessionLifetime bounds a sign-in. Zero takes the built-in default.
 	SessionLifetime time.Duration
 
@@ -414,11 +416,18 @@ func Load() (Config, error) {
 
 	c.BootstrapAdmins = access.Identities(env("BOOTSTRAP_ADMINS", ""))
 
-	excluded, err := patchbranch.ParseExcluded(env("PATCH_EXCLUDED", ""))
-	if err != nil {
-		return Config{}, fmt.Errorf("OPENPSIRT_PATCH_EXCLUDED: %w", err)
+	// The name this list had when it covered repositories alone. Refused
+	// rather than ignored: ignored, a deployment that set it fetches from
+	// everything it meant to keep out.
+	if env("PATCH_EXCLUDED", "") != "" {
+		return Config{}, fmt.Errorf("OPENPSIRT_PATCH_EXCLUDED is now OPENPSIRT_OUTBOUND_EXCLUDED: " +
+			"rename it, since the old name is not read")
 	}
-	c.PatchExcluded = excluded
+	excluded, err := outward.ParseExcluded(env("OUTBOUND_EXCLUDED", ""))
+	if err != nil {
+		return Config{}, fmt.Errorf("OPENPSIRT_OUTBOUND_EXCLUDED: %w", err)
+	}
+	c.OutboundExcluded = excluded
 
 	sources, err := access.ParseSources(env("TRUSTED_SOURCES", ""))
 	if err != nil {

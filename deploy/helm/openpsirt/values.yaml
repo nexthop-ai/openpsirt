@@ -295,18 +295,22 @@ scanner:
     # set. It is node disk, so it is bounded rather than left open.
     sizeLimit: 10Gi
 
+# Where nothing is fetched from: no repository a patch link names and no
+# supplier's directory. A report and a supplier's own description choose the
+# hosts, so list your internal domains and networks here. Loopback and private
+# address space are refused regardless.
+outbound:
+  excluded: []
+  #   - corp.example.com
+  #   - 203.0.113.0/24
+
 # Labeling a patch link with the branches its commit is on, which fetches the
 # repositories reports link to. Off until an administrator turns it on under
 # Settings; nothing here turns it on.
 patchBranches:
-  # Needs the memory limit raised: see `resources` above.
+  # Needs the memory limit raised: see `resources` above. Set
+  # `outbound.excluded` before turning it on.
   #
-  # Hosts and networks no repository is fetched from. A report chooses the
-  # host, so list your internal domains and networks here. Loopback and
-  # private address space are refused regardless.
-  excluded: []
-  #   - corp.example.com
-  #   - 203.0.113.0/24
   # How many bytes the copies may hold together, as a whole number. Empty takes
   # the built-in 20 GB, which holds the kernel's full history beside others.
   quota: ""

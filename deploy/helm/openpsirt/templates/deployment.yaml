@@ -169,8 +169,8 @@ spec:
             - name: OPENPSIRT_TRUSTED_GROUPS_DELIMITER
               value: {{ .Values.auth.trustedHeader.groupsDelimiter | quote }}
             {{- end }}
-            {{- with .Values.patchBranches.excluded }}
-            - name: OPENPSIRT_PATCH_EXCLUDED
+            {{- with .Values.outbound.excluded }}
+            - name: OPENPSIRT_OUTBOUND_EXCLUDED
               value: {{ join "," . | quote }}
             {{- end }}
             {{- with .Values.patchBranches.quota }}

@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -50,7 +51,7 @@ type Pass struct {
 	logger   *slog.Logger
 	git      git
 	copies   copies
-	excluded Excluded
+	excluded outward.Excluded
 	// Now is the clock, so a test can ask what happens a week from now.
 	Now func() time.Time
 
@@ -68,7 +69,7 @@ type Options struct {
 	Quota int64
 	// Excluded is where no repository is fetched from, on top of this
 	// network.
-	Excluded Excluded
+	Excluded outward.Excluded
 }
 
 // NewPass returns the pass over db as whichever replica this is.

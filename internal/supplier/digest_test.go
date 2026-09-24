@@ -191,8 +191,8 @@ func TestADigestThatCannotBeReachedHoldsTheMark(t *testing.T) {
 }
 
 func TestADigestTheClientRefusesToFetchIsReadAsNoDigest(t *testing.T) {
-	// A redirect and a host nobody configured are turned away by the client
-	// itself. Read as a publisher that cannot be reached, the pass would stop
+	// A redirect and a host an administrator excluded are turned away by the
+	// client itself. Read as a publisher that cannot be reached, the pass would stop
 	// at that document on every wake.
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
@@ -202,6 +202,7 @@ func TestADigestTheClientRefusesToFetchIsReadAsNoDigest(t *testing.T) {
 		p.linked["/2026/EL-109.json"] = []string{"https://elsewhere.example/EL-109.json.sha256"}
 		p.moved["/2026/EL-109.json.sha256"] = "https://elsewhere.example/missing"
 		p.moved["/2026/EL-109.json.sha512"] = "https://elsewhere.example/missing"
+		p.excluded = []string{"elsewhere.example"}
 
 		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
 		if err != nil {

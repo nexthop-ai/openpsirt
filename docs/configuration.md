@@ -22,7 +22,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Scheduled rescanning](#scanning) | On, daily | `scanning.every` under Settings sets how often |
 | [Vulnerability data updates](#an-air-gapped-install) | On | `GRYPE_DB_AUTO_UPDATE`; set it to `false` where the deployment cannot reach the network |
 | [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
-| [Patch branches](#patch-branches) | Off | `patch.branches` under Settings. Set `OPENPSIRT_PATCH_EXCLUDED` first |
+| [Patch branches](#patch-branches) | Off | `patch.branches` under Settings. Set [`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions) first |
 | [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
 | [Mail](#mail) | Off | `OPENPSIRT_MAIL_FROM` and `OPENPSIRT_MAIL_SERVER`, both |
 | Webhooks | Off | Adding a destination under Settings |
@@ -76,6 +76,11 @@ now reaches only findings nobody has announced. Grant `public-read` or
 holds — wherever somebody should keep the disclosed findings. Nothing is
 granted on upgrade, so until then a holder of a private role alone sees no
 disclosed finding they are not assigned.
+
+`OPENPSIRT_PATCH_EXCLUDED` is now `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's
+`patchBranches.excluded` is now `outbound.excluded`. The list keeps supplier
+directories out as well as repositories. A deployment still setting the old
+name is refused at startup, naming the new one.
 
 ## Serving
 
@@ -313,10 +318,12 @@ Off unless an administrator names a supplier, under Settings. Each is named
 against one product, and what is read lands as evidence beside a finding — a
 publisher's own judgment, never a decision taken here.
 
-Requests go to the host the configured address names and nowhere else: https
-only, a redirect refused rather than followed, and an address that resolves
-inside this network refused. So an egress rule for this is one host per
-supplier configured, on 443.
+Requests go to the host the configured address names and to the hosts the
+publisher's description there names for its directory and documents: https
+only, a redirect refused rather than followed, and an address inside this
+network or in [`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions) refused. So
+an egress rule for this is every host a supplier's description names, on 443.
+SUSE's description is on `www.suse.com` and its directory on `ftp.suse.com`.
 
 What leaves is the request itself. No component name, no build, no product,
 nothing about what this deployment holds — the narrowing to what a product
@@ -338,9 +345,6 @@ Each document is checked against the SHA-256 or SHA-512 file its publisher
 serves beside it, and one that does not match is not read. A publisher serving
 neither is read unchecked.
 
-The directory has to be served from the host the configured address names.
-SUSE serves its description from `www.suse.com` and its directory from
-`ftp.suse.com`, so it cannot be read this way; upload its advisories instead.
 
 ## Upstream currency
 
@@ -420,6 +424,24 @@ the default is costing; names no public index has heard of are private modules
 and vendored forks, and they are the candidates to promote into
 `OPENPSIRT_UPSTREAM_INTERNAL` so they stop being asked about at all.
 
+## Outbound exclusions
+
+Two fetches go to hosts somebody else chose: the repository a patch link names,
+and the directory and documents a supplier's description names. Both refuse
+loopback, private, link-local and shared address space regardless. An internal
+service on a public address or behind a public name is kept out by this list
+alone.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `OPENPSIRT_OUTBOUND_EXCLUDED` | Hosts and networks nothing is fetched from, separated by commas. A name covers itself and every host under it; a network is written as `10.0.0.0/8` and covers every address a name resolves to inside it | unset |
+
+```
+OPENPSIRT_OUTBOUND_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
+```
+
+The chart sets it from `outbound.excluded`.
+
 ## Patch branches
 
 A patch link to a commit is labeled with the branches of its repository that
@@ -434,18 +456,11 @@ copy are on the System screen and at `/v1/patch-branches`.
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `OPENPSIRT_PATCH_EXCLUDED` | Hosts and networks no repository is fetched from, separated by commas. A name covers itself and every host under it; a network is written as `10.0.0.0/8` and covers every address a name resolves to inside it | unset |
 | `OPENPSIRT_PATCH_DIR` | Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume | `/var/cache/openpsirt/repositories` |
 | `OPENPSIRT_PATCH_QUOTA` | How many bytes the copies may hold together. The least recently used is removed to make room | `21474836480` (20 GB) |
 
-List your internal networks and domains in `OPENPSIRT_PATCH_EXCLUDED`. A report
-chooses the host, and loopback, private, link-local and shared address space
-are refused regardless, but an internal service on a public address or behind a
-public name is only kept out by this list:
-
-```
-OPENPSIRT_PATCH_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
-```
+A report chooses the host, so set [`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions)
+before turning this on.
 
 Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.

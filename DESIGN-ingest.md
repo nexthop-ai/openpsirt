@@ -888,7 +888,7 @@ document has been read.
 | A document is read before its digest is asked for | A statement set listed beside the advisories is set aside whatever its digest says, and a distribution lists tens of thousands of them |
 | The digest a feed entry names is the one read; otherwise the file beside the document | The format puts it at the document's address with the algorithm's suffix, and a feed entry may name it outright. One https address per algorithm is taken from an entry, which bounds what one entry can ask for |
 | Both SHA-256 and SHA-512 are read, and whichever answered is asked for first after | Publishers split between them, and each serves one kind beside every document, so the one a publisher does not serve is asked for once a pass |
-| A publisher serving no digest is read unchecked | The format asks for one of its trusted providers only. A refusal, a page in place of a digest, a redirect, an address off the configured host, or nothing at all means none is served; a publisher that cannot be reached for the digest holds the mark, the way it does for a document. After two documents in a row with none beside them, the rest of the pass does not ask |
+| A publisher serving no digest is read unchecked | The format asks for one of its trusted providers only. A refusal, a page in place of a digest, a redirect, a host an administrator excluded, or nothing at all means none is served; a publisher that cannot be reached for the digest holds the mark, the way it does for a document. After two documents in a row with none beside them, the rest of the pass does not ask |
 | A VEX document in the same feed is left alone | A publisher's statement set replaces their whole answer for a product. Setting that aside is a judgment, and a pass on a timer makes none — it is taken by uploading it |
 | One replica reaches out, settled by a lease | The politeness the pass keeps to is a rate per deployment rather than per replica, and three replicas each keeping to it would be three times the traffic at a publisher's expense |
 | The lease is taken again as the pass runs, between suppliers and before each document | A document is up to three requests with a timeout each — itself and two digest files — so one supplier's pass outlasts a lease sized for the interval, and a slow publisher handing the pass to a second replica mid-flight is what a lease exists to prevent. A pass that loses the lease leaves the supplier due |
@@ -918,7 +918,7 @@ at up to 5,760 a day.
 |---|---|---|---|---|---|
 | Red Hat, advisories | Directory | 28,984 | 10,596 | 17 days, both directories together | SHA-256 |
 | Red Hat, VEX | Directory | 68,238 | 7,614 | | SHA-256 |
-| SUSE, advisories | Directory | 42,268 | 33,438 | Unreachable: see below | SHA-256 |
+| SUSE, advisories | Directory | 42,268 | 33,438 | About 7 days, from a second host | SHA-256 |
 | Cisco | Directory | 1,229 | 155 | About 5 hours | SHA-512 |
 | NCSC-NL | Directory | 503 | 75 | About 2 hours | SHA-512 |
 | Siemens | Feed | 178 | 18 | About 45 minutes | SHA-512 |
@@ -934,19 +934,15 @@ requests and little else. Red Hat's VEX directory is listed beside its
 advisories, and every document in it is fetched and then set aside, because
 nothing in a directory says which profile its documents are.
 
-SUSE describes itself on one host and serves its directory from another, and a
-listing on any host but the configured one is refused. Its description names no
-directory on the host it is served from, so SUSE cannot be read by this path.
+SUSE describes itself on `www.suse.com` and serves its directory from
+`ftp.suse.com`. No description is served on the second host.
 
-Every request is the guarded client's: https only, to the host the
-configured address names, refusing a redirect and refusing an address inside
-this network (REQ-69). It carries a budget of its own rather than the
-interactive one, which is sized for somebody watching a blank page: at ten
-seconds a document too large to arrive inside it could not be fetched at all,
-however many times it was tried. The addresses inside a publisher's directory come from
-outside, so a feed or a document served from anywhere but the configured host
-is refused rather than followed — a publisher that genuinely moved is
-reconfigured, which is visible.
+| Rule | |
+|---|---|
+| The hosts a description names are followed | A publisher serving its description from a web site and its directory from a download host is ordinary, and the description is the publisher saying where its directory is |
+| Every request refuses an address inside this network and one an administrator excluded | Checked on the address a name resolved to, at the moment of connecting, so a public name pointing inward gains nothing (REQ-69). The excluded list is the one repository fetches read |
+| https only, and no redirect followed | A redirect is somebody other than the description naming where to go |
+| A budget of its own rather than the interactive one | That one is sized for somebody watching a blank page: at ten seconds a document too large to arrive inside it could not be fetched at all, however many times it was tried |
 
 Nothing it reads decides anything. A pass on a timer makes that easier to
 violate by accident than an upload does, because nobody is watching each

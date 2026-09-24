@@ -9290,7 +9290,7 @@ export interface components {
             /** @description What stopped the last visit */
             reason?: string;
             /**
-             * @description 'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_PATCH_EXCLUDED lists, and is never fetched
+             * @description 'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_OUTBOUND_EXCLUDED lists, and is never fetched
              * @enum {string}
              */
             state: "waiting" | "working" | "failed" | "done" | "excluded";

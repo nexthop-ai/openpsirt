@@ -529,7 +529,7 @@ gets ticked without being read.
 | **Data integrity** | A scan file is hostile input. Bounded size, depth and component count; never used as a filesystem path (REQ-66 and REQ-69). Markdown fields are length-bounded, and nothing on the server renders them (REQ-69) |
 | **Separation of duties** | An approval points at one revision of a justification. Anything that lets approved text change without withdrawing the approval defeats REQ-24 silently (REQ-28) |
 | **Logging failures** | Secrets never logged. Triage actions land in the append-only history (REQ-68) |
-| **Request forgery** | Outbound fetches restricted to their configured host, no redirects into private address space (REQ-69). The one fetch whose host a report chooses — the repository a patch link names — goes through the loopback proxy that refuses private address space and the administrator's excluded list at connect time, and nothing else (REQ-78) |
+| **Request forgery** | No outbound fetch reaches an address inside this network or a host the administrator's excluded list names, checked at connect time on the address a name resolved to, and no redirect is followed (REQ-69). Two fetches go to hosts somebody outside chose: the repository a patch link names, through the loopback proxy (REQ-78), and a supplier's directory and documents, wherever its description names them. For those two the excluded list is all that keeps out an internal service on a public name. A fetch whose host is fixed — sign-in, the package indexes — stays pinned to it |
 
 ## Testing
 

@@ -10,11 +10,13 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
 // NewLocalPass is a pass that fetches from directories rather than hosts, with
 // no lease, so a test drives it directly.
-func NewLocalPass(db bun.IDB, dir string, quota int64, excluded Excluded, locate func(string) string) *Pass {
+func NewLocalPass(db bun.IDB, dir string, quota int64, excluded outward.Excluded, locate func(string) string) *Pass {
 	return &Pass{
 		db: db, logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 		git:      git{excluded: excluded, transport: "file", locate: locate},
@@ -29,7 +31,7 @@ func (p *Pass) Held(repository string) bool { return p.copies.has(repository) }
 
 // OpenGuard starts the proxy git reaches out through, for one host, and
 // answers its address and how to stop it.
-func OpenGuard(host string, excluded Excluded) (string, func(), error) {
+func OpenGuard(host string, excluded outward.Excluded) (string, func(), error) {
 	door, err := openGuard(host, excluded)
 	if err != nil {
 		return "", nil, err
@@ -42,7 +44,7 @@ var VersionLess = versionLess
 
 // NewRemotePass is a pass that fetches over https through the guard, with no
 // database, for a test about what reaching out does.
-func NewRemotePass(dir string, excluded Excluded) *Pass {
+func NewRemotePass(dir string, excluded outward.Excluded) *Pass {
 	return &Pass{
 		git:      git{excluded: excluded, transport: "https"},
 		copies:   copies{root: dir, quota: DefaultQuota, now: time.Now, poll: time.Second},

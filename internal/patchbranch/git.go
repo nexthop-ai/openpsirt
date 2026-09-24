@@ -19,6 +19,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
 // fetchBudget bounds one clone or fetch.
@@ -42,7 +43,7 @@ const (
 type git struct {
 	// path is the program. Empty means whatever the environment resolves.
 	path     string
-	excluded Excluded
+	excluded outward.Excluded
 	// transport is the protocol a fetch may use. https everywhere but the
 	// tests, which fetch from a directory because a test has no host to
 	// reach.

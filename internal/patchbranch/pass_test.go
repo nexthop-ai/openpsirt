@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -118,7 +119,7 @@ func turnOn(t *testing.T, db *database.DB) {
 }
 
 // passOver is a pass that fetches each named project from its directory.
-func passOver(t *testing.T, db *database.DB, quota int64, excluded patchbranch.Excluded, projects map[string]upstream) *patchbranch.Pass {
+func passOver(t *testing.T, db *database.DB, quota int64, excluded outward.Excluded, projects map[string]upstream) *patchbranch.Pass {
 	t.Helper()
 	return patchbranch.NewLocalPass(db.DB, t.TempDir(), quota, excluded, func(repository string) string {
 		for name, each := range projects {
@@ -144,7 +145,7 @@ func TestEachPatchLinkIsLabeledWithTheBranchesHoldingItsCommit(t *testing.T) {
 		}
 		issue(t, db, "CVE-2025-0001", "high", links...)
 		turnOn(t, db)
-		pass := passOver(t, db, patchbranch.DefaultQuota, patchbranch.Excluded{},
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"project": made})
 
 		visited, err := pass.Once(ctx)
@@ -203,7 +204,7 @@ func TestACopyMadeWithoutFilesTakesTheCommitsThatLandAfter(t *testing.T) {
 		issue(t, db, "CVE-2025-0015", "high", link("project", made.fix))
 		turnOn(t, db)
 		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
-			patchbranch.Excluded{}, func(string) string { return "file://" + made.dir })
+			outward.Excluded{}, func(string) string { return "file://" + made.dir })
 		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("project") {
 			t.Fatalf("visited %q, %v", visited, err)
 		}
@@ -218,7 +219,7 @@ func TestACopyMadeWithoutFilesTakesTheCommitsThatLandAfter(t *testing.T) {
 		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("project") {
 			t.Fatalf("the second visit went to %q, %v", visited, err)
 		}
-		repositories, _, err := patchbranch.Progress(ctx, db.DB, patchbranch.Excluded{})
+		repositories, _, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -245,7 +246,7 @@ func TestABranchNameNoEngineCanStoreIsCountedAndNotKept(t *testing.T) {
 		gitIn(t, made.dir, "branch", "release-\xff", made.fix)
 		issue(t, db, "CVE-2025-0017", "high", link("project", made.fix))
 		turnOn(t, db)
-		pass := passOver(t, db, patchbranch.DefaultQuota, patchbranch.Excluded{},
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"project": made})
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
@@ -266,7 +267,7 @@ func TestNothingIsFetchedWhileTheLookupsAreOff(t *testing.T) {
 		empty(t, db)
 		made := project(t)
 		issue(t, db, "CVE-2025-0002", "critical", link("project", made.fix))
-		pass := passOver(t, db, patchbranch.DefaultQuota, patchbranch.Excluded{},
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"project": made})
 		visited, err := pass.Once(t.Context())
 		if err != nil {
@@ -285,7 +286,7 @@ func TestTheRepositoryBehindTheWorstIssueIsVisitedFirst(t *testing.T) {
 		issue(t, db, "CVE-2025-0003", "low", link("mild", mild.fix))
 		issue(t, db, "CVE-2025-0004", "critical", link("severe", severe.fix))
 		turnOn(t, db)
-		pass := passOver(t, db, patchbranch.DefaultQuota, patchbranch.Excluded{},
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"mild": mild, "severe": severe})
 		visited, err := pass.Once(t.Context())
 		if err != nil {
@@ -304,7 +305,7 @@ func TestARepositoryAlreadyCopiedIsVisitedFirstForNewCommits(t *testing.T) {
 		mild, severe := project(t), project(t)
 		issue(t, db, "CVE-2025-0005", "low", link("mild", mild.fix))
 		turnOn(t, db)
-		pass := passOver(t, db, patchbranch.DefaultQuota, patchbranch.Excluded{},
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"mild": mild, "severe": severe})
 		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("mild") {
 			t.Fatalf("visited %q, %v", visited, err)
@@ -334,7 +335,7 @@ func TestARepositoryOnAnExcludedHostIsNeverVisited(t *testing.T) {
 		made := project(t)
 		issue(t, db, "CVE-2025-0008", "critical", link("project", made.fix))
 		turnOn(t, db)
-		excluded, err := patchbranch.ParseExcluded("github.com")
+		excluded, err := outward.ParseExcluded("github.com")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -364,14 +365,14 @@ func TestACopyLargerThanTheCacheIsNotKeptAndWaitsADay(t *testing.T) {
 		made := project(t)
 		issue(t, db, "CVE-2025-0009", "critical", link("project", made.fix))
 		turnOn(t, db)
-		pass := passOver(t, db, 1, patchbranch.Excluded{}, map[string]upstream{"project": made})
+		pass := passOver(t, db, 1, outward.Excluded{}, map[string]upstream{"project": made})
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
 		if pass.Held(repositoryOf("project")) {
 			t.Error("a copy larger than the cache was kept")
 		}
-		repositories, _, err := patchbranch.Progress(ctx, db.DB, patchbranch.Excluded{})
+		repositories, _, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -398,14 +399,14 @@ func TestAVisitStoppedPartwayIsNeitherFinishedNorFailed(t *testing.T) {
 		// Shutdown arrives as the fetch begins.
 		ctx, stop := context.WithCancel(t.Context())
 		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
-			patchbranch.Excluded{}, func(string) string {
+			outward.Excluded{}, func(string) string {
 				stop()
 				return made.dir
 			})
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		repositories, _, err := patchbranch.Progress(t.Context(), db.DB, patchbranch.Excluded{})
+		repositories, _, err := patchbranch.Progress(t.Context(), db.DB, outward.Excluded{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -447,19 +448,19 @@ func TestAVisitStoppedPartwayLeavesAnEarlierFailureStanding(t *testing.T) {
 		issue(t, db, "CVE-2025-0018", "critical", link("project", made.fix))
 		turnOn(t, db)
 		// A visit that fails: the copy cannot fit.
-		failing := patchbranch.NewLocalPass(db.DB, t.TempDir(), 1, patchbranch.Excluded{},
+		failing := patchbranch.NewLocalPass(db.DB, t.TempDir(), 1, outward.Excluded{},
 			func(string) string { return made.dir })
 		if _, err := failing.Once(t.Context()); err != nil {
 			t.Fatal(err)
 		}
-		before, _, err := patchbranch.Progress(t.Context(), db.DB, patchbranch.Excluded{})
+		before, _, err := patchbranch.Progress(t.Context(), db.DB, outward.Excluded{})
 		if err != nil || len(before) != 1 || before[0].Reason == "" {
 			t.Fatalf("the first visit did not fail: %+v, %v", before, err)
 		}
 		// A day on, the retry is cut short by a shutdown.
 		ctx, stop := context.WithCancel(t.Context())
 		retry := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
-			patchbranch.Excluded{}, func(string) string {
+			outward.Excluded{}, func(string) string {
 				stop()
 				return made.dir
 			})
@@ -467,7 +468,7 @@ func TestAVisitStoppedPartwayLeavesAnEarlierFailureStanding(t *testing.T) {
 		if visited, err := retry.Once(ctx); err != nil || visited == "" {
 			t.Fatalf("the retry did not begin: %q, %v", visited, err)
 		}
-		after, _, err := patchbranch.Progress(t.Context(), db.DB, patchbranch.Excluded{})
+		after, _, err := patchbranch.Progress(t.Context(), db.DB, outward.Excluded{})
 		if err != nil || len(after) != 1 {
 			t.Fatalf("the report says %+v, %v", after, err)
 		}
@@ -491,7 +492,7 @@ func TestAFailureOfOursIsNotRecordedAsTheRepositorys(t *testing.T) {
 		// The table a lookup is recorded in goes away once the visit begins,
 		// which is this deployment failing and not the repository.
 		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
-			patchbranch.Excluded{}, func(string) string {
+			outward.Excluded{}, func(string) string {
 				if _, err := db.ExecContext(t.Context(),
 					`ALTER TABLE "patch_commit_branch" RENAME TO "patch_commit_branch_away"`); err != nil {
 					t.Fatal(err)
@@ -501,7 +502,7 @@ func TestAFailureOfOursIsNotRecordedAsTheRepositorys(t *testing.T) {
 		if _, err := pass.Once(t.Context()); err == nil {
 			t.Error("a visit that could not record what it found reported nothing")
 		}
-		repositories, _, err := patchbranch.Progress(t.Context(), db.DB, patchbranch.Excluded{})
+		repositories, _, err := patchbranch.Progress(t.Context(), db.DB, outward.Excluded{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -520,9 +521,9 @@ func TestProgressCountsWhatIsLookedUpAgainstWhatIsLinked(t *testing.T) {
 			link("project", made.fix), link("project", strings.Repeat("cd", 20)),
 			"https://github.com/example/project/pull/7")
 		turnOn(t, db)
-		pass := passOver(t, db, patchbranch.DefaultQuota, patchbranch.Excluded{},
+		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"project": made})
-		_, before, err := patchbranch.Progress(ctx, db.DB, patchbranch.Excluded{})
+		_, before, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -532,7 +533,7 @@ func TestProgressCountsWhatIsLookedUpAgainstWhatIsLinked(t *testing.T) {
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
 		}
-		repositories, after, err := patchbranch.Progress(ctx, db.DB, patchbranch.Excluded{})
+		repositories, after, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -565,7 +566,7 @@ func TestTheLeastRecentlyUsedCopyIsRemovedFirst(t *testing.T) {
 			return ""
 		}
 		// Room for two copies of this size and not three.
-		probe := patchbranch.NewLocalPass(db.DB, cache, patchbranch.DefaultQuota, patchbranch.Excluded{}, locate)
+		probe := patchbranch.NewLocalPass(db.DB, cache, patchbranch.DefaultQuota, outward.Excluded{}, locate)
 		issue(t, db, "CVE-2025-0011", "critical", link("first", first.fix))
 		if _, err := probe.Once(ctx); err != nil {
 			t.Fatal(err)
@@ -574,7 +575,7 @@ func TestTheLeastRecentlyUsedCopyIsRemovedFirst(t *testing.T) {
 		// Measured after each visit only. A copy arriving is briefly larger
 		// than it ends, so room made while it arrives can take a second copy
 		// — the order is the same, and the order is what this pins.
-		pass := patchbranch.NewLocalPass(db.DB, cache, 2*one+one/2, patchbranch.Excluded{}, locate).Unpolled()
+		pass := patchbranch.NewLocalPass(db.DB, cache, 2*one+one/2, outward.Excluded{}, locate).Unpolled()
 		issue(t, db, "CVE-2025-0012", "high", link("second", second.fix))
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)

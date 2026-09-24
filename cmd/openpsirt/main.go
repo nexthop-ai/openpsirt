@@ -299,7 +299,7 @@ func run(args []string, stdout, stderr *os.File) error {
 		// derivations of one boundary would be two boundaries the first time
 		// either moved.
 		Ours:     ours,
-		Excluded: cfg.PatchExcluded,
+		Excluded: cfg.OutboundExcluded,
 	})
 
 	// Every replica serves, reads and scans. Separate worker deployments would
@@ -352,7 +352,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// reaching out on one, holding a lease of its own the way the two passes
 	// above hold theirs: the politeness it keeps to is a rate per deployment
 	// rather than per replica.
-	suppliers := supplier.NewPass(db.DB, logger, name, cfg.Limits())
+	suppliers := supplier.NewPass(db.DB, logger, name, cfg.Limits(), cfg.OutboundExcluded)
 	// Fetches the repositories patch links point into and records which
 	// branches each linked commit is on. Started whatever the setting says
 	// and doing nothing until it is on, reading the setting each cycle so
@@ -360,7 +360,7 @@ func run(args []string, stdout, stderr *os.File) error {
 	// fetches, settled by a lease, because the copies are that replica's
 	// disk and a fetch of a large tree is not work to do twice.
 	branches := patchbranch.NewPass(db.DB, logger, name, patchbranch.Options{
-		Dir: cfg.PatchDir, Quota: int64(cfg.PatchQuota), Excluded: cfg.PatchExcluded,
+		Dir: cfg.PatchDir, Quota: int64(cfg.PatchQuota), Excluded: cfg.OutboundExcluded,
 	})
 	// The messages that leave the application, where an operator configured
 	// somewhere for it to go. Nil when they did not, which is ordinary rather

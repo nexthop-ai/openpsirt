@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
 // State is where one repository stands.
@@ -63,7 +65,7 @@ type Totals struct {
 }
 
 // Progress answers where every repository stands, most work left first.
-func Progress(ctx context.Context, db bun.IDB, excluded Excluded) ([]RepositoryProgress, Totals, error) {
+func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]RepositoryProgress, Totals, error) {
 	commits, links, err := linked(ctx, db)
 	if err != nil {
 		return nil, Totals{}, err
@@ -143,7 +145,7 @@ func Progress(ctx context.Context, db bun.IDB, excluded Excluded) ([]RepositoryP
 }
 
 // stateOf reads where a repository stands from what its row records.
-func stateOf(one RepositoryProgress, excluded Excluded) State {
+func stateOf(one RepositoryProgress, excluded outward.Excluded) State {
 	switch {
 	case excluded.Host(one.Host):
 		return Refused

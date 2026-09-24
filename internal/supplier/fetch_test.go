@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,9 @@ type publisher struct {
 	// override answers everything where a test needs a directory this
 	// publisher would not serve. Set before the first request.
 	override http.HandlerFunc
+	// excluded are hosts the client refuses the way it refuses one an
+	// administrator excluded.
+	excluded []string
 }
 
 func serving(t *testing.T) *publisher {
@@ -111,41 +115,57 @@ func (p *publisher) publishes(path, stamp, body string) {
 	p.stamped[path] = stamp
 }
 
-// reaching is a client that talks to one host and nowhere else, which is the
-// rule internal/outward enforces for real.
+// reaching is a client that answers for the publisher's own host and for
+// every other host named, all of them served by the one test server.
 //
-// A stand-in rather than the real guarded client, because that one refuses an
-// address inside this network and a test server has no other kind. What it
-// pins is what this package is responsible for: handing one client one host,
-// so that a feed or a document served from anywhere else is refused rather
-// than followed. The guard itself is internal/outward's to test.
+// A stand-in rather than the client a deployment runs, because that one
+// refuses an address inside this network and a test server has no other kind.
+// What it lets a test say is that a publisher's description naming a second
+// host is followed there. What the real client refuses is internal/outward's
+// to test, and the fetcher as built is driven once below to show it is wired.
 //
-// It trusts the certificate every test server here presents, which is one
-// certificate for all of them — so a request refused in these tests is refused
-// by the host pin and never by the handshake.
-func (p *publisher) reaching() func(string) *http.Client {
-	trusting := p.server.Client()
-	return func(host string) *http.Client {
-		return &http.Client{
-			Transport: pinned{host: host, inner: trusting.Transport},
-			CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-				return fmt.Errorf("%w a redirect to %s", outward.ErrRefused, req.URL.Host)
-			},
-		}
+// A host nobody named fails the way a name that does not resolve does, and an
+// excluded one is refused by the client the way the real one refuses it.
+func (p *publisher) reaching(also ...string) *http.Client {
+	served, err := url.Parse(p.server.URL)
+	if err != nil {
+		panic(err)
+	}
+	known := map[string]bool{strings.ToLower(served.Hostname()): true}
+	for _, host := range also {
+		known[strings.ToLower(host)] = true
+	}
+	refused := map[string]bool{}
+	for _, host := range p.excluded {
+		refused[strings.ToLower(host)] = true
+	}
+	return &http.Client{
+		Transport: aliased{known: known, refused: refused, at: served.Host,
+			inner: p.server.Client().Transport},
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return fmt.Errorf("%w a redirect to %s", outward.ErrRefused, req.URL.Host)
+		},
 	}
 }
 
-type pinned struct {
-	host  string
-	inner http.RoundTripper
+type aliased struct {
+	known   map[string]bool
+	refused map[string]bool
+	at      string
+	inner   http.RoundTripper
 }
 
-func (p pinned) RoundTrip(req *http.Request) (*http.Response, error) {
-	if !strings.EqualFold(req.URL.Hostname(), p.host) {
-		return nil, fmt.Errorf("%w a request to %s: not a configured provider host",
+func (a aliased) RoundTrip(req *http.Request) (*http.Response, error) {
+	if a.refused[strings.ToLower(req.URL.Hostname())] {
+		return nil, fmt.Errorf("%w a request to %s: an administrator excluded it",
 			outward.ErrRefused, req.URL.Hostname())
 	}
-	return p.inner.RoundTrip(req)
+	if !a.known[strings.ToLower(req.URL.Hostname())] {
+		return nil, fmt.Errorf("no such host %s", req.URL.Hostname())
+	}
+	sent := req.Clone(req.Context())
+	sent.URL.Host = a.at
+	return a.inner.RoundTrip(sent)
 }
 
 // advisory is one CSAF security advisory about a package at a version.
@@ -312,7 +332,7 @@ func (f *ships) reported(t *testing.T, issue, component, version string) int64 {
 // taken off so a test does not spend real seconds on it.
 func fetching(t *testing.T, f *ships, p *publisher) *supplier.Fetcher {
 	t.Helper()
-	fetch := supplier.NewFetcher(f.db.DB, sbom.Limits{})
+	fetch := supplier.NewFetcher(f.db.DB, sbom.Limits{}, outward.Excluded{})
 	fetch.Client = p.reaching()
 	fetch.Pause = 0
 	return fetch
@@ -482,41 +502,40 @@ func TestAVexDocumentInAPublishersFeedIsLeftAlone(t *testing.T) {
 	})
 }
 
-func TestADocumentServedFromAnotherHostIsRefusedRatherThanFetched(t *testing.T) {
-	// The addresses inside a publisher's directory come from outside. Fetching
-	// whatever they name is the request-forgery primitive the guarded client
-	// exists to refuse, and this pins the half this package is responsible
-	// for: one client, one host, so a document the publisher's own feed points
-	// somewhere else is never reached.
+func TestADirectoryOnASecondHostTheDescriptionNamesIsRead(t *testing.T) {
+	// SUSE describes itself on www.suse.com and serves its directory from
+	// ftp.suse.com. A second host a publisher's own description names is
+	// followed, under the same refusals as the first (REQ-69).
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
 		p := serving(t)
+		const second = "https://downloads.example.test"
 		p.override = func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/.well-known/csaf/provider-metadata.json" {
+			switch r.URL.Path {
+			case "/.well-known/csaf/provider-metadata.json":
 				_, _ = fmt.Fprintf(w, `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":%q}]}}]}`,
-					p.server.URL+"/feed.json")
-				return
+					second+"/feed.json")
+			case "/feed.json":
+				_, _ = fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[
+					{"link":[{"rel":"self","href":%q}],"updated":"2026-09-20T00:00:00Z",
+					 "content":{"type":"application/json","src":%q}}]}}`,
+					second+"/2026/EL-5.json", second+"/2026/EL-5.json")
+			case "/2026/EL-5.json":
+				_, _ = fmt.Fprint(w, advisory("EL-2026-0005", "libnl-3-200", "3.7.1", "CVE-2026-5555"))
+			default:
+				http.NotFound(w, r)
 			}
-			// The shape of the attack: a publisher's own document telling us
-			// to fetch somewhere else.
-			const elsewhere = "https://elsewhere.example/2026/EL-4.json"
-			_, _ = fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[
-				{"link":[{"rel":"self","href":%q}],"updated":"2026-09-20T00:00:00Z",
-				 "content":{"type":"application/json","src":%q}}]}}`, elsewhere, elsewhere)
 		}
 
-		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
-		if err == nil {
-			t.Fatal("a document on another host was fetched")
+		fetch := fetching(t, f, p)
+		fetch.Client = p.reaching("downloads.example.test")
+		took, err := fetch.From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatal(err)
 		}
-		// The reason matters rather than the failure: without the pin this
-		// request goes on to fail at DNS, which would let the test pass while
-		// the rule it names does nothing.
-		if !strings.Contains(err.Error(), "not a configured provider host") {
-			t.Errorf("it was refused for the wrong reason: %v", err)
-		}
-		if took.Recorded != 0 {
-			t.Errorf("%d claims were recorded from it", took.Recorded)
+		if took.Documents != 1 || took.Recorded != 1 {
+			t.Fatalf("the pass read %d documents and recorded %d claims from the second host",
+				took.Documents, took.Recorded)
 		}
 	})
 }
@@ -535,7 +554,7 @@ func TestTheFetcherAsBuiltWillNotReachInsideThisNetwork(t *testing.T) {
 		ctx := t.Context()
 		p := serving(t)
 
-		fetch := supplier.NewFetcher(f.db.DB, sbom.Limits{})
+		fetch := supplier.NewFetcher(f.db.DB, sbom.Limits{}, outward.Excluded{})
 		fetch.Pause = 0
 		_, err := fetch.From(ctx, f.by, from(t, f, p))
 		if err == nil {
