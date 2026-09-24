@@ -4,13 +4,13 @@
 // Package outward is the one HTTP client this process reaches the internet
 // with.
 //
-// Every fetch through here goes somewhere named in configuration or in a
-// document somebody else published, which is to say from outside, so all of it
-// refuses redirects, refuses to connect inside this network, and is bounded in
-// time (REQ-69). A client whose hosts are known in advance is pinned to them;
-// the open client, for hosts a document chooses, also refuses anywhere an
-// administrator excluded. Webhooks, mail and the object store do not reach out
-// through here, and each governs its own address.
+// Every fetch through here refuses redirects, refuses to connect inside this
+// network, and is bounded in time. A client whose hosts an administrator
+// configured or the application names is pinned to them; the open client, for
+// a host a document chooses, also refuses anywhere an administrator excluded
+// (REQ-69). Webhooks, mail and the object store go only where an administrator
+// configured them, do not reach out through here, and each governs its own
+// address.
 //
 // One package, because a control remembered at each call site is missed at the
 // next: a bare client with a timeout and nothing else, or the library's

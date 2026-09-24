@@ -476,8 +476,9 @@ One signed HTTP request per notification kind and per operational condition,
 configured per deployment. That covers Slack, Teams, a tracker driven by
 automation and paging without an adapter each.
 
-This is the first egress to an address an operator types, which makes it a
-request-forgery primitive unless governed (REQ-69):
+This is an egress to an address an operator types: a host an administrator
+configured, which REQ-69 lets it reach wherever that is. It is still a
+request-forgery primitive unless governed:
 
 | Control | Detail |
 |---|---|
