@@ -546,10 +546,10 @@ func TestTheFetcherAsBuiltWillNotReachInsideThisNetwork(t *testing.T) {
 	// guarded client for an ordinary one leaves them all green. This one
 	// drives the fetcher as NewFetcher builds it.
 	//
-	// A test server is on loopback, which is exactly what the guard refuses —
-	// so the refusal is the assertion, and the reason is checked rather than
-	// the failure, because an unguarded client fails here too, on the
-	// certificate.
+	// A test server is on loopback and on a port of its own, both of which
+	// the guard refuses — so the refusal is the assertion, and the reason is
+	// checked rather than the failure, because an unguarded client fails here
+	// too, on the certificate.
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
 		p := serving(t)
@@ -560,7 +560,8 @@ func TestTheFetcherAsBuiltWillNotReachInsideThisNetwork(t *testing.T) {
 		if err == nil {
 			t.Fatal("the fetcher reached a server inside this network")
 		}
-		if !strings.Contains(err.Error(), "not reached inside this network") {
+		if !strings.Contains(err.Error(), "not reached inside this network") &&
+			!strings.Contains(err.Error(), "only the https port") {
 			t.Errorf("it was refused for the wrong reason: %v", err)
 		}
 	})

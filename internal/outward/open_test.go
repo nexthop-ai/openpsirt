@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -43,7 +44,11 @@ func TestAnOpenClientRefusesAnAddressInsideThisNetwork(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	defer server.Close()
 
-	_, err := Open(time.Second, Excluded{}).Get(server.URL)
+	at, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = open(time.Second, Excluded{}, at.Port()).Get(server.URL)
 	if err == nil {
 		t.Fatal("an open client reached a server inside this network")
 	}
@@ -68,5 +73,53 @@ func TestAnOpenClientIsHTTPSOnlyAndFollowsNoRedirect(t *testing.T) {
 	}
 	if err := client.CheckRedirect(moved, nil); !errors.Is(err, ErrRefused) {
 		t.Errorf("a redirect was followed: %v", err)
+	}
+}
+
+func TestAnOpenClientRefusesAnExcludedNetworkWhenItConnects(t *testing.T) {
+	// A name is excluded by the network its address lies in, which is known
+	// only once it resolves. localhost names no excluded host, so what refuses
+	// it is the check at the dial, and the refusal names the exclusion.
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
+	defer server.Close()
+	at, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	excluded, err := ParseExcluded("127.0.0.0/8,::1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = open(time.Second, excluded, at.Port()).Get("https://localhost:" + at.Port() + "/")
+	if err == nil {
+		t.Fatal("an excluded network was reached")
+	}
+	if !strings.Contains(err.Error(), "an administrator excluded it") {
+		t.Errorf("refused for the wrong reason: %v", err)
+	}
+}
+
+func TestAnOpenClientRefusesWhatAnAddressShouldNotCarry(t *testing.T) {
+	excluded, err := ParseExcluded("corp.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := Open(time.Second, excluded)
+	for address, reason := range map[string]string{
+		// A fullwidth letter: the transport maps it to the excluded host.
+		"https://wiki.\uff43orp.example.com/":       "not a host name",
+		"https://downloads.example.test:22/":        "only the https port",
+		"https://downloads.example.test:8443/":      "only the https port",
+		"https://user:pass@downloads.example.test/": "carries no user",
+	} {
+		req, err := http.NewRequest(http.MethodGet, address, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = client.Transport.RoundTrip(req)
+		if !errors.Is(err, ErrRefused) || !strings.Contains(err.Error(), reason) {
+			t.Errorf("%s: %v, want a refusal saying %q", address, err, reason)
+		}
 	}
 }

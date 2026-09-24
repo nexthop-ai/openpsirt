@@ -92,10 +92,10 @@ func (e Excluded) address(ip net.IP) bool {
 
 // Reachable refuses an address inside this network or in one an
 // administrator excluded.
+//
+// The administrator's networks are asked first, so a refusal names the
+// exclusion where a network of theirs also lies inside this one.
 func (e Excluded) Reachable(address string) error {
-	if err := Reachable(address); err != nil {
-		return err
-	}
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		host = address
@@ -103,5 +103,5 @@ func (e Excluded) Reachable(address string) error {
 	if ip := net.ParseIP(host); ip != nil && e.address(ip) {
 		return fmt.Errorf("refused a connection to %s: an administrator excluded it", ip)
 	}
-	return nil
+	return Reachable(address)
 }
