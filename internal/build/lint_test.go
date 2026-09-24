@@ -90,6 +90,20 @@ func vetGaps(text string) []string {
 	if !holds(under(lines, "run", "build-tags"), "measure") {
 		gaps = append(gaps, `the "measure" tag is not passed, so nothing compiles the measurement file`)
 	}
+	// The default skips any file marked generated, which go vet reads.
+	exclusions := under(lines, "linters", "exclusions")
+	generated := false
+	for _, l := range exclusions {
+		switch {
+		case l.text == "generated: disable":
+			generated = true
+		case strings.Contains(l.text, "govet") || strings.Contains(l.text, "_test"):
+			gaps = append(gaps, "an exclusion takes files or findings away from govet: "+l.text)
+		}
+	}
+	if !generated {
+		gaps = append(gaps, "generated files are excluded, and go vet reads them")
+	}
 	return gaps
 }
 
@@ -116,6 +130,8 @@ run:
     - measure
 linters:
   default: none
+  exclusions:
+    generated: disable
   enable:
     - govet
     - staticcheck
@@ -142,7 +158,26 @@ linters:
       disable:
         - printf
 `
-	if gaps := vetGaps(narrowed); len(gaps) != 4 {
-		t.Errorf("reported %d of the four ways this narrows go vet: %v", len(gaps), gaps)
+	if gaps := vetGaps(narrowed); len(gaps) != 5 {
+		t.Errorf("reported %d of the five ways this narrows go vet: %v", len(gaps), gaps)
+	}
+
+	const excluding = `version: "2"
+run:
+  build-tags:
+    - measure
+linters:
+  default: none
+  exclusions:
+    generated: disable
+    rules:
+      - path: _test.go
+        linters:
+          - govet
+  enable:
+    - govet
+`
+	if gaps := vetGaps(excluding); len(gaps) != 2 {
+		t.Errorf("an exclusion rule over govet and test files was reported as %v", gaps)
 	}
 }

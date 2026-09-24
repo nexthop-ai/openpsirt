@@ -22,6 +22,11 @@ run:
 
 linters:
   default: none
+  # Generated files are linted like the rest. The linter is the only vet the
+  # gate runs, and go vet reads a generated file; the default here skips any
+  # file marked generated, which is two of this tree's.
+  exclusions:
+    generated: disable
   enable:
     - govet
     - staticcheck

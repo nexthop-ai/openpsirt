@@ -356,9 +356,10 @@ the next that the emptying does not remove.
 The SQLite template is migrated by the first binary that asks and kept in the
 temporary directory for the rest. Each package is a binary, and migrating once
 in each was 6% of the race pass's processor time: 24 s of 383 s sampled. The
-file is named for the migrations' fingerprint and the SQLite library's version,
-so an edited migration or a new library names a different file, and one that
-does not open like a database is migrated again.
+file is named for everything its content follows from — the migrations'
+fingerprint, the name widths the migrations read, the SQLite library and the
+migration library — so any of those changing names a different file, and one
+that does not open like a database is migrated again.
 
 Each test gets a query builder of its own over the shared pool. A test may add a
 query hook to count its statements, and a hook on a shared builder goes on
@@ -587,7 +588,10 @@ separate `go vet`: the same analysis twice was 50 s of a two-core runner. A
 mistake planted in a test file and in the tagged file was reported by the
 linter in both. What keeps that true is the configuration, so a test holds it:
 `govet` enabled, no `govet` settings narrowing its analyzers, test files not
-excluded, and the `measure` tag passed.
+excluded, generated files not excluded, no exclusion naming `govet` or a test
+file, and the `measure` tag passed. The linter's own default skips any file
+marked generated, which `go vet` reads, so the configuration turns that off for
+every linter.
 
 The linter reports one issue per line. Two problems on one line appear one at a
 time, where `go vet` alone would name both.

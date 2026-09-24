@@ -8,11 +8,12 @@
 // loudly otherwise — a skipped engine is reported rather than silently absent,
 // because a portability suite that quietly tests one engine is worse than none.
 //
-// The schema is built once per test binary, not once per test. A test binary
-// is one package, so on SQLite one file is migrated on first use and copied
-// for each test — a copy is milliseconds where eighteen migrations were about
-// a second — and on the three servers each binary gets a database of its own,
-// named for the package, dropped and created on first use and migrated once.
+// The schema is built once, not once per test. On SQLite the first test
+// binary in a run migrates one file and keeps it in the temporary directory,
+// every other binary reads it, and each test copies it — a copy is
+// milliseconds where a migration is most of a second. On the three servers
+// each binary gets a database of its own, named for the package, dropped and
+// created on first use and migrated once.
 // Packages therefore share nothing and can run in parallel; tests within a
 // package share the database, and one pool of connections to it, and empty it
 // between them with Reset.
@@ -97,7 +98,7 @@ func candidates() []candidate {
 //
 // The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per binary, and each server database is either migrated on
+// was migrated once per run, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
@@ -115,7 +116,7 @@ func Each(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 //
 // The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per binary, and each server database is either migrated on
+// was migrated once per run, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
@@ -133,7 +134,7 @@ func Alone(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 //
 // The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per binary, and each server database is either migrated on
+// was migrated once per run, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
@@ -176,7 +177,7 @@ func Servers(t *testing.T, fn func(t *testing.T, db *database.DB)) {
 //
 // The database arrives migrated and empty of the previous test's rows.
 // Every path here hands back a migrated schema — SQLite copies a template that
-// was migrated once per binary, and each server database is either migrated on
+// was migrated once per run, and each server database is either migrated on
 // creation or emptied on reuse — so a test needs no schema.Up of its own. Call
 // Reset only where a test leaves rows a later one must not see.
 //
@@ -410,10 +411,9 @@ const sqliteHeader = "SQLite format 3\x00"
 // sharedTemplate reads the template kept in dir for the migrations this
 // binary carries, or migrates one and keeps it there.
 //
-// The name carries the migrations' fingerprint and the SQLite library's
-// version, the two things the file's content follows from, so an edited
-// migration or a new library names a different file rather than reading a
-// stale one. It is written beside its name and renamed into place, so a
+// The name carries everything the file's content follows from, so an edited
+// migration, a changed width or a new library names a different file rather
+// than reading a stale one. It is written beside its name and renamed into place, so a
 // binary reading it never sees half a file, and two binaries migrating at once
 // each rename a complete one. A file that does not open like a database is
 // migrated again.
@@ -449,22 +449,26 @@ func sharedTemplate(dir string) ([]byte, error) {
 	return made, nil
 }
 
-// templateName is the file the template for these migrations and this SQLite
-// library is kept under.
+// templateName is the file the template is kept under: named for everything
+// its content follows from — the migrations, the widths seven of them read,
+// the SQLite library that writes the file and the migration library that
+// writes its version table.
 func templateName() (string, error) {
 	schema, err := migrations.Fingerprint()
 	if err != nil {
 		return "", fmt.Errorf("fingerprint the migrations: %w", err)
 	}
-	library := ""
+	var libraries []string
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, dep := range info.Deps {
-			if dep.Path == "modernc.org/sqlite" {
-				library = dep.Version
+			if dep.Path == "modernc.org/sqlite" || dep.Path == "github.com/pressly/goose/v3" {
+				libraries = append(libraries, dep.Path+"@"+dep.Version)
 			}
 		}
 	}
-	sum := sha256.Sum256([]byte(schema + "\x00" + library))
+	key := fmt.Sprintf("%s\x00%s\x00%d\x00%d", schema, strings.Join(libraries, "\x00"),
+		database.NameWidth, database.ComposedWidth)
+	sum := sha256.Sum256([]byte(key))
 	return "openpsirt-dbtest-" + hex.EncodeToString(sum[:6]) + ".db", nil
 }
 
