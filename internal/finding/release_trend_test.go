@@ -139,7 +139,7 @@ func TestAScannedBuildWithNothingOpenIsStillAReleaseOfItsOwn(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		releases, err := f.store.Releases(t.Context(), f.holding(t, access.PrivateRead), f.productID)
+		releases, err := f.store.Releases(t.Context(), f.holding(t, access.PublicRead, access.PrivateRead), f.productID)
 		if err != nil {
 			t.Fatal(err)
 		}

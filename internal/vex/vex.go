@@ -243,9 +243,13 @@ func (s *Store) locate(ctx context.Context, subject access.Subject,
 	// case here — the names their own issue sits at have to resolve, or the
 	// grant refuses them the one thing it gave — and that is not an answer to
 	// this one. Asked before the build is resolved any further.
+	//
+	// Asked of disclosed work. A document is disclosed work alone, and a row
+	// saying one went out is as much a disclosure as the document, so reading
+	// only undisclosed work in the product reaches neither.
 	if !subject.Reads(access.Public, named.ProductID) {
 		return nil, nil, access.Denied(
-			fmt.Sprintf("read findings in product %d", named.ProductID))
+			fmt.Sprintf("read disclosed findings in product %d", named.ProductID))
 	}
 	target, err := names.ExistingTarget(ctx, named.StreamID, named.VariantID)
 	if err != nil {

@@ -107,12 +107,11 @@ export function Record() {
   });
 
   const may = mayOf(who.data, product);
-  // Recording something nobody has announced is triage work on undisclosed
-  // findings, and that is the right it asks for. Somebody who may argue about
-  // known issues in shipped components has not been given the undisclosed
-  // ones, and may still record one that is already public.
+  // Recording a flaw is triage at the visibility it is recorded at, and each
+  // visibility is its own role: somebody holding one records at that one only.
   const mayHide = !!may?.may_hide;
-  const mayRecord = mayHide || !!may?.may_triage;
+  const mayPublish = !!may?.triages_public;
+  const mayRecord = mayHide || mayPublish;
   const whole = product !== "" && streams.length > 0 && variants.length > 0;
   // Filing a report is working reports, which asks for the right to triage
   // undisclosed work. Without it the only path is recording a flaw that is
@@ -127,9 +126,9 @@ export function Record() {
   //
   // Worked out rather than stored, so there is no frame in which the form is
   // drawn one way and corrected to the other once the session has loaded: for
-  // somebody who may not hide a flaw, disclosed is the only answer there is,
-  // and the control that would say otherwise is disabled.
-  const disclosed = mayHide ? (chose ?? false) : true;
+  // somebody holding one of the two roles, that one is the only answer there
+  // is, and the control that would say otherwise is disabled.
+  const disclosed = !mayHide ? true : !mayPublish ? false : (chose ?? false);
   // The choice is about a flaw in this product, so changing the product unmakes
   // it and the default falls back to whatever the new one's rights allow. A
   // choice that carried across would carry "public" onto a product where
@@ -657,16 +656,27 @@ export function Record() {
               >
                 Undisclosed
               </button>
-              <button type="button" aria-pressed={disclosed} onClick={() => setChose(true)}>
+              <button
+                type="button"
+                aria-pressed={disclosed}
+                disabled={!mayPublish}
+                onClick={() => setChose(true)}
+              >
                 Public
               </button>
             </div>
-            {/* Why the first one cannot be picked, in the open rather than on
-                a disabled button, which reads as broken. */}
+            {/* Why one cannot be picked, in the open rather than on a disabled
+                button, which reads as broken. */}
             {!mayHide && (
               <span className="hint">
                 Recording an undisclosed flaw needs the private triage role here. Without it, this
                 is public once saved.
+              </span>
+            )}
+            {!mayPublish && mayHide && (
+              <span className="hint">
+                Recording a public flaw needs the public triage role here. Without it, this is
+                undisclosed once saved.
               </span>
             )}
             <span className="hint">

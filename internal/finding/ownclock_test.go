@@ -247,7 +247,7 @@ func TestAnIssueSaysWhereItIsAFlawRecordedHere(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		scanned := f.anIssueHere(t, who, "A known issue in a component somebody else wrote.")
 		_, identifier, err := f.store.Enter(ctx, who, finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",

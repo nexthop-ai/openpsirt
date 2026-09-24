@@ -22,7 +22,7 @@ import (
 // is not reading, and reading is what these tests mean.
 func everyone(f *fixture) access.Subject {
 	return access.NewPerson(1, "tester", false,
-		map[int64][]access.Role{*f.scope.ProductID: {access.PrivateRead}}, 0)
+		map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead, access.PrivateRead}}, 0)
 }
 
 // chain spells a way down as words, root first.

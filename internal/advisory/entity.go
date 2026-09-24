@@ -230,6 +230,17 @@ func (s *Store) byName(ctx context.Context, subject access.Subject,
 	if held.Beyond > 0 {
 		return nil, ErrNoSuchAdvisory
 	}
+	// Every product is one they read, and every issue has to be one they read
+	// at its own visibility there: reading undisclosed work in a product does
+	// not reach a draft about its disclosed flaws.
+	whole, err := wholeIssues(s.db.NewSelect().TableExpr(`"advisory" AS "ad"`).
+		Where("ad.id = ?", row.ID), subject).Exists(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("check what advisory %q covers: %w", identifier, err)
+	}
+	if !whole {
+		return nil, ErrNoSuchAdvisory
+	}
 	// An advisory covering nothing is its minter's alone. Covering nothing it
 	// satisfies every narrowing there is, and its title is prose somebody
 	// typed that goes on to be the document's — so between minting it and
@@ -567,6 +578,9 @@ func (s *Store) List(ctx context.Context, subject access.Subject, over Covering,
 		// narrowing, and its title is prose somebody typed.
 		Where(`(ad.minted_by = ? OR EXISTS (SELECT 1 FROM "advisory_issue" AS "al"
 			WHERE al.advisory_id = ad.id AND al.removed_at IS NULL))`, subject.ID)
+	// And every issue at a visibility they read in its product, which is
+	// what reading one by name asks as well.
+	q = wholeIssues(q, subject)
 
 	// Narrowed to what covers one issue, where a caller asked. A screen about
 	// one flaw is asking which advisories already say something about it,

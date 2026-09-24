@@ -526,12 +526,13 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // Only when the database is behind. A schema ahead of this build is a
 // rollback, which has to keep working: the migrations a newer binary applied
 // are additive, and refusing here would leave a bad deployment with no way
-// back.
+// back. The migration from v0.1.0 is not additive, and going back to v0.1.0 is
+// rolling it back with the newer binary first.
 //
-// It compares version numbers, which is less than it sounds. Before the
-// first release a schema change edits the migration that created the thing
-// rather than adding one beside it, so two builds can carry the same highest
-// version and different schemas — and an existing database then matches on the
+// It compares version numbers, which is less than it sounds. Below 1.0 a
+// schema change edits what declares the thing rather than adding a migration
+// beside it, so two builds can carry the same highest version and different
+// schemas — and an existing database then matches on the
 // number while its columns are whatever the earlier build made. Nothing here
 // can see that, which is why the line it logs names the version rather than
 // calling the schema current.

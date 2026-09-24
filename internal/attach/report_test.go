@@ -107,7 +107,7 @@ func TestJudgingAClaimDoesNotPublishWhatArrivedWithIt(t *testing.T) {
 	// meant to be read there is attached to the issue, which is an act
 	// somebody takes.
 	each(t, func(t *testing.T, f *fixture) {
-		owner := f.who(t, access.PrivateTriage)
+		owner := f.who(t, access.PublicTriage, access.PrivateTriage)
 		// f.issue is announced work, so a file on the issue itself is
 		// readable by a reader of this product. The pair is what makes the
 		// rule visible rather than a single refusal that could be anything.

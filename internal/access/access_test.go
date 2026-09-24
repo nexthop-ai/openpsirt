@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
@@ -148,6 +149,59 @@ func TestReadingPublicIsNotReadingPrivate(t *testing.T) {
 			t.Error("a public reader reached something undisclosed")
 		}
 	})
+}
+
+// Each visibility is its own grant. Somebody working private reports holds
+// the undisclosed half and is not handed the disclosed stream with it.
+func TestReadingPrivateIsNotReadingPublic(t *testing.T) {
+	embargo := access.NewPerson(7, "embargo", false, map[int64][]access.Role{
+		4: {access.PrivateRead},
+		5: {access.PrivateTriage},
+	}, 70)
+
+	for _, product := range []int64{4, 5} {
+		if !embargo.Reads(access.Private, product) {
+			t.Errorf("product %d: the undisclosed half is not read", product)
+		}
+		if embargo.Reads(access.Public, product) {
+			t.Errorf("product %d: reading undisclosed work read disclosed work too", product)
+		}
+		if !embargo.ReadsIn(product) || !embargo.Sees(product) {
+			t.Errorf("product %d: a private grant does not make the product readable", product)
+		}
+		if got := access.Visible(embargo, product); len(got) != 1 || got[0] != access.Private {
+			t.Errorf("product %d: visible is %v, want only the undisclosed half", product, got)
+		}
+	}
+	if embargo.Triages(access.Private, 4) || embargo.TriagesIn(4) {
+		t.Error("reading undisclosed work triages it")
+	}
+	if !embargo.Triages(access.Private, 5) || !embargo.TriagesIn(5) {
+		t.Error("private triage does not triage undisclosed work")
+	}
+	if embargo.Triages(access.Public, 5) {
+		t.Error("private triage triages disclosed work too")
+	}
+
+	// The narrowing sorts each product by what it allows there.
+	both, public, private := access.Split([]int64{3, 4, 5, 6}, func(v access.Visibility, id int64) bool {
+		switch id {
+		case 3:
+			return true
+		case 4:
+			return v == access.Public
+		case 5:
+			return v == access.Private
+		}
+		return false
+	})
+	if !slices.Equal(both, []int64{3}) || !slices.Equal(public, []int64{4}) ||
+		!slices.Equal(private, []int64{5}) {
+		t.Errorf("split into %v, %v, %v; want [3], [4], [5]", both, public, private)
+	}
+	if where, _ := access.VisibleWhere("p", "v", nil, nil, nil); where != "1 = 0" {
+		t.Errorf("nothing allowed narrows to %q, want a condition nothing meets", where)
+	}
 }
 
 func TestACapabilityHandsOverNoVisibility(t *testing.T) {

@@ -345,7 +345,7 @@ func TestChangingWhatAnAdvisorySaysNeedsTheRoleOnEveryProductItCovers(t *testing
 		// rule being pinned.
 		partly := access.NewPerson(f.second.ID, f.second.Identity, false,
 			map[int64][]access.Role{
-				f.product:      {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				f.product:      {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 				f.otherProduct: {access.PublicRead, access.PrivateRead},
 			}, 0)
 

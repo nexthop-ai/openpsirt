@@ -45,7 +45,7 @@ func (f *fixture) reportNamed(t *testing.T, who access.Subject, reference string
 
 func TestADispositionNobodyElseAgreesToTakesEffectAtOnce(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		named := f.claims(t, who, 1)
 		ruling, err := f.store.Rule(t.Context(), who, f.productID, finding.Ruled{
 			References: named, Disposition: finding.NotReproducible,
@@ -86,7 +86,7 @@ func TestSettingAClaimAsideWaitsForASecondPerson(t *testing.T) {
 	for _, disposition := range []finding.Disposition{finding.Rejected, finding.OutOfScope} {
 		t.Run(string(disposition), func(t *testing.T) {
 			each(t, func(t *testing.T, f *fixture) {
-				proposer := f.planner(t, access.PrivateTriage)
+				proposer := f.planner(t, access.PublicTriage, access.PrivateTriage)
 				second := f.somebody(t, "second@example.com", access.PrivateTriage)
 				named := f.claims(t, proposer, 2)
 
@@ -146,7 +146,7 @@ func TestSettingAClaimAsideWaitsForASecondPerson(t *testing.T) {
 
 func TestAWaitingRulingHoldsItsReports(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		named := f.claims(t, who, 1)
 		if _, err := f.store.Rule(t.Context(), who, f.productID, finding.Ruled{
 			References: named, Disposition: finding.Rejected, Reasoning: "Not a flaw.",
@@ -168,7 +168,7 @@ func TestAWaitingRulingHoldsItsReports(t *testing.T) {
 
 func TestWithdrawingARulingReturnsItsReportsToTheInbox(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		proposer := f.planner(t, access.PrivateTriage)
+		proposer := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		second := f.somebody(t, "second@example.com", access.PrivateTriage)
 
 		// In force and waiting are one act to withdraw: undoing and sending
@@ -231,7 +231,7 @@ func TestADuplicateOfAnIssueThatIsNotOpenIsRefused(t *testing.T) {
 	// elsewhere is not there, and nobody else agreed to anything. Refused at
 	// submission, pointing at rejection, which a second person agrees to.
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.anIssueHereShipped(t, who)
 		named := f.claims(t, who, 2)
 
@@ -262,7 +262,7 @@ func TestADuplicateOfAnIssueThatIsNotOpenIsRefused(t *testing.T) {
 
 func TestADuplicateNamesAnIssueAndNothingElseDoes(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.anIssueHereShipped(t, who)
 		named := f.claims(t, who, 1)
 		if _, err := f.store.Rule(t.Context(), who, f.productID, finding.Ruled{
@@ -293,7 +293,7 @@ func TestADuplicateNamesAnIssueAndNothingElseDoes(t *testing.T) {
 
 func TestADuplicateIsReadFromTheIssueItPointsAt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.anIssueHereShipped(t, who)
 		named := f.claims(t, who, 3)
 
@@ -342,7 +342,7 @@ func TestADuplicateIsReadFromTheIssueItPointsAt(t *testing.T) {
 
 func TestTheBulkCapCountsReportsWrittenRatherThanNamesGiven(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		if err := f.setting(t, setting.TogetherCap, "2"); err != nil {
 			t.Fatal(err)
 		}
@@ -376,7 +376,7 @@ func TestTheBulkCapCountsReportsWrittenRatherThanNamesGiven(t *testing.T) {
 
 func TestSettingAClaimAsideNeedsAReason(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		named := f.claims(t, who, 1)
 		for _, disposition := range []finding.Disposition{
 			finding.Rejected, finding.OutOfScope, finding.NotReproducible,
@@ -400,7 +400,7 @@ func TestSettingAClaimAsideNeedsAReason(t *testing.T) {
 
 func TestARulingNamingOneReportItCannotWriteWritesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		named := f.claims(t, who, 2)
 
 		// A name nobody minted.
@@ -453,7 +453,7 @@ func TestARulingNamingOneReportItCannotWriteWritesNothing(t *testing.T) {
 
 func TestRulingsAreProposedByWhoWorksReportsAndAgreedByWhoMayApprove(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		owner := f.planner(t, access.PrivateTriage)
+		owner := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		named := f.claims(t, owner, 1)
 		ruling, err := f.store.Rule(t.Context(), owner, f.productID, finding.Ruled{
 			References: named, Disposition: finding.Rejected, Reasoning: "Slop.",
@@ -552,7 +552,7 @@ func TestADuplicateOfAnIssueDismissedOrSuppressedEverywhereIsRefused(t *testing.
 		}); err != nil {
 			t.Fatal(err)
 		}
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		named := f.claims(t, who, 3)
 		duplicate := func(reference, issue string) error {
 			t.Helper()
@@ -701,7 +701,7 @@ func TestTheRulingsSomebodyMayApproveAreWaitingOthersInProductsTheyMayAgreeIn(t 
 	// The count a queue of what is pending your approval adds: not your own,
 	// not settled, and only where you may agree to a ruling at all.
 	each(t, func(t *testing.T, f *fixture) {
-		owner := f.planner(t, access.PrivateTriage)
+		owner := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		named := f.claims(t, owner, 3)
 		for _, reference := range named {
 			if _, err := f.store.Rule(t.Context(), owner, f.productID, finding.Ruled{

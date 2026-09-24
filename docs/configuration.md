@@ -35,6 +35,25 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 
 ## Upgrading
 
+Stop every v0.1.0 process before upgrading. The upgrade drops and reshapes
+tables v0.1.0 reads and writes, so a v0.1.0 replica left serving during a
+rolling update fails on them. With the Helm chart, scale the deployment to zero
+first.
+
+Going back to v0.1.0 is `openpsirt migrate down`, run with this build before
+the v0.1.0 one is deployed. v0.1.0 started against the upgraded schema reports
+it current and cannot read it.
+
+A database built by v0.1.0 is upgraded in place, at startup or by `openpsirt
+migrate up`. Back it up first: on MySQL and MariaDB an upgrade that fails part
+way leaves the schema half changed, and the backup is what recovers it. A
+database built by any other earlier build is recreated.
+
+| After the upgrade | |
+|---|---|
+| An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
+| A reported flaw | Has a reference, minted as one recorded today would be |
+
 `OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is now
 refused where it used to be accepted. `psirt.example.com` has to become
 `https://psirt.example.com`.
@@ -50,6 +69,13 @@ A path below the address is refused for the same reason:
 `https://psirt.example.com/psirt` makes every link this deployment writes point
 somewhere it does not answer. If this deployment is served under a path, that
 is a thing to raise rather than to configure here.
+
+`private-read` and `private-triage` used to include disclosed findings. Each
+now reaches only findings nobody has announced. Grant `public-read` or
+`public-triage` beside them — directly, in a group binding, or in a token's
+holds — wherever somebody should keep the disclosed findings. Nothing is
+granted on upgrade, so until then a holder of a private role alone sees no
+disclosed finding they are not assigned.
 
 ## Serving
 
@@ -72,7 +98,7 @@ writes `text`.
 | Variable | Meaning | Default |
 |---|---|---|
 | `OPENPSIRT_DATABASE_URL` | Which database and how to reach it: `postgres://user:password@host:5432/name`, `mysql://…`, `mariadb://…`, or `sqlite:///absolute/path.db`. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. **Required** | unset |
-| `OPENPSIRT_AUTO_MIGRATE` | Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run `openpsirt migrate up` yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and `openpsirt migrate status` says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits the migration that made the thing, so a database can be at the expected version and still hold what an earlier build created | `true` |
+| `OPENPSIRT_AUTO_MIGRATE` | Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run `openpsirt migrate up` yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and `openpsirt migrate status` says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits what declares the thing rather than adding a migration beside it, so a database can be at the expected version and still hold what an earlier build created | `true` |
 | `OPENPSIRT_DB_MAX_OPEN` | Most connections open at once | `25` |
 | `OPENPSIRT_DB_MAX_IDLE` | Most connections kept open idle | `25` |
 | `OPENPSIRT_DB_IDLE_TIMEOUT` | How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back | `1m` |

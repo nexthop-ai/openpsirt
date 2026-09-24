@@ -140,7 +140,7 @@ func TestAPreviewShowsOnlyWhatTheAskerMayRead(t *testing.T) {
 			t.Errorf("a public reader previewed %+v over undisclosed findings", seen)
 		}
 
-		private := f.planner(t, access.PrivateTriage)
+		private := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		held, err := f.store.WouldMatch(ctx, private, f.productID, "", "libnl-3-*", 20)
 		if err != nil {
 			t.Fatal(err)

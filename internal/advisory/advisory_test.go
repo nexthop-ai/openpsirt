@@ -136,13 +136,13 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 			older:        older.ID,
 			otherProduct: second.ID, other: secondTarget.ID, second: another,
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
-				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
-				second.ID:    {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
+				second.ID:    {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 			}, 0),
 			approver: access.NewPerson(another.ID, another.Identity, false,
 				map[int64][]access.Role{
-					w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
-					second.ID:    {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+					w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
+					second.ID:    {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 				}, 0),
 			built: time.Now().UTC().Add(-72 * time.Hour),
 		}

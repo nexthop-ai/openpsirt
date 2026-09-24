@@ -28,7 +28,7 @@ func TestAFlawInWhatWeShipIsRecordedAndSurvivesTheNextScan(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		rows, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
@@ -118,7 +118,7 @@ func TestRecordingAnUndisclosedFlawNeedsThePrivateRight(t *testing.T) {
 			entering); err == nil {
 			t.Error("somebody who may only read recorded a flaw")
 		}
-		if _, _, err := f.store.Enter(t.Context(), f.planner(t, access.PrivateTriage),
+		if _, _, err := f.store.Enter(t.Context(), f.planner(t, access.PublicTriage, access.PrivateTriage),
 			entering); err != nil {
 			t.Errorf("somebody holding private triage could not record one: %v", err)
 		}
@@ -140,7 +140,7 @@ func TestARecordedFlawSaysWhatItIsAndWhereItIs(t *testing.T) {
 	// software.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		// Whitespace passes a minimum length and is not a summary, so this
 		// arrives from a request rather than only from inside this process —
@@ -206,7 +206,7 @@ func TestRecordingAgainstANameTheBuildHoldsTwiceIsRefusedRatherThanGuessed(t *te
 				{Parent: swss, Child: libnlNew},
 			},
 		})
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		const said = "The parser accepts a message it should refuse."
 
 		_, _, err := f.store.Enter(t.Context(), who, finding.Entering{
@@ -258,7 +258,7 @@ func TestOneFlawIsRecordedAgainstEveryBuildThatShipsIt(t *testing.T) {
 		other := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, other, through(libnl))
 
-		rows, identifier, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage),
+		rows, identifier, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
 				TargetIDs: []int64{f.target, other},
 				Component: libnl.Name, Severity: "high",
@@ -279,7 +279,7 @@ func TestOneFlawIsRecordedAgainstEveryBuildThatShipsIt(t *testing.T) {
 		}
 		// And it reads back as one piece of work across the product, which is
 		// what the findings list groups by.
-		groups, total, err := f.store.Groups(ctx, f.holding(t, access.PrivateRead),
+		groups, total, err := f.store.Groups(ctx, f.holding(t, access.PublicRead, access.PrivateRead),
 			f.wholeProduct(), 50, 0, finding.Filter{})
 		if err != nil {
 			t.Fatal(err)
@@ -313,7 +313,7 @@ func TestAFlawIsNotRecordedAgainstBuildsThatDoNotHoldIt(t *testing.T) {
 		// The second build ships something else entirely.
 		f.shippedTo(t, other, through(teamd))
 
-		if _, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage),
+		if _, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
 				TargetIDs: []int64{f.target, other},
 				Component: libnl.Name, Severity: "high",
@@ -327,7 +327,7 @@ func TestAFlawIsNotRecordedAgainstBuildsThatDoNotHoldIt(t *testing.T) {
 func TestRecordingNeedsAtLeastOneBuild(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, through(libnl))
-		if _, _, err := f.store.Enter(t.Context(), f.planner(t, access.PrivateTriage),
+		if _, _, err := f.store.Enter(t.Context(), f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{Severity: "high", Summary: "Something is wrong."}); err == nil {
 			t.Error("a flaw was recorded against no build at all")
 		}
@@ -343,7 +343,7 @@ func TestWhichBuildsAFlawAffectsIsCorrectedAsResearchGoes(t *testing.T) {
 		f.shipped(t, through(libnl))
 		other := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, other, through(libnl))
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		// Recorded against one build to begin with.
 		rows, identifier, err := f.store.Enter(ctx, who, finding.Entering{
@@ -401,7 +401,7 @@ func TestTakingABuildOutNeedsAReasonAndAddingOneDoesNot(t *testing.T) {
 		f.shipped(t, through(libnl))
 		other := f.anotherVariant(t, "mellanox")
 		f.shippedTo(t, other, through(libnl))
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
 			TargetIDs: []int64{f.target, other}, Component: libnl.Name, Severity: "high",
@@ -428,7 +428,7 @@ func TestWhichBuildsAScannedIssueIsInIsNotOursToSet(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.store.Affects(ctx, f.planner(t, access.PrivateTriage), f.productID,
+		if _, err := f.store.Affects(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), f.productID,
 			f.issueID(t, "CVE-2026-1"), []int64{f.target}, "because"); err == nil {
 			t.Error("a scanned issue's builds were set by hand")
 		}
@@ -493,7 +493,7 @@ func TestAFlawReportIsReadableOnlyWhereItWasMade(t *testing.T) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
 
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
@@ -565,7 +565,7 @@ func TestAFlawRecordedByHandIsKeyedWhereAScanWouldKeyIt(t *testing.T) {
 		// libnl sits under two consumers, which is what a place is for.
 		f.shipped(t, twoConsumers())
 
-		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage),
+		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
 				TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
 				Summary: "The parser accepts a message it should refuse.",
@@ -624,7 +624,7 @@ func TestAFlawRecordedAgainstTheBuildIsOnePlaceInEveryVariant(t *testing.T) {
 			Dependencies: []graph.Dependency{{Parent: at("sonic-mellanox", "1.0"), Child: swss}, {Parent: swss, Child: libnl}},
 		})
 
-		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage),
+		rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
 				TargetIDs: []int64{f.target, other}, Severity: "high",
 				Summary: "The pieces are assembled in a way that defeats the sandbox.",
@@ -647,7 +647,7 @@ func TestAFlawRecordedAgainstTheBuildIsOnePlaceInEveryVariant(t *testing.T) {
 		// place in each of them.
 		named := func(target int64, component string) string {
 			t.Helper()
-			rows, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage),
+			rows, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage),
 				finding.Entering{
 					TargetIDs: []int64{target}, Component: component, Severity: "high",
 					Summary: "The pieces are assembled in a way that defeats the sandbox.",
@@ -688,7 +688,7 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 		}
 
 		// libnl sits at two places, and one action here writes one.
-		_, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage), finding.Entering{
+		_, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), finding.Entering{
 			TargetIDs: []int64{f.target}, Component: libnl.Name, Severity: "high",
 			Summary: "The parser accepts a message it should refuse.",
 		})
@@ -708,7 +708,7 @@ func TestRecordingIsBoundedByWhatItWritesRatherThanByWhatWasAsked(t *testing.T) 
 
 		// A component at one place is inside it, so the bound is on what
 		// would be written rather than on what was named.
-		if _, _, err := f.store.Enter(ctx, f.planner(t, access.PrivateTriage), finding.Entering{
+		if _, _, err := f.store.Enter(ctx, f.planner(t, access.PublicTriage, access.PrivateTriage), finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
 		}); err != nil {

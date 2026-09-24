@@ -373,7 +373,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
 		second := w.DeclarePerson("reader", "A Reader", false)
 		roles := map[int64][]access.Role{
-			w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+			w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 		}
 		// Made by the store rather than by the test, and through the
 		// constructor the deployment uses: what mode the files land at is
@@ -390,7 +390,7 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, roles, 0),
 			agrees: access.NewPerson(second.ID, second.Identity, false,
 				map[int64][]access.Role{
-					w.Product.ID: {access.PublicRead, access.PrivateRead, access.PrivateTriage},
+					w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 				}, 0),
 			files: files, where: where,
 			logger: slog.New(slog.NewTextHandler(io.Discard, nil)),

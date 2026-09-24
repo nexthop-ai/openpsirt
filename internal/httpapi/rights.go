@@ -245,6 +245,11 @@ func readRights() []access.Role {
 		access.PrivateRead, access.PrivateTriage}
 }
 
+// publicRights is the roles that may read work that has been disclosed.
+func publicRights() []access.Role {
+	return []access.Role{access.PublicRead, access.PublicTriage}
+}
+
 // privateRights is the roles that may read work nobody has announced.
 func privateRights() []access.Role {
 	return []access.Role{access.PrivateRead, access.PrivateTriage}

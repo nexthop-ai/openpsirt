@@ -20,7 +20,7 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 	// would be a list of decisions somebody has already failed to make.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 
 		rows, _, err := f.store.Enter(t.Context(), who, finding.Entering{
 			TargetIDs: []int64{f.target}, Severity: "high",
@@ -70,7 +70,7 @@ func TestAnEmbargoGetsAnEndAndIsSurfacedBeforeItArrives(t *testing.T) {
 
 		// A disclosed finding carries no date: it is already public, and a
 		// date on it would be a deadline for something that has happened.
-		discloseds, _, err := f.store.Enter(t.Context(), f.planner(t, access.PrivateTriage),
+		discloseds, _, err := f.store.Enter(t.Context(), f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
 				TargetIDs: []int64{f.target}, Severity: "high", Disclosed: true,
 				Summary: "Already announced.",
@@ -95,7 +95,7 @@ func TestWhatIsApproachingDisclosureIsItselfUndisclosed(t *testing.T) {
 	// much as a row.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		if _, _, err := f.store.Enter(t.Context(), f.planner(t, access.PrivateTriage),
+		if _, _, err := f.store.Enter(t.Context(), f.planner(t, access.PublicTriage, access.PrivateTriage),
 			finding.Entering{
 				TargetIDs: []int64{f.target}, Severity: "critical",
 				Summary: "Something nobody outside knows about.",
@@ -161,7 +161,7 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 	// needs a second person.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.embargoed(t, who)
 		was := f.endsAt(t, issue)
 
@@ -240,7 +240,7 @@ func TestAnExtensionSaysWhyAndOnlyEverMovesLater(t *testing.T) {
 	// and is refused here, so that neither is recorded as the other.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.embargoed(t, who)
 		was := f.endsAt(t, issue)
 
@@ -286,7 +286,7 @@ func TestBringingADateForwardIsItsOwnAct(t *testing.T) {
 	// the act, and does not infer it from the direction a date moved.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.embargoed(t, who)
 		was := f.endsAt(t, issue)
 
@@ -367,7 +367,7 @@ func TestAgreeingMovesTheDateFromWhereItIsNow(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		other := f.someoneElse(t, access.PrivateTriage)
 		issue := f.embargoed(t, who)
 		was := f.endsAt(t, issue)
@@ -414,7 +414,7 @@ func TestAMovementThatNeededNobodyCannotBeAgreedTo(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.embargoed(t, who)
 		was := f.endsAt(t, issue)
 

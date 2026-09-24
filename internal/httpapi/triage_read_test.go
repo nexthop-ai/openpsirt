@@ -1018,12 +1018,13 @@ func TestTheCallerIsToldWhatTheyMayDoRatherThanFindingOut(t *testing.T) {
 	// and drifts from the one the server actually enforces.
 	twoReach(t, func(t *testing.T, r *reach) {
 		type can struct {
-			Product   string `json:"product"`
-			MaySee    bool   `json:"may_see"`
-			SeesAll   bool   `json:"sees_all"`
-			MayTriage bool   `json:"may_triage"`
-			MayHide   bool   `json:"may_hide"`
-			MayAgree  bool   `json:"may_agree"`
+			Product      string `json:"product"`
+			MaySee       bool   `json:"may_see"`
+			ReadsPublic  bool   `json:"reads_public"`
+			ReadsPrivate bool   `json:"reads_private"`
+			MayTriage    bool   `json:"may_triage"`
+			MayHide      bool   `json:"may_hide"`
+			MayAgree     bool   `json:"may_agree"`
 		}
 		type who struct {
 			Identity string `json:"identity"`
@@ -1048,13 +1049,13 @@ func TestTheCallerIsToldWhatTheyMayDoRatherThanFindingOut(t *testing.T) {
 			t.Fatal("a reader reaches no product at all")
 		}
 		for _, each := range reader.Reach {
-			if !each.MaySee {
+			if !each.MaySee || !each.ReadsPublic {
 				t.Errorf("%s is listed but cannot be seen", each.Product)
 			}
 			// Reading what is disclosed is not reading what is not, and it is
 			// certainly not deciding. This is the assertion that catches a
 			// capability widened by accident.
-			if each.SeesAll || each.MayTriage || each.MayHide || each.MayAgree {
+			if each.ReadsPrivate || each.MayTriage || each.MayHide || each.MayAgree {
 				t.Errorf("a reader is offered more than reading in %s: %+v", each.Product, each)
 			}
 		}

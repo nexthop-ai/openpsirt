@@ -176,7 +176,7 @@ func registerAdvisory(api huma.API, in Ingest) {
 			"not exist. Told apart, the pair of answers says what exists.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Advisory string `path:"advisory" doc:"The identifier this deployment minted"`
+		Advisory string `path:"advisory" doc:"The identifier the advisory is tracked by"`
 	}) (*struct{ Body AdvisoryBody }, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -568,7 +568,7 @@ func bodyFor(row *advisory.Advisory, held []advisory.Covered) AdvisoryBody {
 
 // AdvisoryBody is one advisory and the issues it covers.
 type AdvisoryBody struct {
-	Advisory string `json:"advisory" doc:"The identifier this deployment minted, which is what the document is tracked by"`
+	Advisory string `json:"advisory" doc:"The identifier the advisory is tracked by"`
 	Title    string `json:"title,omitempty"`
 	// Status and Agreed are left out where the advisory was just started or
 	// just retitled, which answers with what the act did rather than with

@@ -184,14 +184,14 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		embargoed(t, db, target.ID, "SONIC-2026-0001", owner.ID,
+		embargoed(t, db, target.ID, "SONIC-2026-0001", owner.PartyID,
 			time.Now().UTC().Add(-24*time.Hour))
 
 		// A second one, held by somebody who may not read undisclosed work
 		// here. An assignment can outlive the role that allowed it, and
 		// delivering this to them would hand over the thing the role was
 		// withdrawn to stop.
-		embargoed(t, db, target.ID, "SONIC-2026-0002", outsider.ID,
+		embargoed(t, db, target.ID, "SONIC-2026-0002", outsider.PartyID,
 			time.Now().UTC().Add(-24*time.Hour))
 
 		watch := notify.NewWatch(db.DB, quiet)
@@ -243,7 +243,8 @@ func TestAnEmbargoPastItsDateIsToldToAdminsAndWhoeverHoldsIt(t *testing.T) {
 }
 
 // embargoed writes one undisclosed finding past its disclosure date, held by
-// somebody.
+// somebody. The holder is a party, which is what an assignment names; a
+// person's own number coincides with it only by accident of insertion order.
 func embargoed(t *testing.T, db *database.DB, targetID int64, identifier string,
 	owner int64, at time.Time) {
 	t.Helper()
@@ -532,7 +533,7 @@ func TestAnEmbargoComingUpClearsForWhoeverStopsHoldingIt(t *testing.T) {
 
 		// Inside the lead time and not yet arrived, which is the coming
 		// condition and not the arrived one.
-		embargoed(t, db, target.ID, "SONIC-2026-0003", held.ID,
+		embargoed(t, db, target.ID, "SONIC-2026-0003", held.PartyID,
 			time.Now().UTC().Add(24*time.Hour))
 
 		watch := notify.NewWatch(db.DB, quiet)

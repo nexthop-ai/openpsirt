@@ -182,7 +182,9 @@ func strangerTo(roles []string) string {
 	case !held["public-read"]:
 		return "reader"
 	case !held["private-read"]:
-		return "private"
+		// Somebody reading undisclosed work alone, because each visibility
+		// is its own grant: a reader of both satisfies public-read.
+		return "embargo-reader"
 	default:
 		// Both read roles satisfy it, so anybody who can see the
 		// product can ask. What is left is the capability held bare,

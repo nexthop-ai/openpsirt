@@ -1,0 +1,108 @@
+// Copyright Nexthop Systems Inc.
+// SPDX-License-Identifier: Apache-2.0
+
+package migrations
+
+// A file hanging off an issue or a report, and the record of it that outlives
+// the bytes.
+//
+// The bytes are not here. What this table holds is the reference
+// the text uses, what the file is, where it went, who put it there, and — when
+// somebody has to take a file back out — what was removed and why.
+//
+// It hangs off the issue in the product, which is the unit a decision, an
+// embargo and a comment already use. Not a finding row: text is written against
+// a decision and a decision covers every place an issue sits at, so binding a
+// file to whichever of forty-eight rows somebody was looking at would lose it
+// the day that row closed while its siblings stayed open.
+//
+// Or off a report, which is the other thing a file arrives with. A report
+// that has not been judged has no issue to hang anything on, and the
+// screenshot is often the whole of what was sent — so a file arriving with
+// one is kept against the report and stays there once the report gains an
+// issue, because what was sent is a fact about the report.
+//
+// There is no visibility column, deliberately. Whether a file may be read
+// is whether the thing it hangs off may be read, asked at the moment of the
+// request. A copy taken at upload would still say "private" after the embargo
+// it documents had ended, which is the shape of every stale-value defect:
+// correct when written, wrong from then on, and nothing reports it.
+func attachmentStatements(t *columnTypes) []string {
+	return []string{
+		`CREATE TABLE "attachment" (
+			"id"               ` + t.id + `,
+			-- What the text refers to, and the only identifier that
+			-- ever leaves this deployment. Unguessable rather than sequential:
+			-- authorization is what protects a file, but a reference somebody
+			-- can enumerate turns "which issues have attachments" into a
+			-- question an outsider can ask by counting.
+			"token"            ` + t.name + ` NOT NULL,
+			-- What it is about. The product always, because an issue is
+			-- only an issue somewhere: the same CVE in two products is two
+			-- pieces of work and two sets of readers.
+			"product_id"       ` + t.ref + ` NOT NULL,
+			-- And then one of the two things a file hangs off: an issue, or
+			-- a report nobody has turned into one. Exactly one is set, which
+			-- the store asks and the schema does not: MySQL parses a CHECK
+			-- and ignores it until 8.0.16 and the floor here is 8.0, so the
+			-- constraint would hold on three engines of four. No migration
+			-- here declares one.
+			"vulnerability_id" ` + t.refNull + ` NULL,
+			"flaw_report_id"   ` + t.refNull + ` NULL,
+			-- What it was called when it arrived, for the disposition header.
+			-- Kept as given and never used as a path.
+			"filename"         ` + t.text + ` NOT NULL,
+			-- The type **we** decided, never the one that was uploaded.
+			-- Stored because it is what gets served, and because
+			-- deciding it again later would apply today's allowlist to a file
+			-- accepted under an older one.
+			"content_type"     ` + t.name + ` NOT NULL,
+			"size_bytes"       BIGINT NOT NULL,
+			-- The digest of what was stored. Not the key: two identical files
+			-- are two attachments, because redacting one must not blank the
+			-- other. It is here so that a redaction can say what it
+			-- removed after the bytes are gone.
+			"digest"           ` + t.hash + ` NOT NULL,
+			-- Where it went in the store. Ours to choose and never derived
+			-- from the filename, so nothing a person typed reaches a path.
+			"object_key"       ` + t.name + ` NOT NULL,
+			"uploaded_by"      ` + t.ref + ` NOT NULL,
+			"uploaded_at"      ` + t.timestamp + ` NOT NULL,
+			-- When saved text first referred to it. Null is an upload nothing
+			-- points at — somebody dragged a file in and closed the tab — and
+			-- that is what the sweep collects. Set once and never
+			-- cleared: text is append-only, so a reference that existed goes
+			-- on existing in the revision that made it.
+			"attached_at"      ` + t.timestamp + ` NULL,
+			-- The tombstone. The row stays and the reference in the
+			-- text stays; what goes is the file, and these three say that it
+			-- was deliberate, who did it and why. A reason is required of them
+			-- for the same reason moving a disclosure date is.
+			"redacted_at"      ` + t.timestamp + ` NULL,
+			"redacted_by"      ` + t.refNull + ` NULL,
+			"redacted_reason"  ` + t.text + ` NULL,
+			CONSTRAINT "attachment_token_unique" UNIQUE ("token"),
+			CONSTRAINT "attachment_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "attachment_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "attachment_report_fk" FOREIGN KEY ("flaw_report_id") REFERENCES "flaw_report"("id"),
+			CONSTRAINT "attachment_uploaded_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id"),
+			CONSTRAINT "attachment_redacted_by_fk" FOREIGN KEY ("redacted_by") REFERENCES "person"("id")
+		)` + t.suffix,
+
+		// Everything hanging off one issue, which is what a finding screen
+		// lists.
+		`CREATE INDEX "attachment_issue_idx"
+			ON "attachment" ("product_id", "vulnerability_id")`,
+
+		// Everything that arrived with one report, which is what a report
+		// screen lists.
+		`CREATE INDEX "attachment_report_idx"
+			ON "attachment" ("flaw_report_id")`,
+
+		// Anything nothing points at yet, for the sweep. Leading with the
+		// column the sweep tests for null, so it walks only the candidates
+		// rather than every attachment ever made.
+		`CREATE INDEX "attachment_unattached_idx"
+			ON "attachment" ("attached_at", "uploaded_at")`,
+	}
+}

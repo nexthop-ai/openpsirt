@@ -38,7 +38,7 @@ func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assignOne(t, db, fresh.ID)
+		assignOne(t, db, fresh.PartyID)
 
 		if _, _, err := notify.NewWatch(db.DB, hush).Once(ctx); err != nil {
 			t.Fatal(err)
@@ -57,7 +57,8 @@ func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 }
 
 // assignOne records one open finding held by somebody, which is the least that
-// makes them a person holding work.
+// makes them a person holding work. The holder is their party, which is what an
+// assignment names.
 func assignOne(t *testing.T, db *database.DB, holder int64) {
 	t.Helper()
 	ctx := t.Context()
@@ -179,7 +180,7 @@ func TestSomebodyAwayHoldingWorkIsRaisedAndAnIdleAccountIsNot(t *testing.T) {
 		if _, err := db.DB.NewInsert().Model(component).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		holder := map[string]int64{"CVE-2026-1": away.ID, "CVE-2026-2": here.ID}
+		holder := map[string]int64{"CVE-2026-1": away.PartyID, "CVE-2026-2": here.PartyID}
 		for identifier, id := range named {
 			held := holder[identifier]
 			row := &finding.Finding{

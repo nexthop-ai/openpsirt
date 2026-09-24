@@ -14,7 +14,7 @@ func init() {
 	goose.AddMigrationContext(upTriage, downTriage)
 }
 
-// Decisions about findings.
+// What people decide about findings.
 //
 // The key is the whole design. A decision is a claim about a combination of
 // code rather than about the release it was made in, so it is keyed on what
@@ -241,9 +241,7 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			-- its own.
 			"selected_by"                ` + t.free + ` NULL,
 			-- What this decision is a claim about, while it is still a live
-			-- claim: the place and both upstream versions, hashed — and the
-			-- place alone where the claim stands at any version, because the
-			-- versions are not what it is about. Set to null
+			-- claim: the place and both upstream versions, hashed. Set to null
 			-- the moment it is withdrawn or lapses, because a decision that no
 			-- longer applies is history and must not block a fresh one.
 			--
@@ -309,7 +307,7 @@ func upTriage(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "claim_revision_unique" UNIQUE ("claim_id", "ordinal")
 		)` + t.suffix,
 
-		// The agreeing person, and what exactly they agreed to.
+		// Who agreed, and to what exactly.
 		//
 		// Kept rather than reduced to a flag on the decision, because an
 		// approval that was later withdrawn is part of the record: it says a

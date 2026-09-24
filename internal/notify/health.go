@@ -317,7 +317,8 @@ func (w *Watch) pairsConcentrated(ctx context.Context) ([]Holds, error) {
 	able := map[int64]int{}
 	for _, per := range reach {
 		for productID, at := range per {
-			if at.public() && (at.approves || at.triages(false)) {
+			if (at.reads(false) && (at.approves || at.triages(false))) ||
+				(at.reads(true) && (at.approves || at.triages(true))) {
 				able[productID]++
 			}
 		}

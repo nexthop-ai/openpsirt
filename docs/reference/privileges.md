@@ -28,9 +28,9 @@ deployment.
 | Role | What it allows |
 |---|---|
 | `public-read` | Read findings that have been disclosed |
-| `private-read` | Read findings nobody has announced |
+| `private-read` | Read findings nobody has announced, and no others |
 | `public-triage` | Argue about disclosed findings: decide, revise, withdraw, comment. Take work nobody owns, and hand back your own |
-| `private-triage` | The same for findings nobody has announced, including recording one and moving its disclosure date |
+| `private-triage` | The same for findings nobody has announced, including recording one and moving its disclosure date. Disclosed findings take `public-triage` |
 | `approver` | Agree to somebody else's claim. A triager may also approve, and the proposer may never approve their own |
 | `assigner` | Give work to somebody else, or take what they are holding |
 | administrator | The deployment: people, roles, credentials, settings, and the catalog |
@@ -39,6 +39,17 @@ Seeing is never changing. A read role reaches no act, and every act is a
 role of its own. That is why there are two read roles rather than one: what has
 been announced and what has not are different populations, and a great many
 people should see the first without seeing the second.
+
+The two visibilities are separate grants. A private role reaches findings
+nobody has announced and no others, so somebody working private reports is not
+handed every public finding as well. Somebody who works both holds both. A
+triage role carries reading at its own visibility.
+
+A disclosed finding assigned to somebody is listed among their work whatever
+they read, drawn in the tree of what they hold, and theirs to hand back, because
+an assignment carries what was assigned. Opening the finding, like every other
+screen about the product, takes reading at its visibility. An undisclosed one
+goes only to somebody who reads undisclosed work in that product.
 
 `approver` and `assigner` grant no visibility of their own. Each is a
 capability bounded by what its holder may read, so granted alone it reaches

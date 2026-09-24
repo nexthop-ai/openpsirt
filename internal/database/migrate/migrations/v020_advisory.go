@@ -3,17 +3,6 @@
 
 package migrations
 
-import (
-	"context"
-	"database/sql"
-
-	"github.com/pressly/goose/v3"
-)
-
-func init() {
-	goose.AddMigrationContext(upAdvisory, downAdvisory)
-}
-
 // The advisory, the issues it covers, what it says, who agreed to it, and
 // that it went out.
 //
@@ -47,13 +36,8 @@ func init() {
 // passed. The digest beside it is over the part of those bytes that says what
 // the document states, so "is what is published still what we generate" stays
 // a question with a yes or no.
-func upAdvisory(ctx context.Context, tx *sql.Tx) error {
-	t, err := types(ctx)
-	if err != nil {
-		return err
-	}
-
-	statements := []string{
+func advisoryStatements(t *columnTypes) []string {
+	return []string{
 		`CREATE TABLE "advisory" (
 			"id"         ` + t.id + `,
 			-- The name a reader cites the document by, minted here: a prefix
@@ -180,7 +164,10 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 			-- what we generated" while the document answers "what was
 			-- published". Both are written from the one document in the one
 			-- statement.
-			"document"    ` + t.free + ` NOT NULL,
+			--
+			-- Null on an issuance v0.1.0 recorded, which kept the digest and
+			-- not the bytes.
+			"document"    ` + t.free + ` NULL,
 			"digest"      ` + t.hash + ` NOT NULL,
 			-- What somebody wants said about this revision, where they said
 			-- anything. A revision history whose every entry reads the same is
@@ -226,13 +213,4 @@ func upAdvisory(ctx context.Context, tx *sql.Tx) error {
 				FOREIGN KEY ("removed_by") REFERENCES "person"("id")
 		)` + t.suffix,
 	}
-
-	return apply(ctx, tx, statements)
-}
-
-func downAdvisory(ctx context.Context, tx *sql.Tx) error {
-	// An issuance points at the edition it published and an approval at the
-	// edition it agreed to, so both go before the editions do.
-	return dropTables(ctx, tx, "advisory_approval", "advisory_issuance",
-		"advisory_edition", "advisory_issue", "advisory")
 }

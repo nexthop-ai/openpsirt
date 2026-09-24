@@ -30,7 +30,7 @@ export function Product() {
   const { product = "" } = useParams();
   const who = useWho();
   // The inbox asks what reading a report asks: reading undisclosed work.
-  const mayReadReports = !!mayOf(who.data, product)?.sees_all;
+  const mayReadReports = !!mayOf(who.data, product)?.reads_private;
   const waitingRulings = useRulings(product, true, 0, mayReadReports);
   const overview = useQuery({
     queryKey: ["overview", product],

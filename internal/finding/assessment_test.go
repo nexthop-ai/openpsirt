@@ -452,7 +452,7 @@ func TestAgreeingIsMeasuredOnlyInsideTheRatingsOwnProduct(t *testing.T) {
 		// administering is not reading, and what this measures is that
 		// holding both still counts only one.
 		who := f.holdingIn(t, []int64{f.productID, f.productOf(t, elsewhere)},
-			access.PrivateTriage)
+			access.PublicTriage, access.PrivateTriage)
 		claim, err := f.store.Assess(ctx, who, f.productID, f.issue(t, "CVE-2026-BOTH"),
 			"low", "Not worth an afternoon.")
 		if err != nil {
@@ -474,7 +474,8 @@ func TestAgreeingIsMeasuredOnlyInsideTheRatingsOwnProduct(t *testing.T) {
 
 		// And agreeing leaves the other product exactly where it was.
 		if _, err := f.store.Assess(ctx, f.holdingIn(t,
-			[]int64{f.productID, f.productOf(t, elsewhere)}, access.PrivateTriage),
+			[]int64{f.productID, f.productOf(t, elsewhere)}, access.PublicTriage,
+			access.PrivateTriage),
 			f.productOf(t, elsewhere), f.issue(t, "CVE-2026-BOTH"), "critical",
 			"We ship the vulnerable configuration."); err != nil {
 			t.Fatal(err)
@@ -497,7 +498,7 @@ func TestAnUndisclosedFlawCannotBeRatedByName(t *testing.T) {
 	// the claim they made then carried that severity to everybody.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		hidden := f.embargoed(t, f.planner(t, access.PrivateTriage))
+		hidden := f.embargoed(t, f.planner(t, access.PublicTriage, access.PrivateTriage))
 
 		// Triage on this very product, and no reading of undisclosed work.
 		f.recorded(t, 1, "someone")
@@ -520,7 +521,7 @@ func TestAClaimAboutAnUndisclosedFlawIsNotListed(t *testing.T) {
 	// the row itself was not.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		keeper := f.planner(t, access.PrivateTriage)
+		keeper := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		hidden := f.embargoed(t, keeper)
 		if _, err := f.store.Assess(t.Context(), keeper, f.productID, hidden, "critical",
 			"Worse than it looks."); err != nil {
@@ -564,7 +565,7 @@ func TestAgreeingAndWithdrawingAnswerAsThoughTheClaimWereAbsent(t *testing.T) {
 	// undisclosed flaws somebody has an opinion about.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		keeper := f.planner(t, access.PrivateTriage)
+		keeper := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		hidden := f.embargoed(t, keeper)
 		claim, err := f.store.Assess(t.Context(), keeper, f.productID, hidden, "low",
 			"Not reachable in how we ship it.")
@@ -624,11 +625,10 @@ func TestAnIssueThisProductDoesNotCarryCannotBeRatedInIt(t *testing.T) {
 }
 
 func TestWhatAgreeingWouldDoStopsAtTheProductsTheReaderHolds(t *testing.T) {
-	// Both halves of the narrowing. The visibility half alone admits every
-	// disclosed finding in the deployment, so an approver holding one product
-	// was told how many findings an issue has in products they hold nothing
-	// on — and how many products those are, which is a count of what somebody
-	// else ships.
+	// Narrowed to the products the reader holds. Otherwise an approver
+	// holding one product is told how many findings an issue has in products
+	// they hold nothing on — and how many products those are, which is a count
+	// of what somebody else ships.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		elsewhere := f.inAnotherProduct(t, "other-product")
@@ -866,7 +866,7 @@ func TestTheRatingsListIsPagedAndSaysHowManyThereAre(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		f.shipped(t, twoConsumers())
-		keeper := f.planner(t, access.PrivateTriage)
+		keeper := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		for range 5 {
 			id := f.embargoed(t, keeper)
 			if _, err := f.store.Assess(ctx, keeper, f.productID, id, "medium",

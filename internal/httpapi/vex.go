@@ -35,7 +35,7 @@ func registerVEX(api huma.API, in Ingest) {
 		Tags: []string{"Findings"},
 	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
 		"the document is about the whole build rather than about one issue.",
-		readRights()...),
+		publicRights()...),
 		func(ctx context.Context, input *struct {
 			Product     string `path:"product"`
 			Stream      string `path:"stream"`
@@ -75,7 +75,7 @@ func registerVEX(api huma.API, in Ingest) {
 		Tags: []string{"Findings"},
 	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
 		"a row saying a document about this build went out is as much a disclosure as the "+
-		"document.", readRights()...),
+		"document.", publicRights()...),
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 			Stream  string `path:"stream"`
@@ -138,7 +138,7 @@ func registerVEX(api huma.API, in Ingest) {
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, perProduct, "The document is this deployment's word to a customer. The second pair of "+
 		"eyes on each statement it carries was taken when the claim was approved.",
-		triageRights()...),
+		access.PublicTriage),
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 			Stream  string `path:"stream"`
@@ -183,7 +183,7 @@ func registerVEX(api huma.API, in Ingest) {
 		Tags: []string{"Findings"},
 	}, perProduct, "Answers only what you may see. A grant on one case does not reach it: "+
 		"the document is about the whole build rather than about one issue.",
-		readRights()...),
+		publicRights()...),
 		func(ctx context.Context, input *struct {
 			Product string `path:"product"`
 			Stream  string `path:"stream"`

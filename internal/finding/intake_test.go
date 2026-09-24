@@ -26,7 +26,7 @@ func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
 	// nobody believes either fills the findings with one or goes unrecorded,
 	// and an unrecorded claim destroys the evidence that it was answered.
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
 			Summary: "The management socket accepts a request nobody authenticated.",
 			Told: finding.Told{
@@ -81,7 +81,7 @@ func TestAClaimIsRecordedWithoutMintingAnIssue(t *testing.T) {
 
 func TestAClaimWithNothingInItIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, err := f.store.Record(t.Context(), who, f.productID,
 			finding.Claimed{Summary: "   "})
 		if !errors.Is(err, finding.ErrNothingClaimed) {
@@ -108,7 +108,7 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 	// has announced, and recording one, answering one or judging one ask for
 	// the right to triage it.
 	each(t, func(t *testing.T, f *fixture) {
-		owner := f.planner(t, access.PrivateTriage)
+		owner := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), owner, f.productID,
 			finding.Claimed{Summary: "A claim nobody has judged."})
 		if err != nil {
@@ -183,7 +183,7 @@ func TestAClaimIsReadWithPrivateReadAndWorkedWithPrivateTriage(t *testing.T) {
 func TestAClaimIsJudgedOnceAndSaysWhoJudgedIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		issue := f.anIssueHere(t, who,
 			"The management socket accepts a request nobody authenticated.")
 
@@ -258,7 +258,7 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 	// see would come back differently, which turns this into a way to ask
 	// which identifiers are open here.
 	each(t, func(t *testing.T, f *fixture) {
-		owner := f.planner(t, access.PrivateTriage)
+		owner := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), owner, f.productID,
 			finding.Claimed{Summary: "A claim about something undisclosed."})
 		if err != nil {
@@ -310,7 +310,7 @@ func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 
 func TestAnsweringAClaimKeepsTheFirstDate(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		row, err := f.store.Record(t.Context(), who, f.productID,
 			finding.Claimed{Summary: "Somebody wrote in."})
 		if err != nil {
@@ -346,7 +346,7 @@ func TestAnsweringAClaimKeepsTheFirstDate(t *testing.T) {
 
 func TestAProductsClaimsArePagedNewestFirst(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		var references []string
 		for i := range 5 {
 			row, err := f.store.Record(t.Context(), who, f.productID,
@@ -388,7 +388,7 @@ func TestAReferenceIsDrawnRatherThanCounted(t *testing.T) {
 	// this product has received and when the last one arrived. That is a
 	// disclosure made by the name alone, before any route is asked anything.
 	each(t, func(t *testing.T, f *fixture) {
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		seen := map[string]bool{}
 		numbers := make([]int, 0, 6)
 		for range 6 {
@@ -420,7 +420,7 @@ func TestAFlawRecordedByHandCarriesAReportThatWasJudgedAsItWasWrittenDown(t *tes
 	// the issue it was minted with.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		_, identifier, err := f.store.Enter(t.Context(), who, finding.Entering{
 			TargetIDs: []int64{f.target}, Component: swss.Name, Severity: "high",
 			Summary: "The management socket accepts a request nobody authenticated.",
@@ -540,7 +540,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 	// says it arrived.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		claim, err := f.store.Record(t.Context(), who, f.productID, finding.Claimed{
 			Summary: "The management socket lets anybody in.",
 			Told:    finding.Told{ReportedBy: "A Researcher", Received: "2026-06-01"},
@@ -641,7 +641,7 @@ func TestAFlawRecordedFromAReportIsThatReportsIssue(t *testing.T) {
 func TestAFlawRecordedFromAReportIsRefusedWhatTheReportAlreadySays(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
-		who := f.planner(t, access.PrivateTriage)
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
 		claim, err := f.store.Record(t.Context(), who, f.productID,
 			finding.Claimed{Summary: "A claim."})
 		if err != nil {

@@ -108,7 +108,7 @@ func (s *Store) RecordTold(ctx context.Context, subject access.Subject, recordID
 			}
 			return fmt.Errorf("read the record of being exploited: %w", err)
 		}
-		if !subject.Triages(access.Public, record.ProductID) {
+		if !subject.TriagesIn(record.ProductID) {
 			return ErrNoSuchRecord
 		}
 		// Inside the transaction, because a retry re-runs this against a

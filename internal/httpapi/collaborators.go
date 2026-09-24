@@ -316,7 +316,7 @@ func caseAtHolding(ctx context.Context, in Ingest, product, vulnerability string
 	if err != nil {
 		return access.Subject{}, nil, 0, 0, err
 	}
-	if triaging && !subject.Triages(access.Public, named.ID) {
+	if triaging && !subject.TriagesIn(named.ID) {
 		// Asked before the name is resolved further, so a refusal says
 		// nothing about whether the issue is here.
 		return access.Subject{}, nil, 0, 0,

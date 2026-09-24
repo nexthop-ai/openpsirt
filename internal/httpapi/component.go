@@ -327,7 +327,7 @@ func carrying(ctx context.Context, in Ingest, subject access.Subject, productID 
 	if err != nil {
 		return nil, noSuchTeamNamed(team)
 	}
-	reads, err := rights.AnyMemberReads(ctx, found.ID, productID, strictest)
+	reads, err := teamMayHold(ctx, rights, found.ID, productID, strictest)
 	if err != nil {
 		return nil, wentWrong(in.Logger, "cannot tell whether that team may see this", err)
 	}

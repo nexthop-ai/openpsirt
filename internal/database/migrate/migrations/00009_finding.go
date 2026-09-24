@@ -14,7 +14,7 @@ func init() {
 	goose.AddMigrationContext(upFinding, downFinding)
 }
 
-// A scan run's findings, and their subject.
+// What a scan run found, and what it is about.
 //
 // A vulnerability is one issue however many names it goes by. The same issue
 // arrives as a national identifier from one database and an advisory
@@ -130,7 +130,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "vulnerability_reference_unique" UNIQUE ("vulnerability_id", "url_identity")
 		)` + t.suffix,
 
-		// The kind of flaw, by the classification the data carries.
+		// What kind of flaw this is, by the classification the data carries.
 		//
 		// A row per weakness rather than one comma-joined column, which is the
 		// shape every other multi-valued attribute here has. Packed into one
@@ -151,56 +151,12 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- published, and a feed that shouts or whispers one should not
 			-- make two rows of it.
 			"cwe"              ` + t.name + ` NOT NULL,
-			-- Whether this is the one the data calls the root cause.
-			--
-			-- Added to the migration that made the table rather than beside it,
-			-- which is what a version below 1.0 promises (REQ-76). A deployment
-			-- holding data has already recorded this migration as applied, so
-			-- nothing here will run again and nothing will say so: the column
-			-- is simply absent, and what fails is every scan, every advisory
-			-- and the issue screen, each with an unknown-column error that
-			-- reads like four unrelated faults. Recreate the database and
-			-- re-ingest.
-			--
-			-- A published advisory states one weakness, and an issue is
-			-- commonly classified as several. Which one is stated cannot be
-			-- picked here: choosing the lowest number, or the first read, is
-			-- an answer with nothing behind it. The feeds say which is primary
-			-- and a person recording a flaw names theirs first, so the answer
-			-- is carried rather than invented.
-			"is_primary"       ` + t.boolean + ` NOT NULL,
 			CONSTRAINT "vulnerability_weakness_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "vulnerability_weakness_unique" UNIQUE ("vulnerability_id", "cwe")
 		)` + t.suffix,
 
-		// The class-of-flaw filter's index: every issue of one kind.
+		// What the class-of-flaw filter reads: every issue of one kind.
 		`CREATE INDEX "vulnerability_weakness_cwe_idx" ON "vulnerability_weakness" ("cwe")`,
-
-		// Each published rating of an issue, one per generation of the
-		// scoring scheme. A report commonly rates one issue under version 3
-		// and version 4, and the two are different judgments rather than two
-		// spellings of one: the screen shows the newest, and a published
-		// advisory states the one its format has a field for.
-		//
-		// The first stated in each generation is kept whole, number and
-		// vector together, so the two never come from different publishers.
-		`CREATE TABLE "vulnerability_rating" (
-			"id"               ` + t.id + `,
-			"vulnerability_id" ` + t.ref + ` NOT NULL,
-			-- The major version of the scheme: 2, 3 or 4. Version 3.0 and 3.1
-			-- are one generation, because they share one formula and one
-			-- field in every format that carries them.
-			"generation"       ` + t.ref + ` NOT NULL,
-			"score_centi"      ` + t.ref + ` NOT NULL,
-			"vector"           ` + t.free + ` NOT NULL,
-			-- Unbounded, like the three the issue carries beside its own
-			-- score, and for the same reason.
-			"score_version"    ` + t.free + ` NULL,
-			"score_source"     ` + t.free + ` NULL,
-			"score_kind"       ` + t.free + ` NULL,
-			CONSTRAINT "vulnerability_rating_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
-			CONSTRAINT "vulnerability_rating_unique" UNIQUE ("vulnerability_id", "generation")
-		)` + t.suffix,
 
 		`CREATE TABLE "vulnerability_alias" (
 			"id"               ` + t.id + `,
@@ -241,7 +197,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "scan_run_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
 		)` + t.suffix,
 
-		// A build's own argument that something does not apply to it.
+		// What a build has already argued does not apply to it.
 		//
 		// Stored as data rather than left in the document it arrived in. A
 		// nightly scan's documents are discarded once read, the vulnerability
@@ -323,15 +279,6 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- and refused the table outright there.
 			"urgency"           ` + t.ref + ` NOT NULL,
 			"urgency_exploited" ` + t.boolean + ` NOT NULL,
-			-- Whether somebody here recorded that this product was exploited
-			-- through the issue. A band of its own above the one beside it,
-			-- because a feed saying the world is being attacked and a person
-			-- saying we were are different facts, and only the second is an
-			-- incident. The two are never read as one: a report asking which
-			-- findings are exploited reads the column it means rather than
-			-- the packed number, whose top bands both answer "above the
-			-- line".
-			"urgency_exploited_here" ` + t.boolean + ` NOT NULL,
 			-- When exploitation was learned, which is what an exploited
 			-- deadline is counted from.
 			--
@@ -346,12 +293,6 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			-- marked before this was recorded, which reads as "count from
 			-- the opening" because there is nothing better to count from.
 			"exploited_learned_at" ` + t.timestamp + ` NULL,
-			-- When the issue was first given a severity in this product,
-			-- which is what a recorded flaw's deadline is counted from.
-			-- Null on a scanned row, whose severity arrives with it and
-			-- whose clock runs from the opening, and on a recorded flaw
-			-- nobody has rated yet, which carries no deadline at all.
-			"rated_at" ` + t.timestamp + ` NULL,
 			"urgency_shipped"   ` + t.boolean + ` NOT NULL,
 			-- What this place held before, where the version moved and the
 			-- issue came with it. Present means somebody bumped this and the
@@ -476,7 +417,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 			CONSTRAINT "finding_closed_run_id_fk" FOREIGN KEY ("closed_run_id") REFERENCES "scan_run"("id")
 		)` + t.suffix,
 
-		// Everything open now, per variant, is the query behind every screen.
+		// What is open now, per variant, is the query behind every screen.
 		// Matching an issue by a name somebody else wrote. Both the issue's
 		// own name and every name it goes by, because which of them a
 		// publisher chose is a preference of whichever database they
@@ -486,7 +427,7 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 
 		`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at")`,
 
-		// Deadlines running out, off an index rather than a scan. It leads with
+		// What is running out, off an index rather than a scan. It leads with
 		// the two columns always compared — a finding that is closed or
 		// already answered is not running out of anything — so the deadline
 		// itself is the range at the end of a narrow prefix.
@@ -518,21 +459,15 @@ func upFinding(ctx context.Context, tx *sql.Tx) error {
 		//
 		// The column order is the portable shape: equality columns first
 		// (target, open, visibility), then the grouping key, then what the
-		// aggregates read. Every engine here can answer the grouping from the
+		// aggregate reads. Every engine here can answer the grouping from the
 		// index alone in that order; a narrower index on urgency was tried
 		// first, and it still cost a table lookup per row for the group key.
-		//
-		// The two exploitation flags are in it because the lists read them
-		// rather than the packed number: the number carries both in bands of
-		// its own and cannot say which, so every list that names one of them
-		// aggregates its column, and a column outside the index is a table
-		// row fetched per open finding.
-		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_exploited_here")`,
+		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency")`,
 	}
 
 	return apply(ctx, tx, statements)
 }
 
 func downFinding(ctx context.Context, tx *sql.Tx) error {
-	return dropTables(ctx, tx, "finding", "suppression", "scan_run", "vulnerability_reference", "vulnerability_alias", "vulnerability_weakness", "vulnerability_rating", "vulnerability")
+	return dropTables(ctx, tx, "finding", "suppression", "scan_run", "vulnerability_reference", "vulnerability_alias", "vulnerability_weakness", "vulnerability")
 }

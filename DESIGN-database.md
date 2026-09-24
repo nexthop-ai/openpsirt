@@ -90,6 +90,7 @@ Engine-specific code is confined to these places:
 | The test harness | It names every engine to choose a connection and to say which one ran, rather than to write a query — and the check that each engine ran is what keeps that naming honest |
 | Listing the harness's own databases | The one query in the harness that does branch. PostgreSQL keeps databases in a catalog of its own, where the standard information schema describes only the one connected to, and there is no portable third spelling |
 | A test choosing which engine it runs on | The same act as the row above, written at the call site: `dbtest.Only(t, database.SQLite, …)` says a question has the same answer everywhere and is asked once. Allowed anywhere, because it selects an engine rather than branching a query on one — which is the distinction the whole rule is about |
+| Migration 37 | Changing an existing table is spelled per engine: PostgreSQL drops or restores a column's refusal of a null where the other two servers restate the column, MySQL and MariaDB drop a foreign key by a word of their own, SQLite rebuilds the table with its foreign keys suspended, and PostgreSQL alone is told to move its identity past rows carried across. The catalog is asked which indexes a table already has |
 | Asking each engine what words it reserves | One statement per engine, because each publishes its keywords somewhere of its own and two publish nothing a query can read. It is not a query the application runs: it regenerates the word list the quoting gate reads, and the gate exists because the four engines do not reserve the same words |
 
 This list is the complete set and is checked by grep rather than trusted —
@@ -177,7 +178,7 @@ worked.
 |---|---|
 | Behind what the binary carries | Refused at startup, naming both versions and what to run. The previous replica stays up, which is what a startup refusal buys over a readiness failure |
 | Equal | Served, and the two versions are logged |
-| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back |
+| Ahead | Served. That is a rollback, and the migrations a newer binary applied are additive — refusing would leave a bad deployment with no way back. Migration 37 is the exception: it reshapes what v0.1.0 reads, so going back to v0.1.0 is rolling it back with the newer binary first |
 
 What the binary carries is the highest version among the embedded migration
 sources, read from their file names, which is the same rule the migration
@@ -213,16 +214,22 @@ engine. A timestamp column has no portable spelling: PostgreSQL has no
 `DATETIME`, and MySQL's `TIMESTAMP` is a 32-bit value that can acquire an
 implicit default and an on-update clause depending on server configuration.
 
-Below 1.0 a migration is edited rather than added to (REQ-72 and REQ-76). A
-change to a table edits the migration that created it, and anybody holding a
-development database recreates it. The migrations that exist are kept only
-because walking the chain up and down catches an ordering mistake between two of
-them, and they collapse into a single initial migration before 1.0.
+The chain has two parts.
 
-Every migration creates something. A migration that alters what an earlier one
-created costs a rollback per engine that exists only because the column arrived
-late, a file per alteration to read before anybody knows what one table holds,
-and one more migration for the collapse at 1.0 to unpick.
+| Migrations | What they are |
+|---|---|
+| 1 to 36 | The ones the v0.1.0 release shipped, as that release tagged them. A database v0.1.0 built has applied exactly these, so none of them changes again. A test holds each file to the digest of the tagged one, and what they build to the schema the tag built on each engine, which also catches a change to the column spellings and widths they read from elsewhere |
+| 37 | v0.2.0: v0.1.0's schema changed into v0.2.0's, and the rows moved with it. § Release upgrades says how |
+
+Below 1.0 there is no compatibility (REQ-76), and a schema change edits what
+declares the table rather than adding a migration beside it. Until v0.2.0 is
+tagged, that is v0.2.0's declaration of the table, which migration 37 reads.
+The chain collapses into a single initial migration before 1.0 (REQ-72), and a
+database any 0.x release built is recreated then.
+
+Migrations 1 to 36 each create something, which is why rolling one back is
+dropping what it made. Migration 37 is the one that changes an existing table,
+and rolling it back changes the table back.
 
 A migration is its statements and nothing else. What every one of them does
 around those statements — asking which engine this is, refusing an engine there
@@ -259,6 +266,71 @@ asked.
 CI runs the success path on four engines, which is where this hides: the
 engines agree about what a migration does and disagree only about what is left
 when one stops half way.
+
+### Release upgrades
+
+Migration 37 carries a database from v0.1.0 to v0.2.0. A database v0.1.0
+built applies it and nothing else; a fresh install walks the whole chain and
+applies it last. It is the one migration here shaped the way every migration
+after 1.0 will be, and it exists to show the project can carry a deployment
+from one release to the next.
+
+| Rule | |
+|---|---|
+| Every table and index is made by v0.2.0's own statement | v0.2.0's declaration of each table it creates or changes sits beside it, with the reasoning for each. A column it adds is declared as that statement declares it. What the migration writes itself is the order, the rows, and how an existing table is changed on each engine |
+| One transaction of its own | Registered without the migration library's transaction, because SQLite's foreign keys have to be switched off before a transaction begins, and because the rows it moves are read back by name |
+| PostgreSQL, MySQL and MariaDB alter a table where it stands | A column every existing row fills is added with a default and the default dropped, which leaves it declared as v0.2.0 declares it and costs no row rewrite on any of the three |
+| SQLite rebuilds a table it cannot alter | It cannot drop a default or change whether a column takes a null. A replacement is made by v0.2.0's statement, the rows copied across by column name with their identifiers, the original dropped, and the replacement renamed. The indexes the table had from other migrations are read from the catalog first and made again |
+| SQLite's foreign keys are off while it rebuilds | Dropping a table others point at is refused otherwise. The setting is ignored inside a transaction, so it is made before one begins, and every reference is checked before the transaction commits |
+| Rows written with their own identifiers keep them | References into a moved table still land. PostgreSQL's identity does not move past a value it did not generate, so it is moved past them; the other three move on the insert |
+| A column added is last in its table on the three servers | A table SQLite rebuilds has it where v0.2.0 declares it. No query reads a column by position |
+| On MySQL and MariaDB a failure part way is recovered from a backup | Both commit every data-definition statement as it runs, so the transaction does not hold the migration together there, and the version is not recorded. The operator page says to take one first |
+
+What v0.1.0's rows become:
+
+| In v0.1.0 | After the upgrade |
+|---|---|
+| An embargo extension | A disclosure movement whose act is an extension, under the same identifier. v0.1.0 refused a move that was not later |
+| An issuance, keyed on a product and an issue | An advisory per product and issue, with one edition, the one issue it covers, and its issuances beneath it keeping their identifiers, ordinals, digests and summaries |
+| The name an advisory was issued under | The advisory's identifier. v0.1.0 used the issue's own identifier as the tracking identifier, and a revision that changed it would read as a second document. For an issue filed under a CVE since, it is the name minted for the flaw, kept among its aliases; that is wrong only for an issue refiled before its first issuance, and nothing v0.1.0 kept says which came first. These names were not minted from the configured prefix, so they are numbered in year zero, where no advisory minted from it lands |
+| The first release date of an issued advisory | Frozen as the earliest recording of the issue in the product, which is what v0.1.0's document said |
+| The document an issuance sent | Not kept by v0.1.0, and nothing can work it out again. Stored as null, which is what the column says for an issuance that kept only its digest; a published directory reads only issuances that kept their bytes, so it serves the advisory once it is issued again |
+| A reported flaw | A reference minted the way one is today: the product's name, the year it was recorded, and six random digits. Judged when it was recorded, by whoever recorded it: v0.1.0 wrote a report only together with its flaw, which is the act a report is judged by today. Sent in from outside, because v0.1.0 wrote one only where somebody said who told us |
+| A VEX statement | From a statement set, with no document name of its own: v0.1.0 read nothing else. The version it is about is read from its package identifier the way an upload is read today, and is empty where the identifier names none |
+| The weaknesses of a flaw recorded here | The first named is primary. v0.1.0 wrote them in the order named, in one statement. An issue a scanner reported has none marked until a scan reports it again |
+| A finding | Not exploited here. v0.1.0 had no record of that |
+| A flaw recorded here with a severity | Rated when it was recorded, which is when v0.1.0 started its clock. One recorded without a severity is not rated, and its clock starts when somebody rates it. Its deadline is as v0.1.0 set it until the next recount moves it onto the windows for our own products |
+| A notification | Carried alone. Only a kind of message v0.1.0 did not have is carried together |
+| A column v0.1.0 did not have and that takes a null | Null |
+
+Rolled back, it puts back v0.1.0's tables and columns. What v0.1.0 has no
+place for goes with the tables and columns that held it: an embargo shortened,
+a report that did not become an issue, judged or not, a file attached to a
+report, every issue an advisory covers but its first, and every later advisory
+about the same issue in the same product. On MySQL and MariaDB a foreign key served by an
+index v0.2.0 added is dropped and declared again, so that the engine makes the
+key an index of its own as it did in v0.1.0; one made by hand would outlive
+the next upgrade.
+
+A test on each of the four engines builds a database to migration 36, writes a
+row into every table, every column holding a value, plus the rows each move
+above reads, and applies migration 37. It compares every column, index and
+constraint against a database that walked the chain empty, compares every
+value the release held with what the upgrade left, and checks each move in the
+table above. It then rolls migration 37 back, compares against the schema
+migration 36 built and the rows the release held against what came back, checks
+that the tables it recreated generate identifiers past those rows, and applies
+it again.
+
+The upgrade over a v0.1.0 database holding 524,288 findings, which is the
+largest table and one every engine changes:
+
+| Engine | Time |
+|---|---|
+| PostgreSQL 16 | 0.7 s |
+| SQLite | 7.5 s |
+| MySQL 8.4 | 12.1 s |
+| MariaDB 11.4 | 19.3 s |
 
 ## Migration locks
 
@@ -843,3 +915,8 @@ and the granularity are open questions.
   Index a hash, not the raw string.
 - Timestamp semantics differ between engines. Store UTC and be explicit about
   types.
+- Migration 37 is kept or collapsed on the measurement above. The lasting test
+  compares an upgraded database with one that walked the same chain empty, so
+  a column the migration leaves out is missing from both and nothing notices.
+  That the chain builds the schema the per-table migrations it replaced built
+  was checked once, when it was written, and matched on all four engines.
