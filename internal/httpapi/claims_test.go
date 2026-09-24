@@ -152,7 +152,7 @@ func TestTheQueueListsOneEntryPerClaimWithItsSize(t *testing.T) {
 		if one.Decisions != len(ids) || one.Issues != 1 || one.Places != len(ids) {
 			t.Errorf("the entry's size reads as %d/%d/%d, want %d/1/%d", one.Decisions, one.Issues, one.Places, len(ids), len(ids))
 		}
-		if len(one.Builds) != 1 || one.Builds[0] != "master · broadcom" {
+		if len(one.Builds) != 1 || one.Builds[0] != "Master · Broadcom" {
 			t.Errorf("the entry names builds %v, want the one it sits in", one.Builds)
 		}
 	})
