@@ -51,7 +51,7 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 		return nil, access.Denied("disclose an issue without being anybody")
 	}
 	if strings.TrimSpace(reason) == "" {
-		return nil, fmt.Errorf("say why the issue is being disclosed")
+		return nil, Unreasoned{Said: "say why the issue is being disclosed"}
 	}
 	// The submission policy, run before the text is stored. The row is
 	// append-only and becomes public with the rest of the record.
@@ -66,20 +66,6 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return err
 		}
-		waiting, err := tx.NewSelect().Model((*Movement)(nil)).
-			Where("product_id = ?", productID).
-			Where("vulnerability_id = ?", vulnerabilityID).
-			Where("act = ?", Disclosure).
-			Where("needs_approval = ?", true).
-			Where("approved_at IS NULL").
-			Exists(ctx)
-		if err != nil {
-			return fmt.Errorf("read whether a disclosure is waiting: %w", err)
-		}
-		if waiting {
-			return ErrDisclosureWaiting
-		}
-
 		asked := &Movement{
 			VulnerabilityID: vulnerabilityID, ProductID: productID,
 			Act: Disclosure, Was: now, Until: now, Reason: reason,
@@ -104,6 +90,24 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 			}
 			asked.NeedsApproval = threshold <= 0 || already+asked.Distance() >= threshold
 		}
+		if asked.NeedsApproval {
+			// Refused only where this one would wait too. One that takes
+			// effect at once ends the embargo whatever is waiting, and what
+			// was waiting leaves the queue with nothing left to disclose.
+			waiting, err := tx.NewSelect().Model((*Movement)(nil)).
+				Where("product_id = ?", productID).
+				Where("vulnerability_id = ?", vulnerabilityID).
+				Where("act = ?", Disclosure).
+				Where("needs_approval = ?", true).
+				Where("approved_at IS NULL").
+				Exists(ctx)
+			if err != nil {
+				return fmt.Errorf("read whether a disclosure is waiting: %w", err)
+			}
+			if waiting {
+				return ErrDisclosureWaiting
+			}
+		}
 		out = asked
 		if _, err := tx.NewInsert().Model(out).Exec(ctx); err != nil {
 			return fmt.Errorf("record the disclosure: %w", err)
@@ -124,8 +128,9 @@ func (s *Store) Disclose(ctx context.Context, subject access.Subject,
 //
 // Closed places count. A place that closed while undisclosed still carries a
 // record — comments, decisions, who did what — and disclosing the issue is
-// disclosing that record too (REQ-40). The end is the latest date any of them
-// carries, and nil where none carries one.
+// disclosing that record too (REQ-40). The end is read from the open places,
+// which are the ones a movement reads and moves, and from the closed ones only
+// where nothing is open; it is nil where none carries a date.
 func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (*time.Time, error) {
 	var held struct {
 		Places int        `bun:"places"`
@@ -136,8 +141,9 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 		TableExpr(`"finding" AS "f"`).
 		ColumnExpr(`COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS "places"`, access.Private).
 		ColumnExpr(`COUNT(CASE WHEN f.visibility = ? THEN 1 END) AS "public"`, access.Public).
-		ColumnExpr(`MAX(CASE WHEN f.visibility = ? THEN f.disclose_at END) AS "ends"`,
-			access.Private).
+		ColumnExpr(`COALESCE(MAX(CASE WHEN f.visibility = ? AND f.closed_at IS NULL THEN f.disclose_at END), `+
+			`MAX(CASE WHEN f.visibility = ? THEN f.disclose_at END)) AS "ends"`,
+			access.Private, access.Private).
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where(inThisProductAs("f.target_id"), productID).
 		Scan(ctx, &held)
@@ -161,11 +167,16 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 // who may reach it is answered by the row. Left behind, the decisions of a
 // disclosed issue would stay readable only to the people who could read it
 // before, which is the opposite of what disclosing says.
+//
+// The disclosure date goes with it. A public finding carries none, and one
+// left behind is read back as the date an embargo ends that has already
+// ended. The movement just recorded keeps where it stood.
 func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64,
 	now time.Time) error {
 
 	if _, err := db.NewUpdate().Model((*Finding)(nil)).
 		Set("visibility = ?", access.Public).
+		Set("disclose_at = NULL").
 		Set("last_changed_at = ?", now).
 		Where("vulnerability_id = ?", vulnerabilityID).
 		Where("visibility = ?", access.Private).
@@ -184,51 +195,46 @@ func makePublic(ctx context.Context, db bun.IDB, productID, vulnerabilityID int6
 	return nil
 }
 
-// Movement reads one movement by its identifier.
-func (s *Store) Movement(ctx context.Context, id int64) (*Movement, error) {
-	row := new(Movement)
-	if err := s.db.NewSelect().Model(row).Where("id = ?", id).Scan(ctx); err != nil {
-		if database.IsNoRows(err) {
-			return nil, ErrNotEmbargoed
-		}
-		return nil, fmt.Errorf("read the movement: %w", err)
-	}
-	return row, nil
+// Audience is who to tell that an issue was disclosed, and the names to tell them
+// in.
+type Audience struct {
+	Product       string
+	Vulnerability string
+	// People is every person holding a place of the issue in the product,
+	// open or closed. People only: a place in a team's queue has nobody to
+	// tell, and the queue itself shows the change.
+	People []int64
 }
 
-// MovementNames reads the product and issue a movement is about, by name.
-func (s *Store) MovementNames(ctx context.Context, m *Movement) (string, string, error) {
-	var product, issue string
+// ToTell reads who holds an issue in a product, for the person who has just
+// disclosed it there.
+func (s *Store) ToTell(ctx context.Context, subject access.Subject,
+	productID, vulnerabilityID int64) (*Audience, error) {
+
+	if !subject.Triages(access.Private, productID) {
+		return nil, access.Denied(fmt.Sprintf("read who holds an issue in product %d", productID))
+	}
+	out := &Audience{}
 	err := s.db.NewSelect().
 		TableExpr(`"product" AS "p"`).
-		Join(`JOIN "vulnerability" AS "v" ON v.id = ?`, m.VulnerabilityID).
+		Join(`JOIN "vulnerability" AS "v" ON v.id = ?`, vulnerabilityID).
 		ColumnExpr("p.name").
 		ColumnExpr("v.identifier").
-		Where("p.id = ?", m.ProductID).
-		Scan(ctx, &product, &issue)
+		Where("p.id = ?", productID).
+		Scan(ctx, &out.Product, &out.Vulnerability)
 	if err != nil {
-		return "", "", fmt.Errorf("read what a movement is about: %w", err)
+		return nil, fmt.Errorf("read what was disclosed: %w", err)
 	}
-	return product, issue, nil
-}
-
-// Holders is every person holding a place of one issue in one product, open
-// or closed.
-//
-// People only. A place held by a team is in a queue nobody has taken, and the
-// queue itself shows the change.
-func (s *Store) Holders(ctx context.Context, productID, vulnerabilityID int64) ([]int64, error) {
-	var ids []int64
-	err := s.db.NewSelect().
+	err = s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "person" AS "ps" ON ps.party_id = f.assigned_to`).
 		ColumnExpr("DISTINCT ps.id").
 		Where("f.vulnerability_id = ?", vulnerabilityID).
 		Where(inThisProductAs("f.target_id"), productID).
 		OrderExpr("ps.id").
-		Scan(ctx, &ids)
+		Scan(ctx, &out.People)
 	if err != nil {
 		return nil, fmt.Errorf("read who holds this issue: %w", err)
 	}
-	return ids, nil
+	return out, nil
 }

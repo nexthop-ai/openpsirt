@@ -263,6 +263,11 @@ var ErrAlreadyAgreed = errors.New("that movement has already been agreed to")
 // ErrNotLater says an extension would not move the date later.
 var ErrNotLater = errors.New("an extension moves a date later")
 
+// Unreasoned is a movement asked for with no reason. The caller's to fix.
+type Unreasoned struct{ Said string }
+
+func (u Unreasoned) Error() string { return u.Said }
+
 // ErrNotEarlier says bringing a date forward would not move it earlier.
 var ErrNotEarlier = errors.New("bringing a disclosure date forward moves it earlier")
 
@@ -331,7 +336,7 @@ func (s *Store) move(ctx context.Context, subject access.Subject, act Act,
 		return nil, access.Denied("move a disclosure date without being anybody")
 	}
 	if strings.TrimSpace(reason) == "" {
-		return nil, fmt.Errorf("say why the embargo is being moved")
+		return nil, Unreasoned{Said: "say why the embargo is being moved"}
 	}
 	// The submission policy, run before the text is stored. This row is
 	// append-only and is read back into a disclosure record.
@@ -423,14 +428,18 @@ func endsAt(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (
 // The person who asked may not be the one who agrees. That is the control the
 // threshold exists to reach, and a movement somebody approved for themselves
 // is the same as one nobody approved.
-func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id int64) error {
+//
+// It answers the movement agreed to, which says which act took effect.
+func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id int64) (*Movement, error) {
 	if subject.ID == 0 {
-		return access.Denied("agree to a disclosure movement without being anybody")
+		return nil, access.Denied("agree to a disclosure movement without being anybody")
 	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 
-	return database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+	var agreed *Movement
+	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		asked := new(Movement)
+		agreed = asked
 		if err := tx.NewSelect().Model(asked).Where("id = ?", id).Scan(ctx); err != nil {
 			// A movement somebody may not reach and one that is
 			// not there answer alike, so guessing identifiers says
@@ -486,6 +495,10 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 		}
 		return moveTo(ctx, tx, asked.ProductID, asked.VulnerabilityID, asked.Until, now)
 	})
+	if err != nil {
+		return nil, err
+	}
+	return agreed, nil
 }
 
 // agree records one person agreeing to one movement.
@@ -521,11 +534,25 @@ func agree(ctx context.Context, tx bun.IDB, id, personID int64, now time.Time) e
 // Kept in full and never overwritten. One movement is a judgment and six is a
 // policy nobody wrote down, and the difference is invisible if each replaces
 // the last.
+//
+// Public once the issue is disclosed in the product: the history of the
+// embargo is part of the record that disclosing opens (REQ-40). Until then
+// only somebody reading undisclosed work there may read it.
 func (s *Store) Movements(ctx context.Context, subject access.Subject,
 	productID, vulnerabilityID int64) ([]Movement, error) {
 
 	if !subject.Reads(access.Private, productID) {
-		return nil, access.Denied(fmt.Sprintf("read undisclosed work in product %d", productID))
+		denied := access.Denied(fmt.Sprintf("read undisclosed work in product %d", productID))
+		if !subject.Reads(access.Public, productID) {
+			return nil, denied
+		}
+		switch _, err := undisclosedHere(ctx, s.db, productID, vulnerabilityID); {
+		case errors.Is(err, ErrDisclosed):
+		case err == nil, errors.Is(err, ErrNotEmbargoed):
+			return nil, denied
+		default:
+			return nil, err
+		}
 	}
 	var rows []Movement
 	if err := s.db.NewSelect().Model(&rows).

@@ -151,10 +151,10 @@ func TestDisclosingEarlyIsAShortening(t *testing.T) {
 			err, finding.ErrDisclosureWaiting) {
 			t.Errorf("asking twice answered %v, want ErrDisclosureWaiting", err)
 		}
-		if err := f.store.AgreeToMovement(ctx, who, asked.ID); !errors.Is(err, finding.ErrSamePerson) {
+		if _, err := f.store.AgreeToMovement(ctx, who, asked.ID); !errors.Is(err, finding.ErrSamePerson) {
 			t.Errorf("agreeing to your own disclosure answered %v, want ErrSamePerson", err)
 		}
-		if err := f.store.AgreeToMovement(ctx, other, asked.ID); err != nil {
+		if _, err := f.store.AgreeToMovement(ctx, other, asked.ID); err != nil {
 			t.Fatal(err)
 		}
 		if n, _ := f.undisclosed(t, far); n != 0 {
@@ -224,8 +224,182 @@ func TestADisclosedIssueLeavesNothingWaitingToBeMoved(t *testing.T) {
 		if len(waiting) != 0 || total != 0 {
 			t.Errorf("after disclosure the queue still lists %d (total %d)", len(waiting), total)
 		}
-		if err := f.store.AgreeToMovement(ctx, other, long.ID); !errors.Is(err, finding.ErrNotEmbargoed) {
+		if _, err := f.store.AgreeToMovement(ctx, other, long.ID); !errors.Is(err, finding.ErrNotEmbargoed) {
 			t.Errorf("agreeing to an extension of a disclosed issue answered %v", err)
+		}
+	})
+}
+
+func TestDisclosingAnIssueInOneProductLeavesItUndisclosedInAnother(t *testing.T) {
+	// The unit is one issue in one product. The same issue embargoed in a
+	// second product keeps its findings, its decisions and its waiting
+	// movements private when the first discloses it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		issue := f.embargoed(t, who)
+		f.dated(t, issue, time.Now().Add(-time.Hour))
+
+		elsewhere := f.inAnotherProduct(t, "router")
+		other := f.productOf(t, elsewhere)
+		var there finding.Finding
+		if err := f.db.DB.NewSelect().Model(&there).
+			Where("vulnerability_id = ?", issue).Limit(1).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		there.ID = 0
+		there.TargetID = elsewhere
+		farOff := time.Now().Add(90 * 24 * time.Hour).UTC()
+		there.DiscloseAt = &farOff
+		if _, err := f.db.DB.NewInsert().Model(&there).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		row := map[string]any{
+			"claim_id":   claimBy(t, f.db, who.ID),
+			"product_id": other, "vulnerability_id": issue,
+			"place_identity": there.PlaceIdentity, "visibility": "private",
+			"state": "proposed", "needs_approval": true, "proposed_by": who.ID,
+			"proposed_at": time.Now().UTC(),
+		}
+		if _, err := f.db.DB.NewInsert().Model(&row).TableExpr(`"decision"`).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		both := access.NewPerson(who.ID, "both@example.com", false, map[int64][]access.Role{
+			f.productID: {access.PrivateTriage}, other: {access.PrivateTriage},
+		}, 0)
+		asked, err := f.store.Extend(ctx, both, other, issue,
+			farOff.Add(90*24*time.Hour), "Upstream has not answered.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !asked.NeedsApproval {
+			t.Fatal("a three-month extension stood alone")
+		}
+
+		if _, err := f.store.Disclose(ctx, who, f.productID, issue, "Published here."); err != nil {
+			t.Fatal(err)
+		}
+		var private int
+		private, err = f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
+			Where("target_id = ?", elsewhere).
+			Where("visibility = ?", access.Private).Count(ctx)
+		if err != nil || private != 1 {
+			t.Errorf("the other product's finding is undisclosed %d times (%v), want once", private, err)
+		}
+		private, err = f.db.DB.NewSelect().TableExpr(`"decision"`).
+			Where(`"product_id" = ?`, other).
+			Where(`"visibility" = ?`, access.Private).Count(ctx)
+		if err != nil || private != 1 {
+			t.Errorf("the other product's decision is undisclosed %d times (%v), want once", private, err)
+		}
+		waiting, _, err := f.store.PendingPage(ctx, both, 50, 0)
+		if err != nil || len(waiting) != 1 || waiting[0].ProductID != other {
+			t.Errorf("after disclosing elsewhere the queue holds %+v (%v), want the other product's extension",
+				waiting, err)
+		}
+	})
+}
+
+func TestADisclosureWaitingDoesNotHoldBackOneThatNeedsNobody(t *testing.T) {
+	// A disclosure asked for early waits for a second person. Once the date
+	// has arrived a new one needs nobody, and the one still waiting does not
+	// stand in its way.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		issue := f.embargoed(t, who)
+		f.dated(t, issue, time.Now().Add(60*24*time.Hour))
+		early, err := f.store.Disclose(ctx, who, f.productID, issue, "It may leak.")
+		if err != nil || !early.NeedsApproval {
+			t.Fatalf("disclosing two months early answered %+v, %v", early, err)
+		}
+
+		f.dated(t, issue, time.Now().Add(-time.Hour))
+		done, err := f.store.Disclose(ctx, who, f.productID, issue, "The date has come.")
+		if err != nil {
+			t.Fatalf("disclosing on the date with one waiting answered %v", err)
+		}
+		if !done.InForce() {
+			t.Errorf("disclosing on the date waited: %+v", done)
+		}
+		if n, _ := f.undisclosed(t, issue); n != 0 {
+			t.Errorf("%d findings are still undisclosed", n)
+		}
+	})
+}
+
+func TestTheEndOfAnEmbargoIsReadFromTheOpenPlaces(t *testing.T) {
+	// A movement reads and moves the open places. A closed place keeps the
+	// date it closed with, and a date it carries that is later than the one
+	// the open places have been moved to is not the end of the embargo.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		issue := f.embargoed(t, who)
+		var places []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&places).
+			Where("vulnerability_id = ?", issue).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		closed := places[0]
+		closed.ID = 0
+		closed.PlaceIdentity = "closed-" + closed.PlaceIdentity
+		now := time.Now().UTC()
+		later := now.Add(60 * 24 * time.Hour)
+		closed.DiscloseAt = &later
+		closed.ClosedAt = &now
+		if _, err := f.db.DB.NewInsert().Model(&closed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set("disclose_at = ?", now.Add(-time.Hour)).
+			Where("vulnerability_id = ?", issue).
+			Where("closed_at IS NULL").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		done, err := f.store.Disclose(ctx, who, f.productID, issue, "The date has come.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if done.NeedsApproval {
+			t.Error("a closed place's later date sent a disclosure whose date has arrived to a queue")
+		}
+	})
+}
+
+func TestADisclosedIssueCarriesNoDateAndItsHistoryIsPublic(t *testing.T) {
+	// A public finding carries no disclosure date, and the history of the
+	// embargo is part of the record disclosing opens.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		public := f.planner(t, access.PublicRead)
+		issue := f.embargoed(t, who)
+		f.dated(t, issue, time.Now().Add(-time.Hour))
+
+		if _, err := f.store.Movements(ctx, public, f.productID, issue); err == nil {
+			t.Error("a public reader read the history of an embargo still running")
+		}
+		if _, err := f.store.Disclose(ctx, who, f.productID, issue, "Published."); err != nil {
+			t.Fatal(err)
+		}
+		dated, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
+			Where("vulnerability_id = ?", issue).
+			Where("disclose_at IS NOT NULL").Count(ctx)
+		if err != nil || dated != 0 {
+			t.Errorf("%d disclosed findings still carry a disclosure date (%v)", dated, err)
+		}
+		history, err := f.store.Movements(ctx, public, f.productID, issue)
+		if err != nil {
+			t.Fatalf("a public reader could not read the history of a disclosed issue: %v", err)
+		}
+		if len(history) != 1 || history[0].Act != finding.Disclosure || history[0].Reason != "Published." {
+			t.Errorf("the history reads %+v, want the disclosure and its reason", history)
 		}
 	})
 }

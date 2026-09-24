@@ -199,11 +199,11 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 		}
 
 		// The person who asked may not be the one who agrees.
-		if err := f.store.AgreeToMovement(t.Context(), who, long.ID); err == nil {
+		if _, err := f.store.AgreeToMovement(t.Context(), who, long.ID); err == nil {
 			t.Error("somebody agreed to their own request")
 		}
 		other := f.someoneElse(t, access.PrivateTriage)
-		if err := f.store.AgreeToMovement(t.Context(), other, long.ID); err != nil {
+		if _, err := f.store.AgreeToMovement(t.Context(), other, long.ID); err != nil {
 			t.Fatal(err)
 		}
 		if got := f.endsAt(t, issue); !got.Equal(now.Add(28 * 24 * time.Hour)) {
@@ -223,7 +223,7 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 		// the barrier `internal/catalog/race_test.go` is written against, and
 		// is not covered here.
 		third := f.someoneElse(t, access.PrivateTriage)
-		if err := f.store.AgreeToMovement(t.Context(), third, long.ID); !errors.Is(
+		if _, err := f.store.AgreeToMovement(t.Context(), third, long.ID); !errors.Is(
 			err, finding.ErrAlreadyAgreed) {
 			t.Errorf("agreeing a second time answered %v, want ErrAlreadyAgreed", err)
 		}
@@ -389,7 +389,7 @@ func TestAgreeingMovesTheDateFromWhereItIsNow(t *testing.T) {
 		}
 
 		// The longer one is agreed to first, and the date follows it.
-		if err := f.store.AgreeToMovement(ctx, other, far.ID); err != nil {
+		if _, err := f.store.AgreeToMovement(ctx, other, far.ID); err != nil {
 			t.Fatal(err)
 		}
 		if got := f.endsAt(t, issue); !got.Equal(far.Until) {
@@ -398,7 +398,7 @@ func TestAgreeingMovesTheDateFromWhereItIsNow(t *testing.T) {
 
 		// Agreeing to the shorter one would now carry the date backwards,
 		// which an extension never does. Refused, and nothing moves.
-		if err := f.store.AgreeToMovement(ctx, other, near.ID); !errors.Is(err, finding.ErrNotLater) {
+		if _, err := f.store.AgreeToMovement(ctx, other, near.ID); !errors.Is(err, finding.ErrNotLater) {
 			t.Errorf("agreeing to the earlier extension answered %v, want ErrNotLater", err)
 		}
 		if got := f.endsAt(t, issue); !got.Equal(far.Until) {
@@ -434,7 +434,7 @@ func TestAMovementThatNeededNobodyCannotBeAgreedTo(t *testing.T) {
 		ends := f.endsAt(t, issue)
 
 		other := f.someoneElse(t, access.PrivateTriage)
-		if err := f.store.AgreeToMovement(ctx, other, short.ID); !errors.Is(
+		if _, err := f.store.AgreeToMovement(ctx, other, short.ID); !errors.Is(
 			err, finding.ErrAlreadyAgreed) {
 			t.Errorf("agreeing to a movement that needed nobody answered %v", err)
 		}

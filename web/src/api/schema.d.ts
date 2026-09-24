@@ -1103,7 +1103,7 @@ export interface paths {
         };
         /**
          * List disclosure-date movements waiting for a second person
-         * @description Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first. Both acts are here, and `act` says which each one is.
+         * @description Every request to move a disclosure date that nobody has agreed to yet, across the products you may read undisclosed work in, newest first. Every act is here, and `act` says which each one is.
          *
          *     Without this there is nowhere to be that second person. A request could be read on the finding it belongs to and nowhere else, so the only way to find one was to already know it existed — which is the failure the review queue exists to prevent, in the one place where what is being agreed to is how long something stays hidden.
          *
@@ -2759,7 +2759,9 @@ export interface paths {
          *
          *     Kept in full and never overwritten. One movement is a judgment and six is a policy nobody wrote down, and the difference is invisible if each replaces the last. A request still waiting for agreement is here too: what was asked for is part of how long this stayed hidden, whether or not it was granted.
          *
-         *     Requires: private-read or private-triage on the product. Only where you may read undisclosed work.
+         *     Readable to anybody who may read the issue once it is disclosed in the product.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage on the product. Where you may read undisclosed work, or once the issue is disclosed in the product.
          */
         get: operations["list-disclosure-movements"];
         put?: never;

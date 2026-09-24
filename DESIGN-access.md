@@ -1084,15 +1084,16 @@ the extensions and shortenings with the act `disclosure`.
 | Every place turns public, open and closed | A closed place still carries comments and decisions, and REQ-40 opens the whole record |
 | Every decision about the issue in the product turns public | A decision carries its finding's visibility so that the row answers who may reach it |
 | Nothing else is rewritten | Comments, notes, attachments, assignments and an advisory's distribution label read the finding's visibility when asked |
+| A decision written after the place was read follows | Its visibility is read from the issue inside the write, so a disclosure landing between the read and the write leaves no private row behind |
 | A flaw with no date always needs a second person | A flaw found here has no end anybody agreed to, so the disclosure is the whole decision |
 | One way | Nothing turns a disclosed issue undisclosed again, and a later extension or shortening finds nothing to move |
-| One disclosure waits at a time | A second request for the same issue is refused while the first waits |
+| One disclosure waits at a time | A second request that would also wait is refused while the first waits. One that takes effect at once is not, and the one waiting leaves the queue |
+| The end is read from the open places | The places a movement reads and moves. A closed place's date is read only where nothing is open |
+| The disclosure date is cleared | A public finding carries none. The movement keeps where the embargo stood |
+| The embargo's history is public once disclosed | Every movement and its reason is part of the record that disclosing opens. Before that, only somebody reading undisclosed work in the product reads it |
 | A disclosure waiting for agreement changes nothing | The same rule as every other movement |
 | Whoever holds a place is told, apart from the person whose act made it public | What they write about it is public from then on. People only: a place in a team's queue has nobody to tell |
 | A movement left waiting when the issue is disclosed leaves the queue | It can no longer be agreed to |
-
-The disclosure date stays on the findings after disclosure. Nothing reads it
-there, because every list of embargoes asks for undisclosed findings.
 
 ## Disclosure-date movements
 

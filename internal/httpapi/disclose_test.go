@@ -41,8 +41,17 @@ func TestDisclosingAnIssueMakesItReadableToEverybody(t *testing.T) {
 		}
 
 		at := "/v1/products/mine/issues/" + recorded.Identifier + "/disclosure"
-		if got := asPerson(t, r, "private-triage", http.MethodPost, at, `{"reason":""}`); got.Code < 400 {
-			t.Errorf("an issue was disclosed for no stated reason: %d", got.Code)
+		// A reason missing, or one the text policy refuses, is the caller's to
+		// fix, and says so.
+		for _, reason := range []string{`""`, `"   "`, `"<b>leaked</b>"`} {
+			if got := asPerson(t, r, "private-triage", http.MethodPost, at,
+				`{"reason":`+reason+`}`); got.Code != http.StatusUnprocessableEntity {
+				t.Errorf("disclosing for the reason %s answered %d, want 422: %s",
+					reason, got.Code, got.Body.String())
+			}
+		}
+		if got := asPerson(t, r, "reader", http.MethodGet, at, ""); got.Code < 400 {
+			t.Errorf("a public reader read the history of a running embargo: %d", got.Code)
 		}
 		if got := asPerson(t, r, "triager", http.MethodPost, at, `{"reason":"Because."}`); got.Code < 400 {
 			t.Errorf("somebody holding only public triage disclosed an issue: %d", got.Code)
@@ -75,6 +84,11 @@ func TestDisclosingAnIssueMakesItReadableToEverybody(t *testing.T) {
 		}
 		if got := asPerson(t, r, "reader", http.MethodGet, finding, ""); got.Code != http.StatusOK {
 			t.Errorf("a disclosed finding answered %d to a public reader: %s", got.Code, got.Body.String())
+		}
+		if got := asPerson(t, r, "reader", http.MethodGet, at, ""); got.Code != http.StatusOK ||
+			!strings.Contains(got.Body.String(), "The advisory is out.") {
+			t.Errorf("a public reader reading the disclosed embargo's history got %d: %s",
+				got.Code, got.Body.String())
 		}
 		if got := asPerson(t, r, "private-triage", http.MethodPost, at,
 			`{"reason":"Once more."}`); got.Code != http.StatusConflict {

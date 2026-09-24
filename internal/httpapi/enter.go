@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -15,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -446,7 +448,7 @@ func registerMovements(api huma.API, in Ingest) {
 				if errors.Is(err, finding.ErrNotEmbargoed) {
 					return nil, noSuchFinding()
 				}
-				return nil, refusedFinding(in, err)
+				return nil, refusedMovement(in, err)
 			}
 			body, err := movementBody(ctx, in, []finding.Movement{*asked})
 			if err != nil {
@@ -528,10 +530,10 @@ func registerMovements(api huma.API, in Ingest) {
 		case errors.Is(err, finding.ErrDisclosed), errors.Is(err, finding.ErrDisclosureWaiting):
 			return nil, huma.Error409Conflict(err.Error())
 		case err != nil:
-			return nil, refusedFinding(in, err)
+			return nil, refusedMovement(in, err)
 		}
 		if asked.InForce() {
-			toldDisclosed(ctx, in, store, product, issue, input.Product, input.Vulnerability, subject.ID)
+			toldDisclosed(ctx, in, store, subject, product, issue)
 		}
 		body, err := movementBody(ctx, in, []finding.Movement{*asked})
 		if err != nil {
@@ -548,9 +550,11 @@ func registerMovements(api huma.API, in Ingest) {
 			"Kept in full and never overwritten. One movement is a judgment and six is a " +
 			"policy nobody wrote down, and the difference is invisible if each replaces the " +
 			"last. A request still waiting for agreement is here too: what was asked for is " +
-			"part of how long this stayed hidden, whether or not it was granted.",
+			"part of how long this stayed hidden, whether or not it was granted.\n\n" +
+			"Readable to anybody who may read the issue once it is disclosed in the product.",
 		Tags: []string{"Findings"},
-	}, perProduct, "Only where you may read undisclosed work.", privateRights()...), func(ctx context.Context, input *struct {
+	}, perProduct, "Where you may read undisclosed work, or once the issue is disclosed in the product.",
+		readRights()...), func(ctx context.Context, input *struct {
 		Product       string `path:"product"`
 		Vulnerability string `path:"vulnerability"`
 	}) (*listOutput[MovementBody], error) {
@@ -576,8 +580,8 @@ func registerMovements(api huma.API, in Ingest) {
 		Path:    "/v1/disclosure-movements",
 		Summary: "List disclosure-date movements waiting for a second person",
 		Description: "Every request to move a disclosure date that nobody has agreed to yet, " +
-			"across the products you may read undisclosed work in, newest first. Both acts " +
-			"are here, and `act` says which each one is.\n\n" +
+			"across the products you may read undisclosed work in, newest first. Every act " +
+			"is here, and `act` says which each one is.\n\n" +
 			"Without this there is nowhere to be that second person. A request could be " +
 			"read on the finding it belongs to and nowhere else, so the only way to find one " +
 			"was to already know it existed — which is the failure the review queue exists to " +
@@ -650,7 +654,7 @@ func registerMovements(api huma.API, in Ingest) {
 			return nil, noDatabase(in.Logger)
 		}
 		store := finding.NewStore(in.DB.DB)
-		err = store.AgreeToMovement(ctx, subject, input.ID)
+		agreed, err := store.AgreeToMovement(ctx, subject, input.ID)
 		switch {
 		case errors.Is(err, finding.ErrNotEmbargoed):
 			return nil, noSuchFinding()
@@ -666,11 +670,8 @@ func registerMovements(api huma.API, in Ingest) {
 		case err != nil:
 			return nil, refusedFinding(in, err)
 		}
-		if agreed, err := store.Movement(ctx, input.ID); err == nil && agreed.Act == finding.Disclosure {
-			if product, issue, err := store.MovementNames(ctx, agreed); err == nil {
-				toldDisclosed(ctx, in, store, agreed.ProductID, agreed.VulnerabilityID,
-					product, issue, subject.ID)
-			}
+		if agreed.Act == finding.Disclosure {
+			toldDisclosed(ctx, in, store, subject, agreed.ProductID, agreed.VulnerabilityID)
 		}
 		return &struct{}{}, nil
 	})
@@ -683,26 +684,41 @@ func registerMovements(api huma.API, in Ingest) {
 // leaves the disclosure standing, and a disclosure rolled back for want of a
 // notice is the embargo held on a mail queue.
 func toldDisclosed(ctx context.Context, in Ingest, store *finding.Store,
-	product, issue int64, productName, issueName string, by int64) {
+	by access.Subject, product, issue int64) {
 
-	holders, err := store.Holders(ctx, product, issue)
+	told, err := store.ToTell(ctx, by, product, issue)
 	if err != nil {
 		in.logger().Error("could not read who holds a disclosed issue", "error", err)
 		return
 	}
-	for _, person := range holders {
-		if person == by {
+	for _, person := range told.People {
+		if person == by.ID {
 			continue
 		}
 		tell(ctx, in, "could not say that an issue was disclosed", notify.Telling{
 			PersonID: person, Kind: notify.Disclosed,
-			Body: issueName + " is disclosed in " + productName +
+			Body: told.Vulnerability + " is disclosed in " + told.Product +
 				". Its findings, decisions and comments are public.",
-			Link:            "/products/" + productName + "/findings?q=" + issueName,
+			Link: "/products/" + url.PathEscape(told.Product) +
+				"/findings?q=" + url.QueryEscape(told.Vulnerability),
 			ProductID:       &product,
 			VulnerabilityID: &issue,
-		}, "issue", issueName)
+		}, "issue", told.Vulnerability)
 	}
+}
+
+// refusedMovement is the answer to a movement of an embargo the store turned
+// away. A reason missing or refused by the text policy is the caller's to fix.
+func refusedMovement(in Ingest, err error) error {
+	var faults markdown.Faults
+	if errors.As(err, &faults) {
+		return refusedText(faults)
+	}
+	var unreasoned finding.Unreasoned
+	if errors.As(err, &unreasoned) {
+		return huma.Error422UnprocessableEntity(unreasoned.Error())
+	}
+	return refusedFinding(in, err)
 }
 
 // embargoAt resolves a product and an issue for the disclosure endpoints.
