@@ -12,6 +12,7 @@
     "classes": "node scripts/class-collisions.mjs",
     "tokens": "node scripts/tokens.mjs",
     "ladder": "node scripts/one-ladder.mjs",
+    "copy": "node scripts/screen-copy.mjs",
     "licenses": "node scripts/licenses.mjs",
     "lint": "eslint .",
     "stylelint": "stylelint \"src/**/*.css\"",

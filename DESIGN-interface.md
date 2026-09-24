@@ -1652,6 +1652,27 @@ Measured before the sweep that applied this: 262 standing strings, about
 somebody opens every day. The copy had drifted into explaining the design to
 the reader, which is what a design document is for.
 
+### The copy gate
+
+`npm run copy`, part of `make web-check`, bounds how much a screen says at once.
+
+| It checks | |
+|---|---|
+| Every paragraph, every hint span, and every `hint` or `detail` given as text | The shapes the explanation drifted into |
+| At most 20 words each | A label, a value and one short line fit. A second sentence of reasoning does not |
+| What a paragraph can show at once | Every text node and string it renders. The longer side of a condition is counted, so a sentence inside a branch is prose like any other. A list it maps over is data and is not counted |
+| Nothing examined fails the run | A check that found no paragraph looked at nothing |
+
+| It cannot check | |
+|---|---|
+| Whether a short line is plain | Twenty mannered words pass |
+| Whether a line is needed at all | Cut before rewriting is judgment |
+| Text a helper builds | A string assembled in a function and passed in is counted as nothing |
+| Tooltips | A `title` is where clarification belongs, so it is left alone |
+
+A paragraph that has to stay longer is named in the gate's allowlist with its
+reason.
+
 Contractions are allowed here. The rule against them covers the durable
 documents, which are read years later by somebody deciding whether a decision
 still holds. Screen
