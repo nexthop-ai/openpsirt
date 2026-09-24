@@ -6,9 +6,18 @@ import { useSelection } from "./useSelection";
 import { FindingsTable } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
 import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
+import {
+  ASSIGNED,
+  DEADLINES,
+  Filters,
+  Narrowed,
+  STATES,
+  activeFilters,
+  without,
+  withoutAny,
+} from "./FindingsFilters";
+import { FilterMenu, type MenuOption } from "../ui/FilterMenu";
 import { FLOORS } from "../ui/severities";
-import { Filters, Narrowed, STATES, activeFilters, without, withoutAny } from "./FindingsFilters";
-import { Choices } from "../ui/Choices";
 import { findingsPath } from "../app/scope";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -61,6 +70,23 @@ import {
 // assignee, and a bump has none of those — so they are named on that screen
 // rather than dropped, which is what would widen the list back out while the
 // chips went on saying they were on.
+// The filters the bar sets itself, so the count on More filters leaves them out.
+const ON_THE_BAR = new Set(["q", "floor", "state", "assigned", "running"]);
+
+// The severity scale as the bar offers it: a floor, read as "and up". The
+// lowest step is no floor at all, and the highest has nothing above it.
+const FLOOR_MENU: readonly MenuOption[] = FLOORS.map((band, i) => {
+  const name = `${band[0]?.toUpperCase() ?? ""}${band.slice(1)}`;
+  if (i === 0) return ["", "Any"] as const;
+  return [band, i === FLOORS.length - 1 ? name : `${name} and up`] as const;
+});
+
+// The deadlines, worded to read after "Due".
+const DUE_MENU: readonly MenuOption[] = DEADLINES.map(([word, label]) => [
+  word,
+  word === "" ? "Any time" : label.replace(/^Due within/, "Within"),
+]);
+
 const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "state"]);
 
 // One row per issue in a component, not per place. Every filter is in the URL,
@@ -125,6 +151,13 @@ export function Findings() {
   // travels with a link like any other filter.
   const asked = useMemo(() => asAsked(params, view), [params, view]);
   const advanced = activeFilters(asked).length;
+  // What narrows the list from behind More filters, which is every chip but
+  // the ones the bar sets itself — so the count on that button is about what
+  // it opens.
+  const elsewhere = activeFilters(asked).filter(
+    (each) =>
+      !ON_THE_BAR.has(each.key) && !(each.key === "opened_after" && each.value === daysBack(1)),
+  ).length;
   // Closed until somebody opens it. The panel is most of a screen, and what is
   // narrowed is already stated above the list as a chip per filter that removes
   // itself when clicked — so opening it because a filter is set covers the rows
@@ -533,7 +566,33 @@ export function Findings() {
 
   const controls = (
     <>
-      <div className="filters">
+      {/* How a row is grouped, which changes what a row is rather than which
+          rows show. Across every product there is no by-component or
+          by-upgrade answer: both ask a product-scoped endpoint. */}
+      {!spanning && (
+        <div className="viewtabs" role="tablist" aria-label="Group the list">
+          {(
+            [
+              ["issues", "By issue", view === "issues" ? total : byIssue.data?.total],
+              ["components", "By component", byComponent.data?.total],
+              ["bumps", "By upgrade", byUpgrade.data?.total],
+            ] as const
+          ).map(([value, label, count]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              className="viewtab"
+              aria-selected={view === value}
+              onClick={() => set("view", value === "issues" ? "" : value)}
+            >
+              {label}
+              {typeof count === "number" && <span className="n">{count.toLocaleString()}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="filters filterbar">
         <form
           className="searchbox"
           onSubmit={(event) => {
@@ -563,50 +622,39 @@ export function Findings() {
             Clear “{searching}”
           </button>
         )}
-        <span className="seg">
-          {/* Across every product there is no by-component or by-bump answer
-              to give: both ask a product-scoped endpoint, and asked with no
-              product they are refused for a path parameter that is missing.
-              Offered anyway, the two buttons were controls that could only
-              produce an error — and switching to one and back is how somebody
-              loses the question they had built. */}
-          {[
-            ["issues", "By issue", view === "issues" ? total : byIssue.data?.total],
-            ...(spanning ? [] : [["components", "By component", byComponent.data?.total] as const]),
-            ...(spanning ? [] : [["bumps", "By upgrade", byUpgrade.data?.total] as const]),
-          ].map(([value, label, count]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={view === value}
-              onClick={() => set("view", value === "issues" ? "" : (value as string))}
-            >
-              {label}
-              {typeof count === "number" && <span className="n">{count.toLocaleString()}</span>}
-            </button>
-          ))}
-        </span>
-        {/* Where somebody starts. The two chips that stood here were
-            "exploited" and "fix available", and neither earned the place: the
-            list is ordered by urgency, so what is being exploited is already
-            at the top of it, and both are still in the panel. What people
-            reach for first is what has not been answered yet, and that is a
-            question about several states at once — undecided and pending
-            approval together are everything nobody has finished with. */}
-        <span className="floor">
-          <span style={{ color: "var(--faint)" }}>Decision</span>
-          <Choices
-            bare
-            label="Decision state"
-            options={STATES}
-            chosen={asked.getAll("state").filter(Boolean)}
-            onChange={(chosen) => setMany("state", chosen)}
-          />
-        </span>
-        {/* What came in overnight, which is the first question of a working
-            day and was a hand-typed date behind a disclosure. The date rather
-            than the word, so a list somebody sends means the same thing when
-            it is opened. */}
+        {/* One button per question asked every day, each naming itself and
+            what it is set to. Whatever else narrows the list is behind More
+            filters, and every filter in force is a chip under the bar. */}
+        <FilterMenu
+          label="Decision"
+          multi
+          options={STATES}
+          chosen={asked.getAll("state").filter(Boolean)}
+          onChange={(chosen) => setMany("state", chosen)}
+        />
+        <FilterMenu
+          label="Severity"
+          options={FLOOR_MENU}
+          chosen={floor === "low" ? [] : [floor]}
+          onChange={(chosen) => set("floor", chosen[0] ?? "")}
+        />
+        <FilterMenu
+          label="Assigned"
+          multi
+          anything="Anyone"
+          options={ASSIGNED}
+          chosen={asked.getAll("assigned").filter(Boolean)}
+          onChange={(chosen) => setMany("assigned", chosen)}
+        />
+        <FilterMenu
+          label="Due"
+          anything="Any time"
+          options={DUE_MENU}
+          chosen={asked.get("running") ? [asked.get("running") ?? ""] : []}
+          onChange={(chosen) => set("running", chosen[0] ?? "")}
+        />
+        {/* The date rather than the word, so a list somebody sends means the
+            same thing when it is opened. */}
         <button
           type="button"
           className="chip"
@@ -616,23 +664,20 @@ export function Findings() {
         >
           New today
         </button>
-        {/* Behind a control rather than always on screen: the chips above are
-            what somebody uses constantly. What is on is said on the control,
-            so a narrowed list never looks like an unnarrowed one. */}
+        <span className="spacer" />
         <button
           type="button"
           className="chip"
-          aria-pressed={advanced > 0 || more}
+          aria-pressed={elsewhere > 0 || more}
           aria-expanded={more}
           onClick={() => setMore(!more)}
         >
-          Filters{advanced > 0 ? ` · ${advanced}` : ""}
+          More filters{elsewhere > 0 ? ` · ${elsewhere}` : ""}
         </button>
         {/* Picking a saved filter replaces what is on screen, so it replaces
           the population a selection was made out of. Keeping the selection
           across that would carry rows chosen under one question into an act
-          taken under another, and the bar would go on saying they are
-          selected while none of them is listed. */}
+          taken under another. */}
         {!spanning && (
           <Saved
             product={product}
@@ -642,41 +687,6 @@ export function Findings() {
             }}
           />
         )}
-        {/* Which order the list is in, said rather than inferred. Four of the
-            six sit under a column header, so the two that do not — the tool's
-            own ranking and how long something has been open — could not be
-            asked for at all, and the ranking could not be got back to once a
-            header had been clicked. */}
-        <span className="floor">
-          <span style={{ color: "var(--faint)" }}>Order</span>
-          <select
-            aria-label="Order the list"
-            value={sort || BY_DEFAULT}
-            onChange={(event) => setEach(firstAsk(event.target.value as SortWord))}
-          >
-            {Object.entries(ORDERS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </span>
-        <span className="floor">
-          <span style={{ color: "var(--faint)" }}>Min severity</span>
-          <span className="seg">
-            {FLOORS.map((band) => (
-              <button
-                key={band}
-                type="button"
-                aria-pressed={floor === band}
-                onClick={() => set("floor", band)}
-              >
-                {band[0]?.toUpperCase()}
-                {band.slice(1)}
-              </button>
-            ))}
-          </span>
-        </span>
       </div>
 
       {/* What is narrowing the list, whether or not the panel is open, and
@@ -764,6 +774,34 @@ export function Findings() {
           </button>
         </div>
       )}
+
+      {/* The order is about the list rather than what is in it, so it sits
+          with the list. Four of the six are also under a column header; the
+          tool's own ranking and age are asked for here alone. */}
+      <div className="listhead">
+        <span className="hint">
+          {(view === "components"
+            ? byComponent.data?.total
+            : view === "bumps"
+              ? byUpgrade.data?.total
+              : total
+          )?.toLocaleString() ?? "…"}{" "}
+          {view === "components" ? "components" : view === "bumps" ? "upgrades" : "issues"}
+        </span>
+        <label className="sortby">
+          <span>Sorted by</span>
+          <select
+            value={sort || BY_DEFAULT}
+            onChange={(event) => setEach(firstAsk(event.target.value as SortWord))}
+          >
+            {Object.entries(ORDERS).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
     </>
   );
 

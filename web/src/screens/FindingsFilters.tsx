@@ -467,7 +467,9 @@ function Group({ legend, children }: { legend: string; children: React.ReactNode
   );
 }
 
-// The whole panel. What it can offer depends on where it is: a subtree and
+// The whole panel, less the four filters the bar above the list sets itself:
+// decision state, severity, who holds it and its deadline. What it can offer
+// depends on where it is: a subtree and
 // "differs between builds" are statements about one build's edges and one
 // selection, so they are absent rather than dead where there is no build to
 // walk, and a VEX publisher or a tag is a per-product list.
@@ -505,12 +507,6 @@ export function Filters({
   return (
     <div className="filterpanel">
       <Group legend="Severity and risk">
-        <Pick
-          label="Minimum severity"
-          value={at("floor") || "low"}
-          options={SEVERITIES}
-          onChange={(value) => set("floor", value === "low" ? "" : value)}
-        />
         <Field label="Exploit likelihood at least" hint="The published EPSS estimate, 0 to 1">
           <input
             {...notACredential}
@@ -559,29 +555,12 @@ export function Filters({
       </Group>
 
       <Group legend="Triage">
-        {/* Also above the list, because it is the first thing most people
-            narrow by. Both controls read and write the same address, so
-            whichever is used the other says the same thing. */}
-        <Choices
-          label="Decision state"
-          hint="Anything unfinished"
-          chosen={all("state")}
-          options={STATES}
-          onChange={(chosen) => setMany("state", chosen)}
-        />
         <Choices
           label="Decision outcome"
           hint="The outcome that stands"
           chosen={all("outcome")}
           options={OUTCOMES}
           onChange={(chosen) => setMany("outcome", chosen)}
-        />
-        <Choices
-          label="Assigned to"
-          hint="Mine and unassigned together"
-          chosen={all("assigned")}
-          options={ASSIGNED}
-          onChange={(chosen) => setMany("assigned", chosen)}
         />
         <Flag
           label="Sent back to its author"
@@ -711,12 +690,6 @@ export function Filters({
       </Group>
 
       <Group legend="Timing">
-        <Pick
-          label="Deadline"
-          value={at("running")}
-          options={DEADLINES}
-          onChange={(value) => set("running", value)}
-        />
         <Field label="Open for at least" hint="Days since first seen">
           <input
             {...notACredential}
