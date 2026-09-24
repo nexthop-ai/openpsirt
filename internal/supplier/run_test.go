@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -28,7 +29,7 @@ func TestADeploymentThatNamesNoSupplierReachesNothing(t *testing.T) {
 		ctx := t.Context()
 		p := serving(t)
 
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{})
+		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(pass, fetching(t, f, p))
 		took, err := pass.Once(ctx)
 		if err != nil {
@@ -54,7 +55,7 @@ func TestThePassRecordsHowFarThroughAPublisherItHasRead(t *testing.T) {
 		if _, err := store.Add(ctx, f.by, f.product, "Example Linux", p.described()); err != nil {
 			t.Fatal(err)
 		}
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{})
+		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(pass, fetching(t, f, p))
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
@@ -109,7 +110,7 @@ func TestANewSupplierIsReadFromTheHistoryWindowBeforeItWasNamed(t *testing.T) {
 			p.described()); err != nil {
 			t.Fatal(err)
 		}
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{})
+		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(pass, fetching(t, f, p))
 		took, err := pass.Once(ctx)
 		if err != nil {
@@ -155,7 +156,7 @@ func TestASupplierThatCannotBeReachedDoesNotStopTheNext(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{})
+		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(pass, fetching(t, f, p))
 		took, err := pass.Once(ctx)
 		if err != nil {
@@ -233,7 +234,7 @@ func TestOneReplicaReachesOutAndTheOtherDoesNothing(t *testing.T) {
 			t.Fatalf("the supplier is not due, so the lease is not what is being tested")
 		}
 
-		second := supplier.NewPass(f.db.DB, quiet(), "two", sbom.Limits{})
+		second := supplier.NewPass(f.db.DB, quiet(), "two", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(second, fetching(t, f, p))
 		took, err := second.Once(ctx)
 		if err != nil {
@@ -249,7 +250,7 @@ func TestOneReplicaReachesOutAndTheOtherDoesNothing(t *testing.T) {
 
 		// And the replica holding it does the work, so the refusal above is
 		// the lease rather than something that stops both.
-		first := supplier.NewPass(f.db.DB, quiet(), "one", sbom.Limits{})
+		first := supplier.NewPass(f.db.DB, quiet(), "one", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(first, fetching(t, f, p))
 		if took, err := first.Once(ctx); err != nil || took.Documents != 1 {
 			t.Fatalf("the replica holding the lease read %+v (%v)", took, err)
@@ -277,7 +278,7 @@ func TestAnAdvisoryIsRecordedAsTheAdministratorWhoNamedTheSupplier(t *testing.T)
 			t.Fatal(err)
 		}
 
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{})
+		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(pass, fetching(t, f, p))
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
@@ -319,7 +320,7 @@ func TestTheBoundOnOneCycleIsTheSameWhicheverWayTheFeedIsOrdered(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{})
+		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(pass, fetching(t, f, p))
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)

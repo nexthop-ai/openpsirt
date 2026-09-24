@@ -95,3 +95,59 @@ func TestAProducerDocumentBecomesTheStoredGraph(t *testing.T) {
 		}
 	})
 }
+
+// TestALicenseReadFromAnElementReachesTheStoredComponent stores a document
+// whose licenses are elements of their own, attached by relationships after
+// the packages were read. An edge carries its endpoints, and every copy of a
+// component is interned: an edge holding the copy from before the licenses
+// were resolved stores the component without one.
+func TestALicenseReadFromAnElementReachesTheStoredComponent(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Reset(t, db)
+
+		cat := catalog.NewStore(db.DB)
+		product, err := cat.DeclareProduct(ctx, "app", "App")
+		if err != nil {
+			t.Fatal(err)
+		}
+		stream, err := cat.DeclareStream(ctx, product.ID, "main", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		variant, err := cat.DeclareVariant(ctx, product.ID, "linux", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		target, err := cat.TargetFor(ctx, stream.ID, variant.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc, err := sbom.Read(fixture(t, "rust-app.spdx3.json"), sbom.Limits{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
+			TargetID: target.ID, ContentHash: "spdx3", BuiltAt: time.Now().UTC(), ParserVersion: "test",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := graph.NewStore(db.DB).Apply(ctx, target.ID, rec.ID,
+			doc.Snapshot(graph.Described{Name: "app", Version: "main"})); err != nil {
+			t.Fatal(err)
+		}
+
+		// hyper is a dependency, so it is an edge's child as well as a
+		// component of the document.
+		var license string
+		if err := db.DB.NewSelect().TableExpr(`"component" AS "c"`).
+			ColumnExpr("COALESCE(c.license, '')").Where("c.name = ?", "hyper").
+			Scan(ctx, &license); err != nil {
+			t.Fatal(err)
+		}
+		if license != "MIT" {
+			t.Errorf("hyper is stored under the license %q, want MIT", license)
+		}
+	})
+}

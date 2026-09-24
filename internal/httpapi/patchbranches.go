@@ -18,7 +18,7 @@ import (
 type PatchRepositoryBody struct {
 	URL       string `json:"url" doc:"The address the repository is fetched from"`
 	Host      string `json:"host"`
-	State     string `json:"state" enum:"waiting,working,failed,done,excluded" doc:"'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_PATCH_EXCLUDED lists, and is never fetched"`
+	State     string `json:"state" enum:"waiting,working,failed,done,excluded" doc:"'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_OUTBOUND_EXCLUDED lists, and is never fetched"`
 	Commits   int    `json:"commits" doc:"How many commits patch links name in this repository"`
 	Looked    int    `json:"looked" doc:"How many of those have been looked up"`
 	Found     int    `json:"found" doc:"How many of those the repository holds"`

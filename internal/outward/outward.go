@@ -4,10 +4,13 @@
 // Package outward is the one HTTP client this process reaches the internet
 // with.
 //
-// Every fetch out of here goes somewhere named in configuration or in a
-// document somebody else published, which is to say from outside, so all of it
-// is pinned to the hosts it was told about, refuses redirects, refuses to
-// connect inside this network, and is bounded in time.
+// Every fetch through here refuses redirects, refuses to connect inside this
+// network, and is bounded in time. A client whose hosts an administrator
+// configured or the application names is pinned to them; the open client, for
+// a host a document chooses, also refuses anywhere an administrator excluded
+// (REQ-69). Webhooks, mail and the object store go only where an administrator
+// configured them, do not reach out through here, and each governs its own
+// address.
 //
 // One package, because a control remembered at each call site is missed at the
 // next: a bare client with a timeout and nothing else, or the library's
@@ -21,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"syscall"
 	"time"
@@ -69,6 +73,61 @@ func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 	for _, host := range hosts {
 		allowed[strings.ToLower(host)] = true
 	}
+	return client(within, Reachable, func(to *url.URL) error {
+		host := to.Hostname()
+		if !allowed[strings.ToLower(host)] {
+			return fmt.Errorf("%w a request to %s: not a configured provider host", ErrRefused, host)
+		}
+		return nil
+	})
+}
+
+// Open returns an HTTP client for addresses a publisher's own document names,
+// which may be on any host outside this network and outside what an
+// administrator excluded.
+//
+// The same refusals as Guarded apart from the allowlist: https only, no
+// redirect followed, and no connection to an address inside this network or
+// in an excluded one — checked on the address a name resolved to, at the
+// moment of connecting. Before anything is resolved, a request is refused
+// that names a host excluded by name, a host that is not a plain name or
+// address, a port other than the https one, or a user.
+//
+// A plain name is checked because the transport maps a name written in other
+// scripts to the one it resolves: a fullwidth letter in a host passes a
+// comparison against the excluded names and then dials the host they name.
+// The port is checked because the addresses come from a publisher's document,
+// and one naming every port on a host would make the fetcher a port scanner
+// whose findings come back in the supplier's error.
+func Open(within time.Duration, excluded Excluded) *http.Client {
+	return open(within, excluded, "443")
+}
+
+// open is Open with the one port it reaches named, so a test can point it at
+// a server on a port of its own.
+func open(within time.Duration, excluded Excluded, port string) *http.Client {
+	return client(within, excluded.Reachable, func(to *url.URL) error {
+		host := strings.ToLower(strings.TrimSuffix(to.Hostname(), "."))
+		switch {
+		case to.User != nil:
+			return fmt.Errorf("%w a request to %s: an address carries no user", ErrRefused, host)
+		case to.Port() != "" && to.Port() != port:
+			return fmt.Errorf("%w a request to %s on port %s: only the https port is reached",
+				ErrRefused, host, to.Port())
+		case net.ParseIP(host) == nil && !HostName(host):
+			return fmt.Errorf("%w a request to %q: not a host name", ErrRefused, to.Hostname())
+		case excluded.Host(host):
+			return fmt.Errorf("%w a request to %s: an administrator excluded it", ErrRefused, host)
+		}
+		return nil
+	})
+}
+
+// client is the one shape every outbound client here takes: an address check
+// at the dial, a host check at the round trip, redirects refused, and a budget
+// for the whole call.
+func client(within time.Duration, reachable func(string) error,
+	permits func(to *url.URL) error) *http.Client {
 
 	// Control rather than a wrapped DialContext. DialContext is handed the
 	// *unresolved* host and port from the URL, so a check there sees a name
@@ -80,7 +139,7 @@ func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 	dialer := &net.Dialer{
 		Timeout: Timeout,
 		Control: func(_, address string, _ syscall.RawConn) error {
-			return Reachable(address)
+			return reachable(address)
 		},
 	}
 	return &http.Client{
@@ -90,26 +149,26 @@ func GuardedWithin(within time.Duration, hosts ...string) *http.Client {
 				ErrRefused, req.URL.Host)
 		},
 		Transport: &guard{
-			allowed: allowed,
+			permits: permits,
 			inner:   &http.Transport{DialContext: dialer.DialContext},
 		},
 	}
 }
 
 // ErrRefused says the guarded client turned a request away itself: a redirect,
-// a scheme other than https, or a host nobody configured. Nothing was asked of
+// a scheme other than https, a host nobody configured, or a host an
+// administrator excluded. Nothing was asked of
 // the address, so a caller can tell this from a provider that did not answer.
 var ErrRefused = errors.New("refused")
 
-// guard refuses a request to anywhere but the hosts a provider was configured
-// with.
+// guard refuses a request to a host the client does not permit.
 //
 // Checked at the round trip rather than only at the dial, because the dial
 // sees an address and this sees a name: a request for an unexpected host that
 // happens to resolve to a permitted address would pass the first check and
 // fail this one.
 type guard struct {
-	allowed map[string]bool
+	permits func(to *url.URL) error
 	inner   http.RoundTripper
 }
 
@@ -117,9 +176,8 @@ func (g *guard) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.URL.Scheme != "https" {
 		return nil, fmt.Errorf("%w a request to %s: a provider is reached over https", ErrRefused, req.URL)
 	}
-	if !g.allowed[strings.ToLower(req.URL.Hostname())] {
-		return nil, fmt.Errorf("%w a request to %s: not a configured provider host",
-			ErrRefused, req.URL.Hostname())
+	if err := g.permits(req.URL); err != nil {
+		return nil, err
 	}
 	return g.inner.RoundTrip(req)
 }

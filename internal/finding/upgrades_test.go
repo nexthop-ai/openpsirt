@@ -104,8 +104,8 @@ func TestAComponentIsAnsweredPerBuildBecauseTheAnswerDiffers(t *testing.T) {
 		if len(builds) != 1 {
 			t.Fatalf("%d builds carry it, want the one it was scanned into", len(builds))
 		}
-		if builds[0].Version != libnl.Version {
-			t.Errorf("the build ships %q, want %q", builds[0].Version, libnl.Version)
+		if builds[0].SourceVersion != libnl.Version {
+			t.Errorf("the build ships %q, want %q", builds[0].SourceVersion, libnl.Version)
 		}
 		if builds[0].Issues != 1 {
 			t.Errorf("%d issues open there, want one", builds[0].Issues)
@@ -165,6 +165,80 @@ func TestWhatAPromisedUpgradeCoversIsDerivedRatherThanMarked(t *testing.T) {
 	})
 }
 
+func TestTheBinariesOfOneSourcePackageAreOneEntryWhicheverNameIsAsked(t *testing.T) {
+	// curl, libcurl4t64 and libcurl3t64 are one bump, so they are one page:
+	// asked by either binary or by the source, the answer is one entry per
+	// build carrying all three, and an issue on two of them counts once.
+	each(t, func(t *testing.T, f *fixture) {
+		built := func(name string) graph.Described {
+			return graph.Described{
+				Purl:         "pkg:deb/debian/" + name + "@8.5.0-2?upstream=curl",
+				Name:         name,
+				Version:      "8.5.0-2",
+				UpstreamName: "curl",
+			}
+		}
+		curl, libcurl, gnutls := built("curl"), built("libcurl4t64"), built("libcurl3t64-gnutls")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{root, swss, curl, libcurl, gnutls},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss},
+				{Parent: root, Child: curl},
+				// One binary pulling in another is the fold depending on
+				// itself, and is not somebody consuming it.
+				{Parent: curl, Child: libcurl},
+				{Parent: swss, Child: libcurl},
+				{Parent: swss, Child: gnutls},
+			},
+		})
+		if _, err := f.store.Apply(t.Context(), f.target, f.run(t), []finding.Reported{
+			{
+				Issue: finding.Named{Identifier: "CVE-2026-20", Severity: "high"}, Component: libcurl,
+				FixState: finding.FixedUpstream, FixedIn: "8.5.0-3",
+			},
+			{
+				Issue: finding.Named{Identifier: "CVE-2026-20", Severity: "high"}, Component: gnutls,
+				FixState: finding.FixedUpstream, FixedIn: "8.5.0-3",
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		who := f.holding(t, access.PublicTriage)
+		for _, asked := range []string{"libcurl4t64", "CURL", "libcurl3t64-gnutls"} {
+			builds, err := f.store.AcrossBuilds(t.Context(), who, f.wholeProduct(), asked)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(builds) != 1 {
+				t.Fatalf("asked as %q: %d entries, want one for the source package", asked, len(builds))
+			}
+			got := builds[0]
+			if got.Source != "curl" || got.SourceVersion != "8.5.0-2" {
+				t.Errorf("asked as %q: source %q at %q", asked, got.Source, got.SourceVersion)
+			}
+			if len(got.Packages) != 3 {
+				t.Errorf("asked as %q: %d binaries, want all three", asked, len(got.Packages))
+			}
+			// libcurl4t64 sits under two consumers and the gnutls build under one.
+			if got.Issues != 1 || got.Places != 3 {
+				t.Errorf("asked as %q: %d issues at %d places, want one at three",
+					asked, got.Issues, got.Places)
+			}
+			if len(got.Upgrades) != 1 || got.Upgrades[0].FixedHere != 1 {
+				t.Errorf("asked as %q: upgrades %+v, want one version fixing one issue",
+					asked, got.Upgrades)
+			}
+			// The build pulls curl in and swss pulls in the two libraries:
+			// two consumers, and curl pulling in its own library is neither.
+			if got.Consumers != 2 {
+				t.Errorf("asked as %q: %d consumers, want two", asked, got.Consumers)
+			}
+		}
+	})
+}
+
 func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 	// A component is in the inventory because the build ships it. Answered off
 	// the findings instead, anything carrying its risk underneath rather than
@@ -194,8 +268,8 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 				len(builds))
 		}
 		clean := builds[0]
-		if clean.Version != swss.Version {
-			t.Errorf("it ships %q, want %q", clean.Version, swss.Version)
+		if clean.SourceVersion != swss.Version {
+			t.Errorf("it ships %q, want %q", clean.SourceVersion, swss.Version)
 		}
 		if clean.Issues != 0 || clean.Places != 0 {
 			t.Errorf("%d issues at %d places against something nothing was reported on",
@@ -208,8 +282,8 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 		}
 		// The identifier travels, because the ecosystem and an upstream
 		// address are both read out of it and neither is stored.
-		if clean.Purl != swss.Purl {
-			t.Errorf("the identifier is %q, want %q", clean.Purl, swss.Purl)
+		if len(clean.Packages) != 1 || clean.Packages[0].Purl != swss.Purl {
+			t.Errorf("the packages are %+v, want the one carrying %q", clean.Packages, swss.Purl)
 		}
 		// Nothing pulls swss in, so the build itself is what carries it.
 		if clean.Consumers != 1 {

@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -63,9 +64,10 @@ type Pass struct {
 // and only the one holding the lease reaches out: the politeness this is built
 // around is a rate per deployment rather than per replica, and three replicas
 // each keeping to it would be three times the traffic at a publisher's expense.
-func NewPass(db *bun.DB, logger *slog.Logger, replica string, limits sbom.Limits) *Pass {
+func NewPass(db *bun.DB, logger *slog.Logger, replica string, limits sbom.Limits,
+	excluded outward.Excluded) *Pass {
 	return &Pass{
-		db: db, fetch: NewFetcher(db, limits), logger: logger,
+		db: db, fetch: NewFetcher(db, limits, excluded), logger: logger,
 		leases: queue.NewLeases(db), replica: replica,
 		now: func() time.Time { return time.Now().UTC() },
 	}

@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
 func TestATunnelTheGuardOpensCarriesTLSEndToEnd(t *testing.T) {
@@ -27,7 +29,7 @@ func TestATunnelTheGuardOpensCarriesTLSEndToEnd(t *testing.T) {
 	}
 	// The server is on this machine, which the guard refuses; the test
 	// relaxes that and the port, and nothing else.
-	door, err := openGuard(host, Excluded{})
+	door, err := openGuard(host, outward.Excluded{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +58,7 @@ func TestATunnelTheGuardOpensCarriesTLSEndToEnd(t *testing.T) {
 }
 
 func TestTheGuardRefusesAnAddressInAnExcludedNetworkWhateverNameReachedIt(t *testing.T) {
-	excluded, err := ParseExcluded("203.0.113.0/24")
+	excluded, err := outward.ParseExcluded("203.0.113.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}

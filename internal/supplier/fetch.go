@@ -44,7 +44,7 @@ const MostPerPass = 20
 // MostFeeds bounds how many listings one publisher may point at.
 //
 // Nothing in the format bounds it, and a description within the size bound can
-// name tens of thousands of addresses on the pinned host — which is a pass
+// name tens of thousands of addresses — which is a pass
 // running for hours, holding every entry it has read, and outliving the lease
 // that says it is the one reading (REQ-69). A publisher serves one listing per
 // label they publish under, so this is far above any real directory.
@@ -142,11 +142,11 @@ type Taken struct {
 type Fetcher struct {
 	db     bun.IDB
 	limits sbom.Limits
-	// Client returns the client to reach one host with. A field so a test can
-	// answer without a network, which is the only way to test this at all: a
-	// real supplier's directory is somebody else's service and its contents
-	// change.
-	Client func(host string) *http.Client
+	// Client is what every request to a publisher goes through, whichever
+	// host their description names. A field so a test can answer without a
+	// network, which is the only way to test this at all: a real supplier's
+	// directory is somebody else's service and its contents change.
+	Client *http.Client
 	// Pause is how long to wait between one request and the next. A field so
 	// a test does not spend real seconds being polite to a fake.
 	Pause time.Duration
@@ -165,15 +165,14 @@ type Fetcher struct {
 	History time.Duration
 }
 
-// NewFetcher returns a fetcher over db, reaching real suppliers.
-func NewFetcher(db bun.IDB, limits sbom.Limits) *Fetcher {
+// NewFetcher returns a fetcher over db, reaching real suppliers anywhere
+// outside this network and outside what an administrator excluded.
+func NewFetcher(db bun.IDB, limits sbom.Limits, excluded outward.Excluded) *Fetcher {
 	return &Fetcher{
 		db: db, limits: limits.OrDefault(),
-		Client: func(host string) *http.Client {
-			return outward.GuardedWithin(fetchTimeout, host)
-		},
-		Pause: betweenAsks,
-		Now:   func() time.Time { return time.Now().UTC() },
+		Client: outward.Open(fetchTimeout, excluded),
+		Pause:  betweenAsks,
+		Now:    func() time.Time { return time.Now().UTC() },
 	}
 }
 
@@ -205,16 +204,13 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, source Source) (T
 	if err := Reachable(source.URL); err != nil {
 		return took, err
 	}
-	at, err := url.Parse(source.URL)
-	if err != nil {
-		return took, err
-	}
-	// One client per supplier, pinned to the host their directory is served
-	// from. A listing or a document somewhere else is refused rather than
-	// followed: the addresses inside a publisher's directory come from
-	// outside, and fetching whatever they name is the request-forgery
-	// primitive the guarded client exists to refuse (REQ-69).
-	client := f.Client(at.Hostname())
+	// The description may name its directory on another host, and a feed
+	// may name documents on another host again: a publisher serving its
+	// description from its web site and its directory from a download host
+	// is ordinary. Every address is fetched through the one client, which
+	// refuses an address inside this network or one an administrator
+	// excluded, at the moment of connecting (REQ-69).
+	client := f.Client
 
 	listed, err := f.listings(ctx, client, source.URL)
 	if err != nil {
@@ -771,8 +767,8 @@ func algorithmOf(address string) int {
 // A refusal naming the file says the publisher does not serve that one, which
 // is ordinary; a missing file is answered 404 by some and 403 by others. A
 // file past the size of a digest file is not one either, and nor is an
-// address the guarded client turns away itself — a redirect, or a host nobody
-// configured. A publisher that cannot be reached holds the mark, the way it
+// address the guarded client turns away itself — a redirect, or a host an
+// administrator excluded. A publisher that cannot be reached holds the mark, the way it
 // does for the document.
 func (f *Fetcher) compare(ctx context.Context, client *http.Client, address string,
 	kind int, body []byte) (bool, error) {

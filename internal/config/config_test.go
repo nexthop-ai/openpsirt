@@ -137,6 +137,30 @@ func TestATrustedHeaderHonoredFromAnywhereIsRefused(t *testing.T) {
 	}
 }
 
+func TestTheExcludedListUnderItsOldNameIsRefusedRatherThanIgnored(t *testing.T) {
+	// Ignored, a deployment that set the old name fetches from everything it
+	// meant to keep out.
+	t.Setenv(envPrefix+"PATCH_EXCLUDED", "corp.example.com")
+	_, err := Load()
+	if err == nil {
+		t.Fatal("the old name was accepted and nothing it lists is excluded")
+	}
+	if !strings.Contains(err.Error(), envPrefix+"OUTBOUND_EXCLUDED") {
+		t.Errorf("the refusal does not name the new variable: %v", err)
+	}
+}
+
+func TestTheExcludedListIsReadUnderItsName(t *testing.T) {
+	t.Setenv(envPrefix+"OUTBOUND_EXCLUDED", "corp.example.com")
+	c, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.OutboundExcluded.Host("mirror.corp.example.com") {
+		t.Error("a host under an excluded name is not excluded")
+	}
+}
+
 func TestATrustedHeaderAndTheSourcesItIsReadFromAreAcceptedTogether(t *testing.T) {
 	// The other side, so the refusals above cannot be satisfied by refusing
 	// the pair outright.

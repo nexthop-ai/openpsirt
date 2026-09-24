@@ -2270,16 +2270,18 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Show a component across the builds that carry it
-         * @description What each build ships, what is open against it there, where it could go, and what has already been promised.
+         * Show a source package across the builds that ship it
+         * @description One entry per build per source package: the binaries the build ships from it, what is open across them, where it could go, and what has already been promised.
          *
-         *     Answered per build, because the answer differs by build. A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them.
+         *     `component` is a binary name or a source package name, matched without regard to capitals. A binary name answers for the source package it was built from, so `libcurl4t64` and `curl` answer alike. A binary whose inventory names no source package is its own source. A source shipped at two versions in one build is two entries: two pieces of code, decided about separately.
          *
-         *     Where it could go carries two counts. `fixed_here` is how many of what is open name that exact version as their fix, which is the release's own security content; `reached` is how many the upgrade closes altogether, counting everything fixed at or before it. The second is the one somebody choosing a version is asking about, and it needs the ecosystem's ordering: where that is not defined the two counts are equal, `ordered` is false, and the list is not ranked. Ranked on `fixed_here` a quiet release late on a maintained line sorts near the bottom while carrying every fix before it.
+         *     Answered per build, because the answer differs by build. A stream staying on a maintained older line and a stream that has moved on are different work.
          *
-         *     A build is listed because it ships the component, not because something is open against it. A package carrying nothing of its own still answers with the version it ships and how many things pull it in, which is the ordinary case for anything vendored in pre-built.
+         *     Counts cover the source package: an issue open on three of its binaries is one issue. Each entry in `packages` carries its own counts.
          *
-         *     One entry per version rather than per build. A build shipping a name at two versions holds two components, and they are two different pieces of code to decide about.
+         *     Where it could go carries two counts. `fixed_here` is how many of what is open name that exact version as their fix; `reached` is how many the upgrade closes altogether, counting everything fixed at or before it. Where the ecosystem's ordering is not defined the two counts are equal, `ordered` is false, and the list is not ranked.
+         *
+         *     A build is listed because it ships the source package, not because something is open against it.
          *
          *     `due_at` is what a commitment about that build is gated against, and is absent where nothing is open.
          *
@@ -7731,6 +7733,48 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        FoldPackageBody: {
+            /**
+             * Format: int64
+             * @description The number of things pulling this binary in here
+             */
+            consumers: number;
+            /**
+             * Format: date-time
+             * @description The moment a scan of this deployment first reported the package
+             */
+            first_seen: string;
+            /**
+             * Format: int64
+             * @description Distinct vulnerabilities open against this binary alone
+             */
+            issues: number;
+            /** @description The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none */
+            license?: string;
+            /** @description The binary package's name */
+            name: string;
+            /**
+             * Format: date-time
+             * @description The date that version shipped, where the index said
+             */
+            newest_released_at?: string;
+            /** @description The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package */
+            newest_version?: string;
+            /** @description The name for that address on screen — which distribution's or which index's record it is */
+            package_page_name?: string;
+            /** @description The address this package is published at, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like */
+            package_page_url?: string;
+            /** @description The address the index gives for where the package is developed. Absent where it does not say */
+            project_url?: string;
+            /** @description The package identifier this build ships it under */
+            purl?: string;
+            /** @description One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package */
+            summary?: string;
+            /** @description The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it */
+            supplier?: string;
+            /** @description The version this build ships the binary at */
+            version: string;
+        };
         Generator: {
             /** Format: date-time */
             date: string;
@@ -9326,7 +9370,7 @@ export interface components {
             /** @description What stopped the last visit */
             reason?: string;
             /**
-             * @description 'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_PATCH_EXCLUDED lists, and is never fetched
+             * @description 'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_OUTBOUND_EXCLUDED lists, and is never fetched
              * @enum {string}
              */
             state: "waiting" | "working" | "failed" | "done" | "excluded";
@@ -9362,7 +9406,7 @@ export interface components {
             was: string;
         };
         PerBuildBody: {
-            /** @description Everything open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count */
+            /** @description Everything open across the source package here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count */
             by_severity?: {
                 [key: string]: number;
             };
@@ -9373,66 +9417,46 @@ export interface components {
             committed_to?: string;
             /**
              * Format: int64
-             * @description The number of things pulling it in here
+             * @description The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted
              */
             consumers: number;
             /**
              * Format: date-time
-             * @description The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees, because that defers the worst thing it covers
+             * @description The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees
              */
             due_at?: string;
-            /** @description The ecosystem the identifier names, read out of it rather than stored */
+            /** @description The ecosystem the package identifiers name */
             ecosystem?: string;
-            /** @description Whether any of what is open here is known to be exploited, which outranks everything else about it */
+            /** @description Whether any of what is open here is known to be exploited */
             exploited: boolean;
             /** @description Whether this product is recorded as having been exploited through any of what is open here */
             exploited_here?: boolean;
             /**
-             * Format: date-time
-             * @description The moment a scan of this deployment first reported the component
-             */
-            first_seen: string;
-            /**
              * Format: int64
-             * @description The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue
+             * @description The number of open issues any version fixes, counted once per issue however many binaries carry it
              */
             fixable: number;
             /**
              * Format: int64
-             * @description Distinct vulnerabilities open against it here
+             * @description Distinct vulnerabilities open across the source package here, counted once however many binaries carry each
              */
             issues: number;
-            /**
-             * Format: date-time
-             * @description The date that version shipped, where the index said
-             */
-            newest_released_at?: string;
-            /** @description The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package */
-            newest_version?: string;
-            /** @description The name for that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is */
-            package_page_name?: string;
-            /** @description The address this package is published at, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like */
-            package_page_url?: string;
+            /** @description The binary packages this build ships from the source package, by name */
+            packages: components["schemas"]["FoldPackageBody"][] | null;
             /**
              * Format: int64
              * @description The number of times those sit somewhere in this build. What the bulk cap is measured against
              */
             places: number;
-            /** @description The address the index gives for where the package is developed. Absent where it does not say, in which case an address can still be built from the identifier */
-            project_url?: string;
-            /** @description The package identifier this build ships it under */
-            purl?: string;
+            /** @description The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing */
+            source: string;
             stream: string;
-            /** @description One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package */
-            summary?: string;
-            /** @description The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it */
-            supplier?: string;
             /** @description The version somebody has committed to moving this build to */
             upgrade_to?: string;
-            /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets */
+            /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets */
             upgrades?: components["schemas"]["UpgradeBody"][] | null;
             variant: string;
-            /** @description The version this build ships */
+            /** @description The version the source package was built at */
             version: string;
         };
         PersonBody: {
@@ -9508,6 +9532,8 @@ export interface components {
             team?: string;
             /** @description The version this moves to, as whoever packages it writes it */
             to: string;
+            /** @description The source version this is about, as the component's entries name it. Required where a release named ships the source package at more than one version, which is refused with the versions listed; otherwise optional */
+            version?: string;
         };
         PlannedBody: {
             /** @description The date the promise named, as a date. Absent where the commitment is intent rather than a promise */

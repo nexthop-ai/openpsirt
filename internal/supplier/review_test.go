@@ -13,6 +13,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
@@ -479,7 +480,7 @@ func TestAPassThatFilledItsBoundLeavesTheSupplierDue(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{})
+		pass := supplier.NewPass(f.db.DB, quiet(), "test", sbom.Limits{}, outward.Excluded{})
 		supplier.FetchForTest(pass, fetching(t, f, p))
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)

@@ -55,9 +55,10 @@ fixture skips where `xz` is missing, which is the right trade for something
 kept for its scale; a fixture kept to prove a format revision is read has to
 run wherever the suite does.
 
-It brought eight paths with it, all recorded as skipped and all for the same
-reason: a component's licenses, description, publisher and SWID tag are things
-the scanner fills in and nothing here acts on. Identity comes from the package
+It brought eight paths with it. A component's licenses are read, and are what
+the component's license is taken from. Its description, publisher and SWID tag
+are recorded as skipped: they are things the scanner fills in and nothing here
+acts on. Identity comes from the package
 identifier, the national database keys on the CPE, and neither of those is any
 of these. They are named so that reading one later is a decision rather than a
 discovery.

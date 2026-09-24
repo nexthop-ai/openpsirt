@@ -13,6 +13,7 @@ REQ-78.
 - [Issue identity](#issue-identity)
 - [Report contents](#report-contents)
 - [Component suppliers](#component-suppliers)
+- [Component licenses](#component-licenses)
 - [Report merging](#report-merging)
 - [Derived addresses](#derived-addresses)
 - [Index responses](#index-responses)
@@ -143,6 +144,25 @@ a dependency somebody has never heard of.
 | A party's kind is dropped, its name kept | The other format prefixes it — "Organization: Debian" — and one of the two words is a label rather than a name. The word that format uses for "nobody stated one" is treated as nobody having stated one |
 | Never part of identity | Two producers describing one component name its supplier differently or not at all, and an identity that moved with it would take every triage decision attached along with it |
 | A later report fills it in where the row has none | The rule the section below states for everything else two reports can disagree about. Written only on the insert instead, a component first seen through a producer that stated none never got one, however many later scans said who it was |
+
+## Component licenses
+
+An inventory often says what license a component is under, and that is kept
+beside the supplier and shown on the component's page. Measured on a switch
+image: 4,483 of 6,866 components declare one. Asking a build which licenses it
+ships — a listing, a filter or an export across its components — is not built.
+
+| Rule | Reason |
+|---|---|
+| From the inventory, as the producer wrote it | An SPDX expression where the format carries one, and a producer's own name where it wrote one — a distribution's copyright file says "GPL-2+" rather than an identifier. Nothing is translated, because a translation is a license judgment nobody here made |
+| Declared first, concluded where nothing is declared | A declaration is what the package says about itself. A real producer declares NOASSERTION for most language packages and concludes a license from the source, and that conclusion is the only answer the inventory holds |
+| NOASSERTION and NONE are nothing stated | They are the format's words for not knowing and for there being none, and neither is a license |
+| Several licenses listed for one component are one conjunction | A package listing several is under all of them. Joined with AND, repeats dropped, in the producer's order. An entry joining licenses with AND, OR or WITH is parenthesized unless it is one group already; a name with spaces in it is one license and is left as written |
+| An identifier stands over a name given beside it | It is the one another tool can match |
+| A license element is resolved after the whole document is read | One format states a license as an element of its own that the package points at, in no fixed order, and may point at the license list's own address without describing it |
+| Never part of identity, and a later report fills it in where the row has none | The two supplier rules above, for the same reasons |
+| Bounded to 4,096 characters, cut on a character | A document is bounded in bytes alone, and one component can list licenses to the size of it. The supplier is bounded the same way (REQ-69) |
+| Absent where nothing is stated | A screen says so rather than showing a blank. A component scanned before the column existed carries none until a scan of a build that ships it |
 
 ## Report merging
 

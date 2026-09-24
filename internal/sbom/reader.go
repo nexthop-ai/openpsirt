@@ -151,6 +151,11 @@ type reader struct {
 	// by an element, in no fixed position, so whether a relationship came
 	// from the document cannot be answered where it is read.
 	spdx3Describes []spdx3Describes
+	// spdx3Licenses is what each license element says, by its identifier, and
+	// spdx3Licensed the relationships attaching them, both resolved once the
+	// walk is over because either may arrive first.
+	spdx3Licenses map[string]string
+	spdx3Licensed []spdx3Licensed
 	// settleErr is a fault found after the walk, where the format states
 	// something by pointing at an element rather than by carrying it.
 	settleErr error
@@ -170,6 +175,7 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 		upstream:   map[string]string{},
 
 		spdx3DocumentRefs: map[string]bool{},
+		spdx3Licenses:     map[string]string{},
 	}
 }
 
@@ -353,6 +359,7 @@ func (c *reader) finish() (*Document, error) {
 	c.spdx3Roots()
 	c.resolveRoot()
 	c.resolveUpstream()
+	c.spdx3Licensing()
 	rootIdentity := c.doc.Root.Identity()
 
 	c.doc.Components = make([]graph.Described, 0, len(c.described))
@@ -383,12 +390,13 @@ func (c *reader) finish() (*Document, error) {
 			continue
 		}
 		declared = append(declared, graph.Dependency{
-			Parent: parent, Child: child, Kind: c.scopeFor(e.kind, child),
+			Parent: c.merged(parent), Child: c.merged(child), Kind: c.scopeFor(e.kind, child),
 		})
 	}
 	for _, dep := range c.contained {
 		// Nesting states no scope of its own, so what the child was declared
 		// as is what the edge into it carries.
+		dep.Parent, dep.Child = c.merged(dep.Parent), c.merged(dep.Child)
 		dep.Kind = c.scopeFor("", dep.Child)
 		declared = append(declared, dep)
 	}
@@ -429,6 +437,21 @@ func (c *reader) finish() (*Document, error) {
 		}
 	}
 	return &c.doc, nil
+}
+
+// merged is the one description of a component everything read about it was
+// gathered into.
+//
+// An edge names a component through the copy bound when its identifier was
+// read. What arrived later — a second description of the same package, an
+// ancestor a relationship pointed at, a license element — lands on the merged
+// description, and an edge carrying the earlier copy would store the component
+// without it: whichever copy is interned last is the one kept.
+func (c *reader) merged(d graph.Described) graph.Described {
+	if at, ok := c.seen[d.Identity()]; ok {
+		return c.described[at]
+	}
+	return d
 }
 
 // drop records an edge that resolved to nothing, under the reason it did.

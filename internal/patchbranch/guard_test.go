@@ -14,11 +14,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 )
 
 func TestAnExcludedNameCoversTheHostsUnderItAndNoOthers(t *testing.T) {
-	excluded, err := patchbranch.ParseExcluded(" corp.example.com , .lab.example.org,10.20.0.0/16, 192.0.2.7 ")
+	excluded, err := outward.ParseExcluded(" corp.example.com , .lab.example.org,10.20.0.0/16, 192.0.2.7 ")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +44,7 @@ func TestAnExcludedNameCoversTheHostsUnderItAndNoOthers(t *testing.T) {
 }
 
 func TestAnAddressAnExcludedNetworkHoldsIsRefusedWhateverNameReachedIt(t *testing.T) {
-	excluded, err := patchbranch.ParseExcluded("203.0.113.0/24")
+	excluded, err := outward.ParseExcluded("203.0.113.0/24")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +56,7 @@ func TestAnAddressAnExcludedNetworkHoldsIsRefusedWhateverNameReachedIt(t *testin
 	}
 	// This network is refused with nothing configured at all.
 	for _, address := range []string{"127.0.0.1:443", "10.0.0.1:443", "192.168.1.1:443", "169.254.169.254:443", "[::1]:443"} {
-		if err := (patchbranch.Excluded{}).Reachable(address); err == nil {
+		if err := (outward.Excluded{}).Reachable(address); err == nil {
 			t.Errorf("%s was reachable with nothing excluded", address)
 		}
 	}
@@ -63,7 +64,7 @@ func TestAnAddressAnExcludedNetworkHoldsIsRefusedWhateverNameReachedIt(t *testin
 
 func TestAnExclusionThatIsNeitherANameNorANetworkIsRefused(t *testing.T) {
 	for _, bad := range []string{"10.0.0.0/33", "host name", "https://corp.example.com", "corp.example.com:443"} {
-		if _, err := patchbranch.ParseExcluded(bad); err == nil {
+		if _, err := outward.ParseExcluded(bad); err == nil {
 			t.Errorf("%q was accepted as an exclusion", bad)
 		}
 	}
@@ -99,7 +100,7 @@ func tunnel(t *testing.T, proxy, method, target string) (int, string) {
 }
 
 func TestTheGuardOpensNoTunnelGitWasNotSentThrough(t *testing.T) {
-	excluded, err := patchbranch.ParseExcluded("corp.example.com")
+	excluded, err := outward.ParseExcluded("corp.example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +136,7 @@ func TestGitIsToldToReachOutThroughTheGuardAndNothingElse(t *testing.T) {
 	// A repository on a host that resolves inside this network. The fetch
 	// fails at the guard, and what it reports is the guard's reason rather
 	// than git's account of a proxy that said no.
-	excluded := patchbranch.Excluded{}
+	excluded := outward.Excluded{}
 	pass := patchbranch.NewRemotePass(t.TempDir(), excluded)
 	err := pass.Fetch(t.Context(), "https://localhost/example/project.git")
 	if err == nil {
