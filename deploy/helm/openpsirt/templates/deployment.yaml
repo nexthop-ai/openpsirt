@@ -1,3 +1,6 @@
+{{- if (.Values.patchBranches).excluded }}
+{{- fail "patchBranches.excluded is now outbound.excluded: move the list there, since the old key is not read" }}
+{{- end }}
 {{- if and (not .Values.database.url) (not .Values.database.existingSecret) }}
 {{- fail "set database.url or database.existingSecret: openpsirt needs a database" }}
 {{- end }}

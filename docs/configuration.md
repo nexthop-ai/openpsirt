@@ -80,7 +80,8 @@ disclosed finding they are not assigned.
 `OPENPSIRT_PATCH_EXCLUDED` is now `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's
 `patchBranches.excluded` is now `outbound.excluded`. The list keeps supplier
 directories out as well as repositories. A deployment still setting the old
-name is refused at startup, naming the new one.
+name is refused at startup, naming the new one, and the chart refuses to render
+with the old key set.
 
 ## Serving
 
