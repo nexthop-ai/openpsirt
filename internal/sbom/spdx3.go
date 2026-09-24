@@ -437,7 +437,6 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 	return nil
 }
 
-// spdx3Describes is one describes relationship as it was read.
 // The license elements and the two relationships that attach one to a package.
 // A license is an element of its own, pointed at from the package, so what a
 // package is licensed under is only known once the whole graph has been read.
@@ -511,6 +510,7 @@ func (c *reader) spdx3Licensing() {
 	}
 }
 
+// spdx3Describes is one describes relationship as it was read.
 type spdx3Describes struct {
 	from string
 	to   []string
