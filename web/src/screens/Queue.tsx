@@ -513,7 +513,7 @@ function Stopped({ row }: { row: Standing }) {
       )}
       <div className="qmeta">
         <span>
-          Proposed by <b>{row.proposed_by}</b>
+          Proposed by <b>{row.proposed_by_name || row.proposed_by}</b>
         </span>
         <span>
           Stood <b>{row.age_days} days</b>

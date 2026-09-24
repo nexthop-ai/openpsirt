@@ -530,6 +530,10 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The person who agreed, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where they have one
           type: string
         batch:
           description: The batch it was approved under, if it was a bulk approval
@@ -749,7 +753,10 @@ components:
       additionalProperties: false
       properties:
         by:
-          description: The person who did it, where a person did
+          description: The person who did it, where a person did, by sign-in identity
+          type: string
+        by_name:
+          description: Their display name, where they have one
           type: string
         claim:
           $ref: "#/components/schemas/ClaimBody"
@@ -1346,6 +1353,9 @@ components:
         by:
           description: The person who made the change, by sign-in identity
           type: string
+        by_name:
+          description: Their display name, where they have one
+          type: string
         cleared:
           description: This change cleared it
           type: boolean
@@ -1516,6 +1526,10 @@ components:
           description: The moment the action was taken
           type: string
         proposed_by:
+          description: The person who took it, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where they have one
           type: string
         selected_by:
           description: The narrowing behind a bulk set. Never part of the claim itself
@@ -1554,7 +1568,10 @@ components:
             - array
             - "null"
         by:
-          description: The person who did it, where a person did
+          description: The person who did it, where a person did, by sign-in identity
+          type: string
+        by_name:
+          description: Their display name, where they have one
           type: string
         claim:
           $ref: "#/components/schemas/ClaimBody"
@@ -1687,6 +1704,10 @@ components:
         added_at:
           type: string
         added_by:
+          description: The person who brought them in, by sign-in identity
+          type: string
+        added_by_name:
+          description: Their display name, where they have one
           type: string
         identity:
           type: string
@@ -1752,6 +1773,10 @@ components:
         written_at:
           type: string
         written_by:
+          description: The author, by sign-in identity
+          type: string
+        written_by_name:
+          description: Their display name, where they have one
           type: string
       required:
         - id
@@ -2315,6 +2340,10 @@ components:
           description: The moment the claim was made
           type: string
         proposed_by:
+          description: The person who made the claim, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where they have one
           type: string
         reasoning:
           description: The justification as it currently stands, in markdown
@@ -2607,7 +2636,10 @@ components:
           description: The component upstream version it was a claim about
           type: string
         approved_by:
-          description: The person who last agreed to it, where anybody did
+          description: The person who last agreed to it, where anybody did, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where they have one
           type: string
         claim_id:
           format: int64
@@ -2650,6 +2682,10 @@ components:
         proposed_at:
           type: string
         proposed_by:
+          description: The person who proposed it, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where they have one
           type: string
         reasoning:
           description: The reasoning as it last stood, in markdown, offered back rather than thrown away
@@ -2702,6 +2738,10 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The person who agreed, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where they have one
           type: string
         claim_id:
           format: int64
@@ -3808,6 +3848,9 @@ components:
     HoldingBody:
       additionalProperties: false
       properties:
+        name:
+          description: Their display name, where they have one
+          type: string
         open:
           description: "Pieces of work assigned to them: an issue in a component in a product"
           format: int64
@@ -3817,7 +3860,7 @@ components:
           format: int64
           type: integer
         person:
-          description: The holder, by the name they are shown under. A person or a team
+          description: The holder, by sign-in identity for a person and by name for a team
           type: string
         places:
           description: The number of findings those cover, across every build
@@ -4289,7 +4332,10 @@ components:
       additionalProperties: false
       properties:
         assigned_to:
-          description: Empty means nobody, or not everywhere the same person
+          description: The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person
+          type: string
+        assigned_to_name:
+          description: Their display name, where they have one
           type: string
         component:
           type: string
@@ -5715,10 +5761,18 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The second person, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where they have one
           type: string
         asked_at:
           type: string
         asked_by:
+          description: The person who asked, by sign-in identity
+          type: string
+        asked_by_name:
+          description: Their display name, where they have one
           type: string
         id:
           format: int64
@@ -5856,7 +5910,10 @@ components:
         written_at:
           type: string
         written_by:
-          description: The author
+          description: The author, by sign-in identity
+          type: string
+        written_by_name:
+          description: Their display name, where they have one
           type: string
       required:
         - id
@@ -6552,7 +6609,10 @@ components:
         asked_at:
           type: string
         by:
-          description: The person who asked
+          description: The person who asked, by sign-in identity
+          type: string
+        by_name:
+          description: Their display name, where they have one
           type: string
         days:
           description: How far the date moves, in days, whichever way it moves
@@ -7799,6 +7859,10 @@ components:
         acknowledged:
           type: string
         acknowledged_by:
+          description: The person who answered them, by sign-in identity
+          type: string
+        acknowledged_by_name:
+          description: Their display name, where they have one
           type: string
         contact:
           type: string
@@ -7821,7 +7885,10 @@ components:
           description: When somebody said what it turned out to be
           type: string
         evaluated_by:
-          description: Who said so
+          description: The person who said so, by sign-in identity
+          type: string
+        evaluated_by_name:
+          description: Their display name, where they have one
           type: string
         found_here:
           description: Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer
@@ -7836,7 +7903,10 @@ components:
           description: When it was written down, which is not when it arrived
           type: string
         recorded_by:
-          description: Who wrote it down
+          description: The person who wrote it down, by sign-in identity
+          type: string
+        recorded_by_name:
+          description: Their display name, where they have one
           type: string
         reference:
           description: The name this report is reached by
@@ -8095,6 +8165,10 @@ components:
         written_at:
           type: string
         written_by:
+          description: The author, by sign-in identity
+          type: string
+        written_by_name:
+          description: Their display name, where they have one
           type: string
       required:
         - id
@@ -8209,7 +8283,10 @@ components:
         approved_at:
           type: string
         approved_by:
-          description: Who agreed, on a disposition that takes a second person
+          description: The person who agreed, on a disposition that takes a second person, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where they have one
           type: string
         disposition:
           enum:
@@ -8230,6 +8307,10 @@ components:
         proposed_at:
           type: string
         proposed_by:
+          description: The person who proposed it, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where they have one
           type: string
         reasoning:
           description: Why, as markdown. Never edited
@@ -8251,6 +8332,10 @@ components:
         withdrawn_at:
           type: string
         withdrawn_by:
+          description: The person who took it back, by sign-in identity
+          type: string
+        withdrawn_by_name:
+          description: Their display name, where they have one
           type: string
         yours:
           description: Whether you proposed it. The proposer may not approve it
@@ -8886,6 +8971,10 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The person who agreed, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where they have one
           type: string
         claim_id:
           description: Pass as extends when deciding to carry it to this issue
@@ -9093,6 +9182,10 @@ components:
         approved_at:
           type: string
         approved_by:
+          description: The person who agreed, by sign-in identity
+          type: string
+        approved_by_name:
+          description: Their display name, where they have one
           type: string
         builds:
           description: Every build the claim currently covers, as stream and variant
@@ -9149,6 +9242,10 @@ components:
         proposed_at:
           type: string
         proposed_by:
+          description: The person who proposed it, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where they have one
           type: string
         rows:
           $ref: "#/components/schemas/RowsStandingBody"
@@ -10012,6 +10109,10 @@ components:
           description: This was agreed to before and came back
           type: boolean
         proposed_by:
+          description: The person who made the claim, by sign-in identity
+          type: string
+        proposed_by_name:
+          description: Their display name, where they have one
           type: string
         reasoning:
           type: string

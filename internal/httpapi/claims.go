@@ -282,9 +282,9 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 	})
 }
 
-func claimBody(c triage.Claim, proposedBy string) ClaimBody {
+func claimBody(c triage.Claim, proposedBy, proposedByName string) ClaimBody {
 	body := ClaimBody{
-		ID: c.ID, Kind: string(c.Kind), ProposedBy: proposedBy,
+		ID: c.ID, Kind: string(c.Kind), ProposedBy: proposedBy, ProposedByName: proposedByName,
 		ProposedAt: c.ProposedAt.Format(time.RFC3339),
 		Elsewhere:  c.Elsewhere,
 	}
@@ -341,14 +341,16 @@ type StandingClaimBody struct {
 	// on the screen the claim is read from. Carried by the audit trail alone,
 	// the checkable part of the claim is everywhere except where somebody
 	// reads the claim.
-	FixedVersion  string   `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
-	NeedsApproval bool     `json:"needs_approval,omitempty"`
-	ProposedBy    string   `json:"proposed_by"`
-	ProposedAt    string   `json:"proposed_at"`
-	Places        int      `json:"places" doc:"The number of this finding's places the claim covers"`
-	Builds        []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
-	ApprovedBy    string   `json:"approved_by,omitempty"`
-	ApprovedAt    string   `json:"approved_at,omitempty"`
+	FixedVersion   string   `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
+	NeedsApproval  bool     `json:"needs_approval,omitempty"`
+	ProposedBy     string   `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
+	ProposedByName string   `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedAt     string   `json:"proposed_at"`
+	Places         int      `json:"places" doc:"The number of this finding's places the claim covers"`
+	Builds         []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
+	ApprovedBy     string   `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
+	ApprovedByName string   `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedAt     string   `json:"approved_at,omitempty"`
 	// Elsewhere is where this is being worked on outside here.
 	Elsewhere string `json:"elsewhere,omitempty" doc:"A ticket, a thread or a change. Stored and never fetched"`
 }
@@ -370,26 +372,29 @@ type EarlierBody struct {
 	// FixedVersion is the evidence an approver checks the already-fixed claim
 	// against. Agreeing to a claim of fact without being shown the fact is
 	// the failure this outcome is most exposed to.
-	FixedVersion string `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
-	ProposedBy   string `json:"proposed_by"`
-	ProposedAt   string `json:"proposed_at"`
-	Ended        string `json:"ended" enum:"lapsed,withdrawn" doc:"The reason it stopped applying"`
-	EndedAt      string `json:"ended_at,omitempty"`
-	About        string `json:"about,omitempty" doc:"The component upstream version it was a claim about"`
-	Reasoning    string `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away"`
-	ApprovedBy   string `json:"approved_by,omitempty" doc:"The person who last agreed to it, where anybody did"`
+	FixedVersion   string `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
+	ProposedBy     string `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
+	ProposedByName string `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedAt     string `json:"proposed_at"`
+	Ended          string `json:"ended" enum:"lapsed,withdrawn" doc:"The reason it stopped applying"`
+	EndedAt        string `json:"ended_at,omitempty"`
+	About          string `json:"about,omitempty" doc:"The component upstream version it was a claim about"`
+	Reasoning      string `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away"`
+	ApprovedBy     string `json:"approved_by,omitempty" doc:"The person who last agreed to it, where anybody did, by sign-in identity"`
+	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
 }
 
 // SimilarBody is an approved claim at the same places about another issue,
 // which may reach this one.
 type SimilarBody struct {
-	ClaimID       int64         `json:"claim_id" doc:"Pass as extends when deciding to carry it to this issue"`
-	DecisionID    int64         `json:"decision_id"`
-	Justification justification `json:"justification,omitempty"`
-	Reasoning     string        `json:"reasoning"`
-	ApprovedBy    string        `json:"approved_by,omitempty"`
-	ApprovedAt    string        `json:"approved_at,omitempty"`
-	Issues        int           `json:"issues" doc:"The number of distinct issues the claim covers"`
+	ClaimID        int64         `json:"claim_id" doc:"Pass as extends when deciding to carry it to this issue"`
+	DecisionID     int64         `json:"decision_id"`
+	Justification  justification `json:"justification,omitempty"`
+	Reasoning      string        `json:"reasoning"`
+	ApprovedBy     string        `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
+	ApprovedByName string        `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedAt     string        `json:"approved_at,omitempty"`
+	Issues         int           `json:"issues" doc:"The number of distinct issues the claim covers"`
 }
 
 // ElsewhereBody is an approved claim about this same issue at this same place,
@@ -402,14 +407,15 @@ type SimilarBody struct {
 // differs, which is why a place is a component at a position rather than a
 // component.
 type ElsewhereBody struct {
-	Product       string        `json:"product" doc:"The product it was decided in"`
-	ClaimID       int64         `json:"claim_id"`
-	DecisionID    int64         `json:"decision_id"`
-	Outcome       outcome       `json:"outcome"`
-	Justification justification `json:"justification,omitempty"`
-	Reasoning     string        `json:"reasoning"`
-	ApprovedBy    string        `json:"approved_by,omitempty"`
-	ApprovedAt    string        `json:"approved_at,omitempty"`
+	Product        string        `json:"product" doc:"The product it was decided in"`
+	ClaimID        int64         `json:"claim_id"`
+	DecisionID     int64         `json:"decision_id"`
+	Outcome        outcome       `json:"outcome"`
+	Justification  justification `json:"justification,omitempty"`
+	Reasoning      string        `json:"reasoning"`
+	ApprovedBy     string        `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
+	ApprovedByName string        `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedAt     string        `json:"approved_at,omitempty"`
 }
 
 // decidedAbout gathers what has been decided at a finding's places: what
@@ -463,7 +469,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 	for _, one := range elsewhere {
 		people = append(people, one.ApprovedBy)
 	}
-	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
+	who, err := whoSigned(ctx, in.DB.DB, people)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -480,7 +486,8 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			Justification:   justification(orBlank(one.Claim.Justification)),
 			FixedVersion:    orBlank(one.Claim.FixedVersion),
 			NeedsApproval:   one.Decision.NeedsApproval,
-			ProposedBy:      names[one.Claim.ProposedBy],
+			ProposedBy:      who.identity(one.Claim.ProposedBy),
+			ProposedByName:  who.label(one.Claim.ProposedBy),
 			ProposedAt:      one.Claim.ProposedAt.Format(time.RFC3339),
 			Places:          one.Places, Builds: one.Builds,
 			Elsewhere: one.Claim.Elsewhere,
@@ -489,7 +496,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			body.Builds = []string{}
 		}
 		if one.ApprovedAt != nil {
-			body.ApprovedBy = names[one.ApprovedBy]
+			body.ApprovedBy, body.ApprovedByName = who.identity(one.ApprovedBy), who.label(one.ApprovedBy)
 			body.ApprovedAt = one.ApprovedAt.Format(time.RFC3339)
 		}
 		if one.SentBackAt != nil {
@@ -506,10 +513,11 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 		body := EarlierBody{
 			DecisionID: d.ID, ClaimID: d.ClaimID, Outcome: outcome(said.Outcome),
 			Justification: justification(orBlank(said.Justification)),
-			ProposedBy:    names[d.ProposedBy], ProposedAt: d.ProposedAt.Format(time.RFC3339),
-			Ended:     string(d.State),
-			About:     orBlank(d.ComponentUpstreamVersion),
-			Reasoning: one.Reasoning,
+			ProposedBy:    who.identity(d.ProposedBy), ProposedByName: who.label(d.ProposedBy),
+			ProposedAt: d.ProposedAt.Format(time.RFC3339),
+			Ended:      string(d.State),
+			About:      orBlank(d.ComponentUpstreamVersion),
+			Reasoning:  one.Reasoning,
 		}
 		if said.FixedVersion != nil {
 			body.FixedVersion = *said.FixedVersion
@@ -521,7 +529,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			body.EndedAt = d.EndedAt.Format(time.RFC3339)
 		}
 		if one.ApprovedBy != 0 {
-			body.ApprovedBy = names[one.ApprovedBy]
+			body.ApprovedBy, body.ApprovedByName = who.identity(one.ApprovedBy), who.label(one.ApprovedBy)
 		}
 		earlierOut = append(earlierOut, body)
 	}
@@ -534,7 +542,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			Reasoning:     one.Reasoning, Issues: one.Issues,
 		}
 		if one.ApprovedAt != nil {
-			body.ApprovedBy = names[one.ApprovedBy]
+			body.ApprovedBy, body.ApprovedByName = who.identity(one.ApprovedBy), who.label(one.ApprovedBy)
 			body.ApprovedAt = one.ApprovedAt.Format(time.RFC3339)
 		}
 		similarOut = append(similarOut, body)
@@ -554,7 +562,7 @@ func decidedAbout(ctx context.Context, in Ingest, subject access.Subject, produc
 			Reasoning:     one.Reasoning,
 		}
 		if one.ApprovedAt != nil {
-			body.ApprovedBy = names[one.ApprovedBy]
+			body.ApprovedBy, body.ApprovedByName = who.identity(one.ApprovedBy), who.label(one.ApprovedBy)
 			body.ApprovedAt = one.ApprovedAt.Format(time.RFC3339)
 		}
 		elsewhereOut = append(elsewhereOut, body)

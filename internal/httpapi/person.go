@@ -402,3 +402,38 @@ func aboutPerson(ctx context.Context, a Administering, db bun.IDB, identity stri
 	}
 	return rights, subject, person, nil
 }
+
+// signedAs is a set of people by the identity they sign in under, with the
+// display name each is shown under.
+//
+// Every field naming a person carries the identity, and the label goes beside
+// it in a field of its own. The identity is what a route resolves and what a
+// screen compares against the viewer's own, so a label in its place is a
+// value a caller can show and cannot act on.
+type signedAs struct {
+	handles, names map[int64]string
+}
+
+// whoSigned reads the identities and display names of these people.
+func whoSigned(ctx context.Context, db bun.IDB, ids []int64) (signedAs, error) {
+	rights := access.NewStore(db)
+	handles, err := rights.Handles(ctx, ids)
+	if err != nil {
+		return signedAs{}, err
+	}
+	names, err := rights.Names(ctx, ids)
+	if err != nil {
+		return signedAs{}, err
+	}
+	return signedAs{handles: handles, names: names}, nil
+}
+
+// identity is the name this person signs in under.
+func (s signedAs) identity(id int64) string {
+	return s.handles[id]
+}
+
+// label is this person's display name, or empty where they have none.
+func (s signedAs) label(id int64) string {
+	return labelBeside(s.names[id], s.handles[id])
+}

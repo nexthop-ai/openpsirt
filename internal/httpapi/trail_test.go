@@ -4,6 +4,7 @@
 package httpapi_test
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -812,6 +813,54 @@ func TestAChangeThatCannotBeRecordedIsNotMade(t *testing.T) {
 			return
 		}
 		t.Error("the triage floor is not among the settings offered")
+	})
+}
+
+// TestTheTrailNamesWhoChangedSomethingByTheIdentityTheySignInUnder pins the
+// address in `by`, on the screen and in the file, with the display name beside
+// it. A caller matching the trail against a person matches on the identity,
+// and a label in its place matches nobody.
+func TestTheTrailNamesWhoChangedSomethingByTheIdentityTheySignInUnder(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		if got := asPerson(t, r, "admin", http.MethodPut, "/v1/settings/triage.floor",
+			`{"value":"high"}`); got.Code >= 300 {
+			t.Fatalf("raising the floor answered %d: %s", got.Code, got.Body.String())
+		}
+
+		var trail struct {
+			Items []struct {
+				By     string `json:"by"`
+				ByName string `json:"by_name"`
+			} `json:"items"`
+		}
+		read(t, r, "admin", "/v1/administration/changes?kind=setting&limit=1", &trail)
+		if len(trail.Items) != 1 || trail.Items[0].By != "admin" ||
+			trail.Items[0].ByName != shownAs("admin") {
+			t.Errorf("the trail names who changed it as %+v, want the identity with the "+
+				"display name beside it", trail.Items)
+		}
+
+		file := asPerson(t, r, "admin", http.MethodGet,
+			"/v1/administration/changes.csv?kind=setting", "")
+		if file.Code != http.StatusOK {
+			t.Fatalf("exporting answered %d: %s", file.Code, file.Body.String())
+		}
+		lines, err := csv.NewReader(strings.NewReader(file.Body.String())).ReadAll()
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := rowsUnder(lines)
+		by, label := indexOf(body[0], "by"), indexOf(body[0], "by_name")
+		if by < 0 || label < 0 {
+			t.Fatalf("the file has no by or by_name column: %v", body[0])
+		}
+		if len(body) < 2 {
+			t.Fatal("the file holds no change")
+		}
+		if body[1][by] != "admin" || body[1][label] != shownAs("admin") {
+			t.Errorf("the file names who changed it as %q (%q), want the identity with "+
+				"the display name beside it", body[1][by], body[1][label])
+		}
 	})
 }
 

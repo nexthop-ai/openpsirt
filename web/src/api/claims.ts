@@ -62,7 +62,11 @@ export function claimOf(row: QueueRow): Claim {
     outcome: row.decision.outcome ?? "",
     justification: row.decision.justification ?? "",
     deferredUntil: row.decision.deferred_until ?? "",
-    proposedBy: row.claim.proposed_by || row.proposed_by,
+    proposedBy:
+      row.claim.proposed_by_name ||
+      row.claim.proposed_by ||
+      row.proposed_by_name ||
+      row.proposed_by,
     proposedAt: row.claim.proposed_at,
     selectedBy: row.claim.selected_by ?? row.decision.selected_by ?? "",
     reasoning: row.reasoning,

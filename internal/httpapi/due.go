@@ -26,7 +26,8 @@ type LateBody struct {
 	Stream        string `json:"stream"`
 	Variant       string `json:"variant"`
 	Places        int    `json:"places" doc:"The number of places in that build this sits at"`
-	AssignedTo    string `json:"assigned_to,omitempty" doc:"Empty means nobody, or not everywhere the same person"`
+	AssignedTo    string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`
+	AssignedName  string `json:"assigned_to_name,omitempty" doc:"Their display name, where they have one"`
 	Due           string `json:"due" doc:"The date it is due"`
 	DaysLeft      int    `json:"days_left" doc:"Negative once it is overdue"`
 }
@@ -105,7 +106,8 @@ func registerDue(api huma.API, in Ingest) {
 				DaysLeft: int(math.Floor(row.Due.Sub(now).Hours() / 24)),
 			}
 			if row.AssignedTo != nil {
-				body.AssignedTo = who[*row.AssignedTo].Name
+				held := who[*row.AssignedTo]
+				body.AssignedTo, body.AssignedName = held.Address, labelBeside(held.Name, held.Address)
 			}
 			out.Body.Items = append(out.Body.Items, body)
 		}

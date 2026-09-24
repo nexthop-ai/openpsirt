@@ -36,7 +36,10 @@ type UnassignedBody struct {
 
 // HoldingBody is how much work one person has.
 type HoldingBody struct {
-	Person string `json:"person" doc:"The holder, by the name they are shown under. A person or a team"`
+	Person string `json:"person" doc:"The holder, by sign-in identity for a person and by name for a team"`
+	// Name is the label beside the address rather than in its place: the
+	// address is what the holder's own list resolves.
+	Name string `json:"name,omitempty" doc:"Their display name, where they have one"`
 	// Team says this is a queue rather than a holding: work routed to a
 	// team is unheld until somebody takes it.
 	Team bool `json:"team,omitempty" doc:"This is a team's queue rather than one person's work"`
@@ -609,8 +612,10 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 		out.Body.Items = make([]HoldingBody, 0, len(held))
 		for _, h := range held {
 			out.Body.Items = append(out.Body.Items, HoldingBody{
-				Person: who[h.PartyID].Name, Team: who[h.PartyID].Team,
-				Open: h.Open, Places: h.Places, Overdue: h.Overdue,
+				Person: who[h.PartyID].Address,
+				Name:   labelBeside(who[h.PartyID].Name, who[h.PartyID].Address),
+				Team:   who[h.PartyID].Team,
+				Open:   h.Open, Places: h.Places, Overdue: h.Overdue,
 			})
 		}
 		return out, nil

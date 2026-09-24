@@ -63,7 +63,6 @@ Missing or wrong, with no decision needed to fix it.
 | Gap | Effect |
 |---|---|
 | Approvers are not told when an edit withdraws their approval | Their approval stops counting silently. The API description of notifications says they are told |
-| Some routes return a display name where a sign-in identity is documented | Affects the administration trail's `by`, its CSV export, and the disclosure-date movement routes. A caller matching on identity gets a name |
 | The webhook listing returns each destination's full address | For Slack and Teams the address is the secret. Hiding it means deciding how somebody tells two destinations apart |
 | The upload alert compares against the size of the build | A build that rolls its base image every week raises the alert every week. Comparing against the build's usual churn needs a stored baseline |
 | A supplier whose directory is on a second host cannot be read | SUSE is one. Every request is pinned to the configured host, and allowing a second one means deciding how an administrator names it |
@@ -103,7 +102,6 @@ Missing or wrong, with no decision needed to fix it.
 | The upstream-currency retry | Runs one pass, so nothing is asked again |
 | The empty-document reader | Its comment says an empty part is refused, and it asserts that the part is stored |
 | Scanned builds in the API tests | Several tests build a scanned build by hand. The shared fixture has helpers for the catalog and people only |
-| People in the API tests | Most are seeded with no display name, so a test cannot tell a name from an identity. This hides the display-name gap above |
 
 ## Owner decisions outstanding
 

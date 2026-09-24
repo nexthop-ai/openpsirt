@@ -370,16 +370,18 @@ func registerDisclosure(api huma.API, in Ingest) {
 
 // MovementBody is one time somebody moved the end of an embargo.
 type MovementBody struct {
-	ID            int64  `json:"id"`
-	Act           string `json:"act" enum:"extension,shortening" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner"`
-	Was           string `json:"was" doc:"The embargo's previous end"`
-	Until         string `json:"until" doc:"The end that was asked for"`
-	Reason        string `json:"reason"`
-	AskedBy       string `json:"asked_by"`
-	AskedAt       string `json:"asked_at"`
-	NeedsApproval bool   `json:"needs_approval" doc:"Whether a second person had to agree"`
-	ApprovedBy    string `json:"approved_by,omitempty"`
-	ApprovedAt    string `json:"approved_at,omitempty"`
+	ID             int64  `json:"id"`
+	Act            string `json:"act" enum:"extension,shortening" doc:"Which act this was. An extension ends the embargo later, a shortening ends it sooner"`
+	Was            string `json:"was" doc:"The embargo's previous end"`
+	Until          string `json:"until" doc:"The end that was asked for"`
+	Reason         string `json:"reason"`
+	AskedBy        string `json:"asked_by" doc:"The person who asked, by sign-in identity"`
+	AskedByName    string `json:"asked_by_name,omitempty" doc:"Their display name, where they have one"`
+	AskedAt        string `json:"asked_at"`
+	NeedsApproval  bool   `json:"needs_approval" doc:"Whether a second person had to agree"`
+	ApprovedBy     string `json:"approved_by,omitempty" doc:"The second person, by sign-in identity"`
+	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedAt     string `json:"approved_at,omitempty"`
 	// InForce says the date follows this one. A movement waiting for
 	// agreement has moved nothing.
 	InForce bool `json:"in_force"`
@@ -395,7 +397,8 @@ type PendingMovementBody struct {
 	Was           string `json:"was" doc:"The embargo's end now"`
 	Until         string `json:"until" doc:"The end being asked for"`
 	Days          int    `json:"days" doc:"How far the date moves, in days, whichever way it moves"`
-	By            string `json:"by" doc:"The person who asked"`
+	By            string `json:"by" doc:"The person who asked, by sign-in identity"`
+	ByName        string `json:"by_name,omitempty" doc:"Their display name, where they have one"`
 	AskedAt       string `json:"asked_at"`
 	Reason        string `json:"reason"`
 	// Mine says you asked for this one, so you may not agree to it.
@@ -559,6 +562,14 @@ func registerMovements(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what is waiting could not be read", err)
 		}
+		askers := make([]int64, 0, len(rows))
+		for _, row := range rows {
+			askers = append(askers, row.AskedBy)
+		}
+		who, err := whoSigned(ctx, in.DB.DB, askers)
+		if err != nil {
+			return nil, wentWrong(in.Logger, "who asked could not be read", err)
+		}
 		out := &listOutput[PendingMovementBody]{}
 		// The number waiting in all: without it a screen prints the length of
 		// its own page as the number.
@@ -570,7 +581,8 @@ func registerMovements(api huma.API, in Ingest) {
 				Product: row.Product, Vulnerability: row.Vulnerability,
 				Act: string(row.Act),
 				Was: row.Was.Format(time.DateOnly), Until: row.Until.Format(time.DateOnly),
-				By:      row.AskedByName,
+				By:      who.identity(row.AskedBy),
+				ByName:  who.label(row.AskedBy),
 				AskedAt: row.AskedAt.Format(time.RFC3339),
 				Reason:  row.Reason,
 				// Said rather than left to be worked out: the person who asked
@@ -644,7 +656,8 @@ func embargoAt(ctx context.Context, in Ingest, productName, issueName string) (
 	return subject, finding.NewStore(in.DB.DB), product.ID, issue, nil
 }
 
-// movementBody names the people a movement record refers to by identifier.
+// movementBody names the people a movement record refers to by the identity
+// they sign in under, with the display name beside it.
 func movementBody(ctx context.Context, in Ingest, rows []finding.Movement) ([]MovementBody, error) {
 	people := make([]int64, 0, len(rows)*2)
 	for _, row := range rows {
@@ -653,7 +666,7 @@ func movementBody(ctx context.Context, in Ingest, rows []finding.Movement) ([]Mo
 			people = append(people, *row.ApprovedBy)
 		}
 	}
-	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
+	who, err := whoSigned(ctx, in.DB.DB, people)
 	if err != nil {
 		return nil, err
 	}
@@ -661,12 +674,14 @@ func movementBody(ctx context.Context, in Ingest, rows []finding.Movement) ([]Mo
 	for _, row := range rows {
 		body := MovementBody{
 			ID: row.ID, Act: string(row.Act), Was: stamp(row.Was), Until: stamp(row.Until),
-			Reason: row.Reason, AskedBy: names[row.AskedBy],
-			AskedAt: stamp(row.AskedAt), NeedsApproval: row.NeedsApproval,
+			Reason: row.Reason, AskedBy: who.identity(row.AskedBy),
+			AskedByName: who.label(row.AskedBy),
+			AskedAt:     stamp(row.AskedAt), NeedsApproval: row.NeedsApproval,
 			InForce: row.InForce(),
 		}
 		if row.ApprovedBy != nil {
-			body.ApprovedBy = names[*row.ApprovedBy]
+			body.ApprovedBy = who.identity(*row.ApprovedBy)
+			body.ApprovedByName = who.label(*row.ApprovedBy)
 		}
 		if row.ApprovedAt != nil {
 			body.ApprovedAt = stamp(*row.ApprovedAt)

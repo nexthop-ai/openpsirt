@@ -794,7 +794,7 @@ function InProgress({ me }: { me: string }) {
       <ul>
         {mine.slice(0, 3).map((each) => (
           <li key={each.person}>
-            <span className="id">{each.person === me ? "you" : each.person}</span>
+            <span className="id">{each.person === me ? "you" : each.name || each.person}</span>
             <span className="what">{each.open} open</span>
             {(each.overdue ?? 0) > 0 && <span className="when">{each.overdue} overdue</span>}
           </li>

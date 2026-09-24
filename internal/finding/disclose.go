@@ -568,7 +568,6 @@ type Waiting struct {
 	Movement
 	Product       string
 	Vulnerability string
-	AskedByName   string
 }
 
 // Pending lists movements of a disclosure date waiting for a second person,
@@ -621,17 +620,14 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 		Movement      `bun:",extend"`
 		Product       string `bun:"product"`
 		Vulnerability string `bun:"vulnerability"`
-		AskedByName   string `bun:"asked_by_name"`
 	}
 	query := s.db.NewSelect().
 		Model((*Movement)(nil)).
 		ColumnExpr("dx.*").
 		Join(`JOIN "product" AS "p" ON p.id = dx.product_id`).
 		Join(`JOIN "vulnerability" AS "v" ON v.id = dx.vulnerability_id`).
-		Join(`LEFT JOIN "person" AS "ps" ON ps.id = dx.asked_by`).
 		ColumnExpr(`p.name AS "product"`).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
-		ColumnExpr(`COALESCE(NULLIF(ps.display_name, ''), ps.identity, '') AS "asked_by_name"`).
 		Where("dx.needs_approval = ?", true).
 		Where("dx.approved_at IS NULL").
 		OrderExpr("dx.asked_at DESC")
@@ -649,7 +645,7 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 	for _, row := range rows {
 		out = append(out, Waiting{
 			Movement: row.Movement, Product: row.Product,
-			Vulnerability: row.Vulnerability, AskedByName: row.AskedByName,
+			Vulnerability: row.Vulnerability,
 		})
 	}
 	return out, total, nil

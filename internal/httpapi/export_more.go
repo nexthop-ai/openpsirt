@@ -557,33 +557,34 @@ func registerChangeExport(api huma.API, in Ingest) {
 			return nil, err
 		}
 		store := trail.NewStore(in.DB.DB)
-		rights := access.NewStore(in.DB.DB)
 		out := Exporting{
 			What: "what has been changed administratively",
 			About: []Stated{
 				{"from", asDay(since)}, {"to", asDay(until)}, {"kind", input.Kind},
 			},
-			Header: []string{"at", "by", "kind", "about", "was", "became", "unset", "cleared"},
+			Header: []string{"at", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				changes, _, err := store.Changes(ctx, subject, trail.Kind(input.Kind),
 					trail.Over{Since: since, Until: until}, limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				// The person, by the identity they sign in under, read a page
-				// at a time like every other name this file carries.
+				// The person, by the identity they sign in under and their
+				// display name beside it, read a page at a time like every
+				// other name this file carries.
 				who := make([]int64, 0, len(changes))
 				for _, change := range changes {
 					who = append(who, change.By)
 				}
-				names, err := rights.Names(ctx, who)
+				people, err := whoSigned(ctx, in.DB.DB, who)
 				if err != nil {
 					return nil, err
 				}
 				rows := make([][]string, 0, len(changes))
 				for _, change := range changes {
 					rows = append(rows, []string{
-						change.At.UTC().Format(time.RFC3339), names[change.By],
+						change.At.UTC().Format(time.RFC3339), people.identity(change.By),
+						people.label(change.By),
 						string(change.Kind), change.Name,
 						orBlank(change.Was), orBlank(change.Became),
 						strconv.FormatBool(change.Was == nil),

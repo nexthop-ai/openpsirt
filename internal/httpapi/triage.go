@@ -125,9 +125,11 @@ type ClaimBody struct {
 	ID          int64  `json:"id"`
 	Kind        string `json:"kind" enum:"finding,together,extension,returned" doc:"The sort of action: one judgment about a finding, one about many issues at a component, an approved claim carried to a new issue, or rows set aside from a larger claim — by an approver agreeing to the rest, or by the author holding them back"`
 	DerivedFrom int64  `json:"derived_from,omitempty" doc:"The claim this one came from, for an extension or a returned set"`
-	ProposedBy  string `json:"proposed_by"`
-	ProposedAt  string `json:"proposed_at" doc:"The moment the action was taken"`
-	SelectedBy  string `json:"selected_by,omitempty" doc:"The narrowing behind a bulk set. Never part of the claim itself"`
+	ProposedBy  string `json:"proposed_by" doc:"The person who took it, by sign-in identity"`
+	// ProposedByName is the label beside the identity.
+	ProposedByName string `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedAt     string `json:"proposed_at" doc:"The moment the action was taken"`
+	SelectedBy     string `json:"selected_by,omitempty" doc:"The narrowing behind a bulk set. Never part of the claim itself"`
 	// Selection is the same claim in a form an approver can re-run. Prose
 	// alone cannot be checked, and a decision rests on how the set was
 	// chosen.
@@ -151,7 +153,8 @@ type WaitingBody struct {
 	Reasoning          string `json:"reasoning"`
 	PreviouslyApproved bool   `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
 	DeferredDays       int    `json:"deferred_days,omitempty" doc:"The total this finding has been put off for"`
-	ProposedBy         string `json:"proposed_by"`
+	ProposedBy         string `json:"proposed_by" doc:"The person who made the claim, by sign-in identity"`
+	ProposedByName     string `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
 	AgeDays            int    `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
 	Decisions          int    `json:"decisions" doc:"The number of rows the claim wrote"`
 	Issues             int    `json:"issues" doc:"The number of distinct issues it covers"`
@@ -223,7 +226,8 @@ type BecameBody struct {
 	// The moment it became that, and the person who did it where a person
 	// did. Both absent while it is waiting: nothing has happened to it yet.
 	When      string          `json:"when,omitempty" doc:"The moment it became that"`
-	By        string          `json:"by,omitempty" doc:"The person who did it, where a person did"`
+	By        string          `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
+	ByName    string          `json:"by_name,omitempty" doc:"Their display name, where they have one"`
 	Reasoning string          `json:"reasoning"`
 	Decisions int             `json:"decisions" doc:"The number of rows the claim wrote"`
 	Issues    int             `json:"issues" doc:"The number of distinct issues it covers"`
@@ -310,13 +314,14 @@ func registerTriage(api huma.API, in Ingest) {
 		out.Body.Items = make([]WaitingBody, 0, len(waiting))
 		for i, row := range waiting {
 			entry := WaitingBody{
-				Claim:              claimBody(row.Claim, named[i].ProposedBy),
+				Claim:              claimBody(row.Claim, named[i].ProposedBy, named[i].ProposedByName),
 				Decision:           decisionBody(row.Decision),
 				Place:              named[i].Place,
 				Reasoning:          row.Reasoning,
 				PreviouslyApproved: row.PreviouslyApproved,
 				DeferredDays:       int(row.DeferredSoFar.Hours() / 24),
 				ProposedBy:         named[i].ProposedBy,
+				ProposedByName:     named[i].ProposedByName,
 				AgeDays:            int(store.Age(&row.Decision).Hours() / 24),
 				Decisions:          row.Decisions,
 				Issues:             row.Issues,
@@ -461,7 +466,7 @@ func registerTriage(api huma.API, in Ingest) {
 				actors = append(actors, row.By)
 			}
 		}
-		names, err := access.NewStore(in.DB.DB).Names(ctx, actors)
+		who, err := whoSigned(ctx, in.DB.DB, actors)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "what you proposed could not be read", err)
 		}
@@ -470,7 +475,7 @@ func registerTriage(api huma.API, in Ingest) {
 		out.Body.Items = make([]BecameBody, 0, len(mine))
 		for i, row := range mine {
 			entry := BecameBody{
-				Claim:     claimBody(row.Claim, named[i].ProposedBy),
+				Claim:     claimBody(row.Claim, named[i].ProposedBy, named[i].ProposedByName),
 				Decision:  decisionBody(row.Decision),
 				Place:     named[i].Place,
 				Reasoning: row.Reasoning,
@@ -484,7 +489,7 @@ func registerTriage(api huma.API, in Ingest) {
 				entry.When = row.When.Format(time.RFC3339)
 			}
 			if row.By != 0 {
-				entry.By = names[row.By]
+				entry.By, entry.ByName = who.identity(row.By), who.label(row.By)
 			}
 			if row.Outliers != nil {
 				entry.Outliers = outliersBody(*row.Outliers)

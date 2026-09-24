@@ -341,6 +341,9 @@ type Held struct {
 	// Party is the name in the assignable space, which is what the assignment
 	// column holds.
 	Party int64
+	// Address is what a route resolves: a person's sign-in identity, or a
+	// team's name.
+	Address string
 	// Name is what to show. A person's display name or sign-in identity, or a
 	// team's.
 	Name string
@@ -370,7 +373,7 @@ func (s *Store) WhoHolds(ctx context.Context, parties []int64) (map[int64]Held, 
 		if name == "" {
 			name = person.Identity
 		}
-		held[person.PartyID] = Held{Party: person.PartyID, Name: name}
+		held[person.PartyID] = Held{Party: person.PartyID, Address: person.Identity, Name: name}
 	}
 	var teams []Team
 	if err := s.db.NewSelect().Model(&teams).
@@ -379,7 +382,8 @@ func (s *Store) WhoHolds(ctx context.Context, parties []int64) (map[int64]Held, 
 		return nil, fmt.Errorf("read which teams hold these: %w", err)
 	}
 	for _, team := range teams {
-		held[team.PartyID] = Held{Party: team.PartyID, Name: team.Called(), Team: true}
+		held[team.PartyID] = Held{Party: team.PartyID, Address: team.Name, Name: team.Called(),
+			Team: true}
 	}
 	return held, nil
 }

@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-
-	"github.com/nexthop-ai/openpsirt/internal/access"
 )
 
 // The words people put on a claim, and the revisions before them.
@@ -43,7 +41,7 @@ func registerComments(api huma.API, in Ingest) {
 		for _, comment := range comments {
 			authors = append(authors, comment.WrittenBy)
 		}
-		names, err := access.NewStore(in.DB.DB).Names(ctx, authors)
+		who, err := whoSigned(ctx, in.DB.DB, authors)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "the discussion could not be read", err)
 		}
@@ -53,8 +51,9 @@ func registerComments(api huma.API, in Ingest) {
 		for _, comment := range comments {
 			body := CommentBody{
 				ID: comment.ID, Body: comment.Body,
-				WrittenBy: names[comment.WrittenBy],
-				WrittenAt: comment.WrittenAt.Format(time.RFC3339),
+				WrittenBy:     who.identity(comment.WrittenBy),
+				WrittenByName: who.label(comment.WrittenBy),
+				WrittenAt:     comment.WrittenAt.Format(time.RFC3339),
 			}
 			if comment.EditedAt != nil {
 				body.EditedAt = comment.EditedAt.Format(time.RFC3339)

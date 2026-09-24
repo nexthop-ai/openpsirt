@@ -13,7 +13,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
@@ -102,11 +101,23 @@ func dayOf(at *time.Time) string {
 	return at.UTC().Format(time.DateOnly)
 }
 
+// labelBeside is a display name for the field beside an identity: empty where
+// it would repeat the identity, so that an absent label keeps meaning "no
+// display name" rather than "the same again".
+func labelBeside(name, handle string) string {
+	if name == handle {
+		return ""
+	}
+	return name
+}
+
 // ChangeBody is one administrative act, as an administrator reads it.
 type ChangeBody struct {
-	At   string `json:"at"`
-	By   string `json:"by" doc:"The person who made the change, by sign-in identity"`
-	Kind string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here" doc:"The kind of thing that changed"`
+	At string `json:"at"`
+	By string `json:"by" doc:"The person who made the change, by sign-in identity"`
+	// ByName is the label beside the identity rather than in its place.
+	ByName string `json:"by_name,omitempty" doc:"Their display name, where they have one"`
+	Kind   string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here" doc:"The kind of thing that changed"`
 	// About is the subject: the setting's name, the person and product a role
 	// was granted on, the release whose support date moved.
 	About string `json:"about"`
@@ -168,7 +179,6 @@ func registerTrail(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		store := access.NewStore(in.DB.DB)
 		// Refused by the store rather than here. A row names who was brought
 		// into which case, undisclosed ones among them, so who may read it is
 		// a question about the query (REQ-42 and REQ-43).
@@ -183,7 +193,7 @@ func registerTrail(api huma.API, in Ingest) {
 		for _, change := range changes {
 			who = append(who, change.By)
 		}
-		names, err := store.Names(ctx, who)
+		people, err := whoSigned(ctx, in.DB.DB, who)
 		if err != nil {
 			return nil, wentWrong(in.Logger, "who changed these could not be read", err)
 		}
@@ -201,8 +211,9 @@ func registerTrail(api huma.API, in Ingest) {
 		out.Body.Items = make([]ChangeBody, 0, len(changes))
 		for _, change := range changes {
 			body := ChangeBody{
-				At: change.At.Format("2006-01-02T15:04:05Z"), By: names[change.By],
-				Kind: string(change.Kind), About: change.Name,
+				At: change.At.Format("2006-01-02T15:04:05Z"), By: people.identity(change.By),
+				ByName: people.label(change.By),
+				Kind:   string(change.Kind), About: change.Name,
 				Unset: change.Was == nil, Cleared: change.Became == nil,
 			}
 			if change.Was != nil {

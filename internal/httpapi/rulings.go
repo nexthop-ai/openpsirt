@@ -19,20 +19,23 @@ import (
 
 // RulingBody is one act of saying what one or more reports are.
 type RulingBody struct {
-	ID          int64    `json:"id"`
-	Product     string   `json:"product" doc:"The product it was made in"`
-	Disposition string   `json:"disposition" enum:"duplicate,not-reproducible,out-of-scope,rejected"`
-	Reasoning   string   `json:"reasoning,omitempty" doc:"Why, as markdown. Never edited"`
-	DuplicateOf string   `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
-	Reports     []string `json:"reports" doc:"The references of the reports it covers, including after it was withdrawn"`
-	State       string   `json:"state" enum:"waiting,in-force,withdrawn" doc:"Waiting for a second person, what its reports currently are, or taken back"`
-	ProposedBy  string   `json:"proposed_by"`
-	ProposedAt  string   `json:"proposed_at"`
-	Yours       bool     `json:"yours,omitempty" doc:"Whether you proposed it. The proposer may not approve it"`
-	ApprovedBy  string   `json:"approved_by,omitempty" doc:"Who agreed, on a disposition that takes a second person"`
-	ApprovedAt  string   `json:"approved_at,omitempty"`
-	WithdrawnBy string   `json:"withdrawn_by,omitempty"`
-	WithdrawnAt string   `json:"withdrawn_at,omitempty"`
+	ID              int64    `json:"id"`
+	Product         string   `json:"product" doc:"The product it was made in"`
+	Disposition     string   `json:"disposition" enum:"duplicate,not-reproducible,out-of-scope,rejected"`
+	Reasoning       string   `json:"reasoning,omitempty" doc:"Why, as markdown. Never edited"`
+	DuplicateOf     string   `json:"duplicate_of,omitempty" doc:"The issue a duplicate points at"`
+	Reports         []string `json:"reports" doc:"The references of the reports it covers, including after it was withdrawn"`
+	State           string   `json:"state" enum:"waiting,in-force,withdrawn" doc:"Waiting for a second person, what its reports currently are, or taken back"`
+	ProposedBy      string   `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
+	ProposedByName  string   `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedAt      string   `json:"proposed_at"`
+	Yours           bool     `json:"yours,omitempty" doc:"Whether you proposed it. The proposer may not approve it"`
+	ApprovedBy      string   `json:"approved_by,omitempty" doc:"The person who agreed, on a disposition that takes a second person, by sign-in identity"`
+	ApprovedByName  string   `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedAt      string   `json:"approved_at,omitempty"`
+	WithdrawnBy     string   `json:"withdrawn_by,omitempty" doc:"The person who took it back, by sign-in identity"`
+	WithdrawnByName string   `json:"withdrawn_by_name,omitempty" doc:"Their display name, where they have one"`
+	WithdrawnAt     string   `json:"withdrawn_at,omitempty"`
 }
 
 // RulingProposedBody is a ruling as somebody submits it.
@@ -324,7 +327,7 @@ func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
 			issues = append(issues, *row.DuplicateOf)
 		}
 	}
-	names, err := access.NewStore(in.DB.DB).Names(ctx, people)
+	who, err := whoSigned(ctx, in.DB.DB, people)
 	if err != nil {
 		return nil, err
 	}
@@ -338,8 +341,9 @@ func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
 			ID: row.ID, Product: row.Product,
 			Disposition: string(row.Disposition), Reasoning: row.Reasoning,
 			Reports: row.References, State: rulingState(row),
-			ProposedBy: names[row.ProposedBy], ProposedAt: row.ProposedAt.Format(time.RFC3339),
-			Yours: row.ProposedBy == subject.ID,
+			ProposedBy: who.identity(row.ProposedBy), ProposedByName: who.label(row.ProposedBy),
+			ProposedAt: row.ProposedAt.Format(time.RFC3339),
+			Yours:      row.ProposedBy == subject.ID,
 		}
 		if body.Reports == nil {
 			body.Reports = []string{}
@@ -348,13 +352,13 @@ func rulingBodies(ctx context.Context, in Ingest, subject access.Subject,
 			body.DuplicateOf = identifiers[*row.DuplicateOf]
 		}
 		if row.ApprovedBy != nil {
-			body.ApprovedBy = names[*row.ApprovedBy]
+			body.ApprovedBy, body.ApprovedByName = who.identity(*row.ApprovedBy), who.label(*row.ApprovedBy)
 		}
 		if row.ApprovedAt != nil {
 			body.ApprovedAt = row.ApprovedAt.Format(time.RFC3339)
 		}
 		if row.WithdrawnBy != nil {
-			body.WithdrawnBy = names[*row.WithdrawnBy]
+			body.WithdrawnBy, body.WithdrawnByName = who.identity(*row.WithdrawnBy), who.label(*row.WithdrawnBy)
 		}
 		if row.WithdrawnAt != nil {
 			body.WithdrawnAt = row.WithdrawnAt.Format(time.RFC3339)

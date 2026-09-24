@@ -106,7 +106,7 @@ export function Embargoes({
             <div className="cardhead">
               <span className="id">{row.vulnerability}</span>
               <span className="hint">
-                {row.product} · asked by {row.by}
+                {row.product} · asked by {row.by_name || row.by}
                 {row.mine && <> · yours</>}
               </span>
             </div>

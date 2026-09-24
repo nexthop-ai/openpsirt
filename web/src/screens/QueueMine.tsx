@@ -87,7 +87,7 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
     <>
       <tr className="row">
         <td>
-          <Happened word={row.happened} by={row.by} />
+          <Happened word={row.happened} by={row.by_name || row.by} />
         </td>
         <td>
           {row.finding ? (

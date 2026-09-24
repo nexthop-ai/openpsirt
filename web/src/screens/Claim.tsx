@@ -97,7 +97,7 @@ export function Claim({ who }: { who: Who }) {
         </h2>
         <p className="hint">
           Claim <span className="id">#{it.claim.id}</span> · proposed by{" "}
-          <b>{it.claim.proposed_by}</b>
+          <b>{it.claim.proposed_by_name || it.claim.proposed_by}</b>
           {it.claim.proposed_at && <> on {on(it.claim.proposed_at)}</>}
           {it.age_days > 365 && (
             <>
@@ -134,7 +134,7 @@ function Argument({ claim, id, onChanged }: { claim: Claimed; id: number; onChan
     <div className={`card standing ${stripe(claim.happened)}`}>
       <header className="dhead">
         <h3>The decision</h3>
-        <Happened word={claim.happened} by={claim.by} />
+        <Happened word={claim.happened} by={claim.by_name || claim.by} />
       </header>
       {claim.happened === "sent-back" && (
         <div className="alert" style={{ marginBottom: 12 }}>

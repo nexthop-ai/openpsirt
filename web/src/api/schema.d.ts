@@ -5906,7 +5906,10 @@ export interface components {
         };
         ApprovalBody: {
             approved_at: string;
+            /** @description The person who agreed, by sign-in identity */
             approved_by: string;
+            /** @description Their display name, where they have one */
+            approved_by_name?: string;
             /** @description The batch it was approved under, if it was a bulk approval */
             batch?: string;
             /**
@@ -6048,8 +6051,10 @@ export interface components {
             uploaded_at: string;
         };
         BecameBody: {
-            /** @description The person who did it, where a person did */
+            /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
+            /** @description Their display name, where they have one */
+            by_name?: string;
             claim: components["schemas"]["ClaimBody"];
             decision: components["schemas"]["DecisionBody"];
             /**
@@ -6385,6 +6390,8 @@ export interface components {
             became?: string;
             /** @description The person who made the change, by sign-in identity */
             by: string;
+            /** @description Their display name, where they have one */
+            by_name?: string;
             /** @description This change cleared it */
             cleared?: boolean;
             /**
@@ -6483,7 +6490,10 @@ export interface components {
             kind: "finding" | "together" | "extension" | "returned";
             /** @description The moment the action was taken */
             proposed_at: string;
+            /** @description The person who took it, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where they have one */
+            proposed_by_name?: string;
             /** @description The narrowing behind a bulk set. Never part of the claim itself */
             selected_by?: string;
             /** @description The narrowing behind a bulk claim, as something you can re-run. Absent on a claim that was not one */
@@ -6505,8 +6515,10 @@ export interface components {
             argument: components["schemas"]["DecisionBody"];
             /** @description Every build the claim currently covers, as stream and variant */
             builds: string[] | null;
-            /** @description The person who did it, where a person did */
+            /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
+            /** @description Their display name, where they have one */
+            by_name?: string;
             /** @description The actor, the moment, the sort of action, the narrowing behind a bulk set, and where the work is happening */
             claim: components["schemas"]["ClaimBody"];
             /**
@@ -6591,7 +6603,10 @@ export interface components {
         };
         CollaboratorBody: {
             added_at: string;
+            /** @description The person who brought them in, by sign-in identity */
             added_by: string;
+            /** @description Their display name, where they have one */
+            added_by_name?: string;
             identity: string;
             /** @description Their display name, where they have one */
             name?: string;
@@ -6625,7 +6640,10 @@ export interface components {
             /** Format: int64 */
             id: number;
             written_at: string;
+            /** @description The author, by sign-in identity */
             written_by: string;
+            /** @description Their display name, where they have one */
+            written_by_name?: string;
         };
         ComparisonBody: {
             /**
@@ -6964,7 +6982,10 @@ export interface components {
             place: components["schemas"]["PlaceBody"];
             /** @description The moment the claim was made */
             proposed_at: string;
+            /** @description The person who made the claim, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where they have one */
+            proposed_by_name?: string;
             /** @description The justification as it currently stands, in markdown */
             reasoning: string;
         };
@@ -7108,8 +7129,10 @@ export interface components {
         EarlierBody: {
             /** @description The component upstream version it was a claim about */
             about?: string;
-            /** @description The person who last agreed to it, where anybody did */
+            /** @description The person who last agreed to it, where anybody did, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where they have one */
+            approved_by_name?: string;
             /** Format: int64 */
             claim_id: number;
             /** Format: int64 */
@@ -7128,7 +7151,10 @@ export interface components {
             /** @enum {string} */
             outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             proposed_at: string;
+            /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where they have one */
+            proposed_by_name?: string;
             /** @description The reasoning as it last stood, in markdown, offered back rather than thrown away */
             reasoning: string;
         };
@@ -7153,7 +7179,10 @@ export interface components {
         };
         ElsewhereBody: {
             approved_at?: string;
+            /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where they have one */
+            approved_by_name?: string;
             /** Format: int64 */
             claim_id: number;
             /** Format: int64 */
@@ -7798,6 +7827,8 @@ export interface components {
             name: string;
         };
         HoldingBody: {
+            /** @description Their display name, where they have one */
+            name?: string;
             /**
              * Format: int64
              * @description Pieces of work assigned to them: an issue in a component in a product
@@ -7808,7 +7839,7 @@ export interface components {
              * @description The number of those pieces past their deadline
              */
             overdue: number;
-            /** @description The holder, by the name they are shown under. A person or a team */
+            /** @description The holder, by sign-in identity for a person and by name for a team */
             person: string;
             /**
              * Format: int64
@@ -8031,8 +8062,10 @@ export interface components {
             rows: number;
         };
         LateBody: {
-            /** @description Empty means nobody, or not everywhere the same person */
+            /** @description The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person */
             assigned_to?: string;
+            /** @description Their display name, where they have one */
+            assigned_to_name?: string;
             component: string;
             /**
              * Format: int64
@@ -8757,9 +8790,15 @@ export interface components {
              */
             act: "extension" | "shortening";
             approved_at?: string;
+            /** @description The second person, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where they have one */
+            approved_by_name?: string;
             asked_at: string;
+            /** @description The person who asked, by sign-in identity */
             asked_by: string;
+            /** @description Their display name, where they have one */
+            asked_by_name?: string;
             /** Format: int64 */
             id: number;
             in_force: boolean;
@@ -8834,8 +8873,10 @@ export interface components {
             /** Format: int64 */
             id: number;
             written_at: string;
-            /** @description The author */
+            /** @description The author, by sign-in identity */
             written_by: string;
+            /** @description Their display name, where they have one */
+            written_by_name?: string;
         };
         NoteWritten: {
             /**
@@ -9261,8 +9302,10 @@ export interface components {
              */
             act: "extension" | "shortening";
             asked_at: string;
-            /** @description The person who asked */
+            /** @description The person who asked, by sign-in identity */
             by: string;
+            /** @description Their display name, where they have one */
+            by_name?: string;
             /**
              * Format: int64
              * @description How far the date moves, in days, whichever way it moves
@@ -10039,7 +10082,10 @@ export interface components {
              */
             readonly $schema?: string;
             acknowledged?: string;
+            /** @description The person who answered them, by sign-in identity */
             acknowledged_by?: string;
+            /** @description Their display name, where they have one */
+            acknowledged_by_name?: string;
             contact?: string;
             /** @description The credit they asked for in an advisory */
             credit?: string;
@@ -10052,8 +10098,10 @@ export interface components {
             duplicate_of?: string;
             /** @description When somebody said what it turned out to be */
             evaluated?: string;
-            /** @description Who said so */
+            /** @description The person who said so, by sign-in identity */
             evaluated_by?: string;
+            /** @description Their display name, where they have one */
+            evaluated_by_name?: string;
             /** @description Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer */
             found_here: boolean;
             /** @description The issue the claim turned out to be */
@@ -10062,8 +10110,10 @@ export interface components {
             received?: string;
             /** @description When it was written down, which is not when it arrived */
             recorded_at: string;
-            /** @description Who wrote it down */
+            /** @description The person who wrote it down, by sign-in identity */
             recorded_by: string;
+            /** @description Their display name, where they have one */
+            recorded_by_name?: string;
             /** @description The name this report is reached by */
             reference: string;
             reported_by?: string;
@@ -10227,7 +10277,10 @@ export interface components {
              */
             ordinal: number;
             written_at: string;
+            /** @description The author, by sign-in identity */
             written_by: string;
+            /** @description Their display name, where they have one */
+            written_by_name?: string;
         };
         RootsBody: {
             /**
@@ -10302,8 +10355,10 @@ export interface components {
              */
             readonly $schema?: string;
             approved_at?: string;
-            /** @description Who agreed, on a disposition that takes a second person */
+            /** @description The person who agreed, on a disposition that takes a second person, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where they have one */
+            approved_by_name?: string;
             /** @enum {string} */
             disposition: "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
             /** @description The issue a duplicate points at */
@@ -10313,7 +10368,10 @@ export interface components {
             /** @description The product it was made in */
             product: string;
             proposed_at: string;
+            /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where they have one */
+            proposed_by_name?: string;
             /** @description Why, as markdown. Never edited */
             reasoning?: string;
             /** @description The references of the reports it covers, including after it was withdrawn */
@@ -10324,7 +10382,10 @@ export interface components {
              */
             state: "waiting" | "in-force" | "withdrawn";
             withdrawn_at?: string;
+            /** @description The person who took it back, by sign-in identity */
             withdrawn_by?: string;
+            /** @description Their display name, where they have one */
+            withdrawn_by_name?: string;
             /** @description Whether you proposed it. The proposer may not approve it */
             yours?: boolean;
         };
@@ -10667,7 +10728,10 @@ export interface components {
         };
         SimilarBody: {
             approved_at?: string;
+            /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where they have one */
+            approved_by_name?: string;
             /**
              * Format: int64
              * @description Pass as extends when deciding to carry it to this issue
@@ -10804,7 +10868,10 @@ export interface components {
         };
         StandingClaimBody: {
             approved_at?: string;
+            /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
+            /** @description Their display name, where they have one */
+            approved_by_name?: string;
             /** @description Every build the claim currently covers, as stream and variant */
             builds: string[] | null;
             /** Format: int64 */
@@ -10831,7 +10898,10 @@ export interface components {
              */
             places: number;
             proposed_at: string;
+            /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where they have one */
+            proposed_by_name?: string;
             /** @description The state of the claim's rows here */
             rows: components["schemas"]["RowsStandingBody"];
             /** @description The last time rows were sent back to the author */
@@ -11307,7 +11377,10 @@ export interface components {
             places: number;
             /** @description This was agreed to before and came back */
             previously_approved?: boolean;
+            /** @description The person who made the claim, by sign-in identity */
             proposed_by: string;
+            /** @description Their display name, where they have one */
+            proposed_by_name?: string;
             reasoning: string;
         };
         WasSaidBody: {
