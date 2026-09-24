@@ -68,7 +68,6 @@ Missing or wrong, with no decision needed to fix it.
 | The upload alert compares against the size of the build | A build that rolls its base image every week raises the alert every week. Comparing against the build's usual churn needs a stored baseline |
 | A supplier whose directory is on a second host cannot be read | SUSE is one. Every request is pinned to the configured host, and allowing a second one means deciding how an administrator names it |
 | The container image is `amd64` only | The binaries are built for `arm64` too. `DESIGN-packaging.md` names the fix |
-| The license an inventory declares is skipped when it is read | 4,483 of 6,866 components on the switch image declare one, so nothing can say which licenses a build ships |
 | The component screen is keyed on the binary package name | Upgrades happen per source package, so three binaries from one source read as three pieces of work |
 | No distribution package index is asked what a package is | A language package gets a summary and an address from its index. A distribution package gets neither |
 | The component screen's twelve-week chart does not mark version changes | It shows findings opened and closed, and not which version the build shipped each week, so it cannot show whether an upgrade worked |

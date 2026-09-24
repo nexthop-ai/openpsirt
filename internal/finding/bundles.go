@@ -641,6 +641,8 @@ type PerBuild struct {
 	// Supplier is who the scan said supplied it, from the inventory rather
 	// than from an index.
 	Supplier string
+	// License is the license the inventory declares for it, where one did.
+	License string
 	// BySeverity is what is open here by how it was rated, so a count has a
 	// shape: forty issues and three criticals are different work.
 	BySeverity map[string]int
@@ -727,6 +729,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		Summary       string     `bun:"summary"`
 		ProjectURL    string     `bun:"project_url"`
 		Supplier      string     `bun:"supplier"`
+		License       string     `bun:"license"`
 		Newest        string     `bun:"latest_version"`
 		NewestAt      *time.Time `bun:"latest_released_at"`
 		FirstSeen     time.Time  `bun:"first_seen_at"`
@@ -793,6 +796,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr(`COALESCE(c.summary, '') AS "summary"`).
 		ColumnExpr(`COALESCE(c.project_url, '') AS "project_url"`).
 		ColumnExpr(`COALESCE(c.supplier, '') AS "supplier"`).
+		ColumnExpr(`COALESCE(c.license, '') AS "license"`).
 		ColumnExpr(`COALESCE(c.latest_version, '') AS "latest_version"`).
 		ColumnExpr(`c.latest_released_at AS "latest_released_at"`).
 		ColumnExpr(`c.first_seen_at AS "first_seen_at"`).
@@ -841,8 +845,8 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
 			Version: row.Version, Purl: row.Purl,
 			Summary: row.Summary, ProjectURL: row.ProjectURL,
-			Supplier: row.Supplier,
-			Newest:   row.Newest, NewestAt: row.NewestAt, FirstSeen: row.FirstSeen,
+			Supplier: row.Supplier, License: row.License,
+			Newest: row.Newest, NewestAt: row.NewestAt, FirstSeen: row.FirstSeen,
 			Exploited: row.Exploited > 0, ExploitedHere: row.ExploitedHere > 0,
 			Fixable: row.Fixable, Issues: row.Issues,
 			BySeverity: bands[[2]int64{row.TargetID, row.ComponentID}],

@@ -221,6 +221,9 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 		// keys and which field wins must not.
 		supplier   string
 		originator string
+		// The license the package declares and the one somebody concluded,
+		// resolved after the object like the two above.
+		declared, concluded string
 	)
 	if err := c.count(); err != nil {
 		return graph.Described{}, "", err
@@ -250,6 +253,10 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 			// producer's choice. Read first-key-wins, a package stating both
 			// took whichever the producer put nearer the top.
 			return c.into(&originator)
+		case "licenseDeclared":
+			return c.into(&declared)
+		case "licenseConcluded":
+			return c.into(&concluded)
 		case "externalRefs":
 			return c.spdxExternalRefs(&described)
 		default:
@@ -271,6 +278,13 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 	described.Supplier = partyName(supplier)
 	if described.Supplier == "" {
 		described.Supplier = partyName(originator)
+	}
+	// What the package declares, and what somebody concluded where it
+	// declares nothing. A real producer writes NOASSERTION for the declared
+	// license of most language packages and concludes one from the source.
+	described.License = licenseExpression(declared)
+	if described.License == "" {
+		described.License = licenseExpression(concluded)
 	}
 
 	// The format has no field saying what a package was built from — what it

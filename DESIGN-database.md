@@ -338,6 +338,7 @@ largest table and one every engine changes:
 | Migration | What it does |
 |---|---|
 | 38 | Adds when a recorded flaw was first rated, and whether a report was found here (REQ-33, REQ-37) |
+| 39 | Adds the license an inventory declares for a component, empty on every row it finds. `DESIGN-findings.md` § Component licenses says what fills it |
 
 Migration 38 moves v0.2.0's rows onto those rules:
 

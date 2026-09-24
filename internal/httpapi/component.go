@@ -54,6 +54,7 @@ type PerBuildBody struct {
 	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of what is open here"`
 	Fixable       int    `json:"fixable" doc:"The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
 	Supplier      string `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
+	License       string `json:"license,omitempty" doc:"The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none"`
 	// Newest is the current version according to the ecosystem's index, where
 	// one was asked.
 	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
@@ -149,6 +150,7 @@ func registerComponent(api huma.API, in Ingest) {
 				ExploitedHere: build.ExploitedHere,
 				Fixable:       build.Fixable,
 				Supplier:      build.Supplier,
+				License:       build.License,
 				Newest:        build.Newest, NewestAt: build.NewestAt, FirstSeen: build.FirstSeen,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,

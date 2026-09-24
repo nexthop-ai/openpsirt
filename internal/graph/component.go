@@ -97,6 +97,10 @@ type Component struct {
 	// than from an index, and often absent: a producer states it for some of
 	// what it describes and not the rest.
 	Supplier string `bun:"supplier"`
+	// License is the license the inventory declares for it, as the producer
+	// wrote it. From the inventory, filled in the way Supplier is, and absent
+	// wherever a producer states none.
+	License string `bun:"license"`
 }
 
 // Described is a component as a scan describes it, before it has been matched
@@ -113,6 +117,11 @@ type Described struct {
 	// describing one component name it differently or not at all, and an
 	// identity that moved with it would reset every decision attached.
 	Supplier string
+	// License is the license a producer declares for the component: an SPDX
+	// expression where the format carries one, and the names a producer
+	// listed, joined as a conjunction, where it lists several. Not part of
+	// identity, for the reason Supplier is not.
+	License string
 }
 
 // Identity returns the content-derived key for a described component.
@@ -321,6 +330,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			UpstreamFolded: Folded(d.UpstreamName),
 			FoldKey:        d.FoldKey(),
 			Supplier:       d.Supplier,
+			License:        d.License,
 			FirstSeenAt:    now,
 		})
 	}
@@ -329,7 +339,12 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 	// in is not an edit: a producer stating a supplier where the producer that
 	// wrote the row stated none is the merge rule every other field here
 	// follows, and filling it in overwrites nothing.
-	if err := c.fillSuppliers(ctx, byIdentity, known); err != nil {
+	if err := c.fillBlank(ctx, "supplier", "who supplied", byIdentity, known,
+		func(d Described) string { return d.Supplier }); err != nil {
+		return nil, err
+	}
+	if err := c.fillBlank(ctx, "license", "the license of", byIdentity, known,
+		func(d Described) string { return d.License }); err != nil {
 		return nil, err
 	}
 	if len(missing) > 0 {
@@ -410,6 +425,9 @@ func (d *Described) FillFrom(other Described) {
 	}
 	if d.Version == "" {
 		d.Version = other.Version
+	}
+	if d.License == "" {
+		d.License = other.License
 	}
 	if d.UpstreamName == "" {
 		d.UpstreamName, d.UpstreamVersion = other.UpstreamName, other.UpstreamVersion
@@ -605,52 +623,54 @@ func Folded(name string) string {
 // every engine.
 const foldedWidth = 191
 
-// fillSuppliers writes a supplier onto rows that have none.
+// fillBlank writes one producer-supplied column onto rows that have none.
 //
-// Only where a report states one and the stored row does not, so a later report
-// fills in what an earlier one did not know and overwrites nothing — the rule
-// `DESIGN-findings.md` states for every other field two reports can disagree
-// about. Without it a component first interned through a producer that states no
-// supplier never gets one, however many later scans say who it is.
+// Only where a report states a value and the stored row does not, so a later
+// report fills in what an earlier one did not know and overwrites nothing — the
+// rule `DESIGN-findings.md` states for every other field two reports can
+// disagree about. Without it a component first interned through a producer
+// that states no supplier or license never gets one, however many later scans
+// say what it is.
 //
-// Grouped by what the supplier is, so the number of statements is the number of
-// distinct suppliers in the scan rather than the number of components: a night's
+// The column is one of the two names Intern passes, never anything a caller
+// supplies. Grouped by value, so the number of statements is the number of
+// distinct values in the scan rather than the number of components: a night's
 // apply issues enough statements already, and a real image names a few dozen
-// suppliers across thousands of rows.
-func (c *Components) fillSuppliers(ctx context.Context, described map[string]Described,
-	known map[string]int64) error {
+// suppliers and a few hundred licenses across thousands of rows.
+func (c *Components) fillBlank(ctx context.Context, column, what string,
+	described map[string]Described, known map[string]int64,
+	said func(Described) string) error {
 
-	byName := map[string][]int64{}
+	byValue := map[string][]int64{}
 	for identity, d := range described {
-		said := strings.TrimSpace(d.Supplier)
-		if said == "" {
+		value := strings.TrimSpace(said(d))
+		if value == "" {
 			continue
 		}
 		// Only rows that already exist: one being written this moment carries
-		// its supplier on the insert.
+		// its value on the insert.
 		id, have := known[identity]
 		if !have {
 			continue
 		}
-		byName[said] = append(byName[said], id)
+		byValue[value] = append(byValue[value], id)
 	}
 	// Batched, and on identifiers rather than on identity strings. A Debian
 	// inventory names one supplier for nearly every component, so a group here
 	// is the whole inventory — measured at 8,373 — and one statement binding
 	// that many parameters is refused by two of the four engines, inside the
-	// transaction the scan applies in. The read ten lines above batches for
-	// exactly this reason; the write beside it did not.
-	for said, ids := range byName {
+	// transaction the scan applies in.
+	for value, ids := range byValue {
 		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			_, err := c.db.NewUpdate().Model((*Component)(nil)).
-				Set("supplier = ?", said).
+				Set("? = ?", bun.Ident(column), value).
 				Where("id IN (?)", bun.List(batch)).
-				Where(`"supplier" IS NULL OR "supplier" = ?`, "").
+				Where("? IS NULL OR ? = ?", bun.Ident(column), bun.Ident(column), "").
 				Exec(ctx)
 			return err
 		})
 		if err != nil {
-			return fmt.Errorf("record who supplied %d components: %w", len(ids), err)
+			return fmt.Errorf("record %s %d components: %w", what, len(ids), err)
 		}
 	}
 	return nil

@@ -259,6 +259,16 @@ export function Component() {
                   </span>
                 )}
               </dd>
+              <dt>License</dt>
+              <dd>
+                {here.license ? (
+                  <span className="id">{here.license}</span>
+                ) : (
+                  <span className="hint" title="The inventory did not declare one">
+                    not stated
+                  </span>
+                )}
+              </dd>
               <dt>Newest known</dt>
               <dd>
                 {here.newest_version ? (

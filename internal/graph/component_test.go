@@ -230,3 +230,57 @@ func supplierOf(t *testing.T, f *fixture, identity string) string {
 	}
 	return said
 }
+
+func TestALicenseIsWrittenOnTheInsertAndFilledInByALaterReport(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		components := graph.NewComponents(f.db.DB)
+
+		stated := graph.Described{
+			Purl: "pkg:deb/debian/zlib@1.3", Name: "zlib", Version: "1.3", License: "Zlib",
+		}
+		quiet := graph.Described{
+			Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0",
+		}
+		if _, err := components.Intern(ctx, []graph.Described{stated, quiet}); err != nil {
+			t.Fatal(err)
+		}
+		if got := licenseOf(t, f, stated.Identity()); got != "Zlib" {
+			t.Errorf("a new component carries the license %q", got)
+		}
+
+		said := quiet
+		said.License = "curl"
+		if _, err := components.Intern(ctx, []graph.Described{said}); err != nil {
+			t.Fatal(err)
+		}
+		if got := licenseOf(t, f, quiet.Identity()); got != "curl" {
+			t.Errorf("after a report stating one, the license is %q", got)
+		}
+
+		// Nothing overwrites it, for the reason a supplier is not overwritten.
+		other := quiet
+		other.License = "MIT"
+		if _, err := components.Intern(ctx, []graph.Described{other}); err != nil {
+			t.Fatal(err)
+		}
+		if got := licenseOf(t, f, quiet.Identity()); got != "curl" {
+			t.Errorf("a later report overwrote the license with %q", got)
+		}
+	})
+}
+
+// licenseOf reads back the license a component is recorded under.
+func licenseOf(t *testing.T, f *fixture, identity string) string {
+	t.Helper()
+	var said string
+	err := f.db.DB.NewSelect().
+		TableExpr("\"component\" AS \"c\"").
+		ColumnExpr("COALESCE(c.license, '')").
+		Where("c.identity = ?", identity).
+		Scan(t.Context(), &said)
+	if err != nil {
+		t.Fatalf("read the license: %v", err)
+	}
+	return said
+}

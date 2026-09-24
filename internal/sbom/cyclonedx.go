@@ -188,6 +188,10 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 		// above rather than acted on during the object: key order is the
 		// producer's choice.
 		scope string
+		// The licenses, split by what the producer says it did: declared, or
+		// concluded by somebody reading the source. Resolved after the object
+		// like the others.
+		declared, concluded []string
 	)
 	// Charged on the way in, before anything is held, for the reason the
 	// count itself records.
@@ -220,6 +224,8 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			// which one the producer happened to write first, and key order is
 			// the producer's choice.
 			return c.into(&publisher)
+		case "licenses":
+			return c.cdxLicenses(&declared, &concluded)
 		case "scope":
 			// The producer's own words about the component, which is where this
 			// format states it: "required", "optional", or "excluded", which
@@ -253,6 +259,12 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	if described.Supplier == "" {
 		described.Supplier = strings.TrimSpace(publisher)
 	}
+	// The license the component declares, and what somebody concluded where
+	// it declares none.
+	described.License = conjunction(declared)
+	if described.License == "" {
+		described.License = conjunction(concluded)
+	}
 
 	// Where a pedigree states what this was built from, it stands: it is the
 	// format's own way of saying so, and it carries more than a name. Where
@@ -273,6 +285,55 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 	// until the fields it is derived from have all arrived.
 	c.scoped(described, scope)
 	return described, ref, nested, nil
+}
+
+// cdxLicenses reads the licenses a component states.
+//
+// Each entry is an SPDX expression, a license by its SPDX identifier, or a
+// license by a name of the producer's own — a distribution's copyright file
+// says "GPL-2+" rather than an identifier. An entry marked as concluded is kept
+// apart from one declared or unmarked, because the format's default is a
+// declaration.
+func (c *reader) cdxLicenses(declared, concluded *[]string) error {
+	return c.b.array(func() error {
+		var said, acknowledged string
+		if err := c.b.object(func(key string) error {
+			switch key {
+			case "expression":
+				return c.into(&said)
+			case "acknowledgement":
+				return c.into(&acknowledged)
+			case "license":
+				return c.b.object(func(field string) error {
+					switch field {
+					case "id":
+						return c.into(&said)
+					case "name":
+						// An identifier stands where both are given: it is
+						// the one another tool can match.
+						if said != "" {
+							return c.b.skip()
+						}
+						return c.into(&said)
+					case "acknowledgement":
+						return c.into(&acknowledged)
+					default:
+						return c.b.skip()
+					}
+				})
+			default:
+				return c.b.skip()
+			}
+		}); err != nil {
+			return err
+		}
+		if strings.EqualFold(strings.TrimSpace(acknowledged), "concluded") {
+			*concluded = append(*concluded, said)
+		} else {
+			*declared = append(*declared, said)
+		}
+		return nil
+	})
 }
 
 // pedigree reads where a component came from, and what its patches say they

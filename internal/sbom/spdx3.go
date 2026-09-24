@@ -119,6 +119,9 @@ type spdx3Element struct {
 	to    []string
 	kinds string
 	scope string
+
+	// expression is what a license element says, where it is one.
+	expression string
 }
 
 // spdx3Context refuses a version this reader was not written against, from the
@@ -172,6 +175,8 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 			return c.into(&e.version)
 		case "software_packageUrl":
 			return c.into(&e.purl)
+		case "simplelicensing_licenseExpression":
+			return c.into(&e.expression)
 		case "externalIdentifier":
 			return c.spdx3ExternalIdentifiers(&e)
 		case "created":
@@ -294,6 +299,9 @@ func (c *reader) spdx3Record(e spdx3Element) error {
 		return nil
 	case spdx3Package:
 		return c.spdx3Package(e)
+	case spdx3Expression, spdx3Listed, spdx3Custom:
+		c.spdx3License(e)
+		return nil
 	}
 	// A relationship, where it carries what one is. The format has a scoped
 	// subtype as well as the plain one, and both state the same three fields,
@@ -406,6 +414,10 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 				refEdge{parent: e.from, child: to, kind: scopeWord(e.scope)})
 		}
 		return nil
+	case e.kinds == spdx3Declared || e.kinds == spdx3Concluded:
+		c.spdx3Licensed = append(c.spdx3Licensed, spdx3Licensed{
+			from: e.from, to: e.to, declared: e.kinds == spdx3Declared})
+		return nil
 	case spdx3Ancestors[e.kinds]:
 		for _, to := range e.to {
 			from, ancestor := e.from, to
@@ -426,6 +438,79 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 }
 
 // spdx3Describes is one describes relationship as it was read.
+// The license elements and the two relationships that attach one to a package.
+// A license is an element of its own, pointed at from the package, so what a
+// package is licensed under is only known once the whole graph has been read.
+const (
+	spdx3Expression = "simplelicensing_LicenseExpression"
+	spdx3Listed     = "expandedlicensing_ListedLicense"
+	spdx3Custom     = "expandedlicensing_CustomLicense"
+	spdx3Declared   = "hasDeclaredLicense"
+	spdx3Concluded  = "hasConcludedLicense"
+	// spdx3ListedPrefix is where the license list's own identifiers live. A
+	// relationship may point at one without the document describing it.
+	spdx3ListedPrefix = "https://spdx.org/licenses/"
+)
+
+// spdx3Licensed is one relationship attaching licenses to a package, kept until
+// the walk is over.
+type spdx3Licensed struct {
+	from     string
+	to       []string
+	declared bool
+}
+
+// spdx3License records what one license element says.
+func (c *reader) spdx3License(e spdx3Element) {
+	if c.headerOnly || e.id == "" {
+		return
+	}
+	said := e.expression
+	switch e.kind {
+	case spdx3Listed:
+		said = strings.TrimPrefix(e.id, spdx3ListedPrefix)
+	case spdx3Custom:
+		said = e.name
+	}
+	if said = licenseExpression(said); said != "" {
+		c.spdx3Licenses[e.id] = said
+	}
+}
+
+// spdx3Licensing gives each package the licenses its relationships name:
+// what it declares, and what somebody concluded where it declares nothing.
+// Nothing already stated is overwritten, which leaves the first description of
+// a package merged from several standing, as everywhere else.
+func (c *reader) spdx3Licensing() {
+	if len(c.spdx3Licensed) == 0 || c.headerOnly {
+		return
+	}
+	for _, declared := range []bool{true, false} {
+		for _, one := range c.spdx3Licensed {
+			if one.declared != declared {
+				continue
+			}
+			described, ok := c.byRef[one.from]
+			if !ok {
+				continue
+			}
+			at, seen := c.seen[described.Identity()]
+			if !seen || c.described[at].License != "" {
+				continue
+			}
+			var said []string
+			for _, ref := range one.to {
+				if named, ok := c.spdx3Licenses[ref]; ok {
+					said = append(said, named)
+				} else if listed, ok := strings.CutPrefix(ref, spdx3ListedPrefix); ok {
+					said = append(said, listed)
+				}
+			}
+			c.described[at].License = conjunction(said)
+		}
+	}
+}
+
 type spdx3Describes struct {
 	from string
 	to   []string

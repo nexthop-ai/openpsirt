@@ -151,6 +151,11 @@ type reader struct {
 	// by an element, in no fixed position, so whether a relationship came
 	// from the document cannot be answered where it is read.
 	spdx3Describes []spdx3Describes
+	// spdx3Licenses is what each license element says, by its identifier, and
+	// spdx3Licensed the relationships attaching them, both resolved once the
+	// walk is over because either may arrive first.
+	spdx3Licenses map[string]string
+	spdx3Licensed []spdx3Licensed
 	// settleErr is a fault found after the walk, where the format states
 	// something by pointing at an element rather than by carrying it.
 	settleErr error
@@ -170,6 +175,7 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 		upstream:   map[string]string{},
 
 		spdx3DocumentRefs: map[string]bool{},
+		spdx3Licenses:     map[string]string{},
 	}
 }
 
@@ -353,6 +359,7 @@ func (c *reader) finish() (*Document, error) {
 	c.spdx3Roots()
 	c.resolveRoot()
 	c.resolveUpstream()
+	c.spdx3Licensing()
 	rootIdentity := c.doc.Root.Identity()
 
 	c.doc.Components = make([]graph.Described, 0, len(c.described))

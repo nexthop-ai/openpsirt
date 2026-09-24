@@ -9321,6 +9321,8 @@ export interface components {
              * @description Distinct vulnerabilities open against it here
              */
             issues: number;
+            /** @description The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none */
+            license?: string;
             /**
              * Format: date-time
              * @description The date that version shipped, where the index said
