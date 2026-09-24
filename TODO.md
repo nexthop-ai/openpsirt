@@ -62,7 +62,6 @@ Missing or wrong, with no decision needed to fix it.
 
 | Gap | Effect |
 |---|---|
-| Approvers are not told when an edit withdraws their approval | Their approval stops counting silently. The API description of notifications says they are told |
 | The webhook listing returns each destination's full address | For Slack and Teams the address is the secret. Hiding it means deciding how somebody tells two destinations apart |
 | The upload alert compares against the size of the build | A build that rolls its base image every week raises the alert every week. Comparing against the build's usual churn needs a stored baseline |
 | A supplier whose directory is on a second host cannot be read | SUSE is one. Every request is pinned to the configured host, and allowing a second one means deciding how an administrator names it |

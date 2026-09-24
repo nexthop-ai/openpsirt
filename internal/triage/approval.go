@@ -41,14 +41,23 @@ import (
 // It needs no approval of its own. Returning something to the queue re-exposes
 // risk rather than hiding it, and the queue exists to stop risk being hidden
 // unseen.
-func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int64, reasoning string) (*Revision, error) {
-	var written *Revision
+func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int64, reasoning string) (Revised, error) {
+	var written Revised
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
 		var err error
 		written, err = within.revise(ctx, subject, claimID, reasoning)
 		return err
 	})
 	return written, err
+}
+
+// Revised is a revision, and the people whose agreement it took back.
+type Revised struct {
+	Revision *Revision
+	// Withdrawn is everybody whose standing agreement the revision withdrew,
+	// once each, leaving out whoever revised it. An agreement that stops
+	// counting with nobody told is one its giver goes on relying on.
+	Withdrawn []ForPerson
 }
 
 // revise is the whole of a revision, inside a transaction the caller opened.
@@ -59,22 +68,22 @@ func (s *Store) Revise(ctx context.Context, subject access.Subject, claimID int6
 // second entry point that reached the write without it stored raw HTML,
 // remote images and text past the bound a render is kept inside.
 func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int64,
-	reasoning string) (*Revision, error) {
+	reasoning string) (Revised, error) {
 
 	if strings.TrimSpace(reasoning) == "" {
-		return nil, errors.New("a revision has to say something")
+		return Revised{}, errors.New("a revision has to say something")
 	}
 	if err := markdown.Check(reasoning); err != nil {
-		return nil, err
+		return Revised{}, err
 	}
 
 	claim, rows, err := s.claimRows(ctx, subject, claimID, mayDecide)
 	if err != nil {
-		return nil, err
+		return Revised{}, err
 	}
 	for _, row := range rows {
 		if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-			return nil, ErrNotTheirs
+			return Revised{}, ErrNotTheirs
 		}
 	}
 
@@ -82,10 +91,17 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 	if err := s.db.NewSelect().Model((*Revision)(nil)).
 		ColumnExpr("COALESCE(MAX(ordinal), 0)").
 		Where("claim_id = ?", claimID).Scan(ctx, &latest); err != nil {
-		return nil, fmt.Errorf("read what has been said already: %w", err)
+		return Revised{}, fmt.Errorf("read what has been said already: %w", err)
 	}
 	if latest == 0 {
-		return nil, ErrNotTheirs
+		return Revised{}, ErrNotTheirs
+	}
+	// Who agreed, read before the agreements are withdrawn and inside the
+	// same transaction, because what is reported is whose agreement this
+	// revision took back.
+	withdrawn, err := s.agreeingTo(ctx, subject, claimID, rows)
+	if err != nil {
+		return Revised{}, err
 	}
 
 	now := s.now().Truncate(time.Microsecond)
@@ -94,10 +110,10 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 		Body: reasoning, WrittenBy: subject.ID, WrittenAt: now,
 	}
 	if _, err := s.db.NewInsert().Model(revision).Exec(ctx); err != nil {
-		return nil, fmt.Errorf("record a revision: %w", err)
+		return Revised{}, fmt.Errorf("record a revision: %w", err)
 	}
 	if err := noting(ctx, s.db, reasoning, revision.WrittenAt); err != nil {
-		return nil, err
+		return Revised{}, err
 	}
 
 	// Every approval standing on the old words is taken back, and the claim
@@ -114,12 +130,12 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 		Set("withdrawn_by = ?", subject.ID).
 		Where("claim_id = ?", claimID).
 		Where("withdrawn_at IS NULL").Exec(ctx); err != nil {
-		return nil, fmt.Errorf("withdraw the approvals on what was revised: %w", err)
+		return Revised{}, fmt.Errorf("withdraw the approvals on what was revised: %w", err)
 	}
 	if _, err := s.db.NewUpdate().Model((*Claim)(nil)).
 		Set("revision_id = ?", revision.ID).
 		Where("id = ?", claimID).Exec(ctx); err != nil {
-		return nil, fmt.Errorf("record a revision: %w", err)
+		return Revised{}, fmt.Errorf("record a revision: %w", err)
 	}
 	claim.RevisionID = &revision.ID
 
@@ -146,10 +162,10 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, claimID int6
 			// unusable.
 			Set("sent_back_at = ?", nil).
 			Where("id = ?", row.ID).Exec(ctx); err != nil {
-			return nil, fmt.Errorf("record a revision: %w", err)
+			return Revised{}, fmt.Errorf("record a revision: %w", err)
 		}
 	}
-	return revision, nil
+	return Revised{Revision: revision, Withdrawn: withdrawn}, nil
 }
 
 // Withdraw takes a claim back.
@@ -372,6 +388,47 @@ func (s *Store) wholeClaims(ctx context.Context, reached []int64) ([]int64, []in
 		kept = append(kept, row.ID)
 	}
 	return claims, kept, nil
+}
+
+// agreeingTo gathers who has a standing agreement on a claim, one entry each,
+// leaving out the subject. Each entry carries the claim's earliest row as the
+// representative, and whether any of its rows is undisclosed, read off the rows
+// rather than off the representative.
+func (s *Store) agreeingTo(ctx context.Context, subject access.Subject, claimID int64,
+	rows []Decision) ([]ForPerson, error) {
+
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	var approvers []int64
+	if err := s.db.NewSelect().Model((*Approval)(nil)).
+		ColumnExpr("DISTINCT da.approved_by").
+		Where("da.claim_id = ?", claimID).
+		Where("da.withdrawn_at IS NULL").
+		Where("da.approved_by <> ?", subject.ID).
+		OrderExpr("da.approved_by ASC").
+		Scan(ctx, &approvers); err != nil {
+		return nil, fmt.Errorf("read who agreed to this: %w", err)
+	}
+	undisclosed := false
+	first := rows[0]
+	for _, row := range rows {
+		if row.Visibility == access.Private {
+			undisclosed = true
+		}
+		if row.ID < first.ID {
+			first = row
+		}
+	}
+	told := make([]ForPerson, 0, len(approvers))
+	for _, person := range approvers {
+		told = append(told, ForPerson{
+			PersonID: person, DecisionID: first.ID,
+			ProductID: first.ProductID, VulnerabilityID: first.VulnerabilityID,
+			Rows: len(rows), Undisclosed: undisclosed,
+		})
+	}
+	return told, nil
 }
 
 // proposersOf gathers who wrote a set of decisions, one entry each.

@@ -59,7 +59,7 @@ func Kinds() []Kind {
 		Assigned, Mentioned, SentBack, BuildQuiet, HoldingAbsent,
 		CriticalOnRelease, DisclosureDue, DisclosureNear, StatementRevised,
 		ClaimWaiting, SentBackWaiting, DeferralEnding, QueueUntaken,
-		ApprovalUndone, ClaimLapsed, BroughtIn, Unanswered,
+		ApprovalUndone, ApprovalWithdrawn, ClaimLapsed, BroughtIn, Unanswered,
 		VulnerabilityDataStale, RiskUnagreed, PairsConcentrated, SupplierSilent,
 		InventoryMoved,
 		ObligationOpen, ObligationNear, ObligationPassed,
@@ -188,6 +188,11 @@ const (
 	// ApprovalUndone is an agreement taken back. It reverses something the
 	// proposer was relying on, which is the one outcome nobody expects.
 	ApprovalUndone Kind = "approval-undone"
+	// ApprovalWithdrawn is told to an approver rather than a proposer: the
+	// words or the promise they agreed to were changed, so their agreement
+	// stopped counting. Without it they go on relying on an agreement the
+	// record no longer holds.
+	ApprovalWithdrawn Kind = "approval-withdrawn"
 	// ClaimLapsed is a judgment the code moved out from under. It hands work
 	// back to somebody who did nothing to cause it, and the alternative is the
 	// finding reappearing as though nobody had ever looked at it.

@@ -31,6 +31,7 @@ describe("what a notification is called", () => {
     expect(label("deferral-ending")).toBe("deferral running out");
     expect(label("queue-untaken")).toBe("sitting in a team queue");
     expect(label("approval-undone")).toBe("agreement taken back");
+    expect(label("approval-withdrawn")).toBe("agreed claim changed");
     expect(label("claim-lapsed")).toBe("stopped applying");
   });
 

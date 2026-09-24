@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -16,6 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -353,7 +355,8 @@ func registerTriage(api huma.API, in Ingest) {
 		Description: "Changes the version a promised upgrade moves to, or the date it is " +
 			"promised by, on the claim and on every commitment it wrote.\n\n" +
 			"This withdraws any existing approval and returns every row of the claim to " +
-			"the review queue. An approver agreed to a version by a date; changing either is " +
+			"the review queue, and notifies everybody whose approval it withdrew. An approver " +
+			"agreed to a version by a date; changing either is " +
 			"changing what they agreed to, so it goes through the same act revising the words " +
 			"does.\n\n" +
 			"`reasoning` is required and is recorded as a revision — saying why a date moved " +
@@ -376,10 +379,12 @@ func registerTriage(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, huma.Error422UnprocessableEntity("by must be a date, as YYYY-MM-DD")
 		}
-		if err := store.Repromise(ctx, subject, input.ID, input.Body.To, by,
-			input.Body.Reasoning); err != nil {
+		withdrawn, err := store.Repromise(ctx, subject, input.ID, input.Body.To, by,
+			input.Body.Reasoning)
+		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}
+		tellTheApprovers(ctx, in, input.ID, withdrawn, "The promise")
 		return &struct{}{}, nil
 	})
 
@@ -507,7 +512,8 @@ func registerTriage(api huma.API, in Ingest) {
 			"kept and remain readable.\n\n" +
 			"A claim is one argument however many places it covers, so this revises all of it. " +
 			"It withdraws any existing approval and returns every row of the claim to the " +
-			"review queue, marked as previously approved. Requires no approval of its own.\n\n" +
+			"review queue, marked as previously approved. Everybody whose approval it " +
+			"withdrew is notified. Requires no approval of its own.\n\n" +
 			"The text is markdown and is validated before it is stored; a 422 names the line and " +
 			"the offending text.",
 		Tags: []string{"Triage"},
@@ -521,9 +527,11 @@ func registerTriage(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		if _, err := store.Revise(ctx, subject, input.ID, input.Body.Reasoning); err != nil {
+		revised, err := store.Revise(ctx, subject, input.ID, input.Body.Reasoning)
+		if err != nil {
 			return nil, refusedDecision(in.Logger, err)
 		}
+		tellTheApprovers(ctx, in, input.ID, revised.Withdrawn, "The reasoning")
 		dropped := tellMentioned(ctx, in, subject, store, input.ID, input.Body.Reasoning)
 		return &struct{ Body MentionsBody }{Body: MentionsBody{NotNotified: dropped}}, nil
 	})
@@ -888,4 +896,28 @@ func deferralThreshold(ctx context.Context, in Ingest) (time.Duration, error) {
 	// doing.
 	return setting.NewStore(in.DB.DB).Duration(ctx, setting.DeferralThreshold,
 		triage.DefaultDeferralThreshold)
+}
+
+// tellTheApprovers tells everybody whose agreement an edit took back.
+//
+// Approval is otherwise silent, and this is the one outcome an approver cannot
+// see coming: somebody else changed what they agreed to, and their agreement
+// stopped counting. What changed is named, the claim is linked, and a claim
+// with an undisclosed row carries nothing more than that, like every telling
+// about an undisclosed finding.
+func tellTheApprovers(ctx context.Context, in Ingest, claimID int64,
+	withdrawn []triage.ForPerson, what string) {
+
+	for _, one := range withdrawn {
+		tell(ctx, in, "could not say that an agreement was withdrawn", notify.Telling{
+			PersonID: one.PersonID, Kind: notify.ApprovalWithdrawn,
+			Body: what + " of a claim you agreed to was changed, so your agreement no " +
+				"longer counts. It is back in the review queue.",
+			Link:    "/claims/" + strconv.FormatInt(claimID, 10),
+			Private: one.Undisclosed,
+			// The narrowing a later read applies.
+			ProductID:       &one.ProductID,
+			VulnerabilityID: &one.VulnerabilityID,
+		}, "person", one.PersonID, "claim", claimID)
+	}
 }

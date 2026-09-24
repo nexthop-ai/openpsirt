@@ -12097,7 +12097,7 @@ paths:
       description: |-
         Changes the version a promised upgrade moves to, or the date it is promised by, on the claim and on every commitment it wrote.
 
-        This withdraws any existing approval and returns every row of the claim to the review queue. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
+        This withdraws any existing approval and returns every row of the claim to the review queue, and notifies everybody whose approval it withdrew. An approver agreed to a version by a date; changing either is changing what they agreed to, so it goes through the same act revising the words does.
 
         `reasoning` is required and is recorded as a revision — saying why a date moved is what the second person has to read, and the revisions are where what was said before survives being changed.
 
@@ -12189,7 +12189,7 @@ paths:
       description: |-
         Replaces the justification text with a new revision. Earlier revisions are kept and remain readable.
 
-        A claim is one argument however many places it covers, so this revises all of it. It withdraws any existing approval and returns every row of the claim to the review queue, marked as previously approved. Requires no approval of its own.
+        A claim is one argument however many places it covers, so this revises all of it. It withdraws any existing approval and returns every row of the claim to the review queue, marked as previously approved. Everybody whose approval it withdrew is notified. Requires no approval of its own.
 
         The text is markdown and is validated before it is stored; a 422 names the line and the offending text.
 

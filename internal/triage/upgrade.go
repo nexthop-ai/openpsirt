@@ -262,21 +262,24 @@ func (s *Store) PlanUpgrade(ctx context.Context, subject access.Subject,
 // said in October" survives being changed in November. A promise moved with no
 // sentence attached is a promise nobody can audit.
 func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID int64,
-	to string, by time.Time, reasoning string) error {
+	to string, by time.Time, reasoning string) ([]ForPerson, error) {
 
 	if strings.TrimSpace(to) == "" {
-		return fmt.Errorf("say which version this is moving to")
+		return nil, fmt.Errorf("say which version this is moving to")
 	}
 	if strings.TrimSpace(reasoning) == "" {
-		return fmt.Errorf("say why the promise is changing: a date moved with no reason " +
+		return nil, fmt.Errorf("say why the promise is changing: a date moved with no reason " +
 			"is one nobody can agree to again")
 	}
 	db, err := s.pool()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	findings := finding.NewStore(db)
-	return database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+	// Whose agreement the change took back, which the caller tells. Set by
+	// the attempt that commits, since a retry reads it again.
+	var withdrawn []ForPerson
+	err = database.InTransaction(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		within := &Store{db: tx, now: s.now}
 		claim, rows, err := within.claimRows(ctx, subject, claimID, mayDecide)
 		if err != nil {
@@ -337,11 +340,14 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, claimID i
 		}
 		// Last, because it is what returns the rows to the queue: an approver
 		// meeting it again is reading a promise that has changed.
-		if _, err := within.revise(ctx, subject, claimID, reasoning); err != nil {
+		revised, err := within.revise(ctx, subject, claimID, reasoning)
+		if err != nil {
 			return err
 		}
+		withdrawn = revised.Withdrawn
 		return nil
 	})
+	return withdrawn, err
 }
 
 // regate works out whether a changed promise needs a second person, from what

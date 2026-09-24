@@ -316,6 +316,50 @@ func TestAnAgreementTakenBackIsSaidToWhoeverProposedIt(t *testing.T) {
 	})
 }
 
+func TestAnEditThatWithdrawsAnAgreementIsSaidToWhoeverAgreed(t *testing.T) {
+	// The approver's half of an edit: the words they agreed to were
+	// replaced, so their agreement stopped counting, and nothing they did
+	// caused it.
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+		claim, _ := r.claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", dismissal)
+		if got := asPerson(t, r, "reviewer", http.MethodPost,
+			fmt.Sprintf("/v1/claims/%d/approval", claim), `{}`); got.Code != http.StatusOK {
+			t.Fatalf("approving answered %d: %s", got.Code, got.Body.String())
+		}
+		if told := r.told(t, "reviewer", "approval-withdrawn"); len(told) != 0 {
+			t.Fatalf("an approval told its own approver something: %v", told)
+		}
+
+		if got := asPerson(t, r, "triager", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			`{"reasoning":"The parser is unreachable: the only caller is the encoder."}`); got.Code != http.StatusOK {
+			t.Fatalf("revising answered %d: %s", got.Code, got.Body.String())
+		}
+		told := r.told(t, "reviewer", "approval-withdrawn")
+		if len(told) != 1 {
+			t.Fatalf("revising told the approver %d times: %v", len(told), told)
+		}
+		if !contains(told[0], "no longer counts") {
+			t.Errorf("the notice does not say what happened: %q", told[0])
+		}
+		// The person who made the edit knows already.
+		if told := r.told(t, "triager", "approval-withdrawn"); len(told) != 0 {
+			t.Errorf("the person who revised it was told their own edit: %v", told)
+		}
+
+		// A second revision withdraws nothing, because nothing stands.
+		if got := asPerson(t, r, "triager", http.MethodPut,
+			fmt.Sprintf("/v1/claims/%d/reasoning", claim),
+			`{"reasoning":"The parser is unreachable, and the encoder never calls it."}`); got.Code != http.StatusOK {
+			t.Fatalf("revising again answered %d: %s", got.Code, got.Body.String())
+		}
+		if told := r.told(t, "reviewer", "approval-withdrawn"); len(told) != 1 {
+			t.Errorf("a revision with no agreement standing told the approver again: %v", told)
+		}
+	})
+}
+
 func TestARecordOfBeingExploitedIsSaidToWhoeverProposedTheDismissal(t *testing.T) {
 	// The other cause of the same telling, and the one nobody is expecting: a
 	// reviewer undoing their own batch is an exchange the proposer can see,
