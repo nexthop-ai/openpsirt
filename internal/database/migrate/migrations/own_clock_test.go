@@ -41,10 +41,13 @@ func TestAV020DatabaseMovesItsRecordedFlawsOntoTheirOwnClock(t *testing.T) {
 		// by nobody, and one a scanner reported.
 		exec(t, ctx, db, `UPDATE "vulnerability" SET "identifier" = 'SONIC-2026-100001',
 			"identifier_folded" = 'sonic-2026-100001', "severity" = 'high' WHERE "id" = 1`)
-		for id, severity := range map[int64]string{2: "", 3: "", 4: "high"} {
-			name := []string{"", "", "SONIC-2026-100002", "SONIC-2026-100003", "CVE-2026-4444"}[id]
+		// In order, so each takes the identifier the rows below name.
+		for _, issue := range []struct{ name, severity string }{
+			{"SONIC-2026-100002", ""}, {"SONIC-2026-100003", ""}, {"CVE-2026-4444", "high"},
+		} {
 			copyRow(t, ctx, db, tables["vulnerability"], "vulnerability", map[string]any{
-				"identifier": name, "identifier_folded": strings.ToLower(name), "severity": severity})
+				"identifier": issue.name, "identifier_folded": strings.ToLower(issue.name),
+				"severity": issue.severity})
 		}
 		exec(t, ctx, db, `UPDATE "issue_rating" SET "vulnerability_id" = 2, "severity" = 'critical',
 			"product_id" = 1`)
