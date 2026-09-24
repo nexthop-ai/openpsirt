@@ -17,15 +17,50 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// PerBuildBody is one build's answer about a component.
+// PerBuildBody is one build's answer about a source package.
 type PerBuildBody struct {
 	Stream  string `json:"stream"`
 	Variant string `json:"variant"`
-	Version string `json:"version" doc:"The version this build ships"`
+	Source  string `json:"source" doc:"The source package: what the inventory says the binaries were built from, or the binary's own name where it says nothing"`
+	Version string `json:"version" doc:"The version the source package was built at"`
+	// Ecosystem is read out of the identifiers rather than stored, and every
+	// binary of one fold shares it: the package type is part of the fold.
+	Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem the package identifiers name"`
+	// Packages are the binaries, each with its own identifier, address and
+	// counts. A graph and a trend are about one of them.
+	Packages []FoldPackageBody `json:"packages" doc:"The binary packages this build ships from the source package, by name"`
+	// A count has a shape. Forty issues and three criticals are different
+	// work, and a number with nothing beside it says which is which.
+	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Everything open across the source package here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
+	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited"`
+	// ExploitedHere is the other exploitation signal, and the one that
+	// outranks it. Separate, because a feed's word about the world and a
+	// person's word about this product are different facts.
+	ExploitedHere bool `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of what is open here"`
+	Fixable       int  `json:"fixable" doc:"The number of open issues any version fixes, counted once per issue however many binaries carry it"`
+	Issues        int  `json:"issues" doc:"Distinct vulnerabilities open across the source package here, counted once however many binaries carry each"`
+	// Consumers is the unit somebody acts in: one judgment covers the whole
+	// fold, and what varies underneath it is the set of consumers pulling the
+	// package in.
+	Consumers int `json:"consumers" doc:"The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted"`
+	Places    int `json:"places" doc:"The number of times those sit somewhere in this build. What the bulk cap is measured against"`
+	// Upgrades are the versions this build could move to.
+	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a stream on a maintained older line and a stream that has moved on have different targets"`
+	DueAt    *time.Time    `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees"`
+	// CommittedTo is the promise already made for this build, read off the
+	// decisions.
+	CommittedTo *time.Time `json:"committed_to,omitempty" doc:"The date the work promised here is due"`
+	UpgradeTo   string     `json:"upgrade_to,omitempty" doc:"The version somebody has committed to moving this build to"`
+}
+
+// FoldPackageBody is one binary package of a source package, as one build
+// ships it.
+type FoldPackageBody struct {
+	Name    string `json:"name"`
+	Version string `json:"version" doc:"The version this build ships the binary at"`
 	// Purl is the identifier an ecosystem and an upstream address are read out
 	// of.
-	Purl      string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
-	Ecosystem string `json:"ecosystem,omitempty" doc:"The ecosystem the identifier names, read out of it rather than stored"`
+	Purl string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
 	// PackagePageURL is where the package is published, worked out from
 	// the identifier by the one table that does that. A second table in the
 	// interface, with a different membership, answers differently for the same
@@ -35,44 +70,21 @@ type PerBuildBody struct {
 	// Named for what it is rather than "upstream", which already means
 	// something else in this vocabulary: on a finding it is what a fork was
 	// made from, and on a component it is the source package a binary was
-	// built from. One word for two unrelated senses is what this name
-	// avoids.
+	// built from.
 	PackagePageURL  string `json:"package_page_url,omitempty" doc:"The address this package is published at, worked out from its identifier. Absent for a kind of package this has no address for, which is what a private registry, a vendored fork and a distribution with no package browser all look like"`
-	PackagePageName string `json:"package_page_name,omitempty" doc:"The name for that address on screen — which distribution's or which index's record it is, since a reader choosing between two needs to know which kind of source each is"`
+	PackagePageName string `json:"package_page_name,omitempty" doc:"The name for that address on screen — which distribution's or which index's record it is"`
 	// Summary is the ecosystem index's own description of the package, where
 	// one was asked and answered. Absent is the ordinary case rather than a
 	// gap.
-	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
-	ProjectURL string `json:"project_url,omitempty" doc:"The address the index gives for where the package is developed. Absent where it does not say, in which case an address can still be built from the identifier"`
-	// A count has a shape. Forty issues and three criticals are different
-	// work, and a number with nothing beside it says which is which.
-	BySeverity map[string]int `json:"by_severity,omitempty" doc:"Everything open here by how it was rated. 'unrated' is what nobody scored, and the bands sum to the issue count"`
-	Exploited  bool           `json:"exploited" doc:"Whether any of what is open here is known to be exploited, which outranks everything else about it"`
-	// ExploitedHere is the other exploitation signal, and the one that
-	// outranks it. Separate, because a feed's word about the world and a
-	// person's word about this product are different facts.
-	ExploitedHere bool   `json:"exploited_here,omitempty" doc:"Whether this product is recorded as having been exploited through any of what is open here"`
-	Fixable       int    `json:"fixable" doc:"The number of open findings any version fixes, counted once per issue. What is left needs a judgment rather than an upgrade, and a record naming several fixed versions is still one issue"`
-	Supplier      string `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
-	License       string `json:"license,omitempty" doc:"The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none"`
-	// Newest is the current version according to the ecosystem's index, where
-	// one was asked.
-	Newest    string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
-	NewestAt  *time.Time `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
-	FirstSeen time.Time  `json:"first_seen" doc:"The moment a scan of this deployment first reported the component"`
-	Issues    int        `json:"issues" doc:"Distinct vulnerabilities open against it here"`
-	// Consumers is the unit somebody acts in: one judgment covers the whole
-	// fold, and what varies underneath it is the set of consumers pulling the
-	// package in.
-	Consumers int `json:"consumers" doc:"The number of things pulling it in here"`
-	Places    int `json:"places" doc:"The number of times those sit somewhere in this build. What the bulk cap is measured against"`
-	// Upgrades are the versions this build could move to.
-	Upgrades []UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because the answer differs by build: a stream on a maintained older line and a stream that has moved on have different targets"`
-	DueAt    *time.Time    `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees, because that defers the worst thing it covers"`
-	// CommittedTo is the promise already made for this build, read off the
-	// decisions.
-	CommittedTo *time.Time `json:"committed_to,omitempty" doc:"The date the work promised here is due"`
-	UpgradeTo   string     `json:"upgrade_to,omitempty" doc:"The version somebody has committed to moving this build to"`
+	Summary    string     `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
+	ProjectURL string     `json:"project_url,omitempty" doc:"The address the index gives for where the package is developed. Absent where it does not say"`
+	Supplier   string     `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
+	License    string     `json:"license,omitempty" doc:"The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none"`
+	Newest     string     `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
+	NewestAt   *time.Time `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
+	FirstSeen  time.Time  `json:"first_seen" doc:"The moment a scan of this deployment first reported the package"`
+	Issues     int        `json:"issues" doc:"Distinct vulnerabilities open against this binary alone"`
+	Consumers  int        `json:"consumers" doc:"The number of things pulling this binary in here"`
 }
 
 // registerComponent answers a component across the builds that carry it.
@@ -85,28 +97,26 @@ func registerComponent(api huma.API, in Ingest) {
 	huma.Register(api, requiring(huma.Operation{
 		OperationID: "get-component", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/components/{component}",
-		Summary: "Show a component across the builds that carry it",
-		Description: "What each build ships, what is open against it there, where it could " +
-			"go, and what has already been promised.\n\n" +
+		Summary: "Show a source package across the builds that ship it",
+		Description: "One entry per build per source package: the binaries the build ships " +
+			"from it, what is open across them, where it could go, and what has already been " +
+			"promised.\n\n" +
+			"`component` is a binary name or a source package name, matched without regard " +
+			"to capitals. A binary name answers for the source package it was built from, so " +
+			"`libcurl4t64` and `curl` answer alike. A binary whose inventory names no source " +
+			"package is its own source. A source shipped at two versions in one build is two " +
+			"entries: two pieces of code, decided about separately.\n\n" +
 			"Answered per build, because the answer differs by build. A stream staying " +
-			"on a maintained older line and a stream that has moved on are different work " +
-			"with different testing, and one target across both would be wrong for one of " +
-			"them.\n\n" +
+			"on a maintained older line and a stream that has moved on are different work.\n\n" +
+			"Counts cover the source package: an issue open on three of its binaries is one " +
+			"issue. Each entry in `packages` carries its own counts.\n\n" +
 			"Where it could go carries two counts. `fixed_here` is how many of what is " +
-			"open name that exact version as their fix, which is the release's own security " +
-			"content; `reached` is how many the upgrade closes altogether, counting " +
-			"everything fixed at or before it. The second is the one somebody choosing a " +
-			"version is asking about, and it needs the ecosystem's ordering: where that is " +
-			"not defined the two counts are equal, `ordered` is false, and the list is not " +
-			"ranked. Ranked on `fixed_here` a quiet release late on a maintained line sorts " +
-			"near the bottom while carrying every fix before it.\n\n" +
-			"A build is listed because it ships the component, not because something is " +
-			"open against it. A package carrying nothing of its own still answers with the " +
-			"version it ships and how many things pull it in, which is the ordinary case for " +
-			"anything vendored in pre-built.\n\n" +
-			"One entry per version rather than per build. A build shipping a name at two " +
-			"versions holds two components, and they are two different pieces of code to " +
-			"decide about.\n\n" +
+			"open name that exact version as their fix; `reached` is how many the upgrade " +
+			"closes altogether, counting everything fixed at or before it. Where the " +
+			"ecosystem's ordering is not defined the two counts are equal, `ordered` is " +
+			"false, and the list is not ranked.\n\n" +
+			"A build is listed because it ships the source package, not because something is " +
+			"open against it.\n\n" +
 			"`due_at` is what a commitment about that build is gated against, and is absent " +
 			"where nothing is open.",
 		Tags: []string{"Findings"},
@@ -140,18 +150,28 @@ func registerComponent(api huma.API, in Ingest) {
 				upgrades = append(upgrades, UpgradeBody{To: each.To, FixedHere: each.FixedHere,
 					Reached: each.Reached, Ordered: each.Ordered})
 			}
-			page, called := finding.PackagePage(build.Purl)
+			packages := make([]FoldPackageBody, 0, len(build.Packages))
+			ecosystem := ""
+			for _, one := range build.Packages {
+				page, called := finding.PackagePage(one.Purl)
+				if ecosystem == "" {
+					ecosystem = graph.EcosystemOf(one.Purl)
+				}
+				packages = append(packages, FoldPackageBody{
+					Name: one.Name, Version: one.Version, Purl: one.Purl,
+					PackagePageURL: page, PackagePageName: called,
+					Summary: one.Summary, ProjectURL: one.ProjectURL,
+					Supplier: one.Supplier, License: one.License,
+					Newest: one.Newest, NewestAt: one.NewestAt, FirstSeen: one.FirstSeen,
+					Issues: one.Issues, Consumers: one.Consumers,
+				})
+			}
 			out.Body.Items = append(out.Body.Items, PerBuildBody{
-				Stream: build.Stream, Variant: build.Variant, Version: build.Version,
-				Purl: build.Purl, Ecosystem: graph.EcosystemOf(build.Purl),
-				PackagePageURL: page, PackagePageName: called,
-				Summary: build.Summary, ProjectURL: build.ProjectURL,
+				Stream: build.Stream, Variant: build.Variant,
+				Source: build.Source, Version: build.SourceVersion, Ecosystem: ecosystem,
+				Packages:   packages,
 				BySeverity: build.BySeverity, Exploited: build.Exploited,
-				ExploitedHere: build.ExploitedHere,
-				Fixable:       build.Fixable,
-				Supplier:      build.Supplier,
-				License:       build.License,
-				Newest:        build.Newest, NewestAt: build.NewestAt, FirstSeen: build.FirstSeen,
+				ExploitedHere: build.ExploitedHere, Fixable: build.Fixable,
 				Issues: build.Issues, Consumers: build.Consumers, Places: build.Places,
 				Upgrades: upgrades,
 				DueAt:    build.DueAt, CommittedTo: build.CommittedTo, UpgradeTo: build.UpgradeTo,

@@ -13,7 +13,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // ErrSamePerson says work was handed from somebody to themselves.
@@ -334,8 +333,7 @@ func (s *Store) StrictestOnComponent(ctx context.Context, subject access.Subject
 		Where("visibility IN (?)", bun.List(visible)).
 		Where("visibility = ?", access.Private).
 		Where(`component_id IN (SELECT c.id FROM "component" AS "c"
-			WHERE `+FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2"
-				WHERE c2."name_folded" = ? LIMIT 1))`, graph.Folded(component)).
+			WHERE `+FoldedOn+` IN (?))`, FoldsNamed(s.db, targets, component)).
 		Exists(ctx)
 	if err != nil {
 		return access.Public, fmt.Errorf("read how far this is disclosed: %w", err)

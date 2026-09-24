@@ -12,7 +12,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
@@ -370,9 +369,10 @@ func (s *Store) PlacesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// them three acts that can disagree. Naming any of the three reaches
 		// all of them, and the act says which it covered — while one source
 		// shipped at two versions in one build stays two, which matching on
-		// the source package's name alone could not do.
-		Where(FoldedOn+` = (SELECT c2."fold_key" FROM "component" AS "c2"
-				WHERE c2."name_folded" = ? LIMIT 1)`, graph.Folded(component)).
+		// the source package's name alone could not do. A name reaches every
+		// fold it names in the builds asked about, so a source package named
+		// in two builds at two versions moves both.
+		Where(FoldedOn+` IN (?)`, FoldsNamed(db, targets, component)).
 		OrderExpr("f.vulnerability_id, f.component_id, f.target_id, place_identity")
 	err := query.Scan(ctx, &rows)
 	if err != nil {

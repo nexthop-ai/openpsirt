@@ -22,7 +22,13 @@ import { Severity } from "../ui/Severity";
 import { Shape } from "../ui/Shape";
 import { Wide } from "../ui/Wide";
 
-// One component, and the one piece of work it is.
+// One source package, and the one piece of work it is.
+//
+// The binaries built from one source package at one version are one upgrade,
+// so they are one page: curl, libcurl4t64 and libcurl3t64 are decided together.
+// The graph and the history are about one binary, because what pulls a library
+// in is not what pulls its command in, so one of them is picked — the one the
+// address named, arriving from the tree or a findings list.
 //
 // Arranged on where it sits. What can be done about a package is mostly a
 // function of its position: a leaf carries its own risk and is upgraded, and
@@ -34,20 +40,37 @@ import { Wide } from "../ui/Wide";
 // against it. A package whose risk is all inherited still has a version, a
 // position, and things pulling it in.
 //
-// One entry per version. A build shipping a name at two versions holds two
-// components, and they are two pieces of code to decide about. The page is
-// about the one asked for and says what the others are.
+// One entry per version. A build shipping a source at two versions holds two
+// folds, and they are two pieces of code to decide about. The page is about the
+// one asked for and says what the others are.
 type Build = Body<"PerBuildBody">;
+type Package = Body<"FoldPackageBody">;
 
 // The versions offered before the rest are a count. A kernel names
 // twenty, and the question is which to take rather than what the whole set is.
 const SHOWN = 5;
 
-const findingsAt = (product: string, row: Build, component: string) =>
+// The findings list names binaries, so a source package is every binary of it.
+const findingsAt = (product: string, row: Build, names: string[]) =>
   `/products/${encodeURIComponent(product)}` +
   `/streams/${encodeURIComponent(row.stream ?? "")}` +
-  `/variants/${encodeURIComponent(row.variant ?? "")}/findings` +
-  `?component=${encodeURIComponent(component)}`;
+  `/variants/${encodeURIComponent(row.variant ?? "")}/findings?` +
+  names.map((name) => `component=${encodeURIComponent(name)}`).join("&");
+
+const binaries = (row: Build) => (row.packages ?? []).map((each) => each.name);
+
+// The binary the graph and the history are about: the one asked for by name,
+// then the one carrying most, so a page opened on a source name lands on the
+// binary with something to answer.
+function pickPackage(row: Build, asked: string): Package | undefined {
+  const all = row.packages ?? [];
+  const wanted = asked.toLowerCase();
+  return (
+    all.find((each) => each.name === asked) ??
+    all.find((each) => each.name.toLowerCase() === wanted) ??
+    [...all].sort((a, b) => (b.issues ?? 0) - (a.issues ?? 0))[0]
+  );
+}
 
 // One judgment about many issues at this component, which is the answer where
 // no version fixes them. The screen was built, works, and had no link to it
@@ -112,7 +135,8 @@ export function Component() {
   if (builds.isError) {
     return <Failed error={builds.error} what="This component could not be read." />;
   }
-  if (!here) {
+  const pkg = here ? pickPackage(here, params.get("package") || component) : undefined;
+  if (!here || !pkg) {
     return (
       <>
         <div className="screen-head">
@@ -136,19 +160,22 @@ export function Component() {
   // finding went to Launchpad. A link that lands on a record for the wrong
   // thing costs more than no link, because it is followed before it is
   // disbelieved.
-  const link = here.package_page_url ?? null;
+  const link = pkg.package_page_url ?? null;
   // The bands are declared worst first, so the first one present is the worst.
   const worst = ROLLED.find((band) => (here.by_severity ?? {})[band]);
 
   return (
     <>
       <div className="screen-head">
-        <h2 className="id">{component}</h2>
+        <h2 className="id">{here.source}</h2>
         <p className="variants">
+          <span className="vchip" title="The source package the binaries were built from">
+            source
+          </span>
           <span className="vchip id">{here.version}</span>
           {here.ecosystem && <span className="vchip">{here.ecosystem}</span>}
           {(here.issues ?? 0) > 0 ? (
-            <Link className="vchip" to={findingsAt(product, here, component)}>
+            <Link className="vchip" to={findingsAt(product, here, binaries(here))}>
               {(here.issues ?? 0).toLocaleString()} open on it →
             </Link>
           ) : (
@@ -193,11 +220,15 @@ export function Component() {
         </div>
       )}
 
+      {(here.packages ?? []).length > 1 && (
+        <Binaries here={here} pkg={pkg} onPick={(name) => go({ package: name })} />
+      )}
+
       <div className="detail">
         <div>
           <Sits
             product={product}
-            component={component}
+            pkg={pkg}
             here={here}
             builds={rows}
             onBuild={(row) =>
@@ -205,6 +236,7 @@ export function Component() {
                 stream: row.stream ?? "",
                 variant: row.variant ?? "",
                 version: row.version ?? "",
+                package: pickPackage(row, pkg.name)?.name ?? "",
               })
             }
           />
@@ -214,7 +246,7 @@ export function Component() {
           <Upgrade
             key={buildKey(here, here.version)}
             product={product}
-            component={component}
+            component={pkg.name}
             here={here}
             covering={sameVersion}
           />
@@ -222,18 +254,20 @@ export function Component() {
 
         <div>
           <div className="card">
-            <h3>The package</h3>
-            {here.summary && <p className="reading">{here.summary}</p>}
+            <h3>
+              The package <span className="id">{pkg.name}</span>
+            </h3>
+            {pkg.summary && <p className="reading">{pkg.summary}</p>}
             <dl className="facts">
               <dt>Identifier</dt>
               <dd className="id" style={{ wordBreak: "break-all" }}>
-                {here.purl || "—"}
+                {pkg.purl || "—"}
               </dd>
               <dt>Project</dt>
               <dd>
-                {here.project_url ? (
-                  <Outward href={here.project_url}>
-                    {here.project_url.replace(/^https?:\/\//, "")}
+                {pkg.project_url ? (
+                  <Outward href={pkg.project_url}>
+                    {pkg.project_url.replace(/^https?:\/\//, "")}
                   </Outward>
                 ) : link ? (
                   // The record itself, not what its address spells. Which
@@ -243,7 +277,7 @@ export function Component() {
                   // for exactly this, and stripping the scheme instead threw
                   // the name away.
                   <Outward href={link}>
-                    {here.package_page_name || link.replace(/^https:\/\//, "")}
+                    {pkg.package_page_name || link.replace(/^https:\/\//, "")}
                   </Outward>
                 ) : (
                   <span className="hint">not known</span>
@@ -251,8 +285,8 @@ export function Component() {
               </dd>
               <dt>Supplier</dt>
               <dd>
-                {here.supplier ? (
-                  here.supplier
+                {pkg.supplier ? (
+                  pkg.supplier
                 ) : (
                   <span className="hint" title="The inventory did not say who supplied it">
                     not stated
@@ -261,8 +295,8 @@ export function Component() {
               </dd>
               <dt>License</dt>
               <dd>
-                {here.license ? (
-                  <span className="id">{here.license}</span>
+                {pkg.license ? (
+                  <span className="id">{pkg.license}</span>
                 ) : (
                   <span className="hint" title="The inventory did not declare one">
                     not stated
@@ -271,11 +305,11 @@ export function Component() {
               </dd>
               <dt>Newest known</dt>
               <dd>
-                {here.newest_version ? (
+                {pkg.newest_version ? (
                   <>
-                    <span className="id">{here.newest_version}</span>
-                    {here.newest_released_at && (
-                      <span className="hint"> · {on(here.newest_released_at)}</span>
+                    <span className="id">{pkg.newest_version}</span>
+                    {pkg.newest_released_at && (
+                      <span className="hint"> · {on(pkg.newest_released_at)}</span>
                     )}
                   </>
                 ) : (
@@ -292,7 +326,7 @@ export function Component() {
                 )}
               </dd>
               <dt>First seen</dt>
-              <dd className="hint">{here.first_seen ? on(here.first_seen) : "—"}</dd>
+              <dd className="hint">{pkg.first_seen ? on(pkg.first_seen) : "—"}</dd>
               <dt>Upgrade scheduled</dt>
               <dd>
                 {here.upgrade_to ? (
@@ -311,10 +345,47 @@ export function Component() {
         </div>
       </div>
 
-      <Ships product={product} component={component} rows={rows} here={here} />
+      <Ships product={product} rows={rows} here={here} />
 
-      <History product={product} component={component} here={here} />
+      <History product={product} component={pkg.name} here={here} />
     </>
+  );
+}
+
+// The binaries built from the source package, and which one the graph and the
+// history below are about.
+function Binaries({
+  here,
+  pkg,
+  onPick,
+}: {
+  here: Build;
+  pkg: Package;
+  onPick: (name: string) => void;
+}) {
+  const all = here.packages ?? [];
+  return (
+    <div className="card" style={{ marginBottom: 12 }}>
+      <h3>{all.length} binaries</h3>
+      <p className="reading" style={{ marginBottom: 8 }}>
+        One upgrade moves all of them.
+      </p>
+      <p className="variants">
+        {all.map((each) => (
+          <button
+            key={each.name}
+            type="button"
+            className={each.name === pkg.name ? "vchip on" : "vchip"}
+            aria-pressed={each.name === pkg.name}
+            title="Show its place in the graph"
+            onClick={() => onPick(each.name)}
+          >
+            <span className="id">{each.name}</span>{" "}
+            <span className="hint">{each.issues ?? 0} open</span>
+          </button>
+        ))}
+      </p>
+    </div>
   );
 }
 
@@ -325,20 +396,21 @@ export function Component() {
 // than being typed.
 function Sits({
   product,
-  component,
+  pkg,
   here,
   builds,
   onBuild,
 }: {
   product: string;
-  component: string;
+  pkg: Package;
   here: Build;
   builds: Build[];
   onBuild: (row: Build) => void;
 }) {
   const scope = { product, stream: here.stream ?? "", variant: here.variant ?? "" };
+  const component = pkg.name;
   const around = useQuery({
-    queryKey: ["around", product, component, here.stream, here.variant, here.version],
+    queryKey: ["around", product, component, here.stream, here.variant, pkg.version],
     queryFn: async () =>
       unwrap(
         await api.GET(
@@ -346,7 +418,7 @@ function Sits({
           {
             params: {
               path: { ...scope, component },
-              query: here.version ? { version: here.version } : {},
+              query: pkg.version ? { version: pkg.version } : {},
             },
           },
         ),
@@ -430,21 +502,20 @@ function Sits({
               This package{here.ecosystem ? ` · ${here.ecosystem}` : ""}
             </span>
             <span className="nm id">
-              {component} <span className="hint">{here.version}</span>
+              {component} <span className="hint">{pkg.version}</span>
             </span>
             <span className="sub">
-              {(here.issues ?? 0).toLocaleString()} open on it, at{" "}
-              {(here.places ?? 0).toLocaleString()} {here.places === 1 ? "place" : "places"} under{" "}
-              {(here.consumers ?? 0).toLocaleString()}{" "}
-              {here.consumers === 1 ? "consumer" : "consumers"}
-              {(here.issues ?? 0) > 0 && (
+              {(pkg.issues ?? 0).toLocaleString()} open on it, under{" "}
+              {(pkg.consumers ?? 0).toLocaleString()}{" "}
+              {pkg.consumers === 1 ? "consumer" : "consumers"}
+              {(pkg.issues ?? 0) > 0 && (
                 <>
                   {" · "}
-                  <Link to={findingsAt(product, here, component)}>Read them →</Link>
+                  <Link to={findingsAt(product, here, [component])}>Read them →</Link>
                 </>
               )}
             </span>
-            <Shape by={here.by_severity} />
+            {(here.packages ?? []).length === 1 && <Shape by={here.by_severity} />}
           </li>
 
           <li>
@@ -683,7 +754,7 @@ function Upgrade({
           <Link className="btn" to={decideAt(product, here, component)}>
             Decide them together
           </Link>{" "}
-          <Link className="btn quiet" to={findingsAt(product, here, component)}>
+          <Link className="btn quiet" to={findingsAt(product, here, binaries(here))}>
             Read them
           </Link>
         </p>
@@ -856,17 +927,7 @@ function Upgrade({
 }
 
 // The version each release ships, and what is open against it there.
-function Ships({
-  product,
-  component,
-  rows,
-  here,
-}: {
-  product: string;
-  component: string;
-  rows: Build[];
-  here: Build;
-}) {
+function Ships({ product, rows, here }: { product: string; rows: Build[]; here: Build }) {
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div className="screen-head" style={{ marginBottom: 8 }}>
@@ -902,7 +963,7 @@ function Ships({
                 </td>
                 <td className="id">{row.version}</td>
                 <td className="num">
-                  <Link to={findingsAt(product, row, component)}>
+                  <Link to={findingsAt(product, row, binaries(row))}>
                     {(row.issues ?? 0).toLocaleString()}
                   </Link>
                 </td>

@@ -589,10 +589,12 @@ coordinator's. Keyed on the fold, so packages built from one source are one row.
 
 ## The component screen
 
-A component has a row per version each build carries, with what that build
-ships, what is open against it there, where it could go, the earliest deadline
-among what is open, and what has already been promised. The issue count is the
-way through to the findings list.
+The page is a source package at the version it was built at: the fold
+`DESIGN-data-model.md` defines. It has a row per build shipping it, with the
+binaries that build ships from it, what is open across them, where it could go,
+the earliest deadline among what is open, and what has already been promised.
+The issue count is the way through to the findings list, filtered to every
+binary of the source.
 
 The screen is arranged on where the package sits, because that is what
 decides what can be done about it. A leaf carries its own risk and is upgraded; a
@@ -607,9 +609,14 @@ and the act hangs off it.
 | The version to move to is offered and never required | The list is what the scanner named; the server is what refuses one it has not heard of. So a version newer than anything reported can still be named, which is the case where an upgrade is ahead of the advisories |
 | Nothing to upgrade to is a state, not an empty form | Where no version fixes any of it, an upgrade would lapse and the work is a judgment. A form that cannot be filled in is one somebody fills in anyway |
 | The way to make that judgment is on this page | One judgment about many issues at one component is its own screen, and nothing in the application linked to it — it could be reached by typing the address. This page is where the question is asked: beside the count of what no version fixes, and as the action where nothing fixes anything at all |
-| More than one version is a choice, not a refusal | A name meaning two components is two pieces of code. The versions are offered with what is open at each, rather than the request being refused with an instruction to add a parameter |
+| One page per source package | curl, libcurl4t64 and libcurl3t64 are one upgrade, and an upgrade is what the page is for. A binary whose inventory names no source package is its own source, and its page is the same shape with one binary |
+| A binary name and a source name open the same page | The address takes either, compared without regard to capitals. A link from the tree names the binary somebody was reading; a person asking about a kernel names the source |
+| The binaries are listed, and one is picked | The graph and the twelve weeks answer for the picked binary: what pulls a library in is not what pulls its command in. The one the address named is picked, then the one carrying most |
+| Counts cover the source package, once per issue | An issue on three binaries is one issue. Each binary carries its own count beside its name |
+| Consumers are counted from outside the source package | One binary pulling in another is the source depending on itself |
+| More than one version is a choice, not a refusal | A source at two versions is two pieces of code. The versions are offered with what is open at each, rather than the request being refused with an instruction to add a parameter |
 | A build is listed because it ships the component, not because something is open | The presence is a fact about the graph and the counts are joined onto it. Read off the findings instead, a package whose whole risk sits in what it pulls in — nothing on the package, everything underneath — answered with no builds, which reads as a name the product does not ship. That is the ordinary state of anything vendored in pre-built |
-| One row per version rather than per build | A build shipping a name at two versions holds two components, and they are two pieces of code to decide about separately. Collapsing them to the lowest version reported one and hid the other |
+| One row per source version rather than per build | A build shipping a source at two versions holds two folds, and they are two pieces of code to decide about separately. Collapsed to one version, the other is hidden |
 | A deadline is absent where nothing is open, never zero | It is the earliest among what is open, so with nothing open there is no such date |
 | The package identifier travels with the row | The ecosystem is read out of it and so is an upstream address, and neither is stored. Nothing is fetched from either |
 | Per build, because the answer differs by build | A stream staying on a maintained older line and a stream that has moved on are different work with different testing, and one target across both would be wrong for one of them |
