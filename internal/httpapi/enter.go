@@ -25,7 +25,7 @@ type EmbargoedBody struct {
 	Component     string `json:"component"`
 	Product       string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	Stream      string `json:"stream"`
 	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
 	Variant     string `json:"variant"`
@@ -383,11 +383,11 @@ type MovementBody struct {
 	Until          string `json:"until" doc:"The end that was asked for"`
 	Reason         string `json:"reason"`
 	AskedBy        string `json:"asked_by" doc:"The person who asked, by sign-in identity"`
-	AskedByName    string `json:"asked_by_name,omitempty" doc:"Their display name, where they have one"`
+	AskedByName    string `json:"asked_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	AskedAt        string `json:"asked_at"`
 	NeedsApproval  bool   `json:"needs_approval" doc:"Whether a second person had to agree"`
 	ApprovedBy     string `json:"approved_by,omitempty" doc:"The second person, by sign-in identity"`
-	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt     string `json:"approved_at,omitempty"`
 	// InForce says the date follows this one. A movement waiting for
 	// agreement has moved nothing.
@@ -405,7 +405,7 @@ type PendingMovementBody struct {
 	Until         string `json:"until" doc:"The end being asked for"`
 	Days          int    `json:"days" doc:"How far the date moves, in days, whichever way it moves"`
 	By            string `json:"by" doc:"The person who asked, by sign-in identity"`
-	ByName        string `json:"by_name,omitempty" doc:"Their display name, where they have one"`
+	ByName        string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	AskedAt       string `json:"asked_at"`
 	Reason        string `json:"reason"`
 	// Mine says you asked for this one, so you may not agree to it.

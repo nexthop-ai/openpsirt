@@ -116,7 +116,7 @@ type ChangeBody struct {
 	At string `json:"at"`
 	By string `json:"by" doc:"The person who made the change, by sign-in identity"`
 	// ByName is the label beside the identity rather than in its place.
-	ByName string `json:"by_name,omitempty" doc:"Their display name, where they have one"`
+	ByName string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	Kind   string `json:"kind" enum:"setting,role,routing,support,release,credential,account,team,case,alias,catalog,exploited-here" doc:"The kind of thing that changed"`
 	// About is the subject: the setting's name, the person and product a role
 	// was granted on, the release whose support date moved.

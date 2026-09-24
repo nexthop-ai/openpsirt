@@ -79,7 +79,7 @@ type DecisionBody struct {
 // the build to link to, the issue, the component and where it sits.
 type FindingRefBody struct {
 	Product       string  `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
-	ProductName   string  `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
+	ProductName   string  `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	Stream        string  `json:"stream"`
 	StreamName    string  `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
 	Variant       string  `json:"variant"`
@@ -107,7 +107,7 @@ type FindingRefBody struct {
 // place freely would be choosing which decisions apply where.
 type PlaceBody struct {
 	Product       string `json:"product" minLength:"1" doc:"The product, by the name that addresses it"`
-	ProductName   string `json:"product_name,omitempty" readOnly:"true" doc:"The product's display name, where it has one"`
+	ProductName   string `json:"product_name,omitempty" readOnly:"true" doc:"The product's display name, where it differs from its name"`
 	Vulnerability string `json:"vulnerability" minLength:"1" doc:"The issue, by any name it is known under"`
 	Place         string `json:"place" minLength:"1" doc:"The place in the build, as the findings list gives it"`
 }
@@ -133,7 +133,7 @@ type ClaimBody struct {
 	DerivedFrom int64  `json:"derived_from,omitempty" doc:"The claim this one came from, for an extension or a returned set"`
 	ProposedBy  string `json:"proposed_by" doc:"The person who took it, by sign-in identity"`
 	// ProposedByName is the label beside the identity.
-	ProposedByName string `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedByName string `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt     string `json:"proposed_at" doc:"The moment the action was taken"`
 	SelectedBy     string `json:"selected_by,omitempty" doc:"The narrowing behind a bulk set. Never part of the claim itself"`
 	// Selection is the same claim in a form an approver can re-run. Prose
@@ -160,7 +160,7 @@ type WaitingBody struct {
 	PreviouslyApproved bool   `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
 	DeferredDays       int    `json:"deferred_days,omitempty" doc:"The total this finding has been put off for"`
 	ProposedBy         string `json:"proposed_by" doc:"The person who made the claim, by sign-in identity"`
-	ProposedByName     string `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedByName     string `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	AgeDays            int    `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
 	Decisions          int    `json:"decisions" doc:"The number of rows the claim wrote"`
 	Issues             int    `json:"issues" doc:"The number of distinct issues it covers"`
@@ -233,7 +233,7 @@ type BecameBody struct {
 	// did. Both absent while it is waiting: nothing has happened to it yet.
 	When      string          `json:"when,omitempty" doc:"The moment it became that"`
 	By        string          `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
-	ByName    string          `json:"by_name,omitempty" doc:"Their display name, where they have one"`
+	ByName    string          `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	Reasoning string          `json:"reasoning"`
 	Decisions int             `json:"decisions" doc:"The number of rows the claim wrote"`
 	Issues    int             `json:"issues" doc:"The number of distinct issues it covers"`

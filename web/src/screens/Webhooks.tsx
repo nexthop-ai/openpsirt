@@ -63,10 +63,9 @@ function Failing({ row }: { row: Destination }) {
 }
 
 // The configuration. Administrator-only, and gated as a whole rather than
-// per control: the address is a credential, so a reader who may not hold one
-// is not shown the table either — and the endpoint behind it refuses anybody
-// who is not an administrator, so a panel drawn for an auditor would be a
-// panel that could only fail.
+// per control: the endpoint behind it refuses anybody who is not an
+// administrator, so a panel drawn for an auditor would be a panel that could
+// only fail.
 export function Webhooks() {
   const queries = useQueryClient();
   const [adding, setAdding] = useState(false);

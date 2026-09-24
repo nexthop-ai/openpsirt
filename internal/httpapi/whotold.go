@@ -30,14 +30,14 @@ type ReportBody struct {
 	// of coordinated disclosure a reporter actually judges.
 	Acknowledged       string `json:"acknowledged,omitempty"`
 	AcknowledgedBy     string `json:"acknowledged_by,omitempty" doc:"The person who answered them, by sign-in identity"`
-	AcknowledgedByName string `json:"acknowledged_by_name,omitempty" doc:"Their display name, where they have one"`
+	AcknowledgedByName string `json:"acknowledged_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	// Issue is what the claim turned out to be, where somebody has said, with
 	// when they said it and who they were. Absent is a claim nobody has
 	// judged, which is the state every report arrives in.
 	Issue           string `json:"issue,omitempty" doc:"The issue the claim turned out to be"`
 	Evaluated       string `json:"evaluated,omitempty" doc:"When somebody said what it turned out to be"`
 	EvaluatedBy     string `json:"evaluated_by,omitempty" doc:"The person who said so, by sign-in identity"`
-	EvaluatedByName string `json:"evaluated_by_name,omitempty" doc:"Their display name, where they have one"`
+	EvaluatedByName string `json:"evaluated_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	// Disposition is what the claim was judged to be, where that has taken
 	// effect. Absent is a claim nobody has answered, or one whose ruling is
 	// waiting for a second person.
@@ -46,7 +46,7 @@ type ReportBody struct {
 	Ruling         int64  `json:"ruling,omitempty" doc:"The ruling that answers it, waiting or in force"`
 	Waiting        string `json:"waiting,omitempty" enum:"out-of-scope,rejected" doc:"A disposition proposed and waiting for a second person"`
 	RecordedBy     string `json:"recorded_by" doc:"The person who wrote it down, by sign-in identity"`
-	RecordedByName string `json:"recorded_by_name,omitempty" doc:"Their display name, where they have one"`
+	RecordedByName string `json:"recorded_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	RecordedAt     string `json:"recorded_at" doc:"When it was written down, which is not when it arrived"`
 }
 

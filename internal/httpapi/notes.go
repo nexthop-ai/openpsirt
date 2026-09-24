@@ -187,7 +187,7 @@ type NoteBody struct {
 	ID            int64  `json:"id"`
 	Body          string `json:"body" doc:"The text, in markdown"`
 	WrittenBy     string `json:"written_by" doc:"The author, by sign-in identity"`
-	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where they have one"`
+	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	WrittenAt     string `json:"written_at"`
 	EditedAt      string `json:"edited_at,omitempty" doc:"The moment the author last changed it, where they have"`
 }

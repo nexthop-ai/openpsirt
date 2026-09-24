@@ -799,7 +799,7 @@ function InProgress({ me }: { me: string }) {
         {mine.slice(0, 3).map((each) => (
           <li key={`${each.team ? "t" : "p"}:${each.person}`}>
             <span className="id">
-              {!each.team && each.person === me ? "you" : each.name || each.person}
+              {!each.team && each.person === me ? "you" : each.person_name || each.person}
             </span>
             <span className="what">{each.open} open</span>
             {(each.overdue ?? 0) > 0 && <span className="when">{each.overdue} overdue</span>}

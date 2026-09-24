@@ -533,7 +533,7 @@ components:
           description: The person who agreed, by sign-in identity
           type: string
         approved_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         batch:
           description: The batch it was approved under, if it was a bulk approval
@@ -756,7 +756,7 @@ components:
           description: The person who did it, where a person did, by sign-in identity
           type: string
         by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         claim:
           $ref: "#/components/schemas/ClaimBody"
@@ -849,8 +849,8 @@ components:
         product:
           description: The product the role is held against, by the name that addresses it
           type: string
-        product_display_name:
-          description: That product's display name, where it was declared with one
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         role:
           description: The role membership of this group grants
@@ -1360,7 +1360,7 @@ components:
           description: The person who made the change, by sign-in identity
           type: string
         by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         cleared:
           description: This change cleared it
@@ -1535,7 +1535,7 @@ components:
           description: The person who took it, by sign-in identity
           type: string
         proposed_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         selected_by:
           description: The narrowing behind a bulk set. Never part of the claim itself
@@ -1577,7 +1577,7 @@ components:
           description: The person who did it, where a person did, by sign-in identity
           type: string
         by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         claim:
           $ref: "#/components/schemas/ClaimBody"
@@ -1713,12 +1713,12 @@ components:
           description: The person who brought them in, by sign-in identity
           type: string
         added_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         identity:
           type: string
         name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
       required:
         - identity
@@ -1782,7 +1782,7 @@ components:
           description: The author, by sign-in identity
           type: string
         written_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
       required:
         - id
@@ -2029,7 +2029,7 @@ components:
         product:
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         summary:
           type: string
@@ -2349,7 +2349,7 @@ components:
           description: The person who made the claim, by sign-in identity
           type: string
         proposed_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         reasoning:
           description: The justification as it currently stands, in markdown
@@ -2645,7 +2645,7 @@ components:
           description: The person who last agreed to it, where anybody did, by sign-in identity
           type: string
         approved_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         claim_id:
           format: int64
@@ -2691,7 +2691,7 @@ components:
           description: The person who proposed it, by sign-in identity
           type: string
         proposed_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         reasoning:
           description: The reasoning as it last stood, in markdown, offered back rather than thrown away
@@ -2747,7 +2747,7 @@ components:
           description: The person who agreed, by sign-in identity
           type: string
         approved_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         claim_id:
           format: int64
@@ -2805,7 +2805,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         severity:
           type: string
@@ -3586,7 +3586,7 @@ components:
           description: The build to link to, by product, branch or tag, and variant. The product by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         score:
           format: double
@@ -3811,8 +3811,8 @@ components:
         product:
           description: The product the role is held against, by the name that addresses it. Absent where it is held across every product
           type: string
-        product_display_name:
-          description: That product's display name, where it was declared with one
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         role:
           description: The rights it carries
@@ -3879,9 +3879,6 @@ components:
     HoldingBody:
       additionalProperties: false
       properties:
-        name:
-          description: Their display name, where they have one
-          type: string
         open:
           description: "Pieces of work assigned to them: an issue in a component in a product"
           format: int64
@@ -3892,6 +3889,9 @@ components:
           type: integer
         person:
           description: The holder, by sign-in identity for a person and by name for a team
+          type: string
+        person_name:
+          description: Their display name, where it differs from the name above
           type: string
         places:
           description: The number of findings those cover, across every build
@@ -4247,7 +4247,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         proposed_at:
           type: string
@@ -4310,8 +4310,8 @@ components:
           description: The product it may send scans for, by the name that addresses it. Always required
           minLength: 1
           type: string
-        product_display_name:
-          description: That product's display name, where it was declared with one
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
@@ -4370,7 +4370,7 @@ components:
           description: The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person
           type: string
         assigned_to_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         component:
           type: string
@@ -4391,7 +4391,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         severity:
           type: string
@@ -5815,7 +5815,7 @@ components:
           description: The second person, by sign-in identity
           type: string
         approved_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         asked_at:
           type: string
@@ -5823,7 +5823,7 @@ components:
           description: The person who asked, by sign-in identity
           type: string
         asked_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         id:
           format: int64
@@ -5964,7 +5964,7 @@ components:
           description: The author, by sign-in identity
           type: string
         written_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
       required:
         - id
@@ -6664,7 +6664,7 @@ components:
           description: The person who asked, by sign-in identity
           type: string
         by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         days:
           description: How far the date moves, in days, whichever way it moves
@@ -6884,7 +6884,7 @@ components:
           minLength: 1
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           readOnly: true
           type: string
         vulnerability:
@@ -7886,7 +7886,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         severity:
           type: string
@@ -7926,7 +7926,7 @@ components:
           description: The person who answered them, by sign-in identity
           type: string
         acknowledged_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         contact:
           type: string
@@ -7952,7 +7952,7 @@ components:
           description: The person who said so, by sign-in identity
           type: string
         evaluated_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         found_here:
           description: Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer
@@ -7970,7 +7970,7 @@ components:
           description: The person who wrote it down, by sign-in identity
           type: string
         recorded_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         reference:
           description: The name this report is reached by
@@ -8232,7 +8232,7 @@ components:
           description: The author, by sign-in identity
           type: string
         written_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
       required:
         - id
@@ -8322,8 +8322,8 @@ components:
         team:
           description: The team work lands on, by the name that addresses it
           type: string
-        team_display_name:
-          description: That team's display name, where it was declared with one
+        team_name:
+          description: The team's display name, where it differs from its name
           type: string
         upstream:
           description: A source package name. Catches every binary package built from it
@@ -8350,7 +8350,7 @@ components:
           description: The person who agreed, on a disposition that takes a second person, by sign-in identity
           type: string
         approved_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         disposition:
           enum:
@@ -8374,7 +8374,7 @@ components:
           description: The person who proposed it, by sign-in identity
           type: string
         proposed_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         reasoning:
           description: Why, as markdown. Never edited
@@ -8399,7 +8399,7 @@ components:
           description: The person who took it back, by sign-in identity
           type: string
         withdrawn_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         yours:
           description: Whether you proposed it. The proposer may not approve it
@@ -9038,7 +9038,7 @@ components:
           description: The person who agreed, by sign-in identity
           type: string
         approved_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         claim_id:
           description: Pass as extends when deciding to carry it to this issue
@@ -9134,7 +9134,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         promised:
           description: "Claims that promised work: an upgrade or a backport"
@@ -9253,7 +9253,7 @@ components:
           description: The person who agreed, by sign-in identity
           type: string
         approved_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         builds:
           description: Every build the claim currently covers, as stream and variant
@@ -9313,7 +9313,7 @@ components:
           description: The person who proposed it, by sign-in identity
           type: string
         proposed_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         rows:
           $ref: "#/components/schemas/RowsStandingBody"
@@ -9632,8 +9632,8 @@ components:
         product:
           description: Optionally, the one product it may reach, by the name that addresses it
           type: string
-        product_display_name:
-          description: That product's display name, where it was declared with one
+        product_name:
+          description: The product's display name, where it differs from its name
           type: string
         secret:
           description: Shown once, at creation. It is stored hashed and cannot be shown again
@@ -9831,7 +9831,7 @@ components:
           description: The product, by the name that addresses it
           type: string
         product_name:
-          description: The product's display name, where it has one
+          description: The product's display name, where it differs from its name
           type: string
         severity:
           type: string
@@ -10190,7 +10190,7 @@ components:
           description: The person who made the claim, by sign-in identity
           type: string
         proposed_by_name:
-          description: Their display name, where they have one
+          description: Their display name, where it differs from their identity
           type: string
         reasoning:
           type: string
@@ -14731,7 +14731,7 @@ paths:
       description: |-
         The destinations configured, which kinds go to each, and whether they are working.
 
-        The signing secret is never returned, and of the address only the host is. For Slack and Teams the path of the address is the credential. A destination is told apart by its name and kind.
+        The signing secret is never returned, and of the address only the host is. A destination is told apart by its name and kind.
 
         Requires: administrator
       operationId: list-outbound

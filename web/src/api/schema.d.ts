@@ -1667,7 +1667,7 @@ export interface paths {
          * List where this deployment sends things
          * @description The destinations configured, which kinds go to each, and whether they are working.
          *
-         *     The signing secret is never returned, and of the address only the host is. For Slack and Teams the path of the address is the credential. A destination is told apart by its name and kind.
+         *     The signing secret is never returned, and of the address only the host is. A destination is told apart by its name and kind.
          *
          *     Requires: administrator
          */
@@ -5910,7 +5910,7 @@ export interface components {
             approved_at: string;
             /** @description The person who agreed, by sign-in identity */
             approved_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             approved_by_name?: string;
             /** @description The batch it was approved under, if it was a bulk approval */
             batch?: string;
@@ -6055,7 +6055,7 @@ export interface components {
         BecameBody: {
             /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             by_name?: string;
             claim: components["schemas"]["ClaimBody"];
             decision: components["schemas"]["DecisionBody"];
@@ -6110,8 +6110,8 @@ export interface components {
             group: string;
             /** @description The product the role is held against, by the name that addresses it */
             product?: string;
-            /** @description That product's display name, where it was declared with one */
-            product_display_name?: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /**
              * @description The role membership of this group grants
              * @enum {string}
@@ -6396,7 +6396,7 @@ export interface components {
             became?: string;
             /** @description The person who made the change, by sign-in identity */
             by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             by_name?: string;
             /** @description This change cleared it */
             cleared?: boolean;
@@ -6498,7 +6498,7 @@ export interface components {
             proposed_at: string;
             /** @description The person who took it, by sign-in identity */
             proposed_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             proposed_by_name?: string;
             /** @description The narrowing behind a bulk set. Never part of the claim itself */
             selected_by?: string;
@@ -6523,7 +6523,7 @@ export interface components {
             builds: string[] | null;
             /** @description The person who did it, where a person did, by sign-in identity */
             by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             by_name?: string;
             /** @description The actor, the moment, the sort of action, the narrowing behind a bulk set, and where the work is happening */
             claim: components["schemas"]["ClaimBody"];
@@ -6611,10 +6611,10 @@ export interface components {
             added_at: string;
             /** @description The person who brought them in, by sign-in identity */
             added_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             added_by_name?: string;
             identity: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             name?: string;
         };
         "Comment-on-claimRequest": {
@@ -6648,7 +6648,7 @@ export interface components {
             written_at: string;
             /** @description The author, by sign-in identity */
             written_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             written_by_name?: string;
         };
         ComparisonBody: {
@@ -6791,7 +6791,7 @@ export interface components {
             readonly $schema?: string;
             added_at: string;
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             summary?: string;
             vulnerability: string;
@@ -6990,7 +6990,7 @@ export interface components {
             proposed_at: string;
             /** @description The person who made the claim, by sign-in identity */
             proposed_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             proposed_by_name?: string;
             /** @description The justification as it currently stands, in markdown */
             reasoning: string;
@@ -7137,7 +7137,7 @@ export interface components {
             about?: string;
             /** @description The person who last agreed to it, where anybody did, by sign-in identity */
             approved_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             approved_by_name?: string;
             /** Format: int64 */
             claim_id: number;
@@ -7159,7 +7159,7 @@ export interface components {
             proposed_at: string;
             /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             proposed_by_name?: string;
             /** @description The reasoning as it last stood, in markdown, offered back rather than thrown away */
             reasoning: string;
@@ -7187,7 +7187,7 @@ export interface components {
             approved_at?: string;
             /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             approved_by_name?: string;
             /** Format: int64 */
             claim_id: number;
@@ -7214,7 +7214,7 @@ export interface components {
             places: number;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             severity?: string;
             stream: string;
@@ -7694,7 +7694,7 @@ export interface components {
             places: number;
             /** @description The build to link to, by product, branch or tag, and variant. The product by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             /** Format: double */
             score?: number;
@@ -7814,8 +7814,8 @@ export interface components {
             everywhere?: boolean;
             /** @description The product the role is held against, by the name that addresses it. Absent where it is held across every product */
             product?: string;
-            /** @description That product's display name, where it was declared with one */
-            product_display_name?: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /**
              * @description The rights it carries
              * @enum {string}
@@ -7850,8 +7850,6 @@ export interface components {
             name: string;
         };
         HoldingBody: {
-            /** @description Their display name, where they have one */
-            name?: string;
             /**
              * Format: int64
              * @description Pieces of work assigned to them: an issue in a component in a product
@@ -7864,6 +7862,8 @@ export interface components {
             overdue: number;
             /** @description The holder, by sign-in identity for a person and by name for a team */
             person: string;
+            /** @description Their display name, where it differs from the name above */
+            person_name?: string;
             /**
              * Format: int64
              * @description The number of findings those cover, across every build
@@ -8036,7 +8036,7 @@ export interface components {
             outcome: "affected" | "not-applicable" | "mismatched" | "deferred" | "wont-fix" | "already-fixed" | "upgrade-needed" | "patch-needed";
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             proposed_at: string;
             proposed_by: string;
@@ -8065,8 +8065,8 @@ export interface components {
             name: string;
             /** @description The product it may send scans for, by the name that addresses it. Always required */
             product: string;
-            /** @description That product's display name, where it was declared with one */
-            product_display_name?: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
             /** @description Optionally, the one release it may send for */
@@ -8090,7 +8090,7 @@ export interface components {
         LateBody: {
             /** @description The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person */
             assigned_to?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             assigned_to_name?: string;
             component: string;
             /**
@@ -8108,7 +8108,7 @@ export interface components {
             places: number;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             severity?: string;
             stream: string;
@@ -8829,12 +8829,12 @@ export interface components {
             approved_at?: string;
             /** @description The second person, by sign-in identity */
             approved_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             approved_by_name?: string;
             asked_at: string;
             /** @description The person who asked, by sign-in identity */
             asked_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             asked_by_name?: string;
             /** Format: int64 */
             id: number;
@@ -8912,7 +8912,7 @@ export interface components {
             written_at: string;
             /** @description The author, by sign-in identity */
             written_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             written_by_name?: string;
         };
         NoteWritten: {
@@ -9342,7 +9342,7 @@ export interface components {
             asked_at: string;
             /** @description The person who asked, by sign-in identity */
             by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             by_name?: string;
             /**
              * Format: int64
@@ -9484,7 +9484,7 @@ export interface components {
             place: string;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             readonly product_name?: string;
             /** @description The issue, by any name it is known under */
             vulnerability: string;
@@ -10103,7 +10103,7 @@ export interface components {
             place: string;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             severity?: string;
             /** @description A deferral is in force now. Something put off three times and since decided is history; the same thing still being put off is the pattern */
@@ -10130,7 +10130,7 @@ export interface components {
             acknowledged?: string;
             /** @description The person who answered them, by sign-in identity */
             acknowledged_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             acknowledged_by_name?: string;
             contact?: string;
             /** @description The credit they asked for in an advisory */
@@ -10146,7 +10146,7 @@ export interface components {
             evaluated?: string;
             /** @description The person who said so, by sign-in identity */
             evaluated_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             evaluated_by_name?: string;
             /** @description Whether somebody here found it rather than somebody outside sending it. A flaw found here carries no disclosure date and nobody is owed an answer */
             found_here: boolean;
@@ -10158,7 +10158,7 @@ export interface components {
             recorded_at: string;
             /** @description The person who wrote it down, by sign-in identity */
             recorded_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             recorded_by_name?: string;
             /** @description The name this report is reached by */
             reference: string;
@@ -10325,7 +10325,7 @@ export interface components {
             written_at: string;
             /** @description The author, by sign-in identity */
             written_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             written_by_name?: string;
         };
         RootsBody: {
@@ -10388,8 +10388,8 @@ export interface components {
             order: number;
             /** @description The team work lands on, by the name that addresses it */
             team: string;
-            /** @description That team's display name, where it was declared with one */
-            team_display_name?: string;
+            /** @description The team's display name, where it differs from its name */
+            team_name?: string;
             /** @description A source package name. Catches every binary package built from it */
             upstream?: string;
         };
@@ -10403,7 +10403,7 @@ export interface components {
             approved_at?: string;
             /** @description The person who agreed, on a disposition that takes a second person, by sign-in identity */
             approved_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             approved_by_name?: string;
             /** @enum {string} */
             disposition: "duplicate" | "not-reproducible" | "out-of-scope" | "rejected";
@@ -10416,7 +10416,7 @@ export interface components {
             proposed_at: string;
             /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             proposed_by_name?: string;
             /** @description Why, as markdown. Never edited */
             reasoning?: string;
@@ -10430,7 +10430,7 @@ export interface components {
             withdrawn_at?: string;
             /** @description The person who took it back, by sign-in identity */
             withdrawn_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             withdrawn_by_name?: string;
             /** @description Whether you proposed it. The proposer may not approve it */
             yours?: boolean;
@@ -10776,7 +10776,7 @@ export interface components {
             approved_at?: string;
             /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             approved_by_name?: string;
             /**
              * Format: int64
@@ -10848,7 +10848,7 @@ export interface components {
             people: number;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             /**
              * Format: int64
@@ -10919,7 +10919,7 @@ export interface components {
             approved_at?: string;
             /** @description The person who agreed, by sign-in identity */
             approved_by?: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             approved_by_name?: string;
             /** @description Every build the claim currently covers, as stream and variant */
             builds: string[] | null;
@@ -10949,7 +10949,7 @@ export interface components {
             proposed_at: string;
             /** @description The person who proposed it, by sign-in identity */
             proposed_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             proposed_by_name?: string;
             /** @description The state of the claim's rows here */
             rows: components["schemas"]["RowsStandingBody"];
@@ -11111,8 +11111,8 @@ export interface components {
             owner?: string;
             /** @description Optionally, the one product it may reach, by the name that addresses it */
             product?: string;
-            /** @description That product's display name, where it was declared with one */
-            product_display_name?: string;
+            /** @description The product's display name, where it differs from its name */
+            product_name?: string;
             /** @description Shown once, at creation. It is stored hashed and cannot be shown again */
             secret?: string;
             /** @description Whether it has been withdrawn */
@@ -11216,7 +11216,7 @@ export interface components {
             places: number;
             /** @description The product, by the name that addresses it */
             product: string;
-            /** @description The product's display name, where it has one */
+            /** @description The product's display name, where it differs from its name */
             product_name?: string;
             severity?: string;
             /** @description A branch or tag holding it. Where builds is more than one, any of them */
@@ -11435,7 +11435,7 @@ export interface components {
             previously_approved?: boolean;
             /** @description The person who made the claim, by sign-in identity */
             proposed_by: string;
-            /** @description Their display name, where they have one */
+            /** @description Their display name, where it differs from their identity */
             proposed_by_name?: string;
             reasoning: string;
         };

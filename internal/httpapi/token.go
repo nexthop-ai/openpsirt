@@ -26,7 +26,7 @@ type TokenBody struct {
 	Product string `json:"product,omitempty" doc:"Optionally, the one product it may reach, by the name that addresses it"`
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: minting a token resolves the field above.
-	ProductDisplayName string `json:"product_display_name,omitempty" doc:"That product's display name, where it was declared with one"`
+	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	// Holds narrows which of its owner's roles it carries, the same way and
 	// for the same reason Product narrows where. Absent means all of them.
 	Holds []role `json:"holds,omitempty" doc:"Optionally, which of its owner's roles it carries. Intersected with what they hold, so naming one they do not have reaches nothing. Absent means all of them, and an empty list is refused because it would reach none"`

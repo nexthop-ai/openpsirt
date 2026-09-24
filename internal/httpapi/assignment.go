@@ -26,7 +26,7 @@ type UnassignedBody struct {
 	Version       string `json:"version"`
 	Product       string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	// Stream and Variant name a build holding this, not the only one: a screen
 	// needs somewhere to link to and an action needs a finding to name. The
 	// field that says there are several is `builds`.
@@ -43,7 +43,7 @@ type HoldingBody struct {
 	Person string `json:"person" doc:"The holder, by sign-in identity for a person and by name for a team"`
 	// Name is the label beside the address rather than in its place: the
 	// address is what the holder's own list resolves.
-	Name string `json:"name,omitempty" doc:"Their display name, where they have one"`
+	Name string `json:"person_name,omitempty" doc:"Their display name, where it differs from the name above"`
 	// Team says this is a queue rather than a holding: work routed to a
 	// team is unheld until somebody takes it.
 	Team bool `json:"team,omitempty" doc:"This is a team's queue rather than one person's work"`

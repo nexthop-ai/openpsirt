@@ -21,9 +21,9 @@ import (
 // CollaboratorBody is one person brought into one case.
 type CollaboratorBody struct {
 	Identity    string `json:"identity"`
-	Name        string `json:"name,omitempty" doc:"Their display name, where they have one"`
+	Name        string `json:"name,omitempty" doc:"Their display name, where it differs from their identity"`
 	AddedBy     string `json:"added_by" doc:"The person who brought them in, by sign-in identity"`
-	AddedByName string `json:"added_by_name,omitempty" doc:"Their display name, where they have one"`
+	AddedByName string `json:"added_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	AddedAt     string `json:"added_at"`
 }
 

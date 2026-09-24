@@ -344,12 +344,12 @@ type StandingClaimBody struct {
 	FixedVersion   string   `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
 	NeedsApproval  bool     `json:"needs_approval,omitempty"`
 	ProposedBy     string   `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
-	ProposedByName string   `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedByName string   `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt     string   `json:"proposed_at"`
 	Places         int      `json:"places" doc:"The number of this finding's places the claim covers"`
 	Builds         []string `json:"builds" doc:"Every build the claim currently covers, as stream and variant"`
 	ApprovedBy     string   `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
-	ApprovedByName string   `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedByName string   `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt     string   `json:"approved_at,omitempty"`
 	// Elsewhere is where this is being worked on outside here.
 	Elsewhere string `json:"elsewhere,omitempty" doc:"A ticket, a thread or a change. Stored and never fetched"`
@@ -374,14 +374,14 @@ type EarlierBody struct {
 	// the failure this outcome is most exposed to.
 	FixedVersion   string `json:"fixed_version,omitempty" doc:"The package version the claim says the fix arrived in, where it claims one has"`
 	ProposedBy     string `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
-	ProposedByName string `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedByName string `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt     string `json:"proposed_at"`
 	Ended          string `json:"ended" enum:"lapsed,withdrawn" doc:"The reason it stopped applying"`
 	EndedAt        string `json:"ended_at,omitempty"`
 	About          string `json:"about,omitempty" doc:"The component upstream version it was a claim about"`
 	Reasoning      string `json:"reasoning" doc:"The reasoning as it last stood, in markdown, offered back rather than thrown away"`
 	ApprovedBy     string `json:"approved_by,omitempty" doc:"The person who last agreed to it, where anybody did, by sign-in identity"`
-	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 }
 
 // SimilarBody is an approved claim at the same places about another issue,
@@ -392,7 +392,7 @@ type SimilarBody struct {
 	Justification  justification `json:"justification,omitempty"`
 	Reasoning      string        `json:"reasoning"`
 	ApprovedBy     string        `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
-	ApprovedByName string        `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedByName string        `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt     string        `json:"approved_at,omitempty"`
 	Issues         int           `json:"issues" doc:"The number of distinct issues the claim covers"`
 }
@@ -414,7 +414,7 @@ type ElsewhereBody struct {
 	Justification  justification `json:"justification,omitempty"`
 	Reasoning      string        `json:"reasoning"`
 	ApprovedBy     string        `json:"approved_by,omitempty" doc:"The person who agreed, by sign-in identity"`
-	ApprovedByName string        `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedByName string        `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt     string        `json:"approved_at,omitempty"`
 }
 

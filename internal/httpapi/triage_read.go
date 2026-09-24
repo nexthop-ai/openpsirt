@@ -26,7 +26,7 @@ type DecisionDetail struct {
 	Finding        *FindingRefBody `json:"finding,omitempty" doc:"The decision's subject — build, issue, component, where it sits — read from the open finding at its place. Absent where none is open there"`
 	Reasoning      string          `json:"reasoning" doc:"The justification as it currently stands, in markdown"`
 	ProposedBy     string          `json:"proposed_by" doc:"The person who made the claim, by sign-in identity"`
-	ProposedByName string          `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedByName string          `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt     string          `json:"proposed_at" doc:"The moment the claim was made"`
 	AgeDays        int             `json:"age_days" doc:"The age of the claim. An old judgment should look like one"`
 }
@@ -53,7 +53,7 @@ type ClaimDetail struct {
 	Happened string `json:"happened" enum:"waiting,sent-back,approved,withdrawn,lapsed,undone,mixed" doc:"The claim's outcome. mixed is a claim whose rows did not all end the same way"`
 	When     string `json:"when,omitempty" doc:"The moment it became that. Absent while it is waiting: nothing has happened to it"`
 	By       string `json:"by,omitempty" doc:"The person who did it, where a person did, by sign-in identity"`
-	ByName   string `json:"by_name,omitempty" doc:"Their display name, where they have one"`
+	ByName   string `json:"by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	// PreviouslyApproved says this was agreed to before and came back —
 	// revised under the approval, or the code moved.
 	PreviouslyApproved bool `json:"previously_approved,omitempty" doc:"This was agreed to before and came back"`
@@ -113,7 +113,7 @@ type RevisionBody struct {
 	Ordinal       int64  `json:"ordinal" doc:"The revision number, counting from one"`
 	Body          string `json:"body" doc:"The justification text, in markdown"`
 	WrittenBy     string `json:"written_by" doc:"The author, by sign-in identity"`
-	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where they have one"`
+	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	WrittenAt     string `json:"written_at"`
 }
 
@@ -122,7 +122,7 @@ type ApprovalBody struct {
 	ID             int64  `json:"id"`
 	RevisionID     int64  `json:"revision_id" doc:"The revision of the justification that was agreed to"`
 	ApprovedBy     string `json:"approved_by" doc:"The person who agreed, by sign-in identity"`
-	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedByName string `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt     string `json:"approved_at"`
 	WithdrawnAt    string `json:"withdrawn_at,omitempty" doc:"The moment this approval was taken back, if it was"`
 	Batch          string `json:"batch,omitempty" doc:"The batch it was approved under, if it was a bulk approval"`
@@ -142,7 +142,7 @@ type CommentBody struct {
 	ID            int64  `json:"id"`
 	Body          string `json:"body" doc:"The comment text, in markdown"`
 	WrittenBy     string `json:"written_by" doc:"The author, by sign-in identity"`
-	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where they have one"`
+	WrittenByName string `json:"written_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	WrittenAt     string `json:"written_at"`
 	EditedAt      string `json:"edited_at,omitempty" doc:"The moment the author last changed it, if they did"`
 }

@@ -279,9 +279,9 @@ function ByPerson({
                           it with somebody's initials says the opposite: work
                           routed to a team is unheld until somebody takes it. */}
                       <span className="avatar">
-                        {row.team ? "◇" : initials(row.name || row.person || "")}
+                        {row.team ? "◇" : initials(row.person_name || row.person || "")}
                       </span>
-                      {row.name || row.person}
+                      {row.person_name || row.person}
                       {row.team && <span className="hint"> · team queue</span>}
                     </span>
                   </button>

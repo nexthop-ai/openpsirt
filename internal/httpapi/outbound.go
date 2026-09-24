@@ -47,9 +47,8 @@ func registerOutbound(api huma.API, in Ingest, a Administering) {
 		Summary: "List where this deployment sends things",
 		Description: "The destinations configured, which kinds go to each, and whether they " +
 			"are working.\n\n" +
-			"The signing secret is never returned, and of the address only the host is. For " +
-			"Slack and Teams the path of the address is the credential. A destination is " +
-			"told apart by its name and kind.",
+			"The signing secret is never returned, and of the address only the host is. A " +
+			"destination is told apart by its name and kind.",
 		Tags: []string{"Administration"},
 	}, deploymentWide, ""), func(ctx context.Context, _ *struct{}) (*listOutput[OutboundBody], error) {
 		if _, _, err := administerable(ctx, a, a.handle()); err != nil {

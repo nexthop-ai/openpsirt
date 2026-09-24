@@ -31,7 +31,7 @@ func TestAPersonalTokenIsNarrowedWhenItIsMade(t *testing.T) {
 			Items []struct {
 				Name               string `json:"name"`
 				Product            string `json:"product"`
-				ProductDisplayName string `json:"product_display_name"`
+				ProductDisplayName string `json:"product_name"`
 				Withdrawn          bool   `json:"withdrawn"`
 			} `json:"items"`
 		}

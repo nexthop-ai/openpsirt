@@ -34,7 +34,7 @@ type JudgedBody struct {
 	Issue   string `json:"issue" doc:"The vulnerability, under the name it is filed here"`
 	Product string `json:"product" doc:"The product, by the name that addresses it"`
 
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
 	// Component is the judgment's subject. Named from a finding at the place,
 	// in any state — a judgment about something since fixed or removed is
 	// exactly what an audit asks for, so it is named rather than left

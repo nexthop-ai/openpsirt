@@ -27,14 +27,14 @@ type RulingBody struct {
 	Reports         []string `json:"reports" doc:"The references of the reports it covers, including after it was withdrawn"`
 	State           string   `json:"state" enum:"waiting,in-force,withdrawn" doc:"Waiting for a second person, what its reports currently are, or taken back"`
 	ProposedBy      string   `json:"proposed_by" doc:"The person who proposed it, by sign-in identity"`
-	ProposedByName  string   `json:"proposed_by_name,omitempty" doc:"Their display name, where they have one"`
+	ProposedByName  string   `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt      string   `json:"proposed_at"`
 	Yours           bool     `json:"yours,omitempty" doc:"Whether you proposed it. The proposer may not approve it"`
 	ApprovedBy      string   `json:"approved_by,omitempty" doc:"The person who agreed, on a disposition that takes a second person, by sign-in identity"`
-	ApprovedByName  string   `json:"approved_by_name,omitempty" doc:"Their display name, where they have one"`
+	ApprovedByName  string   `json:"approved_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ApprovedAt      string   `json:"approved_at,omitempty"`
 	WithdrawnBy     string   `json:"withdrawn_by,omitempty" doc:"The person who took it back, by sign-in identity"`
-	WithdrawnByName string   `json:"withdrawn_by_name,omitempty" doc:"Their display name, where they have one"`
+	WithdrawnByName string   `json:"withdrawn_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	WithdrawnAt     string   `json:"withdrawn_at,omitempty"`
 }
 

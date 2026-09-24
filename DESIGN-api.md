@@ -243,7 +243,7 @@ part of the statement.
 | A filter with three answers is a word, not a flag | Origin is one: a screen offering "Scanner" as a flag can only send the absence of "entered by hand", so choosing it filters nothing |
 | A repeated value is one value | A set of one word sent twice otherwise reads as both kinds and no narrowing, which silently puts tags back into a list somebody asked to see branches of |
 | A query parameter the operation does not declare is refused with a 400 naming it | Ignored, a mistyped filter returns the unfiltered list, which reads as a correct answer. The list is read from the operation's own declaration, so what is accepted is what the document publishes |
-| That refusal comes after the operation's declared privileges are checked | A caller who may not reach the operation learns nothing about what it takes |
+| That refusal comes after the scope on the operation's declaration is checked | A caller outside the scope learns nothing about what it takes. A role on the product is checked by the handler, after it; the parameters are published, so the order discloses nothing there |
 
 This also prevents a sort exposing a column the caller was never meant to order
 by.
@@ -370,17 +370,18 @@ label, is sent back by the withdraw beside it and matches nothing.
 Every listing carries both fields: the collaborators, the roles, the
 credentials, the bindings, the tokens and the routing rules.
 
-A person named as the actor on a record is named the same way.
+A person named as the actor on a record, and a product, branch or tag, variant
+or team a row is about, are named the same way.
 
 | Rule | Reason |
 |---|---|
-| The actor's field carries the sign-in identity | A caller matches the record against a person, and a screen matches it against the viewer's own identity to decide what is theirs |
-| The display name sits beside it in a field suffixed `_name` | `proposed_by` and `proposed_by_name`, `by` and `by_name`. One suffix, so a caller finds the label without reading each field's description |
-| A row naming the product it is about carries the product's name, with the display name beside it in `product_name` | A caller filters a list and builds a path from the product it was handed, and a display name resolves to no product |
-| A row naming a build carries the branch or tag and the variant by name, with the spelling somebody declared beside each in `stream_name` and `variant_name` | The same rule as the product. A path folds a name, so the spelling routes today; the field still carries the name a path is built from, and the spelling is a label |
-| A file carries a label as a column beside the name | The running-out, repeated-deferral and audit files name the product, and the running-out file the build, the way their lists do |
-| The holder of work is a person's identity or a team's name | The holder's own list resolves it, and a team's label matches no team |
-| The administration trail's file carries the person both ways, as two columns | A spreadsheet filtered on the identity and one read by a person are the same file |
+| A field naming a person carries the sign-in identity | A caller matches the record against a person, and a screen matches it against the viewer's own identity to decide what is theirs |
+| A field naming a product, a branch or tag, a variant or a team carries its name | A caller filters a list and builds a path from what it was handed, and a label resolves to nothing |
+| A label, where a response carries one, is the field's name suffixed `_name` | `proposed_by` and `proposed_by_name`, `product` and `product_name`, `stream` and `stream_name`, `team` and `team_name`. One suffix, so a caller finds the label without reading each field's description |
+| A label is absent where it would repeat the name | So that absent reads as "the same", and a caller shows the name |
+| Not every field carries a label | The lists a person reads by name carry one. Adding a label beside a name is additive, so the rest gain one as a screen needs it |
+| The holder of work is a person's identity or a team's name, beside `person_name` | The holder's own list resolves it, and a team's label matches no team |
+| A file carries a label as a column beside the name | The administration trail names the person, the running-out file the product, the build and the holder, the repeated-deferral and audit files the product, and the review-queue file the product and the proposer, the way their lists do |
 
 ## File organization
 
