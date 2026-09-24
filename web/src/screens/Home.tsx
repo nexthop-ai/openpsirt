@@ -239,7 +239,7 @@ function Readiness({ at }: { at: Scoped }) {
                 <tr>
                   <th />
                   <th className="num">Now</th>
-                  <th className="num">{shipped.stream}</th>
+                  <th className="num">{shipped.stream_name || shipped.stream}</th>
                   <th className="num">Change</th>
                 </tr>
               </thead>

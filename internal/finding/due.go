@@ -220,7 +220,9 @@ type Late struct {
 	Product     string `bun:"product"`
 	ProductName string `bun:"product_name"`
 	Stream      string `bun:"stream"`
+	StreamName  string `bun:"stream_name"`
 	Variant     string `bun:"variant"`
+	VariantName string `bun:"variant_name"`
 	AssignedTo  *int64 `bun:"assigned_to"`
 	// Due is the earliest deadline among the places this row covers — the one
 	// that makes the whole group late.
@@ -387,7 +389,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	// The grouping, which decides what one row is: an issue at a component in
 	// one build, however many places it sits at there.
 	const grouping = "v.identifier, c.name, c.version, f.urgency_exploited, p.name, p.display_name, " +
-		"st.display_name, va.display_name, f.target_id, f.vulnerability_id, f.component_id"
+		"st.name, st.display_name, va.name, va.display_name, f.target_id, f.vulnerability_id, f.component_id"
 
 	query := narrow(s.db.NewSelect()).
 		ColumnExpr(`v.identifier AS "vulnerability"`).
@@ -397,8 +399,10 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`f.urgency_exploited AS "exploited"`).
 		ColumnExpr(`p.name AS "product"`).
 		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		// The earliest of the places this row covers, because that is the one
 		// that makes the whole group late.
 		ColumnExpr(`MIN(f.due_at) AS "due"`).

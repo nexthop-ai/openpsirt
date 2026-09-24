@@ -16,8 +16,10 @@ import (
 
 // BuildCountsBody is what one build holds now, by severity band.
 type BuildCountsBody struct {
-	Stream  string `json:"stream"`
-	Variant string `json:"variant"`
+	Stream      string `json:"stream"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	Variant     string `json:"variant"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
 	// Kind says whether this is a branch or a tag. The comparison only means
 	// something for a branch, and a screen asks before drawing the panel at
 	// all rather than drawing one that explains why it is empty.
@@ -180,7 +182,9 @@ func registerReadiness(api huma.API, in Ingest) {
 func buildCounts(s finding.Standing) BuildCountsBody {
 	body := BuildCountsBody{
 		Stream: s.Stream, Variant: s.Variant, Kind: s.Kind, Total: s.Total,
-		Critical: s.ByBand["critical"], High: s.ByBand["high"],
+		StreamName:  labelBeside(s.StreamName, s.Stream),
+		VariantName: labelBeside(s.VariantName, s.Variant),
+		Critical:    s.ByBand["critical"], High: s.ByBand["high"],
 		Medium: s.ByBand["medium"], Low: s.ByBand["low"],
 	}
 	if s.LastScanned != nil {

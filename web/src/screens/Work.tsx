@@ -405,7 +405,7 @@ function Held({
                   ) : (
                     <>
                       {" "}
-                      · {row.stream} · {row.variant}
+                      · {row.stream_name || row.stream} · {row.variant_name || row.variant}
                     </>
                   )}
                 </td>

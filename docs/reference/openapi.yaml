@@ -971,10 +971,16 @@ components:
           type: integer
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         total:
           format: int64
           type: integer
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
       required:
         - stream
@@ -2805,9 +2811,15 @@ components:
           type: string
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         summary:
           type: string
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         vulnerability:
           type: string
@@ -3418,6 +3430,9 @@ components:
         stream:
           description: "A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build"
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         summary:
           description: The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding
           type: string
@@ -3436,6 +3451,9 @@ components:
           type: string
         variant:
           description: The variant of that build
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           description: The version that ships
@@ -3581,7 +3599,13 @@ components:
           type: string
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           description: The version that ships
@@ -4373,7 +4397,13 @@ components:
           type: string
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           description: The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved
@@ -5559,7 +5589,13 @@ components:
           type: integer
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         variant:
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           description: The version that build ships under this name — pass it as ?version= when applying a decision there
@@ -7769,6 +7805,9 @@ components:
           type: integer
         stream:
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
       required:
         - stream
         - cut
@@ -9799,8 +9838,14 @@ components:
         stream:
           description: A branch or tag holding it. Where builds is more than one, any of them
           type: string
+        stream_name:
+          description: The branch or tag as it was spelled, where that differs from its name
+          type: string
         variant:
           description: A build variant holding it. Where builds is more than one, any of them
+          type: string
+        variant_name:
+          description: The variant as it was spelled, where that differs from its name
           type: string
         version:
           type: string

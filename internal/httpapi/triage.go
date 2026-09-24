@@ -81,7 +81,9 @@ type FindingRefBody struct {
 	Product       string  `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
 	ProductName   string  `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
 	Stream        string  `json:"stream"`
+	StreamName    string  `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
 	Variant       string  `json:"variant"`
+	VariantName   string  `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
 	Vulnerability string  `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
 	Component     string  `json:"component"`
 	Version       string  `json:"version" doc:"The version that ships"`

@@ -374,7 +374,9 @@ export function Decide({
         // version — a build at matching versions never reaches this list — so
         // "this build" is the honest label for another version sitting beside
         // the one in hand, rather than the build's own name repeated back.
-        const build = m.here ? "this build" : `${m.stream} · ${m.variant}`;
+        const build = m.here
+          ? "this build"
+          : `${m.stream_name || m.stream} · ${m.variant_name || m.variant}`;
         // One question per version, not one per build: a build carrying the
         // component at four versions is four claims about different code, and
         // each is posted with its own version.

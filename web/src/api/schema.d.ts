@@ -6175,9 +6175,13 @@ export interface components {
             /** Format: int64 */
             medium: number;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             /** Format: int64 */
             total: number;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
         };
         BuildName: {
             stream: string;
@@ -7214,8 +7218,12 @@ export interface components {
             product_name?: string;
             severity?: string;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             summary?: string;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             vulnerability: string;
         };
         EndOfLifeBody: {
@@ -7602,6 +7610,8 @@ export interface components {
             state?: "undecided" | "waiting" | "agreed" | "lapsed";
             /** @description A branch or tag holding this, for linking to. One of them, not the only one: builds says how many there are. Absent where the selection is one build */
             stream?: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             /** @description The first line of what the issue says about itself, cut to fit a row. The whole of it is on the finding */
             summary?: string;
             /** @description Words somebody put on this. Free text, no fixed vocabulary */
@@ -7612,6 +7622,8 @@ export interface components {
             upstream?: string;
             /** @description The variant of that build */
             variant?: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             /** @description The version that ships */
             version: string;
             /** @description The issue, under the name it is most widely known by */
@@ -7691,7 +7703,11 @@ export interface components {
             /** @description Our rating where one stands, else as published */
             severity?: string;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             /** @description The version that ships */
             version: string;
             /** @description The issue, under the name it is most widely known by */
@@ -8096,7 +8112,11 @@ export interface components {
             product_name?: string;
             severity?: string;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             /** @description The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved */
             version?: string;
             vulnerability: string;
@@ -8682,7 +8702,11 @@ export interface components {
              */
             places: number;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             /** @description The version that build ships under this name — pass it as ?version= when applying a decision there */
             version?: string;
         };
@@ -10036,6 +10060,8 @@ export interface components {
              */
             open: number;
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
         };
         Remediation: {
             category: string;
@@ -11195,8 +11221,12 @@ export interface components {
             severity?: string;
             /** @description A branch or tag holding it. Where builds is more than one, any of them */
             stream: string;
+            /** @description The branch or tag as it was spelled, where that differs from its name */
+            stream_name?: string;
             /** @description A build variant holding it. Where builds is more than one, any of them */
             variant: string;
+            /** @description The variant as it was spelled, where that differs from its name */
+            variant_name?: string;
             version: string;
             vulnerability: string;
         };

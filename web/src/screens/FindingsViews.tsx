@@ -47,9 +47,9 @@ export function Sits({ row }: { row: Row }) {
             itself; the note about the other builds is a second, and may
             take a line of its own where the column is narrow. */}
         <span className="ends">
-          <span className="hop id">{row.stream}</span>
+          <span className="hop id">{row.stream_name || row.stream}</span>
           <span className="arrow">/</span>
-          <span className="hop id">{row.variant}</span>
+          <span className="hop id">{row.variant_name || row.variant}</span>
         </span>
         {row.builds > 1 && <span className="hint">· one of {row.builds} builds</span>}
       </span>

@@ -30,10 +30,12 @@ type UnassignedBody struct {
 	// Stream and Variant name a build holding this, not the only one: a screen
 	// needs somewhere to link to and an action needs a finding to name. The
 	// field that says there are several is `builds`.
-	Stream  string `json:"stream" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
-	Variant string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
-	Places  int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
-	Builds  int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
+	Stream      string `json:"stream" doc:"A branch or tag holding it. Where builds is more than one, any of them"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
+	Variant     string `json:"variant" doc:"A build variant holding it. Where builds is more than one, any of them"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
+	Places      int    `json:"places" doc:"The number of findings a judgment here would be recorded against, across every build it is in"`
+	Builds      int    `json:"builds" doc:"The number of builds holding it. More than one means the same code built more than one way, which one judgment answers"`
 }
 
 // HoldingBody is how much work one person has.
@@ -380,7 +382,9 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Component: row.Component, Version: row.Version,
 				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
 				Stream: row.Stream, Variant: row.Variant,
-				Places: row.Places, Builds: row.Builds,
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				Places:      row.Places, Builds: row.Builds,
 			})
 		}
 		out.Body.Total = total
@@ -485,7 +489,9 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Component: row.Component, Version: row.Version,
 				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
 				Stream: row.Stream, Variant: row.Variant,
-				Places: row.Places, Builds: row.Builds,
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				Places:      row.Places, Builds: row.Builds,
 			})
 		}
 		out.Body.Total = total
@@ -569,7 +575,9 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 				Component: row.Component, Version: row.Version,
 				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
 				Stream: row.Stream, Variant: row.Variant,
-				Places: row.Places, Builds: row.Builds,
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				Places:      row.Places, Builds: row.Builds,
 			})
 		}
 		out.Body.Total = total

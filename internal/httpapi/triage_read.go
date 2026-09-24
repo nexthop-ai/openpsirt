@@ -498,6 +498,8 @@ func findingRef(described map[int64]triage.Described, decisionID int64) *Finding
 	body := &FindingRefBody{
 		Product: d.Product, ProductName: labelBeside(d.ProductName, d.Product),
 		Stream: d.Stream, Variant: d.Variant,
+		StreamName:    labelBeside(d.StreamName, d.Stream),
+		VariantName:   labelBeside(d.VariantName, d.Variant),
 		Vulnerability: d.Issue.Identifier, Component: d.Component, Version: d.Version,
 		Severity: d.Issue.InForce(), Exploited: d.Issue.Exploited,
 		FixState: d.FixState, FixedIn: d.FixedIn,

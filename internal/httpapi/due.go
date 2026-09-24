@@ -26,7 +26,9 @@ type LateBody struct {
 
 	ProductName  string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
 	Stream       string `json:"stream"`
+	StreamName   string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
 	Variant      string `json:"variant"`
+	VariantName  string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
 	Places       int    `json:"places" doc:"The number of places in that build this sits at"`
 	AssignedTo   string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`
 	AssignedName string `json:"assigned_to_name,omitempty" doc:"Their display name, where they have one"`
@@ -101,8 +103,10 @@ func registerDue(api huma.API, in Ingest) {
 				Exploited: row.Exploited, Component: row.Component, Version: row.Version,
 				Product: row.Product, ProductName: labelBeside(row.ProductName, row.Product),
 				Stream: row.Stream, Variant: row.Variant,
-				Places: row.Places,
-				Due:    row.Due.Format(time.DateOnly),
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				Places:      row.Places,
+				Due:         row.Due.Format(time.DateOnly),
 				// Rounded down, not toward zero. Truncation reports something
 				// twelve hours overdue as having zero days left, which reads
 				// as due today rather than as late.

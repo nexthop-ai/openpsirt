@@ -27,7 +27,9 @@ type EmbargoedBody struct {
 
 	ProductName string `json:"product_name,omitempty" doc:"The product's display name, where it has one"`
 	Stream      string `json:"stream"`
+	StreamName  string `json:"stream_name,omitempty" doc:"The branch or tag as it was spelled, where that differs from its name"`
 	Variant     string `json:"variant"`
+	VariantName string `json:"variant_name,omitempty" doc:"The variant as it was spelled, where that differs from its name"`
 	Severity    string `json:"severity,omitempty"`
 	DiscloseAt  string `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
 	// Passed says the date has arrived. It is a date to answer rather than a
@@ -363,7 +365,9 @@ func registerDisclosure(api huma.API, in Ingest) {
 				Component: row.Component, Product: row.Product,
 				ProductName: labelBeside(row.ProductName, row.Product),
 				Stream:      row.Stream, Variant: row.Variant, Severity: row.Severity,
-				DiscloseAt: stamp(row.DiscloseAt), Passed: row.Passed(now),
+				StreamName:  labelBeside(row.StreamName, row.Stream),
+				VariantName: labelBeside(row.VariantName, row.Variant),
+				DiscloseAt:  stamp(row.DiscloseAt), Passed: row.Passed(now),
 				Places: row.Places,
 			})
 		}

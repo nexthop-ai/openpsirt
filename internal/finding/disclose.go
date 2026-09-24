@@ -27,7 +27,9 @@ type Embargoed struct {
 	Product       string `bun:"product"`
 	ProductName   string `bun:"product_name"`
 	Stream        string `bun:"stream"`
+	StreamName    string `bun:"stream_name"`
 	Variant       string `bun:"variant"`
+	VariantName   string `bun:"variant_name"`
 	Severity      string `bun:"severity"`
 	// DiscloseAt is when the embargo ends. Reaching it discloses nothing:
 	// it is a date to answer, not a trigger.
@@ -122,8 +124,10 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		ColumnExpr(`c.name AS "component"`).
 		ColumnExpr(`p.name AS "product"`).
 		ColumnExpr(`COALESCE(NULLIF(p.display_name, ''), p.name) AS "product_name"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		ColumnExpr(`MIN(f.disclose_at) AS "disclose_at"`).
 		// Whoever is dealing with it, and nobody where the places disagree.
 		// A minimum named one of them: a partly assigned embargo read as one
@@ -139,7 +143,7 @@ func (s *Store) DisclosingPage(ctx context.Context, subject access.Subject, scop
 		Where("f.disclose_at IS NOT NULL").
 		Where("f.disclose_at <= ?", s.now().UTC().Add(within)).
 		GroupExpr("v.identifier, v.description, " + rating.EffectiveExpr +
-			", c.name, p.name, p.display_name, st.display_name, va.display_name").
+			", c.name, p.name, p.display_name, st.name, st.display_name, va.name, va.display_name").
 		OrderExpr("disclose_at, v.identifier")
 	if len(private) > 0 {
 		query = query.Where("st.product_id IN (?)", bun.List(private))

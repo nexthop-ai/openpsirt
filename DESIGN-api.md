@@ -377,8 +377,10 @@ A person named as the actor on a record is named the same way.
 | The actor's field carries the sign-in identity | A caller matches the record against a person, and a screen matches it against the viewer's own identity to decide what is theirs |
 | The display name sits beside it in a field suffixed `_name` | `proposed_by` and `proposed_by_name`, `by` and `by_name`. One suffix, so a caller finds the label without reading each field's description |
 | A row naming the product it is about carries the product's name, with the display name beside it in `product_name` | A caller filters a list and builds a path from the product it was handed, and a display name resolves to no product |
+| A row naming a build carries the branch or tag and the variant by name, with the spelling somebody declared beside each in `stream_name` and `variant_name` | The same rule as the product. A path folds a name, so the spelling routes today; the field still carries the name a path is built from, and the spelling is a label |
+| A file carries a label as a column beside the name | The running-out, repeated-deferral and audit files name the product, and the running-out file the build, the way their lists do |
 | The holder of work is a person's identity or a team's name | The holder's own list resolves it, and a team's label matches no team |
-| The administration trail's file carries both, as two columns | A spreadsheet filtered on the identity and one read by a person are the same file |
+| The administration trail's file carries the person both ways, as two columns | A spreadsheet filtered on the identity and one read by a person are the same file |
 
 ## File organization
 

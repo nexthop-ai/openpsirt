@@ -84,7 +84,8 @@ func registerDueExport(api huma.API, in Ingest) {
 			About: []Stated{{"looking ahead days", strconv.Itoa(input.Days)}},
 			Header: []string{
 				"issue", "severity", "exploited", "component", "version",
-				"product", "stream", "variant", "places", "held by", "due", "days left",
+				"product", "product name", "stream", "stream name", "variant", "variant name",
+				"places", "held by", "due", "days left",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
 				late, _, err := store.RunningOutPage(ctx, subject, scope,
@@ -114,7 +115,9 @@ func registerDueExport(api huma.API, in Ingest) {
 						row.Vulnerability, row.Severity,
 						strconv.FormatBool(row.Exploited),
 						row.Component, row.Version,
-						row.Product, row.Stream, row.Variant,
+						row.Product, labelBeside(row.ProductName, row.Product),
+						row.Stream, labelBeside(row.StreamName, row.Stream),
+						row.Variant, labelBeside(row.VariantName, row.Variant),
 						strconv.Itoa(row.Places), held,
 						row.Due.Format(time.DateOnly),
 						// Rounded down rather than toward zero, the way the
@@ -310,7 +313,8 @@ func registerAuditExport(api huma.API, in Ingest) {
 			What:  "the record of judgments",
 			About: about,
 			Header: []string{
-				"id", "proposed", "product", "issue", "component", "version", "consumer",
+				"id", "proposed", "product", "product name", "issue", "component", "version",
+				"consumer",
 				"outcome", "justification", "deferred until", "fixed version",
 				"state", "standing", "proposed by", "approved by", "two people", "ended",
 				"agreements", "reasoning",
@@ -351,7 +355,7 @@ func registerAuditExport(api huma.API, in Ingest) {
 					}
 					rows = append(rows, []string{
 						strconv.FormatInt(body.ID, 10), body.ProposedAt, body.Product,
-						body.Issue, body.Component, body.Version, body.Consumer,
+						body.ProductName, body.Issue, body.Component, body.Version, body.Consumer,
 						string(body.Outcome), string(body.Justification), body.DeferredUntil,
 						body.FixedVersion, body.State,
 						strconv.FormatBool(body.Standing),

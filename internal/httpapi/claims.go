@@ -137,7 +137,7 @@ func registerClaims(api huma.API, in Ingest) {
 		link := "/decisions/" + strconv.FormatInt(back.Decision.ID, 10)
 		if described, err := store.Describe(ctx, subject, []triage.Decision{back.Decision}); err == nil {
 			if d, ok := described[back.Decision.ID]; ok {
-				link = findingPath(d.Product, d.StreamName, d.VariantName,
+				link = findingPath(d.Product, d.Stream, d.Variant,
 					d.Issue.Identifier, d.Component) + "?version=" + url.QueryEscape(d.Version)
 			}
 		} else if err != nil {

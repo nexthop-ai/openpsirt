@@ -27,9 +27,11 @@ type Standing struct {
 	// branch or a tag. A screen asks because the comparison only means
 	// something for a branch: a tag is one frozen point and was not cut into
 	// anything.
-	Stream  string `bun:"stream"`
-	Variant string `bun:"variant"`
-	Kind    string `bun:"kind"`
+	Stream      string `bun:"stream"`
+	StreamName  string `bun:"stream_name"`
+	Variant     string `bun:"variant"`
+	VariantName string `bun:"variant_name"`
+	Kind        string `bun:"kind"`
 	// ByBand is critical, high, medium and low, folded the way the line folds
 	// them, with nothing for a band holding nothing.
 	ByBand map[string]int `bun:"-"`
@@ -184,9 +186,11 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		ColumnExpr(`tg.id AS "target_id"`).
-		ColumnExpr(`st.display_name AS "stream"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
 		ColumnExpr(`st.kind AS "kind"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		Where("tg.stream_id = ?", streamID).
 		Where("tg.variant_id = ?", variantID).
 		Limit(1).

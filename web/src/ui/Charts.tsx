@@ -343,7 +343,7 @@ export function Across({ releases }: { releases: Release[] }) {
 export function Releases({
   points,
 }: {
-  points: { stream?: string; open?: number; cut?: string }[];
+  points: { stream?: string; stream_name?: string; open?: number; cut?: string }[];
 }) {
   if (points.length === 0) return null;
   const W = 560,
@@ -391,13 +391,13 @@ export function Releases({
               rx={2}
             >
               <title>
-                {point.stream}: {(point.open ?? 0).toLocaleString()} open
+                {point.stream_name || point.stream}: {(point.open ?? 0).toLocaleString()} open
               </title>
             </rect>
             {/* Every release is named. A tick every other bar would leave
                 somebody counting to work out which one they are looking at. */}
             <text className="axis" x={x + bar / 2} y={T + H + 16} textAnchor="middle">
-              {point.stream}
+              {point.stream_name || point.stream}
             </text>
           </g>
         );

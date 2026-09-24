@@ -114,7 +114,8 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
           {row.finding?.stream && (
             <>
               {" "}
-              · {row.finding.stream} · {row.finding.variant}
+              · {row.finding.stream_name || row.finding.stream} ·{" "}
+              {row.finding.variant_name || row.finding.variant}
             </>
           )}
         </td>

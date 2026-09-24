@@ -39,6 +39,9 @@ type Match struct {
 	TargetID int64
 	Stream   string
 	Variant  string
+	// StreamName and VariantName are the names they are shown under; the
+	// two above are the names a path addresses them by.
+	StreamName, VariantName string
 	// Version is what that build ships under the name, which is what a route
 	// naming a component resolves. For anything that is not a patched fork it
 	// is the same as the upstream version below; for a fork it is the fork's
@@ -169,7 +172,9 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		PlaceIdentity     string `bun:"place_identity"`
 		TargetID          int64  `bun:"target_id"`
 		Stream            string `bun:"stream"`
+		StreamName        string `bun:"stream_name"`
 		Variant           string `bun:"variant"`
+		VariantName       string `bun:"variant_name"`
 		Version           string `bun:"version"`
 		ComponentUpstream string `bun:"component_upstream"`
 		ConsumerUpstream  string `bun:"consumer_upstream"`
@@ -184,8 +189,10 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		Join(`LEFT JOIN "component" AS "uc" ON uc.id = f.consumer_id`).
 		ColumnExpr(`f.place_identity AS "place_identity"`).
 		ColumnExpr(`f.target_id AS "target_id"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(ComponentUpstreamExpr+` AS "component_upstream"`).
 		ColumnExpr(ConsumerUpstreamExpr+` AS "consumer_upstream"`).
@@ -195,9 +202,10 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		Where("f.place_identity IN (?)", bun.List(identities)).
 		Where("f.closed_at IS NULL").
 		Where("f.visibility IN (?)", bun.List(visible)).
-		GroupExpr("f.place_identity, f.target_id, st.display_name, va.display_name, c.version, "+
+		GroupExpr("f.place_identity, f.target_id, st.name, st.display_name, va.name, va.display_name, "+
+			"c.version, "+
 			ComponentUpstreamExpr+", "+ConsumerUpstreamExpr).
-		OrderExpr("st.display_name, va.display_name, c.version").
+		OrderExpr("st.name, va.name, c.version").
 		Scan(ctx, &rows)
 	if err != nil {
 		return Reach{}, fmt.Errorf("look for the same issue elsewhere: %w", err)
@@ -210,6 +218,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 		}
 		match := Match{
 			TargetID: row.TargetID, Stream: row.Stream, Variant: row.Variant,
+			StreamName: row.StreamName, VariantName: row.VariantName,
 			Version:           row.Version,
 			ComponentUpstream: row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
 			Places: row.Places,

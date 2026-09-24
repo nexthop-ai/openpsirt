@@ -40,3 +40,36 @@ func TestAListNamesAProductByTheNameThatAddressesIt(t *testing.T) {
 		}
 	})
 }
+
+// TestAListNamesABuildByTheNamesThatAddressIt is the same rule for the branch
+// or tag and the variant. The cast declares them with a capital, so the
+// spelling shown differs from the name a path folds to.
+func TestAListNamesABuildByTheNamesThatAddressIt(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.scanned(t)
+
+		type row struct {
+			Stream      string `json:"stream"`
+			StreamName  string `json:"stream_name"`
+			Variant     string `json:"variant"`
+			VariantName string `json:"variant_name"`
+		}
+		for _, path := range []string{"/v1/running-out?days=365", "/v1/unassigned"} {
+			var list struct {
+				Items []row `json:"items"`
+			}
+			read(t, r, "triager", path, &list)
+			if len(list.Items) == 0 {
+				t.Errorf("%s answered nothing, so this checked nothing", path)
+				continue
+			}
+			for _, one := range list.Items {
+				if one.Stream != "master" || one.StreamName != "Master" ||
+					one.Variant != "broadcom" || one.VariantName != "Broadcom" {
+					t.Errorf("%s names the build as %+v, want the addresses with the spellings beside them",
+						path, one)
+				}
+			}
+		}
+	})
+}

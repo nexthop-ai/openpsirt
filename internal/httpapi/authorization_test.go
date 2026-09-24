@@ -207,21 +207,24 @@ func seedCast(ctx context.Context, db *database.DB) (cast, error) {
 	if err != nil {
 		return cast{}, err
 	}
-	if _, err := cat.DeclareStream(ctx, mine.ID, "master", catalog.Branch, nil); err != nil {
+	// The streams and variants are declared with a capital, so each is spelled
+	// differently from the name a path addresses it by and a test can tell
+	// which of the two a field carries.
+	if _, err := cat.DeclareStream(ctx, mine.ID, "Master", catalog.Branch, nil); err != nil {
 		return cast{}, err
 	}
-	if _, err := cat.DeclareVariant(ctx, mine.ID, "broadcom", true); err != nil {
+	if _, err := cat.DeclareVariant(ctx, mine.ID, "Broadcom", true); err != nil {
 		return cast{}, err
 	}
 	theirs, err := cat.DeclareProduct(ctx, "theirs", shownAs("theirs"))
 	if err != nil {
 		return cast{}, err
 	}
-	theirBranch, err := cat.DeclareStream(ctx, theirs.ID, "master", catalog.Branch, nil)
+	theirBranch, err := cat.DeclareStream(ctx, theirs.ID, "Master", catalog.Branch, nil)
 	if err != nil {
 		return cast{}, err
 	}
-	theirVariant, err := cat.DeclareVariant(ctx, theirs.ID, "mellanox", true)
+	theirVariant, err := cat.DeclareVariant(ctx, theirs.ID, "Mellanox", true)
 	if err != nil {
 		return cast{}, err
 	}

@@ -175,6 +175,9 @@ type Group struct {
 	Builds  int
 	Stream  string
 	Variant string
+	// StreamName and VariantName are the spellings shown, beside the names
+	// above that a path addresses them by.
+	StreamName, VariantName string
 	// Matched says how the scanner reached this. One answer for the whole
 	// group: every place of it comes from the same line of a report. Empty
 	// where the scanner said nothing.
@@ -451,6 +454,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 			// build: the group sits in every build the count names, and each
 			// of them reaches it its own way.
 			group.Stream, group.Variant = at.Stream, at.Variant
+			group.StreamName, group.VariantName = at.StreamName, at.VariantName
 		}
 		groups = append(groups, group)
 	}
@@ -542,16 +546,17 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 
 // build names one of the places a group sits, for a row that spans several.
 type build struct {
-	ID      int64  `bun:"id"`
-	Stream  string `bun:"stream"`
-	Variant string `bun:"variant"`
+	ID          int64  `bun:"id"`
+	Stream      string `bun:"stream"`
+	StreamName  string `bun:"stream_name"`
+	Variant     string `bun:"variant"`
+	VariantName string `bun:"variant_name"`
 }
 
 // buildsNamed names the builds a page's rows point at.
 //
-// One statement for the page rather than one per row, and the names are the
-// ones somebody declared: a path resolves a name without regard to capitals ,
-// so what was typed is both what reads correctly and what routes.
+// One statement for the page rather than one per row. Each name is the one a
+// path addresses the build by, with the spelling somebody declared beside it.
 func buildsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build, error) {
 	named := make(map[int64]build, len(ids))
 	if len(ids) == 0 {
@@ -563,8 +568,10 @@ func buildsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build,
 		Join(`JOIN "stream" AS "st" ON st.id = tg.stream_id`).
 		Join(`JOIN "variant" AS "va" ON va.id = tg.variant_id`).
 		ColumnExpr(`tg.id AS "id"`).
-		ColumnExpr(`st.display_name AS "stream"`).
-		ColumnExpr(`va.display_name AS "variant"`).
+		ColumnExpr(`st.name AS "stream"`).
+		ColumnExpr(`st.display_name AS "stream_name"`).
+		ColumnExpr(`va.name AS "variant"`).
+		ColumnExpr(`va.display_name AS "variant_name"`).
 		Where("tg.id IN (?)", bun.List(ids)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("name the builds a page sits in: %w", err)

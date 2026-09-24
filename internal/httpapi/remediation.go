@@ -210,7 +210,7 @@ func registerRemediation(api huma.API, in Ingest) {
 			What:  "repeated deferrals",
 			About: []Stated{{"deferred at least", strconv.Itoa(input.AtLeast) + " times"}},
 			Header: []string{
-				"product", "issue", "severity", "place", "times",
+				"product", "product_name", "issue", "severity", "place", "times",
 				"total_days", "standing", "last_until",
 			},
 			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
@@ -222,7 +222,7 @@ func registerRemediation(api huma.API, in Ingest) {
 				written := make([][]string, 0, len(rows))
 				for _, row := range repeatBodies(rows) {
 					written = append(written, []string{
-						row.Product, row.Vulnerability, row.Severity, row.Place,
+						row.Product, row.ProductName, row.Vulnerability, row.Severity, row.Place,
 						strconv.Itoa(row.Times), strconv.Itoa(row.TotalDays),
 						strconv.FormatBool(row.Standing), row.LastUntil,
 					})
