@@ -1265,6 +1265,13 @@ else
 	  --set auth.bootstrapAdmins='{admin}' --set auth.baseURL=https://psirt.example.com \
 	  --set auth.oidc.issuer=https://id.example.com --set auth.oidc.clientID=abc \
 	  --set auth.oidc.clientSecret=shh --set auth.oidc.usernameClaim=sub >/dev/null
+	@# An upgrade may reshape tables the earlier release reads, so by default
+	@# no pod of it serves beside a pod of this one.
+	@helm template t deploy/helm/openpsirt --set database.existingSecret=s \
+	  --set auth.bootstrapAdmins='{admin}' --set auth.trustedHeader.name=X-User \
+	  --set auth.trustedHeader.sources='{10.0.0.0/8}' -s templates/deployment.yaml \
+	  | awk '/^  strategy:$$/ {s=1; next} s && /^    type: Recreate$$/ {found=1} /^  [^ ]/ {s=0} END {exit !found}' \
+	  || { echo "the chart's Deployment does not stop the earlier release before starting this one"; exit 1; }
 	# An install that cannot reach a login is not an install, and mail that is
 	# half configured is mail nobody gets. Each of these refuses at template
 	# time rather than producing a deployment that starts, fails its own
