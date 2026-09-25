@@ -479,7 +479,7 @@ const STATES: Record<Uploaded, { cls: string; label: string; means: string }> = 
   },
   scanned: { cls: "agreed", label: "Completed", means: "complete" },
   failed: {
-    cls: "lapsed",
+    cls: "bad",
     label: "Failed",
     means: "it did not finish, and the reason is beside it",
   },

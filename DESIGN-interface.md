@@ -164,6 +164,25 @@ what every other application on the same screen calls them.
 Two looks, not three. Named for their aesthetics they ask somebody to guess
 which of "Dojo", "Ledger" and "Obsidian" is the light one.
 
+### State chips
+
+A state is a word on a tint of its color. The color says how the reader should
+take the word, so one color never carries two readings.
+
+| Class | Means | Color | Examples |
+|---|---|---|---|
+| `closed` | Asked for and done | Good | Scanned, met |
+| `agreed` | Agreed to | Good | Decided, approved, in force |
+| `waiting` | Under way, or waiting on somebody | Amber | Pending, scanning |
+| `warn` | Not wrong yet, and close to it | Amber | A queue at its limit |
+| `lapsed` | Ended without standing | Orange | Lapsed, withdrawn, sent back |
+| `bad` | Wrong, and somebody should look | Red | Failing, failed, stopped |
+| none | A fact, neither good nor bad | Muted | Left, held back |
+
+| Rule | |
+|---|---|
+| A problem is never drawn in the done color | Green reads as good news, which is the one reading a failure must not get. A web test fails on a chip drawn as done whose words say something is wrong |
+
 ## The shell
 
 A rail down the side carries the brand and the entries grouped by what they span;

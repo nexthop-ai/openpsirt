@@ -53,7 +53,7 @@ function useSources(product: string) {
 function Read({ row }: { row: Source }) {
   if (row.because) {
     return (
-      <span className="state closed" title={row.because}>
+      <span className="state bad" title={row.because}>
         {row.read ? <>failing, last read {since(row.read)}</> : <>never read</>}
       </span>
     );

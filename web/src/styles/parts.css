@@ -359,6 +359,14 @@ a.kpi:hover {
 .state.closed {
   --c: var(--ok);
 }
+/* Something wrong that somebody should look at: failing, stopped, failed. */
+.state.bad {
+  --c: var(--sev-critical);
+}
+/* Not wrong yet, and close to it: a queue at its limit. */
+.state.warn {
+  --c: var(--wait);
+}
 
 /* A word standing in for a value that is missing in a way somebody should act
    on. "never", where every other row in the column carries a date: the page
