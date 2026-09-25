@@ -76,7 +76,7 @@ Missing or wrong, with no decision needed to fix it.
 | Nothing checks that every API operation is reached by some screen | An operation no screen calls is found only by reading |
 | Other multi-step flows lack a visible next step | Reporting a flaw was reworked so each step offers the next. Finding to decision to approval, and fix to release to VEX, were not |
 | A flaw found here and upgraded from v0.1.0 has no report | v0.1.0 kept nothing saying who recorded it. A later claim about it is accepted as the flaw where it should be ruled a duplicate |
-| `cgit.freedesktop.org` patch links fail | That project moved to GitLab. The System screen shows the failure |
+| `cgit.freedesktop.org` patch links fail, except drm-misc | Those projects moved to GitLab, most under new paths. Each needs its new address checked before it is read there. The System screen shows the failure |
 | One demo component has no walkable route to the build root | `golang.org/x/net` under `sonic-mgmt-common-codegen`. The screen names the consumer. The inventory may hold a disconnected fragment |
 | No real producer's SPDX 3.x output is a fixture | The SPDX 3.x fixtures are the specification's own examples. Yocto and one vendor tool emit it |
 | The recorded scanner output is from grype 0.112.0 | The image ships 0.119.0. Re-recording changes what several tests assert |

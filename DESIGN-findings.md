@@ -306,11 +306,19 @@ startup, so turning it off is a restart.
 | git.savannah.gnu.org, cgit.git.savannah.gnu.org | `/cgit/{repo}` | `https.git.savannah.gnu.org/git/{repo}` |
 | git.savannah.nongnu.org, cgit.git.savannah.nongnu.org | `/cgit/{repo}` | `https.git.savannah.nongnu.org/git/{repo}` |
 | cgit.freebsd.org | `/{repo}` | `git.freebsd.org/{repo}` |
+| sourceware.org | `/cgit/{repo}` | `sourceware.org/git/{repo}` |
 
-A cgit site no longer serving a repository at any address, such as
-cgit.freedesktop.org since the project moved to GitLab, is read as the address
-its link names. Fetching it fails, and the failure is shown with the reason
-git gave.
+A repository a retired site's links still name is read at the address it moved
+to, where that move is known and the new address has been checked to clone.
+
+| Link reads as | Fetched from |
+|---|---|
+| `cgit.freedesktop.org/drm/drm-misc` | `gitlab.freedesktop.org/drm/misc/kernel` |
+
+Any other repository on a site no longer serving it, such as the rest of
+cgit.freedesktop.org, is read as the address its link names. Fetching it fails,
+and the failure is shown with the reason git gave. A repository row recorded
+under an address no link reads as any more is left out of the report.
 
 Measured on this deployment's own demonstration data: 36,625 patch links, of
 which 36,000 are `git.kernel.org/stable/c/`.
