@@ -9,7 +9,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Wide } from "../ui/Wide";
 import { since } from "../ui/when";
-import { humaneBytes } from "./bytes";
+import { PatchBranches } from "./PatchBranches";
 import { WebhookDelivery } from "./Webhooks";
 
 // The deployment's own state, rather than what it has found.
@@ -213,109 +213,6 @@ function VulnerabilityData() {
       )}
     </section>
   );
-}
-
-// The repositories listed. Sorted by work left, so a stuck one is at the top
-// and the tail is the repositories with one or two commits each.
-const REPOSITORIES = 20;
-
-// How far looking up the branches patch links' commits are on has got, and
-// what the repository copies take on disk.
-//
-// Fails silently like the rest of this screen: a host that stopped answering
-// leaves labels missing from findings, and nothing on a finding says so.
-function PatchBranches() {
-  const progress = useQuery({
-    queryKey: ["patch-branches"],
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/patch-branches", { params: { query: { limit: REPOSITORIES } } })),
-  });
-
-  if (progress.isPending) return <Loading />;
-  if (progress.isError) {
-    return (
-      <Failed
-        error={progress.error}
-        what="How far the patch branch lookups have got could not be read."
-      />
-    );
-  }
-  const it = progress.data;
-  const rows = it?.repositories ?? [];
-  const held = it?.held_bytes ?? 0;
-
-  return (
-    <section className="panel">
-      <h3>Patch branches</h3>
-      <p className="hint" style={{ marginTop: 0 }}>
-        {it?.on ? "On" : "Off, in the deployment's configuration"} ·{" "}
-        {(it?.looked ?? 0).toLocaleString()} of {(it?.commits ?? 0).toLocaleString()} commits looked
-        up · from {(it?.links ?? 0).toLocaleString()} patch links
-        {held > 0 && ` · copies ${humaneBytes(String(held))}`}
-      </p>
-      {rows.length === 0 ? (
-        <Empty
-          title="No patch link names a commit."
-          detail="Only links to a commit in a repository are looked up."
-        />
-      ) : (
-        <>
-          {rows.length < (it?.total ?? 0) && (
-            <p className="hint">
-              {rows.length.toLocaleString()} of {(it?.total ?? 0).toLocaleString()} repositories
-              shown.
-            </p>
-          )}
-          <Wide>
-            <table>
-              <thead>
-                <tr>
-                  <th>Repository</th>
-                  <th>State</th>
-                  <th>Looked up</th>
-                  <th>Copy</th>
-                  <th>Last finished</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.url} className="row">
-                    <td className="id">{row.url}</td>
-                    <td title={row.reason || undefined}>{standing(row.state)}</td>
-                    <td className="hint">
-                      {row.looked.toLocaleString()} / {row.commits.toLocaleString()}
-                      {row.looked > row.found &&
-                        ` · ${(row.looked - row.found).toLocaleString()} not in repository`}
-                    </td>
-                    <td className="hint">
-                      {row.held_bytes ? humaneBytes(String(row.held_bytes)) : "—"}
-                    </td>
-                    <td className="hint">{row.reached_at ? since(row.reached_at) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Wide>
-        </>
-      )}
-    </section>
-  );
-}
-
-// Each repository state in words.
-function standing(state?: string) {
-  switch (state) {
-    case "working":
-      return <span className="state open">fetching</span>;
-    case "failed":
-      return <span className="state closed">failed</span>;
-    case "excluded":
-      return <span className="hint">excluded</span>;
-    case "done":
-      return <span>done</span>;
-    default:
-      return <span className="hint">waiting</span>;
-  }
 }
 
 // Each reason's meaning, in words rather than in the vocabulary the API uses.

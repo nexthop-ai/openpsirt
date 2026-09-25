@@ -1536,7 +1536,7 @@ What this deployment is doing, rather than what it has found.
 | What a full queue needs is both numbers | An operator adds workers or raises the limit, and neither is decided from the depth alone. Said beside the count rather than drawn as a bar, because at the limit is a state rather than a proportion |
 | A resolved issue is counted at the severity it held while it was open | The step it left in no longer has one, and counting it as unrated would make every answered critical disappear from the answered column |
 | The signing secret is never shown, so changing one means recording the destination again | It signs our requests rather than authenticating anybody to us. A configuration screen that showed it would put a shared secret on a page |
-| Patch branch lookups are reported per repository, with the work left and the disk each copy takes | A host that stops answering leaves labels missing from findings, and nothing on a finding says so. Sorted by commits still to look up, so a stuck repository sits at the top; what stopped its last visit is on hover over its state |
+| Patch branch lookups are shown in the order the pass works: Now, Next, Failed, and Done folded away | A host that stops answering leaves labels missing from findings, and nothing on a finding says so. Now carries the step and a bar of commits looked up against those due, and the panel asks again every ten seconds while a visit is under way. Next is numbered. A failure's first line shows, the whole on hover, with when it is retried. Every repository is reachable, a page at a time; `DESIGN-findings.md` § Patch branches holds what each part means |
 
 ## The administration screens
 
