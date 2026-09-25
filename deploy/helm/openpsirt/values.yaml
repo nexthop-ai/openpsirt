@@ -197,7 +197,7 @@ ingress:
 # Raise both together with the ingest bounds. `OPENPSIRT_INGEST_*` allows about
 # 250 MB for one document being read, and that is the server's half.
 #
-# Patch branch lookups, where an administrator turns them on, add git as a
+# Patch branch lookups, where `patchBranches.enabled` turns them on, add git as a
 # third process in the same cgroup: 1.3 GB at the peak of a first fetch of the
 # kernel from kernel.org, which can coincide with a scan. Raise the limit to 4Gi
 # before turning them on; over the limit, the kernel may kill the server itself.
@@ -305,17 +305,25 @@ outbound:
   #   - 203.0.113.0/24
 
 # Labeling a patch link with the branches its commit is on, which fetches the
-# repositories reports link to. Off until an administrator turns it on under
-# Settings; nothing here turns it on.
+# repositories reports link to. Off unless turned on here. Before turning it on:
+#   - raise `resources.limits.memory` to 4Gi
+#   - set `outbound.excluded`
+#   - name `existingClaim` below, so the copies survive a restart
 patchBranches:
-  # Needs the memory limit raised: see `resources` above. Set
-  # `outbound.excluded` before turning it on.
-  #
+  enabled: false
   # How many bytes the copies may hold together, as a whole number. Empty takes
   # the built-in 20 GB, which holds the kernel's full history beside others.
   quota: ""
   # A claim to keep the copies on. Without one they are scratch space and are
   # fetched again after every restart — fifteen minutes and 5 GB for the kernel.
+  #
+  # With more than one replica: one replica fetches at a time, and every
+  # replica serves the branch labels, which live in the database. Use a
+  # ReadWriteMany claim shared by all of them. A ReadWriteOnce claim leaves the
+  # replicas on other nodes Pending, and the chart cannot catch that because it
+  # cannot see the access mode of a claim it did not make. With no claim, each
+  # pod keeps its own scratch copy and fetches again whenever the work moves
+  # to it.
   existingClaim: ""
   # The bound on that scratch space. Empty follows the quota with a fifth
   # beside it, 24 GB for the built-in one: a copy arriving adds to the copies

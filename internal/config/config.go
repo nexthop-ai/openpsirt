@@ -260,6 +260,12 @@ type Config struct {
 	// Zero takes the built-in default.
 	PatchDir   string
 	PatchQuota int
+	// PatchBranches is whether the deployment looks up which branches hold
+	// the commits patch links name (REQ-78). Here rather than among the
+	// settings because turning it on is work only the person who deployed it
+	// can do: the memory the fetches take, the volume the copies live on and
+	// the hosts they may not reach are all theirs.
+	PatchBranches bool
 	// OutboundExcluded is where nothing is fetched from — no repository a
 	// patch link names and no supplier's directory: host names, each
 	// covering the hosts under it, and networks. On top of this network,
@@ -377,6 +383,7 @@ func Load() (Config, error) {
 		UpstreamInternal:       listed(env("UPSTREAM_INTERNAL", "")),
 		PatchDir:               env("PATCH_DIR", "/var/cache/openpsirt/repositories"),
 		PatchQuota:             r.number("PATCH_QUOTA", patchbranch.DefaultQuota),
+		PatchBranches:          r.boolean("PATCH_BRANCHES", false),
 		TrustedGroupsHeader:    env("TRUSTED_GROUPS_HEADER", ""),
 		TrustedGroupsDelimiter: env("TRUSTED_GROUPS_DELIMITER", ","),
 		PlainHTTP:              r.boolean("PLAIN_HTTP", false),

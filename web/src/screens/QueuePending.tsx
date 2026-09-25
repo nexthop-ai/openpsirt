@@ -93,10 +93,7 @@ export function Embargoes({
     <>
       <div className="screen-head" id="embargoes" style={{ marginTop: 22 }}>
         <h2>Disclosure dates</h2>
-        <p>
-          {said(waiting.length, total)} · somebody has asked to move a date or disclose an issue,
-          and it needs a second person. Reaching the date discloses nothing by itself.
-        </p>
+        <p>{said(waiting.length, total)} · moves and disclosures waiting for a second person.</p>
       </div>
       {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
       <div className="queue">
@@ -206,11 +203,7 @@ export function Ratings({
     <>
       <div className="screen-head" id="ratings" style={{ marginTop: 22 }}>
         <h2>Ratings awaiting approval</h2>
-        <p>
-          {said(waiting.length, total)} · somebody says an issue is milder than the world does. A
-          rating holds in every build of the product it was made for, so it waits for a second
-          person.
-        </p>
+        <p>{said(waiting.length, total)} · issues rated milder than the world rates them.</p>
       </div>
       {agree.error != null && <Failed error={agree.error} what="That could not be agreed to." />}
       <div className="queue">
@@ -237,15 +230,12 @@ export function Ratings({
                   This takes {(row.off_the_list ?? 0).toLocaleString()} of them off the working list
                   in {row.product_name || row.product}.
                 </strong>
-                <span>
-                  Still recorded and counted, but with no deadline. You are agreeing this is not
-                  work, rather than later work.
-                </span>
+                <span>They stay recorded, with no deadline.</span>
               </p>
             ) : (
               <p className="hint" style={{ margin: "6px 0 0" }}>
-                Still above what {row.product_name || row.product} triages from, so this makes them
-                later work rather than no work.
+                Still above {row.product_name || row.product}'s triage line: later work, not no
+                work.
               </p>
             )}
             <div className="cardfoot">

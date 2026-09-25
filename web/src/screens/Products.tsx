@@ -184,7 +184,7 @@ export function Products({ who }: { who: Who }) {
                   Open findings
                 </th>
                 <th>Triage from</th>
-                <th title="When one pair of people agreeing to most of the work is raised: a share of the agreements, among at least this many people who may approve">
+                <th title="Raised when one proposer and approver pair makes this share of agreements, with at least this many approvers">
                   One pair
                 </th>
                 <th>Out of support</th>
@@ -304,7 +304,7 @@ export function Products({ who }: { who: Who }) {
         error={amend.error}
         busy={amend.isPending || renameTo.trim() === "" || showAs.trim() === ""}
         ok="Save"
-        hint="The name cannot be corrected once a document naming this product has gone out: readers hold it by that name. The shown name is not in any identifier and moves freely."
+        hint="Locked once a published document names it. The display name can always change."
       >
         <Field
           label="Name"

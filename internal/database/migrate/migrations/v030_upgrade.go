@@ -39,6 +39,10 @@ import (
 //     it is read from an inventory, and the next scan of a build that ships
 //     the component writes it, as a supplier is written.
 //
+// Two settings are carried: the disclosure movement threshold under the name
+// v0.1.0 gave it moves to the name read since, and the patch branch switch,
+// which moved into the deployment's configuration, is removed.
+//
 // A deadline a recorded flaw holds is rewritten onto the windows for our own
 // products as this release ships them, counted from the stamp. Nothing has set
 // those windows yet: the settings that hold them arrive with this release. A
@@ -66,11 +70,59 @@ func upgradeV030(ctx context.Context, tx bun.Tx) error {
 		// Rows that move onto the rules the new columns carry.
 		func() error { return foundHereLosesItsDate(ctx, tx) },
 		func() error { return ratedAndReclocked(ctx, tx) },
+		func() error { return settingsRenamed(ctx, tx) },
 	}
 	for _, step := range steps {
 		if err := step(); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// settingsRenamed carries the settings v0.3.0 reads under another name, or no
+// longer reads at all.
+//
+//   - The disclosure movement threshold was named for extensions alone in
+//     v0.1.0, and v0.2.0 renamed it without carrying the value, so an operator
+//     who set it in v0.1.0 has been on the shipped value since. The old value
+//     is carried to the new name where the new name is unset, and the old row
+//     removed. Where both are set, the new name is what v0.2.0 read, and it
+//     stands.
+//   - Patch branch lookups are turned on in the deployment's configuration in
+//     v0.3.0. The row that switched them is removed rather than left unread.
+func settingsRenamed(ctx context.Context, tx bun.Tx) error {
+	const old, current = "disclosure.extension-threshold", "disclosure.movement-threshold"
+	var held []struct {
+		Name      string    `bun:"name"`
+		Value     string    `bun:"value"`
+		UpdatedAt time.Time `bun:"updated_at"`
+	}
+	if err := tx.NewRaw(`SELECT "name", "value", "updated_at" FROM "application_setting"
+		WHERE "name" IN (?, ?)`, old, current).Scan(ctx, &held); err != nil {
+		return fmt.Errorf("read the disclosure movement threshold: %w", err)
+	}
+	var carried *time.Time
+	var value string
+	hasCurrent := false
+	for _, each := range held {
+		switch each.Name {
+		case old:
+			at := each.UpdatedAt
+			carried, value = &at, each.Value
+		case current:
+			hasCurrent = true
+		}
+	}
+	if carried != nil && !hasCurrent {
+		if _, err := tx.NewRaw(`INSERT INTO "application_setting" ("name", "value", "updated_at")
+			VALUES (?, ?, ?)`, current, value, *carried).Exec(ctx); err != nil {
+			return fmt.Errorf("carry the disclosure movement threshold to its name: %w", err)
+		}
+	}
+	if _, err := tx.NewRaw(`DELETE FROM "application_setting" WHERE "name" IN (?, ?)`,
+		old, "patch.branches").Exec(ctx); err != nil {
+		return fmt.Errorf("remove the settings nothing reads: %w", err)
 	}
 	return nil
 }

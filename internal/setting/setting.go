@@ -227,16 +227,6 @@ const (
 	// made of it, so names this deployment calls its own are held back and the
 	// report says which.
 	UpstreamCurrency = "upstream.currency"
-	// PatchBranches is whether this deployment fetches the repositories patch
-	// links point into, to label each linked commit with the branches that
-	// carry it.
-	//
-	// Off unless somebody turns it on, for the reason asking upstream is: it
-	// reaches out, and a scan needs none of it (REQ-12). What goes out is a
-	// fetch of a public repository a report named. The host comes from the
-	// report, so where a fetch may not go is a boundary the deployment draws
-	// in its configuration rather than here (REQ-78).
-	PatchBranches = "patch.branches"
 	// AttachmentMaxSize is the largest single file this deployment
 	// accepts, in bytes, and AttachmentQuota is how much it will hold in
 	// total.

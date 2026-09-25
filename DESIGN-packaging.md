@@ -111,6 +111,8 @@ used; this is where they live.
 | The quota is written as a whole number whatever the values file holds | A values file reads a whole number as a float, and 5.36870912e+10 is a value the server refuses |
 | The chart makes no claim for it | A deployment turning this on chooses its storage. A claim named in values is mounted instead |
 | The excluded hosts and the quota are chart values | Both are the deployment's boundary rather than an administrator's setting |
+| Turning the lookups on is a chart value too | Nothing about them works until the memory limit, the volume and the excluded hosts are set in the chart, so the person setting those is the one who turns them on. The value sets `OPENPSIRT_PATCH_BRANCHES` |
+| One replica fetches, and every replica serves the labels | The labels are in the database and the copies are one replica's disk. A claim shared by several replicas has to be ReadWriteMany. The chart cannot refuse a ReadWriteOnce claim it did not make, because it cannot see the claim's access mode |
 
 ## Pod sizing
 

@@ -22,7 +22,7 @@ Everything marked off does nothing until the thing in the last column is set.
 | [Scheduled rescanning](#scanning) | On, daily | `scanning.every` under Settings sets how often |
 | [Vulnerability data updates](#an-air-gapped-install) | On | `GRYPE_DB_AUTO_UPDATE`; set it to `false` where the deployment cannot reach the network |
 | [Upstream currency](#upstream-currency) | Off | `upstream.currency` under Settings |
-| [Patch branches](#patch-branches) | Off | `patch.branches` under Settings. Set [`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions) first |
+| [Patch branches](#patch-branches) | Off | `OPENPSIRT_PATCH_BRANCHES`, or `patchBranches.enabled` in the chart. [What to set first](#enabling) |
 | [Supplier advisories](#supplier-advisories) | Off | Naming a supplier under Settings |
 | [Mail](#mail) | Off | `OPENPSIRT_MAIL_FROM` and `OPENPSIRT_MAIL_SERVER`, both |
 | Webhooks | Off | Adding a destination under Settings |
@@ -36,25 +36,48 @@ refuses to start without one. [Sign-in](#sign-in) says which.
 ## Upgrading
 
 A database built by v0.1.0 or v0.2.0 is upgraded in place, at startup or by
-`openpsirt migrate up`. One built by v0.1.0 passes through v0.2.0's upgrade on
+`openpsirt migrate up`. One built by v0.1.0 passes through the v0.2.0 upgrade on
 the way. A database built by any build between releases is recreated.
 
-Back the database up first. On MySQL and MariaDB an upgrade that fails part way
-leaves the schema half changed, and the backup is what recovers it.
+Read the sections for the release you are coming from, and every section after
+it: from v0.1.0, read all three.
 
-Stop every process of the earlier release before upgrading. The upgrade from
-v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a v0.1.0 replica
-left serving during a rolling update fails on them. With the Helm chart, scale
-the deployment to zero first.
+### Every upgrade
 
-Going back is `openpsirt migrate down`, once for each release stepped back,
-run with this build before the earlier one is deployed. v0.1.0 started against
-an upgraded schema reports it current and cannot read it.
+| Step | |
+|---|---|
+| Back the database up | On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it |
+| Stop every process of the earlier release | With the Helm chart, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them |
+| Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
+
+Going back is `openpsirt migrate down`, once for each release stepped back, run
+with this build before the earlier one is deployed. v0.1.0 started against an
+upgraded schema reports it current and cannot read it. Patch branch lookups
+come back off in v0.2.0, which reads its own setting for them: turn them on
+again under its Settings.
+
+### From v0.1.0
+
+| Change | What to do |
+|---|---|
+| `private-read` and `private-triage` reach undisclosed findings only. In v0.1.0 they reached disclosed findings too | Grant `public-read` or `public-triage` beside them, directly, in a group binding or in a token's holds, wherever somebody should keep the disclosed findings. Nothing is granted on upgrade |
+| The setting `disclosure.extension-threshold` is `disclosure.movement-threshold` | Nothing. The value is carried across by the upgrade |
 
 | After the upgrade from v0.1.0 | |
 |---|---|
 | An advisory v0.1.0 issued | Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again |
 | A reported flaw | Has a reference, minted as one recorded today would be |
+
+### From v0.2.0
+
+Also read after an upgrade from v0.1.0.
+
+| Change | What to do |
+|---|---|
+| `OPENPSIRT_PATCH_EXCLUDED` is `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's `patchBranches.excluded` is `outbound.excluded` | Move the list. The old name is refused at startup, and the chart refuses to render with the old key set |
+| The excluded list also keeps supplier directories out, and a supplier is read from every host its description names | Set `outbound.excluded` wherever suppliers are configured |
+| A threshold stored under its v0.1.0 name, `disclosure.extension-threshold`, is in force again as `disclosure.movement-threshold` where that was never set. v0.2.0 read only the new name, so it ran on the default | Check it under Settings, Disclosure |
+| Patch branch lookups are turned on in the deployment's configuration. The `patch.branches` setting is gone | Set `patchBranches.enabled: true` in the chart, or `OPENPSIRT_PATCH_BRANCHES=true`. A deployment that had the setting on has the lookups off until then. [What to set first](#enabling) |
 
 | After the upgrade from v0.2.0 | |
 |---|---|
@@ -63,35 +86,6 @@ an upgraded schema reports it current and cannot read it.
 | A flaw recorded here with no severity in force | Not rated, and with no deadline |
 | A flaw recorded with nobody named as reporting it | Found here. It has no disclosure date |
 | A component | Has no license until a scan reads one from its inventory |
-
-`OPENPSIRT_BASE_URL` is checked at startup, and a value with no scheme is now
-refused where it used to be accepted. `psirt.example.com` has to become
-`https://psirt.example.com`.
-
-Accepting it bought nothing: with no scheme there is no host to read, so the
-same-origin check on every state-changing browser request falls back to the
-address the request itself claimed — the guard runs and guards nothing — and
-the address a sign-in provider is sent back to is not absolute, which the
-provider refuses. A deployment reaching this has not been protected by that
-check for as long as the value has been wrong.
-
-A path below the address is refused for the same reason:
-`https://psirt.example.com/psirt` makes every link this deployment writes point
-somewhere it does not answer. If this deployment is served under a path, that
-is a thing to raise rather than to configure here.
-
-`private-read` and `private-triage` used to include disclosed findings. Each
-now reaches only findings nobody has announced. Grant `public-read` or
-`public-triage` beside them — directly, in a group binding, or in a token's
-holds — wherever somebody should keep the disclosed findings. Nothing is
-granted on upgrade, so until then a holder of a private role alone sees no
-disclosed finding they are not assigned.
-
-`OPENPSIRT_PATCH_EXCLUDED` is now `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's
-`patchBranches.excluded` is now `outbound.excluded`. The list keeps supplier
-directories out as well as repositories. A deployment still setting the old
-name is refused at startup, naming the new one, and the chart refuses to render
-with the old key set.
 
 ## Serving
 
@@ -461,18 +455,35 @@ contain the commit, on the finding it belongs to. A fix backported to five
 branches arrives as five bare commit links, and the label is what says which
 one applies to the branch you ship.
 
-Off unless an administrator turns it on, under Settings. It fetches a copy of
-each repository a patch link names, from the host the link names, and asks the
-copy which branches hold each commit. Progress, failures and the size of each
-copy are on the System screen and at `/v1/patch-branches`.
+Off unless the deployment turns it on. It fetches a copy of each repository a
+patch link names, from the host the link names, and asks the copy which
+branches hold each commit. Progress, failures and the size of each copy are on
+the System screen and at `/v1/patch-branches`.
 
 | Variable | Meaning | Default |
 |---|---|---|
+| `OPENPSIRT_PATCH_BRANCHES` | Whether the lookups run. Read at startup, so changing it takes a restart | `false` |
 | `OPENPSIRT_PATCH_DIR` | Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume | `/var/cache/openpsirt/repositories` |
 | `OPENPSIRT_PATCH_QUOTA` | How many bytes the copies may hold together. The least recently used is removed to make room | `21474836480` (20 GB) |
 
-A report chooses the host, so set [`OPENPSIRT_OUTBOUND_EXCLUDED`](#outbound-exclusions)
-before turning this on.
+### Enabling
+
+| Step | Chart value | Why |
+|---|---|---|
+| Raise the memory limit to 4 GiB | `resources.limits.memory` | git runs inside the pod's limit beside the server and the scanner |
+| List your internal domains and networks | `outbound.excluded` | A report chooses the host. See [Outbound exclusions](#outbound-exclusions) |
+| Keep the copies on a volume | `patchBranches.existingClaim` | Scratch space loses them on every restart |
+| Turn it on | `patchBranches.enabled: true` | Sets `OPENPSIRT_PATCH_BRANCHES` |
+
+### Replicas
+
+| | |
+|---|---|
+| One replica fetches at a time | A lease decides which |
+| Every replica serves the labels | They are kept in the database |
+| The copies are one replica's disk | A ReadWriteMany claim shared by every replica keeps one set. Only the replica holding the lease writes to it |
+| A ReadWriteOnce claim with several replicas | The replicas on other nodes stay Pending. The chart cannot refuse this, because it cannot see the access mode of a claim it did not make |
+| No claim | Each pod keeps its own scratch copy and fetches again when the lease moves to it |
 
 Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.
@@ -768,7 +779,7 @@ resources:
 | The server reading one scanner report | Bounded by `OPENPSIRT_SCANNER_MAX_OUTPUT`. A read and a scan run in separate loops, so a pod can be doing both |
 | The scanner itself | Not bounded by anything here. It is a separate program, and its report is bounded only once written |
 | The scanner importing its vulnerability database | The largest single draw, and it happens on every start where the data is not kept |
-| Fetching a repository for [patch branches](#patch-branches) | Off unless turned on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org |
+| Fetching a repository for [patch branches](#patch-branches) | Off unless the deployment turns it on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org |
 
 Raise the limit for a bigger inventory, for raised scan-file bounds, or where
 the database is imported on every start.

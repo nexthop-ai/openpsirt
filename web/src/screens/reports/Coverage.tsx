@@ -99,14 +99,12 @@ export function Coverage() {
               {unsupported > 0 && (
                 <>
                   A further {unsupported.toLocaleString()}{" "}
-                  {unsupported === 1 ? "build is" : "builds are"} out of support and left out of
-                  those three figures. They are listed below and never counted as quiet: silence
-                  there is expected, and a coverage report filling with them stops catching the
-                  product that dropped out.{" "}
+                  {unsupported === 1 ? "build is" : "builds are"} out of support, listed below and
+                  not counted.{" "}
                 </>
               )}
-              The whole of it as a file — <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
-              <a href={fileAt("json", asked)}>JSON</a>, with the threshold stated in it.
+              Download <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
+              <a href={fileAt("json", asked)}>JSON</a>
             </p>
           </section>
 

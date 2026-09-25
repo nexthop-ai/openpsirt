@@ -229,8 +229,7 @@ export function Product() {
           </Wide>
         )}
         <p className="hint" style={{ marginTop: 8 }}>
-          Issues at components, the same unit the findings list uses. <b>Undecided</b> means no
-          place has a decision; <b>decided</b> means every place is answered by one that stands.
+          Issues at components. <b>Decided</b> means every place has a standing decision.
         </p>
       </div>
     </div>

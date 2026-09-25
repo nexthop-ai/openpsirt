@@ -279,8 +279,7 @@ export function Overview() {
               </table>
             </Wide>
             <p className="hint">
-              &ldquo;Nobody has said&rdquo; counts what carries no standing judgment. A claim
-              waiting on a second person suppresses nothing.
+              &ldquo;Nobody has said&rdquo; includes claims still waiting for approval.
             </p>
           </>
         )}
@@ -372,9 +371,7 @@ export function Overview() {
                 ? " — the most recent part of the window rather than all of it"
                 : ""}
               . {(measures.data?.sent_back ?? 0).toLocaleString()}{" "}
-              {(measures.data?.sent_back ?? 0) === 1 ? "claim was" : "claims were"} sent back for
-              more, which is the approver&rsquo;s other answer: a queue moving because claims are
-              good and one moving because nobody reads them look alike without it.
+              {(measures.data?.sent_back ?? 0) === 1 ? "claim was" : "claims were"} sent back.
             </p>
 
             <h4 style={{ marginTop: 14 }}>Throughput by person</h4>
@@ -414,8 +411,7 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Repeated deferrals</h3>
         <p className="hint">
-          One item deferred three times is a judgment; forty is an undocumented policy. This
-          product, not this build — and over the whole record, not the window above.{" "}
+          This product, all time.{" "}
           {/* The one list on this sheet rather than a figure, so it is the one
               thing here that exports. A review argues over the rows. */}
           <a href={repeatsFile(at.product ?? "", "csv")}>CSV</a> ·{" "}
@@ -480,9 +476,8 @@ export function Overview() {
       <section className="panel" style={{ marginTop: 14 }}>
         <h3>Dismissals</h3>
         <p className="hint">
-          Approved dismissals in this window, newest first. This product, not this build. One row
-          per place, the way <Link to="/audit">the record</Link> lists them, so a judgment covering
-          forty places is forty rows. All three dismissal outcomes are here.
+          Approved in this window, newest first. This product, one row per place, as in{" "}
+          <Link to="/audit">the record</Link>.
         </p>
         {argued.isPending ? (
           <Loading />

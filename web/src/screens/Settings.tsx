@@ -5,6 +5,8 @@ import { notACredential } from "../ui/noautofill";
 import { AdvisorySources } from "./AdvisorySources";
 import { Webhooks } from "./Webhooks";
 import { useId, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ADMIN_TABS, SECTIONS, tabOf, tally, type Tab } from "./settingsTabs";
 import { Loading } from "../ui/Loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -14,15 +16,17 @@ import type { Who } from "../app/session";
 import { composable, humane, read, write, UNITS, type Unit } from "./duration";
 import { humaneBytes, readBytes, writeBytes, SIZES, type Size } from "./bytes";
 
-// The decisions this deployment has made for everybody in it, grouped the way
-// the mockup groups them. Every setting the server exposes renders; a setting
-// no group names lands under "Other", so nothing offered is hidden.
+// The decisions this deployment has made for everybody in it, one section at a
+// time. The section a setting belongs to, its title and what it decides are
+// served with it, so the screen names no setting of its own.
 export function Settings({ who }: { who: Who }) {
   const queries = useQueryClient();
   // The audit permission reads this screen and writes none of it. A control
   // somebody can press that the server will refuse is worse than one that is
   // not there, because pressing it looks like it worked.
   const canSet = Boolean(who.admin);
+  const { section } = useParams();
+  const tab = tabOf(section, canSet);
   const settings = useQuery({
     queryKey: ["settings"],
     queryFn: async () => unwrap(await api.GET("/v1/settings", {})),
@@ -40,218 +44,99 @@ export function Settings({ who }: { who: Who }) {
   }
 
   const items = settings.data?.items ?? [];
-  const named = new Set<string>();
-  const group = (test: (name: string) => boolean) =>
-    items.filter((each) => {
-      const name = each.name ?? "";
-      if (named.has(name) || !test(name)) return false;
-      named.add(name);
-      return true;
-    });
-  const deadlines = group((name) => name.startsWith("remediation.due."));
-  const ownDeadlines = group((name) => name.startsWith("remediation.own.due."));
-  const floor = group((name) => name === "triage.floor");
-  const threshold = group(
-    (name) => name === "triage.deferral-threshold" || name === "triage.together-cap",
-  );
-  // The four periods after which work that has not moved is reported. One
-  // card, because they are one question asked four ways and the answer to each
-  // depends on the others: a deployment that approves weekly wants all four
-  // longer.
-  const stale = group((name) =>
-    [
-      "triage.waiting-after",
-      "triage.sent-back-after",
-      "triage.deferral-lead",
-      "triage.queued-after",
-    ].includes(name),
-  );
-  const rest = group(() => true);
-
-  const field = (each: (typeof items)[number]) => (
-    <Field
-      key={each.name}
-      setting={each}
-      canSet={canSet}
-      onSet={(value) => set.mutate({ name: each.name ?? "", value })}
-    />
-  );
+  const tabs = [...SECTIONS, ...(canSet ? ADMIN_TABS : [])];
+  const shown = items.filter((each) => each.section === tab);
+  const note = NOTES[tab];
 
   return (
     <>
       <div className="screen-head">
         <h2>Settings</h2>
-        <p>Applies to everyone.</p>
+        <p>Applies to everyone. Zero or negative is refused.</p>
       </div>
+
+      {/* The tab is in the address, so a link lands on a section and the
+          back button leaves one. */}
+      <nav className="tabs2 settingtabs" aria-label="Settings sections">
+        {tabs.map(([key, name]) => (
+          <Link
+            key={key}
+            to={`/settings/${key}`}
+            className="tab2"
+            aria-selected={tab === key}
+            aria-current={tab === key ? "page" : undefined}
+          >
+            {name}
+            {SECTIONS.some(([each]) => each === key) && (
+              <span className="n">{tally(items, key)}</span>
+            )}
+          </Link>
+        ))}
+      </nav>
 
       {set.error != null && <Failed error={set.error} what="That could not be recorded." />}
 
-      {deadlines.length > 0 && (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <h3>Remediation deadlines</h3>
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end" }}>
-            {deadlines.map(field)}
-          </div>
-          <p className="reading" style={{ marginTop: 10 }}>
-            Counted from when a finding was first seen. Exploited findings use their own window.
-          </p>
-        </div>
+      {tab === "webhooks" ? (
+        <Webhooks />
+      ) : tab === "suppliers" ? (
+        <AdvisorySources />
+      ) : (
+        <section className="settinggroup">
+          {note && <p className="hint settingnote">{note}</p>}
+          {shown.map((each) => (
+            <Field
+              key={each.name}
+              setting={each}
+              canSet={canSet}
+              onSet={(value) => set.mutate({ name: each.name ?? "", value })}
+            />
+          ))}
+          {tab === "outbound" && canSet && <PatchBranches />}
+        </section>
       )}
-
-      {ownDeadlines.length > 0 && (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <h3>Deadlines for our own products</h3>
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end" }}>
-            {ownDeadlines.map(field)}
-          </div>
-          <p className="reading" style={{ marginTop: 10 }}>
-            For flaws recorded here. Counted from when one is first rated; unrated, it has no
-            deadline.
-          </p>
-        </div>
-      )}
-
-      {floor.length > 0 && (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <h3>Severity floor</h3>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
-            {floor.map(field)}
-          </div>
-          <p className="reading" style={{ marginTop: 10 }}>
-            Applies to every shared figure. Below the line, nothing has a deadline.
-          </p>
-        </div>
-      )}
-
-      {threshold.length > 0 && (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <h3>Approval thresholds</h3>
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-end" }}>
-            {threshold.map(field)}
-          </div>
-          <p className="reading" style={{ marginTop: 10 }}>
-            Measured against the total already deferred. A bulk decision always needs a second
-            person, and is bounded.
-          </p>
-        </div>
-      )}
-
-      {stale.length > 0 && (
-        <div className="card" style={{ marginBottom: 14 }}>
-          <h3>Stalled work reminders</h3>
-          <div className="filters">{stale.map(field)}</div>
-          <p className="reading" style={{ marginTop: 10 }}>
-            Derived rather than sent, because nothing happening raises no event. Each clears when
-            the thing finally happens.
-          </p>
-        </div>
-      )}
-
-      {rest.map((each) => (
-        <div className="card" key={each.name} style={{ marginBottom: 14 }}>
-          <h3>{title(each.name)}</h3>
-          {field(each)}
-          <p className="reading" style={{ marginTop: 10 }}>
-            {each.means}
-          </p>
-        </div>
-      ))}
-
-      <p className="hint">Defaults, not recommendations. Zero or negative is refused.</p>
-
-      {/* Where this deployment posts what it has to say. Configuration rather
-          than health, so it is here with the rest of what the deployment is
-          set to; whether they are arriving is on the system screen.
-
-          Administrators only, and the whole panel rather than its controls:
-          the address is the credential for two of the services it names, and
-          the endpoint behind it refuses anybody else — so drawn for an auditor
-          this would be a table that could only fail to load. */}
-      {who.admin && <Webhooks />}
-
-      {/* The suppliers whose published advisories are read on the scan
-          schedule. Configuration rather than health, so it is here with the
-          rest of what the deployment is set to.
-
-          Administrators only, for the reason the panel above is: the endpoint
-          behind it refuses anybody else. */}
-      {who.admin && <AdvisorySources />}
     </>
   );
 }
 
-// A setting's own name. A noun phrase naming the thing, the way a settings
-// screen anywhere else names one — not a description of the situation it
-// governs. What it does and why is the paragraph underneath, which is where a
-// reader looks second.
-function title(name?: string): string {
-  switch (name) {
-    case "session.lifetime":
-      return "Session lifetime";
-    case "token.max-lifetime":
-      return "Personal token lifetime";
-    case "signin.claim-window":
-      return "Authorization redemption window";
-    case "upstream.currency":
-      return "Upstream version checks";
-    case "scanning.quiet-after":
-      return "Quiet build threshold";
-    case "scanning.every":
-      return "Rescan interval";
-    case "attachment.max-size":
-      return "Maximum attachment size";
-    case "attachment.quota":
-      return "Total attachment storage";
-    case "attachment.per-person-quota":
-      return "Attachment storage per person";
-    case "queue.backlog":
-      return "Queued work limit";
-    case "routing.batch":
-      return "Findings placed per pass";
-    case "people.absent-after":
-      return "Inactive account threshold";
-    // These three fell through to the last segment of the key, which named
-    // one of them "After" — a card heading that says nothing at all about
-    // what is being set.
-    case "disclosure.after":
-      return "Default embargo period";
-    case "disclosure.movement-threshold":
-      return "Embargo movement threshold";
-    case "disclosure.lead-time":
-      return "Embargo expiry warning";
-    default:
-      return (
-        (name ?? "")
-          .split(".")
-          .pop()
-          ?.replace(/-/g, " ")
-          .replace(/^\w/, (c) => c.toUpperCase()) ?? ""
-      );
-  }
+// Patch branch lookups, which the deployment turns on in its configuration
+// rather than here: turning them on needs memory, a volume and excluded hosts
+// that only whoever deployed it can provide. Shown with the settings so this
+// screen answers what leaves the deployment. Administrators only, because the
+// endpoint behind it refuses anybody else.
+function PatchBranches() {
+  const progress = useQuery({
+    queryKey: ["patch-branches", "on"],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/patch-branches", { params: { query: { limit: 1 } } })),
+  });
+  return (
+    <div className="settingrow">
+      <div className="settingname">
+        <span className="settinglabel">Patch branches</span>
+        <span className="hint">Label patch links with the branches that hold their commit</span>
+      </div>
+      <div className="settingcontrol">
+        {progress.isPending ? (
+          <span className="hint">…</span>
+        ) : progress.isError ? (
+          <span className="hint">Could not be read</span>
+        ) : (
+          <span>
+            {progress.data?.on ? "On" : "Off"}
+            <span className="hint">, set by the deployment</span>
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
-// The same rule for a field inside a group: the name of the value, not a
-// description of when it applies.
-function label(name?: string): string {
-  switch (name) {
-    case "triage.waiting-after":
-      return "Awaiting approval";
-    case "triage.sent-back-after":
-      return "Returned, untouched";
-    case "triage.deferral-lead":
-      return "Deferral expiry warning";
-    case "triage.queued-after":
-      return "Unclaimed in a team queue";
-    case "triage.together-cap":
-      return "Bulk claim limit";
-    case "triage.floor":
-      return "Minimum severity";
-    case "triage.deferral-threshold":
-      return "Second approver above";
-    default:
-      return ((name ?? "").split(".").pop() ?? "").replace(/-/g, " ");
-  }
-}
+// One line under a section's tabs, where the section has something every one
+// of its settings shares.
+const NOTES: Partial<Record<Tab, string>> = {
+  deadlines: "Counted from when a finding is first seen.",
+  own: "For flaws recorded here, counted from when one is first rated. An unrated flaw has no deadline.",
+};
 
 // A value's type, and the values it may take, come from the server.
 //
@@ -270,7 +155,9 @@ function Field({
     name?: string;
     value?: string;
     default?: boolean;
-    means?: string;
+    title: string;
+    summary: string;
+    detail?: string;
     kind: "duration" | "count" | "size" | "percent" | "word" | "switch";
     words?: string[] | null;
   };
@@ -327,7 +214,7 @@ function Field({
   // setting's key.
   //
   // A password manager classifies a field by every word it can reach through
-  // it, and the key is one of those: "signin.claim-window" rendered into `id`
+  // it, and the key is one of those: the claim window's key rendered into `id`
   // is a sign-in field to LastPass however many ignore attributes sit beside
   // it, which is how one duration box came to be offered a saved login. `name`
   // was already pinned to a constant for this reason and `id` was missed.
@@ -351,27 +238,22 @@ function Field({
   const changed = canSet && asked !== "" && asked !== (setting.value ?? "");
 
   return (
-    <div className="field" style={{ margin: 0, maxWidth: takes || sizes ? 320 : 240 }}>
-      <label htmlFor={field}>
-        {label(setting.name)}
-        {setting.default && <span className="hint"> · default</span>}
-      </label>
-      {/* What the setting does, in words, under the name of it. It sat on the
-          label's hover, which is where clarification goes — and what a
-          setting does is not clarification, it is the whole of what the
-          control is. Three of these rewrite what the tool reports without
-          anything being scanned, and a reader had to hover to find out which.
-
-          Not on the control itself: a password manager classifies a field by
-          the words it can reach through it, and this is prose about sign-ins,
-          accounts and dates — which is how three of them came to be offered a
-          saved login despite saying they were not credentials. */}
-      {setting.means && (
-        <span className="hint" style={{ margin: "0 0 4px" }}>
-          {setting.means}
-        </span>
-      )}
-      <div style={{ display: "flex", gap: 6 }}>
+    <div className="settingrow">
+      <div className="settingname">
+        <label htmlFor={field}>
+          {setting.title}
+          {setting.default ? (
+            <span className="badge">default</span>
+          ) : (
+            <span className="badge set">set</span>
+          )}
+        </label>
+        {/* On the label's side of the row, never on the control: a password
+            manager classifies a field by the words it can reach through it,
+            and some of these are about sign-ins and accounts. */}
+        <span className="hint">{setting.summary}</span>
+      </div>
+      <div className="settingcontrol">
         {words ? (
           <select
             id={field}
@@ -399,7 +281,7 @@ function Field({
               onChange={(event) => setCount(event.target.value)}
             />
             <select
-              aria-label={`${label(setting.name)} unit`}
+              aria-label={`${setting.title} unit`}
               name="unit"
               {...notACredential}
               style={{ width: "auto" }}
@@ -426,7 +308,7 @@ function Field({
               onChange={(event) => setCount(event.target.value)}
             />
             <select
-              aria-label={`${label(setting.name)} unit`}
+              aria-label={`${setting.title} unit`}
               name="unit"
               {...notACredential}
               style={{ width: "auto" }}
@@ -455,28 +337,34 @@ function Field({
             Save
           </button>
         )}
-      </div>
-      {/* Said in words only where the control could not say it. A composer
+        {/* Said in words only where the control could not say it. A composer
           showing "30 days" and then "stored as 720h" underneath is telling
           somebody the storage format of a thing they just chose in the unit
           they chose it in, which is arithmetic nobody asked for. A value the
           composer cannot take is the case that needs the sentence: it sits in
           a plain text field, and what it means is not obvious. */}
-      {!takes && !sizes && !words && humane(value) && (
-        <span className="hint">= {humane(value)}</span>
-      )}
-      {!sizes && setting.kind === "size" && humaneBytes(value) && (
-        <span className="hint">= {humaneBytes(value)}</span>
-      )}
-      {/* A share in a plain box is a number with no unit, and the number it
+        {!takes && !sizes && !words && humane(value) && (
+          <span className="hint">= {humane(value)}</span>
+        )}
+        {!sizes && setting.kind === "size" && humaneBytes(value) && (
+          <span className="hint">= {humaneBytes(value)}</span>
+        )}
+        {/* A share in a plain box is a number with no unit, and the number it
           would be read as is the count of something. */}
-      {setting.kind === "percent" && value.trim() !== "" && (
-        <span className="hint">= {value.trim()}%</span>
-      )}
-      {(takes || sizes) && count.trim() !== "" && !usable && (
-        <span className="hint" style={{ color: "var(--sev-high)" }}>
-          A whole number of one or more.
-        </span>
+        {setting.kind === "percent" && value.trim() !== "" && (
+          <span className="hint">= {value.trim()}%</span>
+        )}
+        {(takes || sizes) && count.trim() !== "" && !usable && (
+          <span className="hint" style={{ color: "var(--sev-high)" }}>
+            A whole number of one or more.
+          </span>
+        )}
+      </div>
+      {setting.detail && (
+        <details className="settingdetail">
+          <summary>Details</summary>
+          <p>{setting.detail}</p>
+        </details>
       )}
     </div>
   );

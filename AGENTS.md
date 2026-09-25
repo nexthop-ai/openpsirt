@@ -480,9 +480,9 @@ them.
 This is the one register here written to be skimmed rather than read, so it
 does not follow the house style the documents use — including the rule against
 contractions below, which is about text read years later. `DESIGN-interface.md`
-§ Screen copy holds the whole of it, with worked examples. Nothing gates
-any of it; the copy reached 6,700 words of explanation across 65 files once
-already.
+§ Screen copy holds the whole of it, with worked examples. One gate bounds
+how long a paragraph may run and nothing checks the rest; the copy reached
+6,700 words of explanation across 65 files once already.
 
 American spelling everywhere: license, not licence; catalog, normalize,
 behavior, color, authorize. It applies to prose, comments and identifiers

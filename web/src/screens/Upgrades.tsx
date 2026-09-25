@@ -64,10 +64,8 @@ export function Upgrades() {
           <span className="n">{rows.filter((row) => row.state !== "landed").length}</span>
         </h2>
         <p>
-          What {stream} · {variant} is waiting on, by the upstream upgrade that would deliver it.
-          Nothing here is declared done by hand: a piece of work has landed when the build stops
-          holding it, which the scans already say — and where it stands is read the same way, from
-          the scans and the date somebody promised.
+          Upgrades {stream} · {variant} is waiting on. Marked landed when a scan no longer finds the
+          old version.
         </p>
         {late > 0 && (
           <div className="alert warn">
@@ -83,19 +81,15 @@ export function Upgrades() {
         <p className="hint">
           {/* A link somebody follows rather than a request this page makes, so
               the browser fetches it with the session it already has. */}
-          The whole of it as a file — <a href={fileAt(product, stream, variant, "csv")}>CSV</a> ·{" "}
-          <a href={fileAt(product, stream, variant, "json")}>JSON</a>, with the build it is about
-          and the day it was taken stated in it.
+          Download <a href={fileAt(product, stream, variant, "csv")}>CSV</a> ·{" "}
+          <a href={fileAt(product, stream, variant, "json")}>JSON</a>.
         </p>
       )}
 
       {rows.length === 0 ? (
         <Empty
           title="Nothing is planned for this build."
-          detail={
-            "Plan one from a component's screen: pick the releases, the version to " +
-            "move to, and the date. Progress comes from the scans."
-          }
+          detail="Plan one from a component's screen."
         />
       ) : (
         <Wide>

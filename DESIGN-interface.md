@@ -398,7 +398,8 @@ bound — is a narrowing only somebody editing the address can use.
 | **A filter cleared drops its key; it does not write out its own default** | The three narrowings the list applies when the address is silent are applied only where the key is absent. Two controls wrote both of their values to mean "not narrowed", which made the address say something, suppressed the default and widened the list — and left no way to express from the panel what the rail's address says |
 | The count is read from the address | The one place that knows what every filter is called |
 | Filtering is the server's, not the browser's | A list narrowed after it arrives is narrowed within one page of it, so "hide the kernel" would hide it from the twenty rows already fetched and from nothing else |
-| The common ones stay one click away | Severity, exploited and fix-available. Package kind, what holds a thing, and how far it has been decided sit in a panel that opens, with how many are on written on the control while it is shut |
+| The daily questions are on the bar | Decision state, severity, who holds it and when it is due, each a button naming itself and its value, with New today beside them. Everything else is behind More filters, a panel that opens with how many of its own filters are on written on the control while it is shut. A filter is on the bar or in the panel, never both. New today is the one shortcut: a single value of the panel's First seen after, drawn pressed only while that date is a day back, so any other date stays the panel's and the button does not clear it |
+| A filter on the bar is one button | The name, the value and the menu of values are one control, so a name cannot wrap to a different line from its value. A value in force tints the button. A question with several answers at once — decision state, who holds it — takes ticks and stays open; a step on a scale — severity, due — takes one and closes |
 | The panel is shut until somebody opens it, whatever the address narrows by | It is most of a screen. Opened because a filter is set, a link to a narrowed list covers the rows somebody followed it to read — and it says nothing the chips above the list do not already say, each of which removes its own filter when clicked |
 
 Exploited and fix-available are two flags, not one parameter holding one of two
@@ -467,8 +468,8 @@ is what has not been answered yet.
 
 Sorting is by a column the server names, never by one a caller does (REQ-66).
 Four headers order the list — severity, EPSS, locations and the deadline — and
-clicking the one already sorted turns it around. An order control above the
-list carries all six, including the two with no column: the ranking the list
+clicking the one already sorted turns it around. The "Sorted by" control on
+the line over the rows carries all six, including the two with no column: the ranking the list
 is in when nothing is asked, and how long something has been open. What reaches
 the statement is
 an expression the server stores against each of its own keys: a placeholder
@@ -481,13 +482,13 @@ back in its own order rather than refusing.
 | A finding with no deadline sorts last whichever direction is asked for | "No deadline" is neither early nor late |
 | **What came in overnight is a control, not a typed date** | The first question of a working day was a date box behind the filter panel. A chip writes the date a day back into the address — the date rather than the word, so a list somebody sends means the same thing when it is opened |
 | **An empty list says what emptied it and offers the way back** | A narrowed list matching nothing is a dead end: the controls that produced it are scrolled off above, and what is left on screen says so and offers nothing. It names how many filters are in force and carries a control that takes all of them off — and says "nothing is open here at all" where none was in force, which is a different answer |
-| **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided lead now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the order control above the list |
+| **The columns that decide the next action come first** | The table is wider than its container on a laptop — 1,583 px in 1,088 at 1,366 — so the right-hand end is cut, and what was cut was Due and State: the two facts somebody reads a list of findings to get at. Severity, the deadline and how far it is decided lead now; the component, the path, the estimate, the fix and the reach can run off the edge without taking the next action with them, and the orders they carry are all in the "Sorted by" control over the rows |
 | **A row is decided where it sits** | Opening a row carries the same decision form the finding screen does, over the list rather than instead of it. What a claim requires and what it writes are unchanged — a second person still agrees — and what changes is the two journeys per row, each of which read the list again on the way back. Everything the form cannot show there is one link away |
 | A screen that is waiting says so with a mark that moves | The word alone is one faint line on a page that is otherwise still, and a still page reads as a stopped one. The mark carries no text, so a screen reader hears the word once; the page-wide reduced-motion rule stops it, and a still ring beside the word is still a mark |
 | **A filter change narrows the list rather than replacing the screen** | The rows on screen stay and dim while the next answer is read. Unmounting the whole screen — the search box, the chips, the count and the controls with it — blanks the thing being narrowed and takes the cursor with it. `aria-busy` says the same thing to a reader who cannot see the dimming |
-| **Each view's button carries what that view would show** | The three answer one narrowing at three grains and the difference is the whole reason to switch: a by-issue list of 7,455 rows is 341 by component and 284 by upgrade. Without the numbers the list opened on its longest view and read as the only one. The by-upgrade figure is a fix-bundle aggregate, measured at 2.2 s against a backlog of 8,376, so it is held for five minutes rather than asked again as somebody pages |
-| **The list opens by issue, whatever the size** | No threshold, and the other two are a click away in the toggle and in the address as a chip that removes itself. A list that jumps to a different grain past a number nobody set is a list that answers a different question on two products |
-| The order in force is named on screen, and every order can be asked for | Four of the six sit under a column header, so the other two could be reached by typing an address and by nothing else — one of them being urgency, which is the order the list opens in and what REQ-32 is for. Sorting by a column and then wanting the ranking back was a dead end |
+| **The views are tabs above the filters, each carrying what it would show** | A view changes what a row is rather than which rows show, so it sits apart from the filters. Across every product there is one view, and no tabs.  The three answer one narrowing at three grains and the difference is the whole reason to switch: a by-issue list of 7,455 rows is 341 by component and 284 by upgrade. Without the numbers the list opened on its longest view and read as the only one. The by-upgrade figure is a fix-bundle aggregate, measured at 2.2 s against a backlog of 8,376, so it is held for five minutes rather than asked again as somebody pages |
+| **The list opens by issue, whatever the size** | No threshold, and the other two are a click away in the tabs and in the address as a chip that removes itself. A list that jumps to a different grain past a number nobody set is a list that answers a different question on two products |
+| The order in force is named over the list, and every order can be asked for | "Sorted by" sits beside the count on the line above the rows, because the order is about the list rather than what is in it. Four of the six sit under a column header, so the other two could be reached by typing an address and by nothing else — one of them being urgency, which is the order the list opens in and what REQ-32 is for. Sorting by a column and then wanting the ranking back was a dead end |
 | An order opens the way round that order means | The worst severity, the highest likelihood and the widest reach are all "most first"; a deadline and an age are not. Due opened at the furthest-away date, which is the answer to a question nobody asks |
 | The tie-break is always the same pair of identifiers | Two rows equal on the sorted column do not swap between pages and drop one while repeating another |
 | A page size of fifty, a hundred or two hundred, kept in the address | Fifty is 153 pages of one product's findings |
@@ -872,11 +873,27 @@ distinct issues and the list is one row per issue and component. A name the
 build does not hold is refused rather than answered with an empty list, since an
 empty list is also what a clean subtree looks like.
 
-Searching the tree counts what the tree counts. Counted as finding rows rather
-than distinct issues, a library reachable under three parents reported three
-times its real number — and the results are **ordered** by that number, so
-deeply-vendored components with few real issues outranked shallow ones with
-many, which is the opposite of what a search of a build is for.
+Searching the tree counts what the tree counts: distinct open issues the reader
+may read, per component, ordered by that count and then by name. A component at
+several places is one answer with one count.
+
+| Rule | |
+|---|---|
+| Issues, not finding rows | A library reachable under three parents is one issue. Counted as rows it reads three times its number, and the order follows the count |
+| Counted in one pass over the build, grouped by component | Counted per matched component, SQLite reads the build's open findings once for each, and a term matching many names takes most of a minute |
+
+Measured on the demo's switch image, 6,867 components and 297,881 open
+findings, before and after counting in one pass:
+
+| Term | SQLite | PostgreSQL | MySQL | MariaDB |
+|---|---|---|---|---|
+| `li`, 698 matches | 17.1 s → 0.24 s | 1.38 s → 0.09 s | 0.33 s → 0.37 s | 33.5 s → 0.13 s |
+| `open` | 12.7 s → 0.24 s | 0.30 s → 0.08 s | 16 ms → 0.35 s | 13 ms → 0.13 s |
+| `ssl`, 6 matches | 0.15 s → 0.22 s | 6 ms → 75 ms | 14 ms → 0.36 s | 12 ms → 0.13 s |
+
+A narrow term is slower than it was on three engines, because the pass reads the
+whole build however few names match. Every term is under half a second on every
+engine, where a broad term was over half a minute on two.
 
 ## The review queue
 
@@ -1278,7 +1295,7 @@ A control somebody can see and cannot reach is a control that is not there.
 | **The cursor is drawn, and goes when the question changes** | A cursor nobody can see is a key that appears to do nothing, and a cursor pointing at row nine of a list that has been re-read points at a different finding |
 | The focus ring is added to, never replaced | An accent border and a wash around it are an addition to the global ring. A checkbox and a radio are painted by the browser, so a border declaration reaches nothing on them and a wash at a tenth of full strength is 1.16:1 against the surface — where 3:1 is the floor. Tabbing into the permission grid, where one press writes a grant per product, nothing on screen said which box had focus |
 | Where a control has no border of its own, the ring goes on the box around it | The two search boxes draw their own frame and the input inside has none, so the ring taken off the input had nowhere to go |
-| Nothing a person operates is hidden with `display: none` | It leaves the tab order. The upload drop zone's file input was hidden that way and nothing else reached it — no focusable label, no drag handler, and the Upload button disabled until a file is chosen — so filing an inventory by hand was pointer-only |
+| Nothing a person operates is hidden with `display: none` | It leaves the tab order. A drop zone's file input is out of sight and still focusable, and the zone draws the focus ring, because a label is not focusable and nothing else reaches the input |
 | Text on a severity color reads the token that flips with the look | Every severity token in the dark look is a light tint, so white on one of them is 2.54:1. One rule hardcoded white over the critical token at nine and a half pixels |
 | One ratio for one meaning | A disabled chip and a disabled button said the same thing at two strengths, and the weaker composited to about 2.2:1 against white |
 
@@ -1478,7 +1495,13 @@ since a person only ever sees products they hold a role on.
 
 | Rule | |
 |---|---|
-| The settings screen is grouped, and its values are formatted for whoever reads it (REQ-60) | Cards are titled by what the setting decides rather than by the last segment of its key, and a duration is composed from a count and a unit rather than typed as one. Under REQ-01 that reader is an operator nobody here will ever meet, and this is the screen where every threshold that changes what the tool reports is set. Sizes are still raw byte counts, which is the half that is not done |
+| The settings screen is one section at a time, in tabs, and its values are formatted for whoever reads it (REQ-60) | Deadlines, Our products, Triage, Disclosure, Scanning, Sign-in, Limits and Outbound, then Webhooks and Suppliers for administrators. The tab is in the address. A duration is composed from a count and a unit, and a size from a count and a unit, rather than typed as one. Under REQ-01 that reader is an operator nobody here will ever meet |
+| A tab says how many of its settings hold a stored value | A value set on a tab nobody opened is otherwise invisible. Stored rather than differing: a value set back to what ships still counts. A tab with none set says how many it holds |
+| The sections are the server's list, and the screen names each one | A section the server adds does not compile in the screen until it has a name, so no setting is served under a tab nobody draws |
+| Patch branch lookups show on Outbound, read-only, for administrators | The deployment's configuration turns them on, because they need memory, a volume and excluded hosts only whoever deployed it can provide. Shown here so the screen answers what leaves the deployment; administrators alone, because the progress endpoint behind it refuses anybody else. A failed read says so rather than drawing Off |
+| Every setting is one row: its title and a one-line summary beside the control, the rest under Details | One text width for every setting, whatever its control. A summary sitting inside a field the width of its control wrapped into a tall column while the note under it ran the width of the card |
+| A setting's title, section, summary and detail are served with it | The same reason its kind is: a title or section kept in the interface is a second list keyed on the name, and a setting added to the server and not to it is drawn under its dotted key. What a section is called and the order of the tabs are the screen's |
+| Save appears on a row once its value changes | A button on every row reads as a change waiting on every row |
 | A setting whose value is one of a few words is a select, not a text box | A free field invites a value the server then refuses, and for a switch it invites "true", "yes" and "1", none of which are what it takes |
 | A setting nobody has set is composed like one that is set | Nothing to read is not a value the composer refuses. The embargo periods arrive with no value at all, and they fell to the plain box kept for a duration this cannot say — which is the one control that cannot ask whether a typed 90 means hours, days or weeks. An empty composer opens on days, because a period nobody has set here is an embargo and an embargo is said in days |
 | What a new line inherits is on the inventories screen | That is where somebody is when a line has just had its first scan, which is the moment the question arises. It names the line to carry from, says how many reach this one already and how many cover nothing here, and offers the rest as a list to tick. Only two of the four groups are questions, and the screen says which |
@@ -1636,6 +1659,27 @@ Measured before the sweep that applied this: 262 standing strings, about
 somebody opens every day. The copy had drifted into explaining the design to
 the reader, which is what a design document is for.
 
+### The copy gate
+
+`npm run copy`, part of `make web-check`, bounds how much a screen says at once.
+
+| It checks | |
+|---|---|
+| Every paragraph, every element styled as a hint, and every `hint` or `detail` given as text | The shapes the explanation drifted into, whatever element carries them |
+| At most 20 words each | A label, a value and one short line fit. A second sentence of reasoning does not |
+| What a paragraph can show at once | Every text node and string it renders. The longer side of a condition is counted, so a sentence inside a branch is prose like any other. A list it maps over is data and is not counted |
+| Nothing examined fails the run | A check that found no paragraph looked at nothing |
+
+| It cannot check | |
+|---|---|
+| Whether a short line is plain | Twenty mannered words pass |
+| Whether a line is needed at all | Cut before rewriting is judgment |
+| Text a helper builds | A string assembled in a function and passed in is counted as nothing |
+| Tooltips | A `title` is where clarification belongs, so it is left alone |
+
+A paragraph that has to stay longer is named in the gate's allowlist with its
+reason.
+
 Contractions are allowed here. The rule against them covers the durable
 documents, which are read years later by somebody deciding whether a decision
 still holds. Screen
@@ -1664,6 +1708,9 @@ scroll sideways. That is why the tables here are written rather than installed.
 | **Stacking is a named scale, not hand-picked numbers** | They were spread across the stylesheets with nothing to read to decide the next one, and two unrelated overlays claimed the same step: the drawer and the rail's scrim resolve in one context, so the drawer won on document order and the rail's click-to-dismiss stopped working wherever they overlapped |
 | **A closed vocabulary the server owns is rendered from the generated client** | They were hand-kept tables here, and every one had a member it could not label: an outcome drew an empty cell wherever it was the whole of it, register states printed as wire tokens, and a narrowing over the claim kinds could not fail because its comparisons exhausted every value but one |
 | **A word the table does not know is shown as it arrived** | A server that grows a vocabulary before the interface does should leave somebody reading something unfamiliar rather than a blank |
+| **A choice with a consequence is a card per option** | Where it came from, filing or recording, a recorded flaw's disclosure, and a ruling's disposition each decide something that follows. The card carries what picking it does, so it is read before the choice. An option somebody may not pick is left out and said in a line below, not drawn as a card that refuses. A radio group to the keyboard: one tab stop, arrows move and pick |
+| **A switch between values is a segmented control** | Each option is drawn as a button, the picked one filled, and the frame is dashed while nothing is picked. It keeps its own width inside a panel, which otherwise stretches it to the panel's edge |
+| **A file is picked in a drop zone** | Click or drop, a button-look at its end, and what was picked listed under it as chips that come off again. The browser's own file input changes with the browser and takes no drop |
 
 ## The initial load
 

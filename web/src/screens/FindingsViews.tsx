@@ -184,10 +184,7 @@ export function ByComponent({
   return (
     <>
       <p className="hint" style={{ margin: "0 0 8px" }}>
-        Ordered by {orderedBy[asked] ?? asked} — <b>issues</b> is rows in the by-issue view and{" "}
-        <b>places</b> is how many places those occupy in what you are looking at. Making urgency the
-        order by default would reproduce the by-issue list at worse resolution, so the weight is the
-        order unless you ask for another and each row says what its weight is made of.{" "}
+        Ordered by {orderedBy[asked] ?? asked}.{" "}
         {/* The same answer as a file, narrowed the same way. This is
             the shape a release meeting argues over, and taking it away meant
             copying the table out. */}
@@ -435,19 +432,16 @@ export function ByBump({
         {/* The same answer as a file, narrowed the same way. A bump list is
             what a release meeting works from, and taking it away meant
             copying the table out by hand. */}
-        The whole of it as a file — <a href={bundlesFile(at, narrowed, "csv")}>CSV</a> ·{" "}
+        Download <a href={bundlesFile(at, narrowed, "csv")}>CSV</a> ·{" "}
         <a href={bundlesFile(at, narrowed, "json")}>JSON</a>.
       </p>
       <p className="hint" style={{ margin: "0 0 8px" }}>
-        Ordered by what each upgrade would close. <b>Listed rather than ordered</b> — versions can
-        be compared in some ecosystems and not others, so one package appears once per version
-        upstream released and there is no nearest and no latest.
+        Ordered by what each upgrade would close.
         {cannot.length > 0 && (
           <>
             {" "}
             <span style={{ color: "var(--sev-medium)" }}>
-              An upgrade has no place, no deadline and no assignee, so {cannot.join(", ")}{" "}
-              {cannot.length === 1 ? "is" : "are"} not applied here.
+              Not applied here: {cannot.join(", ")}.
             </span>
           </>
         )}

@@ -213,8 +213,7 @@ export function Issue() {
 
       {(it?.total ?? 0) > rows.length && (
         <p className="hint" style={{ marginTop: 10 }}>
-          Showing {rows.length.toLocaleString()} of {(it?.total ?? 0).toLocaleString()}. A kernel
-          flaw across a dozen products is a real answer and an unbounded page is one nobody reads.
+          Showing {rows.length.toLocaleString()} of {(it?.total ?? 0).toLocaleString()}.
         </p>
       )}
     </>

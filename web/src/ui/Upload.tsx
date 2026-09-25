@@ -9,8 +9,8 @@ import { unwrap } from "../api/queries";
 import { useCatalog } from "../api/catalog";
 import { useScope } from "../app/scope";
 import { Drawer } from "./Drawer";
+import { Dropzone } from "./Dropzone";
 import { Failed } from "./Failed";
-import { Icon } from "./Icons";
 import { useReseed } from "./reseed";
 
 // Uploading an inventory by hand: the same endpoint a pipeline uses, for a
@@ -95,9 +95,8 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
       }
     >
       <p className="reading" style={{ margin: "0 0 14px" }}>
-        The same endpoint a pipeline uses: two parts, <span className="mono">inventory</span> and{" "}
-        <span className="mono">suppressions</span> — for a build with no automation, or to try any
-        SBOM.
+        Same as a pipeline upload: <span className="mono">inventory</span> and{" "}
+        <span className="mono">suppressions</span>.
       </p>
 
       {upload.error != null && <Failed error={upload.error} what="That could not be uploaded." />}
@@ -180,26 +179,14 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
             required
           </span>
         </label>
-        <label className={inventory ? "dropzone has" : "dropzone"}>
-          <input
-            type="file"
-            accept=".json,.cdx.json,.spdx.json,.spdx3.json,application/json"
-            onChange={(event) => setInventory(event.target.files?.[0] ?? null)}
-          />
-          <Icon name="upload" />
-          <span>
-            {inventory ? (
-              <>
-                <b>{inventory.name}</b> · {(inventory.size / 1048576).toFixed(1)} MB
-              </>
-            ) : (
-              <>
-                <b>Drop a CycloneDX or SPDX JSON file</b> (CycloneDX 1.4–1.7, SPDX 2.2, 2.3 and
-                3.x), or click to choose. The scan runs here.
-              </>
-            )}
-          </span>
-        </label>
+        <Dropzone
+          files={inventory ? [inventory] : []}
+          accept=".json,.cdx.json,.spdx.json,.spdx3.json,application/json"
+          onChange={(chosen) => setInventory(chosen[0] ?? null)}
+        >
+          <b>A CycloneDX or SPDX JSON file</b> (CycloneDX 1.4–1.7, SPDX 2.2, 2.3 and 3.x). The scan
+          runs here.
+        </Dropzone>
       </div>
 
       <div className="field">
@@ -209,30 +196,10 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
             optional · any number
           </span>
         </label>
-        <label className={suppressions.length ? "dropzone small has" : "dropzone small"}>
-          <input
-            type="file"
-            multiple
-            onChange={(event) => setSuppressions([...(event.target.files ?? [])])}
-          />
-          <span>
-            {suppressions.length > 0 ? (
-              <>
-                <b>
-                  {suppressions.length === 1
-                    ? suppressions[0]?.name
-                    : `${suppressions.length} files`}
-                </b>
-                {suppressions.length > 1 && <> · {suppressions.map((f) => f.name).join(", ")}</>}
-              </>
-            ) : (
-              <>
-                OpenVEX documents, usually the build&rsquo;s suppressions directory. Applied here,
-                never re-decided.
-              </>
-            )}
-          </span>
-        </label>
+        <Dropzone files={suppressions} onChange={setSuppressions} multiple small>
+          OpenVEX documents, usually the build&rsquo;s suppressions directory. Applied here, never
+          re-decided.
+        </Dropzone>
       </div>
 
       <div className="alert info">

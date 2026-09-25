@@ -123,8 +123,8 @@ export function Scrutiny() {
             <p className="alert" style={{ marginTop: 14 }}>
               <strong>Not all of it.</strong>
               <span>
-                A section reached {SECTION.toLocaleString()} rows. What follows is the worst of it,
-                not the whole of it. Narrow the window or the product to see a section whole.
+                A section hit {SECTION.toLocaleString()} rows and shows the worst. Narrow the window
+                or product.
               </span>
             </p>
           )}
@@ -211,10 +211,8 @@ export function Scrutiny() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>Proposer and approver pairs</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              Concentration is the signal, and a count alone does not carry it: fifty out of
-              fifty-two and fifty out of nine hundred are the same number and not the same
-              situation. A share is of every decision a standing agreement covers in this window —{" "}
-              {(got.data?.agreed ?? 0).toLocaleString()} of them.
+              Share of the {(got.data?.agreed ?? 0).toLocaleString()} agreed decisions in this
+              window.
             </p>
             {(got.data?.pairs ?? []).length === 0 ? (
               <p className="hint">Nobody has agreed to anything in this window.</p>
@@ -325,8 +323,7 @@ export function Scrutiny() {
           <section className="panel" style={{ marginTop: 14 }}>
             <h3>Standing from somebody who could not give it now</h3>
             <p className="hint" style={{ marginTop: 0 }}>
-              These still stand: losing a role does not undo an approval. Still the first list asked
-              for after a reorganization.
+              Losing a role does not undo an approval.
             </p>
             {(got.data?.lapsed ?? []).length === 0 ? (
               <p className="hint">Everyone whose agreement stands could still give it.</p>

@@ -15,6 +15,7 @@ import {
 } from "../api/intake";
 import { Paged } from "../ui/Paged";
 import { overCapNotice, useBulkCap } from "../ui/bulk";
+import { ChoiceCards } from "../ui/ChoiceCards";
 import { Editor } from "../ui/Editor";
 import { notACredential } from "../ui/noautofill";
 import { Failed } from "../ui/Failed";
@@ -48,18 +49,20 @@ export function RuleForm({
 
   return (
     <div>
-      <div className="seg" role="group" aria-label="Disposition">
-        {RULABLE.map((each) => (
-          <button
-            key={each}
-            type="button"
-            aria-pressed={disposition === each}
-            onClick={() => setDisposition(each)}
-          >
-            {dispositionSaid(each)}
-          </button>
-        ))}
-      </div>
+      <ChoiceCards
+        label="Disposition"
+        value={disposition}
+        onChange={setDisposition}
+        options={RULABLE.map((each) => ({
+          value: each,
+          label: dispositionSaid(each),
+          note: needsSecond(each)
+            ? "Takes effect when somebody else approves"
+            : needsReason(each)
+              ? "Takes a reason"
+              : "Names the issue it repeats",
+        }))}
+      />
 
       {disposition === "duplicate" && (
         <div className="field" style={{ marginTop: 10 }}>
@@ -88,12 +91,6 @@ export function RuleForm({
             draftKey={`ruling:${product}:${references.join(",")}`}
           />
         </div>
-      )}
-
-      {disposition !== "" && needsSecond(disposition) && (
-        <p className="hint" style={{ margin: "6px 0 0" }}>
-          Takes effect when somebody else approves.
-        </p>
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>

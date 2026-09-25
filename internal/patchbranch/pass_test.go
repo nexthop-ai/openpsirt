@@ -19,7 +19,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // upstream is a repository a test made, shaped like a project that backports:
@@ -111,13 +110,6 @@ func empty(t *testing.T, db *database.DB) {
 	dbtest.Reset(t, db)
 }
 
-func turnOn(t *testing.T, db *database.DB) {
-	t.Helper()
-	if err := setting.NewStore(db.DB).Set(t.Context(), setting.PatchBranches, setting.On); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // passOver is a pass that fetches each named project from its directory.
 func passOver(t *testing.T, db *database.DB, quota int64, excluded outward.Excluded, projects map[string]upstream) *patchbranch.Pass {
 	t.Helper()
@@ -144,7 +136,6 @@ func TestEachPatchLinkIsLabeledWithTheBranchesHoldingItsCommit(t *testing.T) {
 			link("project", missing),
 		}
 		issue(t, db, "CVE-2025-0001", "high", links...)
-		turnOn(t, db)
 		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"project": made})
 
@@ -202,7 +193,6 @@ func TestACopyMadeWithoutFilesTakesTheCommitsThatLandAfter(t *testing.T) {
 		gitIn(t, made.dir, "add", "readme")
 		gitIn(t, made.dir, "commit", "--quiet", "-m", "say what this is")
 		issue(t, db, "CVE-2025-0015", "high", link("project", made.fix))
-		turnOn(t, db)
 		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
 			outward.Excluded{}, func(string) string { return "file://" + made.dir })
 		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("project") {
@@ -245,7 +235,6 @@ func TestABranchNameNoEngineCanStoreIsCountedAndNotKept(t *testing.T) {
 		// text that is not UTF-8.
 		gitIn(t, made.dir, "branch", "release-\xff", made.fix)
 		issue(t, db, "CVE-2025-0017", "high", link("project", made.fix))
-		turnOn(t, db)
 		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"project": made})
 		if _, err := pass.Once(ctx); err != nil {
@@ -268,7 +257,7 @@ func TestNothingIsFetchedWhileTheLookupsAreOff(t *testing.T) {
 		made := project(t)
 		issue(t, db, "CVE-2025-0002", "critical", link("project", made.fix))
 		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
-			map[string]upstream{"project": made})
+			map[string]upstream{"project": made}).TurnOff()
 		visited, err := pass.Once(t.Context())
 		if err != nil {
 			t.Fatal(err)
@@ -285,7 +274,6 @@ func TestTheRepositoryBehindTheWorstIssueIsVisitedFirst(t *testing.T) {
 		mild, severe := project(t), project(t)
 		issue(t, db, "CVE-2025-0003", "low", link("mild", mild.fix))
 		issue(t, db, "CVE-2025-0004", "critical", link("severe", severe.fix))
-		turnOn(t, db)
 		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"mild": mild, "severe": severe})
 		visited, err := pass.Once(t.Context())
@@ -304,7 +292,6 @@ func TestARepositoryAlreadyCopiedIsVisitedFirstForNewCommits(t *testing.T) {
 		ctx := t.Context()
 		mild, severe := project(t), project(t)
 		issue(t, db, "CVE-2025-0005", "low", link("mild", mild.fix))
-		turnOn(t, db)
 		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"mild": mild, "severe": severe})
 		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("mild") {
@@ -334,7 +321,6 @@ func TestARepositoryOnAnExcludedHostIsNeverVisited(t *testing.T) {
 		ctx := t.Context()
 		made := project(t)
 		issue(t, db, "CVE-2025-0008", "critical", link("project", made.fix))
-		turnOn(t, db)
 		excluded, err := outward.ParseExcluded("github.com")
 		if err != nil {
 			t.Fatal(err)
@@ -364,7 +350,6 @@ func TestACopyLargerThanTheCacheIsNotKeptAndWaitsADay(t *testing.T) {
 		ctx := t.Context()
 		made := project(t)
 		issue(t, db, "CVE-2025-0009", "critical", link("project", made.fix))
-		turnOn(t, db)
 		pass := passOver(t, db, 1, outward.Excluded{}, map[string]upstream{"project": made})
 		if _, err := pass.Once(ctx); err != nil {
 			t.Fatal(err)
@@ -395,7 +380,6 @@ func TestAVisitStoppedPartwayIsNeitherFinishedNorFailed(t *testing.T) {
 		empty(t, db)
 		made := project(t)
 		issue(t, db, "CVE-2025-0014", "critical", link("project", made.fix))
-		turnOn(t, db)
 		// Shutdown arrives as the fetch begins.
 		ctx, stop := context.WithCancel(t.Context())
 		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
@@ -425,7 +409,6 @@ func TestAVisitKeepsTheLeaseAsItGoes(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		empty(t, db)
 		ctx := t.Context()
-		turnOn(t, db)
 		pass := patchbranch.NewLeasedPass(db.DB, "this-replica")
 		if err := pass.StillMine(ctx); err != nil {
 			t.Fatal(err)
@@ -446,7 +429,6 @@ func TestAVisitStoppedPartwayLeavesAnEarlierFailureStanding(t *testing.T) {
 		empty(t, db)
 		made := project(t)
 		issue(t, db, "CVE-2025-0018", "critical", link("project", made.fix))
-		turnOn(t, db)
 		// A visit that fails: the copy cannot fit.
 		failing := patchbranch.NewLocalPass(db.DB, t.TempDir(), 1, outward.Excluded{},
 			func(string) string { return made.dir })
@@ -488,7 +470,6 @@ func TestAFailureOfOursIsNotRecordedAsTheRepositorys(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
 		made := project(t)
 		issue(t, db, "CVE-2025-0019", "critical", link("project", made.fix))
-		turnOn(t, db)
 		// The table a lookup is recorded in goes away once the visit begins,
 		// which is this deployment failing and not the repository.
 		pass := patchbranch.NewLocalPass(db.DB, t.TempDir(), patchbranch.DefaultQuota,
@@ -520,7 +501,6 @@ func TestProgressCountsWhatIsLookedUpAgainstWhatIsLinked(t *testing.T) {
 		issue(t, db, "CVE-2025-0010", "high",
 			link("project", made.fix), link("project", strings.Repeat("cd", 20)),
 			"https://github.com/example/project/pull/7")
-		turnOn(t, db)
 		pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
 			map[string]upstream{"project": made})
 		_, before, err := patchbranch.Progress(ctx, db.DB, outward.Excluded{})
@@ -554,7 +534,6 @@ func TestTheLeastRecentlyUsedCopyIsRemovedFirst(t *testing.T) {
 		empty(t, db)
 		ctx := t.Context()
 		first, second, third := project(t), project(t), project(t)
-		turnOn(t, db)
 		cache := t.TempDir()
 		projects := map[string]upstream{"first": first, "second": second, "third": third}
 		locate := func(repository string) string {

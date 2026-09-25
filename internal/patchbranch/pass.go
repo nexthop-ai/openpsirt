@@ -18,7 +18,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // Lease names the work of fetching repositories and looking commits up, so
@@ -52,6 +51,9 @@ type Pass struct {
 	git      git
 	copies   copies
 	excluded outward.Excluded
+	// on is whether the deployment turned the lookups on, read once at
+	// startup from its configuration.
+	on bool
 	// Now is the clock, so a test can ask what happens a week from now.
 	Now func() time.Time
 
@@ -70,6 +72,9 @@ type Options struct {
 	// Excluded is where no repository is fetched from, on top of this
 	// network.
 	Excluded outward.Excluded
+	// On is whether the deployment turned the lookups on. Nothing is fetched
+	// while it is off.
+	On bool
 }
 
 // NewPass returns the pass over db as whichever replica this is.
@@ -83,6 +88,7 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, options Options) *
 		git:      git{excluded: options.Excluded, transport: "https"},
 		copies:   copies{root: options.Dir, quota: quota, now: time.Now, poll: 15 * time.Second},
 		excluded: options.Excluded,
+		on:       options.On,
 		Now:      time.Now,
 		leases:   queue.NewLeases(db), replica: replica,
 	}
@@ -91,17 +97,9 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, options Options) *
 }
 
 // Run looks for work until the context ends.
-//
-// The setting is read each cycle, and again as a visit runs, so turning this
-// off stops the fetching without a restart.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
-		on, err := p.enabled(ctx)
-		switch {
-		case err != nil:
-			p.logger.Error("reading whether to look up patch branches", "error", err)
-			return
-		case !on:
+		if !p.on {
 			return
 		}
 		p.interval = interval
@@ -153,25 +151,13 @@ func (p *Pass) holding(ctx context.Context) (bool, error) {
 	return p.leases.Take(ctx, Lease, p.replica, held)
 }
 
-// enabled reports whether this deployment has turned the lookups on.
-func (p *Pass) enabled(ctx context.Context) (bool, error) {
-	value, set, err := setting.NewStore(p.db).Get(ctx, setting.PatchBranches)
-	if err != nil {
-		return false, err
-	}
-	return set && value == setting.On, nil
-}
-
 // Once records what patch links name, visits the one repository most worth
 // visiting, and answers which it was.
 //
 // The switch is read here as well as in Run: a guard beside the work cannot be
 // skipped by calling the work another way.
 func (p *Pass) Once(ctx context.Context) (string, error) {
-	switch on, err := p.enabled(ctx); {
-	case err != nil:
-		return "", fmt.Errorf("read whether patch branches are looked up: %w", err)
-	case !on:
+	if !p.on {
 		return "", nil
 	}
 	now := p.Now()
@@ -289,12 +275,12 @@ func (c *candidate) before(other *candidate) bool {
 	return c.repository.ID < other.repository.ID
 }
 
-// errStopped is a visit that stopped because the switch was turned off or the
-// lease was lost. Not a failure of the repository.
+// errStopped is a visit that stopped because the lease was lost. Not a
+// failure of the repository.
 var errStopped = errors.New("stopped")
 
 // ourFault is a failure of this deployment rather than of the repository: the
-// database, the lease, the setting. A visit that meets one leaves the
+// database or the lease. A visit that meets one leaves the
 // repository as it was, because blaming the repository for a dropped
 // connection puts it out of reach for a day and says the wrong thing on the
 // screen.
@@ -303,8 +289,7 @@ type ourFault struct{ err error }
 func (f ourFault) Error() string { return f.err.Error() }
 func (f ourFault) Unwrap() error { return f.err }
 
-// renewTick is how often a visit asks for the lease again and reads the
-// switch. Throughout the visit, the fetch and the index write included: a
+// renewTick is how often a visit asks for the lease again. Throughout the visit, the fetch and the index write included: a
 // first fetch of the kernel from kernel.org takes a quarter of an hour, and
 // the lease is half an hour.
 const renewTick = time.Minute
@@ -406,15 +391,8 @@ func (p *Pass) lookUp(ctx context.Context, c candidate, commits map[Commit]urgen
 	return nil
 }
 
-// stillMine stops a visit that has lost the lease or been turned off.
+// stillMine stops a visit that has lost the lease.
 func (p *Pass) stillMine(ctx context.Context) error {
-	on, err := p.enabled(ctx)
-	if err != nil {
-		return ourFault{fmt.Errorf("read whether patch branches are looked up: %w", err)}
-	}
-	if !on {
-		return errStopped
-	}
 	mine, err := p.holding(ctx)
 	if err != nil {
 		return ourFault{fmt.Errorf("keep the lease on looking up patch branches: %w", err)}

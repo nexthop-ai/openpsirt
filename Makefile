@@ -653,6 +653,7 @@ web-check:
 	$(NPM) --prefix web run classes
 	$(NPM) --prefix web run tokens
 	$(NPM) --prefix web run ladder
+	$(NPM) --prefix web run copy
 	$(MAKE) web-audit
 	$(MAKE) web-api
 

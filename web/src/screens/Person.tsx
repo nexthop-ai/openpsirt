@@ -89,10 +89,8 @@ export function Person() {
         <section className="panel" style={{ marginBottom: 14 }}>
           <h3>They have left</h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Recorded on {stamp(who.deactivated_at)}. They are refused at every way in and what they
-            were dealing with was handed back. Nothing was deleted: they are still named by every
-            judgment they proposed and every one they agreed to, and the roles below are still
-            theirs, so bringing them back does not mean granting again.
+            Since {stamp(who.deactivated_at)}. Signed out and unassigned. Their record and roles are
+            kept.
           </p>
           <button type="button" onClick={() => leaving.mutate(false)} disabled={leaving.isPending}>
             Bring them back
@@ -280,8 +278,7 @@ export function Person() {
         <section className="panel" style={{ marginTop: 14 }}>
           <h3>Departure</h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            Providers do not report disabled accounts, so mark departures here. Refuses them from
-            the next request, ends their sessions, and unassigns their work.
+            Signs them out, refuses them from now on, and unassigns their work.
           </p>
           <p className="hint">
             Not a deletion. Roles are kept, so reinstating does not mean granting again.

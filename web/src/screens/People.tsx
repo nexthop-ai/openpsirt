@@ -563,8 +563,7 @@ export function People({ who: me }: { who: Who }) {
               {(bindings.data?.items ?? []).length === 1 ? "binding" : "bindings"}
             </>
           )}
-          . Either an administrator assigns roles directly, or they are derived from the groups a
-          sign-in provider reports. Never both.
+          . Roles are assigned here or derived from sign-in groups, never both.
         </p>
         {(bindings.data?.items ?? []).length > 0 && (
           <Wide style={{ marginTop: 10 }}>
@@ -637,7 +636,7 @@ export function People({ who: me }: { who: Who }) {
           value={email}
           onChange={setEmail}
           placeholder="ashwin@example.com"
-          hint="Where they are reached outside the application. Without one they get the notifications inside it and no mail. A provider that verifies an address fills this in where nobody has."
+          hint="For mail. Without one, notifications stay in the app."
         />
       </Declare>
     </>

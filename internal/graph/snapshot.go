@@ -868,10 +868,37 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 	}
 	limit = database.AList.Of(limit)
 
+	// The components matched, each once however many places it sits at. The
+	// name is matched on its folded form, which is lowercased and trimmed
+	// when stored, so no engine is asked to compare loosely; and the term is
+	// escaped as well as folded, so a term of "%" searches for a percent sign.
+	matched := `(SELECT DISTINCT n.component_id AS "cid"
+		FROM "graph_node" AS "n"
+		JOIN "component" AS "m" ON m.id = n.component_id
+		WHERE n.target_id = ? AND n.closed_scan_id IS NULL
+		  AND m.name_folded LIKE ?` + database.LikeClause + `) AS "matched"`
+
 	var rows []Neighbor
 	err = s.db.NewSelect().
-		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
+		TableExpr(matched, targetID, "%"+database.LikeEscaped(Folded(term))+"%").
+		Join(`JOIN "component" AS "c" ON c.id = matched.cid`).
+		// Issues rather than finding rows, which is what this field is and
+		// what the two queries that browse to the same component answer: a
+		// library reachable under three parents is one issue, not three.
+		//
+		// Counted in one grouped pass over the build's open findings, which
+		// the covering index over target, closure, visibility, issue and
+		// component answers without reading a row. Counted per matched
+		// component instead, SQLite reads the whole build's open findings once
+		// per component through the same index, and a term matching many
+		// names takes most of a minute: 17.1 s for "li" on a switch image of
+		// 297,881 open findings, where this takes 0.24 s.
+		Join(`LEFT JOIN (SELECT f.component_id AS "cid",
+				COUNT(DISTINCT f.vulnerability_id) AS "n"
+			FROM "finding" AS "f"
+			WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
+			GROUP BY f.component_id) AS "counted" ON counted.cid = c.id`,
+			targetID, bun.List(readable)).
 		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
 			JOIN "graph_node" AS "dp" ON dp.id = d.parent_id
@@ -880,28 +907,9 @@ func (s *Store) Search(ctx context.Context, subject access.Subject, targetID int
 		ColumnExpr(`c.name AS "name"`).
 		ColumnExpr(`c.version AS "version"`).
 		ColumnExpr(`c.purl AS "purl"`).
-		// Issues rather than finding rows, which is what this field is and
-		// what the two queries that browse to the same component answer.
-		// Counted as rows, a library reachable under three parents reported
-		// three times its real number — and the results are ordered by it, so
-		// deeply-vendored components with few real issues outranked shallow
-		// ones with many.
-		ColumnExpr(`(SELECT COUNT(DISTINCT f.vulnerability_id) FROM "finding" AS "f"
-			WHERE f.target_id = ? AND f.component_id = c.id
-			  AND f.closed_at IS NULL AND f.visibility IN (?)) AS "findings"`,
-			targetID, bun.List(readable)).
+		ColumnExpr(`COALESCE(counted.n, 0) AS "findings"`).
 		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`).
-		Where("n.target_id = ?", targetID).
-		Where("n.closed_scan_id IS NULL").
-		// LOWER on both sides rather than a case-insensitive comparison,
-		// which two of the four engines spell differently and one of them
-		// decides by collation.
-		// Escaped as well as folded. Folded trims, lowercases and truncates
-		// and does not escape, so a term of "%" searched the whole build.
-		Where("c.name_folded LIKE ?"+database.LikeClause,
-			"%"+database.LikeEscaped(Folded(term))+"%").
-		GroupExpr("c.id, c.name, c.version, kids.n").
-		OrderExpr("findings DESC, c.name").
+		OrderExpr(`"findings" DESC, c.name`).
 		Limit(limit).
 		Scan(ctx, &rows)
 	if err != nil {

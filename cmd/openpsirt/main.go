@@ -298,8 +298,9 @@ func run(args []string, stdout, stderr *os.File) error {
 		// that asks and by the report saying what it held back. Two
 		// derivations of one boundary would be two boundaries the first time
 		// either moved.
-		Ours:     ours,
-		Excluded: cfg.OutboundExcluded,
+		Ours:          ours,
+		Excluded:      cfg.OutboundExcluded,
+		PatchBranches: cfg.PatchBranches,
 	})
 
 	// Every replica serves, reads and scans. Separate worker deployments would
@@ -354,13 +355,13 @@ func run(args []string, stdout, stderr *os.File) error {
 	// rather than per replica.
 	suppliers := supplier.NewPass(db.DB, logger, name, cfg.Limits(), cfg.OutboundExcluded)
 	// Fetches the repositories patch links point into and records which
-	// branches each linked commit is on. Started whatever the setting says
-	// and doing nothing until it is on, reading the setting each cycle so
-	// turning it off stops the fetching without a redeploy. One replica
-	// fetches, settled by a lease, because the copies are that replica's
-	// disk and a fetch of a large tree is not work to do twice.
+	// branches each linked commit is on. Started either way and doing nothing
+	// unless the deployment turned it on. One replica fetches, settled by a
+	// lease, because the copies are that replica's disk and a fetch of a large
+	// tree is not work to do twice.
 	branches := patchbranch.NewPass(db.DB, logger, name, patchbranch.Options{
 		Dir: cfg.PatchDir, Quota: int64(cfg.PatchQuota), Excluded: cfg.OutboundExcluded,
+		On: cfg.PatchBranches,
 	})
 	// The messages that leave the application, where an operator configured
 	// somewhere for it to go. Nil when they did not, which is ordinary rather

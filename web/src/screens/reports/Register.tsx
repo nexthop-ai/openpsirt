@@ -157,10 +157,9 @@ export function Register() {
             {(states.length > 0 || standing) && <span className="hint"> narrowed</span>}
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
-            One row per issue and place, unfolded. Everything the build carries, decided or not and
-            open or closed: <b>no triage line is applied</b>. The whole of it as a file —{" "}
+            One row per issue and place, open or closed, <b>no triage line</b>.{" "}
             <a href={fileAt(where, "csv", asked)}>CSV</a> ·{" "}
-            <a href={fileAt(where, "json", asked)}>JSON</a>, narrowed the same way.
+            <a href={fileAt(where, "json", asked)}>JSON</a>
           </p>
           <MeasuredWith measured={register.data?.measured} />
           {rows.length === 0 ? (

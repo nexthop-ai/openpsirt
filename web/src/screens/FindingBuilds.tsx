@@ -134,8 +134,7 @@ export function AffectedBuilds({
         </button>
       </h3>
       <p className="reading" style={{ marginBottom: 8 }}>
-        Send the full list, not a change to it. Removing a build closes its findings as
-        <b>never affected</b>, which needs a reason.
+        Removing a build closes its findings as <b>never affected</b>, with a reason.
       </p>
       {!open ? null : builds.isPending || holds.isPending ? (
         <p className="hint">Reading what this is filed against…</p>

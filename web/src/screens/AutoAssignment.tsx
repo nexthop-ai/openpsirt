@@ -285,12 +285,8 @@ export function AutoAssignment() {
           <div className="card" style={{ marginTop: 16 }}>
             <h3>Add a rule</h3>
             <p className="reading" style={{ marginBottom: 8 }}>
-              Naming a <b>source package</b> catches every binary package built from it, wherever
-              they sit — one line for a kernel rather than one per place. Naming a{" "}
-              <b>place in the tree</b> catches that component and everything under it, in every
-              build. At least one is needed; giving both narrows the rule to what satisfies{" "}
-              <em>both</em>, rather than either. <span className="id">*</span> matches any run of
-              characters. Matches are shown before you save.
+              Match a <b>source package</b> (all its binaries) or a <b>place in the tree</b> (and
+              all under it). <span className="id">*</span> matches anything.
             </p>
             <div className="filters">
               <label className="field">
@@ -370,8 +366,7 @@ export function AutoAssignment() {
                   <p className="said">Working out what that catches…</p>
                 ) : (catches.data?.total ?? 0) === 0 ? (
                   <p className="said">
-                    <b>Nothing is called that.</b> A rule matching nothing places nothing, and says
-                    so only by never doing anything.
+                    <b>Nothing is called that.</b>
                     {/* Why it matched nothing, where the answer is knowable.
                         A source-package rule matches what a component was cut
                         from, so typing the component name you see everywhere
@@ -382,8 +377,7 @@ export function AutoAssignment() {
                     {cutFrom.length > 0 ? (
                       <>
                         {" "}
-                        That is a component name rather than a source package.{" "}
-                        {cutFrom.length === 1 ? "It is" : "Those are"} built from{" "}
+                        That is a component, built from{" "}
                         {cutFrom.map((from, i) => (
                           <span key={from}>
                             {i > 0 && ", "}
@@ -396,8 +390,8 @@ export function AutoAssignment() {
                             </button>
                           </span>
                         ))}
-                        {" — use that above, or name it under "}
-                        <b>At or under</b> instead.
+                        {". Use that, or "}
+                        <b>At or under</b>.
                       </>
                     ) : (
                       <>
@@ -420,10 +414,9 @@ export function AutoAssignment() {
                     {(catches.data?.total ?? 0) > (catches.data?.components ?? []).length && (
                       <> and more</>
                     )}
-                    . <b>{(catches.data?.unheld ?? 0).toLocaleString()}</b> of{" "}
-                    {(catches.data?.work ?? 0).toLocaleString()} pieces of work there are held by
-                    nobody, and those are what it would place — where no rule above it claims them
-                    first.
+                    . Would place <b>{(catches.data?.unheld ?? 0).toLocaleString()}</b> of{" "}
+                    {(catches.data?.work ?? 0).toLocaleString()} unheld, unless a rule above claims
+                    them.
                   </p>
                 )}
               </div>

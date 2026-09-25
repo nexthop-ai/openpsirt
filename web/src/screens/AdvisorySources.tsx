@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
 import { AddButton, Declare, Field } from "../ui/Declare";
+import { Dropzone } from "../ui/Dropzone";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -109,9 +110,7 @@ export function AdvisorySources() {
         {product !== "" && <AddButton label="Add supplier" onClick={() => setAdding(true)} />}
       </div>
       <p className="hint" style={{ marginTop: 0 }}>
-        Suppliers whose published advisories are read on the scan schedule. What arrives is evidence
-        and a prefill, never a decision. Reading reaches back a set number of days before a supplier
-        is added — upload anything older below.
+        Read on the scan schedule, as evidence. Upload anything older below.
       </p>
 
       <div className="field">
@@ -281,17 +280,20 @@ function Upload({ product }: { product: string }) {
             ))}
           </select>
         </label>
-        <label className="field">
+        <div className="field" style={{ flex: "1 1 18rem" }}>
           <span>File</span>
-          <input
-            type="file"
+          <Dropzone
+            files={file ? [file] : []}
             accept=".json,application/json"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
+            small
+            onChange={(chosen) => {
+              setFile(chosen[0] ?? null);
               upload.reset();
             }}
-          />
-        </label>
+          >
+            A JSON document
+          </Dropzone>
+        </div>
         <button
           type="button"
           className="btn"

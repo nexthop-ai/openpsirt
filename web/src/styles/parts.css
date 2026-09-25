@@ -869,41 +869,132 @@ button.vchip {
   width: 10.5rem;
 }
 
+/* A switch between a few views or values. Each option is drawn as a button,
+   because an option drawn as grey text reads as a label. It keeps its own
+   width: a panel is a flex column and stretches what it holds, which draws the
+   frame out to the panel's edge with the options bunched at its start. */
 .seg {
+  align-self: flex-start;
   display: inline-flex;
+  gap: 2px;
+  padding: 2px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: var(--surface);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--raised);
+}
+/* Nothing picked yet reads as a question rather than as a row of labels. */
+.seg:not(:has([aria-pressed="true"])) {
+  border-style: dashed;
+  border-color: var(--accent-line);
 }
 .seg button {
-  border: 0;
-  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 4%);
   cursor: pointer;
-  padding: 5px 11px;
+  padding: 4px 10px;
   font-size: var(--step--1);
-  color: var(--muted);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--ink);
   font-family: inherit;
 }
-.seg button + button {
-  border-left: 1px solid var(--line-strong);
+.seg button::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+}
+.seg button:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.seg button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 .seg button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--canvas);
-  font-weight: 500;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.seg button[aria-pressed="true"]::before {
+  border-color: var(--accent-ink);
+  background: radial-gradient(circle, var(--accent-ink) 0 2.5px, transparent 3px);
 }
 /* What switching to that view would show. Quieter than the label, because the
    label is what is being chosen and the number is why. */
 .seg button .n {
-  margin-left: 6px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--faint);
 }
 .seg button[aria-pressed="true"] .n {
   color: inherit;
-  opacity: 0.7;
+  opacity: 0.75;
+}
+
+/* A choice with a consequence, one card per option, the consequence inside. */
+.choice-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 8px;
+  max-width: 36rem;
+}
+.choice-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  text-align: left;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.choice-card:hover {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.choice-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.choice-card .dot {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+}
+.choice-card b {
+  display: block;
+  font-weight: 600;
+}
+.choice-card .note {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+.choice-card[aria-checked="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+}
+.choice-card[aria-checked="true"] .dot {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 4px, var(--surface) 4.5px);
 }
 /* A list being re-read is still the list. It dims rather than being replaced,
    so the rows somebody was narrowing stay where they are while the next answer
@@ -1800,6 +1891,163 @@ textarea:disabled {
   box-shadow: var(--shadow);
   max-height: 260px;
   overflow-y: auto;
+}
+
+/* The findings list's grouping, as tabs: it changes what a row is rather
+   than which rows show, so it sits above the filters rather than among them. */
+.viewtabs {
+  display: flex;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+  overflow-x: auto;
+}
+.viewtab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  padding: 6px 0 8px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.viewtab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.viewtab .n {
+  margin-left: 6px;
+  color: var(--faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.viewtab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* A filter as one button carrying its own name and value. Each wraps as a
+   whole, so a name never lands on a different line from its value. */
+.filterbar .spacer {
+  flex: 1 1 0;
+}
+.filtermenu {
+  position: relative;
+}
+.filterbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: var(--step--1);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.filterbtn:hover {
+  border-color: var(--accent-line);
+}
+.filterbtn:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
+}
+.filterbtn .k,
+.filterbtn .caret {
+  color: var(--faint);
+}
+.filterbtn .v {
+  font-weight: 500;
+}
+.filterbtn[data-on="yes"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.filterlist {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: max(100%, 190px);
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+.filteritem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: var(--step--1);
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.filteritem:hover,
+.filteritem:focus-visible {
+  background: var(--accent-soft);
+  outline: none;
+}
+.filteritem .box,
+.filteritem .dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+}
+.filteritem .box {
+  border-radius: 3px;
+}
+.filteritem .dot {
+  border-radius: 50%;
+}
+.filteritem[aria-checked="true"] .box {
+  border-color: var(--accent);
+  background: var(--accent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3.5 8.5 3 3 6-7' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E")
+    center / 12px no-repeat;
+}
+.filteritem[aria-checked="true"] .dot {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 3.5px, var(--surface) 4px);
+}
+
+/* The line over the list: how many, and in what order. */
+.listhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap);
+  margin: 4px 0 8px;
+}
+.sortby {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--step--1);
+  color: var(--faint);
+  white-space: nowrap;
+}
+.sortby select {
+  width: auto;
 }
 
 /* A checkbox and its word. The class was in the markup and in no stylesheet —
