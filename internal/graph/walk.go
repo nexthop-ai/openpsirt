@@ -100,21 +100,38 @@ func WithinAny(db bun.IDB, targetID int64, componentIDs []int64) *bun.RawQuery {
 // total — one query answers both, and two queries would be two chances for the
 // number and its parts to disagree.
 func (s *Store) beneath(ctx context.Context, productID, targetID int64,
-	visible []access.Visibility, of []int64) (map[int64]map[string]int, error) {
+	visible []access.Visibility, of []int64, adopt adoption) (map[int64]map[string]int, error) {
 
 	totals := map[int64]map[string]int{}
 	if len(of) == 0 {
 		return totals, nil
 	}
+	// Every start is walked from itself. An adoption walks the adopted
+	// components as though from the one adopting them, so the adopter's count
+	// is its own subtree and theirs as one set, in the same statement as
+	// everything else being counted.
+	seeds := `SELECT n.id AS "start", n.id AS "node", 0 AS "depth"
+		FROM "graph_node" AS "n"
+		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
+	args := []any{targetID, bun.List(of)}
+	if len(adopt.IDs) > 0 {
+		seeds += `
+		UNION ALL
+		SELECT bn.id, n.id, 1
+		FROM "graph_node" AS "bn"
+		JOIN "graph_node" AS "n" ON n.target_id = bn.target_id
+		WHERE bn.target_id = ? AND bn.closed_scan_id IS NULL AND bn.component_id = ?
+		  AND n.closed_scan_id IS NULL AND n.component_id IN (?)`
+		args = append(args, targetID, adopt.By, bun.List(adopt.IDs))
+	}
+	args = append(args, targetID, depth, productID, targetID, bun.List(visible))
 	var rows []struct {
 		ComponentID int64  `bun:"component_id"`
 		Band        string `bun:"band"`
 		Issues      int    `bun:"issues"`
 	}
 	err := s.db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT n.id AS "start", n.id AS "node", 0 AS "depth"
-		FROM "graph_node" AS "n"
-		WHERE n.target_id = ? AND n.closed_scan_id IS NULL AND n.component_id IN (?)
+		SELECT "seed"."start", "seed"."node", "seed"."depth" FROM (`+seeds+`) AS "seed"
 		UNION
 		SELECT d.start, e.child_id, d.depth + 1
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
@@ -134,8 +151,7 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 	      WHERE f.target_id = ? AND f.closed_at IS NULL AND f.visibility IN (?)
 	      GROUP BY f.component_id, f.vulnerability_id, `+rating.EffectiveExpr+`) AS "p"
 	  ON p.component_id = n.component_id
-	GROUP BY sn.component_id, p.band`,
-		targetID, bun.List(of), targetID, depth, productID, targetID, bun.List(visible)).
+	GROUP BY sn.component_id, p.band`, args...).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("count what is open beneath each component: %w", err)
@@ -152,6 +168,13 @@ func (s *Store) beneath(ctx context.Context, productID, targetID int64,
 		totals[row.ComponentID][row.Band] += row.Issues
 	}
 	return totals, nil
+}
+
+// adoption names components walked as though the one adopting them pulled
+// them in. The zero value adopts nothing.
+type adoption struct {
+	By  int64
+	IDs []int64
 }
 
 // step is one node on a way up from a component, as the database reports it:

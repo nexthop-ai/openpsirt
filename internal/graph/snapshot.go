@@ -538,13 +538,21 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 func (s *Store) filled(ctx context.Context, productID, targetID int64,
 	readable []access.Visibility, lists ...[]Neighbor) error {
 
+	return s.filledWith(ctx, productID, targetID, readable, adoption{}, lists...)
+}
+
+// filledWith is filled with an adoption: the adopter's number covers what it
+// adopts as well as what is under it.
+func (s *Store) filledWith(ctx context.Context, productID, targetID int64,
+	readable []access.Visibility, adopt adoption, lists ...[]Neighbor) error {
+
 	var ids []int64
 	for _, rows := range lists {
 		for _, row := range rows {
 			ids = append(ids, row.ComponentID)
 		}
 	}
-	totals, err := s.beneath(ctx, productID, targetID, readable, ids)
+	totals, err := s.beneath(ctx, productID, targetID, readable, ids, adopt)
 	if err != nil {
 		return err
 	}
@@ -570,11 +578,25 @@ func (s *Store) filled(ctx context.Context, productID, targetID int64,
 // drawn without the thing being explored: every path shown starts one step in,
 // and the indentation has nothing to hang from. It is nil where the document
 // named no root of its own.
+//
+// What the root pulls in directly includes every component nothing else in
+// the build pulls in. The build contains them, and with nothing above them the
+// build is what holds them. Where the document named no root, those are the
+// whole of the list.
 func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int64) (
 	*Neighbor, []Neighbor, error) {
 
+	productID, readable, err := s.visibleIn(ctx, subject, targetID)
+	if err != nil {
+		return nil, nil, err
+	}
+	loose, err := s.unparentedIDs(ctx, targetID)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	var rootID int64
-	err := s.db.NewSelect().
+	err = s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		ColumnExpr("n.component_id").
 		Where("n.target_id = ?", targetID).
@@ -582,19 +604,28 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 		Where("n.is_root = ?", true).
 		Limit(1).Scan(ctx, &rootID)
 	if database.IsNoRows(err) {
-		// A build whose document named no root of its own. Nothing is wrong
-		// and there is simply nothing above the components.
-		return nil, nil, nil
+		// A build whose document named no root of its own. Nothing is above
+		// the components, so the list is what nothing pulls in.
+		kids, err := s.topLevel(ctx, readable, targetID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if err := s.filled(ctx, productID, targetID, readable, kids); err != nil {
+			return nil, nil, err
+		}
+		ordered(kids)
+		return nil, kids, nil
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("look up what this build is: %w", err)
 	}
 
-	productID, readable, err := s.visibleIn(ctx, subject, targetID)
-	if err != nil {
-		return nil, nil, err
+	var kids []Neighbor
+	if len(loose) == 0 {
+		kids, err = s.step(ctx, readable, targetID, rootID, true)
+	} else {
+		kids, err = s.topLevel(ctx, readable, targetID)
 	}
-	kids, err := s.step(ctx, readable, targetID, rootID, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -613,10 +644,22 @@ func (s *Store) Roots(ctx context.Context, subject access.Subject, targetID int6
 		return nil, kids, nil
 	}
 	// The root and its children counted in the one statement. The root's own
-	// number is the whole build's, and it was a second walk of the same
-	// edges when asked for on its own.
+	// number is the whole build's, and it was a second walk of the same edges
+	// when asked for on its own. What nothing pulls in is adopted by the root:
+	// no edge joins the two, so walking from the root alone reads zero above
+	// children that hold thousands.
+	var adopt adoption
+	if len(loose) > 0 {
+		// The rows the root holds directly, rather than the orphans alone:
+		// the list does not say which is which, and walking a child of the
+		// root from the root as well reaches nothing it would not reach.
+		adopt.By = rootID
+		for _, row := range kids {
+			adopt.IDs = append(adopt.IDs, row.ComponentID)
+		}
+	}
 	top := []Neighbor{*root}
-	if err := s.filled(ctx, productID, targetID, readable, top, kids); err != nil {
+	if err := s.filledWith(ctx, productID, targetID, readable, adopt, top, kids); err != nil {
 		return nil, nil, err
 	}
 	root.Beneath = top[0].Beneath
@@ -671,10 +714,31 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 	}
 
 	var rows []Neighbor
-	err := s.db.NewSelect().
+	query := s.db.NewSelect().
 		TableExpr(`"graph_edge" AS "e"`).
-		Join(`JOIN "graph_node" AS "nn" ON nn.id = e.`+near).
-		Join(`JOIN "graph_node" AS "fn" ON fn.id = e.`+far).
+		Join(`JOIN "graph_node" AS "nn" ON nn.id = e.` + near).
+		Join(`JOIN "graph_node" AS "fn" ON fn.id = e.` + far)
+	err := neighborsAt(query, readable, targetID).
+		Where("e.target_id = ?", targetID).
+		Where("nn.component_id = ?", componentID).
+		Where("e.closed_scan_id IS NULL").
+		Scan(ctx, &rows)
+	if err != nil {
+		return nil, fmt.Errorf("walk the graph: %w", err)
+	}
+
+	// Ordered by ordered(), after the caller has filled in what is beneath
+	// each — the number a branch is ranked on is not known until then.
+	return rows, nil
+}
+
+// neighborsAt reads each node the query reaches as "fn" as a neighbor: its
+// component, what is open against it and how many things it pulls in, in the
+// order a reader descends by.
+func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
+	targetID int64) *bun.SelectQuery {
+
+	return query.
 		Join(`JOIN "component" AS "c" ON c.id = fn.component_id`).
 		Join(`LEFT JOIN (SELECT dp.component_id AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
@@ -716,9 +780,6 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		// first and made it worse (5.4 s to 10.0 s), because the scan being
 		// repeated is over the edges rather than the lookup it drives.
 		ColumnExpr(`COALESCE(kids.n, 0) AS "children"`).
-		Where("e.target_id = ?", targetID).
-		Where("nn.component_id = ?", componentID).
-		Where("e.closed_scan_id IS NULL").
 		// kids.n and open.n are grouped on as well as selected. Each is one
 		// value per c.id and so adds nothing, but the engines that enforce
 		// the rule strictly will not take a column from a joined subquery on
@@ -733,14 +794,64 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, targetID
 		// one of the 37 containers below that. A tree whose first screen
 		// contains no branches is a list, and the reader never learns the
 		// build has containers in it at all.
-		OrderExpr("CASE WHEN COALESCE(kids.n, 0) > 0 THEN 0 ELSE 1 END, findings DESC, c.name").
+		OrderExpr("CASE WHEN COALESCE(kids.n, 0) > 0 THEN 0 ELSE 1 END, findings DESC, c.name")
+}
+
+// orphaned is the condition that nothing in the build pulls in the node the
+// query reaches as "fn".
+//
+// Asked by the node alone. A node belongs to one build, so naming the build as
+// well adds nothing, and it steers SQLite onto the index led by the build,
+// where the child is the fourth column: every open edge in the build scanned
+// once per node, 7.28 s for 59,982 nodes against 45 ms on the index led by the
+// child.
+const orphaned = `NOT EXISTS (SELECT 1 FROM "graph_edge" AS "pe"
+	WHERE pe.child_id = fn.id AND pe.closed_scan_id IS NULL)`
+
+// unparentedIDs is every component of the build that nothing in it pulls in,
+// other than the build's own root.
+//
+// A document that states no edge from its root still lists what the build
+// contains, and a component with no parent is contained by nothing else. One
+// real switch image arrived with 60,935 components, 1,358 edges and none of
+// them from the root, and drawn from the root alone its tree was empty.
+func (s *Store) unparentedIDs(ctx context.Context, targetID int64) ([]int64, error) {
+	var ids []int64
+	err := s.db.NewSelect().
+		TableExpr(`"graph_node" AS "fn"`).
+		ColumnExpr("fn.component_id").
+		Where("fn.target_id = ?", targetID).
+		Where("fn.closed_scan_id IS NULL").
+		Where("fn.is_root = ?", false).
+		Where(orphaned).
+		Scan(ctx, &ids)
+	if err != nil {
+		return nil, fmt.Errorf("read what nothing in the build pulls in: %w", err)
+	}
+	return ids, nil
+}
+
+// topLevel reads what the root pulls in and what nothing pulls in, as one
+// list in one statement: the two are read with the same per-build counts, and
+// read apart each pays for them.
+func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
+	targetID int64) ([]Neighbor, error) {
+
+	var rows []Neighbor
+	err := neighborsAt(s.db.NewSelect().TableExpr(`"graph_node" AS "fn"`), readable, targetID).
+		Where("fn.target_id = ?", targetID).
+		Where("fn.closed_scan_id IS NULL").
+		Where("fn.is_root = ?", false).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where(orphaned).
+				WhereOr(`EXISTS (SELECT 1 FROM "graph_edge" AS "re"
+					JOIN "graph_node" AS "rn" ON rn.id = re.parent_id
+					WHERE re.child_id = fn.id AND re.closed_scan_id IS NULL AND rn.is_root = ?)`, true)
+		}).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("walk the graph: %w", err)
+		return nil, fmt.Errorf("read what the build holds directly: %w", err)
 	}
-
-	// Ordered by ordered(), after the caller has filled in what is beneath
-	// each — the number a branch is ranked on is not known until then.
 	return rows, nil
 }
 

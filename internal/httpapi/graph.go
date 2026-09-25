@@ -69,6 +69,9 @@ func registerGraph(api huma.API, in Ingest) {
 		Description: "Returns the build's own component and what it depends on, most findings " +
 			"first. The root is named separately from the list because it is what the list " +
 			"hangs from rather than a member of it.\n\n" +
+			"The list also holds every component nothing else in the build depends on, and the " +
+			"root's counts cover them. Where the inventory named no root, those components are " +
+			"the list.\n\n" +
 			"The starting point for walking the graph. A full render is not offered and would " +
 			"not be useful: a real image holds thousands of components and tens of thousands of " +
 			"edges, which neither draws nor reads. Ask for one step at a time.\n\n" +

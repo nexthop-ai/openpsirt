@@ -20932,6 +20932,8 @@ paths:
       description: |-
         Returns the build's own component and what it depends on, most findings first. The root is named separately from the list because it is what the list hangs from rather than a member of it.
 
+        The list also holds every component nothing else in the build depends on, and the root's counts cover them. Where the inventory named no root, those components are the list.
+
         The starting point for walking the graph. A full render is not offered and would not be useful: a real image holds thousands of components and tens of thousands of edges, which neither draws nor reads. Ask for one step at a time.
 
         Every entry carries how many findings are open against it and how many components it pulls in, so descending follows something rather than being exploration.
