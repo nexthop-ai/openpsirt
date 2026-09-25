@@ -1,0 +1,8 @@
+# The migrations v0.3.0 tagged, and the digest of each file below its license header.
+last 38
+37f2e23de892dc683db709b0373a0ab15ea45180f5223b8e6f124992b8dfafa1  00038_v030.go
+1d39cb137fad1f04d53c6404d1c55bf6fb5977417d976a957595f19e0f4f4ff6  v030_component.go
+1645e4a0e79e4e4ddfecc23f06dfa882d96d2202c1c8b5688db36740fad0d99e  v030_downgrade.go
+068155d70a3d1433dbabecb025b90773906ea9210ba0f00f8e2272bd2a2c84e4  v030_finding.go
+eddbb0a7c3ec1975a6b69863ac1b9d9ad6a850d4a80a9cd0a1cc27fc79b70735  v030_report.go
+644a37d1d07b97decae86fe8e0b71af5ad1dcd26ce051f1200bb18156e1f4fd4  v030_upgrade.go
