@@ -1429,7 +1429,7 @@ it: from v0.1.0, read all three.</p>
 </tr>
 <tr>
 <td>Stop every process of the earlier release</td>
-<td>With the Helm chart, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them</td>
+<td>The Helm chart does this by default: its <code>strategy</code> is <code>Recreate</code>, so every earlier pod stops before a new one starts. With <code>strategy.type: RollingUpdate</code>, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them</td>
 </tr>
 <tr>
 <td>Deploy this release</td>
