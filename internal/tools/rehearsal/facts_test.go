@@ -60,3 +60,16 @@ func TestATotalThatMovesOrVanishesIsReported(t *testing.T) {
 		t.Errorf("want a moved total, a missing build and a new one, got %v", faults)
 	}
 }
+
+func TestASettingTheUpgradeDropsIsExpectedAndNoMore(t *testing.T) {
+	before := Counts{"application_setting": 3}
+	if faults := Compare(before, Counts{"application_setting": 2}, dropped(1)); len(faults) != 0 {
+		t.Errorf("dropping the one setting the upgrade removes was reported: %v", faults)
+	}
+	if faults := Compare(before, Counts{"application_setting": 1}, dropped(1)); len(faults) != 1 {
+		t.Errorf("losing a second setting was not reported: %v", faults)
+	}
+	if faults := Compare(before, Counts{"application_setting": 2}, dropped(0)); len(faults) != 1 {
+		t.Errorf("a setting lost with none expected was not reported: %v", faults)
+	}
+}

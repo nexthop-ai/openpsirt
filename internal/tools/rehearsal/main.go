@@ -238,6 +238,11 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 			r.from, strings.Join(empty, ", "))
 	}
 
+	removed, err := r.droppedSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	r.step("migrated to %d by this tree", current)
 	if err := r.migrate(ctx, "up"); err != nil {
 		return nil, err
@@ -252,7 +257,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded, rules(r.from)))...)
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded, with(rules(r.from), dropped(removed))))...)
 
 	r.step("rolled back to %d and applied again", record.Last)
 	for i := record.Last; i < current; i++ {
@@ -269,7 +274,9 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	faults = append(faults, prefix("rollback", Compare(held, rolled, nil))...)
+	// Rolling back does not put the dropped settings back: nothing in the
+	// earlier release's schema says what they held once they are gone.
+	faults = append(faults, prefix("rollback", Compare(held, rolled, dropped(removed)))...)
 	if err := r.migrate(ctx, "up"); err != nil {
 		return nil, err
 	}
@@ -456,6 +463,31 @@ func (r *run) settle(ctx context.Context, overrides, env []string) (Totals, erro
 		}
 		time.Sleep(15 * time.Second)
 	}
+}
+
+// droppedSettings counts the settings migration 38 removes from what the
+// release left: the patch branch switch, and v0.1.0's name for the disclosure
+// threshold where the new name is also stored.
+func (r *run) droppedSettings(ctx context.Context) (int64, error) {
+	target, err := database.ParseURL(r.hostURL)
+	if err != nil {
+		return 0, err
+	}
+	db, err := database.Open(ctx, target)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = db.Close() }()
+	var n int64
+	err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "application_setting" AS "s"
+		WHERE "s"."name" = 'patch.branches'
+		   OR ("s"."name" = 'disclosure.extension-threshold' AND EXISTS (
+		       SELECT 1 FROM "application_setting" AS "t"
+		       WHERE "t"."name" = 'disclosure.movement-threshold'))`).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count the settings the upgrade drops: %w", err)
+	}
+	return n, nil
 }
 
 // count reads how many rows each table holds, with nothing running against

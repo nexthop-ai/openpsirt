@@ -27,12 +27,16 @@ const (
 	atMost
 	// gone is a table the upgrade removes after moving its rows elsewhere.
 	gone
+	// fewer is a table the upgrade removes a known number of rows from: the
+	// settings migration 38 drops because nothing reads them.
+	fewer
 )
 
 // expect is the rule for one table.
 type expect struct {
 	kind kind
 	of   string
+	by   int64
 }
 
 // rules is what the upgrade tables in the database design document say
@@ -56,6 +60,29 @@ func rules(from string) map[string]expect {
 		}
 	}
 	return nil
+}
+
+// dropped is the rule for the settings migration 38 removes: the switch the
+// deployment's configuration took over, and v0.1.0's name for the disclosure
+// threshold where the new name already holds a value. A threshold stored only
+// under the old name is renamed, which moves no row. None removed is no rule.
+func dropped(rows int64) map[string]expect {
+	if rows == 0 {
+		return map[string]expect{}
+	}
+	return map[string]expect{"application_setting": {kind: fewer, by: rows}}
+}
+
+// with is a set of rules and some more beside them.
+func with(base, more map[string]expect) map[string]expect {
+	out := map[string]expect{}
+	for name, rule := range base {
+		out[name] = rule
+	}
+	for name, rule := range more {
+		out[name] = rule
+	}
+	return out
 }
 
 // Compare reports every table whose count after an upgrade is not what the
@@ -98,6 +125,11 @@ func Compare(before, after Counts, rules map[string]expect) []string {
 			if limit := before[rule.of]; is > limit || (limit > 0 && is == 0) {
 				faults = append(faults, fmt.Sprintf("%s holds %d rows, and the upgrade makes between one and %d from %s",
 					name, is, limit, rule.of))
+			}
+		case ruled && rule.kind == fewer:
+			if want := was - rule.by; is != want {
+				faults = append(faults, fmt.Sprintf("%s held %d rows and holds %d, and the upgrade removes %d",
+					name, was, is, rule.by))
 			}
 		case held && !holds:
 			faults = append(faults, fmt.Sprintf("%s held %d rows and is gone, and nothing says where they went", name, was))
