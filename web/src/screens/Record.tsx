@@ -633,24 +633,31 @@ export function Record() {
 
           <div className="field">
             <span className="l">Disclosure</span>
-            <div className="seg">
-              <button
-                type="button"
-                aria-pressed={!disclosed}
-                disabled={!mayHide}
-                onClick={() => setChose(false)}
-              >
-                Undisclosed
-              </button>
-              <button
-                type="button"
-                aria-pressed={disclosed}
-                disabled={!mayPublish}
-                onClick={() => setChose(true)}
-              >
-                Public
-              </button>
-            </div>
+            {/* Only what this person may record is offered. The one they may
+                not is named in a line below rather than drawn as a card that
+                refuses, which reads as broken. */}
+            <ChoiceCards
+              label="Disclosure"
+              value={disclosed ? "public" : "undisclosed"}
+              onChange={(next) => setChose(next === "public")}
+              options={[
+                ...(mayHide
+                  ? [
+                      {
+                        value: "undisclosed" as const,
+                        label: "Undisclosed",
+                        note:
+                          origin === "here" || report.data?.found_here
+                            ? "No disclosure date: nobody outside is counting down"
+                            : "Disclosure date 90 days from arrival",
+                      },
+                    ]
+                  : []),
+                ...(mayPublish
+                  ? [{ value: "public" as const, label: "Public", note: "No disclosure date" }]
+                  : []),
+              ]}
+            />
             {/* Why one cannot be picked, in the open rather than on a disabled
                 button, which reads as broken. */}
             {!mayHide && (
@@ -665,13 +672,6 @@ export function Record() {
                 undisclosed once saved.
               </span>
             )}
-            <span className="hint">
-              {disclosed
-                ? "Already disclosed, so no disclosure date."
-                : origin === "here" || report.data?.found_here
-                  ? "Starts undisclosed, with no disclosure date: nobody outside is counting down."
-                  : "Starts undisclosed. Disclosure date: 90 days from arrival, unless set otherwise."}
-            </span>
           </div>
         </div>
       )}
