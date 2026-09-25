@@ -1855,6 +1855,9 @@ components:
           description: Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list
           format: int64
           type: integer
+        namespace:
+          description: The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components of one name at one version
+          type: string
         places:
           description: The number of times those sit somewhere in the build
           format: int64
@@ -3390,6 +3393,9 @@ components:
           description: The number of steps between those two
           format: int64
           type: integer
+        namespace:
+          description: The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version
+          type: string
         no_deadline:
           description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
@@ -3691,6 +3697,9 @@ components:
           type: string
         name:
           description: The binary package's name
+          type: string
+        namespace:
+          description: The namespace the package identifier names, where it names one. Send it back with the version and ecosystem where a build holds one name at one version as two components
           type: string
         newest_released_at:
           description: The date that version shipped, where the index said
@@ -5982,6 +5991,9 @@ components:
           description: Open findings against this component itself
           format: int64
           type: integer
+        namespace:
+          description: The namespace its package identifier names, where it names one. Send it back where a build holds one name at one version in one ecosystem as two components
+          type: string
         version:
           type: string
       required:
@@ -7706,6 +7718,9 @@ components:
         from_report:
           description: A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the five fields above are refused beside it
           maxLength: 593
+          type: string
+        namespace:
+          description: The namespace, where two share a name, a version and an ecosystem
           type: string
         received:
           description: The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless
@@ -16180,12 +16195,12 @@ paths:
           schema:
             description: Limit to one variant. Left out, every one under the product, and independent of the branch
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused
+        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused
+            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused
             type: string
         - description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
           explode: false
@@ -16730,12 +16745,12 @@ paths:
           name: variant
           schema:
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused
+        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused
+            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused
             type: string
         - description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
           explode: false
@@ -17198,12 +17213,12 @@ paths:
           schema:
             description: Limit to one variant. Left out, every one under the product, and independent of the branch
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused
+        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused
+            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused
             type: string
         - description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
           explode: false
@@ -17692,12 +17707,12 @@ paths:
           name: variant
           schema:
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused
+        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused
+            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused
             type: string
         - description: Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there
           explode: false
@@ -21077,6 +21092,13 @@ paths:
           schema:
             description: The ecosystem, for the few names one build holds at one version as two components
             type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components
+            type: string
       responses:
         "200":
           content:
@@ -21285,6 +21307,13 @@ paths:
           name: ecosystem
           schema:
             description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
             type: string
       responses:
         "200":
@@ -24705,6 +24734,13 @@ paths:
           schema:
             description: The ecosystem, for the few names a build holds at one version as two components
             type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            type: string
       responses:
         "200":
           content:
@@ -24801,6 +24837,13 @@ paths:
           name: beneath_ecosystem
           schema:
             description: The ecosystem, for the few names a build holds at one version as two components
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
             type: string
       responses:
         "200":

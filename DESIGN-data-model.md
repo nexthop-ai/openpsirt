@@ -313,6 +313,26 @@ way to every ecosystem. Nothing here knows which producer wrote a document,
 because the inventories this will be given come from build systems nobody has
 seen.
 
+### Component references
+
+A request names a component the way a reader does: by name, narrowed where the
+name is not enough.
+
+| Part | Needed where |
+|---|---|
+| Name | Always |
+| Version | The build ships the name at more than one version |
+| Ecosystem | A source repository and the package built from it share a name and a version |
+| Namespace | One package is described under two namespaces. 170 names in one real switch image arrived this way, once as the distribution's and once as the producer's own |
+
+| Rule | |
+|---|---|
+| The four parts are identity without the qualifiers | Every choice a refusal offers resolves exactly one component |
+| A part left empty matches anything | A caller that never meets the ambiguity sends nothing more |
+| A name matching several is refused with the choices, each carrying all four parts | A choice missing one leads back to the same refusal |
+| Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
+| Every row and tree node that names a component carries its ecosystem and namespace | A screen can send back only what it was given |
+
 ## Upstream name and version
 
 Carried alongside the identity (REQ-18). A shipped fork often has a version

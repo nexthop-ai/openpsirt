@@ -65,6 +65,10 @@ type Group struct {
 	// unique within a build, which can hold a source repository and the
 	// package built from it under one name at one version.
 	Ecosystem string
+	// Namespace is the rest of what tells one row from another where the
+	// ecosystem agrees: one package a producer described twice, once under a
+	// distribution's namespace and once under its own.
+	Namespace string
 	FixState  FixState
 	FixedIn   string
 	// Fold is what the row is about: the source package at the version it was
@@ -505,6 +509,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 	if component, held := shipped[row.ComponentID]; held {
 		group.Component, group.Version = component.Name, component.Version
 		group.Ecosystem = graph.EcosystemOf(component.Purl)
+		group.Namespace = graph.NamespaceOf(component.Purl)
 		if component.UpstreamVersion != "" {
 			group.Upstream = component.UpstreamName + " " + component.UpstreamVersion
 		}

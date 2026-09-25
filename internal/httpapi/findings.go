@@ -83,6 +83,7 @@ type FindingBody struct {
 	Upstream  string `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
 	Source    string `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, routed by one rule"`
 	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"`
+	Namespace string `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version"`
 	FixState  string `json:"fix_state,omitempty" enum:"fixed,none,wont-fix,unknown,mixed" doc:"Upstream's answer about it"`
 	FixedIn   string `json:"fixed_in,omitempty" doc:"The version that resolves it, where one exists"`
 	// Matched is the route the scanner reached this by, the thing to ask about
@@ -209,6 +210,7 @@ type ComponentFindingBody struct {
 	Upstream      string `json:"upstream,omitempty" doc:"The upstream a fork was cut from, where one is known"`
 	Source        string `json:"source_package,omitempty" doc:"The source package this was built from, where one is recorded. What a routing rule matches on: several binary packages of one source move together, so a rule names the source rather than each binary"`
 	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it. With the component and version it tells one row from another, which those two alone do not"`
+	Namespace     string `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components of one name at one version"`
 	Issues        int    `json:"issues" doc:"Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list"`
 	Places        int    `json:"places" doc:"The number of times those sit somewhere in the build"`
 	Exploited     bool   `json:"exploited" doc:"Whether any of them is known-exploited"`
@@ -391,7 +393,7 @@ type Paging struct {
 // "differs between builds" and the spread across variants are statements
 // about a selection.
 type AtOneBuild struct {
-	Beneath        string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused"`
+	Beneath        string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused"`
 	Differs        bool   `query:"differs" doc:"Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there"`
 	AcrossVariants string `query:"across_variants" enum:"only,every" doc:"Keep only what is spread over the variants of its own branch one of these ways. 'only' keeps what no other variant of that branch holds open, and is refused unless a variant is named. 'every' keeps what every build of that branch holds open. The same issue at another version is a different row and counts as not held"`
 }
@@ -477,8 +479,8 @@ func findingBody(group finding.Group, now time.Time) FindingBody {
 				Severity:  group.Severity,
 				Component: group.Component, Version: group.Version, Upstream: group.Upstream,
 				Source:    group.Source,
-				Ecosystem: group.Ecosystem,
-				FixState:  string(group.FixState), FixedIn: group.FixedIn,
+				Ecosystem: group.Ecosystem, Namespace: group.Namespace,
+				FixState: string(group.FixState), FixedIn: group.FixedIn,
 				Matched: string(group.Matched),
 				Owner:   group.Owner, Parent: group.Parent,
 				Middle: group.Middle, Chains: group.Chains,
@@ -577,6 +579,7 @@ func registerComponentFindings(api huma.API, in Ingest) {
 				Component: group.Component, Version: group.Version, Upstream: group.Upstream,
 				Source:     group.UpstreamName,
 				Ecosystem:  group.Ecosystem,
+				Namespace:  group.Namespace,
 				BySeverity: group.BySeverity, Worst: group.Worst,
 				Issues: group.Issues, Places: group.Places, Exploited: group.Exploited,
 				ExploitedHere: group.ExploitedHere,
@@ -617,7 +620,7 @@ func beneathIn(ctx context.Context, in Ingest, scope finding.Scope, name string)
 	if err != nil {
 		if errors.Is(err, graph.ErrAmbiguous) {
 			return nil, huma.Error422UnprocessableEntity(
-				"this build holds " + name + " at more than one version, so it cannot be narrowed beneath by name alone")
+				"this build holds " + name + " as more than one component, so it cannot be narrowed beneath by name alone")
 		}
 		return nil, huma.Error422UnprocessableEntity("this build does not hold a component called " + name)
 	}
@@ -876,6 +879,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		Component     string `path:"component" doc:"The component's name, as the findings list gives it"`
 		Version       string `query:"version" doc:"The version, where the build ships that name at more than one"`
 		Ecosystem     string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it"`
+		Namespace     string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice"`
 	}) (*struct{ Body EvidenceBody }, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -899,7 +903,9 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		// resolving the name on its own answers about whichever was interned
 		// first — for two of the three rows, an issue it does not carry.
 		component, err := graph.NewStore(in.DB.DB).
-			ComponentAs(ctx, target.ID, input.Component, input.Version, input.Ecosystem)
+			ComponentAs(ctx, target.ID, input.Component, graph.Choice{
+				Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
+			})
 		if err != nil {
 			// Narrowed to the versions this issue is open at before it is
 			// offered. The lookup raises the ambiguity before it knows which
@@ -924,7 +930,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 					// back the single URL we just worked out and make the
 					// caller ask again for it.
 					component, err = graph.NewStore(in.DB.DB).ComponentAs(ctx, target.ID,
-						input.Component, carrying[0].Version, carrying[0].Ecosystem)
+						input.Component, carrying[0])
 					if err != nil {
 						return nil, ambiguousOrMissing(err)
 					}

@@ -122,13 +122,23 @@ func ambiguousAmong(name string, choices []graph.Choice) error {
 			// narrowed to the ones this issue is actually open at. The screen
 			// says different things about the two, and saying the wrong one is
 			// telling somebody an issue affects a version it does not.
-			Location: "carrying", Message: choice.Version,
-			Value: map[string]string{"ecosystem": choice.Ecosystem},
+			Location: "carrying", Message: choice.Version, Value: kindOf(choice),
 		})
 	}
 	return huma.Error409Conflict(fmt.Sprintf(
-		"this build ships %q at more than one version, and this issue is open at %d of "+
-			"them — say which one with ?version=", name, len(choices)), detail...)
+		"this build ships %q as more than one component, and this issue is open at %d of "+
+			"them — say which one with ?version=, &ecosystem= and &namespace=", name, len(choices)),
+		detail...)
+}
+
+// kindOf is what tells a choice apart besides its version: the ecosystem, and
+// the namespace where the identifier has one.
+func kindOf(choice graph.Choice) map[string]string {
+	kind := map[string]string{"ecosystem": choice.Ecosystem}
+	if choice.Namespace != "" {
+		kind["namespace"] = choice.Namespace
+	}
+	return kind
 }
 
 // ambiguousOrMissing answers a component lookup that could not settle on one.
@@ -145,14 +155,16 @@ func ambiguousOrMissing(err error) error {
 	// discloses nothing further: the versions in a build are already readable
 	// by anyone who can read the build.
 	//
-	// Each choice carries its ecosystem, because a version alone does not
-	// always resolve one: 13 names in a real image are held at one version by
-	// two components, a source repository and the package built from it. Left
-	// as versions alone, the refusal offers a choice that leads straight back
-	// to the same refusal.
+	// Each choice carries its ecosystem and namespace, because a version
+	// alone does not always resolve one: 13 names in a real image are held at
+	// one version by two components, a source repository and the package built
+	// from it, and 170 in another by one package described under two
+	// namespaces. Left as versions alone, the refusal offers a choice that
+	// leads straight back to the same refusal.
 	var several *graph.Ambiguous
 	if errors.As(err, &several) {
-		return severalComponents(several, "?version= and, where two share a version, &ecosystem=")
+		return severalComponents(several,
+			"?version= and, where two share a version, &ecosystem= and &namespace=")
 	}
 	return noSuchFinding()
 }
@@ -170,8 +182,7 @@ func severalComponents(several *graph.Ambiguous, sayWith string) error {
 			// Every component of that name, *not* narrowed to an issue —
 			// which is why the location differs from the narrowed list above.
 			// Some of these may not carry it at all.
-			Location: "component", Message: choice.Version,
-			Value: map[string]string{"ecosystem": choice.Ecosystem},
+			Location: "component", Message: choice.Version, Value: kindOf(choice),
 		})
 	}
 	return huma.Error409Conflict(fmt.Sprintf(

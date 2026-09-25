@@ -250,7 +250,7 @@ func (s *Store) ComponentAt(ctx context.Context, targetID int64, name string) (i
 
 // ErrAmbiguous says a name matched more than one component and no version was
 // given to tell them apart.
-var ErrAmbiguous = errors.New("this build contains that name at more than one version")
+var ErrAmbiguous = errors.New("this build contains that name as more than one component")
 
 // ErrNoComponent says a build holds nothing by that name.
 //
@@ -275,15 +275,34 @@ type Ambiguous struct {
 }
 
 // Choice is one component a name could mean.
+//
+// The three parts of a package identifier that identity keeps besides the
+// name, so that each choice resolves exactly one component: identity drops
+// the qualifiers, and what is left to differ is the version, the ecosystem and
+// the namespace.
 type Choice struct {
 	Version   string
 	Ecosystem string
+	// Namespace tells apart two components one build holds at one version in
+	// one ecosystem. A producer describing one Debian package once as the
+	// distribution's and once as its own writes two namespaces, and 170 names
+	// in one real image arrived that way.
+	Namespace string
+}
+
+// ChoiceOf is the choice a component with this identifier and version is.
+func ChoiceOf(version, purl string) Choice {
+	return Choice{Version: version, Ecosystem: EcosystemOf(purl), Namespace: NamespaceOf(purl)}
 }
 
 func (a *Ambiguous) Error() string {
 	said := make([]string, 0, len(a.Choices))
 	for _, c := range a.Choices {
-		said = append(said, c.Ecosystem+" "+c.Version)
+		kind := c.Ecosystem
+		if c.Namespace != "" {
+			kind += "/" + c.Namespace
+		}
+		said = append(said, kind+" "+c.Version)
 	}
 	return fmt.Sprintf("%s: %q as %s", ErrAmbiguous, a.Name, strings.Join(said, ", "))
 }
@@ -320,27 +339,30 @@ func (a *Ambiguous) Is(target error) bool { return target == ErrAmbiguous }
 // with no version is an error rather than a guess. A caller that guesses on
 // behalf of somebody is worse than one that says it cannot tell.
 func (s *Store) ComponentVersionAt(ctx context.Context, targetID int64, name, version string) (int64, error) {
-	return s.ComponentAs(ctx, targetID, name, version, "")
+	return s.ComponentAs(ctx, targetID, name, Choice{Version: version})
 }
 
-// ComponentAs resolves a component by name and, where they are given, version
-// and ecosystem.
+// ComponentAs resolves a component by name and, where they are given, the
+// version, ecosystem and namespace a choice names.
 //
-// The ecosystem is the third thing needed to tell two components apart, and
-// only because a name and a version together are not always unique: a source
-// repository and the package built from it share both. Empty means "any",
-// which is what a caller who has never needed it passes.
+// The ecosystem and the namespace are needed only because a name and a
+// version together are not always unique: a source repository and the package
+// built from it share both, and so does one package a producer described under
+// two namespaces. An empty part means "any", which is what a caller who has
+// never needed it passes.
 func (s *Store) ComponentAs(ctx context.Context, targetID int64,
-	name, version, ecosystem string) (int64, error) {
+	name string, which Choice) (int64, error) {
 
-	return ComponentAsIn(ctx, s.db, targetID, name, version, ecosystem)
+	return ComponentAsIn(ctx, s.db, targetID, name, which)
 }
 
 // ComponentAsIn is ComponentAs over any handle, so a caller that has to
 // resolve a component inside its own transaction can rather than reading it
 // beforehand and writing against an answer the database has since moved past.
 func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
-	name, version, ecosystem string) (int64, error) {
+	name string, which Choice) (int64, error) {
+
+	version, ecosystem := which.Version, which.Ecosystem
 
 	query := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
@@ -372,23 +394,40 @@ func ComponentAsIn(ctx context.Context, db bun.IDB, targetID int64,
 	if err := query.Scan(ctx, &rows); err != nil {
 		return 0, fmt.Errorf("look up component %q: %w", name, err)
 	}
+	// Narrowed here rather than in the statement. A namespace can run to
+	// several segments and carries escapes, so a pattern over the stored
+	// identifier matches it only approximately, and the rows left by this point
+	// are the few components sharing one name.
+	if which.Namespace != "" {
+		kept := rows[:0]
+		for _, row := range rows {
+			if strings.EqualFold(NamespaceOf(row.Purl), which.Namespace) {
+				kept = append(kept, row)
+			}
+		}
+		rows = kept
+	}
 	if len(rows) == 0 {
 		return 0, fmt.Errorf("%w: %q", ErrNoComponent, name)
 	}
 	if len(rows) > 1 {
 		choices := make([]Choice, 0, len(rows))
 		for _, row := range rows {
-			choices = append(choices, Choice{
-				Version: row.Version, Ecosystem: EcosystemOf(row.Purl),
-			})
+			choices = append(choices, ChoiceOf(row.Version, row.Purl))
 		}
 		return 0, &Ambiguous{Name: name, Choices: choices}
 	}
 	return rows[0].ID, nil
 }
 
-// EcosystemOf reads the ecosystem out of a package identifier, which is the
-// only thing telling two components with one name and one version apart.
+// NamespaceOf reads the namespace out of a package identifier, decoded, and
+// empty where the identifier has none.
+func NamespaceOf(purl string) string {
+	return PartsOfPurl(purl).Namespace
+}
+
+// EcosystemOf reads the ecosystem out of a package identifier, which with the
+// namespace is what tells two components with one name and one version apart.
 func EcosystemOf(purl string) string {
 	rest, found := strings.CutPrefix(strings.TrimSpace(purl), "pkg:")
 	if !found {
@@ -450,11 +489,11 @@ type Neighbor struct {
 //
 // Naming a component rather than an identifier: it is what a findings list
 // gives out and what somebody composing a request has.
-// Version and ecosystem say which component, where the build ships the name
-// at more than one: a name alone is refused as ambiguous, naming the choices,
-// the way a finding is.
+// The choice says which component, where the build ships the name as more
+// than one: a name alone is refused as ambiguous, naming the choices, the way
+// a finding is.
 func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int64,
-	name, version, ecosystem string) ([]Neighbor, []Neighbor, error) {
+	name string, which Choice) ([]Neighbor, []Neighbor, error) {
 
 	// Authorized before the name is resolved, which is what the two siblings
 	// here already do. The other way round a refusal was informative: a name
@@ -466,7 +505,7 @@ func (s *Store) Around(ctx context.Context, subject access.Subject, targetID int
 	if err != nil {
 		return nil, nil, err
 	}
-	componentID, err := s.ComponentAs(ctx, targetID, name, version, ecosystem)
+	componentID, err := s.ComponentAs(ctx, targetID, name, which)
 	if err != nil {
 		return nil, nil, err
 	}

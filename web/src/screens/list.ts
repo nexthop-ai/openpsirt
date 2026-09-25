@@ -431,12 +431,16 @@ export function pathTo(
   at: { product: string; stream: string; variant: string },
   // Only the three fields the address is built from, so that what a caller has
   // to hold is what a link needs rather than a whole row.
-  row: Pick<Row, "vulnerability" | "component" | "version">,
+  row: Pick<Row, "vulnerability" | "component" | "version" | "ecosystem" | "namespace">,
   from?: string,
   rule?: string,
 ): string {
   const query = new URLSearchParams();
   if (row.version) query.set("version", row.version);
+  // A name at a version can be two components in one build, so the address
+  // carries the rest of what picks the row it was drawn from.
+  if (row.ecosystem) query.set("ecosystem", row.ecosystem);
+  if (row.namespace) query.set("namespace", row.namespace);
   if (rule) query.set("rule", rule);
   // Set even when it is empty, because an unfiltered list is still a list: the
   // finding tells "there was no list" from "the list asked for everything" by

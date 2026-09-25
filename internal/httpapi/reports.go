@@ -92,6 +92,7 @@ func registerReports(api huma.API, in Ingest) {
 		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build"`
 		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
 		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
+		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
 	}) (*listOutput[PointBody], error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -108,6 +109,7 @@ func registerReports(api huma.API, in Ingest) {
 			finding.Within{
 				Component: input.Component, Beneath: input.Beneath,
 				BeneathVersion: input.Version, BeneathEcosystem: input.Ecosystem,
+				BeneathNamespace: input.Namespace,
 			})
 		if err != nil {
 			// A name meaning two components is the caller's question and not a
@@ -118,7 +120,7 @@ func registerReports(api huma.API, in Ingest) {
 			var several *graph.Ambiguous
 			if errors.As(err, &several) {
 				return nil, severalComponents(several,
-					"?beneath_version= and, where two share a version, &beneath_ecosystem=")
+					"?beneath_version= and, where two share a version, &beneath_ecosystem= and &beneath_namespace=")
 			}
 			return nil, wentWrong(in.Logger, "the trend could not be worked out", err)
 		}

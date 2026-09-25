@@ -404,7 +404,16 @@ function Sits({
   const scope = { product, stream: here.stream ?? "", variant: here.variant ?? "" };
   const component = pkg.name;
   const around = useQuery({
-    queryKey: ["around", product, component, here.stream, here.variant, pkg.version],
+    queryKey: [
+      "around",
+      product,
+      component,
+      here.stream,
+      here.variant,
+      pkg.version,
+      here.ecosystem,
+      pkg.namespace,
+    ],
     queryFn: async () =>
       unwrap(
         await api.GET(
@@ -412,7 +421,13 @@ function Sits({
           {
             params: {
               path: { ...scope, component },
-              query: pkg.version ? { version: pkg.version } : {},
+              // All three, because a name and a version do not always pick one
+              // component: a build can hold one package under two namespaces.
+              query: {
+                ...(pkg.version ? { version: pkg.version } : {}),
+                ...(here.ecosystem ? { ecosystem: here.ecosystem } : {}),
+                ...(pkg.namespace ? { namespace: pkg.namespace } : {}),
+              },
             },
           },
         ),

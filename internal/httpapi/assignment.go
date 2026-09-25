@@ -672,7 +672,7 @@ func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
 		case len(carrying) == 1:
 			// One choice is not a choice, so it is taken rather than offered.
 			held, err = graph.NewStore(in.DB.DB).ComponentAs(ctx, target.ID,
-				component, carrying[0].Version, carrying[0].Ecosystem)
+				component, carrying[0])
 		case len(carrying) > 1:
 			return 0, 0, 0, 0, ambiguousAmong(component, carrying)
 		default:

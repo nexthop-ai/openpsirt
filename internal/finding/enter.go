@@ -45,14 +45,15 @@ type Entering struct {
 	// Empty is the build itself, which is the honest answer where the flaw is
 	// in how the pieces are put together rather than in one of them.
 	Component string
-	// Version and Ecosystem narrow a name that reaches more than one
-	// component. A name is not unique within a build — a real switch image
+	// Version, Ecosystem and Namespace narrow a name that reaches more than
+	// one component. A name is not unique within a build — a real switch image
 	// ships three vendored versions of one library, and thirteen names in it
 	// are held at one version by two components — so a name alone is a
 	// question rather than an answer, and the answer to an ambiguous one is a
 	// refusal that says which choices there are.
 	Version   string
 	Ecosystem string
+	Namespace string
 	// Summary is what the flaw is, in the words of whoever found it. It is
 	// what a triager reads first and often all they read.
 	Summary string
@@ -556,8 +557,11 @@ func carrying(ctx context.Context, db bun.IDB, targetID int64, in Entering) (int
 		// so a flaw recorded against one of them was filed against whichever
 		// had been interned first and nothing said so. An ambiguous name is
 		// now a refusal carrying the choices.
-		id, err := graph.ComponentAsIn(ctx, db, targetID, name,
-			strings.TrimSpace(in.Version), strings.TrimSpace(in.Ecosystem))
+		id, err := graph.ComponentAsIn(ctx, db, targetID, name, graph.Choice{
+			Version:   strings.TrimSpace(in.Version),
+			Ecosystem: strings.TrimSpace(in.Ecosystem),
+			Namespace: strings.TrimSpace(in.Namespace),
+		})
 		switch {
 		case errors.Is(err, graph.ErrNoComponent):
 			return 0, "", ErrNoSuchComponent

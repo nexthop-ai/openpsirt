@@ -112,6 +112,7 @@ func registerEntry(api huma.API, in Ingest) {
 			Component  string   `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
 			Version    string   `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
 			Ecosystem  string   `json:"ecosystem,omitempty" doc:"The ecosystem, where two share a name and a version"`
+			Namespace  string   `json:"namespace,omitempty" doc:"The namespace, where two share a name, a version and an ecosystem"`
 			Disclosed  bool     `json:"disclosed,omitempty" doc:"Whether this is already public. Undisclosed by default"`
 			// ReportedBy is who told us, where somebody did. Every
 			// field is optional: a flaw found by whoever is typing
@@ -152,7 +153,8 @@ func registerEntry(api huma.API, in Ingest) {
 		rows, identifier, err := finding.NewStore(in.DB.DB).Enter(ctx, subject, finding.Entering{
 			TargetIDs: targets, Component: input.Body.Component,
 			Version: input.Body.Version, Ecosystem: input.Body.Ecosystem,
-			Summary: input.Body.Summary, Severity: input.Body.Severity,
+			Namespace: input.Body.Namespace,
+			Summary:   input.Body.Summary, Severity: input.Body.Severity,
 			Vector: input.Body.Vector, Weaknesses: input.Body.Weaknesses,
 			Disclosed: input.Body.Disclosed,
 			Told: finding.Told{
@@ -170,7 +172,8 @@ func registerEntry(api huma.API, in Ingest) {
 			var several *graph.Ambiguous
 			switch {
 			case errors.As(err, &several):
-				return nil, severalComponents(several, "version, and ecosystem where two share one")
+				return nil, severalComponents(several,
+					"version, and ecosystem and namespace where two share one")
 			case errors.Is(err, finding.ErrNoSuchComponent):
 				return nil, huma.Error404NotFound(finding.ErrNoSuchComponent.Error())
 			case errors.Is(err, finding.ErrNothingSaid):

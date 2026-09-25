@@ -24,13 +24,15 @@ export type Node = {
   // build ships one twice, and the endpoint that answers about a component
   // refuses a name that means two things — so this travels with the name.
   ecosystem?: string;
+  // The rest of it, where one package arrives under two namespaces.
+  namespace?: string;
 };
 
 // A row's own identity, as a string.
 //
 // The name alone is not it. A build ships one name at more than one version,
 // and a few at one version as two components that only the kind of package
-// tells apart — and the endpoint that answers about a component refuses a
+// or its namespace tells apart — and the endpoint that answers about a component refuses a
 // name that means two things, rightly, since the two are two components. So
 // the open set, the widened set and the map of what sits under each node are
 // all keyed on this rather than on the name: keyed on the name, a component
@@ -38,12 +40,24 @@ export type Node = {
 // asking for its children carried no version to disambiguate it.
 const APART = "\u001e";
 
-export function keyOf(node: { component: string; version?: string; ecosystem?: string }): string {
-  return [node.component, node.version ?? "", node.ecosystem ?? ""].join(APART);
+export function keyOf(node: {
+  component: string;
+  version?: string;
+  ecosystem?: string;
+  namespace?: string;
+}): string {
+  return [node.component, node.version ?? "", node.ecosystem ?? "", node.namespace ?? ""].join(
+    APART,
+  );
 }
 
-// partsOf reads a key back into the three things a request needs.
-export function partsOf(key: string): { component: string; version: string; ecosystem: string } {
-  const [component = "", version = "", ecosystem = ""] = key.split(APART);
-  return { component, version, ecosystem };
+// partsOf reads a key back into the four things a request needs.
+export function partsOf(key: string): {
+  component: string;
+  version: string;
+  ecosystem: string;
+  namespace: string;
+} {
+  const [component = "", version = "", ecosystem = "", namespace = ""] = key.split(APART);
+  return { component, version, ecosystem, namespace };
 }

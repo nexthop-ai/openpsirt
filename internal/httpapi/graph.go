@@ -33,6 +33,7 @@ type NeighborBody struct {
 	// holds twice and says to send this; a list that did not carry it left
 	// nothing able to.
 	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package this is, as its identifier spells it. Send it back where a build holds one name at one version as two components"`
+	Namespace string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one. Send it back where a build holds one name at one version in one ecosystem as two components"`
 }
 
 // RootsBody is the build's own component and what it pulls in directly.
@@ -163,13 +164,16 @@ func registerGraph(api huma.API, in Ingest) {
 		Component string `path:"component" doc:"The component's name, as the findings list gives it"`
 		Version   string `query:"version" doc:"The version, where the build ships that name at more than one"`
 		Ecosystem string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components"`
+		Namespace string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components"`
 	}) (*struct{ Body AroundBody }, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 		above, below, err := graph.NewStore(in.DB.DB).Around(ctx, subject, target,
-			input.Component, input.Version, input.Ecosystem)
+			input.Component, graph.Choice{
+				Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
+			})
 		if err != nil {
 			return nil, ambiguousOrMissing(err)
 		}
@@ -188,6 +192,7 @@ func neighbors(rows []graph.Neighbor) []NeighborBody {
 			BeneathBy: banded(row.BeneathBy),
 			Children:  row.Children,
 			Ecosystem: graph.EcosystemOf(row.Purl),
+			Namespace: graph.NamespaceOf(row.Purl),
 		})
 	}
 	return out

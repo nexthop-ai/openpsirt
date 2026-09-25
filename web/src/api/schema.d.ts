@@ -6699,6 +6699,8 @@ export interface components {
              * @description Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list
              */
             issues: number;
+            /** @description The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components of one name at one version */
+            namespace?: string;
             /**
              * Format: int64
              * @description The number of times those sit somewhere in the build
@@ -7593,6 +7595,8 @@ export interface components {
              * @description The number of steps between those two
              */
             middle?: number;
+            /** @description The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version */
+            namespace?: string;
             /**
              * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
@@ -7779,6 +7783,8 @@ export interface components {
             license?: string;
             /** @description The binary package's name */
             name: string;
+            /** @description The namespace the package identifier names, where it names one. Send it back with the version and ecosystem where a build holds one name at one version as two components */
+            namespace?: string;
             /**
              * Format: date-time
              * @description The date that version shipped, where the index said
@@ -8955,6 +8961,8 @@ export interface components {
              * @description Open findings against this component itself
              */
             findings: number;
+            /** @description The namespace its package identifier names, where it names one. Send it back where a build holds one name at one version in one ecosystem as two components */
+            namespace?: string;
             version: string;
         };
         Note: {
@@ -10033,6 +10041,8 @@ export interface components {
             found_here?: boolean;
             /** @description A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the five fields above are refused beside it */
             from_report?: string;
+            /** @description The namespace, where two share a name, a version and an ecosystem */
+            namespace?: string;
             /**
              * Format: date
              * @description The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless
@@ -15211,7 +15221,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
@@ -15362,7 +15372,7 @@ export interface operations {
             query?: {
                 stream?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
@@ -15475,7 +15485,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
@@ -15591,7 +15601,7 @@ export interface operations {
             query?: {
                 stream?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
@@ -17685,6 +17695,8 @@ export interface operations {
                 version?: string;
                 /** @description The ecosystem, for the few names one build holds at one version as two components */
                 ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components */
+                namespace?: string;
             };
             header?: never;
             path: {
@@ -17802,6 +17814,8 @@ export interface operations {
                 version?: string;
                 /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
                 ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
             };
             header?: never;
             path: {
@@ -20062,6 +20076,8 @@ export interface operations {
                 beneath_version?: string;
                 /** @description The ecosystem, for the few names a build holds at one version as two components */
                 beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
             };
             header?: never;
             path?: never;
@@ -20107,6 +20123,8 @@ export interface operations {
                 beneath_version?: string;
                 /** @description The ecosystem, for the few names a build holds at one version as two components */
                 beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
             };
             header?: never;
             path: {

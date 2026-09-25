@@ -8,8 +8,8 @@ import type { Sitting } from "../ui/Covering";
 // The two separators the tree's path parameter uses, written as escapes: a
 // file holding the bytes themselves reads as binary to every text tool, which
 // skips it and says nothing. One between steps, and one inside a step, which
-// carries the component, the version and the kind of package — a name the
-// build ships twice names two rows in the tree.
+// carries the component, the version, the kind of package and its namespace —
+// a name the build ships twice names two rows in the tree.
 const SEPARATOR = "\u001f";
 const WITHIN = "\u001e";
 
@@ -65,7 +65,7 @@ describe("opening the dependency tree from a finding", () => {
     // the tree opens the step it was given rather than every component
     // sharing its name.
     expect(query.get("path")).toBe(
-      `sonic-broadcom${WITHIN}${WITHIN}${SEPARATOR}curl${WITHIN}8.14.1${WITHIN}`,
+      `sonic-broadcom${WITHIN}${WITHIN}${WITHIN}${SEPARATOR}curl${WITHIN}8.14.1${WITHIN}${WITHIN}`,
     );
     expect(query.get("version")).toBe("8.14.1");
   });

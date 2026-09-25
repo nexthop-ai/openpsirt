@@ -44,7 +44,7 @@ export function notYours(error: unknown): boolean {
 }
 
 // A choice the server offered, with whatever else it takes to pick one.
-export type Choice = { version: string; ecosystem?: string };
+export type Choice = { version: string; ecosystem?: string; namespace?: string };
 
 // at returns the choices the server attached to one location.
 export function at(error: unknown, location: string): Choice[] {
@@ -54,6 +54,7 @@ export function at(error: unknown, location: string): Choice[] {
     .map((d) => ({
       version: d.message as string,
       ecosystem: typeof d.value?.ecosystem === "string" ? d.value.ecosystem : undefined,
+      namespace: typeof d.value?.namespace === "string" ? d.value.namespace : undefined,
     }));
 }
 
