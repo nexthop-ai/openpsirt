@@ -57,6 +57,16 @@ a.kpi:hover {
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
+/* A count still being read: a faint bar the height of a digit, so the figure
+   arrives in place rather than after a zero. */
+.count-pending {
+  display: inline-block;
+  width: 2.2ch;
+  height: 0.8em;
+  vertical-align: -0.05em;
+  border-radius: 3px;
+  background: var(--line);
+}
 .kpi .d {
   font-size: 12px;
   color: var(--faint);
