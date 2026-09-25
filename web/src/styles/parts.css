@@ -57,6 +57,11 @@ a.kpi:hover {
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
+/* A count that could not be read: a dash, with the reason on hover. */
+.count-failed {
+  color: var(--faint);
+  cursor: help;
+}
 /* A count still being read: a faint bar the height of a digit, so the figure
    arrives in place rather than after a zero. */
 .count-pending {
