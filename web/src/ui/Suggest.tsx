@@ -128,7 +128,7 @@ export function Suggest({
                   type="button"
                   role="option"
                   aria-selected={i === at}
-                  className={i === at ? "on" : ""}
+                  className={i === at ? "at" : ""}
                   onMouseEnter={() => setAt(i)}
                   onClick={() => choose(name)}
                 >

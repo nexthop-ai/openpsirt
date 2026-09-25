@@ -393,8 +393,8 @@ button {
   background: var(--raised);
 }
 .opt[aria-current="true"] {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--raised);
+  color: var(--ink);
   font-weight: 600;
 }
 .opt .tag {

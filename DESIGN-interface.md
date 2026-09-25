@@ -150,6 +150,7 @@ what every other application on the same screen calls them.
 | A label is sentence case | The label over a block, a column head, a field's name and a figure's caption are the words a person would use, in the muted tone and at the small step. Uppercase is kept for the two marks that are read as marks — known-exploited and a bulk claim |
 | The primary button is ink | Black on the canvas in the light look, white on it in the dark look. The accent is for what opens something, so a button and a link never read as the same kind of thing. A secondary button is the same outline in two weights of text |
 | A pressed filter is ink too | A chip or a segment that is on is drawn in ink, and a filter in force above the list sits on the raised tone with its label quieter than its value. Neither borrows the accent, because a state and a link must not read alike on one toolbar |
+| Every state is ink or the raised tone | Picked, pressed, checked, selected, the page you are on, the component a path leads to, a setting that is set. The accent stays with links, focus rings, hover on what opens, and the row or option the keys are on. A web test fails on a style rule for a state that uses the accent |
 | Severity is a dot and a word | Colored by the band, with no fill behind them. A tinted pill on every row of a fifty-row list is fifty patches of color competing with the column that is read first |
 | A count beside a tab is a number | Quieter than the word it counts and the same shape whether the tab is selected or not |
 

@@ -512,8 +512,8 @@ a.kpi:hover {
   background: var(--raised);
 }
 .tomove button.on {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--raised);
+  color: var(--ink);
   font-weight: 600;
 }
 .tomove .why {
@@ -569,8 +569,8 @@ a.kpi:hover {
   top: 3px;
   width: 13px;
   height: 13px;
-  border-color: var(--accent);
-  background: var(--accent);
+  border-color: var(--ink);
+  background: var(--ink);
 }
 
 /* The package the screen is about is marked by its node, not by its size. A
@@ -670,7 +670,7 @@ a.kpi:hover {
 
 /* The row a screen is currently about, in a table listing several. */
 tr.row.on > td {
-  background: var(--accent-soft);
+  background: var(--raised);
 }
 
 .judgment .facts {
@@ -746,9 +746,9 @@ button.vchip {
   background: color-mix(in oklab, var(--ok) 10%, transparent);
 }
 .vchip.on {
-  border-color: var(--accent-line);
-  background: var(--accent-soft);
-  color: var(--accent);
+  border-color: var(--ink);
+  background: var(--raised);
+  color: var(--ink);
   font-weight: 600;
 }
 .variants {
@@ -893,7 +893,7 @@ button.vchip {
 /* Nothing picked yet reads as a question rather than as a row of labels. */
 .seg:not(:has([aria-pressed="true"])) {
   border-style: dashed;
-  border-color: var(--accent-line);
+  border-color: var(--line-strong);
 }
 .seg button {
   display: inline-flex;
@@ -928,13 +928,13 @@ button.vchip {
   outline-offset: 1px;
 }
 .seg button[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--canvas);
 }
 .seg button[aria-pressed="true"]::before {
-  border-color: var(--accent-ink);
-  background: radial-gradient(circle, var(--accent-ink) 0 2.5px, transparent 3px);
+  border-color: var(--canvas);
+  background: radial-gradient(circle, var(--canvas) 0 2.5px, transparent 3px);
 }
 /* What switching to that view would show. Quieter than the label, because the
    label is what is being chosen and the number is why. */
@@ -996,13 +996,13 @@ button.vchip {
   color: var(--muted);
 }
 .choice-card[aria-checked="true"] {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
-  background: var(--accent-soft);
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+  background: var(--raised);
 }
 .choice-card[aria-checked="true"] .dot {
-  border-color: var(--accent);
-  background: radial-gradient(circle, var(--accent) 0 4px, var(--surface) 4.5px);
+  border-color: var(--ink);
+  background: radial-gradient(circle, var(--ink) 0 4px, var(--surface) 4.5px);
 }
 /* A list being re-read is still the list. It dims rather than being replaced,
    so the rows somebody was narrowing stay where they are while the next answer
@@ -1438,7 +1438,7 @@ button.edited {
   font-family: var(--mono);
   font-size: 0.95em;
 }
-.suggestions button.on,
+.suggestions button.at,
 .suggestions button:hover {
   background: var(--accent-soft);
   color: var(--accent);
@@ -1644,9 +1644,9 @@ textarea:disabled {
   border-color: var(--accent-line);
 }
 .outcome[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
+  border-color: var(--ink);
+  background: var(--raised);
+  color: var(--ink);
   font-weight: 600;
 }
 .tab {
@@ -1875,8 +1875,8 @@ textarea:disabled {
   text-align: left;
 }
 .choicesat[data-on="yes"] {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 .choicesat:focus-visible {
   border-color: var(--accent);
@@ -1924,7 +1924,7 @@ textarea:disabled {
 }
 .viewtab[aria-selected="true"] {
   color: var(--ink);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--ink);
 }
 .viewtab .n {
   margin-left: 6px;
@@ -1975,8 +1975,8 @@ textarea:disabled {
   font-weight: 500;
 }
 .filterbtn[data-on="yes"] {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-color: var(--line-strong);
+  background: var(--raised);
 }
 .filterlist {
   position: absolute;
@@ -2027,14 +2027,26 @@ textarea:disabled {
   border-radius: 50%;
 }
 .filteritem[aria-checked="true"] .box {
-  border-color: var(--accent);
-  background: var(--accent)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3.5 8.5 3 3 6-7' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E")
-    center / 12px no-repeat;
+  position: relative;
+  border-color: var(--ink);
+  background: var(--ink);
+}
+/* The tick is drawn rather than an image, so it takes the canvas color of
+   whichever look is on against the ink behind it. */
+.filteritem[aria-checked="true"] .box::after {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--canvas);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 .filteritem[aria-checked="true"] .dot {
-  border-color: var(--accent);
-  background: radial-gradient(circle, var(--accent) 0 3.5px, var(--surface) 4px);
+  border-color: var(--ink);
+  background: radial-gradient(circle, var(--ink) 0 3.5px, var(--surface) 4px);
 }
 
 /* The line over the list: how many, and in what order. */
