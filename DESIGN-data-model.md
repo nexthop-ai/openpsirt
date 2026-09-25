@@ -450,16 +450,19 @@ moved, and narrowing to them is speed rather than meaning: a name none of them
 touched stands at the same versions on both sides, or on neither side where it
 reached the build later, and both are counted as no change.
 
-Rows that stood on neither side of any scan being compared are dropped before
-the comparison, which is what keeps the cost proportional to the page rather
-than to the history behind it. Over a year of nightly scans a page of fifty
-uploads takes 73 ms on SQLite behind 73 nights and 102 ms behind 365, 51 to
-62 ms on PostgreSQL, 38 to 50 ms on MySQL and 107 to 200 ms on MariaDB.
-Without the bound, measured on SQLite, the same page takes 78 ms and 264 ms.
+| Rule | Reason |
+|---|---|
+| Each name is compared only at the scans that touched it | The work is what the page's uploads changed, not that times the number of uploads on the page |
+| Rows that stood on neither side of any scan on the page are not read | Without that bound the cost grows with the calendar: on SQLite a page of fifty took 78 ms behind 73 nights and 264 ms behind 365 |
+| The build's rows are read once, by the build, and matched to the names in the application | Joined to the names in one statement, PostgreSQL looked each name's rows up through the index led by the build, where the component is the third column. One upload that removed a file inventory touched 54,902 names and took 40.5 s; read once, it takes 0.76 s for the page |
+
+Over a year of nightly scans a page of fifty uploads takes 4 to 6 ms on SQLite,
+3 to 5 ms on PostgreSQL, 5 to 6 ms on MySQL and 4 to 5 ms on MariaDB, behind 73
+nights of history and behind 365. Measured on 2026-09-25, one engine at a time.
 
 ### The names behind the counts
 
-The counts and the names behind them are one fold over one statement. A listing
+The counts and the names behind them are one fold over the same rows. A listing
 that disagreed with the number beside it leaves a reader with two answers and
 no way to tell which is the build's.
 
@@ -472,11 +475,9 @@ no way to tell which is the build's.
 | A page is cut after the comparison | What is read is the scan's own change — the names it opened or closed a row of — so the cost is what the upload moved rather than what the build contains |
 
 Over a year of nightly scans that cost stays flat: listing an upload that moved
-seven names takes 2 to 4 ms on SQLite, 2 to 6 ms on PostgreSQL, 2 to 5 ms on
-MariaDB and 3 to 17 ms on MySQL, behind 73 nights of history and behind 365.
-The two server engines of the MySQL family were measured on 2026-09-23, one at a
-time; MySQL's highest figure is the night-73 point and every later one is 7 ms or
-under.
+seven names takes 2 to 5 ms on each of the four engines, behind 73 nights of
+history and behind 365, measured on 2026-09-25. Listing the upload that removed
+a file inventory, 54,098 names, takes 0.43 s on PostgreSQL.
 
 ### The size a change is against
 

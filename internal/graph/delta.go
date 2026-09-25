@@ -155,90 +155,140 @@ type movedRow struct {
 	Has     int    `bun:"has"`
 }
 
-// moved reads every version of every name one of these scans may have moved,
-// with what each scan found there and what it left.
+// moved reads every version of every name one of these scans moved, with what
+// each scan found there and what it left.
 //
-// The names are narrowed to what these scans opened or closed a row of, which
-// is the whole of what any of them can have moved: a scan stamps its own
-// identifier on both ends of an interval, so a name none of them touched
-// stands identically on both sides of every one of them.
+// A scan moved a name where it opened or closed a row of it: a scan stamps its
+// own identifier on both ends of an interval, so a name none of them touched
+// stands identically on both sides of every one of them. Each name is paired
+// with the scans that touched it and no other, so the work is what the page's
+// uploads changed rather than that times the length of the page.
 //
-// The narrowing is per page rather than per scan, so a name comes back against
-// every scan on the page and not only against the one that moved it. Against
-// the others it stands the same on both sides, or on neither side where the
-// name reached this build after them — and the caller counts both as no
-// change.
+// Two statements and a fold, rather than one statement joining the names to
+// the build's rows. Joined, PostgreSQL drove from the names and looked each
+// one's rows up through the index led by the build, where the component is the
+// third column: 54,902 lookups each reading the build's whole range, 40.5 s for
+// one upload that removed a file inventory. Read once by the build instead,
+// the rows are matched to the names here.
 func (s *Store) moved(ctx context.Context, targetID int64, scanIDs []int64) ([]movedRow, error) {
 	earliest, latest := scanIDs[0], scanIDs[0]
+	asked := make(map[int64]bool, len(scanIDs))
 	for _, id := range scanIDs {
 		earliest, latest = min(earliest, id), max(latest, id)
+		asked[id] = true
 	}
 
-	touched := s.db.NewSelect().
+	// The names each scan opened or closed a row of.
+	var ends []struct {
+		Opened int64  `bun:"opened"`
+		Closed *int64 `bun:"closed"`
+		Name   string `bun:"nm"`
+	}
+	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "tn"`).
 		Join(`JOIN "component" AS "tc" ON tc.id = tn.component_id`).
-		ColumnExpr(`tc.name_folded`).
+		ColumnExpr(`tn.opened_scan_id AS "opened"`).
+		ColumnExpr(`tn.closed_scan_id AS "closed"`).
+		ColumnExpr(`tc.name_folded AS "nm"`).
 		Where("tn.target_id = ?", targetID).
 		Where("tn.is_root = ?", false).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where("tn.opened_scan_id IN (?)", bun.List(scanIDs)).
 				WhereOr("tn.closed_scan_id IN (?)", bun.List(scanIDs))
-		})
+		}).
+		Scan(ctx, &ends)
+	if err != nil {
+		return nil, fmt.Errorf("read what these scans changed: %w", err)
+	}
+	touched := map[string][]int64{}
+	touch := func(name string, at int64) {
+		if asked[at] && !slices.Contains(touched[name], at) {
+			touched[name] = append(touched[name], at)
+		}
+	}
+	for _, end := range ends {
+		touch(end.Name, end.Opened)
+		if end.Closed != nil {
+			touch(end.Name, *end.Closed)
+		}
+	}
+	if len(touched) == 0 {
+		return nil, nil
+	}
 
-	var rows []movedRow
-	err := s.db.NewSelect().
-		TableExpr(`"scan" AS "sc"`).
-		Join(`JOIN "graph_node" AS "n" ON n.target_id = ?`, targetID).
+	// Every row of the build that stood on either side of any of these scans.
+	// Rows that stood on neither count towards none of them, and a year of
+	// nights leaves most of a build's rows closed long before the page being
+	// read. Without this bound the cost grew with the calendar rather than
+	// with the page: on SQLite a page of fifty took 78 ms behind 73 nights of
+	// history and 264 ms behind 365.
+	var nodes []struct {
+		Opened  int64  `bun:"opened"`
+		Closed  *int64 `bun:"closed"`
+		Name    string `bun:"nm"`
+		Display string `bun:"dsp"`
+		Version string `bun:"ver"`
+	}
+	err = s.db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON c.id = n.component_id`).
-		ColumnExpr(`sc.id AS "at"`).
+		ColumnExpr(`n.opened_scan_id AS "opened"`).
+		ColumnExpr(`n.closed_scan_id AS "closed"`).
 		ColumnExpr(`c.name_folded AS "nm"`).
+		// The name as a producer wrote it, for the listing to show. Two
+		// producers writing one dependency in different capitals are one name
+		// here, and either spelling names the same thing on a screen.
+		ColumnExpr(`c.name AS "dsp"`).
 		ColumnExpr(`c.version AS "ver"`).
-		// The name as a producer wrote it, for the listing to show. An
-		// aggregate because the group is the folded name: two producers
-		// writing one dependency in different capitals are one name here,
-		// and either spelling names the same thing on a screen.
-		ColumnExpr(`MIN(c.name) AS "dsp"`).
-		// Present immediately before the scan, and present at it. A row the
-		// scan closed was still there on the near side of it, which is why
-		// one bound is inclusive and the other is not.
-		ColumnExpr(`MAX(CASE WHEN n.opened_scan_id < sc.id
-			AND (n.closed_scan_id IS NULL OR n.closed_scan_id >= sc.id)
-			THEN 1 ELSE 0 END) AS "had"`).
-		ColumnExpr(`MAX(CASE WHEN n.opened_scan_id <= sc.id
-			AND (n.closed_scan_id IS NULL OR n.closed_scan_id > sc.id)
-			THEN 1 ELSE 0 END) AS "has"`).
-		Where("sc.target_id = ?", targetID).
-		Where("sc.id IN (?)", bun.List(scanIDs)).
+		Where("n.target_id = ?", targetID).
 		// The build's own root is not one of its components, and its version
 		// is not stored, so it can neither arrive nor move.
 		Where("n.is_root = ?", false).
-		Where("c.name_folded IN (?)", touched).
-		// Rows that stood on neither side of any of these scans count
-		// towards none of them, and a year of nights leaves most of a
-		// build's rows closed long before the page being read. Without this
-		// bound the cost grew with the calendar rather than with the page:
-		// on SQLite a page of fifty took 78 ms behind 73 nights of history
-		// and 264 ms behind 365.
-		//
-		// With it, over a year of nightly scans, a page of fifty stays flat
-		// on all four: 73 ms and 102 ms on SQLite behind 73 nights and 365,
-		// 51 to 62 ms on PostgreSQL, 38 to 50 ms on MySQL, 107 to 200 ms on
-		// MariaDB. PostgreSQL takes 703 ms on the statement's first
-		// execution and never again. The unbounded figures above are
-		// SQLite's alone.
 		Where("n.opened_scan_id <= ?", latest).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Where("n.closed_scan_id IS NULL").
 				WhereOr("n.closed_scan_id >= ?", earliest)
 		}).
-		// One row per version of a name at each scan, which is what makes
-		// "the same name at a different set of versions" answerable: the page
-		// of receipts counts those rows and the listing of one scan reads the
-		// strings off them.
-		GroupExpr(`sc.id, c.name_folded, c.version`).
-		Scan(ctx, &rows)
+		Scan(ctx, &nodes)
 	if err != nil {
 		return nil, fmt.Errorf("read what these scans changed: %w", err)
+	}
+
+	// One row per version of a name at each scan that touched it, which is
+	// what makes "the same name at a different set of versions" answerable:
+	// the page of receipts counts those rows and the listing of one scan reads
+	// the strings off them.
+	type key struct {
+		at            int64
+		name, version string
+	}
+	folded := map[key]*movedRow{}
+	var order []key
+	for _, node := range nodes {
+		for _, at := range touched[node.Name] {
+			k := key{at, node.Name, node.Version}
+			row, ok := folded[k]
+			if !ok {
+				row = &movedRow{At: at, Name: node.Name, Display: node.Display, Version: node.Version}
+				folded[k] = row
+				order = append(order, k)
+			} else if node.Display < row.Display {
+				row.Display = node.Display
+			}
+			// Present immediately before the scan, and present at it. A row
+			// the scan closed was still there on the near side of it, which is
+			// why one bound is inclusive and the other is not.
+			if node.Opened < at && (node.Closed == nil || *node.Closed >= at) {
+				row.Had = 1
+			}
+			if node.Opened <= at && (node.Closed == nil || *node.Closed > at) {
+				row.Has = 1
+			}
+		}
+	}
+	rows := make([]movedRow, 0, len(order))
+	for _, k := range order {
+		rows = append(rows, *folded[k])
 	}
 	return rows, nil
 }
