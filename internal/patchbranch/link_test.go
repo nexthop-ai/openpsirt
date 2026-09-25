@@ -42,6 +42,16 @@ func TestALinkNamingACommitIsReadAsItsRepositoryAndHash(t *testing.T) {
 			"https://git.freebsd.org/ports.git", full},
 		{"https://cgit.freebsd.org/ports.git/commit/?id=" + full,
 			"https://git.freebsd.org/ports.git", full},
+		{"https://sourceware.org/cgit/bzip2.git/commit/?id=" + full,
+			"https://sourceware.org/git/bzip2.git", full},
+		{"https://sourceware.org/git/bzip2.git/commit/?id=" + full,
+			"https://sourceware.org/git/bzip2.git", full},
+		{"https://cgit.freedesktop.org/drm/drm-misc/commit/?id=" + full,
+			"https://gitlab.freedesktop.org/drm/misc/kernel.git", full},
+		// A repository on a retired site not known to have moved is read as
+		// written, and fails at fetch time with its reason.
+		{"https://cgit.freedesktop.org/mesa/mesa/commit/?id=" + full,
+			"https://cgit.freedesktop.org/mesa/mesa.git", full},
 		{"https://github.com/madler/zlib/commit/" + full,
 			"https://github.com/madler/zlib.git", full},
 		{"https://github.com/madler/zlib/commit/" + full + ".patch",

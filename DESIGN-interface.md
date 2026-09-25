@@ -150,6 +150,7 @@ what every other application on the same screen calls them.
 | A label is sentence case | The label over a block, a column head, a field's name and a figure's caption are the words a person would use, in the muted tone and at the small step. Uppercase is kept for the two marks that are read as marks — known-exploited and a bulk claim |
 | The primary button is ink | Black on the canvas in the light look, white on it in the dark look. The accent is for what opens something, so a button and a link never read as the same kind of thing. A secondary button is the same outline in two weights of text |
 | A pressed filter is ink too | A chip or a segment that is on is drawn in ink, and a filter in force above the list sits on the raised tone with its label quieter than its value. Neither borrows the accent, because a state and a link must not read alike on one toolbar |
+| Every state is ink or the raised tone | Picked, pressed, checked, selected, the page you are on, the component a path leads to, a setting that is set. The accent stays with links, focus rings, hover on what opens, and the row or option the keys are on. A web test fails on a style rule for a state that uses the accent |
 | Severity is a dot and a word | Colored by the band, with no fill behind them. A tinted pill on every row of a fifty-row list is fifty patches of color competing with the column that is read first |
 | A count beside a tab is a number | Quieter than the word it counts and the same shape whether the tab is selected or not |
 
@@ -163,6 +164,26 @@ what every other application on the same screen calls them.
 
 Two looks, not three. Named for their aesthetics they ask somebody to guess
 which of "Dojo", "Ledger" and "Obsidian" is the light one.
+
+### State chips
+
+A state is a word on a tint of its color. The color says how the reader should
+take the word.
+
+| Class | Means | Color | Examples |
+|---|---|---|---|
+| `closed` | Asked for and done | Good | Scanned, met |
+| `agreed` | Agreed to | Good | Decided, approved, in force |
+| `waiting` | Under way, or waiting on somebody | Amber | Pending, scanning |
+| `warn` | Not wrong yet, and close to it | Amber | A queue at its limit |
+| `lapsed` | Ended without standing | Orange | Lapsed, withdrawn, sent back |
+| `open` | Neither done nor wrong: a state the reader reads rather than acts on | Muted | A branch, undecided, identifier cannot be read |
+| `bad` | Wrong, and somebody should look | Red | Failing, failed, stopped |
+| none | A fact, neither good nor bad | Muted | Left, held back |
+
+| Rule | |
+|---|---|
+| A problem is never drawn in the done color | Green reads as good news, which is the one reading a failure must not get. A web test fails on a chip drawn as done whose words say something is wrong |
 
 ## The shell
 
@@ -606,6 +627,8 @@ and the act hangs off it.
 | Rule | |
 |---|---|
 | The position is drawn before the action | What is possible follows from where it sits, and the same two numbers read opposite ways at the two ends of a graph: nothing open on it and everything beneath means the package itself is the only lever |
+| The open issues are a button beside the name | "1,840 open issues →", to the findings list for every binary of the source. It is the question most people open the page with, and a link at the end of a grey line is one nobody finds. Absent where nothing is open |
+| A count is the link to what it counts | The picked binary's "N open" opens the list for that binary, and each build's count opens that build's list |
 | Releases are picked inside the promise, ticked to the ones shipping this version | One bump moves every release at that version. Picked in a column of the table instead, the form appeared only once something was ticked, so the control was invisible until somebody guessed at it |
 | The version to move to is offered and never required | The list is what the scanner named; the server is what refuses one it has not heard of. So a version newer than anything reported can still be named, which is the case where an upgrade is ahead of the advisories |
 | Nothing to upgrade to is a state, not an empty form | Where no version fixes any of it, an upgrade would lapse and the work is a judgment. A form that cannot be filled in is one somebody fills in anyway |
@@ -640,6 +663,13 @@ The finding is the working screen after a decision as well as before it.
 | **Before a decision** | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, and the decision form |
 | **After** | The decision that stands, in its state — pending, approved, lapsed — with outcome, justification, scope and who agreed to which revision, and the actions that fit the state |
 | **Under both** | The dependency path, in a pane of its own below triage — the longest block on the screen and among the least often read; the notes on this issue in this product; one activity timeline built from the claim's proposal, revisions, approvals and comments; the revision history, marking which revision each approval named; the comments; and the decisions made here before, with their reasoning offered back as "reuse this reasoning" |
+
+The dependency path shows the first six ways down, with a row beneath it.
+
+| Rule | |
+|---|---|
+| The rest unfold from a secondary button that names what it adds | "Show 24 more", then "Show fewer". A total says how many there are, and what somebody deciding whether to click wants is how many they have not seen |
+| The link into the tree sits apart from it, at the row's far end | Two inline controls side by side read as one run of text. The row wraps at a phone's width rather than squeezing them together |
 
 The notes thread and the claim's comments are two threads, rendered near each
 other (REQ-29).
@@ -1668,7 +1698,9 @@ the reader, which is what a design document is for.
 | Every paragraph, every element styled as a hint, and every `hint` or `detail` given as text | The shapes the explanation drifted into, whatever element carries them |
 | At most 20 words each | A label, a value and one short line fit. A second sentence of reasoning does not |
 | What a paragraph can show at once | Every text node and string it renders. The longer side of a condition is counted, so a sentence inside a branch is prose like any other. A list it maps over is data and is not counted |
-| Nothing examined fails the run | A check that found no paragraph looked at nothing |
+| A link or a button whose whole text names nothing | "Read them", "See more", "View", "Open", "Here" and the like. A control says what it opens or does |
+| A heading or a field label that asks | One beginning with what, where, who, how, when, which or why. Headings and labels are noun phrases (REQ-60): "Sent", not "What has gone out" |
+| Nothing examined fails the run | A check that found no paragraph, control or label looked at nothing |
 
 | It cannot check | |
 |---|---|
@@ -1676,6 +1708,8 @@ the reader, which is what a design document is for.
 | Whether a line is needed at all | Cut before rewriting is judgment |
 | Text a helper builds | A string assembled in a function and passed in is counted as nothing |
 | Tooltips | A `title` is where clarification belongs, so it is left alone |
+| A computed control label or heading | A label built from a value names that value, so only text written out in full is read |
+| A description that does not start with a question word | "The component carrying it" names nothing either, and reading for it is a person's job |
 
 A paragraph that has to stay longer is named in the gate's allowlist with its
 reason.
@@ -1707,6 +1741,7 @@ scroll sideways. That is why the tables here are written rather than installed.
 | **What sits over the page is positioned against the viewport** | The nearest positioned ancestor is the frame, which grows with the content — so on a tall page the drawer's height became the whole document: Close at the top of it, submit at the bottom, and neither on screen. A floating action that is not fixed does not float |
 | **Stacking is a named scale, not hand-picked numbers** | They were spread across the stylesheets with nothing to read to decide the next one, and two unrelated overlays claimed the same step: the drawer and the rail's scrim resolve in one context, so the drawer won on document order and the rail's click-to-dismiss stopped working wherever they overlapped |
 | **A closed vocabulary the server owns is rendered from the generated client** | They were hand-kept tables here, and every one had a member it could not label: an outcome drew an empty cell wherever it was the whole of it, register states printed as wire tokens, and a narrowing over the claim kinds could not fail because its comparisons exhausted every value but one |
+| **A count is never shown before it is known** | While its read is in flight a count is a faint placeholder, never a digit; a failed read is a dash with the reason on hover; only an answered read shows the figure. A zero drawn while loading is a confident answer to a question not yet asked. An empty state such as "Nothing is pending" is drawn only once every read it depends on has answered. One shared renderer does all three, and a web test holds it to them |
 | **A word the table does not know is shown as it arrived** | A server that grows a vocabulary before the interface does should leave somebody reading something unfamiliar rather than a blank |
 | **A choice with a consequence is a card per option** | Where it came from, filing or recording, a recorded flaw's disclosure, and a ruling's disposition each decide something that follows. The card carries what picking it does, so it is read before the choice. An option somebody may not pick is left out and said in a line below, not drawn as a card that refuses. A radio group to the keyboard: one tab stop, arrows move and pick |
 | **A switch between values is a segmented control** | Each option is drawn as a button, the picked one filled, and the frame is dashed while nothing is picked. It keeps its own width inside a panel, which otherwise stretches it to the panel's edge |

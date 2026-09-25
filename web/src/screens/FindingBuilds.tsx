@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { buildKey, fromBuildKey } from "../ui/builds";
+import { Required } from "../ui/Required";
 
 // Correcting which builds a recorded flaw affects.
 //
@@ -188,10 +189,8 @@ export function AffectedBuilds({
               <label htmlFor="affects-because">
                 The reason{" "}
                 {removing.length === 1 ? "that build was" : `those ${removing.length} builds were`}{" "}
-                never affected{" "}
-                <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
-                  required
-                </span>
+                never affected
+                <Required />
               </label>
               <textarea
                 id="affects-because"

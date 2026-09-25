@@ -199,7 +199,7 @@ function VulnerabilityData() {
                 {data.data?.stale === true && (
                   <>
                     {" "}
-                    <span className="state closed">stopped</span>
+                    <span className="state bad">stopped</span>
                   </>
                 )}
               </td>
@@ -224,7 +224,7 @@ function VulnerabilityData() {
 function because(why?: string) {
   switch (why) {
     case "ours":
-      return <span className="state closed">held back, ours</span>;
+      return <span className="state">held back, ours</span>;
     case "unreadable":
       return <span className="state open">identifier cannot be read</span>;
     default:
@@ -279,7 +279,7 @@ function TheQueue() {
                     {(kind.waiting ?? 0) >= (kind.limit ?? 0) && (
                       <>
                         {" "}
-                        <span className="state closed">at limit</span>
+                        <span className="state warn">at limit</span>
                       </>
                     )}
                   </td>

@@ -22,6 +22,7 @@ import { Severity, Exploited, ExploitedHere } from "../ui/Severity";
 import { Paged } from "../ui/Paged";
 import { Because, called, labeled } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
+import { Count } from "../ui/Count";
 
 // A page of claims. The queue is read at the grain of a claim, and a claim
 // is a card with its whole argument, so a page is what fits a sitting.
@@ -226,8 +227,8 @@ export function Queue() {
         <p>
           {mine ? (
             <>
-              {(became.data?.total ?? 0).toLocaleString()} proposed by you · what became of each,
-              newest first
+              <Count of={became}>{() => (became.data?.total ?? 0).toLocaleString()}</Count> proposed
+              by you · what became of each, newest first
             </>
           ) : (
             <>
@@ -271,7 +272,10 @@ export function Queue() {
             setParams(now);
           }}
         >
-          Waiting on me <span className="n">{(queue.data?.total ?? 0).toLocaleString()}</span>
+          Waiting on me{" "}
+          <span className="n">
+            <Count of={queue}>{() => (queue.data?.total ?? 0).toLocaleString()}</Count>
+          </span>
         </button>
         <button
           type="button"
@@ -284,7 +288,10 @@ export function Queue() {
             setParams(now);
           }}
         >
-          Mine, recent <span className="n">{(became.data?.total ?? 0).toLocaleString()}</span>
+          Mine, recent{" "}
+          <span className="n">
+            <Count of={became}>{() => (became.data?.total ?? 0).toLocaleString()}</Count>
+          </span>
         </button>
       </div>
 
@@ -448,8 +455,8 @@ export function Queue() {
       <div className="screen-head" id="lapsed" style={{ marginTop: 22 }}>
         <h2>Lapsed decisions</h2>
         <p>
-          {stopped.isError ? "—" : (stopped.data?.total ?? 0).toLocaleString()} · the code moved;
-          each needs a fresh reason, not a new approval.
+          <Count of={stopped}>{() => (stopped.data?.total ?? 0).toLocaleString()}</Count> · the code
+          moved; each needs a fresh reason, not a new approval.
         </p>
       </div>
       {/* A read that did not happen is not a list of nothing. Without this the

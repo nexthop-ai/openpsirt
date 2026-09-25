@@ -308,7 +308,7 @@ export function People({ who: me }: { who: Who }) {
                       {person.deactivated_at && (
                         <>
                           {" "}
-                          <span className="state closed" title={person.deactivated_at}>
+                          <span className="state" title={person.deactivated_at}>
                             left {on(person.deactivated_at)}
                           </span>
                         </>

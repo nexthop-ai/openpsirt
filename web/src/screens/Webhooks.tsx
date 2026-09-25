@@ -56,7 +56,7 @@ function kindOf(kind?: string) {
 function Failing({ row }: { row: Destination }) {
   if ((row.failing ?? 0) === 0) return <span style={{ color: "var(--faint)" }}>none</span>;
   return (
-    <span className="state closed" title={row.because}>
+    <span className="state bad" title={row.because}>
       {(row.failing ?? 0).toLocaleString()}
     </span>
   );

@@ -15,6 +15,7 @@ import { Failed } from "../ui/Failed";
 import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
 import { offeredAs, whoIs } from "../ui/whom";
+import { Required } from "../ui/Required";
 
 // The people brought into one undisclosed case.
 //
@@ -298,10 +299,8 @@ export function Resolve({
         <>
           <div className="field">
             <label htmlFor="res-because">
-              The fix{" "}
-              <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
-                required
-              </span>
+              The fix
+              <Required />
             </label>
             <textarea
               id="res-because"

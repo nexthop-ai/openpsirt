@@ -207,7 +207,7 @@ function Tell({
     <div className="rating">
       {tell.error != null && <Failed error={tell.error} what="That notice was not recorded." />}
       <div className="field" style={{ marginBottom: 8 }}>
-        <label htmlFor="recipient">Who</label>
+        <label htmlFor="recipient">Recipient</label>
         <input
           id="recipient"
           type="text"
@@ -217,7 +217,7 @@ function Tell({
         />
       </div>
       <div className="field" style={{ marginBottom: 8 }}>
-        <label htmlFor="toldat">When</label>
+        <label htmlFor="toldat">Told at</label>
         <input
           id="toldat"
           type="datetime-local"
@@ -241,7 +241,7 @@ function Tell({
         </div>
       )}
       <div className="field" style={{ marginBottom: 8, maxWidth: "78ch" }}>
-        <label htmlFor="said">What they were told</label>
+        <label htmlFor="said">Message</label>
         <textarea
           id="said"
           style={{ minHeight: 64 }}

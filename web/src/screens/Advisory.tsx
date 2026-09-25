@@ -145,7 +145,7 @@ function Says({ advisory, title, covers }: { title: string; advisory: string; co
 
   return (
     <div className="card" style={{ marginBottom: 12 }}>
-      <h3>What it says</h3>
+      <h3>Content</h3>
       <Title advisory={advisory} title={title} />
       {covers.length === 0 ? (
         <p className="hint">None named yet.</p>
@@ -344,7 +344,7 @@ function Issued({
 
   return (
     <div className="card">
-      <h3>What has gone out</h3>
+      <h3>Sent</h3>
       {read.isPending ? (
         <Loading inline />
       ) : read.isError ? (

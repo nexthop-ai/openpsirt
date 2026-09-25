@@ -67,7 +67,7 @@ export function VEX() {
       </div>
 
       <div className="card">
-        <h3>What has gone out</h3>
+        <h3>Sent</h3>
         {gone.isPending ? (
           <Loading inline />
         ) : gone.isError ? (

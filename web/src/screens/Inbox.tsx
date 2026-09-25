@@ -13,6 +13,7 @@ import { Wide } from "../ui/Wide";
 import { on } from "../ui/when";
 import { rulable, standing } from "./inbox";
 import { RuleForm, RulingCard, useBackOff } from "./InboxRuling";
+import { Count } from "../ui/Count";
 
 // One product's reports: what arrived, what it was judged to be, and the
 // rulings waiting on a second person.
@@ -63,7 +64,9 @@ export function Inbox() {
           onClick={() => go("waiting")}
         >
           Waiting for approval{" "}
-          <span className="n">{(waiting.data?.total ?? 0).toLocaleString()}</span>
+          <span className="n">
+            <Count of={waiting}>{() => (waiting.data?.total ?? 0).toLocaleString()}</Count>
+          </span>
         </button>
       </div>
 

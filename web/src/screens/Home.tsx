@@ -17,6 +17,7 @@ import { paceReading, mixReading } from "../ui/trend";
 import { claimOf } from "../api/claims";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
+import { Count, known, type Readable } from "../ui/Count";
 
 // The most of the deadline list the tiles read. The response carries the
 // whole-answer count beside it, so the figures say when they are a floor
@@ -91,7 +92,7 @@ export function Home({ who }: { who: Who }) {
         </p>
       </div>
 
-      <Figures counting={counting} points={points} />
+      <Figures counting={counting} points={points} trend={trend} />
 
       <div className="panels">
         <Pending />
@@ -350,9 +351,11 @@ function reading(now: number, shipped: number, release: string): string {
 function Figures({
   counting,
   points,
+  trend,
 }: {
   counting: string;
   points: { open?: number; by_severity?: Record<string, number> }[];
+  trend: Readable;
 }) {
   const at = useScope();
   const scope = scopeQuery(at);
@@ -506,7 +509,7 @@ function Figures({
       <button type="button" className="kpi" onClick={() => navigate("/work")}>
         <span className="l">Assigned to you · {counting}</span>
         <span className="n">
-          {assigned.isError ? "—" : (assigned.data?.total ?? 0).toLocaleString()}
+          <Count of={assigned}>{() => (assigned.data?.total ?? 0).toLocaleString()}</Count>
         </span>
         <span className="d">yours and your teams&rsquo;</span>
       </button>
@@ -517,9 +520,9 @@ function Figures({
       >
         <span className="l">Sent back to you</span>
         <span className="n">
-          {became.isError
-            ? "—"
-            : `${sentBack.toLocaleString()}${backCut && sentBack > 0 ? "+" : ""}`}
+          <Count of={became}>
+            {() => `${sentBack.toLocaleString()}${backCut && sentBack > 0 ? "+" : ""}`}
+          </Count>
         </span>
         <span className="d">claims an approver returned</span>
       </button>
@@ -529,15 +532,19 @@ function Figures({
           fewer rows in it than the number said. */}
       <button type="button" className="kpi" onClick={() => navigate(findingsPath(at, true))}>
         <span className="l">Open issues · {counting}</span>
-        <span className="n">{openCount === undefined ? "—" : openCount.toLocaleString()}</span>
-        {everywhere(allPoints[allPoints.length - 1]?.open) ?? (
+        <span className="n">
+          <Count of={trend}>
+            {() => (openCount === undefined ? "—" : openCount.toLocaleString())}
+          </Count>
+        </span>
+        {everywhere(known(allOpen) ? allPoints[allPoints.length - 1]?.open : undefined) ?? (
           <span className="d">distinct issues, not findings</span>
         )}
       </button>
       {!!at.product && (
         <button
           type="button"
-          className={`kpi${!exploited.isError && (exploited.data?.total ?? 0) > 0 ? " urgent" : ""}`}
+          className={`kpi${known(exploited) && (exploited.data?.total ?? 0) > 0 ? " urgent" : ""}`}
           onClick={() => navigate(withOnly(findingsPath(at, true), "exploited"))}
         >
           <span className="l">
@@ -547,7 +554,7 @@ function Figures({
               count could not be read" are opposite answers, and the tile that
               says the first is the one somebody stops looking at. */}
           <span className="n">
-            {exploited.isError ? "—" : (exploited.data?.total ?? 0).toLocaleString()}
+            <Count of={exploited}>{() => (exploited.data?.total ?? 0).toLocaleString()}</Count>
           </span>
           {/* No twin. The all-products figure off this endpoint counts a row
               per product, issue and component, so one library's flaw in five
@@ -571,12 +578,12 @@ function Figures({
           <i style={{ background: "var(--wait)" }} /> Pending your approval
         </span>
         <span className="n">
-          {queue.isError || rulings.isError
-            ? "—"
-            : ((queue.data?.total ?? 0) + (rulings.data ?? 0)).toLocaleString()}
+          <Count of={[queue, rulings]}>
+            {() => ((queue.data?.total ?? 0) + (rulings.data ?? 0)).toLocaleString()}
+          </Count>
         </span>
         {everywhere(
-          allQueue.data?.total === undefined
+          !known([allQueue, allRulings]) || allQueue.data?.total === undefined
             ? undefined
             : allQueue.data.total + (allRulings.data ?? 0),
         ) ?? (
@@ -600,13 +607,13 @@ function Figures({
         {/* The list behind this is capped, so a full one is said to be a
             floor rather than passed off as the count. */}
         <span className="n">
-          {overdue.length.toLocaleString()}
-          {cut ? "+" : ""}
+          <Count of={late}>{() => `${overdue.length.toLocaleString()}${cut ? "+" : ""}`}</Count>
         </span>
-        {everywhereAtLeast(
-          allRunning.filter((row) => (row.days_left ?? 0) < 0).length,
-          cutEverywhere,
-        ) ?? (
+        {(known(allLate) &&
+          everywhereAtLeast(
+            allRunning.filter((row) => (row.days_left ?? 0) < 0).length,
+            cutEverywhere,
+          )) || (
           <span className="d">
             {overdueExploited > 0 ? `${overdueExploited} exploited · ` : ""}undecided, past the
             deadline
@@ -626,13 +633,13 @@ function Figures({
           <i style={{ background: "var(--wait)" }} /> Due soon
         </span>
         <span className="n">
-          {soon.length.toLocaleString()}
-          {cut ? "+" : ""}
+          <Count of={late}>{() => `${soon.length.toLocaleString()}${cut ? "+" : ""}`}</Count>
         </span>
-        {everywhereAtLeast(
-          allRunning.filter((row) => (row.days_left ?? 0) >= 0).length,
-          cutEverywhere,
-        ) ?? (
+        {(known(allLate) &&
+          everywhereAtLeast(
+            allRunning.filter((row) => (row.days_left ?? 0) >= 0).length,
+            cutEverywhere,
+          )) || (
           <span className="d">
             {soonExploited > 0 ? `${soonExploited} exploited · ` : ""}undecided, due within{" "}
             {SOON_DAYS} days
@@ -696,16 +703,25 @@ function Pending() {
               : undefined
           }
         >
-          {at.product
-            ? `${((everywhere.data?.total ?? 0) + (allRulings.data ?? 0)).toLocaleString()} all products`
-            : "all products"}
+          {at.product ? (
+            <>
+              <Count of={[everywhere, allRulings]}>
+                {() => ((everywhere.data?.total ?? 0) + (allRulings.data ?? 0)).toLocaleString()}
+              </Count>{" "}
+              all products
+            </>
+          ) : (
+            "all products"
+          )}
         </span>
         <span className="tally">
-          {queue.isError || rulings.isError ? "—" : (queue.data?.total ?? 0) + (rulings.data ?? 0)}
+          <Count of={[queue, rulings]}>
+            {() => ((queue.data?.total ?? 0) + (rulings.data ?? 0)).toLocaleString()}
+          </Count>
         </span>
       </header>
       {queue.isError && <Failed error={queue.error} what="This could not be read." />}
-      {items.length === 0 && !queue.isError && !(rulings.data ?? 0) && (
+      {known([queue, rulings]) && items.length === 0 && !(rulings.data ?? 0) && (
         <p className="reading">Nothing is pending.</p>
       )}
       {(rulings.data ?? 0) > 0 && (
@@ -782,16 +798,27 @@ function InProgress({ me }: { me: string }) {
               : undefined
           }
         >
-          {at.product
-            ? `${(everywhere.data?.items ?? [])
-                .reduce((sum, each) => sum + (each.open ?? 0), 0)
-                .toLocaleString()} all products`
-            : "all products"}
+          {at.product ? (
+            <>
+              <Count of={everywhere}>
+                {() =>
+                  (everywhere.data?.items ?? [])
+                    .reduce((sum, each) => sum + (each.open ?? 0), 0)
+                    .toLocaleString()
+                }
+              </Count>{" "}
+              all products
+            </>
+          ) : (
+            "all products"
+          )}
         </span>
-        <span className={overdue > 0 ? "tally urgent" : "tally"}>{total.toLocaleString()}</span>
+        <span className={overdue > 0 ? "tally urgent" : "tally"}>
+          <Count of={held}>{() => total.toLocaleString()}</Count>
+        </span>
       </header>
       {held.isError && <Failed error={held.error} what="This could not be read." />}
-      {mine.length === 0 && !held.isError && <p className="reading">Nothing is assigned.</p>}
+      {known(held) && mine.length === 0 && <p className="reading">Nothing is assigned.</p>}
       <ul>
         {mine.slice(0, 3).map((each) => (
           <li key={`${each.team ? "t" : "p"}:${each.person}`}>
@@ -881,18 +908,19 @@ function Lapsed() {
       <header>
         <h3>Lapsed decisions</h3>
         <span className="eyebrow" style={{ marginLeft: "auto" }}>
-          {at.product
-            ? // The one read in this panel that is not part of `unread`,
-              // because it answers a different question and a scope with no
-              // product never makes it. A failed read of it drew a confident
-              // "0 all products" beside a tally that correctly read "—".
-              everywhere.isError
-              ? "— all products"
-              : `${allTotal.toLocaleString()} all products`
-            : "all products"}
+          {at.product ? (
+            // The one read in this panel that is not part of `unread`,
+            // because it answers a different question and a scope with no
+            // product never makes it. It has its own three states.
+            <>
+              <Count of={everywhere}>{() => allTotal.toLocaleString()}</Count> all products
+            </>
+          ) : (
+            "all products"
+          )}
         </span>
         <span className={!unread && stoppedTotal > 0 ? "tally urgent" : "tally"}>
-          {unread ? "—" : stoppedTotal.toLocaleString()}
+          <Count of={[stopped, lapsed, expired]}>{() => stoppedTotal.toLocaleString()}</Count>
         </span>
       </header>
       {unread && (
@@ -901,7 +929,7 @@ function Lapsed() {
           what="Lapsed decisions could not be read."
         />
       )}
-      {!unread && lapsedTotal > 0 && (
+      {known(lapsed) && lapsedTotal > 0 && (
         <div className="alert">
           <strong>
             {lapsedTotal.toLocaleString()} {lapsedTotal === 1 ? "decision" : "decisions"} lapsed
@@ -909,7 +937,7 @@ function Lapsed() {
           <span>The versions they were claims about have moved.</span>
         </div>
       )}
-      {!unread && expiredTotal > 0 && (
+      {known(expired) && expiredTotal > 0 && (
         <div className="alert">
           <strong>
             {expiredTotal.toLocaleString()} {expiredTotal === 1 ? "deferral" : "deferrals"} ran out
@@ -917,10 +945,12 @@ function Lapsed() {
           <span>The date they were put off until has passed.</span>
         </div>
       )}
-      {!unread && stoppedTotal === 0 && <p className="reading">Nothing has lapsed.</p>}
+      {known([stopped, lapsed, expired]) && stoppedTotal === 0 && (
+        <p className="reading">Nothing has lapsed.</p>
+      )}
       <footer>
         <Link to="/review-queue#lapsed" className="linkish">
-          View →
+          Lapsed decisions →
         </Link>
       </footer>
     </div>
@@ -984,12 +1014,16 @@ function Status() {
         <li>
           <span className="what">Builds being scanned</span>
           <span className="when">
-            {(live - quietTotal).toLocaleString()} of {live.toLocaleString()}
+            <Count of={scanning}>
+              {() => `${(live - quietTotal).toLocaleString()} of ${live.toLocaleString()}`}
+            </Count>
           </span>
         </li>
         <li>
           <span className="what">Last inventory received</span>
-          <span className="when">{on(last) || "never"}</span>
+          <span className="when">
+            <Count of={scanning}>{() => on(last) || "never"}</Count>
+          </span>
         </li>
         <li>
           <span className="what">Quiet after</span>

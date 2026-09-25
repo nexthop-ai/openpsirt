@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { BOUND, proseIn, sweep } from "./screen-copy.mjs";
+import { BOUND, namesIn, proseIn, sweep, sweepNames } from "./screen-copy.mjs";
 
 // Both directions per shape — one input that must be reported and one that
 // must not — because the failure that matters here is the check going quiet.
@@ -71,6 +71,50 @@ describe("standing prose on a screen", () => {
     expect(
       examined,
       "no paragraph was found in the interface, so this checked nothing",
+    ).toBeGreaterThan(0);
+    expect(found).toEqual([]);
+  });
+});
+
+const rules = (source: string) => namesIn(source).found.map((each: { rule: string }) => each.rule);
+
+describe("controls and labels that name their thing", () => {
+  it("reports a link or a button whose whole text names nothing", () => {
+    expect(rules(`const x = <Link to={to}>Read them →</Link>;`)).toEqual(["vague"]);
+    expect(rules(`const x = <button type="button">More</button>;`)).toEqual(["vague"]);
+  });
+
+  it("passes a link that names where it goes", () => {
+    expect(rules(`const x = <Link to={to}>Opened findings →</Link>;`)).toEqual([]);
+  });
+
+  it("passes a control whose text is computed", () => {
+    expect(rules(`const x = <Link to={to}>{label}</Link>;`)).toEqual([]);
+  });
+
+  it("reports a heading or a field label that asks", () => {
+    expect(rules(`const x = <h3>What has gone out</h3>;`)).toEqual(["asks"]);
+    expect(rules(`const x = <label htmlFor="a">Who</label>;`)).toEqual(["asks"]);
+    expect(rules(`const x = <Field label="When it lands"><input /></Field>;`)).toEqual(["asks"]);
+  });
+
+  it("reads a label past a child element's attributes", () => {
+    expect(
+      rules(`const x = <label htmlFor="a">What it is <span style={{ color: c }}>x</span></label>;`),
+    ).toEqual(["asks"]);
+    expect(rules(`const x = <Link to={to}><Icon name="arrow" /> View</Link>;`)).toEqual(["vague"]);
+  });
+
+  it("passes a heading or a label that names", () => {
+    expect(rules(`const x = <h3>Sent</h3>;`)).toEqual([]);
+    expect(rules(`const x = <Field label="Recipient"><input /></Field>;`)).toEqual([]);
+  });
+
+  it("finds none in the interface, and looked at some", async () => {
+    const { found, examined } = await sweepNames();
+    expect(
+      examined,
+      "no control, heading or label was found, so this checked nothing",
     ).toBeGreaterThan(0);
     expect(found).toEqual([]);
   });

@@ -94,6 +94,17 @@ var cgitSites = map[string]cgitSite{
 	"git.savannah.nongnu.org":      {Host: "https.git.savannah.nongnu.org", Pages: "cgit", Under: []string{"git"}},
 	"cgit.git.savannah.nongnu.org": {Host: "https.git.savannah.nongnu.org", Pages: "cgit", Under: []string{"git"}},
 	"cgit.freebsd.org":             {Host: "git.freebsd.org"},
+	"sourceware.org":               {Host: "sourceware.org", Pages: "cgit", Under: []string{"git"}},
+}
+
+// moved is repositories a retired site's links still name, keyed on the
+// address a link is read as, with the address the repository is fetched from
+// now. cgit.freedesktop.org answers 503 since its projects moved to
+// gitlab.freedesktop.org, where a repository's path is not always its old one.
+// Only addresses checked to clone are listed; any other link to a retired site
+// is read as written and fails with its reason.
+var moved = map[string]string{
+	"https://cgit.freedesktop.org/drm/drm-misc.git": "https://gitlab.freedesktop.org/drm/misc/kernel.git",
 }
 
 // Parse reads the commit a patch link names.
@@ -182,6 +193,9 @@ func at(host string, path []string, hash string) (Commit, bool) {
 	repository := "https://" + host + "/" + strings.Join(path, "/")
 	if !strings.HasSuffix(repository, ".git") {
 		repository += ".git"
+	}
+	if now, ok := moved[repository]; ok {
+		repository = now
 	}
 	return named(repository, hash)
 }

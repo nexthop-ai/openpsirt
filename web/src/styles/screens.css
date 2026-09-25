@@ -348,7 +348,7 @@
   border-radius: 4px;
 }
 .tree .node.here {
-  background: var(--accent-soft);
+  background: var(--raised);
   font-weight: 600;
 }
 .tree .node .ver {
@@ -1067,9 +1067,9 @@
   color: var(--ok);
 }
 .revprog span.on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent);
+  border-color: var(--ink);
+  background: var(--raised);
+  color: var(--ink);
   font-weight: 600;
 }
 
@@ -1425,6 +1425,18 @@
   font-size: 14px;
   font-weight: 600;
 }
+/* Under the tree: what unfolds it on the left, where it leads on the right.
+   Two controls that sit inline run together into one line of text. */
+.pathfoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap);
+  margin-top: 10px;
+}
+.pathfoot > a {
+  margin-left: auto;
+}
 
 /* Who holds a finding, as one row at the head of the triage pane. It was a
    card with a heading and a hint on either side, around a dropdown. */
@@ -1500,8 +1512,8 @@
   padding: 0 6px;
 }
 .settingname .badge.set {
-  color: var(--accent);
-  border-color: var(--accent-line);
+  color: var(--ink);
+  border-color: var(--line-strong);
 }
 .settingcontrol {
   display: flex;

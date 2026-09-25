@@ -393,8 +393,8 @@ button {
   background: var(--raised);
 }
 .opt[aria-current="true"] {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--raised);
+  color: var(--ink);
   font-weight: 600;
 }
 .opt .tag {
@@ -462,6 +462,17 @@ button {
   letter-spacing: -0.015em;
   font-weight: 600;
   flex-basis: 100%;
+}
+/* A heading with the page's one action beside it. */
+.screen-head .titlerow {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.screen-head .titlerow h2 {
+  flex-basis: auto;
 }
 .screen-head p {
   margin: 0;

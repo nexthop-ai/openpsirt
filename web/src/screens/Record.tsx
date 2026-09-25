@@ -19,6 +19,7 @@ import { Failed } from "../ui/Failed";
 import { useReseed } from "../ui/reseed";
 import { Scoring } from "../ui/Scoring";
 import { Weaknesses } from "../ui/Weaknesses";
+import { Required } from "../ui/Required";
 
 // Reporting a flaw in what we ship: one somebody outside sent, or one somebody
 // here found. The one way in for both. What separates them is a single answer
@@ -356,10 +357,8 @@ export function Record() {
 
         <div className="field">
           <label htmlFor="rec-summary">
-            What it is{" "}
-            <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
-              required
-            </span>
+            Description
+            <Required />
           </label>
           {/* The same editor and the same submission policy as a
               justification. It is rendered as markdown where it is read back,
@@ -369,7 +368,7 @@ export function Record() {
             onChange={setSummary}
             draftKey={`record:${product}`}
             rows={6}
-            label="What it is"
+            label="Description"
             placeholder="The management socket answers a request before anyone has authenticated."
             mentions={mentioning(product, !disclosed)}
           />
@@ -386,7 +385,7 @@ export function Record() {
       </div>
 
       <div className="panel" style={{ maxWidth: "80ch", marginTop: 14 }}>
-        <h3>Where it came from</h3>
+        <h3>Source</h3>
         {fromReport ? (
           <p className="hint">
             From{" "}
@@ -405,7 +404,7 @@ export function Record() {
         ) : (
           <>
             <ChoiceCards
-              label="Where it came from"
+              label="Source"
               value={origin}
               onChange={setOrigin}
               options={[
@@ -478,9 +477,9 @@ export function Record() {
           being recorded has nothing left to file. */}
       {choosing && (
         <div className="panel" style={{ maxWidth: "80ch", marginTop: 14 }}>
-          <h3>Next</h3>
+          <h3>Next step</h3>
           <ChoiceCards
-            label="What to do with it"
+            label="Next step"
             value={recordNow ? "record" : "file"}
             onChange={(next) => setNow(next === "record")}
             options={[
@@ -541,7 +540,7 @@ export function Record() {
           </div>
 
           <div className="field">
-            <label htmlFor="rec-component">The component carrying it</label>
+            <label htmlFor="rec-component">Component</label>
             {/* Shown as a list rather than left to the browser's datalist,
                 which has no affordance at all. Names, not name-and-version
                 rows: which of several versions is meant is the question the

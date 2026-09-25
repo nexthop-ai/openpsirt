@@ -160,7 +160,7 @@ export function Scrutiny() {
                           <td className="num">{(row.rows ?? 0).toLocaleString()}</td>
                           <td>
                             <Link to={overTheSame(row.outcome ?? "")} className="linkish">
-                              Read them →
+                              Decisions →
                             </Link>
                           </td>
                         </tr>

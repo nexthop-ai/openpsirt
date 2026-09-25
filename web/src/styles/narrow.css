@@ -345,7 +345,7 @@ a {
   background: none;
 }
 .tabbar a[aria-current="page"] {
-  color: var(--accent);
+  color: var(--ink);
   font-weight: 600;
 }
 /* A drop zone is a label, and not the small-caps kind. */
