@@ -16,14 +16,14 @@ describe("the settings tabs", () => {
     expect(tabOf("webhooks", true)).toBe("webhooks");
     expect(tabOf("webhooks", false)).toBe("deadlines");
   });
-  it("counts what differs from the shipped value, and otherwise what a tab holds", () => {
+  it("counts what somebody stored, and otherwise what a tab holds", () => {
     const items = [
       { section: "triage", default: true },
       { section: "triage", default: false },
       { section: "limits", default: true },
       { section: "limits", default: true },
     ];
-    expect(tally(items, "triage")).toBe("1 changed");
+    expect(tally(items, "triage")).toBe("1 set");
     expect(tally(items, "limits")).toBe("2");
   });
 });

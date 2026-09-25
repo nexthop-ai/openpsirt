@@ -6,6 +6,7 @@ package httpapi
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -79,8 +80,16 @@ func TestTheScreenTakesWhatAValueIsFromTheServer(t *testing.T) {
 // the interface is a second list keyed on the name, and a setting added here
 // and not there is drawn under its dotted key in a section of its own.
 func TestEverySettingCarriesATitleASectionAndOneLine(t *testing.T) {
-	sections := []string{"deadlines", "own", "triage", "disclosure", "scanning", "signin",
-		"limits", "outbound"}
+	// The sections the API document declares, read from the one place they
+	// are written, so the list checked here cannot drift from what is served.
+	field, ok := reflect.TypeFor[SettingBody]().FieldByName("Section")
+	if !ok {
+		t.Fatal("a setting carries no section field")
+	}
+	sections := strings.Split(field.Tag.Get("enum"), ",")
+	if len(sections) < 2 {
+		t.Fatalf("the section field declares %q, which is not a list of sections", field.Tag.Get("enum"))
+	}
 	if len(settable) == 0 {
 		t.Fatal("no settings are offered, so this checked nothing")
 	}

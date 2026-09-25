@@ -118,6 +118,8 @@ function PatchBranches() {
       <div className="settingcontrol">
         {progress.isPending ? (
           <span className="hint">…</span>
+        ) : progress.isError ? (
+          <span className="hint">Could not be read</span>
         ) : (
           <span>
             {progress.data?.on ? "On" : "Off"}
