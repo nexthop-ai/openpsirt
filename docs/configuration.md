@@ -52,7 +52,9 @@ it: from v0.1.0, read all three.
 
 Going back is `openpsirt migrate down`, once for each release stepped back, run
 with this build before the earlier one is deployed. v0.1.0 started against an
-upgraded schema reports it current and cannot read it.
+upgraded schema reports it current and cannot read it. Patch branch lookups
+come back off in v0.2.0, which reads its own setting for them: turn them on
+again under its Settings.
 
 ### From v0.1.0
 
@@ -74,6 +76,7 @@ Also read after an upgrade from v0.1.0.
 |---|---|
 | `OPENPSIRT_PATCH_EXCLUDED` is `OPENPSIRT_OUTBOUND_EXCLUDED`, and the chart's `patchBranches.excluded` is `outbound.excluded` | Move the list. The old name is refused at startup, and the chart refuses to render with the old key set |
 | The excluded list also keeps supplier directories out, and a supplier is read from every host its description names | Set `outbound.excluded` wherever suppliers are configured |
+| A threshold stored under its v0.1.0 name, `disclosure.extension-threshold`, is in force again as `disclosure.movement-threshold` where that was never set. v0.2.0 read only the new name, so it ran on the default | Check it under Settings, Disclosure |
 | Patch branch lookups are turned on in the deployment's configuration. The `patch.branches` setting is gone | Set `patchBranches.enabled: true` in the chart, or `OPENPSIRT_PATCH_BRANCHES=true`. A deployment that had the setting on has the lookups off until then. [What to set first](#enabling) |
 
 | After the upgrade from v0.2.0 | |

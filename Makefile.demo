@@ -193,6 +193,11 @@ demo-up: demo-down
 	@# proxy through without this sends the container's own probe of itself to
 	@# the proxy — which answers 403, and the container reports unhealthy while
 	@# serving every request correctly.
+	@#
+	@# Patch branch lookups are on, so patch links carry their branches. The
+	@# copies are kept beside the scanner's data, and the kernel's stable tree
+	@# is the first fetched: fifteen minutes and 5 GB the first time, a small
+	@# fetch after.
 	@$(DOCKER) run -d --name openpsirt-demo --network $(DEMO_NET) \
 	  --user "$$(id -u):$$(id -g)" \
 	  -e NO_PROXY="127.0.0.1,localhost,$${NO_PROXY}" \
@@ -314,12 +319,6 @@ demo-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(1
 
 demo-seed:
 	@command -v xz >/dev/null || { echo "xz is needed to read the fixtures"; exit 1; }
-	@# Patch links labeled with their branches. Off in a deployment unless
-	@# its configuration turns it on; demo-up turns it on, so the labels are
-	@# there to see. The copies are kept beside the scanner's data, and the
-	@# kernel's stable tree is the first one fetched: fifteen minutes and
-	@# 5 GB the first time, a small fetch after.
-	@echo "  patch branch lookups on"
 	@for entry in $(DEMO_BUILDS); do \
 	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
 	  xz -dc "$$file" > "$(DEMO_DIR)/$$product-$$stream-$$variant.cdx.json"; \
