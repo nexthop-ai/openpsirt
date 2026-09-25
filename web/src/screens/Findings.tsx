@@ -64,12 +64,6 @@ import {
   withParams,
 } from "./list";
 
-// The filters the by-bump view can apply, by the key their chip carries.
-//
-// Six of the thirty-odd. The rest ask about a place, a deadline or an
-// assignee, and a bump has none of those — so they are named on that screen
-// rather than dropped, which is what would widen the list back out while the
-// chips went on saying they were on.
 // The filters the bar sets itself, so the count on More filters leaves them out.
 const ON_THE_BAR = new Set(["q", "floor", "state", "assigned", "running"]);
 
@@ -87,6 +81,12 @@ const DUE_MENU: readonly MenuOption[] = DEADLINES.map(([word, label]) => [
   word === "" ? "Any time" : label.replace(/^Due within/, "Within"),
 ]);
 
+// The filters the by-bump view can apply, by the key their chip carries.
+//
+// Six of the thirty-odd. The rest ask about a place, a deadline or an
+// assignee, and a bump has none of those — so they are named on that screen
+// rather than dropped, which is what would widen the list back out while the
+// chips went on saying they were on.
 const BUMPABLE = new Set(["q", "floor", "exploited", "component", "ecosystem", "state"]);
 
 // One row per issue in a component, not per place. Every filter is in the URL,
@@ -658,9 +658,11 @@ export function Findings() {
         <button
           type="button"
           className="chip"
-          aria-pressed={!!asked.get("opened_after")}
+          aria-pressed={asked.get("opened_after") === daysBack(1)}
           title="Findings first seen in the last day"
-          onClick={() => set("opened_after", asked.get("opened_after") ? "" : daysBack(1))}
+          onClick={() =>
+            set("opened_after", asked.get("opened_after") === daysBack(1) ? "" : daysBack(1))
+          }
         >
           New today
         </button>
