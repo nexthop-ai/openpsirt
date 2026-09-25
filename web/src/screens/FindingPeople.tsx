@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { notYours, unwrap } from "../api/queries";
+import { notYours, unwrap, whichOf } from "../api/queries";
 import { Failed } from "../ui/Failed";
 import { Holder, type Held } from "../ui/Holder";
 import { Suggest } from "../ui/Suggest";
@@ -175,8 +175,12 @@ export function Collaborators({
   );
 }
 
+// Which is what picks the component where its name is not enough.
+type Which = { version?: string; ecosystem?: string; namespace?: string };
+
 export function Assignee({
   at,
+  which,
   assigned,
   undisclosed,
   routedBy,
@@ -188,6 +192,7 @@ export function Assignee({
     vulnerability: string;
     component: string;
   };
+  which?: Which;
   assigned: string;
   undisclosed: boolean;
   // The standing rule that placed this, where one did. A placement nobody can
@@ -203,7 +208,7 @@ export function Assignee({
         await api.PUT(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/assignment",
           {
-            params: { path: at },
+            params: { path: at, query: whichOf(which ?? {}) },
             body:
               held === null
                 ? {}
@@ -467,6 +472,7 @@ export function Attachments({
 // to distrust the ones that work.
 export function Marks({
   at,
+  which,
   tags,
   mayMark,
   onChanged,
@@ -478,6 +484,7 @@ export function Marks({
     vulnerability: string;
     component: string;
   };
+  which?: Which;
   tags: string[];
   mayMark: boolean;
   onChanged: () => void;
@@ -502,7 +509,7 @@ export function Marks({
       unwrap(
         await api.PUT(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/tags/{tag}",
-          { params: { path: path(tag) } },
+          { params: { path: path(tag), query: whichOf(which ?? {}) } },
         ),
       ),
     onSuccess: () => {
@@ -516,7 +523,7 @@ export function Marks({
       unwrap(
         await api.DELETE(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}/tags/{tag}",
-          { params: { path: path(tag) } },
+          { params: { path: path(tag), query: whichOf(which ?? {}) } },
         ),
       ),
     onSuccess: onChanged,

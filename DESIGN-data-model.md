@@ -332,6 +332,7 @@ name is not enough.
 | A name matching several is refused with the choices, each carrying all four parts | A choice missing one leads back to the same refusal |
 | Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
 | Every row and tree node that names a component carries its ecosystem and namespace | A screen can send back only what it was given |
+| Every route addressing a finding or a component by name takes all four, and each narrows the same way | A route that took fewer answered for the kernel on one screen and refused it on the next: the finding read, and marking, assigning or deciding it did not |
 
 ## Upstream name and version
 

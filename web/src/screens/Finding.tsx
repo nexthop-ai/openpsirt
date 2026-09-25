@@ -22,7 +22,7 @@ import { on } from "../ui/when";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { at as choicesAt, type Choice, unwrap } from "../api/queries";
+import { at as choicesAt, type Choice, Refused, unwrap, whichOf } from "../api/queries";
 import { useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/Severity";
@@ -301,17 +301,13 @@ export function Finding() {
         await api.GET(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}",
           {
-            params: {
-              path: at,
-              query: {
-                ...(version ? { version } : {}),
-                ...(ecosystem ? { ecosystem } : {}),
-                ...(namespace ? { namespace } : {}),
-              },
-            },
+            params: { path: at, query: whichOf({ version, ecosystem, namespace }) },
           },
         ),
       ),
+    // A 409 is the answer "say which one", which asking again cannot change,
+    // and retried it holds the choices back behind two more round trips.
+    retry: (count, error) => !(error instanceof Refused && error.status === 409) && count < 2,
   });
 
   const it = finding.data;
@@ -574,6 +570,7 @@ export function Finding() {
             in is the person who put the mark here. */}
         <Marks
           at={at}
+          which={{ version, ecosystem, namespace }}
           tags={it.tags ?? []}
           mayMark={mayTriage}
           onChanged={() => void finding.refetch()}
@@ -1146,12 +1143,13 @@ export function Finding() {
             {settled && (
               <div ref={form}>
                 <Decide
-                  at={{ ...at, version }}
+                  at={{ ...at, version, ecosystem, namespace }}
                   places={places}
                   undisclosed={!!it.undisclosed}
                   assigning={
                     <Assignee
                       at={at}
+                      which={{ version, ecosystem, namespace }}
                       assigned={it.assigned_to ?? ""}
                       undisclosed={!!it.undisclosed}
                       routedBy={it.routed_by ?? ""}
@@ -1239,6 +1237,7 @@ export function Finding() {
         {!undecided && (
           <Assignee
             at={at}
+            which={{ version, ecosystem, namespace }}
             assigned={it.assigned_to ?? ""}
             undisclosed={!!it.undisclosed}
             routedBy={it.routed_by ?? ""}

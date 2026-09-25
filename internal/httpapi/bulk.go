@@ -55,9 +55,10 @@ func registerBulk(api huma.API, in Ingest) {
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`
 		Component string `path:"component"`
-		Contains  string `query:"contains" doc:"Match the text of the report"`
-		Limit     int    `query:"limit" default:"50" minimum:"1" maximum:"500"`
-		Offset    int    `query:"offset" minimum:"0"`
+		ComponentQuery
+		Contains string `query:"contains" doc:"Match the text of the report"`
+		Limit    int    `query:"limit" default:"50" minimum:"1" maximum:"500"`
+		Offset   int    `query:"offset" minimum:"0"`
 	}) (*struct {
 		Body struct {
 			Items []AtComponentBody `json:"items"`
@@ -80,9 +81,10 @@ func registerBulk(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		component, err := graph.NewStore(in.DB.DB).ComponentAt(ctx, target, input.Component)
+		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, target, input.Component,
+			input.choice())
 		if err != nil {
-			return nil, noSuchFinding()
+			return nil, ambiguousOrMissing(err)
 		}
 
 		// One call, which counts both. Two calls run the whole narrowing again
@@ -182,7 +184,8 @@ func registerBulk(api huma.API, in Ingest) {
 		Stream    string `path:"stream"`
 		Variant   string `path:"variant"`
 		Component string `path:"component"`
-		Body      struct {
+		ComponentQuery
+		Body struct {
 			Vulnerabilities []string      `json:"vulnerabilities" minItems:"1" maxItems:"2000" doc:"The issues this claim covers, by name"`
 			SelectedBy      string        `json:"selected_by" minLength:"1" maxLength:"500" doc:"The narrowing, in your own words. Recorded, and never part of the claim"`
 			Contains        string        `json:"contains,omitempty" maxLength:"200" doc:"The text you narrowed the candidate list by, if any. Re-run here rather than believed: what is recorded beside your sentence is how many issues that narrowing reaches against how many you named, so an approver can check the two"`
@@ -207,9 +210,10 @@ func registerBulk(api huma.API, in Ingest) {
 		if err != nil {
 			return nil, err
 		}
-		component, err := graph.NewStore(in.DB.DB).ComponentAt(ctx, target, input.Component)
+		component, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, target, input.Component,
+			input.choice())
 		if err != nil {
-			return nil, noSuchFinding()
+			return nil, ambiguousOrMissing(err)
 		}
 
 		until, err := deferredUntil(string(input.Body.Outcome), input.Body.DeferredUntil)

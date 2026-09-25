@@ -24,7 +24,7 @@ import { Loading } from "../ui/Loading";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { unwrap, whichOf } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Icon } from "../ui/Icons";
@@ -310,6 +310,7 @@ export function Findings() {
                 vulnerability: to.row.vulnerability ?? "",
                 component: to.row.component ?? "",
               },
+              query: whichOf(to.row),
             },
             body: to.team ? { team: to.who } : { person: to.who },
           },

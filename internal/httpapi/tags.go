@@ -27,7 +27,8 @@ func registerTags(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability"`
 		Component     string `path:"component"`
-		Tag           string `path:"tag" maxLength:"191" doc:"The word, matched without regard to capitals"`
+		ComponentQuery
+		Tag string `path:"tag" maxLength:"191" doc:"The word, matched without regard to capitals"`
 	}) (*struct{}, error) {
 		return func(ctx context.Context, input *struct {
 			Product       string `path:"product"`
@@ -35,14 +36,16 @@ func registerTags(api huma.API, in Ingest) {
 			Variant       string `path:"variant"`
 			Vulnerability string `path:"vulnerability"`
 			Component     string `path:"component"`
-			Tag           string `path:"tag" maxLength:"191" doc:"The word, matched without regard to capitals"`
+			ComponentQuery
+			Tag string `path:"tag" maxLength:"191" doc:"The word, matched without regard to capitals"`
 		}) (*struct{}, error) {
 			subject, err := reading(ctx)
 			if err != nil {
 				return nil, err
 			}
 			product, _, issue, component, err := locateFinding(ctx, in, subject,
-				input.Product, input.Stream, input.Variant, input.Vulnerability, input.Component)
+				input.Product, input.Stream, input.Variant, input.Vulnerability, input.Component,
+				input.choice())
 			if err != nil {
 				return nil, err
 			}

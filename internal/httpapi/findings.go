@@ -877,9 +877,7 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component's name, as the findings list gives it"`
-		Version       string `query:"version" doc:"The version, where the build ships that name at more than one"`
-		Ecosystem     string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it"`
-		Namespace     string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice"`
+		ComponentQuery
 	}) (*struct{ Body EvidenceBody }, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -902,46 +900,10 @@ func registerFindingDetail(api huma.API, in Ingest) {
 		// real image ships three vendored versions of one library, and
 		// resolving the name on its own answers about whichever was interned
 		// first — for two of the three rows, an issue it does not carry.
-		component, err := graph.NewStore(in.DB.DB).
-			ComponentAs(ctx, target.ID, input.Component, graph.Choice{
-				Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
-			})
+		component, err := componentCarrying(ctx, in, subject, target.ID, issue,
+			input.Component, input.choice(), ambiguousOrMissing)
 		if err != nil {
-			// Narrowed to the versions this issue is open at before it is
-			// offered. The lookup raises the ambiguity before it knows which
-			// issue is being asked about, so left alone it offers every
-			// version of the name — fifteen, of which three carry the issue,
-			// which is a list where four in five choices lead to "no such
-			// finding".
-			if errors.Is(err, graph.ErrAmbiguous) {
-				carrying, second := finding.NewStore(in.DB.DB).VersionsWithIssue(
-					ctx, subject, target.ID, issue, input.Component)
-				if second != nil {
-					// Logged rather than discarded. Silently falling through
-					// makes a database failure indistinguishable from "the
-					// issue is at none of them", and the caller gets the wide
-					// list with nothing saying why.
-					in.logger().Error("which versions carry this issue could not be read",
-						"component", input.Component, "error", second)
-				}
-				switch {
-				case len(carrying) == 1:
-					// One choice is not a choice. Refusing here would hand
-					// back the single URL we just worked out and make the
-					// caller ask again for it.
-					component, err = graph.NewStore(in.DB.DB).ComponentAs(ctx, target.ID,
-						input.Component, carrying[0])
-					if err != nil {
-						return nil, ambiguousOrMissing(err)
-					}
-				case len(carrying) > 1:
-					return nil, ambiguousAmong(input.Component, carrying)
-				default:
-					return nil, ambiguousOrMissing(err)
-				}
-			} else {
-				return nil, ambiguousOrMissing(err)
-			}
+			return nil, err
 		}
 
 		evidence, err := finding.NewStore(in.DB.DB).Detail(ctx, subject, target.ID, issue, component)

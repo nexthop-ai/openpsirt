@@ -149,8 +149,8 @@ func registerFindingDecision(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability" doc:"The issue, by any name it is known under"`
 		Component     string `path:"component" doc:"The component, as the findings list gives it"`
-		Version       string `query:"version" doc:"The version, where the build ships more than one under that name"`
-		Body          FindingDecisionBody
+		ComponentQuery
+		Body FindingDecisionBody
 	}) (*struct{ Body DecidedBody }, error) {
 		subject, store, err := triaging(ctx, in)
 		if err != nil {
@@ -224,9 +224,14 @@ func registerFindingDecision(api huma.API, in Ingest) {
 			if i > 0 {
 				wanted, remaining = nil, true
 			}
+			// A package's ecosystem and namespace are the same in every build
+			// of a product, so the path's travel to the others with each one's
+			// own version.
 			places, all, target, err := placesToDecide(ctx, in, subject, store, input.Product,
 				build.Stream, build.Variant, input.Vulnerability, input.Component,
-				build.Version, wanted, remaining)
+				graph.Choice{Version: build.Version, Ecosystem: input.Ecosystem,
+					Namespace: input.Namespace},
+				wanted, remaining)
 			if err != nil {
 				if i == 0 {
 					return nil, err
@@ -325,11 +330,11 @@ func registerFindingDecision(api huma.API, in Ingest) {
 // there. The two differ whenever something was left out, and the difference
 // states how much of the finding is still open.
 func placesToDecide(ctx context.Context, in Ingest, subject access.Subject, store *triage.Store,
-	product, stream, variant, vulnerability, component, version string,
+	product, stream, variant, vulnerability, component string, which graph.Choice,
 	wanted []string, remaining bool) ([]finding.Deciding, int, int64, error) {
 
 	target, issue, at, err := findingAbout(ctx, in, subject,
-		product, stream, variant, vulnerability, component, version)
+		product, stream, variant, vulnerability, component, which)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -411,7 +416,8 @@ func aboutBuild(stream, variant string, err error) error {
 // ships three vendored versions of one library, and resolving the name on its
 // own answers about whichever was interned first.
 func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
-	product, stream, variant, vulnerability, component, version string) (int64, int64, int64, error) {
+	product, stream, variant, vulnerability, component string,
+	which graph.Choice) (int64, int64, int64, error) {
 
 	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
@@ -425,9 +431,10 @@ func findingAbout(ctx context.Context, in Ingest, subject access.Subject,
 	if err != nil {
 		return 0, 0, 0, err
 	}
-	at, err := graph.NewStore(in.DB.DB).ComponentVersionAt(ctx, target.ID, component, version)
+	at, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which,
+		ambiguousOrMissing)
 	if err != nil {
-		return 0, 0, 0, ambiguousOrMissing(err)
+		return 0, 0, 0, err
 	}
 	return target.ID, issue, at, nil
 }

@@ -782,6 +782,7 @@ owns that rule.
 
 | Rule | |
 |---|---|
+| The refusal that offers the choices is not asked again | Asking again cannot change which components a build holds, and each retry held the choices back behind another round trip |
 | A link that names a component ambiguously offers the choices rather than refusing | A name and a version together are not unique — a source repository and the package built from it can share both, and so can one package described under two namespaces. Each choice shows its ecosystem and namespace. Two lists are possible and are not interchangeable: the components this issue is open at, and every component of that name. Each says what is true of it |
 | A claim's scope names its locations rather than only counting them | "One location" says how large a judgment was and not which code it was about. Three at most, then how many more, because a kernel sits at sixty and the list would become the card |
 | An approved claim at the same component and consumer is offered to a new issue (REQ-28) | With its reasoning and "apply decision #N", which fills the form and records the new claim as an extension. It still needs a second person |

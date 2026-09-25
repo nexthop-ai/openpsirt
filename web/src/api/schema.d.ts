@@ -17734,7 +17734,14 @@ export interface operations {
     };
     "decide-together": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
             header?: never;
             path: {
                 product: string;
@@ -17773,6 +17780,12 @@ export interface operations {
     "list-issues-at-component": {
         parameters: {
             query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
                 /** @description Match the text of the report */
                 contains?: string;
                 limit?: number;
@@ -17855,7 +17868,14 @@ export interface operations {
     };
     "assign-finding": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
             header?: never;
             path: {
                 product: string;
@@ -17893,8 +17913,12 @@ export interface operations {
     "decide-finding": {
         parameters: {
             query?: {
-                /** @description The version, where the build ships more than one under that name */
+                /** @description The version, where the build ships that name at more than one */
                 version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
             };
             header?: never;
             path: {
@@ -17937,8 +17961,12 @@ export interface operations {
     "get-finding-reach": {
         parameters: {
             query?: {
-                /** @description The version, where the build holds that name at more than one */
+                /** @description The version, where the build ships that name at more than one */
                 version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
             };
             header?: never;
             path: {
@@ -17974,7 +18002,14 @@ export interface operations {
     };
     "tag-finding": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
             header?: never;
             path: {
                 product: string;
@@ -18009,7 +18044,14 @@ export interface operations {
     };
     "untag-finding": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
             header?: never;
             path: {
                 product: string;

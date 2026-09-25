@@ -10,7 +10,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { paths } from "../api/schema";
 import { usePaging } from "./list";
-import { unwrap } from "../api/queries";
+import { unwrap, whichOf } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Crumbs } from "../ui/Crumbs";
@@ -45,6 +45,12 @@ export function Together() {
   const { product = "", stream = "", variant = "", component = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const contains = params.get("contains") ?? "";
+  // Which component the name means, where a build holds it as more than one.
+  const which = whichOf({
+    version: params.get("version") ?? "",
+    ecosystem: params.get("ecosystem") ?? "",
+    namespace: params.get("namespace") ?? "",
+  });
   const { offset, go } = usePaging();
   const [typed, setTyped] = useState(contains);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -55,16 +61,20 @@ export function Together() {
   // four, the same component under two variants shared one draft and each
   // cleared the other's — and what is kept here is the reasoning a second
   // person is asked to agree to.
-  const draftKey = `together:${product}:${stream}:${variant}:${component}`;
+  const kind = Object.values(which).join("/");
+  const draftKey = `together:${product}:${stream}:${variant}:${component}${kind ? `:${kind}` : ""}`;
 
   const issues = useQuery({
-    queryKey: ["at-component", at, contains, offset],
+    queryKey: ["at-component", at, which, contains, offset],
     queryFn: async () =>
       unwrap(
         await api.GET(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/issues",
           {
-            params: { path: at, query: { limit: PAGE, offset, ...(contains ? { contains } : {}) } },
+            params: {
+              path: at,
+              query: { ...which, limit: PAGE, offset, ...(contains ? { contains } : {}) },
+            },
           },
         ),
       ),
@@ -79,7 +89,7 @@ export function Together() {
       unwrap(
         await api.POST(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/components/{component}/decisions",
-          { params: { path: at }, body },
+          { params: { path: at, query: which }, body },
         ),
       ),
     onSuccess: () => {
@@ -141,7 +151,7 @@ export function Together() {
             {
               params: {
                 path: at,
-                query: { limit: 500, offset: from, ...(contains ? { contains } : {}) },
+                query: { ...which, limit: 500, offset: from, ...(contains ? { contains } : {}) },
               },
             },
           ),

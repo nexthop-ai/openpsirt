@@ -4,7 +4,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
-import { unwrap } from "../api/queries";
+import { unwrap, whichOf } from "../api/queries";
 import { Editor, forget, mentioning } from "./Editor";
 import { Failed } from "./Failed";
 import { labeled, reasonOffered, reasonsFor, type Justification } from "./Outcome";
@@ -31,6 +31,10 @@ export type At = {
   vulnerability: string;
   component: string;
   version: string;
+  // The rest of what picks the component, where a build holds its name at
+  // one version as two.
+  ecosystem?: string;
+  namespace?: string;
 };
 
 // The outcomes that may carry advice for a holder, and the ones that must.
@@ -60,11 +64,14 @@ export function mayMitigate(outcome: string, justification: string): boolean {
 // name at more than one version often enough that leaving it out shares a
 // draft between two of them: a justification typed about one version came back
 // pre-filled against the other, which is different code at a different number
-// of places — on the text a second person has to approve.
+// of places — on the text a second person has to approve. The ecosystem and
+// namespace are added only where the address has them, so a draft kept for a
+// component named without them is still found.
 export function draftKeyFor(at: At): string {
+  const kind = at.ecosystem || at.namespace ? `:${at.ecosystem ?? ""}/${at.namespace ?? ""}` : "";
   return (
     `decide:${at.product}:${at.stream}:${at.variant}:` +
-    `${at.vulnerability}:${at.component}:${at.version}`
+    `${at.vulnerability}:${at.component}:${at.version}${kind}`
   );
 }
 
@@ -341,6 +348,8 @@ export function Decide({
       at.vulnerability,
       at.component,
       at.version ?? "",
+      at.ecosystem ?? "",
+      at.namespace ?? "",
     ],
     queryFn: async () =>
       unwrap(
@@ -355,7 +364,7 @@ export function Decide({
                 vulnerability: at.vulnerability,
                 component: at.component,
               },
-              query: at.version ? { version: at.version } : {},
+              query: whichOf(at),
             },
           },
         ),
@@ -462,7 +471,7 @@ export function Decide({
                 vulnerability: at.vulnerability,
                 component: at.component,
               },
-              query: at.version ? { version: at.version } : {},
+              query: whichOf(at),
             },
             body: {
               ...body(),

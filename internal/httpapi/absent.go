@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -110,6 +111,74 @@ const nobody = int64(-1)
 
 func nothingScannedThere() error {
 	return huma.Error404NotFound("nothing has been scanned there")
+}
+
+// ComponentQuery is what picks one component where a name is not enough, on a
+// route that addresses a finding by its component's name.
+type ComponentQuery struct {
+	Version   string `query:"version" doc:"The version, where the build ships that name at more than one"`
+	Ecosystem string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it"`
+	Namespace string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice"`
+}
+
+// choice is the query as the lookup takes it.
+func (q ComponentQuery) choice() graph.Choice {
+	return graph.Choice{Version: q.Version, Ecosystem: q.Ecosystem, Namespace: q.Namespace}
+}
+
+// componentCarrying resolves the component a finding route names, narrowed
+// where the name is ambiguous to the components this issue is open at.
+//
+// The lookup raises the ambiguity before it knows which issue is being asked
+// about, so on its own it offers every component of the name, and a real image
+// ships one library at fifteen versions of which three carry a given issue.
+// Where one carries it, that one is taken: one choice is not a choice. none
+// answers where none does.
+func componentCarrying(ctx context.Context, in Ingest, subject access.Subject,
+	targetID, issue int64, name string, which graph.Choice, none func(error) error) (int64, error) {
+
+	id, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, targetID, name, which)
+	if err == nil {
+		return id, nil
+	}
+	if !errors.Is(err, graph.ErrAmbiguous) {
+		return 0, none(err)
+	}
+	all, second := finding.NewStore(in.DB.DB).VersionsWithIssue(ctx, subject, targetID, issue, name)
+	if second != nil {
+		// Logged rather than discarded. Silently falling through makes a
+		// database failure indistinguishable from "the issue is at none of
+		// them", and the caller gets the wide list with nothing saying why.
+		in.logger().Error("which versions carry this issue could not be read",
+			"component", name, "error", second)
+	}
+	// Only the ones the caller's own narrowing admits: a version named and a
+	// namespace left out is still a version named.
+	var carrying []graph.Choice
+	for _, choice := range all {
+		if admits(which, choice) {
+			carrying = append(carrying, choice)
+		}
+	}
+	switch {
+	case len(carrying) == 1:
+		id, err = graph.NewStore(in.DB.DB).ComponentAs(ctx, targetID, name, carrying[0])
+		if err != nil {
+			return 0, none(err)
+		}
+		return id, nil
+	case len(carrying) > 1:
+		return 0, ambiguousAmong(name, carrying)
+	default:
+		return 0, none(err)
+	}
+}
+
+// admits is whether a choice fits every part a narrowing names.
+func admits(which, choice graph.Choice) bool {
+	return (which.Version == "" || which.Version == choice.Version) &&
+		(which.Ecosystem == "" || strings.EqualFold(which.Ecosystem, choice.Ecosystem)) &&
+		(which.Namespace == "" || strings.EqualFold(which.Namespace, choice.Namespace))
 }
 
 // ambiguousAmong offers the ways a name could be meant, having narrowed them

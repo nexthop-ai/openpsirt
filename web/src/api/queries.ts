@@ -46,6 +46,22 @@ export function notYours(error: unknown): boolean {
 // A choice the server offered, with whatever else it takes to pick one.
 export type Choice = { version: string; ecosystem?: string; namespace?: string };
 
+// whichOf is the query that picks one component where its name is not enough:
+// the version, and the ecosystem and namespace where a build holds one name at
+// one version as two components. Empty parts are left out, and the server reads
+// a part left out as "any".
+export function whichOf(of: { version?: string; ecosystem?: string; namespace?: string }): {
+  version?: string;
+  ecosystem?: string;
+  namespace?: string;
+} {
+  return {
+    ...(of.version ? { version: of.version } : {}),
+    ...(of.ecosystem ? { ecosystem: of.ecosystem } : {}),
+    ...(of.namespace ? { namespace: of.namespace } : {}),
+  };
+}
+
 // at returns the choices the server attached to one location.
 export function at(error: unknown, location: string): Choice[] {
   if (!(error instanceof Refused)) return [];

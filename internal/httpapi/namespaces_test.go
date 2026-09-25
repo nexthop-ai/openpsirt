@@ -104,3 +104,31 @@ func TestAFindingOpenUnderBothNamespacesOffersBoth(t *testing.T) {
 		}
 	})
 }
+
+func TestEveryRouteNamingAFindingsComponentTakesTheNamespace(t *testing.T) {
+	twoReach(t, func(t *testing.T, r *reach) {
+		r.shipsUnderTwoNamespaces(t, seededLib, seededTwin)
+		finding := twoNamespacesAt + "/findings/CVE-2026-9999/components/libnl-3-200"
+		routes := []struct {
+			what, method, path string
+		}{
+			{"the reach", http.MethodGet, finding + "/reach?version=3.7.0"},
+			{"a tag", http.MethodPut, finding + "/tags/waiting-on-vendor?version=3.7.0"},
+			{"the issues at the component", http.MethodGet,
+				twoNamespacesAt + "/components/libnl-3-200/issues?version=3.7.0"},
+		}
+		for _, route := range routes {
+			got := asPerson(t, r, "triager", route.method, route.path, "")
+			if got.Code != http.StatusConflict {
+				t.Errorf("%s with no namespace answered %d, want 409: %s",
+					route.what, got.Code, got.Body.String())
+			}
+			got = asPerson(t, r, "triager", route.method,
+				route.path+"&ecosystem=deb&namespace=sonic", "")
+			if got.Code >= 300 {
+				t.Errorf("%s naming the namespace answered %d: %s",
+					route.what, got.Code, got.Body.String())
+			}
+		}
+	})
+}

@@ -21156,6 +21156,27 @@ paths:
           required: true
           schema:
             type: string
+        - description: The version, where the build ships that name at more than one
+          explode: false
+          in: query
+          name: version
+          schema:
+            description: The version, where the build ships that name at more than one
+            type: string
+        - description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+            type: string
       requestBody:
         content:
           application/json:
@@ -21212,6 +21233,27 @@ paths:
           name: component
           required: true
           schema:
+            type: string
+        - description: The version, where the build ships that name at more than one
+          explode: false
+          in: query
+          name: version
+          schema:
+            description: The version, where the build ships that name at more than one
+            type: string
+        - description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
             type: string
         - description: Match the text of the report
           explode: false
@@ -21377,6 +21419,27 @@ paths:
           required: true
           schema:
             type: string
+        - description: The version, where the build ships that name at more than one
+          explode: false
+          in: query
+          name: version
+          schema:
+            description: The version, where the build ships that name at more than one
+            type: string
+        - description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+            type: string
       requestBody:
         content:
           application/json:
@@ -21450,12 +21513,26 @@ paths:
           schema:
             description: The component, as the findings list gives it
             type: string
-        - description: The version, where the build ships more than one under that name
+        - description: The version, where the build ships that name at more than one
           explode: false
           in: query
           name: version
           schema:
-            description: The version, where the build ships more than one under that name
+            description: The version, where the build ships that name at more than one
+            type: string
+        - description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
             type: string
       requestBody:
         content:
@@ -21521,12 +21598,26 @@ paths:
           required: true
           schema:
             type: string
-        - description: The version, where the build holds that name at more than one
+        - description: The version, where the build ships that name at more than one
           explode: false
           in: query
           name: version
           schema:
-            description: The version, where the build holds that name at more than one
+            description: The version, where the build ships that name at more than one
+            type: string
+        - description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
             type: string
       responses:
         "200":
@@ -21579,6 +21670,27 @@ paths:
           name: component
           required: true
           schema:
+            type: string
+        - description: The version, where the build ships that name at more than one
+          explode: false
+          in: query
+          name: version
+          schema:
+            description: The version, where the build ships that name at more than one
+            type: string
+        - description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
             type: string
         - description: The word, matched without regard to capitals
           in: path
@@ -21644,6 +21756,27 @@ paths:
           name: component
           required: true
           schema:
+            type: string
+        - description: The version, where the build ships that name at more than one
+          explode: false
+          in: query
+          name: version
+          schema:
+            description: The version, where the build ships that name at more than one
+            type: string
+        - description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+          explode: false
+          in: query
+          name: ecosystem
+          schema:
+            description: The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it
+            type: string
+        - description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
+          explode: false
+          in: query
+          name: namespace
+          schema:
+            description: The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice
             type: string
         - description: The word, matched without regard to capitals
           in: path
