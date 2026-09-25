@@ -47,7 +47,7 @@ it: from v0.1.0, read all three.
 | Step | |
 |---|---|
 | Back the database up | On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it |
-| Stop every process of the earlier release | With the Helm chart, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them |
+| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them |
 | Deploy this release | It migrates at startup. With `autoMigrate: false`, run `openpsirt migrate up` first |
 
 Going back is `openpsirt migrate down`, once for each release stepped back, run

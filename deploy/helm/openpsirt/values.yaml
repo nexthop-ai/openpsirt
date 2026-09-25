@@ -11,6 +11,20 @@ replicaCount: 2
 # together if the grace is raised through extraEnv.
 terminationGracePeriodSeconds: 60
 
+# Every pod of the earlier release stops before any pod of this one starts.
+# Below 1.0 an upgrade can drop and reshape tables the earlier release reads
+# and writes, so a replica of it left serving fails on them. It also lets a
+# ReadWriteOnce claim move to a pod on another node, which a rolling update
+# cannot: the new pod waits for a volume the old one still holds.
+#
+# The cost is that nothing answers between the old pods stopping and a new one
+# passing its readiness probe, and an upgrade that fails to start leaves
+# nothing serving. Set {type: RollingUpdate} for a deployment that has to stay
+# up through one, and scale to zero by hand before any upgrade that changes the
+# schema.
+strategy:
+  type: Recreate
+
 # Scratch space for the process, since the root filesystem is read-only. An
 # emptyDir without a limit is node disk that a stray file can fill.
 tmp:

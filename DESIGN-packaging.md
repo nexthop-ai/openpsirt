@@ -190,6 +190,8 @@ the migration from the beginning.
 | Ten background loops run beside the server; two of them may be absent | The mail sender where no channel is configured, and the attachment sweeper where no store is. Every other pass runs whatever a deployment has — a list rather than ten guarded starts, so what runs can be read without opening the package behind each one |
 | Every exit waits for the background work, including a failure to listen | Each pass begins with a timer that fires at once, so returning early leaves them mid-query while the deferred close takes the database away, and an orderly failure to listen becomes failed scans and jobs retried for no reason |
 | Both halves of the shutdown grace answer the same way | One setting bounds them both, so an overrun request exiting 1 and an overrun worker exiting 0 tells a supervisor reading the exit code that half of an unfinished shutdown finished |
+| The chart stops every pod of the earlier release before it starts one of this one | Below 1.0 an upgrade may drop and reshape tables the earlier release reads (REQ-76), so a replica of it left serving fails on them. A ReadWriteOnce claim moves to the new pod too, where a rolling update leaves that pod waiting for a volume the old one holds |
+| A rolling update is the operator's choice | Nothing answers between the old pods stopping and a new one passing readiness, and an upgrade that fails to start leaves nothing serving. A deployment that has to stay up chooses it, and scales to zero by hand before an upgrade that changes the schema |
 
 ## Chart security context
 
