@@ -445,6 +445,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Upgrading">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#every-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.1.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v020" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.2.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -591,6 +630,28 @@
   
     <nav class="md-nav" aria-label="Patch branches">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enabling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replicas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replicas
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#sizing" class="md-nav__link">
@@ -871,6 +932,45 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Upgrading">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#every-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.1.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v020" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.2.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1017,6 +1117,28 @@
   
     <nav class="md-nav" aria-label="Patch branches">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enabling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replicas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replicas
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#sizing" class="md-nav__link">
@@ -1250,7 +1372,7 @@ Everything marked off does nothing until the thing in the last column is set.</p
 <tr>
 <td><a href="#patch-branches">Patch branches</a></td>
 <td>Off</td>
-<td><code>patch.branches</code> under Settings. Set <a href="#outbound-exclusions"><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></a> first</td>
+<td><code>OPENPSIRT_PATCH_BRANCHES</code>, or <code>patchBranches.enabled</code> in the chart. <a href="#enabling">What to set first</a></td>
 </tr>
 <tr>
 <td><a href="#supplier-advisories">Supplier advisories</a></td>
@@ -1288,17 +1410,57 @@ Everything marked off does nothing until the thing in the last column is set.</p
 refuses to start without one. <a href="#sign-in">Sign-in</a> says which.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
 <p>A database built by v0.1.0 or v0.2.0 is upgraded in place, at startup or by
-<code>openpsirt migrate up</code>. One built by v0.1.0 passes through v0.2.0's upgrade on
+<code>openpsirt migrate up</code>. One built by v0.1.0 passes through the v0.2.0 upgrade on
 the way. A database built by any build between releases is recreated.</p>
-<p>Back the database up first. On MySQL and MariaDB an upgrade that fails part way
-leaves the schema half changed, and the backup is what recovers it.</p>
-<p>Stop every process of the earlier release before upgrading. The upgrade from
-v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a v0.1.0 replica
-left serving during a rolling update fails on them. With the Helm chart, scale
-the deployment to zero first.</p>
-<p>Going back is <code>openpsirt migrate down</code>, once for each release stepped back,
-run with this build before the earlier one is deployed. v0.1.0 started against
-an upgraded schema reports it current and cannot read it.</p>
+<p>Read the sections for the release you are coming from, and every section after
+it: from v0.1.0, read all three.</p>
+<h3 id="every-upgrade">Every upgrade<a class="headerlink" href="#every-upgrade" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Back the database up</td>
+<td>On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it</td>
+</tr>
+<tr>
+<td>Stop every process of the earlier release</td>
+<td>With the Helm chart, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them</td>
+</tr>
+<tr>
+<td>Deploy this release</td>
+<td>It migrates at startup. With <code>autoMigrate: false</code>, run <code>openpsirt migrate up</code> first</td>
+</tr>
+</tbody>
+</table>
+<p>Going back is <code>openpsirt migrate down</code>, once for each release stepped back, run
+with this build before the earlier one is deployed. v0.1.0 started against an
+upgraded schema reports it current and cannot read it. Patch branch lookups
+come back off in v0.2.0, which reads its own setting for them: turn them on
+again under its Settings.</p>
+<h3 id="from-v010">From v0.1.0<a class="headerlink" href="#from-v010" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>private-read</code> and <code>private-triage</code> reach undisclosed findings only. In v0.1.0 they reached disclosed findings too</td>
+<td>Grant <code>public-read</code> or <code>public-triage</code> beside them, directly, in a group binding or in a token's holds, wherever somebody should keep the disclosed findings. Nothing is granted on upgrade</td>
+</tr>
+<tr>
+<td>The setting <code>disclosure.extension-threshold</code> is <code>disclosure.movement-threshold</code></td>
+<td>Nothing. The value is carried across by the upgrade</td>
+</tr>
+</tbody>
+</table>
 <table>
 <thead>
 <tr>
@@ -1314,6 +1476,34 @@ an upgraded schema reports it current and cannot read it.</p>
 <tr>
 <td>A reported flaw</td>
 <td>Has a reference, minted as one recorded today would be</td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-v020">From v0.2.0<a class="headerlink" href="#from-v020" title="Permanent link">&para;</a></h3>
+<p>Also read after an upgrade from v0.1.0.</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PATCH_EXCLUDED</code> is <code>OPENPSIRT_OUTBOUND_EXCLUDED</code>, and the chart's <code>patchBranches.excluded</code> is <code>outbound.excluded</code></td>
+<td>Move the list. The old name is refused at startup, and the chart refuses to render with the old key set</td>
+</tr>
+<tr>
+<td>The excluded list also keeps supplier directories out, and a supplier is read from every host its description names</td>
+<td>Set <code>outbound.excluded</code> wherever suppliers are configured</td>
+</tr>
+<tr>
+<td>A threshold stored under its v0.1.0 name, <code>disclosure.extension-threshold</code>, is in force again as <code>disclosure.movement-threshold</code> where that was never set. v0.2.0 read only the new name, so it ran on the default</td>
+<td>Check it under Settings, Disclosure</td>
+</tr>
+<tr>
+<td>Patch branch lookups are turned on in the deployment's configuration. The <code>patch.branches</code> setting is gone</td>
+<td>Set <code>patchBranches.enabled: true</code> in the chart, or <code>OPENPSIRT_PATCH_BRANCHES=true</code>. A deployment that had the setting on has the lookups off until then. <a href="#enabling">What to set first</a></td>
 </tr>
 </tbody>
 </table>
@@ -1347,30 +1537,6 @@ an upgraded schema reports it current and cannot read it.</p>
 </tr>
 </tbody>
 </table>
-<p><code>OPENPSIRT_BASE_URL</code> is checked at startup, and a value with no scheme is now
-refused where it used to be accepted. <code>psirt.example.com</code> has to become
-<code>https://psirt.example.com</code>.</p>
-<p>Accepting it bought nothing: with no scheme there is no host to read, so the
-same-origin check on every state-changing browser request falls back to the
-address the request itself claimed — the guard runs and guards nothing — and
-the address a sign-in provider is sent back to is not absolute, which the
-provider refuses. A deployment reaching this has not been protected by that
-check for as long as the value has been wrong.</p>
-<p>A path below the address is refused for the same reason:
-<code>https://psirt.example.com/psirt</code> makes every link this deployment writes point
-somewhere it does not answer. If this deployment is served under a path, that
-is a thing to raise rather than to configure here.</p>
-<p><code>private-read</code> and <code>private-triage</code> used to include disclosed findings. Each
-now reaches only findings nobody has announced. Grant <code>public-read</code> or
-<code>public-triage</code> beside them — directly, in a group binding, or in a token's
-holds — wherever somebody should keep the disclosed findings. Nothing is
-granted on upgrade, so until then a holder of a private role alone sees no
-disclosed finding they are not assigned.</p>
-<p><code>OPENPSIRT_PATCH_EXCLUDED</code> is now <code>OPENPSIRT_OUTBOUND_EXCLUDED</code>, and the chart's
-<code>patchBranches.excluded</code> is now <code>outbound.excluded</code>. The list keeps supplier
-directories out as well as repositories. A deployment still setting the old
-name is refused at startup, naming the new one, and the chart refuses to render
-with the old key set.</p>
 <h2 id="serving">Serving<a class="headerlink" href="#serving" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -2005,10 +2171,10 @@ alone.</p>
 contain the commit, on the finding it belongs to. A fix backported to five
 branches arrives as five bare commit links, and the label is what says which
 one applies to the branch you ship.</p>
-<p>Off unless an administrator turns it on, under Settings. It fetches a copy of
-each repository a patch link names, from the host the link names, and asks the
-copy which branches hold each commit. Progress, failures and the size of each
-copy are on the System screen and at <code>/v1/patch-branches</code>.</p>
+<p>Off unless the deployment turns it on. It fetches a copy of each repository a
+patch link names, from the host the link names, and asks the copy which
+branches hold each commit. Progress, failures and the size of each copy are on
+the System screen and at <code>/v1/patch-branches</code>.</p>
 <table>
 <thead>
 <tr>
@@ -2018,6 +2184,11 @@ copy are on the System screen and at <code>/v1/patch-branches</code>.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>OPENPSIRT_PATCH_BRANCHES</code></td>
+<td>Whether the lookups run. Read at startup, so changing it takes a restart</td>
+<td><code>false</code></td>
+</tr>
 <tr>
 <td><code>OPENPSIRT_PATCH_DIR</code></td>
 <td>Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume</td>
@@ -2030,8 +2201,69 @@ copy are on the System screen and at <code>/v1/patch-branches</code>.</p>
 </tr>
 </tbody>
 </table>
-<p>A report chooses the host, so set <a href="#outbound-exclusions"><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></a>
-before turning this on.</p>
+<h3 id="enabling">Enabling<a class="headerlink" href="#enabling" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Chart value</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raise the memory limit to 4 GiB</td>
+<td><code>resources.limits.memory</code></td>
+<td>git runs inside the pod's limit beside the server and the scanner</td>
+</tr>
+<tr>
+<td>List your internal domains and networks</td>
+<td><code>outbound.excluded</code></td>
+<td>A report chooses the host. See <a href="#outbound-exclusions">Outbound exclusions</a></td>
+</tr>
+<tr>
+<td>Keep the copies on a volume</td>
+<td><code>patchBranches.existingClaim</code></td>
+<td>Scratch space loses them on every restart</td>
+</tr>
+<tr>
+<td>Turn it on</td>
+<td><code>patchBranches.enabled: true</code></td>
+<td>Sets <code>OPENPSIRT_PATCH_BRANCHES</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="replicas">Replicas<a class="headerlink" href="#replicas" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One replica fetches at a time</td>
+<td>A lease decides which</td>
+</tr>
+<tr>
+<td>Every replica serves the labels</td>
+<td>They are kept in the database</td>
+</tr>
+<tr>
+<td>The copies are one replica's disk</td>
+<td>A ReadWriteMany claim shared by every replica keeps one set. Only the replica holding the lease writes to it</td>
+</tr>
+<tr>
+<td>A ReadWriteOnce claim with several replicas</td>
+<td>The replicas on other nodes stay Pending. The chart cannot refuse this, because it cannot see the access mode of a claim it did not make</td>
+</tr>
+<tr>
+<td>No claim</td>
+<td>Each pod keeps its own scratch copy and fetches again when the lease moves to it</td>
+</tr>
+</tbody>
+</table>
 <p>Only https is used, redirects are not followed, and git runs with no
 configuration, credentials or hooks from the environment.</p>
 <h3 id="sizing">Sizing<a class="headerlink" href="#sizing" title="Permanent link">&para;</a></h3>
@@ -2563,7 +2795,7 @@ so nothing in the failure points at the limit.</p>
 </tr>
 <tr>
 <td>Fetching a repository for <a href="#patch-branches">patch branches</a></td>
-<td>Off unless turned on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org</td>
+<td>Off unless the deployment turns it on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org</td>
 </tr>
 </tbody>
 </table>
