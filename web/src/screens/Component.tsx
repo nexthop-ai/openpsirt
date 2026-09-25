@@ -21,6 +21,7 @@ import { ROLLED } from "../ui/severities";
 import { Severity } from "../ui/Severity";
 import { Shape } from "../ui/Shape";
 import { Wide } from "../ui/Wide";
+import { binaries, findingsAt, openIssues } from "./componentLinks";
 
 // One source package, and the one piece of work it is.
 //
@@ -49,15 +50,6 @@ type Package = Body<"FoldPackageBody">;
 // The versions offered before the rest are a count. A kernel names
 // twenty, and the question is which to take rather than what the whole set is.
 const SHOWN = 5;
-
-// The findings list names binaries, so a source package is every binary of it.
-const findingsAt = (product: string, row: Build, names: string[]) =>
-  `/products/${encodeURIComponent(product)}` +
-  `/streams/${encodeURIComponent(row.stream ?? "")}` +
-  `/variants/${encodeURIComponent(row.variant ?? "")}/findings?` +
-  names.map((name) => `component=${encodeURIComponent(name)}`).join("&");
-
-const binaries = (row: Build) => (row.packages ?? []).map((each) => each.name);
 
 // The binary the graph and the history are about: the one asked for by name,
 // then the one carrying most, so a page opened on a source name lands on the
@@ -163,24 +155,26 @@ export function Component() {
   const link = pkg.package_page_url ?? null;
   // The bands are declared worst first, so the first one present is the worst.
   const worst = ROLLED.find((band) => (here.by_severity ?? {})[band]);
+  const action = openIssues(product, here);
 
   return (
     <>
       <div className="screen-head">
-        <h2 className="id">{here.source}</h2>
+        <div className="titlerow">
+          <h2 className="id">{here.source}</h2>
+          {action && (
+            <Link className="btn" to={action.to}>
+              {action.label}
+            </Link>
+          )}
+        </div>
         <p className="variants">
           <span className="vchip" title="The source package the binaries were built from">
             source
           </span>
           <span className="vchip id">{here.version}</span>
           {here.ecosystem && <span className="vchip">{here.ecosystem}</span>}
-          {(here.issues ?? 0) > 0 ? (
-            <Link className="vchip" to={findingsAt(product, here, binaries(here))}>
-              {(here.issues ?? 0).toLocaleString()} open on it →
-            </Link>
-          ) : (
-            <span className="vchip ok">nothing open on it</span>
-          )}
+          {!action && <span className="vchip ok">nothing open on it</span>}
           {here.exploited && <span className="vchip bad">known exploited</span>}
           {worst && <Severity word={worst} />}
           {here.due_at && <span className="vchip differs">due {on(here.due_at)}</span>}
@@ -505,15 +499,15 @@ function Sits({
               {component} <span className="hint">{pkg.version}</span>
             </span>
             <span className="sub">
-              {(pkg.issues ?? 0).toLocaleString()} open on it, under{" "}
-              {(pkg.consumers ?? 0).toLocaleString()}{" "}
+              {(pkg.issues ?? 0) > 0 ? (
+                <Link to={findingsAt(product, here, [component])}>
+                  {(pkg.issues ?? 0).toLocaleString()} open
+                </Link>
+              ) : (
+                "0 open"
+              )}{" "}
+              on it, under {(pkg.consumers ?? 0).toLocaleString()}{" "}
               {pkg.consumers === 1 ? "consumer" : "consumers"}
-              {(pkg.issues ?? 0) > 0 && (
-                <>
-                  {" · "}
-                  <Link to={findingsAt(product, here, [component])}>Read them →</Link>
-                </>
-              )}
             </span>
             {(here.packages ?? []).length === 1 && <Shape by={here.by_severity} />}
           </li>
@@ -758,7 +752,7 @@ function Upgrade({
             Decide them together
           </Link>{" "}
           <Link className="btn quiet" to={findingsAt(product, here, binaries(here))}>
-            Read them
+            Open issues
           </Link>
         </p>
       </div>
