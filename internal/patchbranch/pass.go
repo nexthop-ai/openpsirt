@@ -280,7 +280,7 @@ func (c *candidate) before(other *candidate) bool {
 var errStopped = errors.New("stopped")
 
 // ourFault is a failure of this deployment rather than of the repository: the
-// database, the lease, the setting. A visit that meets one leaves the
+// database or the lease. A visit that meets one leaves the
 // repository as it was, because blaming the repository for a dropped
 // connection puts it out of reach for a day and says the wrong thing on the
 // screen.
@@ -289,8 +289,7 @@ type ourFault struct{ err error }
 func (f ourFault) Error() string { return f.err.Error() }
 func (f ourFault) Unwrap() error { return f.err }
 
-// renewTick is how often a visit asks for the lease again and reads the
-// switch. Throughout the visit, the fetch and the index write included: a
+// renewTick is how often a visit asks for the lease again. Throughout the visit, the fetch and the index write included: a
 // first fetch of the kernel from kernel.org takes a quarter of an hour, and
 // the lease is half an hour.
 const renewTick = time.Minute
