@@ -101,8 +101,8 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, options Options) *
 // Each wake visits repositories one after another for as long as one has
 // commits due, and sleeps only once none has. A visit to a small repository
 // takes about a second, so a wait between visits leaves the pass asleep almost
-// all the time: on the demonstration images, 48 copies already on disk were
-// visited five minutes apart, four hours before the kernel's turn.
+// all the time: on the demonstration images, a five-minute wait puts the 48
+// copies already on disk four hours ahead of the kernel.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
 		if !p.on {

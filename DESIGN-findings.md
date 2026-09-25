@@ -345,7 +345,7 @@ as each finishes, and sleeps once none has a commit due.
 
 | Pace | Reason |
 |---|---|
-| Visits follow each other with no wait while work is due | A visit to a small repository takes about a second. On the demonstration images, one visit per five-minute wake put 48 repositories already on disk ahead of the kernel's stable tree, which holds 35,990 of the 36,463 linked commits: four hours before its turn |
+| Visits follow each other with no wait while work is due | A visit to a small repository takes about a second. A five-minute wait between visits puts the 48 copies held on the demonstration images four hours ahead of the kernel's stable tree, which holds 35,990 of the 36,463 linked commits |
 | The wake ends on nothing due, a lost lease, a failure of this deployment, or shutdown | A repository that could not be read is left for a day and the next one is chosen |
 | The same repository chosen twice running ends the wake | A visit looks up what was due or puts the repository out for a day, so choosing it again means the visit changed nothing |
 

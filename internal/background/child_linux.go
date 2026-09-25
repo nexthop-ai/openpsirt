@@ -32,6 +32,13 @@ func start(cmd *exec.Cmd) error {
 	go func() {
 		runtime.LockOSThread()
 		tid := syscall.Gettid()
+		if tid == syscall.Getpid() {
+			// A locked goroutine that exits on the main thread parks it for good,
+			// at whatever priority it was left. Another thread does the fork.
+			defer runtime.UnlockOSThread()
+			started <- start(cmd)
+			return
+		}
 		// The kernel's value is 20 minus the niceness. A thread already at or
 		// past the target is left where it is: setting it would be raising it.
 		current, err := syscall.Getpriority(syscall.PRIO_PROCESS, tid)

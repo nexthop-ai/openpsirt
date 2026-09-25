@@ -1547,7 +1547,7 @@
   gap: 6px;
 }
 .patchnow h4,
-.panel h4 {
+.patches h4 {
   margin: 0;
   font-size: var(--step--1);
   font-weight: 600;

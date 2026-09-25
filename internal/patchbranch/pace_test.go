@@ -13,9 +13,9 @@ import (
 )
 
 func TestAWakeVisitsEveryRepositoryDueBeforeItSleeps(t *testing.T) {
-	// A small visit takes about a second, so a wait between visits is what
-	// kept the pass asleep: one repository per wake put the kernel hours
-	// behind copies that took a second each.
+	// A small visit takes about a second, so a wait between visits leaves the
+	// pass asleep: one repository per wake puts the kernel hours behind copies
+	// that take a second each.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		empty(t, db)
 		ctx := t.Context()

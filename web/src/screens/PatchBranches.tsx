@@ -67,12 +67,12 @@ export function PatchBranches() {
   const next = rows.filter(
     (row) => row.state === "waiting" || (row.position && row.state !== "working"),
   );
-  const failed = rows.filter((row) => row.state === "failed");
+  const failed = rows.filter((row) => row.state === "failed" && !row.position);
   const excluded = rows.filter((row) => row.state === "excluded");
-  const done = rows.filter((row) => row.state === "done");
+  const done = rows.filter((row) => row.state === "done" && !row.position);
 
   return (
-    <section className="panel">
+    <section className="panel patches">
       <h3>Patch branches</h3>
       <p className="hint" style={{ marginTop: 0 }}>
         {it.on ? "On" : "Off, in the deployment's configuration"} · {it.looked.toLocaleString()} of{" "}
