@@ -339,8 +339,15 @@ records which replica holds which.
 ### The pass
 
 One replica works, settled by a lease taken again as a visit runs: a first visit
-to a large tree takes hours. Each cycle records any commit a patch link names
-that has no row, chooses one repository, and visits it.
+to a large tree takes hours. Each wake records any commit a patch link names
+that has no row, then visits repositories one after another, the next chosen
+as each finishes, and sleeps once none has a commit due.
+
+| Pace | Reason |
+|---|---|
+| Visits follow each other with no wait while work is due | A visit to a small repository takes about a second. On the demonstration images, one visit per five-minute wake put 48 repositories already on disk ahead of the kernel's stable tree, which holds 35,990 of the 36,463 linked commits: four hours before its turn |
+| The wake ends on nothing due, a lost lease, a failure of this deployment, or shutdown | A repository that could not be read is left for a day and the next one is chosen |
+| The same repository chosen twice running ends the wake | A visit looks up what was due or puts the repository out for a day, so choosing it again means the visit changed nothing |
 
 | Order | Reason |
 |---|---|
@@ -427,9 +434,23 @@ nothing for it. Branches are listed in version order: `linux-6.6.y` before
 `linux-6.12.y`.
 
 The System screen reports the whole of the work: patch links, the commits they
-name, how many are looked up and held, and per repository its state, its
-progress, its last finished visit and the size of its copy. Administrators
-only, like the rest of that screen.
+name, how many are looked up and held. Administrators only, like the rest of
+that screen. Repositories are listed in working order.
+
+| Part | What it holds |
+|---|---|
+| The visit under way | The repository, its step, and the commits looked up since the visit began against those still due |
+| What comes next | Each repository with a commit due, numbered in the order the pass takes it, with how many are due and the worst rating behind them |
+| Failed | What stopped the last visit and when it is tried again, a day after it began |
+| Excluded | The hosts nothing is fetched from |
+| Done | When each finished and the size of its copy |
+
+| Rule | Reason |
+|---|---|
+| The order is the pass's own, from the one plan | A report sorted another way describes work nobody is doing |
+| A copy counts as held where the last visit recorded a size | Any replica answers the report, and only the one working can see its disk. After the lease moves, the two can disagree until the next visit |
+| A commit linked since the last wake is counted as never looked up | The report writes nothing, and the pass records it first thing on its next wake |
+| The step is read from the commits: fetching until the first commit of the visit is looked up, then looking up | Each commit is recorded as it is looked up, so the count moves during a long visit with nothing else stored. Fetching covers the index write |
 
 ## Match methods
 

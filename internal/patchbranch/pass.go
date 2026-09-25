@@ -97,6 +97,12 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, options Options) *
 }
 
 // Run looks for work until the context ends.
+//
+// Each wake visits repositories one after another for as long as one has
+// commits due, and sleeps only once none has. A visit to a small repository
+// takes about a second, so a wait between visits leaves the pass asleep almost
+// all the time: on the demonstration images, 48 copies already on disk were
+// visited five minutes apart, four hours before the kernel's turn.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
 		if !p.on {
@@ -106,13 +112,30 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 		if p.interval <= 0 {
 			p.interval = betweenCycles
 		}
+		p.cycle(ctx)
+	})
+}
+
+// cycle visits repositories while this replica holds the lease and one has
+// commits due, and answers how many it visited.
+//
+// It stops once nothing is due, on a failure of this deployment, on a lost
+// lease and at shutdown. A repository that could not be read does not stop it:
+// that one is left for a day, and the next is chosen.
+//
+// The same repository chosen twice running also stops it. A visit either looks
+// up what was due or leaves the repository out for a day, so a second choice of
+// it means the visit changed nothing, and going round again would spin.
+func (p *Pass) cycle(ctx context.Context) int {
+	visits, last := 0, ""
+	for ctx.Err() == nil {
 		mine, err := p.holding(ctx)
 		if err != nil {
 			p.logger.Error("deciding which replica looks up patch branches", "error", err)
-			return
+			return visits
 		}
 		if !mine {
-			return
+			return visits
 		}
 		visited, err := p.Once(ctx)
 		if ctx.Err() != nil && p.leases != nil {
@@ -124,16 +147,25 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 			if err := p.leases.Release(releasing, Lease, p.replica); err != nil {
 				p.logger.Warn("handing back the lease on looking up patch branches", "error", err)
 			}
-			return
+			return visits
 		}
 		if err != nil {
 			p.logger.Error("looking up the branches patches are on", "error", err)
-			return
+			return visits
 		}
-		if visited != "" {
-			p.logger.Info("looked up the branches patches are on", "repository", visited)
+		if visited == "" {
+			return visits
 		}
-	})
+		visits++
+		p.logger.Info("looked up the branches patches are on", "repository", visited)
+		if visited == last {
+			p.logger.Warn("a visit left the same repository due, so the pass waits for the next wake",
+				"repository", visited)
+			return visits
+		}
+		last = visited
+	}
+	return visits
 }
 
 // holding reports whether this replica is the one doing the work.
@@ -188,21 +220,48 @@ type candidate struct {
 	held  bool
 }
 
-// choose picks the repository to visit.
-//
-// A repository whose copy is already on this disk goes first when it has
-// commits never looked up: the fetch that brings it up to date is small, and
-// looking up everything due in it costs little once it is there. After that,
-// the repository holding the most urgent commit never looked up, then the
-// most urgent one due again. A repository an administrator excluded is never
-// chosen, and one that failed is left for a day.
+// choose picks the repository to visit: the first in the order plan puts
+// them in, counting a copy as held when it is on this disk.
 func (p *Pass) choose(ctx context.Context, commits map[Commit]urgency, now time.Time) (*candidate, error) {
+	ordered, err := plan(ctx, p.db, commits, p.excluded, now, func(repository repositoryRow) bool {
+		return p.copies.has(repository.URL)
+	})
+	if err != nil {
+		return nil, err
+	}
+	// A repository with no row is one the report counts before the pass has
+	// recorded it. The pass records every one before it plans, so this skips
+	// nothing it could visit.
+	for _, one := range ordered {
+		if one.repository.ID != 0 {
+			return one, nil
+		}
+	}
+	return nil, nil
+}
+
+// plan is every repository with commits due a look, in the order the pass
+// takes them.
+//
+// A repository whose copy is held goes first when it has commits never looked
+// up: the fetch that brings it up to date is small, and looking up everything
+// due in it costs little once it is there. After that, the repository holding
+// the most urgent commit never looked up, then the most urgent one due again. A
+// repository an administrator excluded is never planned, and one that failed
+// is left for a day.
+//
+// held says whether a repository's copy is on the disk that counts. The pass
+// asks its own disk; the progress report, answered by any replica, reads the
+// size the last visit recorded.
+func plan(ctx context.Context, db bun.IDB, commits map[Commit]urgency, excluded outward.Excluded,
+	now time.Time, held func(repositoryRow) bool) ([]*candidate, error) {
+
 	var repositories []repositoryRow
-	if err := p.db.NewSelect().Model(&repositories).Scan(ctx); err != nil {
+	if err := db.NewSelect().Model(&repositories).Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the repositories patch links point into: %w", err)
 	}
 	var due []commitRow
-	if err := p.db.NewSelect().Model(&due).
+	if err := db.NewSelect().Model(&due).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.WhereOr(`"looked_at" IS NULL`).
 				WhereOr(`"looked_at" < ?`, now.Add(-LookAgainAfter).UTC())
@@ -212,14 +271,10 @@ func (p *Pass) choose(ctx context.Context, commits map[Commit]urgency, now time.
 	}
 	byID := map[int64]*candidate{}
 	for _, repository := range repositories {
-		if p.excluded.Host(repository.Host) {
+		if excluded.Host(repository.Host) || waitingOut(repository, now) {
 			continue
 		}
-		if repository.Failed != nil && *repository.Failed != "" && repository.FetchedAt != nil &&
-			repository.FetchedAt.After(now.Add(-RetryAfter)) {
-			continue
-		}
-		byID[repository.ID] = &candidate{repository: repository, held: p.copies.has(repository.URL)}
+		byID[repository.ID] = &candidate{repository: repository, held: held(repository)}
 	}
 	for _, row := range due {
 		one := byID[row.RepositoryID]
@@ -242,19 +297,94 @@ func (p *Pass) choose(ctx context.Context, commits map[Commit]urgency, now time.
 			one.stale = how
 		}
 	}
-	var best *candidate
-	for _, one := range byID {
-		if len(one.due) == 0 {
-			continue
+	unrecorded, err := notYetRecorded(ctx, db, commits, repositories, excluded)
+	if err != nil {
+		return nil, err
+	}
+	recorded := map[string]int64{}
+	for _, repository := range repositories {
+		recorded[repository.URL] = repository.ID
+	}
+	unseen := map[string]*candidate{}
+	for _, commit := range unrecorded {
+		one := unseen[commit.Repository]
+		if one == nil {
+			if id, ok := recorded[commit.Repository]; ok {
+				one = byID[id]
+				if one == nil {
+					continue // excluded, or out for a day
+				}
+			} else {
+				one = &candidate{repository: repositoryRow{URL: commit.Repository, Host: commit.Host()}}
+			}
+			unseen[commit.Repository] = one
 		}
-		if best == nil || one.before(best) {
-			best = one
+		how := commits[commit]
+		one.due = append(one.due, commitRow{Hash: commit.Hash})
+		one.never++
+		if how.above(one.worst) || one.never == 1 {
+			one.worst = how
 		}
 	}
-	return best, nil
+	out := make([]*candidate, 0, len(byID)+len(unseen))
+	for _, one := range byID {
+		if len(one.due) > 0 {
+			out = append(out, one)
+		}
+	}
+	for _, one := range unseen {
+		if one.repository.ID == 0 {
+			out = append(out, one)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].before(out[j]) })
+	return out, nil
 }
 
-// before orders two candidates as choose describes.
+// notYetRecorded is the linked commits with no row, in a repository not on an
+// excluded host.
+//
+// The pass records a row for every one before it plans, so for the pass this
+// is empty. The progress report reads without writing, and a link that
+// arrived since the last wake is still work the pass will do.
+func notYetRecorded(ctx context.Context, db bun.IDB, commits map[Commit]urgency,
+	repositories []repositoryRow, excluded outward.Excluded) ([]Commit, error) {
+
+	var rows []commitRow
+	if err := db.NewSelect().Model(&rows).Column("repository_id", "commit_hash").Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the commits already recorded: %w", err)
+	}
+	urlOf := map[int64]string{}
+	for _, repository := range repositories {
+		urlOf[repository.ID] = repository.URL
+	}
+	seen := map[Commit]bool{}
+	for _, row := range rows {
+		seen[Commit{Repository: urlOf[row.RepositoryID], Hash: row.Hash}] = true
+	}
+	var out []Commit
+	for commit := range commits {
+		if !seen[commit] && !excluded.Host(commit.Host()) {
+			out = append(out, commit)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Repository != out[j].Repository {
+			return out[i].Repository < out[j].Repository
+		}
+		return out[i].Hash < out[j].Hash
+	})
+	return out, nil
+}
+
+// waitingOut reports whether a repository's last visit failed less than a day
+// ago, which leaves it out of the plan until the day has passed.
+func waitingOut(repository repositoryRow, now time.Time) bool {
+	return repository.Failed != nil && *repository.Failed != "" && repository.FetchedAt != nil &&
+		repository.FetchedAt.After(now.Add(-RetryAfter))
+}
+
+// before orders two candidates as plan describes.
 func (c *candidate) before(other *candidate) bool {
 	here, there := c.held && c.never > 0, other.held && other.never > 0
 	if here != there {
@@ -272,7 +402,10 @@ func (c *candidate) before(other *candidate) bool {
 	if len(c.due) != len(other.due) {
 		return len(c.due) > len(other.due)
 	}
-	return c.repository.ID < other.repository.ID
+	if c.repository.ID != other.repository.ID {
+		return c.repository.ID < other.repository.ID
+	}
+	return c.repository.URL < other.repository.URL
 }
 
 // errStopped is a visit that stopped because the lease was lost. Not a

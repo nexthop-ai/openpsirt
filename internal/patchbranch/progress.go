@@ -11,6 +11,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
 
@@ -33,19 +34,44 @@ const (
 	Refused State = "excluded"
 )
 
+// Step is what a visit under way is doing.
+type Step string
+
+const (
+	// Fetching is a visit bringing the copy up to date and writing its
+	// index, before the first commit is looked up.
+	Fetching Step = "fetching"
+	// LookingUp is a visit asking the copy about the commits due.
+	LookingUp Step = "looking-up"
+)
+
 // RepositoryProgress is how far one repository's commits have been looked up.
 type RepositoryProgress struct {
 	URL   string
 	Host  string
 	State State
+	// Position is where the repository stands in the order the pass takes
+	// repositories with commits due, from one. Zero is a repository with
+	// nothing due, or one the pass is not taking.
+	Position int
+	// Step is what a visit under way is doing, and VisitLooked how many
+	// commits it has looked up so far. Both are empty outside a visit.
+	Step        Step
+	VisitLooked int
+	// Due is how many commits are due a look now, and Worst the severity of
+	// the most urgent of them.
+	Due   int
+	Worst string
 	// Commits is how many commits patch links name in it, Looked how many
 	// of those have been looked up, and Found how many of those its copy held.
 	Commits int
 	Looked  int
 	Found   int
-	// FetchedAt is when a visit last began, ReachedAt when one last finished.
+	// FetchedAt is when a visit last began, ReachedAt when one last finished,
+	// and RetryAt when a failed repository is next taken.
 	FetchedAt *time.Time
 	ReachedAt *time.Time
+	RetryAt   *time.Time
 	Reason    string
 	// HeldBytes is the size of the copy when the last visit finished.
 	HeldBytes *int64
@@ -64,8 +90,15 @@ type Totals struct {
 	HeldBytes int64
 }
 
-// Progress answers where every repository stands, most work left first.
+// Progress answers where every repository stands, in working order: the visit
+// under way, then the repositories with commits due in the order the pass takes
+// them, then those that failed, those on an excluded host, and those done.
+//
+// The order is the pass's own, from the same plan. A copy counts as held where
+// the last visit recorded a size for it, because the report is answered by any
+// replica and only the one working can see its disk.
 func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]RepositoryProgress, Totals, error) {
+	now := time.Now()
 	commits, links, err := linked(ctx, db)
 	if err != nil {
 		return nil, Totals{}, err
@@ -117,31 +150,111 @@ func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]Rep
 		one.Commits++
 		totals.Commits++
 		row, ok := recorded[key{idOf[commit.Repository], commit.Hash}]
-		if ok && row.LookedAt != nil {
-			one.Looked++
-			totals.Looked++
-			if row.Found {
-				one.Found++
-				totals.Found++
-			}
+		if !ok || row.LookedAt == nil {
+			continue
+		}
+		one.Looked++
+		totals.Looked++
+		if row.Found {
+			one.Found++
+			totals.Found++
+		}
+		if one.FetchedAt != nil && !row.LookedAt.Before(*one.FetchedAt) {
+			one.VisitLooked++
 		}
 	}
+
+	ordered, err := plan(ctx, db, commits, excluded, now, func(repository repositoryRow) bool {
+		return repository.HeldBytes != nil
+	})
+	if err != nil {
+		return nil, Totals{}, err
+	}
+	for i, each := range ordered {
+		one := byURL[each.repository.URL]
+		if one == nil {
+			continue
+		}
+		one.Position = i + 1
+		one.Due = len(each.due)
+		worst := each.worst
+		if each.never == 0 {
+			worst = each.stale
+		}
+		one.Worst = severityOf(worst)
+	}
+
 	out := make([]RepositoryProgress, 0, len(byURL))
 	for _, one := range byURL {
 		if one.Commits == 0 {
 			continue
 		}
 		one.State = stateOf(*one, excluded)
+		switch one.State {
+		case Working:
+			one.Step = Fetching
+			if one.VisitLooked > 0 {
+				one.Step = LookingUp
+			}
+		case Failed:
+			if one.FetchedAt != nil {
+				retry := one.FetchedAt.Add(RetryAfter).UTC()
+				one.RetryAt = &retry
+			}
+		}
+		if one.State != Working {
+			one.VisitLooked = 0
+		}
 		out = append(out, *one)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		left, right := out[i].Commits-out[i].Looked, out[j].Commits-out[j].Looked
-		if left != right {
-			return left > right
-		}
-		return out[i].URL < out[j].URL
-	})
+	sort.SliceStable(out, func(i, j int) bool { return workingBefore(out[i], out[j]) })
 	return out, totals, nil
+}
+
+// workingBefore orders the report: the visit under way, then the plan, then
+// what the plan does not hold, each group in the order most useful to read.
+func workingBefore(a, b RepositoryProgress) bool {
+	if ga, gb := group(a), group(b); ga != gb {
+		return ga < gb
+	}
+	switch {
+	case a.Position != b.Position:
+		return a.Position < b.Position
+	case a.State == Done && b.State == Done && a.ReachedAt != nil && b.ReachedAt != nil &&
+		!a.ReachedAt.Equal(*b.ReachedAt):
+		return a.ReachedAt.After(*b.ReachedAt)
+	case a.Commits-a.Looked != b.Commits-b.Looked:
+		return a.Commits-a.Looked > b.Commits-b.Looked
+	}
+	return a.URL < b.URL
+}
+
+// group is which part of the report a repository is listed in.
+func group(one RepositoryProgress) int {
+	switch {
+	case one.State == Working:
+		return 0
+	case one.Position > 0:
+		return 1
+	case one.State == Waiting:
+		return 2
+	case one.State == Failed:
+		return 3
+	case one.State == Refused:
+		return 4
+	default:
+		return 5
+	}
+}
+
+// severityOf is the severity word an urgency was ranked from, or nothing for
+// an issue nobody rated.
+func severityOf(how urgency) string {
+	bands := finding.Bands()
+	if how.rank < 1 || how.rank > len(bands) {
+		return ""
+	}
+	return bands[len(bands)-how.rank]
 }
 
 // stateOf reads where a repository stands from what its row records.

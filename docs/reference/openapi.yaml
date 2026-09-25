@@ -6654,7 +6654,7 @@ components:
           description: Whether the deployment turned the lookups on. Set in its configuration, not under Settings
           type: boolean
         repositories:
-          description: The repositories those commits are in, most commits still to look up first
+          description: "The repositories those commits are in, in working order: the visit under way, then those with commits due in the order they are visited, then failed, excluded and done"
           items:
             $ref: "#/components/schemas/PatchRepositoryBody"
           type:
@@ -6681,6 +6681,10 @@ components:
           description: How many commits patch links name in this repository
           format: int64
           type: integer
+        due:
+          description: How many commits are due a look now, never looked up or looked up more than a week ago
+          format: int64
+          type: integer
         fetched_at:
           description: When a visit last began
           type: string
@@ -6698,11 +6702,18 @@ components:
           description: How many of those have been looked up
           format: int64
           type: integer
+        position:
+          description: Where the repository stands in the order repositories with commits due are visited, from 1. Absent when nothing is due or the repository is not being visited
+          format: int64
+          type: integer
         reached_at:
           description: When a visit last finished
           type: string
         reason:
           description: What stopped the last visit
+          type: string
+        retry_at:
+          description: When a failed repository is next visited
           type: string
         state:
           description: "'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_OUTBOUND_EXCLUDED lists, and is never fetched"
@@ -6713,8 +6724,21 @@ components:
             - done
             - excluded
           type: string
+        step:
+          description: "What the visit under way is doing: 'fetching' brings the copy up to date and indexes it, 'looking-up' asks it about each commit due. Only on a 'working' repository"
+          enum:
+            - fetching
+            - looking-up
+          type: string
         url:
           description: The address the repository is fetched from
+          type: string
+        visit_looked:
+          description: How many commits the visit under way has looked up so far
+          format: int64
+          type: integer
+        worst:
+          description: The severity of the most urgent issue linking to a commit due, where the issue is rated
           type: string
       required:
         - url
@@ -14913,6 +14937,8 @@ paths:
         The repositories patch links point into, and how many of the commits each link names have been looked up in a copy of the repository.
 
         A link that names no commit in a recognized repository — a pull request, a mailing-list post, a patch tracker — is counted in `links` and nowhere else.
+
+        Repositories come in working order, with `position` on each one due. The one a visit is under way on comes first, with its `step` and `visit_looked`.
 
         Requires: administrator
       operationId: list-patch-branch-progress

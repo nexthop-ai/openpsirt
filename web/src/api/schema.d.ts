@@ -1731,6 +1731,8 @@ export interface paths {
          *
          *     A link that names no commit in a recognized repository — a pull request, a mailing-list post, a patch tracker — is counted in `links` and nowhere else.
          *
+         *     Repositories come in working order, with `position` on each one due. The one a visit is under way on comes first, with its `step` and `visit_looked`.
+         *
          *     Requires: administrator
          */
         get: operations["list-patch-branch-progress"];
@@ -9357,7 +9359,7 @@ export interface components {
             looked: number;
             /** @description Whether the deployment turned the lookups on. Set in its configuration, not under Settings */
             on: boolean;
-            /** @description The repositories those commits are in, most commits still to look up first */
+            /** @description The repositories those commits are in, in working order: the visit under way, then those with commits due in the order they are visited, then failed, excluded and done */
             repositories: components["schemas"]["PatchRepositoryBody"][] | null;
             /**
              * Format: int64
@@ -9371,6 +9373,11 @@ export interface components {
              * @description How many commits patch links name in this repository
              */
             commits: number;
+            /**
+             * Format: int64
+             * @description How many commits are due a look now, never looked up or looked up more than a week ago
+             */
+            due?: number;
             /** @description When a visit last began */
             fetched_at?: string;
             /**
@@ -9389,17 +9396,36 @@ export interface components {
              * @description How many of those have been looked up
              */
             looked: number;
+            /**
+             * Format: int64
+             * @description Where the repository stands in the order repositories with commits due are visited, from 1. Absent when nothing is due or the repository is not being visited
+             */
+            position?: number;
             /** @description When a visit last finished */
             reached_at?: string;
             /** @description What stopped the last visit */
             reason?: string;
+            /** @description When a failed repository is next visited */
+            retry_at?: string;
             /**
              * @description 'waiting' has commits not yet looked up and no visit under way. 'working' is a visit under way. 'failed' is a last visit that stopped on an error, retried a day after it began. 'done' is every commit looked up. 'excluded' is on a host OPENPSIRT_OUTBOUND_EXCLUDED lists, and is never fetched
              * @enum {string}
              */
             state: "waiting" | "working" | "failed" | "done" | "excluded";
+            /**
+             * @description What the visit under way is doing: 'fetching' brings the copy up to date and indexes it, 'looking-up' asks it about each commit due. Only on a 'working' repository
+             * @enum {string}
+             */
+            step?: "fetching" | "looking-up";
             /** @description The address the repository is fetched from */
             url: string;
+            /**
+             * Format: int64
+             * @description How many commits the visit under way has looked up so far
+             */
+            visit_looked?: number;
+            /** @description The severity of the most urgent issue linking to a commit due, where the issue is rated */
+            worst?: string;
         };
         PendingMovementBody: {
             /**
