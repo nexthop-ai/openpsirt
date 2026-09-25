@@ -1,0 +1,2898 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Track vulnerabilities in the products you ship.">
+      
+      
+      
+      
+        <link rel="prev" href="../pipeline/">
+      
+      
+        <link rel="next" href="../reference/api/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/openpsirt-mark.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Configuration - OpenPSIRT</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/brand.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#configuration" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="OpenPSIRT" class="md-header__button md-logo" aria-label="OpenPSIRT" data-md-component="logo">
+      
+  <img src="../assets/openpsirt-mark.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenPSIRT
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Configuration
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="white" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/nexthop-ai/openpsirt" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="OpenPSIRT" class="md-nav__button md-logo" aria-label="OpenPSIRT" data-md-component="logo">
+      
+  <img src="../assets/openpsirt-mark.svg" alt="logo">
+
+    </a>
+    OpenPSIRT
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/nexthop-ai/openpsirt" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../built/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Current state
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../trying/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrading">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#every-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.1.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v020" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.2.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#serving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serving
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-connection-encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database connection encryption
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scanning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scanning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-air-gapped-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An air-gapped install
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mail
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advisory-publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advisory publication
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-published-advisory-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The published advisory directory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supplier-advisories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supplier advisories
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upstream-currency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upstream currency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outbound-exclusions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outbound exclusions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patch-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch branches
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Patch branches">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enabling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replicas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replicas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sizing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sign-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign-in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sign-in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-openid-connect-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An OpenID Connect provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-username-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The username claim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sign-in-without-a-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign-in without a provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-trusted-header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The trusted header
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#attachment-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attachment storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-work-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The work queue
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scan-file-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scan file limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scanner-output-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scanner output limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-and-the-scanners-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory and the scanner's database
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory and the scanner&#39;s database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-exhausted-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An exhausted limit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/privileges/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileges
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Features
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upgrading" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upgrading
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Upgrading">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#every-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v010" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.1.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v020" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.2.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#serving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serving
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-connection-encryption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database connection encryption
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scanning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scanning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scanning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-air-gapped-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An air-gapped install
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mail
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#advisory-publication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advisory publication
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-published-advisory-directory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The published advisory directory
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supplier-advisories" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supplier advisories
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upstream-currency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Upstream currency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outbound-exclusions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Outbound exclusions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#patch-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Patch branches
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Patch branches">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#enabling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enabling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replicas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replicas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sizing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sign-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign-in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sign-in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#an-openid-connect-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An OpenID Connect provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-username-claim" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The username claim
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sign-in-without-a-provider" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sign-in without a provider
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#github" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GitHub
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-trusted-header" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The trusted header
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#attachment-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Attachment storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-work-queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The work queue
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scan-file-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scan file limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scanner-output-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scanner output limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#memory-and-the-scanners-database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Memory and the scanner's database
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Memory and the scanner&#39;s database">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#database-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-exhausted-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An exhausted limit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h1>
+<p>Every setting comes from the environment, and every name starts with
+<code>OPENPSIRT_</code>. Each one has a working default, so the process starts with
+nothing set but a database — and a value that is set and cannot be read stops
+the process with the variable named, rather than falling back to the default.
+A switch spelled wrongly that silently reads as its opposite is worse than a
+refusal to start.</p>
+<p>A switch takes <code>true</code> or <code>false</code> (also <code>1</code>, <code>0</code>, <code>t</code>, <code>f</code>, in any case). A
+duration is written as Go reads it: <code>30s</code>, <code>5m</code>, <code>12h</code>. A number is a positive
+whole number; zero reads as unset everywhere, so it is refused rather than
+taken.</p>
+<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
+<p>What this deployment does beyond scanning and triage, and what turns each on.
+Everything marked off does nothing until the thing in the last column is set.</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Default</th>
+<th>Turned on by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="#scanning">Scheduled rescanning</a></td>
+<td>On, daily</td>
+<td><code>scanning.every</code> under Settings sets how often</td>
+</tr>
+<tr>
+<td><a href="#an-air-gapped-install">Vulnerability data updates</a></td>
+<td>On</td>
+<td><code>GRYPE_DB_AUTO_UPDATE</code>; set it to <code>false</code> where the deployment cannot reach the network</td>
+</tr>
+<tr>
+<td><a href="#upstream-currency">Upstream currency</a></td>
+<td>Off</td>
+<td><code>upstream.currency</code> under Settings</td>
+</tr>
+<tr>
+<td><a href="#patch-branches">Patch branches</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_PATCH_BRANCHES</code>, or <code>patchBranches.enabled</code> in the chart. <a href="#enabling">What to set first</a></td>
+</tr>
+<tr>
+<td><a href="#supplier-advisories">Supplier advisories</a></td>
+<td>Off</td>
+<td>Naming a supplier under Settings</td>
+</tr>
+<tr>
+<td><a href="#mail">Mail</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_MAIL_FROM</code> and <code>OPENPSIRT_MAIL_SERVER</code>, both</td>
+</tr>
+<tr>
+<td>Webhooks</td>
+<td>Off</td>
+<td>Adding a destination under Settings</td>
+</tr>
+<tr>
+<td><a href="#attachment-storage">Attachments</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_ATTACHMENT_BUCKET</code>, or <code>OPENPSIRT_ATTACHMENT_DIR</code> for a trial</td>
+</tr>
+<tr>
+<td><a href="#advisory-publication">Advisory generation</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_PUBLISHER_NAME</code> and <code>OPENPSIRT_PUBLISHER_NAMESPACE</code>, both</td>
+</tr>
+<tr>
+<td><a href="#the-published-advisory-directory">The published advisory directory</a></td>
+<td>Off</td>
+<td><code>OPENPSIRT_DIRECTORY_URL</code> and a bucket or directory to write to, with advisory generation on</td>
+</tr>
+</tbody>
+</table>
+<p>A sign-in method is not in this list because one is required: the process
+refuses to start without one. <a href="#sign-in">Sign-in</a> says which.</p>
+<h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
+<p>A database built by v0.1.0 or v0.2.0 is upgraded in place, at startup or by
+<code>openpsirt migrate up</code>. One built by v0.1.0 passes through the v0.2.0 upgrade on
+the way. A database built by any build between releases is recreated.</p>
+<p>Read the sections for the release you are coming from, and every section after
+it: from v0.1.0, read all three.</p>
+<h3 id="every-upgrade">Every upgrade<a class="headerlink" href="#every-upgrade" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Back the database up</td>
+<td>On MySQL and MariaDB an upgrade that fails part way leaves the schema half changed, and the backup is what recovers it</td>
+</tr>
+<tr>
+<td>Stop every process of the earlier release</td>
+<td>With the Helm chart, scale the deployment to zero first. The upgrade from v0.1.0 drops and reshapes tables v0.1.0 reads and writes, so a replica left serving fails on them</td>
+</tr>
+<tr>
+<td>Deploy this release</td>
+<td>It migrates at startup. With <code>autoMigrate: false</code>, run <code>openpsirt migrate up</code> first</td>
+</tr>
+</tbody>
+</table>
+<p>Going back is <code>openpsirt migrate down</code>, once for each release stepped back, run
+with this build before the earlier one is deployed. v0.1.0 started against an
+upgraded schema reports it current and cannot read it. Patch branch lookups
+come back off in v0.2.0, which reads its own setting for them: turn them on
+again under its Settings.</p>
+<h3 id="from-v010">From v0.1.0<a class="headerlink" href="#from-v010" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>private-read</code> and <code>private-triage</code> reach undisclosed findings only. In v0.1.0 they reached disclosed findings too</td>
+<td>Grant <code>public-read</code> or <code>public-triage</code> beside them, directly, in a group binding or in a token's holds, wherever somebody should keep the disclosed findings. Nothing is granted on upgrade</td>
+</tr>
+<tr>
+<td>The setting <code>disclosure.extension-threshold</code> is <code>disclosure.movement-threshold</code></td>
+<td>Nothing. The value is carried across by the upgrade</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>After the upgrade from v0.1.0</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>An advisory v0.1.0 issued</td>
+<td>Keeps the tracking identifier it was issued under. v0.1.0 did not keep the documents it issued, so a published directory leaves the advisory out until it is issued again</td>
+</tr>
+<tr>
+<td>A reported flaw</td>
+<td>Has a reference, minted as one recorded today would be</td>
+</tr>
+</tbody>
+</table>
+<h3 id="from-v020">From v0.2.0<a class="headerlink" href="#from-v020" title="Permanent link">&para;</a></h3>
+<p>Also read after an upgrade from v0.1.0.</p>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PATCH_EXCLUDED</code> is <code>OPENPSIRT_OUTBOUND_EXCLUDED</code>, and the chart's <code>patchBranches.excluded</code> is <code>outbound.excluded</code></td>
+<td>Move the list. The old name is refused at startup, and the chart refuses to render with the old key set</td>
+</tr>
+<tr>
+<td>The excluded list also keeps supplier directories out, and a supplier is read from every host its description names</td>
+<td>Set <code>outbound.excluded</code> wherever suppliers are configured</td>
+</tr>
+<tr>
+<td>A threshold stored under its v0.1.0 name, <code>disclosure.extension-threshold</code>, is in force again as <code>disclosure.movement-threshold</code> where that was never set. v0.2.0 read only the new name, so it ran on the default</td>
+<td>Check it under Settings, Disclosure</td>
+</tr>
+<tr>
+<td>Patch branch lookups are turned on in the deployment's configuration. The <code>patch.branches</code> setting is gone</td>
+<td>Set <code>patchBranches.enabled: true</code> in the chart, or <code>OPENPSIRT_PATCH_BRANCHES=true</code>. A deployment that had the setting on has the lookups off until then. <a href="#enabling">What to set first</a></td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>After the upgrade from v0.2.0</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A report</td>
+<td>Sent in from outside</td>
+</tr>
+<tr>
+<td>A flaw recorded here with a severity in force in its product</td>
+<td>Rated at its first recording in that product. Its deadline counts from there, on the windows for flaws in our own product</td>
+</tr>
+<tr>
+<td>A flaw recorded here with no severity in force</td>
+<td>Not rated, and with no deadline</td>
+</tr>
+<tr>
+<td>A flaw recorded with nobody named as reporting it</td>
+<td>Found here. It has no disclosure date</td>
+</tr>
+<tr>
+<td>A component</td>
+<td>Has no license until a scan reads one from its inventory</td>
+</tr>
+</tbody>
+</table>
+<h2 id="serving">Serving<a class="headerlink" href="#serving" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_ADDR</code></td>
+<td>The <code>host:port</code> the HTTP server listens on</td>
+<td><code>:8080</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_BASE_URL</code></td>
+<td>The address people arrive on, <strong>written in full and with no path below it</strong>: <code>https://psirt.example.com</code>. Behind a proxy that is not what the process thinks it is called, and a sign-in provider compares the address it sends people back to against what it was registered with, so it is stated rather than guessed. Required once a provider is configured</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PLAIN_HTTP</code></td>
+<td>Serve without TLS, which is what running locally looks like. It only loosens cookies: the session cookie is sent over plain HTTP, which it otherwise is not</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SHUTDOWN_GRACE</code></td>
+<td>How long requests in flight get to finish on a stop signal, and then how long background work gets to finish after that</td>
+<td><code>15s</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_STARTUP_TIMEOUT</code></td>
+<td>How long everything contacted before the server listens has to answer: the database, the schema, the administrators named here, and the attachment store. Past it the process stops and names what it was waiting on</td>
+<td><code>60s</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_LOG_LEVEL</code></td>
+<td><code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code></td>
+<td><code>info</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_LOG_FORMAT</code></td>
+<td><code>text</code> or <code>json</code></td>
+<td><code>text</code></td>
+</tr>
+</tbody>
+</table>
+<p>The defaults above are the binary's. The chart sets a log format of <code>json</code>,
+because a cluster's collector parses the logs; run the binary yourself and it
+writes <code>text</code>.</p>
+<h2 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_DATABASE_URL</code></td>
+<td>Which database and how to reach it: <code>postgres://user:password@host:5432/name</code>, <code>mysql://…</code>, <code>mariadb://…</code>, or <code>sqlite:///absolute/path.db</code>. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. <strong>Required</strong></td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_AUTO_MIGRATE</code></td>
+<td>Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run <code>openpsirt migrate up</code> yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and <code>openpsirt migrate status</code> says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits what declares the thing rather than adding a migration beside it, so a database can be at the expected version and still hold what an earlier build created</td>
+<td><code>true</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_MAX_OPEN</code></td>
+<td>Most connections open at once</td>
+<td><code>25</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_MAX_IDLE</code></td>
+<td>Most connections kept open idle</td>
+<td><code>25</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_IDLE_TIMEOUT</code></td>
+<td>How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back</td>
+<td><code>1m</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_CONN_LIFETIME</code></td>
+<td>How long a connection is used before it is replaced</td>
+<td><code>30m</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DB_REQUIRE_ENCRYPTION</code></td>
+<td>Refuse to start where the connection to the database is not encrypted. See below</td>
+<td><code>false</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="database-connection-encryption">Database connection encryption<a class="headerlink" href="#database-connection-encryption" title="Permanent link">&para;</a></h3>
+<p>The connection carries undisclosed findings, and by default it is encrypted
+only where the server offers it. Opportunistic is not the same as certain: a
+server that answers without TLS is accepted, and so is one whose certificate
+nobody checked. Ask for certainty in the URL.</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Default</th>
+<th>Ask for certainty with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PostgreSQL</td>
+<td><code>sslmode=prefer</code> — encrypted if the server offers it, no certificate checked</td>
+<td><code>?sslmode=verify-full</code>, with <code>sslrootcert</code> naming the authority</td>
+</tr>
+<tr>
+<td>MySQL, MariaDB</td>
+<td><code>tls=preferred</code> — encrypted if the server offers it, no certificate checked</td>
+<td><code>?tls=true</code>, which verifies the certificate against the system roots</td>
+</tr>
+<tr>
+<td>SQLite</td>
+<td>No connection to encrypt</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Anything the URL says about the transport is left alone, so <code>tls=skip-verify</code>
+or a <code>sslmode</code> of your own reaches the driver as written.</p>
+<p>Say so where it is required. With <code>OPENPSIRT_DB_REQUIRE_ENCRYPTION</code> set,
+the process asks the connection what it negotiated and refuses to start where
+that is cleartext — naming the URL, without its password, and what to put in
+it. Asking for encryption in the URL and being given none is a deployment that
+believes it is encrypted and is not, and nothing else says otherwise: the
+process logs the transport at every start, which is a line somebody has to
+read.</p>
+<table>
+<thead>
+<tr>
+<th>Where it is set</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The connection is encrypted</td>
+<td>Nothing happens. The transport is logged as it always is</td>
+</tr>
+<tr>
+<td>The connection is in cleartext</td>
+<td>Refused at startup, naming the setting</td>
+</tr>
+<tr>
+<td>The server will not say which</td>
+<td>Refused. What this asks for is certainty, and "we could not find out" is not it</td>
+</tr>
+<tr>
+<td>The database is SQLite</td>
+<td>Refused. A file opened directly has no connection to encrypt, and quietly doing nothing is what a setting that changes nothing looks like</td>
+</tr>
+</tbody>
+</table>
+<h2 id="scanning">Scanning<a class="headerlink" href="#scanning" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_SCANNER_PATH</code></td>
+<td>Where the vulnerability scanner binary lives. Empty means whatever the environment resolves. The scanner is a requirement of a deployment rather than an option: the vulnerability data is produced here, not sent in</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SCANNER_TIMEOUT</code></td>
+<td>How long one scan may run before it is killed and recorded as a run that failed. Raise it where a large inventory legitimately takes longer: past it, every attempt is killed and the job is set aside once its attempts run out. It has to stay below <code>OPENPSIRT_QUEUE_MAX_HOLD</code>, the span a worker may hold one job for, and the process refuses to start where it does not</td>
+<td><code>30m</code></td>
+</tr>
+<tr>
+<td><code>GRYPE_DB_CACHE_DIR</code></td>
+<td>Where the scanner keeps its vulnerability data. The image sets it; a deployment that moves it has to move it in both places, or the data lands on the read-only root filesystem where it cannot be written</td>
+<td><code>/var/cache/openpsirt/grype</code></td>
+</tr>
+<tr>
+<td><code>GRYPE_DB_AUTO_UPDATE</code></td>
+<td>Whether the scanner fetches its own vulnerability data. Set it to <code>false</code> where the deployment cannot reach the network, and put the data there yourself — see below</td>
+<td><code>true</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="an-air-gapped-install">An air-gapped install<a class="headerlink" href="#an-air-gapped-install" title="Permanent link">&para;</a></h3>
+<p>The scanner's vulnerability data is not shipped in the image: it changes daily
+and the image does not. A deployment that can reach the network downloads it
+itself and nothing here needs doing.</p>
+<p>One that cannot needs the data carried across, and carrying it is a build
+target rather than a list of steps:</p>
+<pre><code>make scanner-db
+</code></pre>
+<p>It produces <code>dist/openpsirt-scanner-db-&lt;date&gt;.tar.gz</code> and its checksum, using
+the scanner the image carries — the format is the scanner's, and a bundle
+built by a different version is one that may not load. Before it says it
+succeeded it runs that same scanner against the bundle with the network off
+and auto-update refused, which is the configuration on the far side of the
+gap: a bundle that merely exists is what the target refuses to produce.</p>
+<p>On the far side, check the bundle before trusting it, unpack it into
+<code>GRYPE_DB_CACHE_DIR</code>, and set <code>GRYPE_DB_AUTO_UPDATE=false</code>:</p>
+<pre><code>make scanner-db-verify BUNDLE=openpsirt-scanner-db-&lt;date&gt;.tar.gz
+</code></pre>
+<p>The verification is available there as well as here on purpose. "It built" and
+"it loads where it has to" are different claims, and the second is the one that
+matters where the bundle is all there is — in the one situation where trying it
+out first is not available.</p>
+<h2 id="mail">Mail<a class="headerlink" href="#mail" title="Permanent link">&para;</a></h2>
+<p>Mail is how anything leaves the application. A deployment that sets none of
+this tells nobody anything outside it, which is an ordinary way to run: the
+notification area in the interface still works.</p>
+<p><code>MAIL_FROM</code> and <code>MAIL_SERVER</code> are both needed for mail to happen at all — a
+server with nobody to send as is half a configuration, and either alone sends
+nothing rather than failing at startup. Credentials are optional, and are
+refused over a connection the server would not secure with STARTTLS.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_MAIL_FROM</code></td>
+<td>The address messages are sent as. Set it and the server together, or neither: half of the pair is refused at startup, because a server with nobody to send as sends nothing and would say nothing about it</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_MAIL_SERVER</code></td>
+<td>The SMTP server as <code>host:port</code>, e.g. <code>smtp.example.com:587</code></td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_MAIL_USERNAME</code></td>
+<td>Username, where the server wants one. Sent only after STARTTLS</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_MAIL_PASSWORD</code></td>
+<td>Password for that username. Sent only after STARTTLS</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<p>Who gets what is not configuration: each person chooses in their own settings,
+and the daily digest is off until somebody asks for it. A message about a
+finding nobody has announced carries no detail — only that there is something,
+and a link.</p>
+<p>On the Helm chart these are the <code>mail</code> values, and the password goes in a
+Secret the chart makes or one you name.</p>
+<h2 id="advisory-publication">Advisory publication<a class="headerlink" href="#advisory-publication" title="Permanent link">&para;</a></h2>
+<p>An advisory is a document about flaws in your own products, under an
+identifier this deployment mints. It is generated from what the deployment
+already holds and handed to you; nothing is sent anywhere. That you published
+it is recorded when you say so, which is what lets the next document be a
+revision.</p>
+<p>Both a name and a namespace are needed for either to do anything. A CSAF
+document requires a publisher, so with one missing no advisory is generated and
+the refusal says which — rather than handing you a document that fails
+validation after you have sent it.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PUBLISHER_NAME</code></td>
+<td>The organization advisories say issued them. Set it and the namespace together, or neither</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PUBLISHER_NAMESPACE</code></td>
+<td>A URL identifying that organization, which is what a reader of a CSAF document matches on</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PUBLISHER_CATEGORY</code></td>
+<td>What the standard calls the kind of publisher: <code>coordinator</code>, <code>discoverer</code>, <code>other</code>, <code>translator</code>, <code>user</code> or <code>vendor</code>. A deployment publishing about its own product is a vendor. Anything else is refused at startup — the value reaches the document verbatim, so a typo produces advisories that fail validation wherever anybody takes them</td>
+<td><code>vendor</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ADVISORY_PREFIX</code></td>
+<td>What a minted advisory identifier opens with, before the year and a number within it — the half a reader recognizes the publisher by. A letter followed by up to nineteen letters, digits or hyphens, upper case; anything else is refused at startup. Unset, no advisory can be started and the refusal says so: an identifier traceable to no publisher is in every document that went out, where a refusal is fixed once</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<p>On the Helm chart these go through <code>extraEnv</code>, since a deployment that does not
+publish needs none of them.</p>
+<h2 id="the-published-advisory-directory">The published advisory directory<a class="headerlink" href="#the-published-advisory-directory" title="Permanent link">&para;</a></h2>
+<p>Absent is ordinary: with none of this set, advisories are generated and handed
+to you and nothing is written anywhere.</p>
+<p>Set it and every advisory that has gone out is written as a static CSAF
+provider directory — the documents in a folder per year, a list of them, a list
+of changes, a ROLIE feed, a description of you as a provider, and a <code>.sha256</code>
+beside each document. This application serves none of it. It writes files; your
+web server serves them, at the address you give below.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_URL</code></td>
+<td>The <code>https</code> address the directory is reachable at, which only you know. Every address the directory states about itself is built from it, and so is the address each advisory states for itself, so nothing is written without it. Refused at startup if it is not an <code>https</code> address</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_BUCKET</code></td>
+<td>The bucket the files are written to. Empty means no object store</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_ENDPOINT</code></td>
+<td>The address of a self-hosted store. A cloud provider needs none</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_REGION</code></td>
+<td>The region, where the store wants one</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_KEY</code></td>
+<td>Access key, where the environment supplies no role</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_SECRET</code></td>
+<td>Its secret</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_SESSION_TOKEN</code></td>
+<td>A session token, where the credentials are temporary ones</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_PATH_STYLE</code></td>
+<td>Address the bucket in the path rather than the host, which is what a self-hosted store usually wants</td>
+<td>set when an endpoint is</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_ALLOW_HTTP</code></td>
+<td>Accept a store endpoint that is not <code>https</code> and is not this machine</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_DIR</code></td>
+<td>A directory on this machine to write the files into instead. The bucket wins where both are set</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_LIST</code></td>
+<td>Tell aggregators they may list you</td>
+<td>on</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_DIRECTORY_MIRROR</code></td>
+<td>Tell aggregators they may mirror your documents</td>
+<td>off</td>
+</tr>
+</tbody>
+</table>
+<p>A directory on this machine is a deployment here, unlike for attachments: a
+web server reading the same disk is the ordinary way to serve static files.
+One process writes it, so it wants a replica of its own and a volume of its
+own — on the chart's defaults, two replicas with a read-only root filesystem,
+the pass cannot create the directory at all, and on a shared volume the two
+replicas write over one another. Run one replica with a volume mounted for it,
+or use the object store.</p>
+<p>Files are written readable by whoever serves them, and folders enterable. A
+web server runs as its own user, and refused the lot it serves what looks like
+a deployment that has published nothing.</p>
+<p>Use a store of its own rather than the one attachments are in. Every file here
+is served to anybody who asks, and every attachment is authorized before it is
+handed over — one destination would have to be both.</p>
+<p>Only a document that may travel is written. An advisory covering a flaw nobody
+outside has been told about carries TLP:RED, and the directory is the freely
+accessible half of the standard's distribution, so those are held back and
+counted in the log line. Editorial state has nothing to do with it: a draft is
+not published because it has not gone out, and a published document stays
+published while it is being revised.</p>
+<p>What is written is what went out, byte for byte. Issuing an advisory is what
+puts a document in the directory, and editing one afterwards changes nothing
+there until you record that the next revision went out.</p>
+<p>Setting the address changes what advisories say, not only where they are put.
+A document states the address it is published at, so one generated before you
+set it states none and one generated after states it — and a document that has
+already gone out keeps the bytes it went out as. Set the address before you
+publish, rather than after.</p>
+<p>Three things are yours to arrange, because they are your web server's rather
+than this application's:</p>
+<ul>
+<li><strong>TLS, and no redirects.</strong> The standard requires the first and asks against
+  the second.</li>
+<li><strong>One of the three ways to be found</strong>: <code>/.well-known/csaf/provider-metadata.json</code>
+  under your main domain, a <code>CSAF</code> field in your <code>security.txt</code> pointing at the
+  description, or the <code>csaf.data.security.&lt;domain&gt;</code> DNS record.</li>
+<li><strong>Directory listings</strong>, if you want the manual navigation the standard asks
+  for.</li>
+<li><strong>Read access to the files.</strong> Nothing here sets an access policy on the
+  object store, which is the right default and leaves readability yours: a
+  bucket made with the usual defaults answers 403 to everybody while this
+  writes into it successfully. Give whatever serves the address a policy that
+  lets it read, or put a front end with credentials of its own in front.</li>
+</ul>
+<p>Nothing is signed. Signatures and a public key are what the standard's trusted
+provider role adds, and key material is configuration of a kind this deployment
+does not yet take. The layout leaves room for it: a signature sits beside the
+document under the same name, and the feed already names the file beside each
+entry that answers for it.</p>
+<h2 id="supplier-advisories">Supplier advisories<a class="headerlink" href="#supplier-advisories" title="Permanent link">&para;</a></h2>
+<p>Off unless an administrator names a supplier, under Settings. Each is named
+against one product, and what is read lands as evidence beside a finding — a
+publisher's own judgment, never a decision taken here.</p>
+<p>Requests go to the host the configured address names, and to every host the
+publisher's description, its feeds and their entries name for listings,
+documents and digests: https on port 443 only, a redirect refused rather than
+followed, and an address inside this network or in
+<a href="#outbound-exclusions"><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></a> refused. So an egress rule
+for this is every host a supplier publishes from, on 443.
+SUSE's description is on <code>www.suse.com</code> and its directory on <code>ftp.suse.com</code>.</p>
+<p>What leaves is the request itself. No component name, no build, no product,
+nothing about what this deployment holds — the narrowing to what a product
+ships happens here, after the document has arrived.</p>
+<p>How often each supplier is read again is <code>scanning.every</code>, the same setting
+that paces re-scans. Shortening it makes more requests to every configured
+supplier as well as more scans here.</p>
+<p>A new supplier is read from <code>scanning.supplier-history</code> days before it was
+added, 365 unless set. A publisher's listing holds everything they have ever
+issued, so this bounds how much of it is asked for: a year of Red Hat is about
+97,000 documents and takes about seventeen days to read, and a year of a vendor
+publishing a few hundred a year takes hours. To take an advisory published
+earlier, upload it. A supplier withdrawn and added again resumes where it
+stopped, no further back than the same window.</p>
+<p>Each document is checked against the SHA-256 or SHA-512 file its publisher
+serves beside it, and one that does not match is not read. A publisher serving
+neither is read unchecked.</p>
+<h2 id="upstream-currency">Upstream currency<a class="headerlink" href="#upstream-currency" title="Permanent link">&para;</a></h2>
+<p>Off unless an administrator turns it on, under Settings. Everything a scan
+needs arrives as a file somebody imported, so a deployment that cannot reach out
+loses this answer and what a scan reports is unaffected.</p>
+<p>What goes out is a component's name, to that ecosystem's public index, and
+nothing else — no version, no build, no product. Most indexes take one request
+per component; Maven Central takes two, the version list and the newest
+release's project document, and nuget.org up to five, the registration and up
+to four of its pages. For an open-source dependency that is public knowledge. For
+something built here it is the name of a project, a team, or a product nobody
+has announced, and a public index records every request made of it.</p>
+<table>
+<thead>
+<tr>
+<th>Ecosystem</th>
+<th>Host asked</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Go</td>
+<td><code>proxy.golang.org</code></td>
+</tr>
+<tr>
+<td>npm</td>
+<td><code>registry.npmjs.org</code></td>
+</tr>
+<tr>
+<td>PyPI</td>
+<td><code>pypi.org</code></td>
+</tr>
+<tr>
+<td>Cargo</td>
+<td><code>crates.io</code></td>
+</tr>
+<tr>
+<td>Maven</td>
+<td><code>repo1.maven.org</code></td>
+</tr>
+<tr>
+<td>NuGet</td>
+<td><code>api.nuget.org</code></td>
+</tr>
+</tbody>
+</table>
+<p>Nothing else is reached, and a redirect is not followed. A distribution
+package is never asked about.</p>
+<p>Where egress is restricted, allow the hosts for the ecosystems your builds
+carry. An index that cannot be reached is asked once a pass and then left for
+the rest of it, so the others are still asked; its components stay due, and
+each pass logs the failure.</p>
+<p>So names this deployment calls its own are never sent. Three sources, unioned:</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>What it yields</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PUBLISHER_NAMESPACE</code></td>
+<td>The organization, spelled the three ways the ecosystems spell one: the host, the host reversed, which is what a Maven group is, and each label short of the top-level domain. A label naming a kind of registration or a forge rather than an organization is dropped, so <code>example.github.io</code> does not hold back everything under <code>github.com</code></td>
+</tr>
+<tr>
+<td>What each build declared itself to be</td>
+<td>The account, scope or group that identifier is published under, where an inventory names one. Read from the scans rather than from here, so a product declared this morning is one whose name does not leave this afternoon</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_UPSTREAM_INTERNAL</code></td>
+<td>Whatever else you name, separated by commas</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_UPSTREAM_INTERNAL</code></td>
+<td>Names never sent to a public index, separated by commas, on top of the two derived sources above. Here rather than among the settings an administrator tunes, beside the namespace the default is derived from: asking upstream is a switch an administrator throws, and what leaves the deployment when it is on is a boundary you drew</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<p>A name matches each part of a package's own name, either exactly or followed by
+<code>-</code>, <code>.</code> or <code>_</code>. A name without a dot also matches each dotted part, which is
+how a Maven group holds an organization's name after its top-level domain. A
+name carrying a dot also covers a host under it. So a
+deployment publishing under <code>example.test</code> holds back:</p>
+<table>
+<thead>
+<tr>
+<th>Identifier</th>
+<th>On the label</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pkg:npm/@example/agent</code></td>
+<td><code>example</code></td>
+</tr>
+<tr>
+<td><code>pkg:golang/github.com/example-corp/thing</code></td>
+<td><code>example</code></td>
+</tr>
+<tr>
+<td><code>pkg:golang/test.example/lib</code></td>
+<td><code>test.example</code>, the same organization spelled the way a module path spells it</td>
+</tr>
+<tr>
+<td><code>pkg:golang/go.example.test/team/agent</code></td>
+<td><code>example.test</code>, which covers a host under it</td>
+</tr>
+<tr>
+<td><code>pkg:maven/test.example.tools/agent</code></td>
+<td><code>test.example</code>, which is what a Maven group is</td>
+</tr>
+<tr>
+<td><code>pkg:nuget/Example.Agent</code></td>
+<td><code>example</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>pkg:npm/exampler</code> is left alone. Case does not decide.</p>
+<p>This is a better default, not a control. A deployment that needs certainty
+about what leaves it leaves the whole feature off, which is where it ships. It
+is biased toward holding back: over-excluding loses an answer, which is visible
+on the screen that would have shown it, and under-excluding sends a name to
+somebody else's service, which is visible nowhere.</p>
+<p>Turning it off again drops what was fetched. On a deployment that had
+asking on before a name was held back, the version an index gave for that name
+is removed the next time the pass reaches it, along with the summary and the
+project address. All of it came from sending the name. Nothing else is
+affected and no upgrade step is needed.</p>
+<p>Read what it held back, and what no index knew. The report is at
+<code>/v1/upstream/unanswered</code> and on the System screen. Held-back names say what
+the default is costing; names no public index has heard of are private modules
+and vendored forks, and they are the candidates to promote into
+<code>OPENPSIRT_UPSTREAM_INTERNAL</code> so they stop being asked about at all.</p>
+<h2 id="outbound-exclusions">Outbound exclusions<a class="headerlink" href="#outbound-exclusions" title="Permanent link">&para;</a></h2>
+<p>Two fetches go to hosts somebody else chose: the repository a patch link names,
+and the directory and documents a supplier's description names. Both refuse
+loopback, private, link-local and shared address space regardless. An internal
+service on a public address or behind a public name is kept out by this list
+alone.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_OUTBOUND_EXCLUDED</code></td>
+<td>Hosts and networks nothing is fetched from, separated by commas. A name covers itself and every host under it; a network is written as <code>10.0.0.0/8</code> and covers every address a name resolves to inside it</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<pre><code>OPENPSIRT_OUTBOUND_EXCLUDED=corp.example.com,internal.example.net,203.0.113.0/24
+</code></pre>
+<p>The chart sets it from <code>outbound.excluded</code>.</p>
+<h2 id="patch-branches">Patch branches<a class="headerlink" href="#patch-branches" title="Permanent link">&para;</a></h2>
+<p>A patch link to a commit is labeled with the branches of its repository that
+contain the commit, on the finding it belongs to. A fix backported to five
+branches arrives as five bare commit links, and the label is what says which
+one applies to the branch you ship.</p>
+<p>Off unless the deployment turns it on. It fetches a copy of each repository a
+patch link names, from the host the link names, and asks the copy which
+branches hold each commit. Progress, failures and the size of each copy are on
+the System screen and at <code>/v1/patch-branches</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_PATCH_BRANCHES</code></td>
+<td>Whether the lookups run. Read at startup, so changing it takes a restart</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PATCH_DIR</code></td>
+<td>Where the copies are kept. It must be writable, which with a read-only root filesystem means a mounted volume</td>
+<td><code>/var/cache/openpsirt/repositories</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_PATCH_QUOTA</code></td>
+<td>How many bytes the copies may hold together. The least recently used is removed to make room</td>
+<td><code>21474836480</code> (20 GB)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="enabling">Enabling<a class="headerlink" href="#enabling" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Chart value</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raise the memory limit to 4 GiB</td>
+<td><code>resources.limits.memory</code></td>
+<td>git runs inside the pod's limit beside the server and the scanner</td>
+</tr>
+<tr>
+<td>List your internal domains and networks</td>
+<td><code>outbound.excluded</code></td>
+<td>A report chooses the host. See <a href="#outbound-exclusions">Outbound exclusions</a></td>
+</tr>
+<tr>
+<td>Keep the copies on a volume</td>
+<td><code>patchBranches.existingClaim</code></td>
+<td>Scratch space loses them on every restart</td>
+</tr>
+<tr>
+<td>Turn it on</td>
+<td><code>patchBranches.enabled: true</code></td>
+<td>Sets <code>OPENPSIRT_PATCH_BRANCHES</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="replicas">Replicas<a class="headerlink" href="#replicas" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>One replica fetches at a time</td>
+<td>A lease decides which</td>
+</tr>
+<tr>
+<td>Every replica serves the labels</td>
+<td>They are kept in the database</td>
+</tr>
+<tr>
+<td>The copies are one replica's disk</td>
+<td>A ReadWriteMany claim shared by every replica keeps one set. Only the replica holding the lease writes to it</td>
+</tr>
+<tr>
+<td>A ReadWriteOnce claim with several replicas</td>
+<td>The replicas on other nodes stay Pending. The chart cannot refuse this, because it cannot see the access mode of a claim it did not make</td>
+</tr>
+<tr>
+<td>No claim</td>
+<td>Each pod keeps its own scratch copy and fetches again when the lease moves to it</td>
+</tr>
+</tbody>
+</table>
+<p>Only https is used, redirects are not followed, and git runs with no
+configuration, credentials or hooks from the environment.</p>
+<h3 id="sizing">Sizing<a class="headerlink" href="#sizing" title="Permanent link">&para;</a></h3>
+<p>The Linux kernel is the largest repository reports link to, and git.kernel.org
+sends whole history:</p>
+<table>
+<thead>
+<tr>
+<th>The kernel's stable tree</th>
+<th>From git.kernel.org</th>
+<th>From a host that sends commits alone</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Copy on disk</td>
+<td>5.1 GB, and 116 MB of index</td>
+<td>1.1 GB, and 116 MB of index</td>
+</tr>
+<tr>
+<td>First fetch</td>
+<td>15 minutes</td>
+<td>90 seconds</td>
+</tr>
+<tr>
+<td>Memory at the peak of the first fetch</td>
+<td>1.3 GB</td>
+<td>0.6 GB</td>
+</tr>
+</tbody>
+</table>
+<p>Size the quota to hold the kernel and the other repositories your reports link
+to, and the volume a fifth larger than the quota. The chart sizes its scratch
+volume that way from <code>patchBranches.quota</code>; a claim of your own needs the same
+room. A copy that alone outgrows the quota is abandoned and tried again a day
+later.</p>
+<p>git runs inside the same memory limit as the server and the scanner, and a
+first kernel fetch can coincide with a scan. Raise the limit to 4 GiB before
+turning this on where reports link to git.kernel.org. Where the limit is
+exceeded, the kernel kills the largest process, the visit fails, and it is
+retried a day later.</p>
+<p>Keep the copies on a persistent volume. Scratch space loses them on every
+restart, and the kernel is fetched again from the start.</p>
+<h2 id="sign-in">Sign-in<a class="headerlink" href="#sign-in" title="Permanent link">&para;</a></h2>
+<p>The process refuses to start until somebody can administer it, and naming
+somebody grants a role — it does not let anybody in without signing in.</p>
+<p>Configure at least one of the sign-in methods below, or nobody can reach it.
+The Helm chart refuses to render an install with none; the binary does not
+check, because a deployment being brought up in pieces is an ordinary state
+for a process and not for an install.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_BOOTSTRAP_ADMINS</code></td>
+<td>Identities granted administration at every startup, comma-separated. Each is the plain username your provider or your trusted proxy reports — there is no prefix, and the same name down either path is the same person. Capitals do not matter: a name is folded as it is stored. <strong>A name written <code>provider:username</code> is refused and the process stops</strong>, naming what to write instead, because an accepted one becomes an administrator account nobody can sign in as. Applied every time rather than only the first, so it is the way back in for an operator who has locked themselves out: add yourself, restart</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SESSION_LIFETIME</code></td>
+<td>How long a sign-in lasts, where nothing has been set in the application. <strong>An administrator's setting wins over this</strong>, because the settings screen offers it and a value somebody sets there that nothing reads is worse than not offering it. A value here has to be a positive duration, and at most 30 days — group membership is read at sign-in and never again, so this is how long a role a group withdrew can still be held</td>
+<td>12 hours</td>
+</tr>
+</tbody>
+</table>
+<h3 id="an-openid-connect-provider">An OpenID Connect provider<a class="headerlink" href="#an-openid-connect-provider" title="Permanent link">&para;</a></h3>
+<p>One sign-in provider is configured at a time. Setting both an issuer here and a
+GitHub client id below stops the process, naming the two: an identity is a
+username, and two providers issuing them independently cannot be told apart.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_OIDC_ISSUER</code></td>
+<td>The provider's issuer address. Empty means no provider. <strong>Every endpoint the provider publishes must be on this host</strong> — the authorization endpoint, the token endpoint and the keys endpoint — and the process refuses to start where one is not. Providers that publish their keys elsewhere, Google among them, are refused: a discovery document names the addresses this deployment will send people to, and it arrives over the network</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_NAME</code></td>
+<td>What the sign-in button calls it. It is also a path segment, so it must be made only of characters a URL path carries as written — no slashes and no spaces. The process refuses to start otherwise</td>
+<td><code>oidc</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_CLIENT_ID</code></td>
+<td>The client registered with the provider</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_CLIENT_SECRET</code></td>
+<td>Its secret</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_USERNAME_CLAIM</code></td>
+<td>Which claim carries the name an authorization is written for. <strong>Required</strong>, with no default — see below</td>
+<td>none — the process refuses to start without it</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_OIDC_GROUPS_CLAIM</code></td>
+<td>The claim carrying group membership, if the provider asserts it</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-username-claim">The username claim<a class="headerlink" href="#the-username-claim" title="Permanent link">&para;</a></h3>
+<p>The claim is not the identity. The provider's subject is, and the first
+sign-in pins it; from then on the subject decides and a rename is followed as
+a label.</p>
+<p>This claim does one job: match an authorization an administrator wrote for
+somebody who has not arrived yet. That has to be a name a person can type, so
+the subject itself cannot serve — nobody knows it in advance. The property it
+needs is narrower than immutable:</p>
+<blockquote>
+<p>An end user must not be able to set it to a name an administrator might
+have authorized.</p>
+</blockquote>
+<p>The exposure runs from the moment a grant is written until somebody redeems
+it, which <code>signin.claim-window</code> also bounds.</p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Usually</th>
+<th>Check before you trust it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Okta</td>
+<td><code>preferred_username</code> — the Okta login, normally the address the directory assigned</td>
+<td>Self-service profile editing must not cover the username or the primary email. It does not by default</td>
+</tr>
+<tr>
+<td>Entra ID</td>
+<td><code>oid</code>, or <code>upn</code> where administrators want a name they recognize</td>
+<td><code>preferred_username</code> on Entra is not a good choice: it follows the mail nickname</td>
+</tr>
+<tr>
+<td>Keycloak</td>
+<td>A custom claim mapped to an administrator-managed attribute</td>
+<td>If self-registration is on, <code>preferred_username</code> is a name the account holder chose, and is the case this refusal exists for</td>
+</tr>
+<tr>
+<td>Anything else</td>
+<td>Whatever the provider assigns rather than the person</td>
+<td>Ask whether a user can edit it in the provider's own account settings</td>
+</tr>
+</tbody>
+</table>
+<p><code>preferred_username</code> rides on the <code>profile</code> scope rather than <code>email</code>. The
+scopes requested are <code>openid profile email</code> and are not configurable, so a
+claim carried by any of the three is available.</p>
+<p>A claim the provider does not send, or sends as something other than a string,
+reads as absent. The sign-in then falls back to the address the provider says
+it verified, and failing that to the subject — which matches no authorization
+anybody typed, so the person is refused rather than admitted. A claim name
+with a typo in it therefore reads as "this person was never granted access",
+not as a configuration error, so check the name against the provider's own
+token before deciding somebody's grant is missing.</p>
+<h3 id="sign-in-without-a-provider">Sign-in without a provider<a class="headerlink" href="#sign-in-without-a-provider" title="Permanent link">&para;</a></h3>
+<p>The trusted header below is the way in that does not depend on the provider,
+and it is what a provider change goes through. A pinned identifier does not
+refuse a proxy arrival, so everybody reaches what they already hold.</p>
+<p>The provider is down and people must sign in.</p>
+<ol>
+<li>Unset <code>OPENPSIRT_OIDC_ISSUER</code>. A provider that cannot be discovered stops
+   the process at startup, so leaving it set means nothing starts at all.</li>
+<li>Set <code>OPENPSIRT_TRUSTED_HEADER</code> and <code>OPENPSIRT_TRUSTED_SOURCES</code>. Both are
+   needed; half a configuration stops the process.</li>
+<li>Restart. Sign-in is by the name the proxy asserts.</li>
+</ol>
+<p>The provider publishes an endpoint on another host. The process refuses to
+start, naming the endpoint and the host. Pinning the fetch to the issuer does
+not stop the document naming somewhere else inside itself, and an issuer naming
+an authorization endpoint elsewhere turns every sign-in into a redirect of its
+choosing. There is no way to allow it: the deployment reaches this provider
+through a proxy that serves the whole of it from one host, or it signs in
+through the trusted header instead.</p>
+<p>The provider is changing. An identifier belongs to the provider that
+issued it, and the same string names somebody else at another one, so a
+deployment configured for a provider its bound identities do not name refuses
+to start.</p>
+<ol>
+<li>Point <code>OPENPSIRT_OIDC_ISSUER</code> back at the <strong>old</strong> provider, or configure the
+   trusted header with no provider at all where the old one cannot be reached
+   either. A binding is withdrawn while the provider that made it is still
+   configured.</li>
+<li><code>DELETE /v1/people/{identity}/identifier</code> for each person. The
+   authorization and the roles stay; only the pin goes.</li>
+<li>Configure the new provider and restart. Each name is redeemed again by
+   whoever next arrives holding it.</li>
+</ol>
+<p>Doing it the other way round — configuring the new provider first — leaves a
+process that will not start. The refusal names the old issuer and the steps, so
+the way out is to put that value back and start at step 1.</p>
+<p>What is compared is the <strong>issuer</strong>, not <code>OPENPSIRT_OIDC_NAME</code>. Renaming the
+button changes nothing, and repointing the issuer while leaving the button
+alone is caught.</p>
+<h3 id="github">GitHub<a class="headerlink" href="#github" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_GITHUB_CLIENT_ID</code></td>
+<td>The OAuth application's client id. Empty means GitHub sign-in is off. Not to be set alongside <code>OPENPSIRT_OIDC_ISSUER</code></td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_GITHUB_CLIENT_SECRET</code></td>
+<td>Its secret</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_GITHUB_ORG</code></td>
+<td>Restrict sign-in to members of one organization, and read its teams as groups. Empty means anybody with a GitHub account, which is rarely what you want</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="the-trusted-header">The trusted header<a class="headerlink" href="#the-trusted-header" title="Permanent link">&para;</a></h3>
+<p>Both the header and the sources it is believed from are required together: a
+header named with nothing to trust it from is either a mistake or the first
+half of one, and the process stops rather than accept a header anybody can set.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Meaning</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_TRUSTED_HEADER</code></td>
+<td>The header an identity-aware proxy sets to say who somebody is</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_TRUSTED_SOURCES</code></td>
+<td>Addresses or CIDR ranges the header is believed from, comma-separated. Anything else presenting it is ignored</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_TRUSTED_GROUPS_HEADER</code></td>
+<td>Where that proxy reports group membership, if it does</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_TRUSTED_GROUPS_DELIMITER</code></td>
+<td>What separates the names in it. Neither the header nor the separator is standardized, so both are named rather than guessed</td>
+<td><code>,</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="attachment-storage">Attachment storage<a class="headerlink" href="#attachment-storage" title="Permanent link">&para;</a></h2>
+<p>Absent is ordinary: with none of this set, attachments are off and everything
+else works. An operator who wants none should not have to run a bucket.</p>
+<p><code>OPENPSIRT_ATTACHMENT_BUCKET</code> is what turns the object store on. The endpoint
+is what a self-hosted store needs and a cloud one does not, and credentials are
+optional — a deployment on a cloud provider gets a rotating role from its
+environment rather than a key somebody stored.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_BUCKET</code></td>
+<td>The bucket files are kept in. Empty means attachments are off</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_ENDPOINT</code></td>
+<td>The address of a self-hosted store. A cloud provider needs none</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_REGION</code></td>
+<td>The region, where the store wants one</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_KEY</code></td>
+<td>Access key, where the environment supplies no role</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_SECRET</code></td>
+<td>Its secret</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_SESSION_TOKEN</code></td>
+<td>A session token, where the credentials are temporary ones</td>
+<td>unset</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_PATH_STYLE</code></td>
+<td>Address the bucket in the path rather than the host, which is what a self-hosted store usually wants. Follows the endpoint rather than having a default of its own</td>
+<td>set when an endpoint is</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_ALLOW_HTTP</code></td>
+<td>Accept an endpoint that is not <code>https</code> and is not this machine. Read what it costs below before setting it</td>
+<td>off</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_ATTACHMENT_DIR</code></td>
+<td>A directory to keep files in instead, for running the tool without standing up an object store. One process and one disk, so never a production option; the bucket wins where both are set</td>
+<td>unset</td>
+</tr>
+</tbody>
+</table>
+<p>An endpoint that is not <code>https</code> is refused, because a file is handed over as a
+redirect to a signed address and that address is a bearer token: anybody on the
+path between the browser and the store may spend it for the file it names.
+Loopback is exempt, since nothing crosses a network.</p>
+<p><code>OPENPSIRT_ATTACHMENT_ALLOW_HTTP</code> accepts one anyway, for a store on a network
+you are content to carry those addresses across. A deployment that sets it is
+told so at every start rather than only where it was configured:</p>
+<pre><code>WARN attachment links cross the network in the clear endpoint=http://minio.internal:9000
+</code></pre>
+<p>This is not <code>OPENPSIRT_PLAIN_HTTP</code>, which is about serving this application
+without TLS and loosens cookies. One is a file on the way out and the other a
+session on the way in; a deployment can want either without the other.</p>
+<h2 id="the-work-queue">The work queue<a class="headerlink" href="#the-work-queue" title="Permanent link">&para;</a></h2>
+<p>Reading a scan and running a scanner are jobs in a queue held in the database.
+Each bound below is what a deployment sizes; left unset, the built-in value
+applies, and each takes effect at the next start rather than at once.</p>
+<p>How deep the queue may get before uploads are refused is not here: it is a
+setting an administrator changes on screen, because the refusal lands on a
+build server and waiting for a restart is not a remedy.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_QUEUE_MAX_ATTEMPTS</code></td>
+<td>How many times a job is tried before it is set aside with its last error</td>
+<td><code>5</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_QUEUE_CLAIM_TIMEOUT</code></td>
+<td>How long a claim is honored with nothing heard from the worker holding it, after which another worker may take the job. It bounds a worker going silent, not how long a job may take</td>
+<td><code>30m</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_QUEUE_HEARTBEAT</code></td>
+<td>How often a running job renews its claim. Well under the claim timeout, so several renewals may fail before the claim is at risk — a value that is not below it is refused at startup</td>
+<td><code>5m</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_QUEUE_MAX_HOLD</code></td>
+<td>How long one claim may be renewed for altogether, after which the work is cancelled and the attempt recorded as a failure. It is what stops a worker wedged inside its work renewing for ever, and it has to stay above both the claim timeout and <code>OPENPSIRT_SCANNER_TIMEOUT</code>, which the process checks at startup</td>
+<td><code>2h</code></td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_QUEUE_BACKOFF</code></td>
+<td>How long a failed job waits before it is tried again, multiplied by the attempt</td>
+<td><code>30s</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="scan-file-limits">Scan file limits<a class="headerlink" href="#scan-file-limits" title="Permanent link">&para;</a></h2>
+<p>A scan file is somebody else's output arriving over a link this deployment does
+not control, so it is read within bounds. These are the ceilings; each is
+refused with a sentence naming what was exceeded rather than by failing
+partway.</p>
+<p>Leave one unset and it keeps the built-in value, so a deployment changing one
+does not have to restate the rest.</p>
+<p>The built-in values are set from what reading a document costs in memory, not
+from how large a document looks. An edge holds about half a kilobyte of heap
+while it is being read and a component about one and a third, so the defaults
+below allow roughly 250 MB for one document. They are still several times the
+largest producer we have. Raise them on a deployment with a bigger box and a
+bigger inventory, and raise the container's memory limit with them.</p>
+<p>That 250 MB is the server's share of the pod. The scanner runs as a second
+process in the same container, so the memory limit covers both — see
+<a href="#memory-and-the-scanners-database">Memory and the scanner's database</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_BYTES</code></td>
+<td>How large a single document may be</td>
+<td>256 MB</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_COMPONENTS</code></td>
+<td>How many components it may describe. About 1.3 KB of heap each while reading</td>
+<td>100,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_EDGES</code></td>
+<td>How many dependency edges it may declare. The component count does not bound this: a thousand components can declare a million edges between them. About 0.5 KB of heap each while reading</td>
+<td>250,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_FILES</code></td>
+<td>How many files a document may catalog. Not covered by the component count: a real scan catalogs forty-five to fifty-six files per package, so one bound cannot size both</td>
+<td>500,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_STATEMENTS</code></td>
+<td>How many claims a suppression document may make</td>
+<td>100,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_DEPTH</code></td>
+<td>How deeply it may nest</td>
+<td>64</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_INGEST_MAX_DOCUMENTS</code></td>
+<td>How many suppression documents may arrive with one scan. Every bound above is per document, so without a ceiling on the count they are multiplied by a number nothing decides. The claim bound is spent across the documents rather than per document</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+<h2 id="scanner-output-limits">Scanner output limits<a class="headerlink" href="#scanner-output-limits" title="Permanent link">&para;</a></h2>
+<p>The scanner's report is read in the same process, and its size is components ×
+matches × references — the first of which a producer controls by uploading a
+scan file. So it is bounded the way a scan file is, from the same budget, and
+each bound left unset keeps the built-in value.</p>
+<p>A report past its ceiling fails the run rather than being read in part: half a
+report reads as a product that stopped having problems. Complaints past theirs
+are dropped instead, because a scanner with a lot to say still scanned.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>What it does</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OPENPSIRT_SCANNER_MAX_OUTPUT</code></td>
+<td>How large one report may be. The load-bearing bound: every count below is bounded by it</td>
+<td>256 MB</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SCANNER_MAX_COMPLAINT</code></td>
+<td>How much of what a scanner said while running is kept</td>
+<td>1 MB</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SCANNER_MAX_MATCHES</code></td>
+<td>How many matches one report may state. One match becomes as many findings as its component has places, so a scan's findings are an upper bound on its report's matches: the largest real image measured here produced 335,021 findings, and stated fewer matches than that</td>
+<td>500,000</td>
+</tr>
+<tr>
+<td><code>OPENPSIRT_SCANNER_MAX_REFERENCES</code></td>
+<td>How many addresses one match may point at. Bounded separately because the two multiply</td>
+<td>1,000</td>
+</tr>
+</tbody>
+</table>
+<h2 id="memory-and-the-scanners-database">Memory and the scanner's database<a class="headerlink" href="#memory-and-the-scanners-database" title="Permanent link">&para;</a></h2>
+<p>The container runs two processes that use memory: the server, and the scanner
+it starts as a child for every scan. One memory limit covers both, and an
+excess is answered by the kernel killing the larger of the two — which is the
+scanner. The scan is then recorded as a run that failed while the pod stays up,
+so nothing in the failure points at the limit.</p>
+<p>The chart ships:</p>
+<pre><code class="language-yaml">resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 2Gi
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>What draws on it</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The server reading one scan document</td>
+<td>About 250 MB at the built-in bounds. <a href="#scan-file-limits">Scan file limits</a> sets it, and raising those raises this</td>
+</tr>
+<tr>
+<td>The server reading one scanner report</td>
+<td>Bounded by <code>OPENPSIRT_SCANNER_MAX_OUTPUT</code>. A read and a scan run in separate loops, so a pod can be doing both</td>
+</tr>
+<tr>
+<td>The scanner itself</td>
+<td>Not bounded by anything here. It is a separate program, and its report is bounded only once written</td>
+</tr>
+<tr>
+<td>The scanner importing its vulnerability database</td>
+<td>The largest single draw, and it happens on every start where the data is not kept</td>
+</tr>
+<tr>
+<td>Fetching a repository for <a href="#patch-branches">patch branches</a></td>
+<td>Off unless the deployment turns it on. Up to 1.3 GB for the first copy of the kernel from git.kernel.org</td>
+</tr>
+</tbody>
+</table>
+<p>Raise the limit for a bigger inventory, for raised scan-file bounds, or where
+the database is imported on every start.</p>
+<h3 id="database-persistence">Database persistence<a class="headerlink" href="#database-persistence" title="Permanent link">&para;</a></h3>
+<p>The scanner fetches its data at runtime, because a database built into an image
+is stale the day after that image is published. Where the data is not kept
+across restarts it is downloaded and imported again on every start, and that
+import is the largest thing the pod does with memory.</p>
+<p>Keeping it takes the import off the common path. The chart will make the claim:</p>
+<pre><code class="language-yaml">scanner:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: &quot;&quot;          # the cluster's default
+    accessModes:
+      - ReadWriteOnce
+</code></pre>
+<p>Every replica mounts the one claim, so the access mode has to allow as many
+nodes as there are replicas. <code>ReadWriteOnce</code> binds to a single node: with more
+than one replica, use <code>ReadWriteMany</code> on a storage class that offers it, name a
+claim per replica set through <code>scanner.persistence.existingClaim</code>, or run one
+replica. The chart refuses the combination it can see at render time rather
+than leaving a replica Pending.</p>
+<p>A claim you made yourself is named instead, and wins over the one the chart
+would make:</p>
+<pre><code class="language-yaml">scanner:
+  persistence:
+    existingClaim: grype-db
+</code></pre>
+<p>Naming both is refused. The claim the chart makes is kept when the release is
+uninstalled, because the data is re-downloadable and a claim is not worth
+deleting by surprise.</p>
+<h3 id="an-exhausted-limit">An exhausted limit<a class="headerlink" href="#an-exhausted-limit" title="Permanent link">&para;</a></h3>
+<p>The scanner is killed by the kernel rather than exiting, so the run fails with
+the signal in the message:</p>
+<pre><code>run /usr/local/bin/grype: signal: killed
+</code></pre>
+<p>The job is retried with backoff and set aside after <code>OPENPSIRT_QUEUE_MAX_ATTEMPTS</code>
+attempts, so the symptom is scans that will not complete rather than a pod that
+will not stay up. Where the pod itself is killed instead, a deployment without a
+kept database restarts into the import that exhausted it.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
