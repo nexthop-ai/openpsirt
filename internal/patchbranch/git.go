@@ -18,6 +18,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 )
@@ -145,7 +146,7 @@ func (g git) run(ctx context.Context, budget time.Duration, dir, proxy string, s
 	// Where the program is killed at the deadline, the pipes it held are not
 	// waited on for ever by anything it started.
 	command.WaitDelay = time.Minute
-	if err := command.Run(); err != nil {
+	if err := background.Run(command); err != nil {
 		complaint := strings.TrimSpace(stderr.String())
 		if ctx.Err() != nil {
 			return fmt.Errorf("git %s did not finish within %s", args[0], budget)

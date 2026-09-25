@@ -133,6 +133,15 @@ two processes, one of them unmeasured, and a peak paid at start — and the
 number that would settle them is the scanner's own memory against a real
 inventory.
 
+### CPU priority
+
+| Rule | |
+|---|---|
+| The scanner and git start at niceness 10 | Both are background work. The pod's CPU is shared by the server and its children, and at a lower priority they take what the server leaves idle, so a request is answered while a scan or a fetch runs |
+| They are born at it, and what they start inherits it | The priority is lowered on the thread that forks them. Set on a child after it starts, git's own children could already be running at the server's priority |
+| Niceness orders the processes inside one pod | It does not change how CPU is shared between pods: the pod's requests and limits decide that |
+| A priority that cannot be lowered is logged and the program runs anyway | Lowering one's own priority needs no privilege, so this is a platform refusing rather than a configuration to fix |
+
 ## Image and archive checks
 
 These are the only places these claims are tested rather than asserted.
