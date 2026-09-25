@@ -261,15 +261,10 @@ export function Release({ product, stream }: { product: string; stream: string }
             <div>
               <Link to="/reports/advisories-issued">Advisories issued</Link>
             </div>
-            <div className="hint">
-              What has been published about flaws in our own product.{" "}
-              {/* Deliberately not narrowed to this release. An advisory is
-                  about a flaw and is published once, so tying it to whichever
-                  release happened to be cut nearby would invent a
-                  relationship the record does not hold. */}
-              Not narrowed to this release: an advisory is about a flaw rather than about a release,
-              and it goes out once however many releases carry the flaw.
-            </div>
+            {/* Not narrowed to this release. An advisory is about a flaw and is
+                published once, so tying it to whichever release was cut nearby
+                would invent a relationship the record does not hold. */}
+            <div className="hint">Published about flaws in our own product. Every release.</div>
           </li>
           {variants.map((variant) => (
             <li key={`vex-${variant.name}`}>
@@ -285,8 +280,7 @@ export function Release({ product, stream }: { product: string; stream: string }
                 </Link>
               </div>
               <div className="hint">
-                For a customer&rsquo;s own scanner. Approved dismissals and public findings only,
-                and a deferral is absent rather than published as anything.
+                For a customer&rsquo;s own scanner. Approved dismissals and public findings only.
               </div>
             </li>
           ))}

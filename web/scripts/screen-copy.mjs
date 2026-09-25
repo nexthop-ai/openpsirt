@@ -96,7 +96,8 @@ function lead(node) {
   return parts.join(" ").split(/\s+/).filter(Boolean).slice(0, 6).join(" ");
 }
 
-// Every paragraph, hint and empty-state detail in one file past the bound,
+// Every paragraph, element styled as a hint, and empty-state detail in one
+// file past the bound,
 // and how many were examined.
 export function proseIn(text, file = "x.tsx", bound = BOUND) {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -112,7 +113,7 @@ export function proseIn(text, file = "x.tsx", bound = BOUND) {
   const visit = (node) => {
     if (ts.isJsxElement(node)) {
       const tag = tagName(node);
-      if (tag === "p" || (tag === "span" && /\bhint\b/.test(className(node)))) {
+      if (tag === "p" || /\bhint\b/.test(className(node))) {
         report(node, shown(node));
       }
     }

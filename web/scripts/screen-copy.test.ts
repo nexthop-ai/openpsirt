@@ -45,6 +45,27 @@ describe("standing prose on a screen", () => {
     expect(reported(`const x = <th title="${long}">One pair</th>;`)).toEqual([]);
   });
 
+  it("reports a hint whatever element carries it", () => {
+    expect(reported(`const x = <div className="hint">${long}</div>;`)).toEqual([BOUND + 5]);
+    expect(reported(`const x = <li className="hint">${long}</li>;`)).toEqual([BOUND + 5]);
+    expect(reported(`const x = <div className="hint">${short}</div>;`)).toEqual([]);
+  });
+
+  it("counts the text of a template literal around what it interpolates", () => {
+    expect(reported(`const x = <p>{\`${long} \${n} ${short}\`}</p>;`)).toEqual([BOUND + 7]);
+    expect(reported(`const x = <p>{\`\${n} ${short}\`}</p>;`)).toEqual([]);
+  });
+
+  it("counts both sides of a string joined with +", () => {
+    expect(reported(`const x = <p>{"${long}" + " ${short}"}</p>;`)).toEqual([BOUND + 7]);
+    expect(reported(`const x = <p>{"${short}" + name}</p>;`)).toEqual([]);
+  });
+
+  it("counts the longer side of a fallback", () => {
+    expect(reported(`const x = <p>{note ?? "${long}"}</p>;`)).toEqual([BOUND + 5]);
+    expect(reported(`const x = <p>{note ?? "${short}"}</p>;`)).toEqual([]);
+  });
+
   it("finds no standing prose in the interface, and looked at some", async () => {
     const { found, examined } = await sweep();
     expect(

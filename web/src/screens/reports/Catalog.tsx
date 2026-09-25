@@ -74,9 +74,8 @@ export function Catalog() {
               <a href="/v1/running-out.json?days=30">JSON</a>
             </div>
             <div className="hint">
-              Open, undecided and due inside the window. Thirty days by default;{" "}
-              <span className="id">?days=</span> takes any number up to a year. Answered deadlines
-              are excluded.
+              Open, undecided and due within 30 days. <span className="id">?days=</span> takes up to
+              a year.
             </div>
           </li>
           {at.product && at.stream && at.variant ? (
@@ -89,8 +88,7 @@ export function Catalog() {
                 <a href={vexAt(at.product, at.stream, at.variant)}>OpenVEX</a>
               </div>
               <div className="hint">
-                For a customer&rsquo;s own scanner. Approved dismissals and public findings only,
-                and a deferral is absent rather than published as anything.
+                For a customer&rsquo;s own scanner. Approved dismissals and public findings only.
               </div>
             </li>
           ) : (

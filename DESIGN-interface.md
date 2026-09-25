@@ -1665,7 +1665,7 @@ the reader, which is what a design document is for.
 
 | It checks | |
 |---|---|
-| Every paragraph, every hint span, and every `hint` or `detail` given as text | The shapes the explanation drifted into |
+| Every paragraph, every element styled as a hint, and every `hint` or `detail` given as text | The shapes the explanation drifted into, whatever element carries them |
 | At most 20 words each | A label, a value and one short line fit. A second sentence of reasoning does not |
 | What a paragraph can show at once | Every text node and string it renders. The longer side of a condition is counted, so a sentence inside a branch is prose like any other. A list it maps over is data and is not counted |
 | Nothing examined fails the run | A check that found no paragraph looked at nothing |
