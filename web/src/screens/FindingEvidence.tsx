@@ -18,12 +18,7 @@ import { mayOf, useWho } from "../app/session";
 import { linkable } from "../ui/addressable";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
-import { intoTheTree, wayDown } from "./waydown";
-
-// Every place the component sits at, as the complete chain. A place is the
-// component and what directly pulled it in, which is what a decision is
-// recorded against.
-const CHAINS = 6;
+import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
 
 // Away is an address somebody else supplied, shown as a link only where it is
 // one this deployment is willing to send a reader to.
@@ -58,6 +53,7 @@ export function Places({
   const [all, setAll] = useState(false);
   if (places.length === 0) return null;
   const shown = all ? places : places.slice(0, CHAINS);
+  const more = moreWays(places.length, all);
   return (
     <div className="pathblock">
       <h3>Dependency path</h3>
@@ -106,22 +102,24 @@ export function Places({
           );
         })}
       </div>
-      {places.length > CHAINS && (
-        <button type="button" className="linkish" onClick={() => setAll(!all)}>
-          {all ? `Show ${CHAINS}` : `Show all ${places.length} ways down`}
-        </button>
-      )}
-      {/* The tree is handed the whole chain, not only the name: it opens
-          each step on the way down and lands on the component, so arriving
-          from a finding shows where it sits rather than the root.
+      <div className="pathfoot">
+        {more && (
+          <button type="button" className="btn quiet" onClick={() => setAll(!all)}>
+            {more}
+          </button>
+        )}
+        {/* The tree is handed the whole chain, not only the name: it opens
+            each step on the way down and lands on the component, so arriving
+            from a finding shows where it sits rather than the root.
 
-          From a place the graph could be walked to, whichever of them that
-          is. A chain is what the tree opens along, and the first place is not
-          always one that has a route up — handed that one, the tree was given
-          a name to land on and no way down to it. */}
-      <Link to={`${build}/components?${intoTheTree(places)}`} className="linkish">
-        View in dependency tree →
-      </Link>
+            From a place the graph could be walked to, whichever of them that
+            is. A chain is what the tree opens along, and the first place is
+            not always one that has a route up — handed that one, the tree was
+            given a name to land on and no way down to it. */}
+        <Link to={`${build}/components?${intoTheTree(places)}`} className="linkish">
+          View in dependency tree →
+        </Link>
+      </div>
     </div>
   );
 }

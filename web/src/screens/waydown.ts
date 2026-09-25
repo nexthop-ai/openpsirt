@@ -73,3 +73,14 @@ export function intoTheTree(places: Sitting[]): string {
   if (last?.version) query.set("version", last.version);
   return query.toString();
 }
+
+// How many ways down the path shows before it is asked for the rest.
+export const CHAINS = 6;
+
+// What the control under the path does, in the words of what it adds: the
+// rest of them while folded, and back to the first few once open. Absent where
+// every way down already shows.
+export function moreWays(total: number, open: boolean): string | undefined {
+  if (total <= CHAINS) return undefined;
+  return open ? "Show fewer" : `Show ${total - CHAINS} more`;
+}

@@ -1425,6 +1425,18 @@
   font-size: 14px;
   font-weight: 600;
 }
+/* Under the tree: what unfolds it on the left, where it leads on the right.
+   Two controls that sit inline run together into one line of text. */
+.pathfoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap);
+  margin-top: 10px;
+}
+.pathfoot > a {
+  margin-left: auto;
+}
 
 /* Who holds a finding, as one row at the head of the triage pane. It was a
    card with a heading and a hint on either side, around a dropdown. */

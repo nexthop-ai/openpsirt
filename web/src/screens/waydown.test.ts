@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { intoTheTree, wayDown } from "./waydown";
+import { intoTheTree, moreWays, wayDown } from "./waydown";
 import type { Sitting } from "../ui/Covering";
 
 // The two separators the tree's path parameter uses, written as escapes: a
@@ -76,5 +76,19 @@ describe("opening the dependency tree from a finding", () => {
     );
     expect(query.get("at")).toBe("curl");
     expect(query.get("path")).toBeNull();
+  });
+});
+
+describe("the control under the dependency path", () => {
+  it("says how many more ways down it adds while folded", () => {
+    expect(moreWays(30, false)).toBe("Show 24 more");
+  });
+
+  it("offers to fold back once open", () => {
+    expect(moreWays(30, true)).toBe("Show fewer");
+  });
+
+  it("is absent when every way down already shows", () => {
+    expect(moreWays(6, false)).toBeUndefined();
   });
 });
