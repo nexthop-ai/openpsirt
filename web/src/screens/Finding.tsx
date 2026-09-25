@@ -904,7 +904,7 @@ export function Finding() {
                 status instead. */}
             {publishers.length === 0 && (
               <div className="card">
-                <h3>What publishers say</h3>
+                <h3>Publisher statements</h3>
                 <p className="reading" title="Uploaded by an administrator, never fetched">
                   Nothing uploaded
                 </p>
@@ -913,7 +913,7 @@ export function Finding() {
 
             {publishers.length > 0 && (
               <div className="card">
-                <h3>What publishers say</h3>
+                <h3>Publisher statements</h3>
                 <p className="reading" style={{ marginBottom: 8 }}>
                   Evidence only. Nothing here is decided or counted from it.
                 </p>

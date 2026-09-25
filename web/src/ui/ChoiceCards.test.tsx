@@ -20,9 +20,7 @@ type Value = (typeof OPTIONS)[number]["value"];
 
 function Harness({ start }: { start: Value | "" }) {
   const [value, setValue] = useState<Value | "">(start);
-  return (
-    <ChoiceCards label="Where it came from" value={value} onChange={setValue} options={OPTIONS} />
-  );
+  return <ChoiceCards label="Source" value={value} onChange={setValue} options={OPTIONS} />;
 }
 
 let host: HTMLDivElement;
@@ -54,9 +52,7 @@ function press(key: string) {
 describe("choice cards", () => {
   it("offers the first card as the one tab stop when nothing is picked", () => {
     act(() => root.render(<Harness start="" />));
-    expect(host.querySelector('[role="radiogroup"]')?.getAttribute("aria-label")).toBe(
-      "Where it came from",
-    );
+    expect(host.querySelector('[role="radiogroup"]')?.getAttribute("aria-label")).toBe("Source");
     expect(checked()).toEqual(["false", "false", "false"]);
     expect(stops()).toEqual([0, -1, -1]);
   });

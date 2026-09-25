@@ -65,7 +65,7 @@ export function InventoryChanges() {
           </Link>{" "}
           › <b>upload {scan}</b>
         </span>
-        <h2>What this upload changed</h2>
+        <h2>Changes in this upload</h2>
         <p>
           {product} · {stream} · {variant} · against the upload before it
         </p>

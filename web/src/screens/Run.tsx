@@ -176,7 +176,7 @@ function Shape({
           {to && (
             <p style={{ margin: "0 0 8px" }}>
               <Link to={to} className="linkish">
-                Read them →
+                Opened findings →
               </Link>
             </p>
           )}

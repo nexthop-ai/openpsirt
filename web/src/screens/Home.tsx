@@ -920,7 +920,7 @@ function Lapsed() {
       {!unread && stoppedTotal === 0 && <p className="reading">Nothing has lapsed.</p>}
       <footer>
         <Link to="/review-queue#lapsed" className="linkish">
-          View →
+          Lapsed decisions →
         </Link>
       </footer>
     </div>

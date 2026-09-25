@@ -126,6 +126,101 @@ export function proseIn(text, file = "x.tsx", bound = BOUND) {
   return { found, examined };
 }
 
+// A control whose whole text names nothing: what it leads to or does is left
+// for the reader to guess from where it sits.
+export const VAGUE = new Set([
+  "read them",
+  "see them",
+  "read more",
+  "see more",
+  "more",
+  "here",
+  "click here",
+  "view",
+  "open",
+  "show",
+  "go",
+  "link",
+  "this",
+]);
+
+// A heading or label that asks rather than names. Headings and field labels
+// are noun phrases (REQ-60).
+const ASKS = /^(what|where|who|whom|whose|how|when|which|why)\b/i;
+
+// The text a node says when all of it is written out, or undefined where any
+// of it is computed: a label built from a value names that value.
+function written(node) {
+  let out = "";
+  let computed = false;
+  const walk = (n) => {
+    if (ts.isJsxText(n)) out += n.text;
+    else if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) out += n.text;
+    else if (ts.isJsxExpression(n) && n.expression && !ts.isStringLiteral(n.expression)) {
+      computed = true;
+    } else ts.forEachChild(n, walk);
+  };
+  if (ts.isJsxElement(node)) node.children.forEach(walk);
+  else walk(node);
+  return computed ? undefined : out.replace(/\s+/g, " ").trim();
+}
+
+const CONTROLS = new Set(["a", "Link", "button"]);
+const HEADINGS = new Set(["h2", "h3", "h4", "label", "legend"]);
+const LABEL_PROPS = new Set(["label", "legend", "title"]);
+const LABELLED = new Set([
+  "Field",
+  "Pick",
+  "Group",
+  "Check",
+  "Choices",
+  "Editor",
+  "ChoiceCards",
+  "FilterMenu",
+]);
+
+// Every control whose whole text is vague, and every heading or label that
+// asks rather than names, in one file, and how many were examined.
+export function namesIn(text, file = "x.tsx") {
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const found = [];
+  let examined = 0;
+  const at = (node) => source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+  const visit = (node) => {
+    if (ts.isJsxElement(node)) {
+      const tag = tagName(node);
+      const said = written(node);
+      if (CONTROLS.has(tag) && said !== undefined && said !== "") {
+        examined++;
+        const bare = said
+          .replace(/[→←›»…]/g, "")
+          .trim()
+          .toLowerCase();
+        if (VAGUE.has(bare)) found.push({ at: at(node), rule: "vague", said });
+      }
+      if (HEADINGS.has(tag) && said !== undefined && said !== "") {
+        examined++;
+        if (ASKS.test(said)) found.push({ at: at(node), rule: "asks", said });
+      }
+    }
+    if (ts.isJsxAttribute(node) && node.initializer && ts.isStringLiteral(node.initializer)) {
+      const owner = node.parent?.parent;
+      const tag =
+        owner && (ts.isJsxOpeningElement(owner) || ts.isJsxSelfClosingElement(owner))
+          ? owner.tagName.getText()
+          : "";
+      if (LABEL_PROPS.has(node.name.getText()) && LABELLED.has(tag)) {
+        examined++;
+        const said = node.initializer.text.trim();
+        if (ASKS.test(said)) found.push({ at: at(node), rule: "asks", said });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return { found, examined };
+}
+
 async function sources(dir) {
   const out = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -155,7 +250,32 @@ export async function sweep() {
   return { found, examined };
 }
 
+// The whole tree, for vague controls and asking labels.
+export async function sweepNames() {
+  const found = [];
+  let examined = 0;
+  for (const file of await sources(src)) {
+    const result = namesIn(await readFile(file, "utf8"), file);
+    examined += result.examined;
+    for (const each of result.found) found.push({ file: path.relative(src, file), ...each });
+  }
+  return { found, examined };
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  const names = await sweepNames();
+  if (names.examined === 0) {
+    console.error("No control, heading or label was found, so this checked nothing.");
+    process.exit(1);
+  }
+  for (const each of names.found) {
+    console.error(
+      each.rule === "vague"
+        ? `src/${each.file}:${each.at}: "${each.said}" names nothing. Say what it opens or does.`
+        : `src/${each.file}:${each.at}: "${each.said}" asks. A heading or label names the thing.`,
+    );
+  }
+  if (names.found.length > 0) process.exit(1);
   const { found, examined } = await sweep();
   if (examined === 0) {
     console.error("No paragraph was found in the interface, so this checked nothing.");

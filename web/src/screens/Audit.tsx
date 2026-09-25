@@ -320,7 +320,7 @@ export function Audit() {
       ) : (
         <>
           {alone && onlyDismissals && (
-            <p className="hint">Dismissals with no standing second approval. Read them.</p>
+            <p className="hint">Dismissals with no standing second approval.</p>
           )}
           {alone && !onlyDismissals && (
             <p className="hint">

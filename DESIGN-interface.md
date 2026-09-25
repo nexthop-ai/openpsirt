@@ -1697,7 +1697,9 @@ the reader, which is what a design document is for.
 | Every paragraph, every element styled as a hint, and every `hint` or `detail` given as text | The shapes the explanation drifted into, whatever element carries them |
 | At most 20 words each | A label, a value and one short line fit. A second sentence of reasoning does not |
 | What a paragraph can show at once | Every text node and string it renders. The longer side of a condition is counted, so a sentence inside a branch is prose like any other. A list it maps over is data and is not counted |
-| Nothing examined fails the run | A check that found no paragraph looked at nothing |
+| A link or a button whose whole text names nothing | "Read them", "See more", "View", "Open", "Here" and the like. A control says what it opens or does |
+| A heading or a field label that asks | One beginning with what, where, who, how, when, which or why. Headings and labels are noun phrases (REQ-60): "Sent", not "What has gone out" |
+| Nothing examined fails the run | A check that found no paragraph, control or label looked at nothing |
 
 | It cannot check | |
 |---|---|
@@ -1705,6 +1707,8 @@ the reader, which is what a design document is for.
 | Whether a line is needed at all | Cut before rewriting is judgment |
 | Text a helper builds | A string assembled in a function and passed in is counted as nothing |
 | Tooltips | A `title` is where clarification belongs, so it is left alone |
+| A computed control label or heading | A label built from a value names that value, so only text written out in full is read |
+| A description that does not start with a question word | "The component carrying it" names nothing either, and reading for it is a person's job |
 
 A paragraph that has to stay longer is named in the gate's allowlist with its
 reason.

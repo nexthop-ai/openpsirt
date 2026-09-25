@@ -12,6 +12,7 @@ import { Drawer } from "./Drawer";
 import { Dropzone } from "./Dropzone";
 import { Failed } from "./Failed";
 import { useReseed } from "./reseed";
+import { Required } from "./Required";
 
 // Uploading an inventory by hand: the same endpoint a pipeline uses, for a
 // build with no automation yet, or for trying the tool on any SBOM to hand.
@@ -174,10 +175,8 @@ export function UploadDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
       <div className="field">
         <label>
-          Inventory{" "}
-          <span style={{ textTransform: "none", letterSpacing: 0, color: "var(--sev-high)" }}>
-            required
-          </span>
+          Inventory
+          <Required />
         </label>
         <Dropzone
           files={inventory ? [inventory] : []}
