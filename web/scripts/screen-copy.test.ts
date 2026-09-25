@@ -98,6 +98,13 @@ describe("controls and labels that name their thing", () => {
     expect(rules(`const x = <Field label="When it lands"><input /></Field>;`)).toEqual(["asks"]);
   });
 
+  it("reads a label past a child element's attributes", () => {
+    expect(
+      rules(`const x = <label htmlFor="a">What it is <span style={{ color: c }}>x</span></label>;`),
+    ).toEqual(["asks"]);
+    expect(rules(`const x = <Link to={to}><Icon name="arrow" /> View</Link>;`)).toEqual(["vague"]);
+  });
+
   it("passes a heading or a label that names", () => {
     expect(rules(`const x = <h3>Sent</h3>;`)).toEqual([]);
     expect(rules(`const x = <Field label="Recipient"><input /></Field>;`)).toEqual([]);

@@ -154,6 +154,7 @@ function written(node) {
   let out = "";
   let computed = false;
   const walk = (n) => {
+    if (ts.isJsxAttributes(n)) return;
     if (ts.isJsxText(n)) out += n.text;
     else if (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) out += n.text;
     else if (ts.isJsxExpression(n) && n.expression && !ts.isStringLiteral(n.expression)) {

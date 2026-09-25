@@ -574,7 +574,7 @@ a.kpi:hover {
   background: var(--surface);
 }
 /* The package the screen is about, marked so the eye lands on it first. */
-.sits > li.at::before {
+.sits > li.here::before {
   left: -8px;
   top: 3px;
   width: 13px;

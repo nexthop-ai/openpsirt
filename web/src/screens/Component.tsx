@@ -491,7 +491,7 @@ function Sits({
             )}
           </li>
 
-          <li className="at">
+          <li className="here">
             <span className="eyebrow">
               This package{here.ecosystem ? ` · ${here.ecosystem}` : ""}
             </span>

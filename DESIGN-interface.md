@@ -168,7 +168,7 @@ which of "Dojo", "Ledger" and "Obsidian" is the light one.
 ### State chips
 
 A state is a word on a tint of its color. The color says how the reader should
-take the word, so one color never carries two readings.
+take the word.
 
 | Class | Means | Color | Examples |
 |---|---|---|---|
@@ -177,6 +177,7 @@ take the word, so one color never carries two readings.
 | `waiting` | Under way, or waiting on somebody | Amber | Pending, scanning |
 | `warn` | Not wrong yet, and close to it | Amber | A queue at its limit |
 | `lapsed` | Ended without standing | Orange | Lapsed, withdrawn, sent back |
+| `open` | Neither done nor wrong: a state the reader reads rather than acts on | Muted | A branch, undecided, identifier cannot be read |
 | `bad` | Wrong, and somebody should look | Red | Failing, failed, stopped |
 | none | A fact, neither good nor bad | Muted | Left, held back |
 
@@ -627,7 +628,7 @@ and the act hangs off it.
 |---|---|
 | The position is drawn before the action | What is possible follows from where it sits, and the same two numbers read opposite ways at the two ends of a graph: nothing open on it and everything beneath means the package itself is the only lever |
 | The open issues are a button beside the name | "1,840 open issues →", to the findings list for every binary of the source. It is the question most people open the page with, and a link at the end of a grey line is one nobody finds. Absent where nothing is open |
-| A count is the link to what it counts | The picked binary's "N open" opens the list for that binary, and each build's count opens that build's list. A trailing "Read them" named nothing |
+| A count is the link to what it counts | The picked binary's "N open" opens the list for that binary, and each build's count opens that build's list |
 | Releases are picked inside the promise, ticked to the ones shipping this version | One bump moves every release at that version. Picked in a column of the table instead, the form appeared only once something was ticked, so the control was invisible until somebody guessed at it |
 | The version to move to is offered and never required | The list is what the scanner named; the server is what refuses one it has not heard of. So a version newer than anything reported can still be named, which is the case where an upgrade is ahead of the advisories |
 | Nothing to upgrade to is a state, not an empty form | Where no version fixes any of it, an upgrade would lapse and the work is a judgment. A form that cannot be filled in is one somebody fills in anyway |
