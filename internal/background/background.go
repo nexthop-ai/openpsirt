@@ -1,7 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package background runs a pass on a timer until its context ends.
+// Package background runs a pass on a timer until its context ends, and starts
+// the programs a pass runs below the server's CPU priority.
 //
 // One body for every recurring pass: default a non-positive interval to a
 // constant of its own, start a timer that fires at once, loop selecting on the

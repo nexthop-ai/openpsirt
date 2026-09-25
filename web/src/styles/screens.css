@@ -1532,3 +1532,47 @@
     justify-self: start;
   }
 }
+
+/* ---------- patch branch lookups ---------- */
+
+/* The visit under way, set apart from the lists under it because it is the
+   one thing on the panel that moves. */
+.patchnow {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--raised);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.patchnow h4,
+.patches h4 {
+  margin: 0;
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+.patchnow p {
+  margin: 0;
+}
+.patchbar {
+  width: 100%;
+  height: 8px;
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.patchbar::-webkit-progress-bar {
+  background: var(--line);
+  border-radius: 999px;
+}
+.patchbar::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 999px;
+}
+.patchbar::-moz-progress-bar {
+  background: var(--accent);
+  border-radius: 999px;
+}

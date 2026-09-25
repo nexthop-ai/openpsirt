@@ -83,3 +83,6 @@ func (p *Pass) Unpolled() *Pass {
 	p.copies.poll = time.Hour
 	return p
 }
+
+// Cycle is one wake of the pass, answering how many repositories it visited.
+func (p *Pass) Cycle(ctx context.Context) int { return p.cycle(ctx) }

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -99,7 +100,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	cmd.Stderr = &errs
 	cmd.WaitDelay = waitDelay
 
-	if err := cmd.Run(); err != nil {
+	if err := background.Run(cmd); err != nil {
 		return Result{}, fmt.Errorf("run %s: %w: %s", g.executable(), err, tail(errs.String()))
 	}
 	// A report past its ceiling fails the run and complaints past theirs do
