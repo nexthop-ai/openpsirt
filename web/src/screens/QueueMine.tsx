@@ -1,4 +1,3 @@
-import { pathTo } from "./list";
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -13,6 +12,7 @@ import { Loading } from "../ui/Loading";
 import { Because } from "../ui/Outcome";
 import { Exploited, Severity } from "../ui/Severity";
 import { Wide } from "../ui/Wide";
+import { pathTo } from "./list";
 
 // The fate of what you proposed.
 //

@@ -1,4 +1,3 @@
-import { pathTo } from "./list";
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -28,6 +27,7 @@ import { on } from "../ui/when";
 import { useWho } from "../app/session";
 import type { Who } from "../app/session";
 import { Wide } from "../ui/Wide";
+import { pathTo } from "./list";
 
 // The comparison between a product's two spellings: a name people type is
 // matched without regard to capitals, which is the rule the server applies to
