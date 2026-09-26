@@ -3,6 +3,7 @@
 
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { useSelection } from "./useSelection";
+import { ReaffirmMany, reaffirmedNotice, type Reaffirmed } from "./ReaffirmMany";
 import { FindingsTable } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
 import { ByBump, ByComponent, Pager, bumpQuery } from "./FindingsViews";
@@ -194,6 +195,7 @@ export function Findings() {
   const { cap: bulkCap, over: overCap } = useBulkCap(picked.size);
   const me = useWho();
   const [handing, setHanding] = useState("");
+  const [reaffirmed, setReaffirmed] = useState<Reaffirmed | null>(null);
   // The list somebody has turned down a prepared claim for, as its address.
   // Kept rather than derived, because "do not use it" is an answer about the
   // list on screen — narrowing further asks a different question, and the rule
@@ -951,6 +953,11 @@ export function Findings() {
             : `${handFailed.toLocaleString()} rows could not be handed over and are still selected.`}
         </p>
       )}
+      {reaffirmed !== null && (
+        <p className="hint" role="status">
+          {reaffirmedNotice(reaffirmed)}
+        </p>
+      )}
       {picked.size > 0 && (
         <div className="batchbar" style={{ marginBottom: 8 }}>
           <span>
@@ -1003,6 +1010,21 @@ export function Findings() {
           >
             {hand.isPending ? "Assigning…" : `Assign ${picked.size}`}
           </button>
+          {!spanning && (
+            <ReaffirmMany
+              product={product}
+              rows={[...picked.values()]}
+              build={(row) => {
+                const { stream: s, variant: v } = buildOf(row);
+                return { stream: s ?? "", variant: v ?? "" };
+              }}
+              onDone={(made) => {
+                setReaffirmed(made);
+                clearPicked();
+                reread();
+              }}
+            />
+          )}
           <button type="button" className="linkish" onClick={clearPicked}>
             Clear
           </button>

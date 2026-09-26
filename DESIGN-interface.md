@@ -522,9 +522,14 @@ back in its own order rather than refusing.
 | Searching is submitted rather than sent per keystroke | Each is a query over every open finding in the build, and a half-typed word is not a question worth asking. It matches anywhere in a component's name, ignoring capitals |
 | A component's name opens the component (reversed) | It narrowed the list, and the component itself sat behind a small "Open →" in the last column next to "Hide" — an act parked away from the thing it acts on, which is the shape the By fix view was deleted for. The name is the way to the thing; narrowing and hiding are the two small acts beside it, and they sit together. The same name on the finding screen opens the same screen, so one word means one thing everywhere it appears |
 
-Selection across rows is a prerequisite, not a convenience. Both bulk workflows
-— accepting a publisher's judgment, and declaring a bump — start by picking a
-filtered set out of the list.
+Selection across rows is a prerequisite, not a convenience. The bulk workflows
+— accepting a publisher's judgment, declaring a bump, and re-affirming what a
+bump lapsed — start by picking a filtered set out of the list.
+
+| Batch bar control | Offered when |
+|---|---|
+| Take, Assign | Anything is selected. Assign needs a product, because who may hold work is a question about one product |
+| Reaffirm | Every selected row is lapsed and the list is inside one product. It opens a box for the one reason every claim shares, and the result says how many claims were re-made and how many wait for a second person. `DESIGN-triage.md` § Re-affirmation across claims holds the rules |
 
 ## Saved filters
 
