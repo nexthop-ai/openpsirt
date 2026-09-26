@@ -329,6 +329,7 @@ name is not enough.
 |---|---|
 | The four parts are identity without the qualifiers | Every choice a refusal offers resolves exactly one component |
 | A part left empty matches anything | A caller that never meets the ambiguity sends nothing more |
+| Except where the part before it was named and exactly one match has nothing in it | A version with no ecosystem then names the component with no identifier, and an ecosystem with no namespace the one with no namespace. The choice offered for such a component carries nothing in that part, so leaving it out is the only way to name it. apko describes each package once more as a directory with no identifier, at the same name and version. A name alone still matches every component of that name |
 | A name matching several is refused with the choices, each carrying all four parts | A choice missing one leads back to the same refusal |
 | Where an issue is open at only one of the matches, that one is taken | One choice is not a choice |
 | Findings rows, tree nodes, the rows of the tree of one's own work, the steps of a way down, component packages, and the unassigned, late, disposed, blocking and claim lists carry the ecosystem and namespace | A screen can send back only what it was given |

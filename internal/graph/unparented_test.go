@@ -177,3 +177,38 @@ func TestWhatNothingCanMatchIsCounted(t *testing.T) {
 		}
 	})
 }
+
+func TestTheChoiceForAComponentWithNoIdentifierResolvesIt(t *testing.T) {
+	// apko describes a package once as an APK and once as a directory with no
+	// identifier, at one name and one version.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		bare := graph.Described{Name: "gdbm", Version: "1.26-r6"}
+		named := graph.Described{Purl: "pkg:apk/wolfi/gdbm@1.26-r6", Name: "gdbm", Version: "1.26-r6"}
+		if _, err := f.store.Apply(ctx, f.targetID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{bare, named},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: named}, {Parent: named, Child: bare},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		_, err := f.store.ComponentAs(ctx, f.targetID, "gdbm", graph.Choice{})
+		var several *graph.Ambiguous
+		if !errors.As(err, &several) || len(several.Choices) != 2 {
+			t.Fatalf("a name held twice answered %v, want the two choices", err)
+		}
+		seen := map[int64]bool{}
+		for _, choice := range several.Choices {
+			id, err := f.store.ComponentAs(ctx, f.targetID, "gdbm", choice)
+			if err != nil {
+				t.Errorf("the choice %+v did not resolve: %v", choice, err)
+			}
+			seen[id] = true
+		}
+		if len(seen) != 2 {
+			t.Errorf("the two choices resolved to %d components, want one each", len(seen))
+		}
+	})
+}

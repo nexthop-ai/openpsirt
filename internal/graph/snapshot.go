@@ -292,11 +292,15 @@ type Choice struct {
 
 // Narrowed is which of these choices a narrowing names, by position.
 //
-// A part left empty matches anything, with one exception. An ecosystem named
-// without a namespace, where both a component with no namespace and one with a
-// namespace match, is the one with none: the choice offered for it carries no
-// namespace, so leaving the part out is the only way to name it, and read as
-// "any" that choice would lead back to the refusal that offered it.
+// A part left empty matches anything, with one exception. Where more than one
+// matches, the part before the first one left empty was named, and exactly one
+// of them has nothing in that part, it is that one: a version named without an
+// ecosystem picks the component with no identifier, and an ecosystem named
+// without a namespace picks the one with no namespace. A name alone still
+// matches every component of that name. The
+// choice offered for such a component carries nothing in that part, so
+// leaving it out is the only way to name it, and read as "any" that choice
+// would lead back to the refusal that offered it.
 func Narrowed(which Choice, choices []Choice) []int {
 	var kept []int
 	for i, choice := range choices {
@@ -306,10 +310,11 @@ func Narrowed(which Choice, choices []Choice) []int {
 			kept = append(kept, i)
 		}
 	}
-	if len(kept) > 1 && which.Ecosystem != "" && which.Namespace == "" {
+	if len(kept) > 1 && which.Namespace == "" {
 		var bare []int
 		for _, i := range kept {
-			if choices[i].Namespace == "" {
+			if which.Version != "" && which.Ecosystem == "" && choices[i].Ecosystem == "" ||
+				which.Ecosystem != "" && choices[i].Namespace == "" {
 				bare = append(bare, i)
 			}
 		}
