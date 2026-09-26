@@ -1245,6 +1245,7 @@ be done rather than doing it.
 |---|---|
 | The scanner is given what was stored, not the file the build sent | That file is not kept for a moving line, so anything not stored can never be scanned. This is the argument for capturing a component's second identifier scheme at ingest |
 | The product itself is left out of what the scanner sees | It is not a package any vulnerability database has heard of, and including it invites a match on a name that happens to collide |
+| A build holding nothing but itself is scanned without the scanner | There is nothing to ask about, and handed an inventory of no components the scanner exits with an error rather than answering none. A services-only inventory, a VEX document sent as an inventory, and a source document naming only itself arrive this way, and each read as a scanner that stopped working |
 | A run is recorded whether or not it found anything | Which scanner, which version, which vulnerability database, and whether it ran here. A run that failed is recorded as a run that failed, with the reason — a scanner that stopped working is otherwise indistinguishable from a product that stopped having problems |
 
 ## A year of nightly scans

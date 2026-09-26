@@ -191,14 +191,23 @@ func (r *Runner) scan(ctx context.Context, reference string) (*Outcome, error) {
 // assess writes the inventory, runs the scanner over it, and records what came
 // back.
 func (r *Runner) assess(ctx context.Context, targetID, runID int64, components []graph.Described, findings *finding.Store) (*Outcome, Result, error) {
-	var inventory bytes.Buffer
-	if err := sbom.WriteInventory(&inventory, components); err != nil {
-		return nil, Result{}, err
-	}
-
-	result, err := r.scanner.Scan(ctx, &inventory)
-	if err != nil {
-		return nil, Result{}, err
+	// A build holding nothing but itself has nothing to scan, and the scanner
+	// is not asked. Handed an inventory of no components it exits with an
+	// error rather than answering none, and a run recorded as failed reads as
+	// a scanner that stopped working. A services-only inventory, a VEX
+	// document sent as one, and a source document naming only itself all
+	// arrive this way.
+	var result Result
+	if len(components) > 0 {
+		var inventory bytes.Buffer
+		if err := sbom.WriteInventory(&inventory, components); err != nil {
+			return nil, Result{}, err
+		}
+		scanned, err := r.scanner.Scan(ctx, &inventory)
+		if err != nil {
+			return nil, Result{}, err
+		}
+		result = scanned
 	}
 
 	applied, err := findings.Apply(ctx, targetID, runID, result.Reported)
