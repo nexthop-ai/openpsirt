@@ -624,8 +624,9 @@ component the document is about, where it declared one.
 ## The VEX document
 
 Assembled from approved `not-applicable`, `mismatched` and `already-fixed`
-claims (REQ-39), and from `wont-fix` claims that say what a holder can do
-instead, for one product, stream and variant.
+claims (REQ-39), from `wont-fix` claims that say what a holder can do
+instead, and from the patches the build declares, for one product, stream and
+variant.
 
 A customer running their own scanner against a shipped image asks "which of these
 are you not affected by" more often than they ask for an advisory. Generating it
@@ -635,7 +636,9 @@ customer — which is the reason the two-person approval on those claims exists.
 | Rule | Reason |
 |---|---|
 | OpenVEX rather than the CSAF profile | It is the format this deployment already reads. One document shape to get right, and one deployment's output can be another's input |
-| Approved claims only | A proposal is one person's opinion and this document is the deployment's word to a customer |
+| Approved claims only, besides the build's own patches | A proposal is one person's opinion and this document is the deployment's word to a customer |
+| A patch the build declares is said as `fixed` | The build's word on its own patches is applied without a decision here (REQ-11). The finding it covers is closed as patched, and a customer's scanner still matches the upstream version, so without the statement the scanner reports it as affected |
+| A patch is said only while it stands | The component still ships in the build, no place of a component of that name and package identifier is open against the issue, and the build still declares the patch. A build that drops the patch has the statement drop with it, before any scan reopens the finding |
 | The impact statement carries what stops the flaw, never the reasoning | The reasoning is the argument a triager put to a second person here, addressed to a reader who can see the record it argues against. Published it is this deployment's review of itself, machine-readable, in front of every customer running a scanner. The mitigation is the half somebody holding the build can act on |
 | Where no mitigation was named the field is absent | Only one recognized reason asks for a mitigation, so most statements carry none. The justification beside it is what the format asks for, and silence says less wrongly than the wrong text |
 | A deferral is absent rather than exported as anything | Publishing it as not-affected would assert we assessed something as harmless when we had only postponed it. Silence already reads as affected in this format |

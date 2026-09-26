@@ -6440,7 +6440,7 @@ export interface components {
              * @description The reason it went. Only on fixed entries
              * @enum {string}
              */
-            because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained";
+            because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained";
             /**
              * Format: int64
              * @description The run that stopped reporting it. Only on an entry that left the affected list, and absent where a person closed it
@@ -7113,7 +7113,7 @@ export interface components {
              * @description The reason it closed, in the tool's terms. Only on a closed row
              * @enum {string}
              */
-            closed_because?: "removed" | "upgraded" | "revised" | "superseded" | "unexplained" | "invalid" | "fixed";
+            closed_because?: "removed" | "upgraded" | "revised" | "patched" | "superseded" | "unexplained" | "invalid" | "fixed";
             /** @description The person's own reason for closing it. Only where a person did */
             closed_note?: string;
             component: string;

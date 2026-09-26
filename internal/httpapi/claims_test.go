@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -23,6 +24,13 @@ import (
 // look nothing alike: one exploited, high and fixable, one low with no fix and
 // a driver in its description. The shape a bulk claim's outliers are read from.
 func (r *reach) scannedTwoIssues(t *testing.T) {
+	t.Helper()
+	r.scannedTwoIssuesArguing(t, "two-issues", nil)
+}
+
+// scannedTwoIssuesArguing is the same build on a scan of its own, carrying
+// what the build argues about what it ships.
+func (r *reach) scannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom.Suppression) {
 	t.Helper()
 	ctx := t.Context()
 
@@ -36,7 +44,7 @@ func (r *reach) scannedTwoIssues(t *testing.T) {
 		t.Fatal(err)
 	}
 	scan, outcome, err := ingest.NewStore(r.db.DB).Record(ctx, ingest.Arriving{
-		TargetID: target.ID, ContentHash: "two-issues", BuiltAt: time.Now().UTC(),
+		TargetID: target.ID, ContentHash: hash, BuiltAt: time.Now().UTC(),
 		ParserVersion: "test",
 	})
 	if err != nil || outcome != ingest.Accept {
@@ -56,6 +64,10 @@ func (r *reach) scannedTwoIssues(t *testing.T) {
 	}
 
 	findings := finding.NewStore(r.db.DB)
+	if _, err := findings.RecordClaims(ctx, target.ID, scan.ID, claims,
+		map[sbom.Origin]bool{sbom.FromStatement: true, sbom.FromPedigree: true}); err != nil {
+		t.Fatal(err)
+	}
 	run, err := findings.Begin(ctx, finding.Run{
 		TargetID: target.ID, Scanner: "grype", ScannerVersion: "0.112.0",
 		DatabaseVersion: "2026-08-28", RanHere: true,

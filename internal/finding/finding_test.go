@@ -210,6 +210,18 @@ func (f *fixture) openClaims(t *testing.T) []finding.Claim {
 	return rows
 }
 
+// every is each row the target holds, open or closed, oldest first.
+func (f *fixture) every(t *testing.T) []finding.Finding {
+	t.Helper()
+	var rows []finding.Finding
+	err := f.db.DB.NewSelect().Model(&rows).
+		Where("target_id = ?", f.target).Order("id").Scan(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rows
+}
+
 func (f *fixture) open(t *testing.T) []finding.Finding {
 	t.Helper()
 	var rows []finding.Finding

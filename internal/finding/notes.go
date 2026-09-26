@@ -378,6 +378,8 @@ func fixedBecause(because Closure) string {
 		return "the component was upgraded"
 	case Revised:
 		return "a carried patch"
+	case Patched:
+		return "a patch the build declares"
 	case Removed:
 		return "the component is no longer shipped"
 	case Fixed:

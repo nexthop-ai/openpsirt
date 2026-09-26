@@ -51,7 +51,7 @@ type ChangedBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Component     string `json:"component"`
 	Severity      string `json:"severity,omitempty"`
-	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,superseded,unexplained" doc:"The reason it went. Only on fixed entries"`
+	Because       string `json:"because,omitempty" enum:"removed,upgraded,revised,patched,superseded,unexplained" doc:"The reason it went. Only on fixed entries"`
 	ArrivedFrom   string `json:"arrived_from,omitempty" doc:"The version this was upgraded from since the earlier build. Only on still-present entries, where it means the upgrade did not reach the fix"`
 	FromVersion   string `json:"from_version,omitempty" doc:"The version the place held before the fix. Only on a fixed entry the version moved for"`
 	MovedTo       string `json:"moved_to,omitempty" doc:"The version the place moved to. Only on a fixed entry the version moved for, so a removed component carries neither"`

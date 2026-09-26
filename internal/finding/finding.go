@@ -126,18 +126,31 @@ const (
 	// found a flaw somebody recorded by hand, so the evidence every other
 	// closure here rests on does not exist for this one.
 	Fixed Closure = "fixed"
+	// Patched means the build declares a patch that fixes this issue in the
+	// component as it ships. The code is no longer vulnerable, which is what
+	// an upgrade says, and the build's word is applied without being decided
+	// again here. The finding opens again once a build stops declaring it.
+	Patched Closure = "patched"
 )
+
+// wasOpen is the condition that a row was open at some point.
+//
+// A finding first seen already patched is recorded closed by the run that
+// opened it, so the patch has a row to be read from. It was never open, and
+// it is neither opened nor fixed: what counts what a run opened or closed, or
+// how long a fix took, leaves it out. It carries no deadline, so no deadline
+// can be judged met by it, and it is in no open set a trend or a list reads.
+const wasOpen = `(f.opened_run_id IS NULL OR f.closed_run_id IS NULL
+	OR f.opened_run_id <> f.closed_run_id)`
 
 // Closures are every reason a finding stops being open, in the order they are
 // offered.
 //
 // One list, as the sort orders are one list: the enum a caller sees is built
 // from this rather than written out again, so a closure added here is
-// published and one removed here is gone from the document too. It was a
-// fourth hand-written copy of these seven words, and `Resolving` below records
-// what the last three copies cost.
+// published and one removed here is gone from the document too.
 func Closures() []Closure {
-	return []Closure{Removed, Upgraded, Revised, Superseded, Unexplained, Invalid, Fixed}
+	return []Closure{Removed, Upgraded, Revised, Patched, Superseded, Unexplained, Invalid, Fixed}
 }
 
 // Resolving is what counts as an issue actually going away.
@@ -148,7 +161,7 @@ func Closures() []Closure {
 // compiler, and all three disagreeing about any closure added later. A closure
 // not named here is churn or a correction, never progress.
 func Resolving() []Closure {
-	return []Closure{Removed, Upgraded, Revised, Fixed}
+	return []Closure{Removed, Upgraded, Revised, Patched, Fixed}
 }
 
 // Resolves reports whether this closure is one of them.
@@ -231,9 +244,11 @@ type Finding struct {
 	// left out of what is running out rather than treated as overdue.
 	DueAt *time.Time `bun:"due_at"`
 	// SuppressedBy is the claim the build made that covers this, where it made
-	// one. A covered finding is kept and marked rather than dropped: a finding
-	// that simply stopped appearing is indistinguishable from a scanner fault,
-	// and that is the bucket nothing is allowed to explain away.
+	// one. A covered finding is kept rather than dropped: a finding that
+	// simply stopped appearing is indistinguishable from a scanner fault, and
+	// that is the bucket nothing is allowed to explain away. A claim that it
+	// does not apply marks an open finding; a patch closes it as patched, and
+	// the closed row names the patch.
 	SuppressedBy *int64 `bun:"suppressed_by"`
 	// Rank is how urgent this is, as one sortable number, and the flags beside
 	// it are what it was made of that is not already on the row. The rest —
@@ -382,9 +397,12 @@ type Applied struct {
 	// a fix becoming available, or the build answering them. Somebody waiting
 	// for a fix is waiting for exactly this.
 	Updated int
-	// Suppressed counts findings the build has already argued about. They are
+	// Suppressed counts findings the build has argued do not apply. They are
 	// open and visible; they are not work anybody has to do.
 	Suppressed int
+	// Patched counts findings a patch the build declares closed on this run,
+	// including those recorded closed on first sight.
+	Patched int
 	// ClaimsReaching and ClaimsReachingNothing say how many of the build's
 	// arguments landed on something it ships. One that reached nothing means a
 	// finding the build believes it answered comes back as noise, and nothing
@@ -398,7 +416,9 @@ type Applied struct {
 }
 
 // Unchanged reports whether the run changed nothing.
-func (a Applied) Unchanged() bool { return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 }
+func (a Applied) Unchanged() bool {
+	return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 && a.Patched == 0
+}
 
 // PlaceIdentity keys a component under the thing that pulled it in.
 //

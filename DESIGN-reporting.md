@@ -64,8 +64,8 @@ measures churn:
 | `superseded` | The component's version moved and the issue came with it. Counting it as resolved draws a line saying work was completed while the same chart's new line rises by exactly as much |
 | `unexplained` | The scanner stopped reporting it with the component present and unchanged. A fault to investigate |
 
-The other four — removed, upgraded, revised, and a recorded flaw declared fixed —
-are counted.
+The other five — removed, upgraded, revised, patched, and a recorded flaw
+declared fixed — are counted.
 
 Closed exactly at the deadline met it: something still open at its deadline
 instant is not yet overdue, so something closed at that instant was not late.
@@ -152,7 +152,7 @@ last release a customer actually has, which is rarely the previous one.
 | Public findings only unless asked otherwise | The destination is usually a public document. Where the two builds differ in what the reader may see, the narrower answer governs |
 | Ordered worst first and stably | A release note that reorders between reads is one nobody can diff |
 | Bounded by the size of a build, not the calendar | Every open entry of both builds, which is what diffing them means. There is no page of a diff |
-| What left the affected list is two sets | An upgrade, a carried patch, a component no longer shipped and a recorded flaw declared fixed are fixes. A bump that carried the issue with it, a record taken back, and a closure nothing explains are not — the last means the component is unchanged and the scanner stopped reporting it, which is a fault to investigate. One list, and the number a release coordinator quotes includes them |
+| What left the affected list is two sets | An upgrade, a carried patch, a patch the build declares, a component no longer shipped and a recorded flaw declared fixed are fixes. A bump that carried the issue with it, a record taken back, and a closure nothing explains are not — the last means the component is unchanged and the scanner stopped reporting it, which is a fault to investigate. One list, and the number a release coordinator quotes includes them |
 | The split is made once, where the release note and the remediation rate read it | A screen making the same judgment a second time in a column heading disagrees with it: a column headed "Fixed" then carries unexplained closures, under an explanatory note about the one reason not in it |
 | An entry that left says which run stopped reporting it | An unexplained closure is a fault, and the first question about one is which run. Told it is unexplained and given nowhere to look, a reader has the fault and no way to start on it. Absent where a person closed the finding, which is the other way one closes |
 | Each fixed entry states why | "Fixed by upgrading to 2.4" and "fixed by a carried patch" are different sentences, and the closure reason distinguishes them. `superseded` means the version moved and the issue came with it — before that reason existed, such a bump put one issue in both the fixed and the newly-present column of the same document |
@@ -373,10 +373,11 @@ kernel or a runtime rather than a whole image.
 | It takes the findings list's own two narrowings | A component at any version, or a component and everything under it. A chart and a list describing a subtree differently is drift worth a shared definition to avoid |
 | Across several builds it refuses | A subtree is a walk over one build's edges, so a selection holding two has no single answer, and both ways of producing one are silent: a chart of whichever build sorted first, or an empty one from an identifier left at zero |
 
-A carried patch shows here where it moves the shipped version: the finding
-closes as revised, and the open count steps down. A patch that names what it
-resolves marks the finding and leaves it open (`DESIGN-findings.md` § Build-declared
-claims), so the chart does not move for it.
+A carried patch shows here as a step down in the open count. A patch that names
+what it resolves closes the finding as patched on the scan that first carries it
+(`DESIGN-findings.md` § Build-declared claims), and a patch that moves the shipped
+version closes it as revised. In a list of what is open now the row is simply
+gone.
 
 ## The disposition register
 

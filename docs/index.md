@@ -58,6 +58,7 @@ the findings and to the judgments standing on them.
 | A component's version moves | The finding at the old version closes as upgraded, or as superseded where the issue came with it. The new finding records the version it arrived from |
 | The version moves and the fix does not arrive | The finding is marked as an incomplete upgrade |
 | The shipped version changes and the upstream one does not | The finding closes as revised, which is what a carried patch looks like from outside |
+| The build declares a patch that fixes an issue | The finding closes as patched. A later build that stops declaring the patch opens it again |
 | A component leaves the build | Its findings close as removed |
 | The scanner stops reporting something present and unchanged | The finding closes as unexplained, and that is flagged at any volume |
 | The vulnerability data moves | The scheduled rescan finds it, in shipped releases as well as current ones |
@@ -167,9 +168,11 @@ says what turns each on.
   points at one revision of the reason, and editing the text withdraws it
 - A rating that disagrees with the published one, or a note for whoever
   decides, belongs to one product and applies to every build of it
-- A third party's word is evidence. The build's suppressions, a supplier's VEX
-  and a supplier's advisory are shown beside the finding, and offer a prefill
-  only at the versions they name
+- A third party's word is evidence. A supplier's VEX and a supplier's advisory
+  are shown beside the finding, and offer a prefill only at the versions they
+  name
+- A build's own patches close what they fix. Its claim that an issue does not
+  apply is kept on the finding, which stays open
 - A deployment sets what it considers worth triaging, and a product may set
   something narrower. Below the line a finding is still recorded, counted and
   reportable, and any list that hides something says how much

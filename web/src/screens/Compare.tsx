@@ -329,7 +329,8 @@ type Changed = Body<"ChangedBody">;
 // release note is being told what happened rather than shown a column.
 const WENT: Record<string, string> = {
   upgraded: "Upgraded",
-  revised: "Patched",
+  revised: "Revised",
+  patched: "Patched",
   removed: "Removed",
   superseded: "Superseded",
   unexplained: "Unexplained",
@@ -359,7 +360,7 @@ function Columns({
         kind="was-fixed"
         title="Fixed"
         rows={fixed}
-        note="Upgraded, patched, removed, or a recorded flaw declared fixed."
+        note="Upgraded, revised, patched, removed, or a recorded flaw declared fixed."
       />
       <Column
         kind="not-fixed"
