@@ -97,7 +97,7 @@ func TestTwoRowsSharingOnePlaceReadAsOnePlace(t *testing.T) {
 	chains := map[int64][]graph.Step{
 		walkable: {{Name: "sonic-broadcom"}, {Name: "host-image"}, {Name: "opennsl-modules"}},
 	}
-	places := placesOf(rows, chains, map[int64]string{10: "6.12.41-1"}, nil)
+	places := placesOf(rows, chains, map[int64]graph.Step{10: {Version: "6.12.41-1"}}, nil)
 
 	if len(places) != 1 {
 		t.Fatalf("%d places for one pair of names, want 1", len(places))

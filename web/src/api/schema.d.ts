@@ -2385,7 +2385,7 @@ export interface paths {
          *
          *     It is filed under an identifier this deployment mints — the product's name, the year and a number. A CVE assigned later becomes another name for the same issue; nothing about the finding, the decisions or the approvals moves.
          *
-         *     `component` names what in the build carries it, as the build calls it. Leave it out for the build itself, which is where a flaw in how the pieces fit together goes. A name the build holds at more than one version is refused with the choices rather than resolved to one; send `version`, and `ecosystem` where two share a version.
+         *     `component` names what in the build carries it, as the build calls it. Leave it out for the build itself, which is where a flaw in how the pieces fit together goes. A name the build holds at more than one version is refused with the choices rather than resolved to one; send `version`, `ecosystem` where two share a version, and `namespace` where two share an ecosystem.
          *
          *     Every flaw is recorded with a vulnerability report. `from_report` records the flaw from one already in this product and accepts it in the same act; it needs private-triage. A report already judged, or under a ruling, is refused with 409. Without it, a report is written from `reported_by`, `contact`, `credit`, `received` and `found_here`, already accepted as this flaw.
          *
@@ -3749,6 +3749,8 @@ export interface paths {
          * List what a build pulls in directly
          * @description Returns the build's own component and what it depends on, most findings first. The root is named separately from the list because it is what the list hangs from rather than a member of it.
          *
+         *     The list also holds every component nothing else in the build depends on, and the root's counts cover them. Where the inventory named no root, those components are the list.
+         *
          *     The starting point for walking the graph. A full render is not offered and would not be useful: a real image holds thousands of components and tens of thousands of edges, which neither draws nor reads. Ask for one step at a time.
          *
          *     Every entry carries how many findings are open against it and how many components it pulls in, so descending follows something rather than being exploration.
@@ -3809,7 +3811,7 @@ export interface paths {
          *
          *     A component reached several ways appears once with several parents. It is a graph rather than a tree, so anything drawing it has to expect the same component under many places.
          *
-         *     A component name is not unique within a build. Where one ships at several versions, `version` says which — without it, a name that matches more than one is refused with 409, naming the choices, rather than guessed at.
+         *     A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -3889,7 +3891,7 @@ export interface paths {
          *
          *     This is what a triage decision is made from, so it is gathered into one request. Each entry in `places` carries the `place` identity to name when recording a decision about it.
          *
-         *     A component name is not unique within a build. Where one ships at several versions, `version` says which — without it, a name that matches more than one is refused rather than guessed at.
+         *     A component name is not unique within a build. `version` says which where it ships at several, `ecosystem` where two share a version, and `namespace` where two share an ecosystem. A name that still matches more than one is refused with 409, naming the choices; where the issue is open at only one of them, that one is answered.
          *
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
@@ -6699,6 +6701,8 @@ export interface components {
              * @description Distinct vulnerabilities open against it, which is how many rows it contributes to the findings list
              */
             issues: number;
+            /** @description The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components of one name at one version */
+            namespace?: string;
             /**
              * Format: int64
              * @description The number of times those sit somewhere in the build
@@ -7593,6 +7597,8 @@ export interface components {
              * @description The number of steps between those two
              */
             middle?: number;
+            /** @description The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version */
+            namespace?: string;
             /**
              * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-the-line when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
@@ -7779,6 +7785,8 @@ export interface components {
             license?: string;
             /** @description The binary package's name */
             name: string;
+            /** @description The namespace the package identifier names, where it names one. Send it back with the version and ecosystem where a build holds one name at one version as two components */
+            namespace?: string;
             /**
              * Format: date-time
              * @description The date that version shipped, where the index said
@@ -8955,6 +8963,8 @@ export interface components {
              * @description Open findings against this component itself
              */
             findings: number;
+            /** @description The namespace its package identifier names, where it names one. Send it back where a build holds one name at one version in one ecosystem as two components */
+            namespace?: string;
             version: string;
         };
         Note: {
@@ -10033,6 +10043,8 @@ export interface components {
             found_here?: boolean;
             /** @description A vulnerability report in this product that this flaw is the record of, by its reference. It is accepted as this flaw in the same act, and who reported it and when come from the report, so the five fields above are refused beside it */
             from_report?: string;
+            /** @description The namespace, where two share a name, a version and an ecosystem */
+            namespace?: string;
             /**
              * Format: date
              * @description The day it arrived. The embargo is counted from this rather than from when it was typed in — the reporter is counting from the day they sent it, and they are the party who will publish regardless
@@ -11113,6 +11125,10 @@ export interface components {
         };
         StepBody: {
             component: string;
+            /** @description The kind of package the step is, as its identifier spells it */
+            ecosystem?: string;
+            /** @description The namespace its package identifier names, where it names one */
+            namespace?: string;
             version?: string;
         };
         StreamBody: {
@@ -15211,7 +15227,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
@@ -15362,7 +15378,7 @@ export interface operations {
             query?: {
                 stream?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
@@ -15475,7 +15491,7 @@ export interface operations {
                 stream?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
@@ -15591,7 +15607,7 @@ export interface operations {
             query?: {
                 stream?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds at more than one version, is refused */
+                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. The name must be in the build; a name that is not, or that the build holds as more than one component, is refused */
                 beneath?: string;
                 /** @description Keep only groups open in some builds of this selection and not others. Meaningless where the selection is one build, and ignored there */
                 differs?: boolean;
@@ -17685,6 +17701,8 @@ export interface operations {
                 version?: string;
                 /** @description The ecosystem, for the few names one build holds at one version as two components */
                 ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components */
+                namespace?: string;
             };
             header?: never;
             path: {
@@ -17720,7 +17738,14 @@ export interface operations {
     };
     "decide-together": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
             header?: never;
             path: {
                 product: string;
@@ -17759,6 +17784,12 @@ export interface operations {
     "list-issues-at-component": {
         parameters: {
             query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
                 /** @description Match the text of the report */
                 contains?: string;
                 limit?: number;
@@ -17802,6 +17833,8 @@ export interface operations {
                 version?: string;
                 /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
                 ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
             };
             header?: never;
             path: {
@@ -17839,7 +17872,14 @@ export interface operations {
     };
     "assign-finding": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
             header?: never;
             path: {
                 product: string;
@@ -17877,8 +17917,12 @@ export interface operations {
     "decide-finding": {
         parameters: {
             query?: {
-                /** @description The version, where the build ships more than one under that name */
+                /** @description The version, where the build ships that name at more than one */
                 version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
             };
             header?: never;
             path: {
@@ -17921,8 +17965,12 @@ export interface operations {
     "get-finding-reach": {
         parameters: {
             query?: {
-                /** @description The version, where the build holds that name at more than one */
+                /** @description The version, where the build ships that name at more than one */
                 version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
             };
             header?: never;
             path: {
@@ -17958,7 +18006,14 @@ export interface operations {
     };
     "tag-finding": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
             header?: never;
             path: {
                 product: string;
@@ -17993,7 +18048,14 @@ export interface operations {
     };
     "untag-finding": {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The version, where the build ships that name at more than one */
+                version?: string;
+                /** @description The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it */
+                ecosystem?: string;
+                /** @description The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice */
+                namespace?: string;
+            };
             header?: never;
             path: {
                 product: string;
@@ -20062,6 +20124,8 @@ export interface operations {
                 beneath_version?: string;
                 /** @description The ecosystem, for the few names a build holds at one version as two components */
                 beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
             };
             header?: never;
             path?: never;
@@ -20107,6 +20171,8 @@ export interface operations {
                 beneath_version?: string;
                 /** @description The ecosystem, for the few names a build holds at one version as two components */
                 beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
             };
             header?: never;
             path: {

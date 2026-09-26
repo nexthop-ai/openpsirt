@@ -7,7 +7,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { buildKey, fromBuildKey } from "../ui/builds";
-import { unwrap } from "../api/queries";
+import { unwrap, whichOf } from "../api/queries";
 import { Loading } from "../ui/Loading";
 import { Failed } from "../ui/Failed";
 import { Empty } from "../ui/Empty";
@@ -68,11 +68,21 @@ function pickPackage(row: Build, asked: string): Package | undefined {
 // no version fixes them. The screen was built, works, and had no link to it
 // anywhere in the application: this page is where the question is asked, so
 // this is where the way to it belongs.
-const decideAt = (product: string, row: Build, component: string) =>
-  `/products/${encodeURIComponent(product)}` +
-  `/streams/${encodeURIComponent(row.stream ?? "")}` +
-  `/variants/${encodeURIComponent(row.variant ?? "")}` +
-  `/components/${encodeURIComponent(component)}/decide`;
+//
+// The package's version, ecosystem and namespace travel with the name, because
+// a build can hold one name as more than one component.
+const decideAt = (product: string, row: Build, component: string, pkg?: Package) => {
+  const which = new URLSearchParams(
+    whichOf({ version: pkg?.version, ecosystem: row.ecosystem, namespace: pkg?.namespace }),
+  ).toString();
+  return (
+    `/products/${encodeURIComponent(product)}` +
+    `/streams/${encodeURIComponent(row.stream ?? "")}` +
+    `/variants/${encodeURIComponent(row.variant ?? "")}` +
+    `/components/${encodeURIComponent(component)}/decide` +
+    (which ? `?${which}` : "")
+  );
+};
 
 export function Component() {
   const { product = "", component = "" } = useParams();
@@ -241,6 +251,7 @@ export function Component() {
             key={buildKey(here, here.version)}
             product={product}
             component={pkg.name}
+            pkg={pkg}
             here={here}
             covering={sameVersion}
           />
@@ -341,7 +352,7 @@ export function Component() {
 
       <Ships product={product} rows={rows} here={here} />
 
-      <History product={product} component={pkg.name} here={here} />
+      <History product={product} pkg={pkg} here={here} />
     </>
   );
 }
@@ -404,7 +415,16 @@ function Sits({
   const scope = { product, stream: here.stream ?? "", variant: here.variant ?? "" };
   const component = pkg.name;
   const around = useQuery({
-    queryKey: ["around", product, component, here.stream, here.variant, pkg.version],
+    queryKey: [
+      "around",
+      product,
+      component,
+      here.stream,
+      here.variant,
+      pkg.version,
+      here.ecosystem,
+      pkg.namespace,
+    ],
     queryFn: async () =>
       unwrap(
         await api.GET(
@@ -412,7 +432,13 @@ function Sits({
           {
             params: {
               path: { ...scope, component },
-              query: pkg.version ? { version: pkg.version } : {},
+              // All three, because a name and a version do not always pick one
+              // component: a build can hold one package under two namespaces.
+              query: {
+                ...(pkg.version ? { version: pkg.version } : {}),
+                ...(here.ecosystem ? { ecosystem: here.ecosystem } : {}),
+                ...(pkg.namespace ? { namespace: pkg.namespace } : {}),
+              },
             },
           },
         ),
@@ -661,11 +687,13 @@ function Landed({ here }: { here: Build }) {
 function Upgrade({
   product,
   component,
+  pkg,
   here,
   covering,
 }: {
   product: string;
   component: string;
+  pkg: Package;
   here: Build;
   covering: Build[];
 }) {
@@ -748,7 +776,7 @@ function Upgrade({
           Nothing fixes the {here.issues} open here.
         </p>
         <p style={{ marginTop: 10 }}>
-          <Link className="btn" to={decideAt(product, here, component)}>
+          <Link className="btn" to={decideAt(product, here, component, pkg)}>
             Decide them together
           </Link>{" "}
           <Link className="btn quiet" to={findingsAt(product, here, binaries(here))}>
@@ -792,7 +820,7 @@ function Upgrade({
           card and nothing on this page answered this one. */}
       {noFix > 0 && (
         <p style={{ marginTop: 6 }}>
-          <Link className="linkish" to={decideAt(product, here, component)}>
+          <Link className="linkish" to={decideAt(product, here, component, pkg)}>
             Decide those together →
           </Link>
         </p>
@@ -989,17 +1017,19 @@ function Ships({ product, rows, here }: { product: string; rows: Build[]; here: 
 }
 
 // Twelve weeks of what opened and closed at this package and under it.
-function History({
-  product,
-  component,
-  here,
-}: {
-  product: string;
-  component: string;
-  here: Build;
-}) {
+function History({ product, pkg, here }: { product: string; pkg: Package; here: Build }) {
+  const component = pkg.name;
   const trend = useQuery({
-    queryKey: ["component-trend", product, component, here.stream, here.variant],
+    queryKey: [
+      "component-trend",
+      product,
+      component,
+      here.stream,
+      here.variant,
+      pkg.version,
+      here.ecosystem,
+      pkg.namespace,
+    ],
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/trend", {
@@ -1009,6 +1039,11 @@ function History({
               stream: here.stream ?? "",
               variant: here.variant ?? "",
               beneath: component,
+              // The subtree of one component, so it says which where the name
+              // is held as more than one.
+              ...(pkg.version ? { beneath_version: pkg.version } : {}),
+              ...(here.ecosystem ? { beneath_ecosystem: here.ecosystem } : {}),
+              ...(pkg.namespace ? { beneath_namespace: pkg.namespace } : {}),
               weeks: 12,
             },
           },

@@ -62,15 +62,15 @@ const CHILDREN = 400;
 // without reading every number on the way down.
 const HOT = 500;
 
-const aroundKey = (at: At, component: string, version = "", ecosystem = "") =>
-  ["tree-around", at, component, version, ecosystem] as const;
+const aroundKey = (at: At, component: string, version = "", ecosystem = "", namespace = "") =>
+  ["tree-around", at, component, version, ecosystem, namespace] as const;
 
 // A name is not always enough: a build ships some libraries at several
 // versions, and a finding arriving here says which one it meant — and a few
 // it ships at one version as two components, which only the kind of package
-// tells apart.
+// or its namespace tells apart.
 const fetchAround =
-  (at: At, component: string, version = "", ecosystem = "") =>
+  (at: At, component: string, version = "", ecosystem = "", namespace = "") =>
   async () =>
     unwrap(
       await api.GET(
@@ -81,6 +81,7 @@ const fetchAround =
             query: {
               ...(version ? { version } : {}),
               ...(ecosystem ? { ecosystem } : {}),
+              ...(namespace ? { namespace } : {}),
             },
           },
         },
@@ -249,6 +250,7 @@ function Whole() {
         component: params.get("at") ?? "",
         version: params.get("version") ?? "",
         ecosystem: params.get("ecosystem") ?? "",
+        namespace: params.get("namespace") ?? "",
       })
     : "";
 
@@ -315,10 +317,10 @@ function Whole() {
   );
   const branches = useQueries({
     queries: wanted.map((key) => {
-      const { component, version, ecosystem } = partsOf(key);
+      const { component, version, ecosystem, namespace } = partsOf(key);
       return {
-        queryKey: aroundKey(at, component, version, ecosystem),
-        queryFn: fetchAround(at, component, version, ecosystem),
+        queryKey: aroundKey(at, component, version, ecosystem, namespace),
+        queryFn: fetchAround(at, component, version, ecosystem, namespace),
       };
     }),
   });
@@ -362,17 +364,18 @@ function Whole() {
   // components refuses to answer about "that name" — rightly, since the two
   // are two components — and the tree knows which one was clicked, so asking
   // without it turned every such component into one nobody could look at.
-  function select(name: string, children = 0, version = "", ecosystem = "") {
-    const key = keyOf({ component: name, version, ecosystem });
+  function select(name: string, children = 0, version = "", ecosystem = "", namespace = "") {
+    const key = keyOf({ component: name, version, ecosystem, namespace });
     // The search term survives the selection. Replaced wholesale, a hit
     // cleared the search it was found through: the list went away, the tree
     // redrew from the root, and the component clicked was not on screen.
     const next = new URLSearchParams(params);
-    for (const key of ["at", "version", "ecosystem"]) next.delete(key);
+    for (const key of ["at", "version", "ecosystem", "namespace"]) next.delete(key);
     if (name) {
       next.set("at", name);
       if (version) next.set("version", version);
       if (ecosystem) next.set("ecosystem", ecosystem);
+      if (namespace) next.set("namespace", namespace);
     }
     setParams(next);
     if (!name || children === 0) return;
@@ -494,7 +497,13 @@ function Matches({
   at: At;
   found: Node[];
   focus: string;
-  onSelect: (name: string, children?: number, version?: string, ecosystem?: string) => void;
+  onSelect: (
+    name: string,
+    children?: number,
+    version?: string,
+    ecosystem?: string,
+    namespace?: string,
+  ) => void;
 }) {
   return (
     <div className="tree">
@@ -507,7 +516,9 @@ function Matches({
           <button
             type="button"
             className="id"
-            onClick={() => onSelect(node.component, node.children, node.version, node.ecosystem)}
+            onClick={() =>
+              onSelect(node.component, node.children, node.version, node.ecosystem, node.namespace)
+            }
           >
             {node.component}
           </button>
@@ -589,7 +600,13 @@ function Branches({
   onPath: Set<string>;
   focus: string;
   onToggle: (key: string) => void;
-  onSelect: (name: string, children?: number, version?: string, ecosystem?: string) => void;
+  onSelect: (
+    name: string,
+    children?: number,
+    version?: string,
+    ecosystem?: string,
+    namespace?: string,
+  ) => void;
   onWiden: (key: string) => void;
 }) {
   const rows: React.ReactNode[] = [];
@@ -671,7 +688,9 @@ function Branches({
           type="button"
           className="id"
           onClick={() =>
-            openable ? onToggle(key) : onSelect(name, 0, node.version, node.ecosystem)
+            openable
+              ? onToggle(key)
+              : onSelect(name, 0, node.version, node.ecosystem, node.namespace)
           }
         >
           {name}

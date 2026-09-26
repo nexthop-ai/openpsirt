@@ -112,6 +112,75 @@ func nothingScannedThere() error {
 	return huma.Error404NotFound("nothing has been scanned there")
 }
 
+// ComponentQuery is what picks one component where a name is not enough, on a
+// route that addresses a finding by its component's name.
+type ComponentQuery struct {
+	Version   string `query:"version" doc:"The version, where the build ships that name at more than one"`
+	Ecosystem string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components — a source repository and the package built from it"`
+	Namespace string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components — one package a producer described twice"`
+}
+
+// choice is the query as the lookup takes it.
+func (q ComponentQuery) choice() graph.Choice {
+	return graph.Choice{Version: q.Version, Ecosystem: q.Ecosystem, Namespace: q.Namespace}
+}
+
+// componentCarrying resolves the component a finding route names, narrowed
+// where the name is ambiguous to the components this issue is open at.
+//
+// The lookup raises the ambiguity before it knows which issue is being asked
+// about, so on its own it offers every component of the name, and a real image
+// ships one library at fifteen versions of which three carry a given issue.
+// Where one carries it, that one is taken: one choice is not a choice. none
+// answers where none does.
+func componentCarrying(ctx context.Context, in Ingest, subject access.Subject,
+	targetID, issue int64, name string, which graph.Choice, none func(error) error) (int64, error) {
+
+	id, err := graph.NewStore(in.DB.DB).ComponentAs(ctx, targetID, name, which)
+	if err == nil {
+		return id, nil
+	}
+	if !errors.Is(err, graph.ErrAmbiguous) {
+		return 0, none(err)
+	}
+	all, second := finding.NewStore(in.DB.DB).VersionsWithIssue(ctx, subject, targetID, issue, name)
+	if second != nil {
+		// Logged rather than discarded. Silently falling through makes a
+		// database failure indistinguishable from "the issue is at none of
+		// them", and the caller gets the wide list with nothing saying why.
+		in.logger().Error("which versions carry this issue could not be read",
+			"component", name, "error", second)
+	}
+	// Only the ones the caller's own narrowing names: a version named and a
+	// namespace left out is still a version named.
+	var carrying []graph.Choice
+	for _, i := range graph.Narrowed(which, all) {
+		carrying = append(carrying, all[i])
+	}
+	switch {
+	case len(carrying) == 1:
+		id, err = graph.NewStore(in.DB.DB).ComponentAs(ctx, targetID, name, carrying[0])
+		if err != nil {
+			return 0, none(err)
+		}
+		return id, nil
+	case len(carrying) > 1:
+		return 0, ambiguousAmong(name, carrying)
+	default:
+		return 0, none(err)
+	}
+}
+
+// answered is the status a refusal answers with, and zero for anything that is
+// not one.
+func answered(err error) int {
+	var refusal huma.StatusError
+	if errors.As(err, &refusal) {
+		return refusal.GetStatus()
+	}
+	return 0
+}
+
 // ambiguousAmong offers the ways a name could be meant, having narrowed them
 // to the ones that answer the question being asked.
 func ambiguousAmong(name string, choices []graph.Choice) error {
@@ -122,13 +191,23 @@ func ambiguousAmong(name string, choices []graph.Choice) error {
 			// narrowed to the ones this issue is actually open at. The screen
 			// says different things about the two, and saying the wrong one is
 			// telling somebody an issue affects a version it does not.
-			Location: "carrying", Message: choice.Version,
-			Value: map[string]string{"ecosystem": choice.Ecosystem},
+			Location: "carrying", Message: choice.Version, Value: kindOf(choice),
 		})
 	}
 	return huma.Error409Conflict(fmt.Sprintf(
-		"this build ships %q at more than one version, and this issue is open at %d of "+
-			"them — say which one with ?version=", name, len(choices)), detail...)
+		"this build ships %q as more than one component, and this issue is open at %d of "+
+			"them — say which one with ?version=, &ecosystem= and &namespace=", name, len(choices)),
+		detail...)
+}
+
+// kindOf is what tells a choice apart besides its version: the ecosystem, and
+// the namespace where the identifier has one.
+func kindOf(choice graph.Choice) map[string]string {
+	kind := map[string]string{"ecosystem": choice.Ecosystem}
+	if choice.Namespace != "" {
+		kind["namespace"] = choice.Namespace
+	}
+	return kind
 }
 
 // ambiguousOrMissing answers a component lookup that could not settle on one.
@@ -145,14 +224,16 @@ func ambiguousOrMissing(err error) error {
 	// discloses nothing further: the versions in a build are already readable
 	// by anyone who can read the build.
 	//
-	// Each choice carries its ecosystem, because a version alone does not
-	// always resolve one: 13 names in a real image are held at one version by
-	// two components, a source repository and the package built from it. Left
-	// as versions alone, the refusal offers a choice that leads straight back
-	// to the same refusal.
+	// Each choice carries its ecosystem and namespace, because a version
+	// alone does not always resolve one: 13 names in a real image are held at
+	// one version by two components, a source repository and the package built
+	// from it, and 170 in another by one package described under two
+	// namespaces. Left as versions alone, the refusal offers a choice that
+	// leads straight back to the same refusal.
 	var several *graph.Ambiguous
 	if errors.As(err, &several) {
-		return severalComponents(several, "?version= and, where two share a version, &ecosystem=")
+		return severalComponents(several,
+			"?version= and, where two share a version, &ecosystem= and &namespace=")
 	}
 	return noSuchFinding()
 }
@@ -170,8 +251,7 @@ func severalComponents(several *graph.Ambiguous, sayWith string) error {
 			// Every component of that name, *not* narrowed to an issue —
 			// which is why the location differs from the narrowed list above.
 			// Some of these may not carry it at all.
-			Location: "component", Message: choice.Version,
-			Value: map[string]string{"ecosystem": choice.Ecosystem},
+			Location: "component", Message: choice.Version, Value: kindOf(choice),
 		})
 	}
 	return huma.Error409Conflict(fmt.Sprintf(

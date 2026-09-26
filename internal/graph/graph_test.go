@@ -637,7 +637,7 @@ func TestARefusalAroundAComponentDoesNotSayWhetherTheBuildHoldsIt(t *testing.T) 
 
 		var said []string
 		for _, name := range []string{zlib.Name, curl.Name, "nothing-is-called-this"} {
-			_, _, err := f.store.Around(ctx, outside, f.targetID, name, "", "")
+			_, _, err := f.store.Around(ctx, outside, f.targetID, name, graph.Choice{})
 			if err == nil {
 				t.Fatalf("%q was answered for somebody who may read nothing here", name)
 			}

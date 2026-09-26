@@ -134,14 +134,14 @@ func registerReachAcross(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability"`
 		Component     string `path:"component"`
-		Version       string `query:"version" doc:"The version, where the build holds that name at more than one"`
+		ComponentQuery
 	}) (*struct{ Body ReachBody }, error) {
 		subject, _, err := triaging(ctx, in)
 		if err != nil {
 			return nil, err
 		}
 		target, issue, at, err := findingAbout(ctx, in, subject, input.Product, input.Stream,
-			input.Variant, input.Vulnerability, input.Component, input.Version)
+			input.Variant, input.Vulnerability, input.Component, input.choice())
 		if err != nil {
 			return nil, err
 		}

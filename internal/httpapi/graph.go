@@ -33,6 +33,7 @@ type NeighborBody struct {
 	// holds twice and says to send this; a list that did not carry it left
 	// nothing able to.
 	Ecosystem string `json:"ecosystem,omitempty" doc:"The kind of package this is, as its identifier spells it. Send it back where a build holds one name at one version as two components"`
+	Namespace string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one. Send it back where a build holds one name at one version in one ecosystem as two components"`
 }
 
 // RootsBody is the build's own component and what it pulls in directly.
@@ -68,6 +69,9 @@ func registerGraph(api huma.API, in Ingest) {
 		Description: "Returns the build's own component and what it depends on, most findings " +
 			"first. The root is named separately from the list because it is what the list " +
 			"hangs from rather than a member of it.\n\n" +
+			"The list also holds every component nothing else in the build depends on, and the " +
+			"root's counts cover them. Where the inventory named no root, those components are " +
+			"the list.\n\n" +
 			"The starting point for walking the graph. A full render is not offered and would " +
 			"not be useful: a real image holds thousands of components and tens of thousands of " +
 			"edges, which neither draws nor reads. Ask for one step at a time.\n\n" +
@@ -152,9 +156,10 @@ func registerGraph(api huma.API, in Ingest) {
 			"A component reached several ways appears once with several parents. It is a graph " +
 			"rather than a tree, so anything drawing it has to expect the same component under " +
 			"many places.\n\n" +
-			"A component name is not unique within a build. Where one ships at several " +
-			"versions, `version` says which — without it, a name that matches more than one is " +
-			"refused with 409, naming the choices, rather than guessed at.",
+			"A component name is not unique within a build. `version` says which where it ships " +
+			"at several, `ecosystem` where two share a version, and `namespace` where two share " +
+			"an ecosystem. A name that still matches more than one is refused with 409, naming " +
+			"the choices.",
 		Tags: []string{"Findings"},
 	}, anyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
@@ -163,13 +168,16 @@ func registerGraph(api huma.API, in Ingest) {
 		Component string `path:"component" doc:"The component's name, as the findings list gives it"`
 		Version   string `query:"version" doc:"The version, where the build ships that name at more than one"`
 		Ecosystem string `query:"ecosystem" doc:"The ecosystem, for the few names one build holds at one version as two components"`
+		Namespace string `query:"namespace" doc:"The namespace, for the few names one build holds at one version in one ecosystem as two components"`
 	}) (*struct{ Body AroundBody }, error) {
 		subject, target, err := browsing(ctx, in, input.Product, input.Stream, input.Variant)
 		if err != nil {
 			return nil, err
 		}
 		above, below, err := graph.NewStore(in.DB.DB).Around(ctx, subject, target,
-			input.Component, input.Version, input.Ecosystem)
+			input.Component, graph.Choice{
+				Version: input.Version, Ecosystem: input.Ecosystem, Namespace: input.Namespace,
+			})
 		if err != nil {
 			return nil, ambiguousOrMissing(err)
 		}
@@ -188,6 +196,7 @@ func neighbors(rows []graph.Neighbor) []NeighborBody {
 			BeneathBy: banded(row.BeneathBy),
 			Children:  row.Children,
 			Ecosystem: graph.EcosystemOf(row.Purl),
+			Namespace: graph.NamespaceOf(row.Purl),
 		})
 	}
 	return out

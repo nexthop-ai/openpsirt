@@ -22,7 +22,7 @@ import { on } from "../ui/when";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
-import { at as choicesAt, unwrap } from "../api/queries";
+import { at as choicesAt, type Choice, unwrap, whichOf } from "../api/queries";
 import { useWho } from "../app/session";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited, ExploitedHere as ExploitedHereBadge } from "../ui/Severity";
@@ -92,6 +92,17 @@ function whyNone(reason: string | undefined): string {
   }
 }
 
+// pickedFrom is this page's address with one choice made, keeping the list it
+// was opened from.
+function pickedFrom(params: URLSearchParams, choice: Choice): string {
+  const next = new URLSearchParams(params);
+  for (const key of ["version", "ecosystem", "namespace"]) next.delete(key);
+  next.set("version", choice.version);
+  if (choice.ecosystem) next.set("ecosystem", choice.ecosystem);
+  if (choice.namespace) next.set("namespace", choice.namespace);
+  return next.toString();
+}
+
 export function Finding() {
   const {
     product = "",
@@ -102,6 +113,11 @@ export function Finding() {
   } = useParams();
   const [params] = useSearchParams();
   const version = params.get("version") ?? "";
+  // The rest of what picks one component, where a name and a version are held
+  // twice: a source repository beside its package, or one package under two
+  // namespaces.
+  const ecosystem = params.get("ecosystem") ?? "";
+  const namespace = params.get("namespace") ?? "";
   // The list this was opened from, carried as one value. Working a filtered
   // list meant returning to it and finding your place after every decision;
   // with the list's own address in hand, the row before and the row after are
@@ -231,7 +247,9 @@ export function Finding() {
       (row) =>
         row.vulnerability === vulnerability &&
         row.component === component &&
-        (row.version ?? "") === version,
+        (row.version ?? "") === version &&
+        (!ecosystem || (row.ecosystem ?? "") === ecosystem) &&
+        (!namespace || (row.namespace ?? "") === namespace),
     );
     if (i < 0) return null;
     function step(j: number) {
@@ -272,15 +290,19 @@ export function Finding() {
     vulnerability,
     component,
     version,
+    ecosystem,
+    namespace,
   ]);
 
   const finding = useQuery({
-    queryKey: ["finding", at, version],
+    queryKey: ["finding", at, version, ecosystem, namespace],
     queryFn: async () =>
       unwrap(
         await api.GET(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}",
-          { params: { path: at, query: version ? { version } : {} } },
+          {
+            params: { path: at, query: whichOf({ version, ecosystem, namespace }) },
+          },
         ),
       ),
   });
@@ -327,21 +349,30 @@ export function Finding() {
 
   if (finding.isPending) return <Loading />;
   if (finding.isError) {
-    const choices = choicesAt(finding.error, "query.version");
+    // Narrowed to the ones carrying this issue where the server could, and
+    // every component of the name where it could not.
+    const carrying = choicesAt(finding.error, "carrying");
+    const choices = carrying.length > 0 ? carrying : choicesAt(finding.error, "component");
     if (choices.length > 0) {
       return (
         <div className="card">
-          <h3>Versions of {component}</h3>
+          <h3>Which {component}</h3>
           <p className="reading" style={{ marginBottom: 10 }}>
-            Shipped at more than one version here.
+            This build ships more than one.
           </p>
           <ul className="refs">
             {choices.map((choice) => (
-              <li key={`${choice.version} ${choice.ecosystem ?? ""}`}>
-                <Link className="linkish id" to={`?version=${encodeURIComponent(choice.version)}`}>
+              <li key={`${choice.version} ${choice.ecosystem ?? ""} ${choice.namespace ?? ""}`}>
+                <Link className="linkish id" to={`?${pickedFrom(params, choice)}`}>
                   {choice.version}
                 </Link>
-                {choice.ecosystem && <span className="hint">{choice.ecosystem}</span>}
+                {choice.ecosystem && (
+                  <span className="hint">
+                    {choice.namespace
+                      ? `${choice.ecosystem}/${choice.namespace}`
+                      : choice.ecosystem}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
@@ -536,6 +567,7 @@ export function Finding() {
             in is the person who put the mark here. */}
         <Marks
           at={at}
+          which={{ version, ecosystem, namespace }}
           tags={it.tags ?? []}
           mayMark={mayTriage}
           onChanged={() => void finding.refetch()}
@@ -1108,12 +1140,13 @@ export function Finding() {
             {settled && (
               <div ref={form}>
                 <Decide
-                  at={{ ...at, version }}
+                  at={{ ...at, version, ecosystem, namespace }}
                   places={places}
                   undisclosed={!!it.undisclosed}
                   assigning={
                     <Assignee
                       at={at}
+                      which={{ version, ecosystem, namespace }}
                       assigned={it.assigned_to ?? ""}
                       undisclosed={!!it.undisclosed}
                       routedBy={it.routed_by ?? ""}
@@ -1201,6 +1234,7 @@ export function Finding() {
         {!undecided && (
           <Assignee
             at={at}
+            which={{ version, ecosystem, namespace }}
             assigned={it.assigned_to ?? ""}
             undisclosed={!!it.undisclosed}
             routedBy={it.routed_by ?? ""}

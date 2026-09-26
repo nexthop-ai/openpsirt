@@ -317,6 +317,9 @@ type ComponentGroup struct {
 	// finding's row carries it: a name at a version does not tell two rows
 	// apart on its own.
 	Ecosystem string
+	// Namespace is the identifier's namespace, which tells two rows apart
+	// where the ecosystem does not.
+	Namespace string
 	// BySeverity is those issues by how they were rated, and Worst the
 	// highest band among them. Ranking by count alone answers the question
 	// this view asks with the opposite of what somebody needs: a package with

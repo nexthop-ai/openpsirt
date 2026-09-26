@@ -633,6 +633,7 @@ func registerTrendExport(api huma.API, in Ingest) {
 		Beneath   string `query:"beneath" doc:"Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a branch and a variant naming exactly one build"`
 		Version   string `query:"beneath_version" doc:"The version, where the build holds that name at several"`
 		Ecosystem string `query:"beneath_ecosystem" doc:"The ecosystem, for the few names a build holds at one version as two components"`
+		Namespace string `query:"beneath_namespace" doc:"The namespace, for the few names a build holds at one version in one ecosystem as two components"`
 	}) (*huma.StreamResponse, error) {
 		subject, err := reading(ctx)
 		if err != nil {
@@ -676,6 +677,7 @@ func registerTrendExport(api huma.API, in Ingest) {
 					since, week, input.Weeks, finding.Within{
 						Component: input.Component, Beneath: input.Beneath,
 						BeneathVersion: input.Version, BeneathEcosystem: input.Ecosystem,
+						BeneathNamespace: input.Namespace,
 					})
 				if err != nil {
 					return nil, err

@@ -492,6 +492,8 @@ export function FindingsTable({
                           vulnerability={row.vulnerability ?? ""}
                           component={row.component ?? ""}
                           version={row.version ?? ""}
+                          ecosystem={row.ecosystem}
+                          namespace={row.namespace}
                           to={at}
                           onDecided={onDecided}
                         />

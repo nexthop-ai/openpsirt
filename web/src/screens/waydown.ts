@@ -18,7 +18,7 @@ import { keyOf } from "./treeshape";
 // the answer, and drew it with the component's own name missing: the name was
 // read off the end of a chain that was not there.
 
-export type Step = { component: string; version?: string };
+export type Step = { component: string; version?: string; ecosystem?: string; namespace?: string };
 
 export type WayDown = {
   steps: Step[];
@@ -35,9 +35,13 @@ export function wayDown(place: Sitting, version?: string): WayDown {
   const chain = place.chain ?? [];
   if (chain.length > 0) {
     return {
+      // All four, because the tree names a row by all four and opens the
+      // rows it is handed by that name.
       steps: chain.map((step) => ({
         component: step.component ?? "",
         version: step.version ?? undefined,
+        ecosystem: step.ecosystem ?? undefined,
+        namespace: step.namespace ?? undefined,
       })),
       rootless: false,
     };

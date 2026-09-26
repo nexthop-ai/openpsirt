@@ -287,8 +287,7 @@ func OneFoldNamed(ctx context.Context, db bun.IDB, targets []int64,
 		for _, row := range rows {
 			if !seen[row.FoldKey] {
 				seen[row.FoldKey] = true
-				choices = append(choices, graph.Choice{
-					Version: row.Version, Ecosystem: graph.EcosystemOf(row.Purl)})
+				choices = append(choices, graph.ChoiceOf(row.Version, row.Purl))
 			}
 		}
 		return nil, &graph.Ambiguous{Name: strings.TrimSpace(name), Choices: choices}

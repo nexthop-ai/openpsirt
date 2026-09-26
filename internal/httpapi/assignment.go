@@ -96,7 +96,8 @@ func registerAssigning(api huma.API, in Ingest) {
 		Variant       string `path:"variant"`
 		Vulnerability string `path:"vulnerability"`
 		Component     string `path:"component"`
-		Body          struct {
+		ComponentQuery
+		Body struct {
 			Person string `json:"person,omitempty" doc:"Their sign-in identity, or empty for nobody"`
 			Team   string `json:"team,omitempty" doc:"A team to route it to instead, by name. A queue rather than a holding: it stays unheld until somebody takes it"`
 		}
@@ -106,7 +107,8 @@ func registerAssigning(api huma.API, in Ingest) {
 			return nil, err
 		}
 		product, target, issue, component, err := locateFinding(ctx, in, subject,
-			input.Product, input.Stream, input.Variant, input.Vulnerability, input.Component)
+			input.Product, input.Stream, input.Variant, input.Vulnerability, input.Component,
+			input.choice())
 		if err != nil {
 			return nil, err
 		}
@@ -636,8 +638,15 @@ func registerAssignmentReading(api huma.API, in Ingest) {
 }
 
 // locateFinding resolves the names in a path to the finding they address.
+//
+// A name the build ships as more than one component is narrowed to the ones
+// carrying this issue, and to what the query names. Answering "no open
+// finding is recorded there" for one is wrong twice over: the finding is
+// there, and the caller has just read it on a screen that resolved the same
+// name.
 func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
-	product, stream, variant, vulnerability, component string) (int64, int64, int64, int64, error) {
+	product, stream, variant, vulnerability, component string,
+	which graph.Choice) (int64, int64, int64, int64, error) {
 
 	named, err := locatedVisibly(ctx, in, subject, product, stream, variant)
 	if err != nil {
@@ -651,36 +660,10 @@ func locateFinding(ctx context.Context, in Ingest, subject access.Subject,
 	if err != nil {
 		return 0, 0, 0, 0, err
 	}
-	held, err := graph.NewStore(in.DB.DB).ComponentAt(ctx, target.ID, component)
-	if errors.Is(err, graph.ErrAmbiguous) {
-		// The build ships that name at more than one version, and these routes
-		// carry no version to choose with. Answering "no open finding is
-		// recorded there" is wrong twice over: the finding is there, and the
-		// caller has just read it on a screen that resolved the same name.
-		//
-		// Narrowed to the versions carrying this issue first, the way the
-		// finding's own route does it, because the lookup raises the ambiguity
-		// before it knows which issue is being asked about — so left alone it
-		// offers every version of the name, most of which lead nowhere.
-		carrying, second := finding.NewStore(in.DB.DB).VersionsWithIssue(
-			ctx, subject, target.ID, issue, component)
-		if second != nil {
-			in.logger().Error("which versions carry this issue could not be read",
-				"component", component, "error", second)
-		}
-		switch {
-		case len(carrying) == 1:
-			// One choice is not a choice, so it is taken rather than offered.
-			held, err = graph.NewStore(in.DB.DB).ComponentAs(ctx, target.ID,
-				component, carrying[0].Version, carrying[0].Ecosystem)
-		case len(carrying) > 1:
-			return 0, 0, 0, 0, ambiguousAmong(component, carrying)
-		default:
-			return 0, 0, 0, 0, noSuchFinding()
-		}
-	}
+	held, err := componentCarrying(ctx, in, subject, target.ID, issue, component, which,
+		func(error) error { return noSuchFinding() })
 	if err != nil {
-		return 0, 0, 0, 0, noSuchFinding()
+		return 0, 0, 0, 0, err
 	}
 	return named.ProductID, target.ID, issue, held, nil
 }

@@ -62,6 +62,9 @@ type FoldPackageBody struct {
 	// Purl is the identifier an ecosystem and an upstream address are read out
 	// of.
 	Purl string `json:"purl,omitempty" doc:"The package identifier this build ships it under"`
+	// Namespace is read out of the identifier, for the few binaries a build
+	// holds twice at one name and one version.
+	Namespace string `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. Send it back with the version and ecosystem where a build holds one name at one version as two components"`
 	// PackagePageURL is where the package is published, worked out from
 	// the identifier by the one table that does that. A second table in the
 	// interface, with a different membership, answers differently for the same
@@ -160,6 +163,7 @@ func registerComponent(api huma.API, in Ingest) {
 				}
 				packages = append(packages, FoldPackageBody{
 					Name: one.Name, Version: one.Version, Purl: one.Purl,
+					Namespace:      graph.NamespaceOf(one.Purl),
 					PackagePageURL: page, PackagePageName: called,
 					Summary: one.Summary, ProjectURL: one.ProjectURL,
 					Supplier: one.Supplier, License: one.License,

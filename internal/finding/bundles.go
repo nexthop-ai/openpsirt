@@ -390,6 +390,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 			group.Upstream = named.UpstreamVersion
 			group.UpstreamName = named.UpstreamName
 			group.Ecosystem = graph.EcosystemOf(named.Purl)
+			group.Namespace = graph.NamespaceOf(named.Purl)
 		}
 		groups = append(groups, group)
 	}

@@ -256,8 +256,8 @@ func TestOnlyTheVersionsCarryingTheIssueAreOffered(t *testing.T) {
 			t.Fatalf("versions: %v", err)
 		}
 		want := []graph.Choice{
-			{Version: "v1", Ecosystem: "golang"},
-			{Version: "v1", Ecosystem: "github"},
+			{Version: "v1", Ecosystem: "golang", Namespace: "example.com"},
+			{Version: "v1", Ecosystem: "github", Namespace: "example.com"},
 		}
 		if !sameChoices(got, want) {
 			t.Errorf("offered %v, expected %v", got, want)

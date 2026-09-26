@@ -29,8 +29,8 @@ describe("what tells one component from another in the tree", () => {
     );
   });
 
-  it("reads back the three values a request needs", () => {
-    const node = { component: "curl", version: "8.14.1", ecosystem: "deb" };
+  it("reads back the four values a request needs", () => {
+    const node = { component: "curl", version: "8.14.1", ecosystem: "deb", namespace: "debian" };
     expect(partsOf(keyOf(node))).toEqual(node);
   });
 
@@ -39,6 +39,7 @@ describe("what tells one component from another in the tree", () => {
       component: "sonic-broadcom",
       version: "",
       ecosystem: "",
+      namespace: "",
     });
   });
 });

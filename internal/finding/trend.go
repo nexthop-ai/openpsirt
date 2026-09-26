@@ -34,13 +34,14 @@ type Within struct {
 	// walk over one build's edges, so it is answerable only where the
 	// selection names exactly one build.
 	//
-	// BeneathVersion and BeneathEcosystem say which component, where the name
-	// means more than one. A build ships some libraries at several versions,
+	// BeneathVersion, BeneathEcosystem and BeneathNamespace say which
+	// component, where the name means more than one. A build ships some libraries at several versions,
 	// and a few at one version as two components — and with no way to say
 	// which, a subtree of either was unaskable.
 	Beneath          string
 	BeneathVersion   string
 	BeneathEcosystem string
+	BeneathNamespace string
 }
 
 // Point is what was true at one moment.
@@ -177,8 +178,11 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 			return nil, fmt.Errorf("trend beneath a component: a subtree is a walk over one"+
 				" build's edges, and %d builds are in scope", len(targets))
 		}
-		componentID, err := graph.NewStore(s.db).ComponentAs(ctx, targets[0], under,
-			strings.TrimSpace(within.BeneathVersion), strings.TrimSpace(within.BeneathEcosystem))
+		componentID, err := graph.NewStore(s.db).ComponentAs(ctx, targets[0], under, graph.Choice{
+			Version:   strings.TrimSpace(within.BeneathVersion),
+			Ecosystem: strings.TrimSpace(within.BeneathEcosystem),
+			Namespace: strings.TrimSpace(within.BeneathNamespace),
+		})
 		if err != nil {
 			// Wrapped so the caller can still see what it is: a name meaning
 			// two components is the caller's question, and reported as a fault

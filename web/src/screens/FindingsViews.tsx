@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Decide } from "../ui/Decide";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { unwrap, whichOf } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Exploited, Severity } from "../ui/Severity";
@@ -529,6 +529,8 @@ export function Peek({
   vulnerability,
   component,
   version,
+  ecosystem,
+  namespace,
   to: link,
   onDecided,
 }: {
@@ -536,18 +538,25 @@ export function Peek({
   vulnerability: string;
   component: string;
   version: string;
+  ecosystem?: string;
+  namespace?: string;
   to: string;
   // The list's own act once something has been recorded here: read itself
   // again, because the row's state has moved.
   onDecided: () => void;
 }) {
   const detail = useQuery({
-    queryKey: ["finding", at, vulnerability, component, version],
+    queryKey: ["finding", at, vulnerability, component, version, ecosystem, namespace],
     queryFn: async () =>
       unwrap(
         await api.GET(
           "/v1/products/{product}/streams/{stream}/variants/{variant}/findings/{vulnerability}/components/{component}",
-          { params: { path: { ...at, vulnerability, component }, query: { version } } },
+          {
+            params: {
+              path: { ...at, vulnerability, component },
+              query: whichOf({ version, ecosystem, namespace }),
+            },
+          },
         ),
       ),
   });
@@ -586,7 +595,7 @@ export function Peek({
           the only difference is that the list is still on screen underneath.
           Everything the form cannot show here is one link away. */}
       <Decide
-        at={{ ...at, vulnerability, component, version }}
+        at={{ ...at, vulnerability, component, version, ecosystem, namespace }}
         places={it?.places ?? []}
         undisclosed={!!it?.undisclosed}
         onDone={() => {

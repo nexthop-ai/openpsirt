@@ -76,6 +76,7 @@ export function Record() {
   // for a handful of names in a build.
   const [version, setVersion] = useState("");
   const [ecosystem, setEcosystem] = useState("");
+  const [namespace, setNamespace] = useState("");
   // The button somebody pressed, and nothing until they press one. The
   // value that is read is worked out below, because what is on offer depends
   // on a right that is not known until the session is.
@@ -195,6 +196,7 @@ export function Record() {
             ...(fromReport ? { from_report: fromReport } : told()),
             ...(version ? { version } : {}),
             ...(ecosystem ? { ecosystem } : {}),
+            ...(namespace ? { namespace } : {}),
             ...(vector ? { vector } : {}),
             ...(weaknesses.length > 0 ? { weaknesses } : {}),
             ...(disclosed ? { disclosed: true } : {}),
@@ -558,6 +560,7 @@ export function Record() {
                 setComponent(next);
                 setVersion("");
                 setEcosystem("");
+                setNamespace("");
               }}
             />
             <span className="hint">
@@ -566,7 +569,7 @@ export function Record() {
                 <>
                   {" "}
                   Recording against <b>{version}</b>
-                  {ecosystem && <> ({ecosystem})</>}.
+                  {ecosystem && <> ({[ecosystem, namespace].filter(Boolean).join("/")})</>}.
                 </>
               )}
             </span>
@@ -578,22 +581,29 @@ export function Record() {
               <span>Shipped as more than one component here. Pick the one that carries it.</span>
               <ul className="refs" style={{ marginTop: 8 }}>
                 {choices.map((choice) => (
-                  <li key={`${choice.version} ${choice.ecosystem ?? ""}`}>
+                  <li key={`${choice.version} ${choice.ecosystem ?? ""} ${choice.namespace ?? ""}`}>
                     <button
                       type="button"
                       className="chip"
                       aria-pressed={
-                        version === choice.version && ecosystem === (choice.ecosystem ?? "")
+                        version === choice.version &&
+                        ecosystem === (choice.ecosystem ?? "") &&
+                        namespace === (choice.namespace ?? "")
                       }
                       onClick={() => {
                         setVersion(choice.version);
                         setEcosystem(choice.ecosystem ?? "");
+                        setNamespace(choice.namespace ?? "");
                         record.reset();
                       }}
                     >
                       {choice.version}
                     </button>
-                    {choice.ecosystem && <span className="hint">{choice.ecosystem}</span>}
+                    {choice.ecosystem && (
+                      <span className="hint">
+                        {[choice.ecosystem, choice.namespace].filter(Boolean).join("/")}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>

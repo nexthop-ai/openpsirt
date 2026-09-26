@@ -247,9 +247,7 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 	}
 	choices := make([]graph.Choice, 0, len(rows))
 	for _, row := range rows {
-		choices = append(choices, graph.Choice{
-			Version: row.Version, Ecosystem: graph.EcosystemOf(row.Purl),
-		})
+		choices = append(choices, graph.ChoiceOf(row.Version, row.Purl))
 	}
 	return choices, nil
 }
