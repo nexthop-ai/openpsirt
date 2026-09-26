@@ -7559,6 +7559,54 @@ components:
         - previous
         - reasoning
       type: object
+    Reaffirm-manyRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Reaffirm-manyRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        claims:
+          description: The lapsed claims to re-make
+          items:
+            format: int64
+            type: integer
+          maxItems: 2000
+          minItems: 1
+          type:
+            - array
+            - "null"
+        reasoning:
+          description: The reason every one of them still holds, in markdown
+          minLength: 1
+          type: string
+      required:
+        - claims
+        - reasoning
+      type: object
+    Reaffirm-manyResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Reaffirm-manyResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        claims:
+          description: One entry per claim re-made
+          items:
+            $ref: "#/components/schemas/ReaffirmedBody"
+          type:
+            - array
+            - "null"
+      required:
+        - claims
+      type: object
     ReaffirmedBody:
       additionalProperties: false
       properties:
@@ -7584,10 +7632,15 @@ components:
           description: The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on
           format: int64
           type: integer
+        previous_claim_id:
+          description: The claim that lapsed
+          format: int64
+          type: integer
         waiting:
           description: Whether a second person has to agree
           type: boolean
       required:
+        - previous_claim_id
         - claim_id
         - decisions
         - places
@@ -9742,6 +9795,82 @@ components:
           type: string
       required:
         - name
+      type: object
+    ToReaffirmBody:
+      additionalProperties: false
+      properties:
+        claim:
+          $ref: "#/components/schemas/ClaimBody"
+        code_moved:
+          description: Whether a version moved under it
+          type: boolean
+        decision:
+          $ref: "#/components/schemas/DecisionBody"
+        decisions:
+          description: The number of its rows that lapsed
+          format: int64
+          type: integer
+        finding:
+          $ref: "#/components/schemas/FindingRefBody"
+          description: The representative decision's subject. Absent where no open finding sits at its place
+        issues:
+          description: The number of distinct issues those cover
+          format: int64
+          type: integer
+        lapsed_at:
+          description: When it lapsed
+          type: string
+        now:
+          description: How bad the issue is judged to be here now. Absent where it is unrated
+          type: string
+        place:
+          $ref: "#/components/schemas/PlaceBody"
+        places:
+          description: The number of distinct places those cover
+          format: int64
+          type: integer
+        rated_worse:
+          description: Whether the issue now sits in a higher band than when the claim was made, on a claim a severity bears on
+          type: boolean
+        reasoning:
+          description: The reasoning the claim rested on
+          type: string
+        was:
+          description: How bad the issue was judged to be when the claim was made. Absent where it was unrated
+          type: string
+      required:
+        - claim
+        - decision
+        - place
+        - reasoning
+        - decisions
+        - issues
+        - places
+        - code_moved
+        - rated_worse
+      type: object
+    ToReaffirmOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ToReaffirmOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/ToReaffirmBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+        - total
       type: object
     TokenBody:
       additionalProperties: false
@@ -12396,7 +12525,7 @@ paths:
 
         Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new claim.
 
-        One act, one approval. Where any row would need approval again — the severity has risen since it was agreed to, or nothing was ever agreed to — the whole act does. An approver works at the unit the proposer acted at, and agreeing to part of an argument they were shown whole is not review.
+        One act, one approval. Where any row would need approval again — nothing was ever agreed to, or the severity has risen since it was agreed to and the claim is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
 
         Bounded like the judgment it re-makes. The outcome comes from the claim, so re-affirming a bulk dismissal is a bulk judgment and is held to `triage.together-cap`; only a promise to upgrade goes through unbounded, because the next scan re-checks it.
 
@@ -22083,7 +22212,7 @@ paths:
 
         Only the person who made the original may do this, and it normally needs no second approver: two people already agreed to the claim, and a version upgrade is a prompt to re-check rather than a new claim.
 
-        It does need approval again if the vulnerability's severity has risen since the original was agreed to, or if nothing was ever agreed to. What was agreed was that this did not matter much, which is not an agreement about what it has become. The response says whether a second person is needed.
+        It does need approval again if nothing was ever agreed to, or if the vulnerability's severity has risen since the original was agreed to and the claim is one a severity bears on. A severity bears on every claim except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path. The response says whether a second person is needed.
 
         Where no second person is needed, the earlier agreement is carried onto the new claim and recorded as carried. The approver named agreed to the previous claim's reasoning, not to what is written here.
 
@@ -23546,6 +23675,48 @@ paths:
         - Ingest
       x-openpsirt-requires:
         scope: deployment
+  /v1/reaffirmations:
+    post:
+      description: |-
+        Re-makes each claim named, as one act with one reasoning. Name claims from `GET /v1/to-reaffirm`.
+
+        Each claim is re-made whole, exactly as re-affirming it alone does: every lapsed place at the versions it has now, keeping the claim's own outcome, justification and dates, and carrying its earlier agreement.
+
+        Whether a second person has to agree is decided per claim, by the rules re-affirming one claim follows. `waiting` on each entry says which.
+
+        Only the person who made a claim may re-affirm it. Where somebody else made any of them the whole act is refused, naming the issues. A claim with no lapsed row that nothing has replaced answers as though it were not there.
+
+        Bounded. At most 2000 claims per request, and every finding the act writes, across every claim, counts against `triage.together-cap`. A promise to upgrade is not counted. `reasoning` is required.
+
+        Requires: public-triage or private-triage
+      operationId: reaffirm-many
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Reaffirm-manyRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reaffirm-manyResponse"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Re-affirm several lapsed claims
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: person
+        any_of:
+          - public-triage
+          - private-triage
   /v1/releases/out-of-support:
     get:
       description: |-
@@ -24841,6 +25012,53 @@ paths:
         - Administration
       x-openpsirt-requires:
         scope: deployment
+  /v1/to-reaffirm:
+    get:
+      description: |-
+        Returns the claims you proposed that lapsed and that nothing has replaced, newest lapse first: the claims that are yours to re-affirm.
+
+        A claim lapses when a version moves under it, and when the issue is rated into a higher band on a claim a severity bears on. `code_moved` and `rated_worse` say which, and both can hold.
+
+        Narrowed to the claims you may still argue about.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may act on.
+      operationId: list-to-reaffirm
+      parameters:
+        - explode: false
+          in: query
+          name: limit
+          schema:
+            default: 50
+            format: int64
+            maximum: 200
+            minimum: 1
+            type: integer
+        - explode: false
+          in: query
+          name: offset
+          schema:
+            format: int64
+            minimum: 0
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToReaffirmOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List your lapsed claims
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may act on.
   /v1/tokens:
     get:
       description: |-

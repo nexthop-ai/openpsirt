@@ -11,13 +11,14 @@ import (
 )
 
 // judged claims something with a severity recorded against it, which is what a
-// later re-affirmation compares itself to.
+// later re-affirmation compares itself to. The reason is one a severity bears
+// on, so a rise escalates it.
 func (f *fixture) judged(t *testing.T, at triage.Place, severity int) *triage.Decision {
 	t.Helper()
 	decision, err := f.store.Propose(t.Context(), f.triager, triage.Proposal{
 		Place: at, Outcome: triage.NotApplicable,
-		Justification: triage.CodeNotInExecutePath,
-		Reasoning:     "The parser is never reached.",
+		Justification: triage.CodeNotReachableByAdversary,
+		Reasoning:     "Nothing an attacker sends reaches the parser.",
 		By:            f.proposer, SeverityCenti: severity,
 		NeedsApproval: true,
 	})
@@ -88,6 +89,77 @@ func TestSeverityRisingSendsItBackForFullApproval(t *testing.T) {
 		}
 		if again.State == triage.Approved {
 			t.Error("a claim about a much worse issue inherited the old agreement")
+		}
+	})
+}
+
+func TestASeverityRiseEscalatesOnlyAClaimItBearsOn(t *testing.T) {
+	// Code that is absent or never runs is not dangerous at any severity, and
+	// a fix that already ships is there whatever the rating says. Every other
+	// claim accepts a risk the severity measures, or argues against an attack
+	// a higher rating may have made possible.
+	cases := []struct {
+		name          string
+		outcome       triage.Outcome
+		justification triage.Justification
+		mitigation    string
+		fixedVersion  string
+		escalates     bool
+	}{
+		{name: "component not present", outcome: triage.NotApplicable,
+			justification: triage.ComponentNotPresent},
+		{name: "code not present", outcome: triage.NotApplicable,
+			justification: triage.CodeNotPresent},
+		{name: "not in execute path", outcome: triage.NotApplicable,
+			justification: triage.CodeNotInExecutePath},
+		{name: "already fixed", outcome: triage.AlreadyFixed, fixedVersion: "1.2.3-4"},
+		{name: "not reachable by adversary", outcome: triage.NotApplicable,
+			justification: triage.CodeNotReachableByAdversary, escalates: true},
+		{name: "mitigations exist", outcome: triage.NotApplicable,
+			justification: triage.MitigationsExist, mitigation: "The port is firewalled.",
+			escalates: true},
+		{name: "won't fix", outcome: triage.WontFix, escalates: true},
+	}
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		agreed := make([]*triage.Decision, len(cases))
+		for i, c := range cases {
+			at := f.at()
+			at.PlaceIdentity = "place-" + c.name
+			decision, err := f.store.Propose(ctx, f.triager, triage.Proposal{
+				Place: at, Outcome: c.outcome, Justification: c.justification,
+				Mitigation: c.mitigation, FixedVersion: c.fixedVersion,
+				Reasoning: "Judged at the old version.", By: f.proposer,
+				SeverityCenti: 400, NeedsApproval: true,
+			})
+			if err != nil {
+				t.Fatalf("%s: %v", c.name, err)
+			}
+			if err := agreeTo(ctx, f.store, f.reviewer, decision.ClaimID, ""); err != nil {
+				t.Fatalf("%s: %v", c.name, err)
+			}
+			agreed[i] = decision
+		}
+		if _, err := f.db.DB.NewUpdate().Table("vulnerability").
+			Set("score_centi = ?", 950).
+			Where("id = ?", f.issue).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		for i, c := range cases {
+			moved := f.at()
+			moved.PlaceIdentity = "place-" + c.name
+			moved.ComponentUpstream = "1.2.4"
+			again, err := f.store.Reaffirm(ctx, f.triager, triage.Reaffirmation{
+				PreviousID: agreed[i].ID, Place: moved,
+				Reasoning: "Checked again at the new version.", By: f.proposer,
+			})
+			if err != nil {
+				t.Fatalf("%s: %v", c.name, err)
+			}
+			if waits := again.State != triage.Approved; waits != c.escalates {
+				t.Errorf("%s: after a severity rise it waits for a second person = %v, want %v",
+					c.name, waits, c.escalates)
+			}
 		}
 	})
 }

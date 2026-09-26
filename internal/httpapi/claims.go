@@ -211,10 +211,11 @@ func noSuchClaim() error {
 
 // ReaffirmedBody is the record of one bulk re-affirmation.
 type ReaffirmedBody struct {
-	ClaimID   int64   `json:"claim_id" doc:"The claim this action made, which is what a second person agrees to where one is needed"`
-	Decisions []int64 `json:"decisions"`
-	Places    int     `json:"places" doc:"The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
-	Waiting   bool    `json:"waiting" doc:"Whether a second person has to agree"`
+	PreviousClaimID int64   `json:"previous_claim_id" doc:"The claim that lapsed"`
+	ClaimID         int64   `json:"claim_id" doc:"The claim this action made, which is what a second person agrees to where one is needed"`
+	Decisions       []int64 `json:"decisions"`
+	Places          int     `json:"places" doc:"The number of distinct places it covers. A place at two versions in two builds is two decisions, because the versions are what a decision expires on"`
+	Waiting         bool    `json:"waiting" doc:"Whether a second person has to agree"`
 }
 
 // registerReaffirmClaim re-makes everything one action claimed.
@@ -233,10 +234,12 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 			"Only the person who made the original may do this. It normally needs no second " +
 			"approver, for the reason the single form does not: two people already agreed, and " +
 			"a version upgrade is a prompt to re-check rather than a new claim.\n\n" +
-			"One act, one approval. Where any row would need approval again — the " +
-			"severity has risen since it was agreed to, or nothing was ever agreed to — the " +
-			"whole act does. An approver works at the unit the proposer acted at, and agreeing " +
-			"to part of an argument they were shown whole is not review.\n\n" +
+			"One act, one approval. Where any row would need approval again — nothing was " +
+			"ever agreed to, or the severity has risen since it was agreed to and the claim " +
+			"is one a severity bears on — the whole act does. An approver works at the unit " +
+			"the proposer acted at. A severity bears on every claim except `already-fixed`, " +
+			"and `not-applicable` because the component or the vulnerable code is not present " +
+			"or not in the execute path.\n\n" +
 			"Bounded like the judgment it re-makes. The outcome comes from the claim, so " +
 			"re-affirming a bulk dismissal is a bulk judgment and is held to " +
 			"`triage.together-cap`; only a promise to upgrade goes through unbounded, because " +
@@ -275,10 +278,7 @@ func registerReaffirmClaim(api huma.API, in Ingest) {
 			}
 			return nil, refusedDecision(in.Logger, err)
 		}
-		return &struct{ Body ReaffirmedBody }{Body: ReaffirmedBody{
-			ClaimID: made.ClaimID, Decisions: made.Decisions,
-			Places: made.Places, Waiting: made.Waiting,
-		}}, nil
+		return &struct{ Body ReaffirmedBody }{Body: reaffirmedBody(made)}, nil
 	})
 }
 

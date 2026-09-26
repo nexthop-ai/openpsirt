@@ -617,10 +617,12 @@ func registerPlaceDecisions(api huma.API, in Ingest) {
 			"Only the person who made the original may do this, and it normally needs no second " +
 			"approver: two people already agreed to the claim, and a version upgrade is a prompt to " +
 			"re-check rather than a new claim.\n\n" +
-			"It does need approval again if the vulnerability's severity has risen since the " +
-			"original was agreed to, or if nothing was ever agreed to. What was agreed was " +
-			"that this did not matter much, which is not an agreement about what it has " +
-			"become. The response says whether a second person is needed.\n\n" +
+			"It does need approval again if nothing was ever agreed to, or if the " +
+			"vulnerability's severity has risen since the original was agreed to and the " +
+			"claim is one a severity bears on. A severity bears on every claim except " +
+			"`already-fixed`, and `not-applicable` because the component or the vulnerable " +
+			"code is not present or not in the execute path. The response says whether a " +
+			"second person is needed.\n\n" +
 			"Where no second person is needed, the earlier agreement is carried onto the new " +
 			"claim and recorded as carried. The approver named agreed to the previous " +
 			"claim's reasoning, not to what is written here.\n\n" +

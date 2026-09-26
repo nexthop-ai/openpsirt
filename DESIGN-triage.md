@@ -330,6 +330,8 @@ not first.
 | Withdraw | The claim. Taking back part of an argument is setting rows aside, which is a different act with a different record |
 | Comment | The claim. A note on one place of forty-four is one nobody else reading the claim would see |
 | Re-affirm | One place. A version moved under one row and not the others, so what is being re-made is that row's judgment |
+| Re-affirm the whole claim | The claim, where every row lapsed under one bump |
+| Re-affirm many | Several lapsed claims of one person's, each re-made as its own claim |
 
 Recording in bulk and changing your mind one row at a time was the split, and it
 was the wrong middle. Approval was already claim-scoped while revising,
@@ -918,6 +920,7 @@ is one act at the grain the claim was made at.
 | The claimant's, and nobody else's | An approver doing it becomes proposer of the new claim while their own earlier agreement is carried onto it, which is one person on both sides of the control |
 | Any row escalating sends the whole act back | An approver works at the unit the proposer acted at (REQ-28). Asked per row, an act covering 45 places could write 44 standing decisions and one waiting, which is agreeing to part of an argument somebody was shown whole |
 | The carried agreement is one row, taking effect on all of them together | An agreement is an agreement to a claim's words. Recorded per decision, one person agreeing once would appear in the record 45 times; taking effect per decision, half the act could stand while half waited |
+| A row a later decision of another claim replaced is not re-made | The later one is what the place last said: the claim that re-made it, a fresh judgment, or one somebody made and withdrew. Re-making the earlier row writes a second live claim where the later one stands, or brings back a judgment somebody took back. Rows of one claim at two versions of one place are one judgment and do not replace each other |
 
 The lapsed population is reached by the findings list's `lapsed` state, and the
 act itself sits on the claim.
@@ -1003,6 +1006,20 @@ moved out from under, and those land in the review queue as work.
 | Failing to mark is reported and not fatal | What the scan found is recorded and correct; the marking is a prompt, and losing a scan over a prompt is the wrong trade |
 | A decision lapses when *either* version moves | Marked once the last build in the product holding its versions has moved, not when the first does |
 
+A claim also lapses when its issue is rated worse, where it is a claim a
+severity bears on (REQ-25). § Re-affirmation says which claims those are and
+what rated worse means.
+
+| Rule | |
+|---|---|
+| Swept after every scan, over the issues the build has open | An issue is one row for the deployment, so one build's report can raise the rating a claim in another product was made against |
+| Swept when a rating is put in force here, agreed to or withdrawn | Withdrawing a milder rating puts the published one back, which can be worse |
+| Proposed claims lapse as well as approved ones | Agreed to afterwards, a claim made against the lower rating would stand on a baseline that is already wrong |
+| Compared per claim, per issue, per product | The rating in force is each product's own |
+| The proposer is told why | `DESIGN-notifications.md` § Claim outcomes |
+| Why a claim lapsed is worked out when it is read, not stored | A version that no longer matches anything open and a rating in a higher band are both facts about the present. Both can hold |
+| Failing to mark is reported and not fatal | The rating is recorded and correct; the lapse is a prompt |
+
 What has **stopped standing** is one question, not two. A lapsed decision and a
 deferral whose date has passed are separate mechanisms — a version bump does not
 change a judgment about priority, and a calendar does not change one about
@@ -1023,7 +1040,26 @@ Two things send it back for full approval:
 | | |
 |---|---|
 | **Nobody agreed to the previous claim** | There is nothing to carry. Asked of the *agreements on the row* and never of its state: a claim lapses from proposed as well as from approved, so reading "lapsed" as evidence of agreement let one person propose a dismissal, wait for a version bump, re-affirm it, and have it stand needing nobody and appearing in no queue |
-| **A severity that has risen since** | What was agreed was that this did not matter much; that is not an agreement about what it has become |
+| **A severity that has risen since, on a claim it bears on** | What was agreed was that this did not matter much; that is not an agreement about what it has become |
+
+Which claims a risen severity bears on:
+
+| Claim | Bears on it | |
+|---|---|---|
+| Not applicable: component not present | No | Absent code is not dangerous at any severity |
+| Not applicable: vulnerable code not present | No | The same |
+| Not applicable: not in execute path | No | Code that never runs is not dangerous at any severity |
+| Already fixed | No | The fix ships whatever the rating says |
+| Not applicable: cannot be controlled by an adversary | Yes | A higher rating is often a new way in |
+| Not applicable: inline mitigations exist | Yes | A mitigation is weighed against what the issue lets an attacker do |
+| Deferred, won't fix | Yes | Both accept the risk, and the severity is the risk |
+| Upgrade needed, patch needed | Yes | Both accept the risk until their date |
+
+Rated worse means a higher band — low, medium, high, critical — and never a
+higher score within one. A rescoring from 7.5 to 7.6 is the same judgment about
+the same issue. A claim made about an unrated issue is measured from medium, the
+way a deadline reads one. The same rule lapses a standing claim when its issue is
+rated worse (§ Lapse marking).
 
 The reasoning is the re-affirmer's own and nobody else has read it, so the
 agreement carried onto the new claim names the agreement it came from. What is
@@ -1045,6 +1081,35 @@ above.
 | What may be carried is read from the row, not from what a caller supplied | A caller holding a stale copy would carry an agreement since withdrawn; a caller inventing one would carry an agreement that never existed. A withdrawn decision keeps its approval rows, so without this a version bump would undo a withdrawal |
 | All of it is one transaction | Written as three steps, a process stopping in the middle leaves a claim standing that nobody agreed to and that no review queue shows |
 | The carried agreement is guarded on the revision | An agreement is an agreement to particular words |
+
+### Re-affirmation across claims
+
+A version bump on a large component lapses many claims at once. A kernel stable
+release lapses every kernel decision, a distribution point release moves many
+packages together, and a new release branch picks up newer versions of
+everything. Each lapsed claim is a separate argument with its own outcome and
+justification, so the whole-action form still leaves one act per claim.
+
+One act re-makes several lapsed claims of one person's.
+
+| Rule | |
+|---|---|
+| The claims are the person's own lapsed claims that nothing replaced | Listed for them, and the lapse message links there. Work handed back is found without searching for it |
+| Claims are named; their rows are resolved here | The rows of one claim are resolved the way the whole-action form resolves them. A claim with no lapsed row that nothing replaced answers as one that is not there |
+| Each claim is re-made whole, by the rules re-affirming it alone follows | Its own outcome, justification, dates and version, at the versions each place has now, carrying its own earlier agreement |
+| One reasoning, shared by every claim | The reason is what somebody checked. The argument is each claim's own |
+| A second person is decided per claim | Each claim carries its own earlier agreement, so one that needs a second look says nothing about the others. Within a claim, any row escalating still sends the whole claim back (REQ-28) |
+| A claim somebody else made refuses the whole act, naming its issues | Re-affirming is the claimant's right. Named, the rows can be taken out of the selection |
+| Authorization is asked of every row before anything is said about who made it | A claim the subject may not act on answers as though it were not there (REQ-42) |
+| The cap counts every judgment the act writes, across every claim | Bound what is written. Held per claim, many claims each under the cap write as much as they like under one sentence (REQ-27). A promise to upgrade is not counted |
+| Refused whole or written whole | One transaction. A selection half re-made is a selection somebody has to work out again |
+
+The response says, per claim, which claim lapsed, which re-makes it, and whether
+it waits for a second person.
+
+The claims are re-made one after another inside the transaction, a bounded number
+of statements each. Measured: 300 claims at two places each in 0.25 s on SQLite
+and 2.3 s on PostgreSQL.
 
 ## Comments and reasoning
 

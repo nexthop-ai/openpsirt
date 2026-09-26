@@ -493,6 +493,61 @@ func TestARebuildThatMovedNothingMarksNothing(t *testing.T) {
 	})
 }
 
+func TestAScanRatingAnIssueWorseLapsesAClaimTheRatingBearsOn(t *testing.T) {
+	// A judgment that something does not matter much is not a judgment about
+	// what it has become (REQ-25). Nothing moved in the build; the report
+	// raised the issue from high to critical, and the proposer is told why.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		f.scan(t, libnl)
+		decided := f.decided(t)
+		// A claim a severity bears on, made against the rating the issue had.
+		if _, err := f.db.DB.NewUpdate().Table("claim").
+			Set("justification = ?", string(triage.CodeNotReachableByAdversary)).
+			Where(`id = (SELECT claim_id FROM "decision" WHERE id = ?)`, decided).
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Table("decision").
+			Set("severity_centi = ?", 800).Where("id = ?", decided).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+
+		f.rebuilt(t, libnl)
+		f.waiting(t)
+		s := &stub{reported: []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "critical", Score: 9.8},
+			Component: libnl, FixState: finding.FixedUpstream, FixedIn: "3.9.0",
+		}}}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		outcome, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").
+			Telling(notify.Lapses(f.db.DB, quiet)).Once(t.Context())
+		if err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		if outcome.Lapsed != 1 {
+			t.Errorf("a scan rating the issue worse marked %d judgments, want 1", outcome.Lapsed)
+		}
+
+		author, err := access.NewStore(f.db.DB).Resolve(t.Context(), "proposer")
+		if err != nil {
+			t.Fatal(err)
+		}
+		waiting, _, err := notify.NewStore(f.db.DB).Waiting(t.Context(), author, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		told := false
+		for _, one := range waiting {
+			if one.Kind == notify.ClaimLapsed && strings.Contains(one.Body, "rated worse") {
+				told = true
+			}
+		}
+		if !told {
+			t.Error("the proposer was not told the issue was rated worse")
+		}
+	})
+}
+
 func TestAScanCutShortByShutdownHandsItsJobBack(t *testing.T) {
 	// A shutdown cancels the scan. The job is handed back and the run is
 	// closed with the same context the scan was canceled with, so without

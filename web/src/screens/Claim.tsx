@@ -314,7 +314,7 @@ function Reaffirm({
         <h3>Re-affirm</h3>
       </header>
       <p className="reading" style={{ marginTop: 0 }}>
-        The code moved. Reaffirming re-makes every place at today's versions.
+        It lapsed. Reaffirming re-makes every place at today's versions.
       </p>
       <textarea
         rows={3}

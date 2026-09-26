@@ -334,8 +334,14 @@ having taken a judgment out of force.
 The lapse message is wired at the deployment rather than inside the scan. What a
 scan does and how anybody hears about it are separate concerns, and this package
 reads what has been ingested, so a scanner reaching it directly would close a
-cycle. It links to the decision rather than the finding, because naming the finding
-needs somebody to read it as, and nobody is acting.
+cycle.
+
+| Lapse message | |
+|---|---|
+| One per person per sweep, counting their rows | A version bump lapses many claims at once, and one message per claim is a channel nobody reads |
+| Says why: the code moved, or the issue was rated worse | The two ask different things of the person re-affirming. `DESIGN-triage.md` § Lapse marking holds both |
+| Links to the review queue's To reaffirm tab | The work is re-affirming every claim that lapsed, not reading one of them. A link to one decision of three hundred leaves the rest to be found |
+| Sent by the scan's sweep and by a rating put in or out of force here | The two places a claim can lapse |
 
 ## The digest
 
